@@ -47,18 +47,26 @@ class ConnectServerTool(MCPServerTool):
             # Set as active server
             self.server_manager.active_server = server_name
 
-            # Initialize server tools if not already initialized
+            # Initialize server tools, resources, and prompts if not already initialized
             if server_name not in self.server_manager._server_tools:
                 connector = session.connector
-                self.server_manager._server_tools[
-                    server_name
-                ] = await self.server_manager.adapter._create_tools_from_connectors([connector])
+                tools = await self.server_manager.adapter._create_tools_from_connectors([connector])
+                resources = await self.server_manager.adapter._create_resources_from_connectors([connector])
+                prompts = await self.server_manager.adapter._create_prompts_from_connectors([connector])
+                all_tools = tools + resources + prompts
+                self.server_manager._server_tools[server_name] = all_tools
                 self.server_manager.initialized_servers[server_name] = True
+                logger.debug(
+                    f"Loaded {len(all_tools)} items for server '{server_name}': "
+                    f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts"
+                )
 
             server_tools = self.server_manager._server_tools.get(server_name, [])
             num_tools = len(server_tools)
 
-            return f"Connected to MCP server '{server_name}'. {num_tools} tools are now available."
+            return (
+                f"Connected to MCP server '{server_name}'. {num_tools} tools, resources, and prompts are now available."
+            )
 
         except Exception as e:
             logger.error(f"Error connecting to server '{server_name}': {e}")

@@ -297,12 +297,12 @@ Extended API
 ```typescript
 interface CreateMessageResult {
   role: 'assistant';
-  content: Array<{
+  content: {
     type: 'text' | 'image';
     text?: string;
     data?: string;
     mimeType?: string;
-  }>;
+  };
   model: string;
   stopReason?: 'endTurn' | 'maxTokens' | 'stopSequence';
 }

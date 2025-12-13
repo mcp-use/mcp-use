@@ -465,25 +465,18 @@
                 "icon": "brain",
                 "pages": [
                   "typescript/agent/index",
+                  "typescript/agent/agent-configuration",
                   {
                     "group": "Core Concepts",
                     "icon": "box",
                     "pages": [
-                      "typescript/agent/agent-configuration",
                       "typescript/agent/llm-integration",
-                      "typescript/agent/server-manager"
-                    ]
-                  },
-                  {
-                    "group": "Features",
-                    "icon": "sparkle",
-                    "pages": [
+                      "typescript/agent/memory-management",
+                      "typescript/agent/server-manager",
                       "typescript/agent/structured-output",
-                      "typescript/agent/streaming",
-                      "typescript/agent/interactive-chat-patterns"
+                      "typescript/agent/streaming"
                     ]
                   },
-                  "typescript/agent/building-custom-agents",
                   "typescript/agent/observability"
                 ]
               },
@@ -492,6 +485,8 @@
                 "icon": "router",
                 "pages": [
                   "typescript/client/index",
+                  "typescript/client/client-configuration",
+                  "typescript/client/environments",
                   {
                     "group": "Core Components",
                     "icon": "box",
@@ -502,24 +497,15 @@
                     ]
                   },
                   {
-                    "group": "Connection",
-                    "icon": "cable",
-                    "pages": [
-                      "typescript/client/client-configuration",
-                      "typescript/client/connection-types",
-                      "typescript/client/sandbox",
-                      "typescript/client/multi-server-setup"
-                    ]
-                  },
-                  {
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/client/cli",
+                      "typescript/client/server-manager",
                       "typescript/client/sampling",
                       "typescript/client/elicitation",
                       "typescript/client/notifications",
-                      "typescript/client/logging",
-                      "typescript/client/direct-tool-calls"
+                      "typescript/client/logging"
                     ]
                   },
                   "typescript/client/authentication",
@@ -533,6 +519,7 @@
                 "tag": "Beta",
                 "pages": [
                   "typescript/server/index",
+                  "typescript/server/configuration",
                   {
                     "group": "Core Components",
                     "icon": "box",
@@ -562,7 +549,6 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
-                      "typescript/server/configuration",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",

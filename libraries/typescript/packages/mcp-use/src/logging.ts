@@ -225,7 +225,7 @@ export class Logger {
           timestamp({ format: "HH:mm:ss" }),
           this.getFormatter()
         ),
-        transports: [],
+        transports: [new winston.transports.Console()],
       });
     }
 

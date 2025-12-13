@@ -32,12 +32,13 @@ async function runAirbnbExample() {
 
   try {
     // Run a query to search for accommodations
-    const result = await agent.run(
-      "Find me a nice place to stay in Barcelona for 2 adults " +
+    const result = await agent.run({
+      prompt:
+        "Find me a nice place to stay in Barcelona for 2 adults " +
         "for a week in August. I prefer places with a pool and " +
         "good reviews. Show me the top 3 options.",
-      30
-    );
+      maxSteps: 30,
+    });
     console.error(`\nResult: ${result}`);
   } finally {
     // Ensure we clean up resources properly

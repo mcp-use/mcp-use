@@ -1,7 +1,7 @@
 ---
 title: "Sampling"
 description: "Enable tools to request LLM completions"
-icon: "sparkles"
+icon: "pipette"
 ---
 
 Sampling enables MCP tools to request LLM completions during their execution. This powerful feature allows servers to dynamically generate content, make decisions, or process data using AI models while executing tool calls.
@@ -18,6 +18,29 @@ Sampling creates a callback mechanism where:
 2. Server requests an LLM completion from the client
 3. Client executes the LLM call and returns results
 4. Server continues execution with the LLM response
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant LLM
+
+    Client->>Server: 1. Call tool
+    activate Server
+    Server->>Client: 2. Request LLM completion (sampling)
+    deactivate Server
+    activate Client
+    Client->>LLM: 3. Execute LLM call
+    activate LLM
+    LLM-->>Client: LLM response
+    deactivate LLM
+    Client-->>Server: 4. Return results
+    deactivate Client
+    activate Server
+    Server->>Server: Continue execution with response
+    Server-->>Client: Tool result
+    deactivate Server
+```
 
 This pattern is useful for:
 - Content generation within tools
@@ -44,8 +67,14 @@ async function samplingCallback(
     ? lastMessage.content[0] 
     : lastMessage.content
   
-  // Call your LLM
-  const response = await yourLlm.complete(content.text)
+  // Call your LLM with optional parameters
+  const response = await yourLlm.complete({
+    text: content.text,
+    systemPrompt: params.systemPrompt,
+    maxTokens: params.maxTokens,
+    temperature: params.temperature,
+    stopSequences: params.stopSequences,
+  })
 
   return {
     role: 'assistant',
@@ -60,171 +89,101 @@ const client = new MCPClient(config, {
 })
 ```
 
-```typescript TypeScript
-// Using with React hook
-import { useMcp } from 'mcp-use/react'
-
-function MyComponent() {
-  const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    samplingCallback: async (params) => {
-      // Your sampling implementation
-      const response = await yourLlm.complete(params.messages[0].content.text)
-      return {
-        role: 'assistant',
-        content: { type: 'text', text: response },
-        model: 'your-model-name',
-        stopReason: 'endTurn'
-      }
-    }
-  })
-  
-  // ... rest of component
-}
-```
 </CodeGroup>
 
-## Creating Sampling-Enabled Tools
+## Type Definitions
 
-When building MCP servers, tools can request sampling using the context parameter:
+### CreateMessageRequestParams
 
-```typescript
-import { MCPServer } from 'mcp-use/server'
-import type { ToolContext } from 'mcp-use/server'
-
-const server = new MCPServer({
-  name: 'MyServer',
-  version: '1.0.0'
-})
-
-server.tool({
-  name: 'analyze-sentiment',
-  description: 'Analyze the sentiment of text using the client\'s LLM',
-  inputs: [
-    { name: 'text', type: 'string', required: true }
-  ],
-  cb: async (params, ctx?: ToolContext) => {
-    if (!ctx) {
-      throw new Error('Sampling not available - client does not support sampling')
-    }
-
-    // Request LLM analysis through sampling
-    const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral.
-Just output a single word - 'positive', 'negative', or 'neutral'.
-
-Text to analyze: ${params.text}`
-
-    // Request LLM analysis through sampling
-    // By default, this waits indefinitely and sends progress notifications every 5s
-    const result = await ctx.sample({
-      messages: [{
-        role: 'user',
-        content: { type: 'text', text: prompt }
-      }],
-      modelPreferences: {
-        intelligencePriority: 0.8,
-        speedPriority: 0.5
-      }
-    })
-
-    // Extract text from result
-    const content = Array.isArray(result.content) 
-      ? result.content[0] 
-      : result.content
-    
-    return {
-      content: [{
-        type: 'text',
-        text: content.text || 'Unable to analyze sentiment'
-      }]
-    }
-  }
-})
-```
-
-## Automatic Progress Reporting
-
-The `ctx.sample()` function automatically handles progress reporting to prevent client-side timeouts during long-running operations.
-
-- **Automatic Progress**: By default, it sends a progress notification every 5 seconds.
-- **Timeout Handling**: If the client has `resetTimeoutOnProgress: true` enabled, these notifications keep the connection alive indefinitely.
-- **Configuration**: You can customize the timeout and progress interval:
+The params object passed to your sampling callback includes:
 
 ```typescript
-const result = await ctx.sample(
-  {
-    messages: [{ role: 'user', content: { type: 'text', text: prompt } }]
-  },
-  {
-    // Optional: Limit wait time (default: Infinity)
-    timeout: 120000, // 2 minutes
-    
-    // Optional: Change progress interval (default: 5000ms)
-    progressIntervalMs: 2000,
-    
-    // Optional: Custom progress handling
-    onProgress: ({ progress, message }) => console.log(message)
-  }
-)
+interface CreateMessageRequestParams {
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: {
+      type: 'text' | 'image';
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    };
+  }>;
+  
+  // Optional model preferences
+  modelPreferences?: {
+    hints?: Array<{ name?: string }>;
+    costPriority?: number;       // 0.0 to 1.0
+    speedPriority?: number;       // 0.0 to 1.0
+    intelligencePriority?: number; // 0.0 to 1.0
+  };
+  
+  // Optional parameters
+  systemPrompt?: string;
+  maxTokens?: number;
+  temperature?: number;
+  stopSequences?: string[];
+  includeContext?: 'none' | 'thisServer' | 'allServers';
+  metadata?: Record<string, unknown>;
+}
 ```
 
-## Using createMessage Directly
+### CreateMessageResult
 
-You can also use `server.createMessage()` directly if you need more control:
+Your callback must return this structure:
 
 ```typescript
-const server = new MCPServer({
-  name: 'MyServer',
-  version: '1.0.0'
-})
-
-server.tool({
-  name: 'custom-llm-task',
-  description: 'Perform a custom LLM task',
-  inputs: [{ name: 'query', type: 'string', required: true }],
-  cb: async (params) => {
-    // Use server.createMessage() directly
-    const result = await server.createMessage({
-      messages: [{
-        role: 'user',
-        content: { type: 'text', text: params.query }
-      }],
-      systemPrompt: 'You are a helpful assistant.',
-      maxTokens: 100
-    })
-
-    return {
-      content: [{
-        type: 'text',
-        text: result.content.text || ''
-      }]
-    }
-  }
-})
+interface CreateMessageResult {
+  role: 'assistant';
+  content: {
+    type: 'text' | 'image';
+    text?: string;      // For text content
+    data?: string;      // For image content (base64)
+    mimeType?: string;  // For image content
+  };
+  model: string;
+  stopReason?: 'endTurn' | 'maxTokens' | 'stopSequence';
+}
 ```
 
-## Error Handling
-
-If no sampling callback is provided but a tool requests sampling:
+### Example with Model Preferences
 
 ```typescript
-// The server will receive an error from the client
-// indicating that sampling is not supported
-
-server.tool({
-  name: 'needs-sampling',
-  cb: async (params, ctx) => {
-    try {
-      const result = await ctx?.sample({ messages: [...] })
-      return { content: [{ type: 'text', text: result.content.text }] }
-    } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error: Client does not support sampling - ${error.message}`
-        }]
-      }
-    }
+async function samplingCallback(
+  params: CreateMessageRequestParams
+): Promise<CreateMessageResult> {
+  // Handle model preferences if provided
+  let modelName = 'default-model';
+  
+  if (params.modelPreferences?.hints?.[0]?.name) {
+    modelName = params.modelPreferences.hints[0].name;
+  } else if (params.modelPreferences?.intelligencePriority > 0.8) {
+    modelName = 'gpt-4';
+  } else if (params.modelPreferences?.speedPriority > 0.8) {
+    modelName = 'gpt-3.5-turbo';
   }
-})
+
+  const lastMessage = params.messages[params.messages.length - 1];
+  const content = Array.isArray(lastMessage.content)
+    ? lastMessage.content[0]
+    : lastMessage.content;
+
+  const response = await yourLlm.complete({
+    model: modelName,
+    text: content.text,
+    systemPrompt: params.systemPrompt,
+    maxTokens: params.maxTokens,
+    temperature: params.temperature,
+  });
+
+  return {
+    role: 'assistant',
+    content: { type: 'text', text: response },
+    model: modelName,
+    stopReason: 'endTurn'
+  };
+}
 ```
+
+<Tip>
+To check how to create sampling-enabled tools, see the [Server Tools Guide](../server/sampling).
+</Tip>

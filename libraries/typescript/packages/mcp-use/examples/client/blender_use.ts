@@ -33,10 +33,11 @@ async function runBlenderExample() {
 
   try {
     // Run the query
-    const result = await agent.run(
-      "Create an inflatable cube with soft material and a plane as ground.",
-      30
-    );
+    const result = await agent.run({
+      prompt:
+        "Create an inflatable cube with soft material and a plane as ground.",
+      maxSteps: 30,
+    });
     console.error(`\nResult: ${result}`);
   } finally {
     // Ensure we clean up resources properly

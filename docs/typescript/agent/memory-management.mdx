@@ -1,0 +1,104 @@
+---
+title: Memory Management
+description: Learn how to manage conversation memory in MCPAgent with different memory modes
+icon: memory-stick
+---
+
+MCPAgent provides flexible memory management options to control how conversation history is handled. You can choose between different memory strategies depending on your use case.
+
+## Memory Modes
+
+### 1. Self-Managed Memory (`memoryEnabled: true`)
+
+When `memoryEnabled` is set to `true` (the default), the agent automatically manages conversation history internally. This is the simplest option for most use cases.
+
+```typescript
+import { MCPAgent, MCPClient } from "mcp-use";
+import { ChatOpenAI } from "@langchain/openai";
+
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"]
+    }
+  }
+});
+
+const llm = new ChatOpenAI({ model: "gpt-4o" });
+
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: true  // Agent manages memory internally (default)
+});
+
+// The agent will automatically maintain conversation context
+const response1 = await agent.run("Hello, my name is Alice");
+const response2 = await agent.run("What's my name?");  // Agent remembers Alice
+
+await client.closeAllSessions();
+```
+
+### 2. No Memory (`memoryEnabled: false`)
+
+When `memoryEnabled` is set to `false`, the agent has no internal memory and treats each interaction independently.
+
+```typescript
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: false  // No internal memory
+});
+
+// Each interaction is independent
+const response1 = await agent.run("Hello, my name is Alice");
+const response2 = await agent.run("What's my name?");  // Agent doesn't remember Alice
+
+await client.closeAllSessions();
+```
+
+## Memory Management Methods
+
+The MCPAgent provides methods to inspect and control conversation history:
+
+### `getConversationHistory()`
+
+Returns a copy of the current conversation history as an array of messages.
+
+```typescript
+const history = agent.getConversationHistory();
+console.log(`Current history has ${history.length} messages`);
+
+// Inspect message types
+for (const message of history) {
+  console.log(message.constructor.name, message.content);
+}
+```
+
+### `clearConversationHistory()`
+
+Clears the internal conversation history. If `memoryEnabled` is true and a system message exists, it will be preserved.
+
+```typescript
+// Clear conversation history
+agent.clearConversationHistory();
+console.log("Conversation history cleared");
+
+// Start fresh conversation
+const response = await agent.run("Start a new conversation");
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
+    Learn more about configuring agents
+  </Card>
+  <Card title="Structured Output" icon="brackets-curly" href="/typescript/agent/structured-output">
+    Generate type-safe responses with Zod schemas
+  </Card>
+  <Card title="Streaming" icon="wave-pulse" href="/typescript/agent/streaming">
+    Stream agent responses in real-time
+  </Card>
+</CardGroup>

@@ -17,7 +17,6 @@ import { BaseConnector } from "./src/connectors/base.js";
 import type { NotificationHandler } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
 import { StdioConnector } from "./src/connectors/stdio.js";
-import { WebSocketConnector } from "./src/connectors/websocket.js";
 
 import { Logger, logger } from "./src/logging.js";
 import {
@@ -29,7 +28,7 @@ import {
 } from "./src/session.js";
 import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
-export { BaseAdapter, LangChainAdapter } from "./src/adapters/index.js";
+export { BaseAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
 export * from "./src/agents/utils/index.js";
 export { ServerManager } from "./src/managers/server_manager.js";
@@ -92,7 +91,6 @@ export {
   MCPSession,
   RemoteAgent,
   StdioConnector,
-  WebSocketConnector,
 };
 
 // Export session-related types

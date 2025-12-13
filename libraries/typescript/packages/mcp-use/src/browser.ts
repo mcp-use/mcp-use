@@ -8,13 +8,12 @@ export { MCPAgent } from "./agents/mcp_agent.js";
 export { RemoteAgent } from "./agents/remote.js";
 
 // Export adapters
-export { BaseAdapter, LangChainAdapter } from "./adapters/index.js";
+export { BaseAdapter } from "./adapters/index.js";
 
 // Export connectors that work in the browser
 export { BaseConnector } from "./connectors/base.js";
 export type { NotificationHandler } from "./connectors/base.js";
 export { HttpConnector } from "./connectors/http.js";
-export { WebSocketConnector } from "./connectors/websocket.js";
 
 // Export session and notification types
 export { MCPSession } from "./session.js";

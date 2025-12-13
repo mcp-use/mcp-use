@@ -344,9 +344,12 @@ print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
 cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/"
+    "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@679/client",
+    "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@679/server",
+    "zod/v4": "https://esm.sh/zod@4/v4"
   }
 }
+
 EOF
 print_success "Created deno.json with mcp-use@$MCP_USE_VERSION dependency"
 

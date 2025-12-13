@@ -111,6 +111,16 @@ export abstract class BaseMCPClient {
     return session;
   }
 
+  public requireSession(serverName: string): MCPSession {
+    const session = this.sessions[serverName];
+    if (!session) {
+      throw new Error(
+        `Session '${serverName}' not found. Available sessions: ${this.activeSessions.join(", ") || "none"}`
+      );
+    }
+    return session;
+  }
+
   public getAllActiveSessions(): Record<string, MCPSession> {
     return Object.fromEntries(
       this.activeSessions.map((n) => [n, this.sessions[n]])

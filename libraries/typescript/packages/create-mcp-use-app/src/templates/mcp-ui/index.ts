@@ -6,6 +6,7 @@ const server = createMCPServer("uiresource-mcp-server", {
   version: "1.0.0",
   description: "MCP server demonstrating all UIResource types",
   baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)
+  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

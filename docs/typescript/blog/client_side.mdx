@@ -78,18 +78,13 @@ We built a browser-native MCP client that works with any MCP server:
 ```typescript
 // src/client/browser.ts
 import { HttpConnector } from '../connectors/http.js'
-import { WebSocketConnector } from '../connectors/websocket.js'
 
 export class BrowserMCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(serverConfig: Record<string, any>): BaseConnector {
-    const { url, transport, headers, authToken } = serverConfig
-
-    // Determine transport from URL or config
-    if (transport === 'websocket' || url.startsWith('ws://')) {
-      return new WebSocketConnector(url, { headers, authToken })
-    } else {
-      return new HttpConnector(url, { headers, authToken })
-    }
+    const { url, headers, authToken } = serverConfig
+    
+    // Use HTTP connector with automatic SSE fallback
+    return new HttpConnector(url, { headers, authToken })
   }
 }
 ```
@@ -98,7 +93,7 @@ export class BrowserMCPClient extends BaseMCPClient {
 
 | Feature | Official SDK | BrowserMCPClient |
 |---------|-------------|------------------|
-| Transports | stdio, SSE, HTTP | HTTP, WebSocket, SSE |
+| Transports | stdio, SSE, HTTP | HTTP, SSE |
 | Environment | Node.js only | Browser + Node.js |
 | File system | Required for stdio | Not used |
 | Process spawning | Native modules | Fetch API only |
@@ -142,8 +137,6 @@ export class HttpConnector extends BaseConnector {
 **Transport selection logic:**
 1. Try Streamable HTTP (efficient, bidirectional)
 2. Fall back to SSE (widely supported, server-push)
-3. Future: WebSocket for real-time bidirectional
-
 All transports work in the browser using standard Web APIs.
 
 ## Challenge 2: Authentication Without Exposing Secrets
@@ -955,7 +948,6 @@ The mcp-use Inspector is now:
 **Browser APIs used:**
 - `fetch` - HTTP requests
 - `EventSource` - SSE transport
-- `WebSocket` - WebSocket transport (future)
 - `localStorage` - OAuth token storage
 - `window.postMessage` - OAuth callback communication
 

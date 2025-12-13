@@ -34,10 +34,10 @@ async function main() {
   const agent = new MCPAgent({ llm, client, maxSteps: 30 });
 
   // Run the query
-  const result = await agent.run(
-    "Which tools are available and what can they do?",
-    30
-  );
+  const result = await agent.run({
+    prompt: "Which tools are available and what can they do?",
+    maxSteps: 30,
+  });
   console.log(`\nResult: ${result}`);
 
   await agent.close();

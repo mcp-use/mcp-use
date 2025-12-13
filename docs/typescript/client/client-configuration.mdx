@@ -1,5 +1,5 @@
 ---
-title: "Client Configuration"
+title: "Configuration"
 description: "Configure your MCP client to connect to servers"
 icon: "cog"
 ---
@@ -9,6 +9,10 @@ The MCPClient is your gateway to connecting with MCP servers. This guide covers 
 <Info>
 **Looking for agent configuration?** If you're building AI agents that interact with MCP servers, see the [Agent Configuration](/typescript/agent/agent-configuration) guide instead.
 </Info>
+
+<Tip>
+**Using in browser or React?** This guide uses the Node.js import (`mcp-use`). For browser or React environments, see the [Environments](/typescript/client/environments) guide to learn about the different entry points.
+</Tip>
 
 ## Quick Start
 
@@ -29,25 +33,30 @@ const config = {
 
 const client = new MCPClient(config)
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-// Configure your MCP servers
-const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-```
 </CodeGroup>
 
+
+## Connection Types
+
+MCP servers communicate with clients using different transport protocols. The mcp-use client supports multiple connection types, each optimized for different use cases.
+
+### Supported Connection Types
+
+The client supports two primary connection types:
+
+- **STDIO**: Local process communication via standard input/output
+- **HTTP/SSE**: Remote servers via HTTP with Server-Sent Events
+
+<Tip>
+The connection type is automatically detected based on your server configuration. You don't need to specify it explicitly - just provide the appropriate parameters (`command` for STDIO, `url` for HTTP).
+</Tip>
+
+### When to Use Each Type
+
+| Connection Type | Best For | Use Cases |
+|----------------|----------|-----------|
+| **STDIO** | Local development | Testing servers locally, file system access, no network setup needed |
+| **HTTP/SSE** | Production deployment | Remote servers, load balancing, authentication, multiple clients |
 
 ## Server Configuration
 
@@ -92,6 +101,19 @@ For servers that run as local child processes:
 - `args`: Array of command-line arguments
 - `env`: Environment variables for the server process
 
+**Example:**
+```json
+{
+  "mcpServers": {
+    "stdio_server": {
+      "command": "npx",
+      "args": ["@my-mcp/server"],
+      "env": {}
+    }
+  }
+}
+```
+
 **HTTP/HTTPS Servers (Remote):**
 
 For servers accessible via HTTP endpoints:
@@ -99,9 +121,19 @@ For servers accessible via HTTP endpoints:
 - `url`: Full URL to the MCP server endpoint
 - `headers`: Custom HTTP headers (useful for authentication)
 
-<Info>
-The client automatically infers the connection type based on your configuration. Use `command` for STDIO servers or `url` for HTTP servers. See [Connection Types](./connection-types) for detailed information.
-</Info>
+**Example:**
+```json
+{
+  "mcpServers": {
+    "http_server": {
+      "url": "http://localhost:3000",
+      "headers": {
+        "Authorization": "Bearer ${AUTH_TOKEN}"
+      }
+    }
+  }
+}
+```
 
 ### Example Configuration
 
@@ -230,5 +262,3 @@ Common client configuration errors and solutions:
 2. **Connection Timeout**: Verify server is running and network connectivity
 3. **Permission Denied**: Ensure proper file permissions and environment setup
 4. **Invalid Configuration**: Validate JSON syntax and required fields
-
-For detailed information, see the [Connection Types](./connection-types) guide.

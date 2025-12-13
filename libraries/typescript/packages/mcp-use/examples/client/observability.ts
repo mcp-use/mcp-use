@@ -57,13 +57,13 @@ async function main() {
   agent.setTags(["test-tag-1", "test-tag-2"]);
 
   console.log("💬 Running agent query...");
-  const result = await agent.run(
-    `Hello, you are a tester can you please answer the follwing questions:
+  const result = await agent.run({
+    prompt: `Hello, you are a tester can you please answer the follwing questions:
 - Which resources do you have access to?
 - Which prompts do you have access to?
 - Which tools do you have access to?`,
-    30
-  );
+    maxSteps: 30,
+  });
   console.log(`\n✅ Result: ${result}`);
 
   // console.log('🧹 Closing agent...')

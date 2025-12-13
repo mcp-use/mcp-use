@@ -1,5 +1,99 @@
 # mcp-use
 
+## 1.11.0-canary.8
+
+### Minor Changes
+
+- 3945a10: **Breaking Changes:**
+  - LangChain adapter no longer exported from main entry point. Import from `mcp-use/adapters` instead:
+
+    ```ts
+    // Before
+    import { LangChainAdapter } from "mcp-use";
+
+    // After
+    import { LangChainAdapter } from "mcp-use/adapters";
+    ```
+
+  - Moved `@langchain/core` and `langchain` from dependencies to optional peer dependencies
+
+  **Features:**
+  - Added favicon support for widget pages. Configure via `favicon` option in `ServerConfig`:
+    ```ts
+    const server = createMCPServer({
+      name: "my-server",
+      version: "1.0.0",
+      favicon: "favicon.ico", // Path relative to public/ directory
+    });
+    ```
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process now includes favicon in widget HTML pages
+
+  **Improvements:**
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode now watches for widget file/directory deletions and cleans up build artifacts
+  - Added long-term caching (1 year) for favicon assets
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - @mcp-use/cli@2.6.0-canary.8
+  - @mcp-use/inspector@0.13.0-canary.8
+
+## 1.11.0-canary.7
+
+### Patch Changes
+
+- 9acf03b: fix: drop react-router-dom in favor of react-router
+- Updated dependencies [9acf03b]
+  - @mcp-use/inspector@0.13.0-canary.7
+  - @mcp-use/cli@2.6.0-canary.7
+
+## 1.11.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - @mcp-use/cli@2.6.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
+## 1.11.0-canary.5
+
+### Minor Changes
+
+- 0b2292d: feat(session): update callTool method to default args to an empty object and add requireSession method for session retrieval
+
+### Patch Changes
+
+- Updated dependencies [861546b]
+  - @mcp-use/inspector@0.13.0-canary.5
+  - @mcp-use/cli@2.6.0-canary.5
+
+## 1.11.0-canary.4
+
+### Patch Changes
+
+- f469d26: feat: updated agent docs and signature
+  - @mcp-use/cli@2.6.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
+## 1.11.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- e302f8d: chore: added support for node >= 18 and commonjs
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - @mcp-use/cli@2.6.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 1.10.6
 
 ### Patch Changes
@@ -51,6 +145,31 @@
 - Updated dependencies [b3d69ed]
   - @mcp-use/inspector@0.12.1
   - @mcp-use/cli@2.5.1
+
+## 1.10.1-canary.2
+
+### Patch Changes
+
+- 1b6562a: fix: clear transport when session idle
+  - @mcp-use/cli@2.5.1-canary.2
+  - @mcp-use/inspector@0.12.1-canary.2
+
+## 1.10.1-canary.1
+
+### Patch Changes
+
+- 2bb2278: fix: allow agent to access resources and prompts
+  - @mcp-use/cli@2.5.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
+## 1.10.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - @mcp-use/inspector@0.12.1-canary.0
+  - @mcp-use/cli@2.5.1-canary.0
 
 ## 1.10.0
 

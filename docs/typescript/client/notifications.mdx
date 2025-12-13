@@ -74,7 +74,7 @@ session.on("notification", async (notification) => {
   if (notification.method === "notifications/tools/list_changed") {
     console.log("Tools list updated - refreshing...");
     // Refresh tools cache
-    const tools = await session.connector.listTools();
+    const tools = await session.listTools();
     console.log(`Now have ${tools.length} tools`);
   }
 });
@@ -88,7 +88,7 @@ Sent when resources have been added, removed, or modified:
 session.on("notification", async (notification) => {
   if (notification.method === "notifications/resources/list_changed") {
     console.log("Resources updated");
-    const resources = await session.connector.listAllResources();
+    const resources = await session.listAllResources();
     // Update your UI or cache
   }
 });
@@ -102,7 +102,7 @@ Sent when prompts have changed:
 session.on("notification", async (notification) => {
   if (notification.method === "notifications/prompts/list_changed") {
     console.log("Prompts updated");
-    const prompts = await session.connector.listPrompts();
+    const prompts = await session.listPrompts();
     // Update your UI or cache
   }
 });
@@ -166,7 +166,7 @@ console.log(`Current roots: ${roots.length}`);
 You can provide initial roots when creating the connector:
 
 ```typescript
-import { HttpConnector } from "mcp-use";
+import { HttpConnector, MCPSession } from "mcp-use";
 
 const connector = new HttpConnector("http://localhost:3000/mcp", {
   roots: [
@@ -185,144 +185,6 @@ await session.setRoots([
 ]);
 ```
 
-### Root Type
-
-```typescript
-interface Root {
-  uri: string;      // Must start with "file://"
-  name?: string;    // Optional human-readable name
-}
-```
-
-## Practical Examples
-
-### Building a Real-Time Dashboard
-
-```typescript
-import { MCPClient, Notification } from "mcp-use";
-
-const client = new MCPClient({
-  mcpServers: {
-    dashboard: { url: "http://localhost:3000/mcp" }
-  }
-});
-
-const session = await client.createSession("dashboard");
-
-// State
-let connectedUsers = 0;
-let lastHeartbeat: Date | null = null;
-
-session.on("notification", async (notification: Notification) => {
-  switch (notification.method) {
-    case "custom/heartbeat":
-      lastHeartbeat = new Date();
-      connectedUsers = notification.params?.connectedClients ?? 0;
-      updateStatusUI();
-      break;
-      
-    case "custom/alert":
-      showAlert(notification.params?.message);
-      break;
-      
-    case "notifications/tools/list_changed":
-      await refreshToolsList();
-      break;
-  }
-});
-
-function updateStatusUI() {
-  console.log(`Status: ${connectedUsers} users, last heartbeat: ${lastHeartbeat}`);
-}
-```
-
-### Handling Connection Events
-
-```typescript
-session.on("notification", async (notification) => {
-  if (notification.method === "custom/welcome") {
-    console.log("Connected to server!");
-    console.log("Server time:", notification.params?.serverTime);
-    console.log("Available tools:", notification.params?.availableTools);
-  }
-});
-```
-
-### Progress Updates
-
-```typescript
-session.on("notification", async (notification) => {
-  if (notification.method === "custom/progress") {
-    const { taskId, progress, status } = notification.params ?? {};
-    console.log(`Task ${taskId}: ${progress}% - ${status}`);
-    
-    // Update progress bar UI
-    updateProgressBar(taskId, progress);
-  }
-});
-```
-
-## Multiple Handlers
-
-You can register multiple notification handlers:
-
-```typescript
-// Handler for logging
-session.on("notification", async (notification) => {
-  console.log("[LOG]", notification.method, notification.params);
-});
-
-// Handler for specific notifications
-session.on("notification", async (notification) => {
-  if (notification.method === "custom/important") {
-    await handleImportantNotification(notification);
-  }
-});
-
-// Handler for UI updates
-session.on("notification", async (notification) => {
-  if (notification.method.startsWith("ui/")) {
-    updateUI(notification);
-  }
-});
-```
-
-## Error Handling
-
-Errors in notification handlers are caught and logged, but don't stop other handlers:
-
-```typescript
-session.on("notification", async (notification) => {
-  try {
-    // Process notification
-    await processNotification(notification);
-  } catch (error) {
-    console.error("Error processing notification:", error);
-    // Handle error - maybe retry or log for debugging
-  }
-});
-```
-
-## Browser Usage
-
-Notifications work the same way in browser environments:
-
-```typescript
-import { MCPClient } from "mcp-use/browser";
-
-const client = new MCPClient({
-  mcpServers: {
-    api: { url: "https://api.example.com/mcp" }
-  }
-});
-
-const session = await client.createSession("api");
-
-session.on("notification", (notification) => {
-  // Update React state, Vue refs, etc.
-  setNotifications(prev => [...prev, notification]);
-});
-```
 
 ## TypeScript Types
 
@@ -340,6 +202,15 @@ const handler: NotificationHandler = async (notification: Notification) => {
 session.on("notification", handler);
 ```
 
+### Root Type
+
+```typescript
+interface Root {
+  uri: string;      // Must start with "file://"
+  name?: string;    // Optional human-readable name
+}
+```
+
 ## Requirements
 
 Notifications require:
@@ -352,17 +223,9 @@ Notifications require:
 Notifications don't work in stateless edge environments where sessions aren't maintained between requests.
 </Note>
 
-## Best Practices
-
-1. **Handle Unknown Notifications**: Always have a fallback for notifications you don't recognize
-2. **Keep Handlers Fast**: Notification handlers should be quick - offload heavy work
-3. **Use TypeScript**: Leverage the `Notification` type for better code quality
-4. **Log Notifications**: During development, log all notifications to understand server behavior
-5. **Clean Up**: If your session disconnects, handlers won't receive new notifications
-
 ## Next Steps
 
 - [Server Notifications](/typescript/server/notifications) - Learn how servers send notifications
-- [Connection Types](./connection-types) - Understand transport options
+- [Client Configuration](./client-configuration) - Understand connection types and transport options
 - [Resources](./resources) - Handle resource change notifications
 - [Tools](./tools) - Handle tool list change notifications

@@ -443,6 +443,21 @@ export abstract class BaseConnector {
   }
 
   /**
+   * List all available tools from the MCP server.
+   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   *
+   * @param options - Optional request options
+   * @returns Array of available tools
+   */
+  async listTools(options?: RequestOptions): Promise<Tool[]> {
+    if (!this.client) {
+      throw new Error("MCP client is not connected");
+    }
+    const result = await this.client.listTools(undefined, options);
+    return (result.tools ?? []) as Tool[];
+  }
+
+  /**
    * List resources from the server with optional pagination
    *
    * @param cursor - Optional cursor for pagination

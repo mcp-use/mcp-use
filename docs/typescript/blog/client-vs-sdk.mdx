@@ -629,10 +629,6 @@ await connector.connect()  // Tries HTTP, falls back to SSE
 // StdioConnector for local processes
 const connector = new StdioConnector({ command: 'python', args: ['server.py'] })
 await connector.connect()
-
-// WebSocketConnector for WS servers
-const connector = new WebSocketConnector('ws://localhost:8080', { headers })
-await connector.connect()
 ```
 
 **Why this matters:**
@@ -640,7 +636,7 @@ await connector.connect()
 1. **Automatic fallback:** User doesn't care if server uses HTTP or SSE
 2. **Consistent API:** All connectors have `.callTool()`, `.readResource()`
 3. **Easy switching:** Change transport by changing one line
-4. **Future transports:** Add WebRTC, WebSocket, etc. without breaking API
+4. **Future transports:** Add new transports without breaking API
 
 ## Bundle Size Comparison
 
@@ -763,6 +759,6 @@ Both are valid choices. We're not replacing the SDK—we're extending it for com
 
 **Learn more:**
 - [mcp-use Client Documentation](https://docs.mcp-use.com/typescript/client)
-- [Multi-Server Setup Guide](https://docs.mcp-use.com/typescript/client/multi-server-setup)
+- [Server Manager Guide](https://docs.mcp-use.com/typescript/client/server-manager)
 - [Official MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 - [Python mcp-use Client](https://docs.mcp-use.com/python/client)

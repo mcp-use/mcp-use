@@ -188,6 +188,29 @@ export interface ServerConfig {
    * ```
    */
   oauth?: OAuthProvider;
+  /**
+   * Path to favicon file relative to public directory
+   *
+   * The favicon will be automatically included in all widget pages.
+   * Place your favicon file in the public/ directory and specify the relative path.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   favicon: 'favicon.ico' // References public/favicon.ico
+   * });
+   *
+   * // For files in subdirectories
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   favicon: 'icons/app-icon.png' // References public/icons/app-icon.png
+   * });
+   * ```
+   */
+  favicon?: string;
 }
 
 export interface InputDefinition {

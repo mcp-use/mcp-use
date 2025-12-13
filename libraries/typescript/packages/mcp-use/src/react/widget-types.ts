@@ -122,10 +122,13 @@ export interface UseWidgetResult<
   TOutput extends UnknownObject = UnknownObject,
   TMetadata extends UnknownObject = UnknownObject,
   TState extends UnknownObject = UnknownObject,
+  TToolInput extends UnknownObject = UnknownObject,
 > {
   // Props and state
-  /** Widget props (mapped from toolInput for MCP compatibility) */
+  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model) */
   props: TProps;
+  /** Original tool input arguments */
+  toolInput: TToolInput;
   /** Tool output from the last execution */
   output: TOutput | null;
   /** Response metadata from the tool */
@@ -168,4 +171,6 @@ export interface UseWidgetResult<
 
   /** Whether the widget API is available */
   isAvailable: boolean;
+  /** Whether the tool is currently executing (metadata is null) */
+  isPending: boolean;
 }

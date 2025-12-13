@@ -1,10 +1,10 @@
 ---
-title: "Multi-Server Setup"
-description: "Connect to multiple MCP servers simultaneously"
-icon: "network"
+title: "Server Manager"
+description: "Manage and connect to multiple MCP servers simultaneously"
+icon: "server"
 ---
 
-Multi-server setup enables your applications to connect to multiple MCP servers simultaneously, combining capabilities from different sources to build powerful, integrated workflows.
+The Server Manager enables your applications to connect to multiple MCP servers simultaneously, combining capabilities from different sources to build powerful, integrated workflows.
 
 ## Why Use Multiple Servers?
 
@@ -183,124 +183,6 @@ main().catch(console.error)
 ```
 </CodeGroup>
 
-## Configuration Patterns
-
-### Web Scraping + Data Processing
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"],
-      "env": {
-        "PLAYWRIGHT_HEADLESS": "true"
-      }
-    },
-    "pandas": {
-      "command": "mcp-server-pandas",
-      "args": ["--allow-file-access"],
-      "env": {
-        "PANDAS_SAFE_MODE": "true"
-      }
-    },
-    "filesystem": {
-      "command": "mcp-server-filesystem",
-      "args": ["/data/workspace"]
-    }
-  }
-}
-```
-
-Usage example:
-
-<CodeGroup>
-```typescript TypeScript
-const result = await agent.run(
-    'Scrape product data from example-store.com, ' +
-    'clean and analyze it with pandas, ' +
-    'then save the results as CSV and Excel files'
-)
-```
-
-```typescript TypeScript
-const result = await agent.run(
-    'Scrape product data from example-store.com, ' +
-    'clean and analyze it with pandas, ' +
-    'then save the results as CSV and Excel files'
-)
-```
-</CodeGroup>
-
-### Development Workflow
-
-```json
-{
-  "mcpServers": {
-    "filesystem": {
-      "command": "mcp-server-filesystem",
-      "args": ["/home/user/projects"]
-    },
-    "github": {
-      "command": "mcp-server-github",
-      "args": ["--token", "${GITHUB_TOKEN}"]
-    },
-    "python": {
-      "command": "mcp-server-python",
-      "args": ["--safe-mode"]
-    },
-    "git": {
-      "command": "mcp-server-git",
-      "args": ["--repo-path", "/home/user/projects"]
-    }
-  }
-}
-```
-
-Usage example:
-
-<CodeGroup>
-```typescript TypeScript
-const result = await agent.run(
-    'Create a new Python function to calculate fibonacci numbers, ' +
-    'write unit tests for it, run the tests, ' +
-    'and if they pass, commit the changes to the current git branch'
-)
-```
-
-```typescript TypeScript
-const result = await agent.run(
-    'Create a new Python function to calculate fibonacci numbers, ' +
-    'write unit tests for it, run the tests, ' +
-    'and if they pass, commit the changes to the current git branch'
-)
-```
-</CodeGroup>
-
-### Research and Documentation
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"]
-    },
-    "arxiv": {
-      "command": "mcp-server-arxiv",
-      "args": ["--max-results", "10"]
-    },
-    "wikipedia": {
-      "command": "mcp-server-wikipedia",
-      "args": ["--language", "en"]
-    },
-    "filesystem": {
-      "command": "mcp-server-filesystem",
-      "args": ["/research/notes"]
-    }
-  }
-}
-```
 
 ## Managing Server Dependencies
 
@@ -444,92 +326,28 @@ The server manager provides several performance benefits:
     ```
 </CodeGroup>
   </Tab>
-  <Tab title="Resource Management">
-    <CodeGroup>
-```typescript TypeScript
-    // Server manager automatically manages connections
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useServerManager: true,
-        maxConcurrentServers: 3  // Limit concurrent connections
-    })
-    ```
-
-```typescript TypeScript
-    // Server manager automatically manages connections
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useServerManager: true,
-        maxConcurrentServers: 3  // Limit concurrent connections
-    })
-    ```
-</CodeGroup>
-  </Tab>
-  <Tab title="Error Isolation">
-    <CodeGroup>
-```typescript TypeScript
-    // If one server fails, others continue working
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useServerManager: true,
-        ignoreServerErrors: true  // Continue on server failures
-    })
-    ```
-
-```typescript TypeScript
-    // If one server fails, others continue working
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useServerManager: true,
-        ignoreServerErrors: true  // Continue on server failures
-    })
-    ```
-</CodeGroup>
-  </Tab>
 </Tabs>
 
 ### Tool Filtering
 
-Control which tools are available to prevent confusion:
+Control which tools are available by disallowing specific tools:
 
 <CodeGroup>
 ```typescript TypeScript
-// Restrict to specific tool types
+// Restrict specific tools
 const agent = new MCPAgent({
     llm,
     client,
-    allowedTools: ['file_read', 'file_write', 'web_search'],
     disallowedTools: ['system_exec', 'network_request']
-})
-
-// Or filter by server
-const agentFiltered = new MCPAgent({
-    llm,
-    client,
-    allowedServers: ['filesystem', 'playwright'],
-    useServerManager: true
 })
 ```
 
 ```typescript TypeScript
-// Restrict to specific tool types
+// Restrict specific tools
 const agent = new MCPAgent({
     llm,
     client,
-    allowedTools: ['file_read', 'file_write', 'web_search'],
     disallowedTools: ['system_exec', 'network_request']
-})
-
-// Or filter by server
-const agentFiltered = new MCPAgent({
-    llm,
-    client,
-    allowedServers: ['filesystem', 'playwright'],
-    useServerManager: true
 })
 ```
 </CodeGroup>
@@ -563,55 +381,6 @@ const agentFiltered = new MCPAgent({
 </CodeGroup>
   </Accordion>
 
-  <Accordion title="Tool name conflicts">
-    Different servers might provide tools with the same name:
-
-    <CodeGroup>
-```typescript TypeScript
-    // Use server prefixes to avoid conflicts
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useToolPrefixes: true  // Tools become "server_name.tool_name"
-    })
-    ```
-
-```typescript TypeScript
-    // Use server prefixes to avoid conflicts
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useToolPrefixes: true  // Tools become "server_name.tool_name"
-    })
-    ```
-</CodeGroup>
-  </Accordion>
-
-  <Accordion title="Performance issues">
-    Too many servers can slow down the agent:
-
-    <CodeGroup>
-```typescript TypeScript
-    // Limit concurrent servers
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useServerManager: true,
-        maxConcurrentServers: 3
-    })
-    ```
-
-```typescript TypeScript
-    // Limit concurrent servers
-    const agent = new MCPAgent({
-        llm,
-        client,
-        useServerManager: true,
-        maxConcurrentServers: 3
-    })
-    ```
-</CodeGroup>
-  </Accordion>
 </AccordionGroup>
 
 ### Debug Configuration
@@ -637,7 +406,6 @@ const agent = new MCPAgent({
     llm,
     client,
     useServerManager: true,
-    debug: true,
     verbose: true
 })
 ```
@@ -660,7 +428,6 @@ const agent = new MCPAgent({
     llm,
     client,
     useServerManager: true,
-    debug: true,
     verbose: true
 })
 ```
@@ -673,7 +440,7 @@ const agent = new MCPAgent({
     Begin with 2-3 servers and add more as needed. Too many servers can overwhelm the LLM.
   </Card>
   <Card title="Use Server Manager" icon="gear">
-    Enable `use_server_manager=True` for better performance and resource management.
+    Enable `useServerManager: true` for better performance and resource management.
   </Card>
   <Card title="Environment Variables" icon="lock">
     Store sensitive configuration like API keys in environment variables, not config files.

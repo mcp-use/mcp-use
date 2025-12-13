@@ -59,16 +59,22 @@ class ServerManager(BaseServerManager):
                         logger.warning(f"Could not create session for '{server_name}' during prefetch")
                         continue
 
-                # Fetch tools if session is available
+                # Fetch tools, resources, and prompts if session is available
                 if session:
                     connector = session.connector
                     tools = await self.adapter._create_tools_from_connectors([connector])
+                    resources = await self.adapter._create_resources_from_connectors([connector])
+                    prompts = await self.adapter._create_prompts_from_connectors([connector])
+                    all_tools = tools + resources + prompts
 
                     # Check if this server's tools have changed
-                    if server_name not in self._server_tools or self._server_tools[server_name] != tools:
-                        self._server_tools[server_name] = tools  # Cache tools
+                    if server_name not in self._server_tools or self._server_tools[server_name] != all_tools:
+                        self._server_tools[server_name] = all_tools  # Cache tools, resources, and prompts
                         self.initialized_servers[server_name] = True  # Mark as initialized
-                        logger.debug(f"Prefetched {len(tools)} tools for server '{server_name}'.")
+                        logger.debug(
+                            f"Prefetched {len(all_tools)} items for server '{server_name}': "
+                            f"{len(tools)} tools, {len(resources)} resources, {len(prompts)} prompts"
+                        )
                     else:
                         logger.debug(f"Tools for server '{server_name}' unchanged, using cached version.")
             except Exception as e:

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useMcp } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
@@ -286,7 +286,6 @@ export function InspectorDashboard() {
 
       // Map UI transport type to actual transport type
       // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
-      // "WebSocket" in UI means "WebSocket" which uses 'sse' transport
       const actualTransportType = transportType === "SSE" ? "http" : "sse";
 
       // Store pending connection config - don't add to saved connections yet

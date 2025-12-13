@@ -11,6 +11,14 @@ interface ServerIconProps {
   size?: "sm" | "md" | "lg";
 }
 
+function getBaseDomain(hostname: string): string {
+  const parts = hostname.split(".");
+  if (parts.length <= 2) {
+    return hostname;
+  }
+  return parts.slice(parts.length - 2).join(".");
+}
+
 interface FaviconCache {
   base64: string;
   timestamp: number;
@@ -142,61 +150,77 @@ export function ServerIcon({
 
         // Check cache first
         const cachedFavicon = getCachedFavicon(domain);
-        if (cachedFavicon) {
-          setFaviconUrl(cachedFavicon);
-          setIsLoading(false);
-          return;
-        }
+        console.log("cachedFavicon", cachedFavicon);
+        // if (cachedFavicon) {
+        //   setFaviconUrl(cachedFavicon);
+        //   setIsLoading(false);
+        //   return;
+        // }
 
         // Try full domain first, then base domain with 1s timeout
-        const baseDomain = domain.split(".").slice(-2).join(".");
+        const baseDomain = getBaseDomain(serverUrl);
+        console.log("baseDomain", baseDomain);
         const domainsToTry =
           domain !== baseDomain ? [domain, baseDomain] : [domain];
+        console.log("domainsToTry", domainsToTry);
 
-        const faviconServices = [`https://favicon.tools.mcp-use.com/${domain}`];
+        let defaultResponse = null;
 
         for (const currentDomain of domainsToTry) {
-          for (const serviceTemplate of faviconServices) {
-            try {
-              const currentFaviconUrl = serviceTemplate.replace(
-                "{domain}",
+          try {
+            const currentFaviconUrl = `https://favicon.tools.mcp-use.com/${currentDomain}`;
+            console.log("currentFaviconUrl", currentFaviconUrl);
+
+            // Create a timeout promise
+            let _timeoutId: NodeJS.Timeout;
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              _timeoutId = setTimeout(() => reject(new Error("Timeout")), 1000);
+            });
+
+            // Race between fetch and timeout
+            const response = await Promise.race([
+              fetch(currentFaviconUrl + "?response=json"),
+              timeoutPromise,
+            ]);
+
+            const responseJson = (await response.json()) as {
+              url: string;
+              sourceUrl: string;
+              width: number;
+              height: number;
+              format: string;
+              bytes: number;
+              source: string;
+            };
+            defaultResponse = responseJson;
+
+            if (responseJson.source === "link-tag") {
+              // Fetch and cache the image as base64
+              const base64Image = await fetchAndCacheImage(
+                responseJson.sourceUrl,
                 currentDomain
               );
-
-              // Create a timeout promise
-              let _timeoutId: NodeJS.Timeout;
-              const timeoutPromise = new Promise<never>((_, reject) => {
-                _timeoutId = setTimeout(
-                  () => reject(new Error("Timeout")),
-                  1000
-                );
-              });
-
-              // Race between fetch and timeout
-              const response = await Promise.race([
-                fetch(currentFaviconUrl),
-                timeoutPromise,
-              ]);
-
-              if (response.ok) {
-                // Fetch and cache the image as base64
-                const base64Image = await fetchAndCacheImage(
-                  currentFaviconUrl,
-                  domain
-                );
-                setImageLoading(true);
-                setFaviconUrl(base64Image);
-                setIsLoading(false);
-                return;
-              }
-            } catch {
-              console.error(
-                `Failed to fetch favicon for ${currentDomain} from ${serviceTemplate}`
-              );
-              // Continue to next service
-              continue;
+              setImageLoading(true);
+              setFaviconUrl(base64Image);
+              setIsLoading(false);
+              return;
             }
+          } catch {
+            console.error(`Failed to fetch favicon for ${currentDomain}`);
+            // Continue to next service
+            continue;
           }
+        }
+
+        if (defaultResponse) {
+          const base64Image = await fetchAndCacheImage(
+            defaultResponse.sourceUrl,
+            domain
+          );
+          setImageLoading(true);
+          setFaviconUrl(base64Image);
+          setIsLoading(false);
+          return;
         }
 
         // If all services fail

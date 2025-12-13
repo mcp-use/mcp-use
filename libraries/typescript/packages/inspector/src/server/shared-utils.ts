@@ -432,6 +432,7 @@ export interface WidgetData {
   uri: string;
   toolInput: Record<string, any>;
   toolOutput: any;
+  toolResponseMetadata?: Record<string, any>;
   resourceData: any;
   toolId: string;
   timestamp: number;
@@ -472,11 +473,13 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     widgetCSP: _widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    theme,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -486,6 +489,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasResourceData: !!resourceData,
     hasToolInput: !!toolInput,
     hasToolOutput: !!toolOutput,
+    hasToolResponseMetadata: !!toolResponseMetadata,
+    toolResponseMetadata,
     hasWidgetCSP: !!_widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
@@ -511,12 +516,14 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     timestamp: Date.now(),
     widgetCSP: _widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    theme,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);
@@ -583,6 +590,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     widgetCSP: _widgetCSP,
@@ -634,6 +642,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   const safeToolOutput = JSON.stringify(toolOutput ?? null)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e");
+  const safeToolResponseMetadata = JSON.stringify(toolResponseMetadata ?? null)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e");
   const safeToolId = JSON.stringify(toolId);
   const safeWidgetStateKey = JSON.stringify(widgetStateKey);
   // Safely serialize theme, defaulting to 'light' if not provided
@@ -659,8 +670,8 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 
         const openaiAPI = {
           toolInput: ${safeToolInput},
-          toolOutput: ${safeToolOutput},
-          toolResponseMetadata: null,
+          toolOutput: null,  // Initially null to emulate OpenAI behavior (widget renders before tool completes)
+          toolResponseMetadata: null,  // Initially null to emulate OpenAI behavior
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},
@@ -799,6 +810,30 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             }
           } catch (err) {}
         }, 0);
+
+        // Emulate OpenAI behavior: initially toolOutput and toolResponseMetadata are null,
+        // then they get populated when the "tool execution completes"
+        setTimeout(() => {
+          try {
+            if (window.openai) {
+              window.openai.toolOutput = ${safeToolOutput};
+              window.openai.toolResponseMetadata = ${safeToolResponseMetadata};
+              
+              // Dispatch set_globals event to notify React components
+              const globalsEvent = new CustomEvent('openai:set_globals', {
+                detail: {
+                  globals: {
+                    toolOutput: window.openai.toolOutput,
+                    toolResponseMetadata: window.openai.toolResponseMetadata,
+                  }
+                }
+              });
+              window.dispatchEvent(globalsEvent);
+            }
+          } catch (err) {
+            console.error('[Inspector] Failed to populate toolOutput:', err);
+          }
+        }, 100); // Small delay to emulate tool execution time
       })();
     </script>
   `;

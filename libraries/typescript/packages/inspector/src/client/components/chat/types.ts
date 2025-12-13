@@ -41,14 +41,13 @@ export interface AuthConfig {
 
 export interface MCPServerConfig {
   url?: string;
-  transport?: "http" | "websocket" | "sse";
+  transport?: "http" | "sse";
   headers?: Record<string, string>;
   authToken?: string;
   auth_token?: string;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
-  ws_url?: string;
   preferSse?: boolean;
 }
 

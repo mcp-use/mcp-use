@@ -1,6 +1,5 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
-import { WebSocketConnector } from "../connectors/websocket.js";
 import { logger } from "../logging.js";
 import { Tel } from "../telemetry/index.js";
 import { getPackageVersion } from "../version.js";
@@ -12,7 +11,7 @@ import { BaseMCPClient } from "./base.js";
  * This client works in both browser and Node.js environments by avoiding
  * Node.js-specific APIs (like fs, path). It supports:
  * - Multiple servers via addServer()
- * - HTTP and WebSocket connectors
+ * - HTTP connector
  * - All base client functionality
  */
 export class BrowserMCPClient extends BaseMCPClient {
@@ -53,14 +52,13 @@ export class BrowserMCPClient extends BaseMCPClient {
 
   /**
    * Create a connector from server configuration (Browser version)
-   * Supports HTTP and WebSocket connectors only
+   * Supports HTTP connector only
    */
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
     const {
       url,
-      transport,
       headers,
       authToken,
       authProvider,
@@ -97,22 +95,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       );
     }
 
-    // Determine transport type
-    if (
-      transport === "websocket" ||
-      url.startsWith("ws://") ||
-      url.startsWith("wss://")
-    ) {
-      return new WebSocketConnector(url, connectorOptions);
-    } else if (
-      transport === "http" ||
-      url.startsWith("http://") ||
-      url.startsWith("https://")
-    ) {
-      return new HttpConnector(url, connectorOptions);
-    } else {
-      // Default to HTTP for browser
-      return new HttpConnector(url, connectorOptions);
-    }
+    // Use HTTP connector for browser
+    return new HttpConnector(url, connectorOptions);
   }
 }

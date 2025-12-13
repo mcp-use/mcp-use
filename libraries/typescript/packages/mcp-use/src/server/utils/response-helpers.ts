@@ -574,9 +574,11 @@ export function binary(base64Data: string, mimeType: string): CallToolResult {
  * Configuration for widget response utility (runtime data only)
  */
 export interface WidgetResponseConfig {
-  /** Structured data to pass to the widget */
-  data: Record<string, any>;
-  /** Optional text message for the response */
+  /** Widget-only data passed to useWidget().props (hidden from model) */
+  props: Record<string, any>;
+  /** Response helper result that the model sees (text(), json(), etc.) */
+  output: CallToolResult | TypedCallToolResult<any>;
+  /** Optional override for the text message */
   message?: string;
 }
 
@@ -587,7 +589,7 @@ export interface WidgetResponseConfig {
  * should be set on the tool's `widget` property at registration time.
  *
  * @param config - Runtime data for the widget
- * @returns CallToolResult with structured content for the widget
+ * @returns CallToolResult with widget props in metadata and tool output in content
  *
  * @example
  * ```typescript
@@ -602,24 +604,31 @@ export interface WidgetResponseConfig {
  * }, async ({ city }) => {
  *   const weatherData = await fetchWeather(city);
  *   return widget({
- *     data: weatherData,
- *     message: `Weather for ${city}`
+ *     // Widget-only data (model doesn't see)
+ *     props: { temperature: weatherData.temp, conditions: weatherData.conditions },
+ *     // Model sees this summary
+ *     output: text(`Weather in ${city}: ${weatherData.temp}°C`)
  *   });
  * })
  * ```
  */
 export function widget(config: WidgetResponseConfig): CallToolResult {
-  const { data, message } = config;
+  const { props, output, message } = config;
+
+  // Build the final content array
+  const finalContent = message
+    ? [{ type: "text" as const, text: message }]
+    : output.content || [{ type: "text" as const, text: "" }];
 
   return {
-    content: [
-      {
-        type: "text",
-        text: message || "",
-      },
-    ],
-    // structuredContent will be injected as window.openai.toolOutput by Apps SDK
-    structuredContent: data,
+    content: finalContent,
+    ...(output.structuredContent && {
+      structuredContent: output.structuredContent,
+    }),
+    _meta: {
+      ...(output._meta || {}),
+      "mcp-use/props": props,
+    },
   };
 }
 

@@ -3,10 +3,12 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: [
     "index.ts",
+    "src/adapters/index.ts",
     "src/agents/index.ts",
     "src/auth/index.ts",
     "src/bin.ts",
     "src/browser.ts",
+    "src/client.ts",
     "src/react/index.ts",
     "src/server/index.ts",
     "src/client/prompts.ts",

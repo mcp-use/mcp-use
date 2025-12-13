@@ -6,12 +6,12 @@ icon: "list-start"
 
 # MCP Client
 
-**mcp-use** provides a powerful MCP client implementation for TypeScript that enables your applications to connect to and interact with any MCP server. Whether you're building AI agents, automation tools, or integrations, the MCPClient gives you full access to MCP protocol features with a clean, type-safe API.
+**mcp-use** provides a complete MCP client implementation for TypeScript that enables your applications to connect to and interact with any MCP server. Whether you're building AI agents, automation tools, or integrations, the MCPClient gives you full access to MCP protocol features with a clean, type-safe API.
 
 ## Key Features
 
 - **Multi-server support**: Connect to multiple MCP servers simultaneously
-- **Multiple connection types**: STDIO, HTTP, WebSocket, and SSE transports
+- **Multiple connection types**: STDIO, HTTP, and SSE transports
 - **Full MCP protocol**: Complete support for tools, resources, prompts, and notifications
 - **Type-safe**: Full TypeScript support with automatic type inference
 - **Middleware support**: Add logging, metrics, and custom middleware
@@ -37,21 +37,23 @@ yarn add mcp-use
 
 Here's a basic example of connecting to an MCP server and calling a tool:
 
+
+<a href="https://codesandbox.io/p/devbox/nice-ptolemy-9j887v?embed=1&file=%2Fsrc%2Findex.ts">
+<img noZoom src="https://codesandbox.io/static/img/play-codesandbox.svg" alt="Edit mcp-client-getting-started" />
+</a>
+
 ```typescript
 import { MCPClient } from 'mcp-use'
 
-// Configure your MCP servers
-const config = {
+// Create client and connect
+const client = new MCPClient({
   mcpServers: {
     'my-server': {
       command: 'npx',
       args: ['-y', '@modelcontextprotocol/server-everything']
     }
   }
-}
-
-// Create client and connect
-const client = new MCPClient(config)
+})
 await client.createAllSessions()
 
 // Get a session for a specific server
@@ -71,156 +73,14 @@ console.log('Result:', result)
 await client.closeAllSessions()
 ```
 
-## Architecture Overview
-
-The mcp-use client is built around a modular architecture that makes it easy to connect to any MCP server, regardless of the transport protocol. Understanding this architecture helps you build robust integrations.
-
-### **Client Instance**
-The main `MCPClient` class manages connections to multiple MCP servers. It handles session lifecycle, configuration, and provides a unified interface for all server interactions.
-
-**Learn more**: [Client Configuration →](/typescript/client/client-configuration)
-
-### **Sessions**
-Each connected server gets its own session that maintains state, handles communication, and provides access to server capabilities. Sessions are automatically managed by the client.
-
-**Learn more**: [Multi-Server Setup →](/typescript/client/multi-server-setup)
-
-### **Connection Types**
-Support for multiple transport protocols (STDIO, HTTP, WebSocket, SSE) allows you to connect to any MCP server, whether it's a local process or a remote service.
-
-**Learn more**: [Connection Types →](/typescript/client/connection-types)
-
-### **Tools**
-Invoke server-provided functions with type-safe parameters. Tools are the primary way to execute actions on MCP servers.
-
-**Learn more**: [Tools Guide →](/typescript/client/tools)
-
-### **Resources**
-Read static or dynamic content from servers via URIs. Resources provide access to configuration, documentation, and data.
-
-**Learn more**: [Resources Guide →](/typescript/client/resources)
-
-### **Prompts**
-Access server-defined prompt templates for AI interactions. Prompts help standardize how you interact with language models.
-
-**Learn more**: [Prompts Guide →](/typescript/client/prompts)
-
-## Connection Flow
-
-Understanding the client connection lifecycle helps you manage resources effectively:
-
-```typescript
-// 1. Create client with server configuration
-const client = new MCPClient(config)
-
-// 2. Establish connections to all configured servers
-await client.createAllSessions()
-
-// 3. Get a session for a specific server
-const session = client.getSession('server-name')
-
-// 4. Use the session to interact with the server
-const tools = await session.listTools()
-const result = await session.callTool('tool_name', params)
-
-// 5. Clean up when done
-await client.closeAllSessions()
-```
-
-## MCPClient API
-
-The `MCPClient` class provides a clean API for managing server connections:
-
-```typescript
-class MCPClient {
-  // Session Management
-  createAllSessions(): Promise<void>
-  createSession(serverName: string): Promise<void>
-  getSession(serverName: string): Session
-  closeAllSessions(): Promise<void>
-  closeSession(serverName: string): Promise<void>
-  
-  // Server Management
-  listServers(): string[]
-  getServerConfig(serverName: string): ServerConfig
-}
-```
-
-## Session API
-
-Each session provides methods to interact with its MCP server:
-
-```typescript
-class Session {
-  // Tools
-  listTools(): Promise<Tool[]>
-  callTool(name: string, params: any): Promise<ToolResult>
-  
-  // Resources
-  listResources(): Promise<Resource[]>
-  readResource(uri: string): Promise<ResourceContent>
-  
-  // Prompts
-  listPrompts(): Promise<Prompt[]>
-  getPrompt(name: string, args?: any): Promise<PromptResult>
-  
-  // Advanced Features
-  enableNotifications(): void
-  subscribeTo(uri: string): Promise<void>
-}
-```
-
-**Additional Features:**
-- **[Sampling](/typescript/client/sampling)**: Request LLM completions from within tool calls
-- **[Elicitation](/typescript/client/elicitation)**: Interactive prompts for user input
-- **[Notifications](/typescript/client/notifications)**: Real-time updates from servers
-- **[Logging](/typescript/client/logging)**: Built-in logging and debugging support
-
-## Advanced Usage
-
-### Multi-Server Connections
-
-Connect to multiple servers simultaneously for complex workflows:
-
-```typescript
-const config = {
-  mcpServers: {
-    'database': { command: 'npx', args: ['-y', '@modelcontextprotocol/server-postgres'] },
-    'filesystem': { command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'] },
-    'web': { url: 'https://api.example.com/mcp' }
-  }
-}
-
-const client = new MCPClient(config)
-await client.createAllSessions()
-
-// Use different servers for different tasks
-const dbSession = client.getSession('database')
-const fsSession = client.getSession('filesystem')
-```
-
-### Middleware
-
-Add logging, metrics, or custom middleware to all requests:
-
-```typescript
-import { MCPClient, LoggingMiddleware } from 'mcp-use'
-
-const client = new MCPClient(config, {
-  middleware: [new LoggingMiddleware()]
-})
-```
-
-**Learn more**: See [Logging](/typescript/client/logging) for middleware options.
-
 ## Next Steps
 
 <CardGroup cols={3}>
-  <Card title="Client Configuration" icon="cog" href="/typescript/client/client-configuration">
-    Learn how to configure your client and connect to servers
+  <Card title="Environments" icon="layer-group" href="/typescript/client/environments">
+    Use the client in Node.js, browser, and React applications
   </Card>
-  <Card title="Connection Types" icon="cable" href="/typescript/client/connection-types">
-    Understand different transport protocols (STDIO, HTTP, WebSocket)
+  <Card title="Configuration" icon="cog" href="/typescript/client/client-configuration">
+    Configure your client and understand connection types (STDIO, HTTP, SSE)
   </Card>
   <Card title="Tools" icon="wrench" href="/typescript/client/tools">
     Invoke server functions and handle results
@@ -228,11 +88,11 @@ const client = new MCPClient(config, {
   <Card title="Resources" icon="folder-open" href="/typescript/client/resources">
     Read content from server resources
   </Card>
-  <Card title="Multi-Server Setup" icon="network" href="/typescript/client/multi-server-setup">
-    Work with multiple MCP servers simultaneously
+  <Card title="Server Manager" icon="server" href="/typescript/client/server-manager">
+    Manage multiple MCP servers simultaneously
   </Card>
-  <Card title="Authentication" icon="shield" href="/typescript/client/authentication">
-    Secure your connections with OAuth and bearer tokens
+  <Card title="OAuth" icon="shield" href="/typescript/client/authentication">
+    Secure your connections with OAuth
   </Card>
 </CardGroup>
 

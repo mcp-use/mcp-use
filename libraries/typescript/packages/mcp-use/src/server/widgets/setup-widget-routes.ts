@@ -11,6 +11,7 @@ import {
   getContentType,
   processWidgetHtml,
   setupPublicRoutes,
+  setupFaviconRoute,
 } from "./widget-helpers.js";
 import type { ServerConfig } from "./widget-types.js";
 
@@ -120,4 +121,7 @@ export function setupWidgetRoutes(
 
   // Serve static files from public directory (production mode)
   setupPublicRoutes(app, true);
+
+  // Setup favicon route at server root (production mode)
+  setupFaviconRoute(app, serverConfig.favicon, true);
 }

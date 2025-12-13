@@ -60,21 +60,25 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
 /**
  * React hook for building OpenAI Apps SDK widgets with MCP-use
  *
- * Provides type-safe access to the window.openai API and automatically
- * maps MCP UI props to the Apps SDK toolInput format.
+ * Provides type-safe access to the window.openai API. Widget props come from
+ * _meta["mcp-use/props"] (widget-only data), while toolInput contains the original tool arguments.
  *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
- *   const { props, theme, callTool, sendFollowUpMessage } = useWidget<{
- *     city: string;
- *     temperature: number;
- *   }>();
+ *   const { props, toolInput, output, theme } = useWidget<
+ *     { city: string; temperature: number },  // Props (widget-only)
+ *     string,                                  // Output (model sees)
+ *     {},                                      // Metadata
+ *     {},                                      // State
+ *     { city: string }                         // ToolInput (tool args)
+ *   >();
  *
  *   return (
  *     <div data-theme={theme}>
  *       <h1>{props.city}</h1>
  *       <p>{props.temperature}°C</p>
+ *       <p>Requested: {toolInput.city}</p>
  *     </div>
  *   );
  * };
@@ -85,7 +89,10 @@ export function useWidget<
   TOutput extends UnknownObject = UnknownObject,
   TMetadata extends UnknownObject = UnknownObject,
   TState extends UnknownObject = UnknownObject,
->(defaultProps?: TProps): UseWidgetResult<TProps, TOutput, TMetadata, TState> {
+  TToolInput extends UnknownObject = UnknownObject,
+>(
+  defaultProps?: TProps
+): UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput> {
   // Check if window.openai is available - use state to allow re-checking after async injection
   const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
     () => typeof window !== "undefined" && !!window.openai
@@ -164,8 +171,8 @@ export function useWidget<
   // Subscribe to globals
   const toolInput =
     provider === "openai"
-      ? (useOpenAiGlobal("toolInput") as TProps | undefined)
-      : (urlParams.toolInput as TProps | undefined);
+      ? (useOpenAiGlobal("toolInput") as TToolInput | undefined)
+      : (urlParams.toolInput as TToolInput | undefined);
   const toolOutput =
     provider === "openai"
       ? (useOpenAiGlobal("toolOutput") as TOutput | null | undefined)
@@ -174,6 +181,17 @@ export function useWidget<
     | TMetadata
     | null
     | undefined;
+
+  // Extract widget props from toolResponseMetadata["mcp-use/props"]
+  const widgetProps = useMemo(() => {
+    if (toolResponseMetadata && typeof toolResponseMetadata === "object") {
+      const metaProps = (toolResponseMetadata as any)["mcp-use/props"];
+      if (metaProps) {
+        return metaProps as TProps;
+      }
+    }
+    return defaultProps || ({} as TProps);
+  }, [toolResponseMetadata, defaultProps]);
   const widgetState = useOpenAiGlobal("widgetState") as
     | TState
     | null
@@ -266,9 +284,16 @@ export function useWidget<
     [widgetState, localWidgetState]
   );
 
+  // Determine if tool is still executing
+  // When widget first loads before tool completes, toolResponseMetadata is null
+  const isPending = useMemo(() => {
+    return provider === "openai" && toolResponseMetadata === null;
+  }, [provider, toolResponseMetadata]);
+
   return {
     // Props and state (with defaults)
-    props: (toolInput || defaultProps || {}) as TProps,
+    props: widgetProps,
+    toolInput: (toolInput || {}) as TToolInput,
     output: (toolOutput ?? null) as TOutput | null,
     metadata: (toolResponseMetadata ?? null) as TMetadata | null,
     state: localWidgetState,
@@ -294,6 +319,7 @@ export function useWidget<
 
     // Availability
     isAvailable: isOpenAiAvailable,
+    isPending,
   };
 }
 

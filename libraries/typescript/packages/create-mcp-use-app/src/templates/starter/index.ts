@@ -5,6 +5,7 @@ const server = createMCPServer("my-mcp-server", {
   version: "1.0.0",
   description: "My first MCP server with all features",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
+  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
 /**

@@ -1,5 +1,94 @@
 # @mcp-use/cli
 
+## 2.6.0-canary.8
+
+### Minor Changes
+
+- 3945a10: **Breaking Changes:**
+  - LangChain adapter no longer exported from main entry point. Import from `mcp-use/adapters` instead:
+
+    ```ts
+    // Before
+    import { LangChainAdapter } from "mcp-use";
+
+    // After
+    import { LangChainAdapter } from "mcp-use/adapters";
+    ```
+
+  - Moved `@langchain/core` and `langchain` from dependencies to optional peer dependencies
+
+  **Features:**
+  - Added favicon support for widget pages. Configure via `favicon` option in `ServerConfig`:
+    ```ts
+    const server = createMCPServer({
+      name: "my-server",
+      version: "1.0.0",
+      favicon: "favicon.ico", // Path relative to public/ directory
+    });
+    ```
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process now includes favicon in widget HTML pages
+
+  **Improvements:**
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode now watches for widget file/directory deletions and cleans up build artifacts
+  - Added long-term caching (1 year) for favicon assets
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - mcp-use@1.11.0-canary.8
+  - @mcp-use/inspector@0.13.0-canary.8
+
+## 2.6.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [9acf03b]
+  - @mcp-use/inspector@0.13.0-canary.7
+  - mcp-use@1.11.0-canary.7
+
+## 2.6.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [0b2292d]
+- Updated dependencies [861546b]
+  - mcp-use@1.11.0-canary.5
+  - @mcp-use/inspector@0.13.0-canary.5
+
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
+## 2.6.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: added support for cli client
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 2.5.6
 
 ### Patch Changes
@@ -48,6 +137,31 @@
 - Updated dependencies [b3d69ed]
   - @mcp-use/inspector@0.12.1
   - mcp-use@1.10.1
+
+## 2.5.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+  - @mcp-use/inspector@0.12.1-canary.2
+
+## 2.5.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
+## 2.5.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - @mcp-use/inspector@0.12.1-canary.0
+  - mcp-use@1.10.1-canary.0
 
 ## 2.5.0
 
