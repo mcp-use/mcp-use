@@ -57,6 +57,11 @@
       "import": "./dist/src/browser.js",
       "require": "./dist/src/browser.cjs"
     },
+    "./client": {
+      "types": "./dist/src/client.d.ts",
+      "import": "./dist/src/client.js",
+      "require": "./dist/src/client.cjs"
+    },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
       "import": "./dist/src/react/index.js",
