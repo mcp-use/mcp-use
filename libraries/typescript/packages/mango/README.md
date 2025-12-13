@@ -4,12 +4,7 @@ AI Agent for MCP Server Development
 
 ## Overview
 
-Mango is a standalone CLI tool that provides an AI-powered development environment for creating and testing MCP servers. It features:
-
-- **Claude Agent SDK Integration**: Powered by Claude for intelligent server development
-- **Visual Canvas**: React Flow-based canvas displaying MCP primitives (tools, resources, prompts, widgets)
-- **Chat Interface**: Interactive chat to guide the agent through server creation and testing
-- **Auto-Testing**: Automatically connects to servers and recursively tests/improves them
+Mango is a vibe coding agent for MCP Server with Apps SDK support.
 
 ## Usage
 
