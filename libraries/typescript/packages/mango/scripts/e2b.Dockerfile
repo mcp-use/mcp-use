@@ -14,7 +14,7 @@ WORKDIR /home/user/mcp_project
 WORKDIR /home/user
 RUN mkdir -p agent-runner
 WORKDIR /home/user/agent-runner
-RUN npm init -y && npm install @anthropic-ai/claude-agent-sdk@latest tsx@latest --legacy-peer-deps
+RUN npm init -y && npm install zod @anthropic-ai/claude-agent-sdk@latest tsx@latest --legacy-peer-deps
 
 # Set working directory back to home
 WORKDIR /home/user

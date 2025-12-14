@@ -50,6 +50,8 @@
     "@hono/node-server": "^1.19.6",
     "dotenv": "^16.4.7",
     "hono": "^4.6.11",
+    "mcp-use": "workspace:*",
+    "react-router": "^7.9.6",
     "streamdown": "^1.6.10"
   },
   "devDependencies": {

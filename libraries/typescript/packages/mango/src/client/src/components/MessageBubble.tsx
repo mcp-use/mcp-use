@@ -35,6 +35,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     );
   }
 
+  // Use parts if available for linear flow, otherwise fall back to content + toolCalls
+  const hasParts = message.parts && message.parts.length > 0;
+
   return (
     <div
       style={{
@@ -55,47 +58,143 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           wordWrap: "break-word",
         }}
       >
-        {/* Render markdown content with Streamdown */}
-        <div style={{ marginBottom: "4px", fontSize: "14px" }}>
-          {message.content ? (
-            <Streamdown
-              className="streamdown-content"
-              style={{
-                color: isUser ? "#ffffff" : "#000000",
-              }}
-            >
-              {message.content}
-            </Streamdown>
-          ) : null}
-        </div>
+        {hasParts ? (
+          // Render parts in chronological order
+          <div style={{ fontSize: "14px" }}>
+            {message.parts!.map((part, idx) => {
+              if (part.type === "text") {
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      marginBottom:
+                        idx < message.parts!.length - 1 ? "8px" : "0",
+                    }}
+                  >
+                    {part.content ? (
+                      <Streamdown
+                        className="streamdown-content"
+                        style={{
+                          color: isUser ? "#ffffff" : "#000000",
+                        }}
+                      >
+                        {part.content}
+                      </Streamdown>
+                    ) : null}
+                  </div>
+                );
+              } else if (part.type === "tool_call") {
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      fontSize: "12px",
+                      opacity: 0.8,
+                      marginTop: "8px",
+                      marginBottom:
+                        idx < message.parts!.length - 1 ? "8px" : "0",
+                      paddingTop: "8px",
+                      borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
+                    }}
+                  >
+                    <div>
+                      🔧 <strong>{part.tool}</strong>
+                      {part.input && Object.keys(part.input).length > 0 && (
+                        <span style={{ marginLeft: "4px" }}>
+                          {part.input._streaming ? (
+                            <span style={{ opacity: 0.7, fontStyle: "italic" }}>
+                              (streaming: {part.input._partial_json || "..."})
+                            </span>
+                          ) : (
+                            `(${JSON.stringify(part.input)})`
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    {part.result !== undefined && (
+                      <div
+                        style={{
+                          marginTop: "8px",
+                          padding: "8px",
+                          backgroundColor: isUser
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                          borderRadius: "4px",
+                          fontSize: "11px",
+                          fontFamily: "monospace",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          maxHeight: "300px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        <div
+                          style={{ marginBottom: "4px", fontWeight: "bold" }}
+                        >
+                          Result:
+                        </div>
+                        {typeof part.result === "string" ? (
+                          part.result
+                        ) : (
+                          <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                            {JSON.stringify(part.result, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })}
+          </div>
+        ) : (
+          // Fallback: render content first, then tool calls (old behavior)
+          <>
+            {/* Render markdown content with Streamdown */}
+            <div style={{ marginBottom: "4px", fontSize: "14px" }}>
+              {message.content ? (
+                <Streamdown
+                  className="streamdown-content"
+                  style={{
+                    color: isUser ? "#ffffff" : "#000000",
+                  }}
+                >
+                  {message.content}
+                </Streamdown>
+              ) : null}
+            </div>
 
-        {/* Show tool calls if any */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div
-            style={{
-              marginTop: "8px",
-              paddingTop: "8px",
-              borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
-            }}
-          >
-            {message.toolCalls.map((toolCall, idx) => (
+            {/* Show tool calls if any */}
+            {message.toolCalls && message.toolCalls.length > 0 && (
               <div
-                key={idx}
                 style={{
-                  fontSize: "12px",
-                  opacity: 0.8,
-                  marginTop: idx > 0 ? "4px" : "0",
+                  marginTop: "8px",
+                  paddingTop: "8px",
+                  borderTop: `1px solid ${isUser ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.1)"}`,
                 }}
               >
-                🔧 <strong>{toolCall.tool}</strong>
-                {toolCall.input && Object.keys(toolCall.input).length > 0 && (
-                  <span style={{ marginLeft: "4px" }}>
-                    ({JSON.stringify(toolCall.input)})
-                  </span>
-                )}
+                {message.toolCalls.map((toolCall, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      fontSize: "12px",
+                      opacity: 0.8,
+                      marginTop: idx > 0 ? "4px" : "0",
+                    }}
+                  >
+                    🔧 <strong>{toolCall.tool}</strong>
+                    {toolCall.input &&
+                      Object.keys(toolCall.input).length > 0 && (
+                        <span style={{ marginLeft: "4px" }}>
+                          ({JSON.stringify(toolCall.input)})
+                        </span>
+                      )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
 
         <div

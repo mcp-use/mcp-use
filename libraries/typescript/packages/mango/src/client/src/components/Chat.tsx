@@ -1,87 +1,119 @@
-import React from "react";
 import { useChatStream } from "../hooks/useChatStream";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { PreviewSidebar } from "./PreviewSidebar";
 
 export function Chat() {
-  const { messages, isStreaming, error, sendMessage, clearMessages } =
-    useChatStream();
+  const {
+    messages,
+    isStreaming,
+    error,
+    devServerUrl,
+    conversationId,
+    sendMessage,
+    clearMessages,
+  } = useChatStream();
 
   return (
     <div
       style={{
         display: "flex",
-        flexDirection: "column",
         height: "100vh",
-        maxWidth: "1200px",
+        maxWidth: "1600px",
         margin: "0 auto",
         backgroundColor: "#ffffff",
       }}
     >
-      {/* Header */}
+      {/* Main Chat Area */}
       <div
         style={{
-          padding: "16px 24px",
-          borderBottom: "1px solid #e0e0e0",
-          backgroundColor: "#f8f9fa",
+          flex: 1,
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          flexDirection: "column",
+          borderRight: "1px solid #e0e0e0",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
-          🥭 Mango Agent
-        </h1>
-        <button
-          onClick={clearMessages}
+        {/* Header */}
+        <div
           style={{
-            padding: "6px 12px",
-            borderRadius: "6px",
-            border: "1px solid #e0e0e0",
-            backgroundColor: "#ffffff",
-            cursor: "pointer",
-            fontSize: "12px",
+            padding: "16px 24px",
+            borderBottom: "1px solid #e0e0e0",
+            backgroundColor: "#f8f9fa",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
-          Clear
-        </button>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "600" }}>
+            🥭 Mango Agent
+          </h1>
+          <button
+            onClick={clearMessages}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "6px",
+              border: "1px solid #e0e0e0",
+              backgroundColor: "#ffffff",
+              cursor: "pointer",
+              fontSize: "12px",
+            }}
+          >
+            Clear
+          </button>
+        </div>
+
+        {/* Messages */}
+        <MessageList messages={messages} />
+
+        {/* Error Display */}
+        {error && (
+          <div
+            style={{
+              padding: "12px 16px",
+              backgroundColor: "#fee",
+              color: "#c00",
+              fontSize: "14px",
+              borderTop: "1px solid #fcc",
+            }}
+          >
+            Error: {error}
+          </div>
+        )}
+
+        {/* Input */}
+        <MessageInput onSend={sendMessage} disabled={isStreaming} />
+
+        {/* Status Indicator */}
+        {isStreaming && (
+          <div
+            style={{
+              padding: "8px 16px",
+              backgroundColor: "#e3f2fd",
+              color: "#1976d2",
+              fontSize: "12px",
+              textAlign: "center",
+            }}
+          >
+            Agent is working...
+          </div>
+        )}
       </div>
 
-      {/* Messages */}
-      <MessageList messages={messages} />
-
-      {/* Error Display */}
-      {error && (
-        <div
-          style={{
-            padding: "12px 16px",
-            backgroundColor: "#fee",
-            color: "#c00",
-            fontSize: "14px",
-            borderTop: "1px solid #fcc",
-          }}
-        >
-          Error: {error}
-        </div>
-      )}
-
-      {/* Input */}
-      <MessageInput onSend={sendMessage} disabled={isStreaming} />
-
-      {/* Status Indicator */}
-      {isStreaming && (
-        <div
-          style={{
-            padding: "8px 16px",
-            backgroundColor: "#e3f2fd",
-            color: "#1976d2",
-            fontSize: "12px",
-            textAlign: "center",
-          }}
-        >
-          Agent is working...
-        </div>
-      )}
+      {/* Preview Sidebar */}
+      <div
+        style={{
+          width: "350px",
+          borderLeft: "1px solid #e0e0e0",
+          backgroundColor: "#ffffff",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <PreviewSidebar
+          devServerUrl={devServerUrl}
+          conversationId={conversationId}
+        />
+      </div>
     </div>
   );
 }

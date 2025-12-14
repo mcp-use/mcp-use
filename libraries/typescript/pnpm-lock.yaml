@@ -562,6 +562,12 @@ importers:
       hono:
         specifier: ^4.6.11
         version: 4.10.7
+      mcp-use:
+        specifier: workspace:*
+        version: link:../mcp-use
+      react-router:
+        specifier: ^7.9.6
+        version: 7.9.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       streamdown:
         specifier: ^1.6.10
         version: 1.6.10(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(react@19.2.0)

@@ -15,9 +15,10 @@ export interface ChatMessage {
 export interface SandboxInfo {
   sandbox: any; // E2B Sandbox type
   agentReady: boolean;
-  phase: 1 | 2 | "complete";
-  mcpServerPort?: number;
-  mcpServerRunning?: boolean;
+  phase: 1 | "complete";
+  devServerUrl?: string | null;
+  isIdle?: boolean; // Whether this sandbox is in the warm pool
+  conversationId?: string; // Which conversation is using this sandbox
 }
 
 export interface AgentEvent {
@@ -33,6 +34,7 @@ export interface AgentEvent {
     | "sandbox_status"
     | "phase_status"
     | "mcp_status"
+    | "dev_server_status"
     | "transition"
     | "stream_complete"
     | "todo_update"
@@ -45,6 +47,8 @@ export interface AgentEvent {
   tool?: string;
   tool_use_id?: string;
   text?: string;
+  url?: string;
+  port?: number;
   [key: string]: any;
 }
 
