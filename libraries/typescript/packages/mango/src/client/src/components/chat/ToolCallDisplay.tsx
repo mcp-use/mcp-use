@@ -1,5 +1,5 @@
 import { Terminal, FileEdit, FileText, Code } from "lucide-react";
-import { MessagePart } from "../../hooks/useChatStream";
+import type { MessagePart } from "../../hooks/useChatStream";
 
 interface ToolCallDisplayProps {
   part: MessagePart & { type: "tool_call" };
