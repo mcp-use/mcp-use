@@ -11,10 +11,12 @@ import {
   startIdleCleanup,
   InMemorySessionStore,
   InMemoryStreamManager,
+  FileSystemSessionStore,
 } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
 import { Telemetry } from "../../telemetry/index.js";
+import { join } from "node:path";
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -39,7 +41,15 @@ export async function mountMcp(
 
   // Initialize session store (pluggable - can be Redis, Postgres, etc.)
   // Stores ONLY serializable metadata (client capabilities, log level, timestamps)
-  const sessionStore = config.sessionStore ?? new InMemorySessionStore();
+  // In development mode: use FileSystemSessionStore for hot reload support
+  // In production mode: use InMemorySessionStore for performance
+  const sessionStore =
+    config.sessionStore ??
+    (isProductionMode
+      ? new InMemorySessionStore()
+      : new FileSystemSessionStore({
+          path: join(process.cwd(), ".mcp-use", "sessions.json"),
+        }));
 
   // Initialize stream manager (pluggable - can be Redis Pub/Sub, Postgres NOTIFY, etc.)
   // Manages active SSE connections for notifications, sampling, resource subscriptions
@@ -137,7 +147,118 @@ export async function mountMcp(
         return new Response(null, { status: 200 });
       }
 
-      // Check if session ID exists but transport doesn't (stale session after restart)
+      // Check if session ID exists in store but not in transports (server restart scenario)
+      if (
+        sessionId &&
+        (await sessionStore.has(sessionId)) &&
+        !transports.has(sessionId)
+      ) {
+        // Session metadata exists but transport was lost (server restart in dev mode)
+        // Create a new transport but reuse the existing session ID
+        console.log(
+          `[MCP] Session metadata found but transport lost (likely hot reload): ${sessionId} - recreating transport`
+        );
+
+        const server = mcpServerInstance.getServerForSession();
+        const transport = new FetchStreamableHTTPServerTransport({
+          sessionIdGenerator: () => sessionId, // Reuse existing session ID
+
+          onsessioninitialized: async (sid: string) => {
+            console.log(`[MCP] Session reconnected: ${sid}`);
+            transports.set(sid, transport);
+
+            // Restore session data from store
+            const metadata = await sessionStore.get(sid);
+            const sessionData: SessionData = {
+              transport,
+              server,
+              lastAccessedAt: Date.now(),
+              context: c,
+              honoContext: c,
+              ...(metadata || {}),
+            };
+            sessions.set(sid, sessionData);
+
+            // Re-register oninitialized handler
+            server.server.oninitialized = async () => {
+              const clientCapabilities = server.server.getClientCapabilities();
+              const clientInfo = (server.server as any).getClientInfo?.() || {};
+              const protocolVersion =
+                (server.server as any).getProtocolVersion?.() || "unknown";
+
+              const metadata = await sessionStore.get(sid);
+              if (metadata) {
+                metadata.clientCapabilities = clientCapabilities;
+                metadata.clientInfo = clientInfo;
+                metadata.protocolVersion = String(protocolVersion);
+                await sessionStore.set(sid, metadata);
+              }
+
+              const sessionData = sessions.get(sid);
+              if (sessionData) {
+                sessionData.clientCapabilities = clientCapabilities;
+              }
+
+              Telemetry.getInstance()
+                .trackServerInitialize({
+                  protocolVersion: String(protocolVersion),
+                  clientInfo: clientInfo || {},
+                  clientCapabilities: clientCapabilities || {},
+                  sessionId: sid,
+                })
+                .catch((e) =>
+                  console.debug(`Failed to track server initialize: ${e}`)
+                );
+
+              // Send list_changed notifications after reconnected session is ready
+              // This triggers the client to refresh its cached lists after hot reload
+              if (!isProductionMode) {
+                console.log(
+                  `[MCP] Development mode: Sending list_changed notifications to reconnected session ${sid}`
+                );
+                try {
+                  const { sendNotificationToSession } =
+                    await import("../sessions/notifications.js");
+                  await sendNotificationToSession(
+                    sessions,
+                    sid,
+                    "notifications/tools/list_changed"
+                  );
+                  await sendNotificationToSession(
+                    sessions,
+                    sid,
+                    "notifications/resources/list_changed"
+                  );
+                  await sendNotificationToSession(
+                    sessions,
+                    sid,
+                    "notifications/prompts/list_changed"
+                  );
+                } catch (err) {
+                  console.debug(
+                    `[MCP] Failed to send list_changed notification:`,
+                    err
+                  );
+                }
+              }
+            };
+          },
+
+          onsessionclosed: async (sid: string) => {
+            console.log(`[MCP] Session closed: ${sid}`);
+            transports.delete(sid);
+            await streamManager.delete(sid);
+            await sessionStore.delete(sid);
+            sessions.delete(sid);
+            mcpServerInstance.cleanupSessionSubscriptions?.(sid);
+          },
+        });
+
+        await server.connect(transport);
+        return transport.handleRequest(c.req.raw);
+      }
+
+      // Check if session ID doesn't exist in store at all (truly invalid)
       if (sessionId && !(await sessionStore.has(sessionId))) {
         // Per MCP spec: Return 404 for invalid/expired sessions
         // Client MUST send new InitializeRequest to establish new session

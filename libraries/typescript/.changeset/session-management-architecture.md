@@ -11,8 +11,9 @@ Implements a split architecture for session management, separating serializable 
 ### New Interfaces
 
 - **SessionStore**: Pluggable interface for storing serializable session metadata (client capabilities, log level, timestamps). Implementations:
-  - `InMemorySessionStore` (default) - Fast, in-memory storage
-  - `RedisSessionStore` - Persistent, distributed storage for production
+  - `InMemorySessionStore` (production default) - Fast, in-memory storage
+  - `FileSystemSessionStore` (dev mode default) - File-based persistence for hot reload support
+  - `RedisSessionStore` - Persistent, distributed storage for production clusters
 
 - **StreamManager**: Pluggable interface for managing active SSE connections. Implementations:
   - `InMemoryStreamManager` (default) - Single server only
@@ -37,6 +38,9 @@ Enhanced:
 
 - Added automatic 404 handling and re-initialization in `SseConnectionManager` and `StreamableHttpConnectionManager` per MCP spec
 - Deprecated `sse` transport type in React types (use `http` or `auto`)
+- **Auto-refresh on list changes**: `useMcp` hook now automatically refreshes tools, resources, and prompts when receiving `notifications/tools/list_changed`, `notifications/resources/list_changed`, or `notifications/prompts/list_changed`
+- Added manual refresh methods: `refreshTools()`, `refreshResources()`, `refreshPrompts()`, and `refreshAll()` to `useMcp` return value
+- Inspector UI now automatically updates when tools/resources/prompts change during development
 
 ### Notification Enhancements
 
@@ -48,10 +52,12 @@ Added convenience methods:
 ### Usage Examples
 
 ```typescript
-// Development (default in-memory)
+// Development (default - FileSystemSessionStore for hot reload support)
 const server = new MCPServer({
   name: 'dev-server',
   version: '1.0.0'
+  // Sessions automatically persist to .mcp-use/sessions.json
+  // Survives server restarts during hot reload!
 });
 
 // Production single instance (persistent sessions)
@@ -74,6 +80,13 @@ const server = new MCPServer({
   })
 });
 ```
+
+### Development Experience Improvements
+
+- **FileSystemSessionStore** (new): Sessions automatically persist to `.mcp-use/sessions.json` in development mode
+- Eliminates the need for clients to re-initialize after server hot reloads
+- Auto-selected in dev mode (`NODE_ENV !== 'production'`), can be overridden via `sessionStore` config
+- Supports session cleanup on load (removes expired sessions older than 24 hours)
 
 ### Testing & Documentation
 

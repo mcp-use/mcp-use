@@ -226,6 +226,29 @@ export type UseMcpResult = {
       content: { type: string; text?: string; [key: string]: any };
     }>;
   }>;
+  /**
+   * Refresh the tools list from the server.
+   * Called automatically when notifications/tools/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshTools: () => Promise<void>;
+  /**
+   * Refresh the resources list from the server.
+   * Called automatically when notifications/resources/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshResources: () => Promise<void>;
+  /**
+   * Refresh the prompts list from the server.
+   * Called automatically when notifications/prompts/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshPrompts: () => Promise<void>;
+  /**
+   * Refresh all lists (tools, resources, prompts) from the server.
+   * Useful after reconnection or for manual refresh.
+   */
+  refreshAll: () => Promise<void>;
   /** Manually attempts to reconnect if the state is 'failed'. */
   retry: () => void;
   /** Disconnects the client from the MCP server. */

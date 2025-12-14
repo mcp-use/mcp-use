@@ -84,6 +84,8 @@ export function LayoutHeader({
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
 
+  const [collapsed, setCollapsed] = useState(false);
+
   const handleCopy = async () => {
     if (!tunnelUrl) return;
 
@@ -150,6 +152,7 @@ export function LayoutHeader({
             <Tabs
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
+              onCollapsedChange={setCollapsed}
             >
               <TabsList className="w-full justify-center">
                 {tabs.map((tab) => {
@@ -160,7 +163,10 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 flex-1 flex-row gap-2 relative"
+                      className={cn(
+                        "[&>svg]:mr-0 flex-1 flex-row gap-2 relative",
+                        collapsed && "pl-2"
+                      )}
                     >
                       {count > 0 && (
                         <span
@@ -201,17 +207,23 @@ export function LayoutHeader({
             <Tabs
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
+              onCollapsedChange={setCollapsed}
             >
-              <TabsList className="overflow-x-auto">
+              <TabsList className="overflow-x-auto" collapsible>
                 {tabs.map((tab) => {
                   const count = getTabCount(tab.id, selectedServer);
+                  const tooltipText =
+                    count > 0 ? `${tab.label} (${count})` : tab.label;
 
                   return (
                     <TabsTrigger
-                      key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2 relative"
+                      className={cn(
+                        "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
+                        collapsed && "pl-4"
+                      )}
+                      title={tooltipText}
                     >
                       <div className="items-center gap-2 hidden lg:flex">
                         {tab.label}

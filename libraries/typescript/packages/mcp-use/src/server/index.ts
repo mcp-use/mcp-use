@@ -76,6 +76,8 @@ export {
   RedisSessionStore,
   type RedisClient,
   type RedisSessionStoreConfig,
+  FileSystemSessionStore,
+  type FileSystemSessionStoreConfig,
   type SessionData,
   type SessionMetadata,
 } from "./sessions/index.js";

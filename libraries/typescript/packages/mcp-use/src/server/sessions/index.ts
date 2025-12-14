@@ -19,6 +19,8 @@ export {
   RedisSessionStore,
   type RedisClient,
   type RedisSessionStoreConfig,
+  FileSystemSessionStore,
+  type FileSystemSessionStoreConfig,
 } from "./stores/index.js";
 
 export {
