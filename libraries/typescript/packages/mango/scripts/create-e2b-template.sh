@@ -1,84 +1,50 @@
 #!/bin/bash
-set -e
 
-echo "🚀 Creating E2B template with pre-scaffolded MCP project..."
+# E2B Template Creation Script for Mango
+# This script creates an E2B template with pre-installed mcp-use project (apps-sdk template)
 
-# Create temporary directory for template setup
-TEMP_DIR=$(mktemp -d)
-echo "📁 Using temporary directory: $TEMP_DIR"
+set -e  # Exit on error
 
-cd "$TEMP_DIR"
+echo "🚀 Creating E2B template for Mango with apps-sdk..."
+echo ""
 
-# Install Node.js dependencies that will be needed
-echo "📦 Installing Node.js and tools..."
+# Check if e2b CLI is installed
+if ! command -v e2b &> /dev/null; then
+    echo "❌ E2B CLI not found. Installing..."
+    npm install -g @e2b/cli
+fi
 
-# Create the MCP project
-echo "🔧 Creating MCP project with dependencies..."
-npx create-mcp-use-app mcp-project --template starter --install --yes
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCKERFILE_PATH="$SCRIPT_DIR/e2b.Dockerfile"
 
-# Verify project was created
-if [ ! -d "mcp-project" ]; then
-    echo "❌ Failed to create MCP project"
+# Check if Dockerfile exists
+if [ ! -f "$DOCKERFILE_PATH" ]; then
+    echo "❌ Dockerfile not found at: $DOCKERFILE_PATH"
     exit 1
 fi
 
-echo "✅ MCP project created at mcp-project/"
-ls -la mcp-project/
+echo "📋 Configuration:"
+echo "   Dockerfile: $DOCKERFILE_PATH"
+echo ""
 
-# Install Infisical CLI
-echo "🔐 Installing Infisical CLI..."
-curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.deb.sh' | sudo -E bash
-sudo apt-get update && sudo apt-get install -y infisical
+# Build E2B template
+echo "🔨 Building E2B template..."
+echo ""
 
-# Verify Infisical installation
-if ! command -v infisical &> /dev/null; then
-    echo "⚠️  Infisical not installed, but continuing..."
-fi
+# e2b expects relative path, so cd to the directory first
+cd "$SCRIPT_DIR"
 
-# Create E2B template configuration
-cat > e2b.Dockerfile <<'EOF'
-# Use E2B base image with Node.js
-FROM e2bdev/code-interpreter:latest
-
-# Set working directory
-WORKDIR /home/user
-
-# Copy the pre-created MCP project
-COPY mcp-project /home/user/mcp-project
-
-# Set permissions
-RUN chown -R user:user /home/user/mcp-project
-
-# Pre-install Infisical CLI (if not already in base image)
-RUN curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.deb.sh' | bash && \
-    apt-get update && apt-get install -y infisical || true
-
-# Install Agent SDK and other dependencies globally for the sandbox agent runtime
-RUN npm install -g tsx @anthropic-ai/claude-agent-sdk
-
-USER user
-WORKDIR /home/user
-EOF
-
-echo "📋 E2B Dockerfile created"
-
-# Create build script for E2B
-cat > build-template.sh <<'EOF'
-#!/bin/bash
-# Build and push E2B template
-e2b template build --name "mcp-use-mango" --dockerfile e2b.Dockerfile
-EOF
-
-chmod +x build-template.sh
+e2b template build \
+  --name "mcp-use-mango-apps-sdk" \
+  --dockerfile "e2b.Dockerfile"
 
 echo ""
-echo "✅ E2B template setup complete!"
+echo "✅ E2B template created successfully!"
 echo ""
-echo "📍 Template directory: $TEMP_DIR"
+echo "📝 Next steps:"
+echo "1. Copy the template ID from the output above"
+echo "2. Update .env file: E2B_TEMPLATE_ID=<your-template-id>"
+echo "3. Restart mango server: pnpm dev"
 echo ""
-echo "To build and upload the template to E2B:"
-echo "  cd $TEMP_DIR"
-echo "  ./build-template.sh"
-echo ""
-echo "After uploading, save the template ID as E2B_TEMPLATE_ID in your environment"
-echo ""
+

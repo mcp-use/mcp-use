@@ -1,0 +1,16 @@
+# This is a config for E2B sandbox template.
+# You can use template ID (mk66sjv7psbqlwyxke8d) or template name (mcp-use-mango-apps-sdk) to create a sandbox:
+
+# Python SDK
+# from e2b import Sandbox, AsyncSandbox
+# sandbox = Sandbox("mcp-use-mango-apps-sdk") # Sync sandbox
+# sandbox = await AsyncSandbox.create("mcp-use-mango-apps-sdk") # Async sandbox
+
+# JS SDK
+# import { Sandbox } from 'e2b'
+# const sandbox = await Sandbox.create('mcp-use-mango-apps-sdk')
+
+team_id = "73ef697b-0a37-41b2-be44-d03009f44392"
+dockerfile = "e2b.Dockerfile"
+template_name = "mcp-use-mango-apps-sdk"
+template_id = "mk66sjv7psbqlwyxke8d"
