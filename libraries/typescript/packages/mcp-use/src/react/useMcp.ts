@@ -116,6 +116,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     autoReconnectRef.current = autoReconnect;
   }, [state, autoReconnect]);
 
+  /**
+   * Helper to update both state and ref atomically
+   * This prevents race conditions where stateRef.current is not yet updated
+   * when callbacks check it immediately after setState
+   */
+  const setStateAndRef = useCallback((newState: UseMcpResult["state"]) => {
+    stateRef.current = newState;
+    setState(newState);
+  }, []);
+
   // --- Stable Callbacks ---
   /**
    * Add a log entry to the connection log
@@ -164,7 +174,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       clientRef.current = null;
 
       if (isMountedRef.current && !quiet) {
-        setState("discovering");
+        setStateAndRef("discovering");
         setTools([]);
         setResources([]);
         setResourceTemplates([]);
@@ -173,7 +183,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setAuthUrl(undefined);
       }
     },
-    [addLog]
+    [addLog, setStateAndRef]
   );
 
   /**
@@ -184,7 +194,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     (errorMessage: string, connectionError?: Error) => {
       addLog("error", errorMessage, connectionError ?? "");
       if (isMountedRef.current) {
-        setState("failed");
+        setStateAndRef("failed");
         setError(errorMessage);
         const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
         if (manualUrl) {
@@ -213,7 +223,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           .catch(() => {});
       }
     },
-    [addLog, url, transportType, samplingCallback, onElicitation]
+    [
+      addLog,
+      url,
+      transportType,
+      samplingCallback,
+      onElicitation,
+      setStateAndRef,
+    ]
   );
 
   /**
@@ -247,7 +264,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     setError(undefined);
     setAuthUrl(undefined);
     successfulTransportRef.current = null;
-    setState("discovering");
+    setStateAndRef("discovering");
     addLog(
       "info",
       `Connecting attempt #${connectAttemptRef.current} to ${url}...`
@@ -354,7 +371,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           "[useMcp] Server capabilities:",
           session.connector.serverCapabilities
         );
-        setState("ready");
+        setStateAndRef("ready");
         successfulTransportRef.current = transportTypeParam;
 
         // Track successful connection
@@ -446,7 +463,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             }
 
             if (isMountedRef.current) {
-              setState("pending_auth");
+              setStateAndRef("pending_auth");
             }
             connectingRef.current = false;
             return "auth_redirect";
@@ -575,7 +592,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot call tool "${name}".`
+          `MCP client is not ready (current state: ${stateRef.current}). Cannot call tool "${name}".`
         );
       }
       addLog("info", `Calling tool: ${name}`, args);
@@ -687,7 +704,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         });
 
         // Update state to authenticating before redirect
-        setState("authenticating");
+        setStateAndRef("authenticating");
 
         // Recreate the auth provider WITHOUT preventAutoAuth
         const freshAuthProvider = new BrowserOAuthClientProvider(url, {
@@ -725,7 +742,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         });
       } catch (authError) {
         if (!isMountedRef.current) return;
-        setState("pending_auth"); // Go back to pending state on error
+        setStateAndRef("pending_auth"); // Go back to pending state on error
         addLog(
           "error",
           `Manual authentication failed: ${authError instanceof Error ? authError.message : String(authError)}`
@@ -798,7 +815,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const listResources = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
       throw new Error(
-        `MCP client is not ready (current state: ${state}). Cannot list resources.`
+        `MCP client is not ready (current state: ${stateRef.current}). Cannot list resources.`
       );
     }
     addLog("info", "Listing resources");
@@ -834,7 +851,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (uri: string) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot read resource.`
+          `MCP client is not ready (current state: ${stateRef.current}). Cannot read resource.`
         );
       }
       addLog("info", `Reading resource: ${uri}`);
@@ -891,7 +908,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const listPrompts = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
       throw new Error(
-        `MCP client is not ready (current state: ${state}). Cannot list prompts.`
+        `MCP client is not ready (current state: ${stateRef.current}). Cannot list prompts.`
       );
     }
     addLog("info", "Listing prompts");
@@ -931,7 +948,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (name: string, args?: Record<string, unknown>) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot get prompt.`
+          `MCP client is not ready (current state: ${stateRef.current}). Cannot get prompt.`
         );
       }
       addLog("info", `Getting prompt: ${name}`, args);
@@ -1040,7 +1057,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           ? "No server URL provided, skipping connection."
           : "Connection disabled via enabled flag."
       );
-      setState("discovering");
+      setStateAndRef("discovering");
       return () => {
         isMountedRef.current = false;
       };

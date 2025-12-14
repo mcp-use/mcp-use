@@ -4,9 +4,16 @@ import React, { useState } from "react";
 interface MessageInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
 }
 
-export function MessageInput({ onSend, disabled }: MessageInputProps) {
+export function MessageInput({
+  onSend,
+  disabled,
+  isStreaming,
+  onStop,
+}: MessageInputProps) {
   const [input, setInput] = useState("");
 
   const handleSend = () => {
@@ -52,22 +59,40 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
         }}
         rows={1}
       />
-      <button
-        onClick={handleSend}
-        disabled={disabled || !input.trim()}
-        style={{
-          padding: "12px 24px",
-          borderRadius: "8px",
-          border: "none",
-          backgroundColor: disabled || !input.trim() ? "#ccc" : "#007bff",
-          color: "#ffffff",
-          fontSize: "14px",
-          fontWeight: "500",
-          cursor: disabled || !input.trim() ? "not-allowed" : "pointer",
-        }}
-      >
-        Send
-      </button>
+      {isStreaming ? (
+        <button
+          onClick={onStop}
+          style={{
+            padding: "12px 24px",
+            borderRadius: "8px",
+            border: "none",
+            backgroundColor: "#d32f2f",
+            color: "#ffffff",
+            fontSize: "14px",
+            fontWeight: "500",
+            cursor: "pointer",
+          }}
+        >
+          ⏹ Stop
+        </button>
+      ) : (
+        <button
+          onClick={handleSend}
+          disabled={disabled || !input.trim()}
+          style={{
+            padding: "12px 24px",
+            borderRadius: "8px",
+            border: "none",
+            backgroundColor: disabled || !input.trim() ? "#ccc" : "#007bff",
+            color: "#ffffff",
+            fontSize: "14px",
+            fontWeight: "500",
+            cursor: disabled || !input.trim() ? "not-allowed" : "pointer",
+          }}
+        >
+          Send
+        </button>
+      )}
     </div>
   );
 }

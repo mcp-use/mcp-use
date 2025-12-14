@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 export type MessagePart =
   | { type: "text"; content: string }
@@ -37,6 +37,7 @@ export interface UseChatStreamReturn {
   conversationId: string;
   sendMessage: (content: string) => Promise<void>;
   clearMessages: () => void;
+  stop: () => void;
 }
 
 export function useChatStream(): UseChatStreamReturn {
@@ -51,7 +52,33 @@ export function useChatStream(): UseChatStreamReturn {
     () => `conv-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
   );
 
+  // AbortController to stop ongoing requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(
+    null
+  );
+
+  const stop = useCallback(() => {
+    // Abort the fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // Cancel the reader
+    if (readerRef.current) {
+      readerRef.current.cancel();
+      readerRef.current = null;
+    }
+
+    // Reset streaming state
+    setIsStreaming(false);
+  }, []);
+
   const clearMessages = useCallback(() => {
+    // Stop any ongoing streams
+    stop();
+
     setMessages([]);
     setError(null);
     setDevServerUrl(null);
@@ -59,7 +86,7 @@ export function useChatStream(): UseChatStreamReturn {
     setConversationId(
       `conv-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
     );
-  }, []);
+  }, [stop]);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -77,6 +104,9 @@ export function useChatStream(): UseChatStreamReturn {
       setError(null);
 
       try {
+        // Create a new AbortController for this request
+        abortControllerRef.current = new AbortController();
+
         // Send the message and get SSE stream directly
         const response = await fetch("/api/chat/stream", {
           method: "POST",
@@ -90,6 +120,7 @@ export function useChatStream(): UseChatStreamReturn {
             })),
             conversationId,
           }),
+          signal: abortControllerRef.current.signal,
         });
 
         if (!response.ok) {
@@ -102,6 +133,7 @@ export function useChatStream(): UseChatStreamReturn {
 
         // Read the SSE stream
         const reader = response.body.getReader();
+        readerRef.current = reader;
         const decoder = new TextDecoder();
 
         let assistantMessageId: string | null = null;
@@ -117,6 +149,8 @@ export function useChatStream(): UseChatStreamReturn {
 
           if (done) {
             setIsStreaming(false);
+            readerRef.current = null;
+            abortControllerRef.current = null;
             break;
           }
 
@@ -551,8 +585,15 @@ export function useChatStream(): UseChatStreamReturn {
           }
         }
       } catch (err: any) {
-        setError(err.message || "Failed to send message");
+        // Don't show error if it was aborted by user
+        if (err.name === "AbortError") {
+          console.log("Stream aborted by user");
+        } else {
+          setError(err.message || "Failed to send message");
+        }
         setIsStreaming(false);
+        readerRef.current = null;
+        abortControllerRef.current = null;
       }
     },
     [messages, conversationId, isStreaming]
@@ -573,5 +614,6 @@ export function useChatStream(): UseChatStreamReturn {
     conversationId,
     sendMessage,
     clearMessages,
+    stop,
   };
 }

@@ -6,6 +6,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { chatRoutes } from "./routes/chat.js";
+import mcpRoutes from "./routes/mcp.js";
+import filesRoutes from "./routes/files.js";
 import dotenv from "dotenv";
 
 // Load environment variables
@@ -34,6 +36,18 @@ app.get("/health", (c) => {
 
 // Mount chat routes
 app.route("/api/chat", chatRoutes);
+
+// Mount MCP routes
+app.route("/api/mcp", mcpRoutes);
+
+// Mount file routes
+app.route("/api/files", filesRoutes);
+
+// Log all registered routes
+console.log("📋 Registered routes:");
+console.log("  - /api/chat/*");
+console.log("  - /api/mcp/*");
+console.log("  - /api/files/*");
 
 // 404 handler
 app.notFound((c) => {

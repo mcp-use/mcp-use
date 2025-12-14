@@ -16,7 +16,7 @@ import type { SandboxInfo, AgentEvent } from "../types.js";
 export const chatRoutes = new Hono();
 
 // Store active E2B sandboxes per conversation with phase tracking
-const conversationSandboxes = new Map<string, SandboxInfo>();
+export const conversationSandboxes = new Map<string, SandboxInfo>();
 
 // Warm sandbox pool - idle sandboxes ready for immediate use
 const idleSandboxPool: SandboxInfo[] = [];
@@ -213,32 +213,6 @@ TO CHECK FOR TYPESCRIPT ERRORS:
 - This checks types WITHOUT building
 - The dev server already handles compilation and hot-reload
 
-TESTING WITH MCP-USE CLI CLIENT:
-After implementing the server, use the mcp-use CLI client to inspect and test it:
-
-1. Connect to the dev server:
-   npx mcp-use client connect http://localhost:3000/mcp --name dev
-
-2. List all available tools:
-   npx mcp-use client tools list --json
-
-3. Describe a specific tool (to see its schema):
-   npx mcp-use client tools describe <tool-name>
-
-4. Call a tool with arguments:
-   npx mcp-use client tools call <tool-name> '{"arg1": "value1", "arg2": "value2"}'
-
-5. List all available resources:
-   npx mcp-use client resources list --json
-
-6. Read a specific resource:
-   npx mcp-use client resources read <uri>
-
-7. List all available prompts:
-   npx mcp-use client prompts list --json
-
-8. Get a prompt with arguments:
-   npx mcp-use client prompts get <prompt-name> '{"arg": "value"}'
 
 WORKFLOW:
 1. Understand the user's requirements directly - NO initial exploration needed
@@ -248,17 +222,7 @@ WORKFLOW:
 5. Install any needed dependencies with npm install
 6. Verify code compiles: run "npx tsc --noEmit" (NOT npm run build)
 7. Check get_dev_server_logs to see if the dev server reloaded successfully
-8. Connect to the server using: npx mcp-use client connect http://localhost:3000/mcp --name dev
-9. Test all tools systematically:
-   - List tools: npx mcp-use client tools list --json
-   - For each tool: describe it, then call it with appropriate test inputs
-10. Test all resources:
-    - List resources: npx mcp-use client resources list --json
-    - Read each resource to verify it works
-11. Test prompts if any:
-    - List prompts: npx mcp-use client prompts list --json
-    - Get each prompt to verify it works
-12. Provide a comprehensive summary of what was implemented and tested
+8. Provide a comprehensive summary of what was implemented and tested
 
 RULES:
 - You already know the project structure - do NOT explore directories at the start
@@ -268,9 +232,8 @@ RULES:
 - To check TypeScript errors: npx tsc --noEmit
 - Use get_dev_server_logs to see real-time server output and errors
 - The dev server auto-reloads on file changes - watch the logs to verify
-- Test systematically: implement → verify compilation → connect CLI → test each tool/resource → report
 
-Your goal: Implement the MCP server, verify it compiles, then use the mcp-use CLI client to systematically test all tools, resources, and prompts, and provide a complete summary.`;
+Your goal: Implement the MCP server, verify the logs, and provide a complete summary.`;
 
   const customToolsSetup = `
     // Create custom MCP server with get_dev_server_logs tool
@@ -360,6 +323,7 @@ async function run() {
         allowDangerouslySkipPermissions: true,
         permissionMode: "bypassPermissions",
         includePartialMessages: true,
+        disallowedTools: ["Bash"],
         cwd: "/home/user/mcp_project",
         mcpServers: {
           "mango_custom_tools": customToolsServer

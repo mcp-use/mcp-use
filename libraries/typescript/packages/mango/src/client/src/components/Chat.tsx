@@ -12,6 +12,7 @@ export function Chat() {
     conversationId,
     sendMessage,
     clearMessages,
+    stop,
   } = useChatStream();
 
   return (
@@ -81,7 +82,12 @@ export function Chat() {
         )}
 
         {/* Input */}
-        <MessageInput onSend={sendMessage} disabled={isStreaming} />
+        <MessageInput
+          onSend={sendMessage}
+          disabled={isStreaming}
+          isStreaming={isStreaming}
+          onStop={stop}
+        />
 
         {/* Status Indicator */}
         {isStreaming && (
