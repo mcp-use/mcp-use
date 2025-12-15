@@ -1,8 +1,8 @@
 ---
-"create-mcp-use-app": patch
-"@mcp-use/inspector": patch
-"mcp-use": patch
-"@mcp-use/cli": patch
+"create-mcp-use-app": minor
+"@mcp-use/inspector": minor
+"mcp-use": minor
+"@mcp-use/cli": minor
 ---
 
-fix: trigger changeset
+chore: add to changeset

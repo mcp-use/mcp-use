@@ -749,41 +749,6 @@ jobs:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter @mcp-use/cli --if-present test
 
-  typescript-deno-test:
-    if: false # tmp disable
-    needs: [detect-changes, typescript-build]
-    # if: needs.detect-changes.outputs.typescript == 'true'
-    name: "typescript/deno"
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: libraries/typescript
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 10.6.1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
-      - name: Install Dependencies
-        run: pnpm install --no-frozen-lockfile
-      - name: Build mcp-use Package
-        run: pnpm --filter mcp-use build
-      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-      - name: Run Deno Tests
-        env:
-          MCP_USE_ANONYMIZED_TELEMETRY: false
-        working-directory: libraries/typescript/packages/mcp-use
-        run: bash test-deno.sh
-
   typescript-changeset-check:
     needs: detect-changes
     if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
