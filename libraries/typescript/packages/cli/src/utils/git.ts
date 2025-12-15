@@ -138,5 +138,18 @@ export async function getGitInfo(
  * Check if remote is a GitHub URL
  */
 export function isGitHubUrl(url: string): boolean {
-  return url.includes("github.com");
+  try {
+    // Handle HTTP(S) URLs
+    const parsedUrl = new URL(url);
+    return parsedUrl.hostname === "github.com" || parsedUrl.hostname === "www.github.com";
+  } catch {
+    // Handle SSH/shortened git URLs: git@github.com:user/repo.git
+    // Extract the host before the ":" or "/" (if git@host:repo or git@host/repo)
+    const sshMatch = url.match(/^git@([^:/]+)[:/]/);
+    if (sshMatch) {
+      const host = sshMatch[1];
+      return host === "github.com" || host === "www.github.com";
+    }
+  }
+  return false;
 }
