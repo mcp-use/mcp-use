@@ -46,19 +46,19 @@ server.tool({
   schema: z.object({
     // Required string
     message: z.string().describe('The message to process'),
-    
+
     // Optional number with default
     count: z.number().default(10).describe('Number of items'),
-    
+
     // Optional boolean with default
     verbose: z.boolean().default(false).describe('Enable verbose output'),
-    
+
     // Optional object
     config: z.object({
       setting1: z.string(),
       setting2: z.number()
     }).optional().describe('Configuration object'),
-    
+
     // Array of strings
     items: z.array(z.string()).describe('List of items to process')
   })
@@ -196,7 +196,7 @@ server.tool({
 }, async ({ city }) => {
   // Fetch weather data
   const weatherData = await fetchWeather(city);
-  
+
   // Return widget with runtime data only
   return widget({
     data: weatherData,
@@ -336,12 +336,12 @@ server.tool({
   })
 }, async ({ files }, ctx) => {
   await ctx.log('info', 'Starting file processing');
-  
+
   for (const file of files) {
     await ctx.log('debug', `Processing ${file}`);
     // ... process file ...
   }
-  
+
   await ctx.log('info', 'Processing completed');
   return text(`Processed ${files.length} files`);
 })

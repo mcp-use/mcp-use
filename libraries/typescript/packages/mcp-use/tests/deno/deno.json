@@ -7,4 +7,3 @@
     "lib": ["deno.window", "deno.unstable"]
   }
 }
-

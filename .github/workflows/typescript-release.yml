@@ -218,7 +218,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e  # Exit immediately if any command fails
-          
+
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
           pnpm changeset publish
@@ -226,12 +226,12 @@ jobs:
           # Capture new tags created by changeset before pushing
           cd ../..
           NEW_TAGS=$(git tag --points-at HEAD)
-          
+
           if [ -z "$NEW_TAGS" ]; then
             echo "⚠️  No tags were created by changeset publish"
             exit 0
           fi
-          
+
           echo "📦 Tags created: $NEW_TAGS"
 
           # Save tags to a file for the next step
@@ -310,13 +310,13 @@ jobs:
           for TAG in $TAGS; do
             echo ""
             echo "Processing tag: $TAG"
-            
+
             # Check if release already exists
             if gh release view "$TAG" &>/dev/null; then
               echo "⚠️  Release for $TAG already exists, skipping"
               continue
             fi
-            
+
             # Extract package name and version
             # Handle both @scope/package@version and package@version formats
             if [[ "$TAG" == @*@* ]]; then
@@ -330,18 +330,18 @@ jobs:
               VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*')
               PACKAGE_DIR="$PACKAGE_NAME"
             fi
-            
+
             echo "  Package: $PACKAGE_NAME"
             echo "  Version: $VERSION"
             echo "  Directory: $PACKAGE_DIR"
-            
+
             # Find and extract changelog
             CHANGELOG_FILE="libraries/typescript/packages/${PACKAGE_DIR}/CHANGELOG.md"
             RELEASE_NOTES=""
-            
+
             if [ -f "$CHANGELOG_FILE" ]; then
               echo "  Found CHANGELOG at: $CHANGELOG_FILE"
-              
+
               # Extract the changelog for this specific version
               PACKAGE_CHANGELOG=$(awk -v ver="$VERSION" '
                 /^## / {
@@ -351,7 +351,7 @@ jobs:
                 }
                 found {print}
               ' "$CHANGELOG_FILE")
-              
+
               if [ -n "$PACKAGE_CHANGELOG" ]; then
                 RELEASE_NOTES="$PACKAGE_CHANGELOG"
               else
@@ -362,18 +362,18 @@ jobs:
               RELEASE_NOTES="Release $VERSION of $PACKAGE_NAME"
               echo "  ⚠️  No CHANGELOG.md found at: $CHANGELOG_FILE"
             fi
-            
+
             # Determine if this should be marked as latest
             LATEST_FLAG=""
             if [ "$PACKAGE_NAME" = "mcp-use" ]; then
               LATEST_FLAG="--latest"
               echo "  📌 Marking as latest release"
             fi
-            
+
             # Create the release
             RELEASE_TITLE="$PACKAGE_NAME $VERSION"
             echo "  Creating release: $RELEASE_TITLE"
-            
+
             if gh release create "$TAG" \
               --title "$RELEASE_TITLE" \
               --notes "$RELEASE_NOTES" \

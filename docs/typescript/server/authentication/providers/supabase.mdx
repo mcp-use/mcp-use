@@ -79,19 +79,19 @@ const server = new McpServer({
   oauth: supabase({
     // Required
     projectId: 'your-project-id',
-    
+
     // Required for HS256 tokens (legacy)
     jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
-    
+
     // Optional: Supabase URL (defaults to supabase.co)
     supabaseUrl: 'https://your-project-id.supabase.co',
-    
+
     // OAuth mode: 'proxy' (default) or 'direct'
     mode: 'proxy',
-    
+
     // JWT verification
     verifyJwt: process.env.NODE_ENV === 'production',
-    
+
     // Custom user info extraction
     getUserInfo: (payload) => ({
       userId: payload.sub,
@@ -153,4 +153,3 @@ const server = new McpServer({
 ## Next Steps
 
 - [User Context](/typescript/server/authentication/user-context) - Access user information
-

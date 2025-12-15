@@ -23,7 +23,7 @@ const server = new MCPServer({
   description: 'Server purpose',  // Human-readable description
   host: 'localhost',             // Hostname (defaults to 'localhost')
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // MCP Server production URL (needed for UI Widgets to work correctly)
-  allowedOrigins: process.env.NODE_ENV === 'production' 
+  allowedOrigins: process.env.NODE_ENV === 'production'
     ? ['https://myapp.com']      // Production: explicit origins
     : undefined,                 // Development: allows all origins
   sessionIdleTimeoutMs: 300000,  // Session idle timeout (default: 5 minutes)

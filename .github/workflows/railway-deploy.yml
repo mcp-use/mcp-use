@@ -45,12 +45,12 @@ jobs:
             // Validate that the workflow_run is from the same repository (not a fork)
             const workflowRun = context.payload.workflow_run;
             const isSameRepo = workflowRun.repository.full_name === `${context.repo.owner}/${context.repo.repo}`;
-            
+
             if (!isSameRepo) {
               core.setFailed(`❌ Security: Workflow run is from a different repository (${workflowRun.repository.full_name}). Only runs from ${context.repo.owner}/${context.repo.repo} are allowed.`);
               return;
             }
-            
+
             core.info(`✅ Workflow run validated: ${workflowRun.repository.full_name}`);
             core.setOutput('is_valid', 'true');
 
@@ -67,15 +67,15 @@ jobs:
               repo: context.repo.repo,
               run_id: context.payload.workflow_run.id,
             });
-            
+
             const marker = artifacts.artifacts.find(a => a.name === 'railway-deploy-marker');
-            
+
             if (!marker) {
               core.setOutput('packages_published', 'false');
               core.info('⚠️ No deployment marker found - packages were not published, skipping deployment');
               return;
             }
-            
+
             core.setOutput('packages_published', 'true');
             core.setOutput('artifact_id', marker.id);
             core.info('✅ Deployment marker found - packages were published');
@@ -95,28 +95,28 @@ jobs:
               artifact_id: parseInt(process.env.ARTIFACT_ID),
               archive_format: 'zip',
             });
-            
+
             const fs = require('fs');
             const { execSync } = require('child_process');
             const path = require('path');
-            
+
             // Save zip file
             const zipPath = path.join(process.env.RUNNER_TEMP, 'marker.zip');
             fs.writeFileSync(zipPath, Buffer.from(download));
-            
+
             // Extract zip using unzip command
             const extractPath = path.join(process.env.RUNNER_TEMP, 'marker');
             fs.mkdirSync(extractPath, { recursive: true });
             execSync(`unzip -q "${zipPath}" -d "${extractPath}"`);
-            
+
             // Read marker file
             const markerPath = path.join(extractPath, '.railway-deploy-marker');
             const markerContent = fs.readFileSync(markerPath, 'utf8');
-            
+
             // Parse branch from marker
             const branchMatch = markerContent.match(/branch=(.+)/);
             const branch = branchMatch ? branchMatch[1].trim() : null;
-            
+
             core.setOutput('branch', branch);
             core.info(`📦 Branch from marker: ${branch}`);
 
@@ -132,7 +132,7 @@ jobs:
           else
             BRANCH="${{ steps.marker-info.outputs.branch }}"
           fi
-          
+
           if [ "$BRANCH" = "canary" ]; then
             echo "service_id=${{ secrets.RAILWAY_SERVICE_ID_CANARY }}" >> $GITHUB_OUTPUT
             echo "environment=canary" >> $GITHUB_OUTPUT
@@ -144,7 +144,7 @@ jobs:
             echo "should_deploy=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "should_deploy=true" >> $GITHUB_OUTPUT
           echo "✅ Will deploy to ${{ steps.config.outputs.environment }} (branch: $BRANCH)"
 
@@ -164,13 +164,13 @@ jobs:
             echo "⚠️ Service ID not configured for ${{ steps.config.outputs.environment }}, skipping deployment"
             exit 0
           fi
-          
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "🚀 Manually deploying to Railway (${{ steps.config.outputs.environment }}) from latest commit on ${{ github.event.inputs.branch }}..."
           else
             echo "🚀 Deploying to Railway (${{ steps.config.outputs.environment }}) after package publish..."
           fi
-          
+
           docker run --rm \
             -e RAILWAY_TOKEN="${{ secrets.RAILWAY_TOKEN }}" \
             -v "$PWD:/workspace" \

@@ -267,4 +267,3 @@ Parameters:
 3. Template name
 4. Flag (or "" for none)
 5. Whether to install ("yes" or "")
-

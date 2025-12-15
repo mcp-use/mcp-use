@@ -313,49 +313,49 @@ server.listen().then(() => {
   ╔═══════════════════════════════════════════════════════════════╗
   ║            🎨 UIResource MCP Server (All Types)                ║
   ╚═══════════════════════════════════════════════════════════════╝
-  
+
   Server is running on port ${server.serverPort}
-  
+
   📍 Endpoints:
      MCP Protocol:  http://localhost:${server.serverPort}/mcp
      Inspector UI:  http://localhost:${server.serverPort}/inspector
      Widgets Base:  http://localhost:${server.serverPort}/mcp-use/widgets/
-  
+
   🎯 Available UIResources (3 types demonstrated):
-  
+
      1️⃣  External URL Widget (Iframe)
      • kanban-board
        Tool:      kanban-board
        Resource:  ui://widget/kanban-board
        Browser:   http://localhost:${server.serverPort}/mcp-use/widgets/kanban-board
-  
+
      2️⃣  Raw HTML Widget (Direct Rendering)
      • welcome-card
        Tool:      welcome-card
        Resource:  ui://widget/welcome-card
-  
+
      3️⃣  Remote DOM Widget (React Components)
      • quick-poll
        Tool:      quick-poll
        Resource:  ui://widget/quick-poll
-  
+
   📝 Usage Examples:
-  
+
      // External URL - Call with dynamic parameters
      await client.callTool('kanban-board', {
        initialTasks: [{id: 1, title: 'Task 1'}],
        theme: 'dark'
      })
-  
+
      // Raw HTML - Access as resource
      await client.readResource('ui://widget/welcome-card')
-  
+
      // Remote DOM - Interactive component
      await client.callTool('quick-poll', {
        question: 'Favorite color?',
        options: ['Red', 'Blue', 'Green']
      })
-  
+
   💡 Tip: Open the Inspector UI to test all widget types interactively!
   `);
 });

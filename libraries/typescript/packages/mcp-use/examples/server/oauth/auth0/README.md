@@ -335,7 +335,7 @@ Implement refresh token handling for long-lived sessions:
 ```typescript
 server.post("/token", async (c) => {
   const body = await c.req.parseBody();
-  
+
   if (body.grant_type === "refresh_token") {
     // Forward refresh token request to Auth0
   }
@@ -442,4 +442,3 @@ server.use("*", cors());
 ## License
 
 MIT
-

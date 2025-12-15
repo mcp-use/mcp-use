@@ -182,4 +182,3 @@ fi
 if [ "$MODE" != "draft" ] && [ "$PREV_TAG" != "none" ]; then
   echo "**Full Changelog**: $REPO_URL/compare/$PREV_TAG...python-v$VERSION"
 fi
-
