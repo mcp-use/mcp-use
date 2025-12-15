@@ -622,7 +622,9 @@ export function widget(config: WidgetResponseConfig): CallToolResult {
   // Build the final content array
   const finalContent = message
     ? [{ type: "text" as const, text: message }]
-    : output?.content || [{ type: "text" as const, text: "" }];
+    : Array.isArray(output?.content) && output.content.length > 0
+      ? output.content
+      : [{ type: "text" as const, text: "" }];
 
   // Build metadata, always creating _meta
   const meta: Record<string, unknown> = {
