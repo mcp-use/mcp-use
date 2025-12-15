@@ -191,9 +191,14 @@ export class Telemetry {
 
   private generateUserId(): string {
     // Generate a random UUID v4 using crypto.getRandomValues for secure randomness
-    const cryptoObj = (typeof window !== "undefined" && window.crypto && window.crypto.getRandomValues)
-      ? window.crypto
-      : (typeof crypto !== "undefined" && crypto.getRandomValues ? crypto : undefined);
+    const cryptoObj =
+      typeof window !== "undefined" &&
+      window.crypto &&
+      window.crypto.getRandomValues
+        ? window.crypto
+        : typeof crypto !== "undefined" && crypto.getRandomValues
+          ? crypto
+          : undefined;
     if (cryptoObj && cryptoObj.getRandomValues) {
       // UUID v4 template: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
       const buffer = new Uint8Array(16);
@@ -201,12 +206,18 @@ export class Telemetry {
       // Per RFC4122: set bits for version and `clock_seq_hi_and_reserved`
       buffer[6] = (buffer[6] & 0x0f) | 0x40; // version 4
       buffer[8] = (buffer[8] & 0x3f) | 0x80; // variant 10xx
-      const hex = Array.from(buffer).map(b => b.toString(16).padStart(2, "0")).join("");
+      const hex = Array.from(buffer)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
       return (
-        hex.slice(0, 8) + "-" +
-        hex.slice(8, 12) + "-" +
-        hex.slice(12, 16) + "-" +
-        hex.slice(16, 20) + "-" +
+        hex.slice(0, 8) +
+        "-" +
+        hex.slice(8, 12) +
+        "-" +
+        hex.slice(12, 16) +
+        "-" +
+        hex.slice(16, 20) +
+        "-" +
         hex.slice(20, 32)
       );
     } else {
