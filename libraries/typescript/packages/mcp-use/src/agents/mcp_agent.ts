@@ -8,7 +8,6 @@ import {
   modelCallLimitMiddleware,
   SystemMessage,
   ToolMessage,
-  type DynamicTool,
   type ReactAgent,
 } from "langchain";
 import type { ZodSchema } from "zod";
@@ -546,7 +545,7 @@ export class MCPAgent {
 
     const agent = createAgent({
       model: this.llm,
-      tools: this._tools as DynamicTool[],
+      tools: this._tools as any,
       systemPrompt: systemContent,
       middleware,
     });

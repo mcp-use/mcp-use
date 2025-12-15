@@ -13,9 +13,7 @@
     "mcp-use": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "tsx": "^4.21.0"
   }
 }
 

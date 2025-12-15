@@ -10,17 +10,14 @@
   },
   "dependencies": {
     "mcp-use": "workspace:*",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@vitejs/plugin-react": "^5.1.2",
     "buffer": "^6.0.3",
     "events": "^3.3.0",
-    "typescript": "^5.9.3",
     "util": "^0.12.5",
-    "vite": "^7.2.4"
+    "vite": "^7.3.0"
   }
 }
