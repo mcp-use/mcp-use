@@ -1,21 +1,21 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@mcp-ui/server@^5.15.0": "5.15.0_zod@4.1.13",
-    "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.4": "1.24.3-mcp-use.4_zod@4.1.13_ajv@8.17.1_express@5.1.0",
+    "npm:@mcp-ui/server@^5.15.0": "5.15.0_zod@4.2.0",
+    "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.4": "1.24.3-mcp-use.4_zod@4.2.0_ajv@8.17.1_express@5.1.0",
     "npm:@types/node@*": "24.2.0",
     "npm:hono@^4.10.7": "4.10.7",
     "npm:jose@^6.1.2": "6.1.2",
-    "npm:zod@^4.1.13": "4.1.13"
+    "npm:zod@^4.2.0": "4.2.0"
   },
   "npm": {
-    "@mcp-ui/server@5.15.0_zod@4.1.13": {
+    "@mcp-ui/server@5.15.0_zod@4.2.0": {
       "integrity": "sha512-yPs3foD5elrt5WDmB6YYXIuOYyICYRI7xwpPfTswWwTUpLMF0czmousP/MDEBakUuKRjgUIu5tLg4chzMh9pAQ==",
       "dependencies": [
         "@modelcontextprotocol/sdk"
       ]
     },
-    "@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.4_zod@4.1.13_ajv@8.17.1_express@5.1.0": {
+    "@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.4_zod@4.2.0_ajv@8.17.1_express@5.1.0": {
       "integrity": "sha512-OJS8SCn7KM85cSq61llPFzSbr0hR8BeIubZ1nH+Cdmkns/Z9mL1j/bp2JAREueD1+ZlBlIBBn1nkWTREGSIMPQ==",
       "dependencies": [
         "ajv",
@@ -35,7 +35,7 @@
         "zod-to-json-schema"
       ]
     },
-    "@modelcontextprotocol/sdk@1.23.0_zod@4.1.13_ajv@8.17.1_express@5.1.0": {
+    "@modelcontextprotocol/sdk@1.23.0_zod@4.2.0_ajv@8.17.1_express@5.1.0": {
       "integrity": "sha512-MCGd4K9aZKvuSqdoBkdMvZNcYXCkZRYVs/Gh92mdV5IHbctX9H9uIvd4X93+9g8tBbXv08sxc/QHXTzf8y65bA==",
       "dependencies": [
         "ajv",
@@ -531,14 +531,14 @@
     "wrappy@1.0.2": {
       "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="
     },
-    "zod-to-json-schema@3.25.0_zod@4.1.13": {
+    "zod-to-json-schema@3.25.0_zod@4.2.0": {
       "integrity": "sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ==",
       "dependencies": [
         "zod"
       ]
     },
-    "zod@4.1.13": {
-      "integrity": "sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig=="
+    "zod@4.2.0": {
+      "integrity": "sha512-Bd5fw9wlIhtqCCxotZgdTOMwGm1a0u75wARVEY9HMs1X17trvA/lMi4+MGK5EUfYkXVTbX8UDiDKW4OgzHVUZw=="
     }
   },
   "remote": {
@@ -581,7 +581,7 @@
       "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.4",
       "npm:hono@^4.10.7",
       "npm:jose@^6.1.2",
-      "npm:zod@^4.1.13"
+      "npm:zod@^4.2.0"
     ]
   }
 }
