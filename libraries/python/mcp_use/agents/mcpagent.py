@@ -930,12 +930,13 @@ class MCPAgent:
 
         # 3. Build inputs --------------------------------------------------------
         history_to_use = external_history if external_history is not None else self._conversation_history
-        inputs = {"messages": [*history_to_use, HumanMessage(content=query)]}
+        langchain_history: list[BaseMessage] = [msg for msg in history_to_use if not isinstance(msg, SystemMessage)]
+        inputs = {"messages": [*langchain_history, HumanMessage(content=query)]}
 
         # 4. Stream & collect response chunks ------------------------------------
         recursion_limit = self.max_steps * 2
         # Collect AI message content from streaming chunks
-        ai_message_chunks = []
+        turn_messages = []
 
         async for event in self._agent_executor.astream_events(
             inputs,
@@ -944,28 +945,26 @@ class MCPAgent:
                 "recursion_limit": recursion_limit,
             },
         ):
-            # Collect AI message chunks for history
-            if event.get("event") == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and getattr(chunk, "content", None):
-                    if isinstance(chunk.content, str):
-                        content = chunk.content
-                    elif hasattr(chunk.content, "__iter__"):
-                        content = "".join([item.get("text", "") for item in chunk.content])
-                    else:
-                        content = str(chunk.content)
-                    ai_message_chunks.append(content)
+            event_type = event.get("event")
+            if event_type == "on_chat_model_end":
+                # This contains the AIMessage
+                ai_message: AIMessage = event.get("data", {}).get("output")
+                turn_messages.append(ai_message)
+            if event_type == "on_tool_end":
+                # This contains the ToolMessage
+                tool_message: ToolMessage = event.get("data", {}).get("output")
+                turn_messages.append(tool_message)
 
             yield event
 
         # 5. Update conversation history with both messages ---------------------
-        if self.memory_enabled:
+        # If external_history is provided, treat it as per-call input (do not mutate internal memory).
+        persist_to_memory = self.memory_enabled and external_history is None
+        if persist_to_memory:
             # Add human message first
             self.add_to_history(HumanMessage(content=query))
-            # Add AI message if we collected any chunks
-            if ai_message_chunks:
-                ai_content = "".join(ai_message_chunks)
-                self.add_to_history(AIMessage(content=ai_content))
+            for message in turn_messages:
+                self.add_to_history(message)
 
         # 6. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
