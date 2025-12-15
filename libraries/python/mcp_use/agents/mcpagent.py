@@ -114,7 +114,7 @@ class MCPAgent:
             retry_on_error: Whether to enable automatic error handling for tool calls. When True, tool errors
                 (including validation errors) are caught and returned as messages to the LLM, allowing it to
                 retry with corrected input. When False, errors will halt execution immediately. Default: True.
-	    metadata: Specific data to be passed to tools without passing through llm.
+            metadata: Specific data to be passed to tools without passing through llm.
             message_id: Unique Id to be passed to each message in a chat.
         """
         # Handle remote execution
@@ -251,7 +251,7 @@ class MCPAgent:
         if isinstance(query, HumanMessage):
             return query
         if isinstance(query, str):
-            return HumanMessage(content=query,id=self.message_id)
+            return HumanMessage(content=query, id=self.message_id)
         raise TypeError("query must be a string or HumanMessage")
 
     def _message_text(self, message: HumanMessage) -> str:
@@ -771,6 +771,8 @@ class MCPAgent:
                             # Add new messages to accumulated messages for potential restart
                             for msg in messages:
                                 if msg not in accumulated_messages:
+                                    if self.message_id:
+                                        msg.id = self.message_id
                                     accumulated_messages.append(msg)
                             for message in messages:
                                 # Track tool calls
@@ -899,7 +901,9 @@ class MCPAgent:
                     )
 
                     if self.memory_enabled and external_history is None:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}", id=self.message_id))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Structured output successful")
                     success = True
@@ -998,10 +1002,14 @@ class MCPAgent:
             if event_type == "on_chat_model_end":
                 # This contains the AIMessage
                 ai_message: AIMessage = event.get("data", {}).get("output")
+                if self.message_id:
+                    ai_message.id = self.message_id
                 turn_messages.append(ai_message)
             if event_type == "on_tool_end":
                 # This contains the ToolMessage
                 tool_message: ToolMessage = event.get("data", {}).get("output")
+                if self.message_id:
+                    tool_message.id = self.message_id
                 turn_messages.append(tool_message)
 
             yield event
