@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import type { CallToolResult } from "mcp-use";
+import type { CallToolResult } from "mcp-use/client";
 
 /**
  * Format data as a table with ASCII borders
