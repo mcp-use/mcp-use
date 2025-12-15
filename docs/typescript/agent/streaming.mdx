@@ -6,26 +6,13 @@ icon: "arrow-up-down"
 
 Streaming enables real-time output from your agents, providing immediate feedback as the agent works through tasks. This creates responsive user experiences and allows you to show progress indicators, tool calls, and partial results as they happen.
 
-## Why Stream?
 
-Streaming provides several benefits:
-
-- **Better UX**: Show progress instead of waiting for completion
-- **Immediate feedback**: Users see the agent working in real-time
-- **Transparency**: Display tool calls and reasoning as they happen
-- **Responsiveness**: Start processing results before the agent finishes
-- **Error visibility**: Catch and display errors immediately
-
-<Tip>
-**Perfect for Chat Interfaces**: Streaming is essential for building chat-like interfaces where users expect to see responses appear token-by-token, just like ChatGPT.
-</Tip>
 
 ## Streaming Methods
 
 The MCPAgent provides different streaming approaches for different use cases.
 
-<CodeGroup>
-```typescript TypeScript
+```typescript 
 import { ChatOpenAI } from '@langchain/openai'
 import { MCPAgent, MCPClient } from 'mcp-use'
 
@@ -62,14 +49,12 @@ async function stepStreamingExample() {
 stepStreamingExample().catch(console.error)
 ```
 
-</CodeGroup>
 
 ## Low-Level Event Streaming
 
 For more granular control, use the `streamEvents()` method to get real-time output events:
 
-<CodeGroup>
-```typescript TypeScript
+```typescript
 import { ChatOpenAI } from '@langchain/openai'
 import { MCPAgent, MCPClient } from 'mcp-use'
 
@@ -109,8 +94,6 @@ async function basicStreamingExample() {
 basicStreamingExample().catch(console.error)
 ```
 
-</CodeGroup>
-
 <Note>
 **Event Property**: The event chunk property may be `text` or `content` depending on the LangChain version and LLM provider. Check both properties for compatibility:
 ```typescript
@@ -126,8 +109,11 @@ The streaming API is based on LangChain's `streamEvents` method. For more detail
 
 The `prettyStreamEvents()` method provides beautifully formatted, syntax-highlighted output for streaming agent execution. Perfect for CLI tools and development environments where you want human-readable output.
 
-<CodeGroup>
-```typescript TypeScript
+<video alt="Code Mode Streaming Example" style={{maxWidth: '600px', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} muted autoPlay loop>
+  <source src="/images/code_mode.mp4" type="video/mp4" />
+</video>
+
+```typescript
 import { MCPAgent } from 'mcp-use'
 
 async function prettyStreamExample() {
@@ -154,7 +140,6 @@ async function prettyStreamExample() {
 
 prettyStreamExample().catch(console.error)
 ```
-</CodeGroup>
 
 ### Features
 
