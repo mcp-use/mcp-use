@@ -116,6 +116,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          
+          # Ensure we're on the latest commit (commits were pushed in previous step)
+          git fetch --tags --force
+          git pull origin canary
+          
           cd libraries/typescript
           pnpm changeset tag
           cd ../..
@@ -129,6 +134,7 @@ jobs:
           echo "📦 Tags created: $NEW_TAGS"
           echo "$NEW_TAGS" > .release-tags
 
+          # Push tags (commits were already pushed in the "Version packages" step)
           git push --tags
           echo "✅ Pushed tags"
 
@@ -347,6 +353,11 @@ jobs:
         run: |
           set -e  # Exit immediately if any command fails
           
+          # Ensure we're on the latest commit and have all remote refs
+          git fetch --tags --force
+          git checkout main
+          git pull origin main
+          
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
           pnpm changeset publish
@@ -367,6 +378,7 @@ jobs:
           echo "$NEW_TAGS" > .release-tags
 
           # Push git tags - fail immediately if this doesn't work
+          # Note: Commits should already be pushed from the prerelease exit step
           if ! git push --tags; then
             echo "❌ Failed to push tags to remote (git push --tags)"
             rm -f .release-tags  # Clean up tags file since push failed
