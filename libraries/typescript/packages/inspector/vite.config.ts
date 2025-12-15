@@ -46,6 +46,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Use require.resolve to get the actual module path from node_modules
+      // This works in both dev (with workspace links) and production
       "mcp-use/react": path.resolve(
         __dirname,
         "../mcp-use/dist/src/react/index.js"
@@ -95,7 +97,7 @@ export default defineConfig({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["mcp-use/react", "react-syntax-highlighter"],
+    include: ["mcp-use/react", "mcp-use/browser", "react-syntax-highlighter"],
     exclude: [
       "posthog-node",
       "tar", // Node.js file system package

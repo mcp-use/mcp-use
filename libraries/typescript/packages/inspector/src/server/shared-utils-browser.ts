@@ -83,7 +83,7 @@ export async function* handleChatRequestStream(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  const { MCPAgent, MCPClient } = await import("mcp-use");
+  const { MCPAgent, MCPClient } = await import("mcp-use/browser");
 
   // Create LLM instance based on provider
   let llm: BaseLLM;
@@ -113,7 +113,8 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
@@ -248,7 +249,7 @@ export async function handleChatRequest(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  const { MCPAgent, MCPClient } = await import("mcp-use");
+  const { MCPAgent, MCPClient } = await import("mcp-use/browser");
 
   // Create LLM instance based on provider
   let llm: BaseLLM;
@@ -278,7 +279,8 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
