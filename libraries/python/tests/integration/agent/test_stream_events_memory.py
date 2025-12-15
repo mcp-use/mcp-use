@@ -106,7 +106,7 @@ async def test_stream_events_keeps_ai_messages_in_memory():
         # Verify all AI messages have content
         for i, msg in enumerate(messages):
             if isinstance(msg, AIMessage):
-                assert len(msg.content) is not None, f"AI message at index {i} should have content"
+                assert msg.content is not None, f"AI message at index {i} should have content"
 
         logger.info("=" * 80 + "\n")
         logger.info("✅ Test passed: stream_events properly stores AI messages in memory")
