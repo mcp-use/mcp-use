@@ -148,126 +148,6 @@ const server = new MCPServer({
 });
 ```
 
-## Registration Replay Pattern
-
-When a new session is created, mcp-use uses a "registration replay" pattern to initialize the server instance:
-
-```typescript
-// During server setup, registrations are stored
-server.tool('greet', { name: z.string() }, async ({ name }) => {
-  return `Hello, ${name}!`;
-});
-
-server.resource('/data', async () => {
-  return { contents: [{ uri: '/data', text: 'Data' }] };
-});
-
-// On each new session initialization:
-// 1. Create fresh McpServer instance
-// 2. Replay all registrations (tools, prompts, resources)
-// 3. Connect to transport
-```
-
-**Why this pattern?**
-
-The official MCP SDK's `McpServer` is designed to be per-session. Rather than creating a new server from scratch each time, mcp-use:
-
-1. **Stores registrations once** when you call `server.tool()`, `server.prompt()`, etc.
-2. **Replays them automatically** when creating new session instances
-3. **Provides isolation** - each session has its own server instance
-
-## Split Architecture: Metadata vs Streams
-
-mcp-use separates session management into two distinct concerns:
-
-### 1. Session Metadata Storage (`SessionStore`)
-
-Stores **serializable** session metadata:
-- Client capabilities
-- Client info (name, version)
-- Protocol version
-- Log level
-- Last access timestamp
-
-This data can be stored in Redis or any persistent storage.
-
-### 2. Active Stream Management (`StreamManager`)
-
-Manages **live** SSE connections:
-- ReadableStreamDefaultController instances
-- Active WebSocket connections
-- Server-to-client push channels
-
-These connections **cannot be serialized** and must use message buses (Redis Pub/Sub) for distributed deployments.
-
-### Why This Split?
-
-```mermaid
-graph TB
-    subgraph singleServer [Single Server - Simple]
-        SM1[SessionStore<br/>In-Memory]
-        STM1[StreamManager<br/>In-Memory]
-    end
-    
-    subgraph distributed [Distributed Servers - Redis]
-        SM2[SessionStore<br/>Redis Keys]
-        STM2[StreamManager<br/>Redis Pub/Sub]
-        
-        SM2 -.->|"stores metadata"| Redis[(Redis)]
-        STM2 -.->|"pub/sub messages"| Redis
-    end
-    
-    Client1[Client A] -->|SSE connection| Server1[Server Instance 1]
-    Client1 -->|HTTP request| Server2[Server Instance 2]
-    
-    Server1 -.->|registers controller| STM2
-    Server2 -.->|sends notification| STM2
-    STM2 -.->|delivers to| Server1
-    Server1 -.->|pushes via SSE| Client1
-    
-    style Redis fill:#ff6b6b
-    style distributed fill:#4ecdc4,color:#000
-    style singleServer fill:#95e1d3,color:#000
-```
-
-**The Problem:** You can't serialize a `ReadableStreamDefaultController`!
-
-```typescript
-// ❌ This doesn't work - controllers can't be stored in Redis
-await redis.set('session:abc', JSON.stringify({
-  controller: mySSEController  // TypeError: Converting circular structure
-}));
-```
-
-**The Solution:** Use Redis Pub/Sub as a message bus between servers.
-
-### Distributed Notifications Flow
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant ServerA as Server A<br/>(has SSE connection)
-    participant Redis as Redis Pub/Sub
-    participant ServerB as Server B<br/>(handling request)
-    
-    Note over Client,ServerA: Client opens SSE connection
-    Client->>ServerA: GET /mcp<br/>Accept: text/event-stream
-    ServerA->>Redis: SUBSCRIBE mcp:stream:abc-123
-    Note over ServerA: Stores controller locally
-    
-    Note over Client,ServerB: Later, load balancer routes to Server B
-    Client->>ServerB: POST /mcp<br/>session-id: abc-123<br/>tools/call "fetch_data"
-    
-    Note over ServerB: Needs to send sampling request
-    ServerB->>Redis: PUBLISH mcp:stream:abc-123<br/>"event: sampling/createMessage..."
-    
-    Redis-->>ServerA: Receives published message
-    ServerA->>Client: Pushes via SSE<br/>event: sampling/createMessage
-    
-    Client->>ServerA: Sends sampling response via SSE
-    ServerA->>ServerB: (via shared state or request)
-    ServerB-->>Client: Returns tool result
-```
 
 ## Storage Providers
 
@@ -293,7 +173,7 @@ const server = new MCPServer({
 
 ## Deployment Patterns
 
-### Pattern 1: Single Server (Default)
+### Single Server
 
 Simple development/single-instance deployment:
 
@@ -312,13 +192,7 @@ const server = new MCPServer({
 - ✅ No external dependencies
 - ❌ Sessions lost on restart
 - ❌ Can't scale horizontally
-
-**Use for:**
-- Development
-- Internal tools
-- Single-user deployments
-
-### Pattern 2: Persistent Sessions (Single Server)
+### Persistent Sessions 
 
 Session metadata survives restarts, but still single server:
 
@@ -339,13 +213,7 @@ const server = new MCPServer({
 - ❌ Can't distribute across multiple instances
 - ⚠️ Active SSE connections still lost on restart
 
-**Use for:**
-- Production single-instance deployments
-- Services that restart frequently
-- Cost-sensitive deployments (no Redis Pub/Sub overhead)
-
-### Pattern 3: Full Distributed (Recommended for Production)
-
+### Distributed
 Complete horizontal scaling with all MCP features:
 
 ```typescript
@@ -371,13 +239,8 @@ const server = new MCPServer({
 - ✅ Load balancer can route requests anywhere
 - ✅ Session metadata persists
 
-**Use for:**
-- Production load-balanced deployments
-- High-availability systems
-- Multi-region deployments
-- Services using notifications/sampling
 
-### Pattern 4: Stateless (Edge Functions)
+### Stateless
 
 No sessions, no state:
 
@@ -398,87 +261,7 @@ const server = new MCPServer({
 - ❌ No resource subscriptions
 - ❌ No SSE streaming
 
-**Use for:**
-- Cloudflare Workers
-- AWS Lambda
-- Vercel Edge Functions
-- Simple stateless APIs
 
-## Best Practices
-
-### 1. Choose the Right Pattern
-
-| Requirement | Pattern |
-|-------------|---------|
-| Development/testing | Pattern 1 (In-memory) |
-| Single server + restart persistence | Pattern 2 (Redis metadata only) |
-| Load balanced + notifications | Pattern 3 (Redis full) |
-| Edge functions/serverless | Pattern 4 (Stateless) |
-
-### 2. Handle 404 Gracefully
-
-Compliant clients automatically re-initialize on 404. This is handled automatically by mcp-use.
-
-### 3. Clean Up on Shutdown
-
-```typescript
-process.on('SIGTERM', async () => {
-  await streamManager.close();  // Close SSE connections
-  await sessionStore.close();    // Close Redis connection
-  process.exit(0);
-});
-```
-
-### 4. Use Two Redis Clients for Pub/Sub
-
-Redis Pub/Sub requires a dedicated client. Use separate clients:
-
-```typescript
-const redis = createClient({ ... });
-const pubSubRedis = redis.duplicate();
-```
-
-## Troubleshooting
-
-### Sessions Lost on Restart
-
-**Problem**: Clients get 404 after server restart.
-
-**Solution**: Use persistent session storage (Redis):
-
-```typescript
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  sessionStore: new RedisSessionStore({ ... })
-});
-```
-
-### Client Not Re-initializing
-
-**Problem**: Client fails to reconnect after 404.
-
-**Solution**: Use a compliant MCP client (Claude Desktop, official SDK) or use persistent storage to avoid 404s.
-
-### Memory Leaks
-
-**Problem**: Memory usage grows over time.
-
-**Solution**: Configure idle timeout:
-
-```typescript
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  sessionIdleTimeoutMs: 300000  // 5 minutes
-});
-```
-
-### Distributed Session Issues
-
-**Problem**: Sessions not shared across multiple server instances.
-
-**Solution**: Use `RedisSessionStore` (see [Redis Storage](/typescript/server/session-management/redis-storage)).
 
 ## Related Documentation
 

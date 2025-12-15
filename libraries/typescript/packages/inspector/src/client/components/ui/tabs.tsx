@@ -1,7 +1,6 @@
 "use client";
 
 import type { LucideIcon } from "lucide-react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/client/lib/utils";
 import {
@@ -49,6 +48,7 @@ interface TabsProps {
   value?: string;
   onValueChange?: (value: string) => void;
   className?: string;
+  collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
 }
 
@@ -59,11 +59,13 @@ function Tabs({
   value,
   onValueChange,
   className,
+  collapsed: collapsedProp,
   onCollapsedChange,
   ...props
 }: TabsProps & { ref?: React.RefObject<HTMLDivElement | null> }) {
   const [activeValue, setActiveValue] = React.useState(defaultValue || "");
   const isControlled = value !== undefined;
+  const isCollapsedControlled = collapsedProp !== undefined;
   const [collapsed, setCollapsed] = React.useState(false);
   const handleValueChange = React.useCallback(
     (val: string) => {
@@ -76,13 +78,16 @@ function Tabs({
   );
 
   const currentValue = isControlled ? value : activeValue;
+  const currentCollapsed = isCollapsedControlled ? collapsedProp : collapsed;
 
   const handleCollapsedChange = React.useCallback(
     (collapsed: boolean) => {
-      setCollapsed(collapsed);
+      if (!isCollapsedControlled) {
+        setCollapsed(collapsed);
+      }
       onCollapsedChange?.(collapsed);
     },
-    [onCollapsedChange]
+    [isCollapsedControlled, onCollapsedChange]
   );
 
   return (
@@ -90,7 +95,7 @@ function Tabs({
       value={{
         activeValue: currentValue,
         handleValueChange,
-        collapsed,
+        collapsed: currentCollapsed,
         handleCollapsedChange,
       }}
     >
@@ -251,32 +256,13 @@ function TabsList({
           <span
             ref={indicatorRef}
             className={cn(
-              "absolute transition-all duration-300 ease-out z-0",
+              "absolute transition-all duration-500 ease-in-out z-0",
               variant === "default" &&
                 "bg-white dark:bg-zinc-700 rounded-full h-[calc(100%)] top-0 border border-zinc-300 dark:border-zinc-600",
               variant === "underline" && "bottom-0 h-0.5 bg-black dark:bg-white"
             )}
           />
         </div>
-        {collapsible && (
-          <button
-            onClick={() => handleCollapsedChange(!collapsed)}
-            className={cn(
-              "shrink-0 p-1.5 rounded-md transition-all duration-300 ease-out",
-              "text-muted-foreground hover:text-foreground",
-              "hover:bg-zinc-100 dark:hover:bg-zinc-800",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            )}
-            aria-label={collapsed ? "Expand tabs" : "Collapse tabs"}
-            type="button"
-          >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4 transition-transform duration-300" />
-            ) : (
-              <ChevronLeft className="h-4 w-4 transition-transform duration-300" />
-            )}
-          </button>
-        )}
       </div>
     </TabsListContext>
   );
@@ -361,7 +347,7 @@ const TabsTrigger = React.forwardRef<
           aria-selected={isActive ? "true" : "false"}
           title={title}
           className={cn(
-            "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+            "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
             variant === "default" && "py-2.5",
             variant === "default" && "rounded-md px-4",
             // variant === "default" && collapsed && "rounded-md px-1.5 aspect-square",
@@ -376,7 +362,7 @@ const TabsTrigger = React.forwardRef<
           {Icon && (
             <Icon
               className={cn(
-                "h-4 w-4 transition-all duration-300 ease-out",
+                "h-4 w-4 transition-all duration-500 ease-in-out",
                 !collapsed && "mr-2",
                 collapsed && "mr-0!"
               )}
@@ -384,7 +370,7 @@ const TabsTrigger = React.forwardRef<
           )}
           <span
             className={cn(
-              "transition-all duration-300 ease-out overflow-hidden",
+              "transition-all duration-500 ease-in-out overflow-hidden",
               collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
             )}
           >
