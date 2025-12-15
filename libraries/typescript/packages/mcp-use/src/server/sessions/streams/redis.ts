@@ -397,11 +397,11 @@ export class RedisStreamManager implements StreamManager {
       // This is important when multiple servers share the same Redis instance
       const activeSessionsKey = this.getActiveSessionsKey();
       const sessionIdsToCleanup = Array.from(this.localControllers.keys());
-      
+
       for (const sessionId of sessionIdsToCleanup) {
         // Delete availability key
         await this.client.del(this.getAvailableKey(sessionId));
-        
+
         // Remove from active sessions SET
         if (this.client.sRem) {
           await this.client.sRem(activeSessionsKey, sessionId);
