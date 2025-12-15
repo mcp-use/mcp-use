@@ -99,7 +99,7 @@ show_help() {
 }
 
 # Parse flags and arguments
-MCP_USE_VERSION="1.10.6"
+MCP_USE_VERSION="latest"
 PROJECT_ID=""
 FUNCTION_NAME=""
 BUCKET_NAME=""
@@ -344,9 +344,9 @@ print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
 cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@679/client",
-    "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@679/server",
-    "zod/v4": "https://esm.sh/zod@4/v4"
+    "mcp-use/client": "npm:mcp-use@${MCP_USE_VERSION}/client",
+    "mcp-use/server": "npm:mcp-use@${MCP_USE_VERSION}/server",
+    "zod": "npm:zod@^4.2.0"
   }
 }
 
