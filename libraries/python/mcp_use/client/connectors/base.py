@@ -21,6 +21,7 @@ from mcp.shared.exceptions import McpError
 from mcp.types import (
     CallToolResult,
     GetPromptResult,
+    InitializeResult,
     Prompt,
     PromptListChangedNotification,
     ReadResourceResult,
@@ -68,9 +69,11 @@ class BaseConnector(ABC):
         self.message_handler = message_handler
         self.logging_callback = logging_callback
         self.capabilities: ServerCapabilities | None = None
+        self._record_telemetry = True
 
         # Set up middleware manager
         self.middleware_manager = MiddlewareManager()
+        self.middleware_manager._record_telemetry = False
         if middleware:
             for mw in middleware:
                 self.middleware_manager.add_middleware(mw)
@@ -169,14 +172,14 @@ class BaseConnector(ABC):
             logger.warning(f"Encountered {len(errors)} errors during resource cleanup")
 
     @telemetry("connector_initialize")
-    async def initialize(self) -> dict[str, Any]:
+    async def initialize(self) -> InitializeResult | None:
         """Initialize the MCP session and return session information."""
         if not self.client_session:
             raise RuntimeError("MCP client is not connected")
 
         # Check if already initialized
         if self._initialized:
-            return {"status": "already_initialized"}
+            return None
 
         # Initialize the session
         result = await self.client_session.initialize()
@@ -473,10 +476,3 @@ class BaseConnector(ABC):
         logger.debug(f"Getting prompt: {name}")
         result = await self.client_session.get_prompt(name, arguments)
         return result
-
-    async def request(self, method: str, params: dict[str, Any] | None = None) -> Any:
-        """Send a raw request to the MCP implementation."""
-        await self._ensure_connected()
-
-        logger.debug(f"Sending request: {method} with params: {params}")
-        return await self.client_session.request({"method": method, "params": params or {}})

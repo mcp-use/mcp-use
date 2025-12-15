@@ -251,7 +251,7 @@ jobs:
 
   python-transport-tests-report:
     needs: python-transport-tests
-    if: always() && github.event_name == 'pull_request'
+    if: always() && github.event_name == 'pull_request' && needs.python-transport-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -415,7 +415,7 @@ jobs:
 
   python-primitive-tests-report:
     needs: python-primitive-tests
-    if: always() && github.event_name == 'pull_request'
+    if: always() && github.event_name == 'pull_request' && needs.python-primitive-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

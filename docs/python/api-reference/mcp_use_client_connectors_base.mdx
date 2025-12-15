@@ -147,7 +147,7 @@ Initialize the MCP session and return session information.
 
 
 **Returns**
-><ResponseField name="returns" type="dict[str, Any]" />
+><ResponseField name="returns" type="mcp.types.InitializeResult | None" />
 
 **Signature**
 ```python wrap
@@ -276,26 +276,6 @@ Read a resource by URI.
 **Signature**
 ```python wrap
 def read_resource(uri: pydantic.networks.AnyUrl):
-```
-
-</Card>
-
-<Card type="info">
-### `method` request
-
-Send a raw request to the MCP implementation.
-
-
-**Parameters**
-><ParamField body="method" type="str" required="True" >   String value </ParamField>
-><ParamField body="params" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
-
-**Returns**
-><ResponseField name="returns" type="Any" />
-
-**Signature**
-```python wrap
-def request(method: str, params: dict[str, typing.Any] | None = None):
 ```
 
 </Card>

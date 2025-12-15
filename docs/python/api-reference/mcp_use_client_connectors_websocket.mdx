@@ -51,4 +51,24 @@ def __init__(url: str, headers: dict[str, str] | None = None, auth: str | dict[s
 ```
 
 </Card>
+<Card type="info">
+### `method` request
+
+Send a raw request to the MCP implementation.
+
+
+**Parameters**
+><ParamField body="method" type="str" required="True" >   String value </ParamField>
+><ParamField body="params" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def request(method: str, params: dict[str, typing.Any] | None = None):
+```
+
+</Card>
+
 </div>

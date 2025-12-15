@@ -453,32 +453,3 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
             await self.connector.read_resource("test/resource")
 
         self.assertEqual(str(context.exception), "MCP client is not connected")
-
-    async def test_request(self, _):
-        """Test sending a request."""
-        self.connector.client_session.request.return_value = {"result": "success"}
-
-        result = await self.connector.request("test_method", {"param": "value"})
-
-        self.connector.client_session.request.assert_called_once_with(
-            {"method": "test_method", "params": {"param": "value"}}
-        )
-        self.assertEqual(result, {"result": "success"})
-
-    async def test_request_no_params(self, _):
-        """Test sending a request without params."""
-        self.connector.client_session.request.return_value = {"result": "success"}
-
-        result = await self.connector.request("test_method")
-
-        self.connector.client_session.request.assert_called_once_with({"method": "test_method", "params": {}})
-        self.assertEqual(result, {"result": "success"})
-
-    async def test_request_no_client(self, _):
-        """Test sending a request when not connected."""
-        self.connector.client_session = None
-
-        with self.assertRaises(RuntimeError) as context:
-            await self.connector.request("test_method")
-
-        self.assertEqual(str(context.exception), "MCP client is not connected")

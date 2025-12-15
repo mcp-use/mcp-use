@@ -1,0 +1,58 @@
+---
+title: Session Management
+description: Using session IDs in MCP servers
+icon: "id-card"
+---
+
+Sessions keep per-client state (caching, auth, limits). Managed by the MCP SDK via `mcp-session-id` HTTP header (spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management).
+
+## How it works
+
+- SDK generates a UUID when no session header is present.
+- Server returns it in `mcp-session-id` on initialize.
+- Client sends the header on all requests.
+- Server reuses the session; middleware sees it as `context.session_id`.
+
+## Get session ID
+
+```python
+# Middleware
+sid = context.session_id or "anonymous"
+
+# Tool
+@server.tool()
+def session_id() -> dict:
+    sid = server._get_session_id_from_request()
+    return {"session_id": sid, "short": sid[:8] if sid else None}
+```
+
+## Per-session patterns (minimal)
+
+**State / rate limit / cache key** by `context.session_id or "anonymous"`:
+
+```python
+class SessionState(Middleware):
+    def __init__(self): self.counts = defaultdict(int)
+    async def on_request(self, ctx, nxt):
+        sid = ctx.session_id or "anonymous"
+        self.counts[sid] += 1
+        return await nxt(ctx)
+```
+
+Per-session cache:
+```python
+class SessionCache(Middleware):
+    def __init__(self): self.c = defaultdict(dict)
+    async def on_read_resource(self, ctx, nxt):
+        sid = ctx.session_id or "anonymous"
+        uri = str(ctx.message.uri)
+        cache = self.c[sid]
+        if uri in cache: return cache[uri]
+        res = await nxt(ctx); cache[uri] = res; return res
+```
+
+## Notes
+
+- Only available on Streamable HTTP transport; stdio has no sessions.
+- Use per-session storage to avoid data leakage.
+- Keep session data lean; expire if needed.
