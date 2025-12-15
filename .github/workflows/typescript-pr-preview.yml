@@ -71,7 +71,8 @@ jobs:
           {
             "imports": {
               "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client"
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client",
+              "zod": "npm:zod@^4.2.0"
             }
           }
           EOF
