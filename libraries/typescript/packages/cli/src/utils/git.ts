@@ -141,7 +141,10 @@ export function isGitHubUrl(url: string): boolean {
   try {
     // Handle HTTP(S) URLs
     const parsedUrl = new URL(url);
-    return parsedUrl.hostname === "github.com" || parsedUrl.hostname === "www.github.com";
+    return (
+      parsedUrl.hostname === "github.com" ||
+      parsedUrl.hostname === "www.github.com"
+    );
   } catch {
     // Handle SSH/shortened git URLs: git@github.com:user/repo.git
     // Extract the host before the ":" or "/" (if git@host:repo or git@host/repo)
