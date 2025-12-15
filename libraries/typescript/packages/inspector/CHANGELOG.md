@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.13
+
+### Patch Changes
+
+- f7623fc: chore: remove dead code
+  - mcp-use@1.11.0-canary.13
+
 ## 0.13.0-canary.12
 
 ### Patch Changes
