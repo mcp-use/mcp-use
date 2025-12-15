@@ -97,7 +97,8 @@
       <h3>🛠️ Create an MCP Server</h3>
       <p>Build your own MCP servers with tools, resources, and prompts.</p>
       <p>
-        <a href="#create-an-mcp-server">Quick Start ↓</a> | 
+        <a href="#create-an-mcp-server">Quick Start ↓</a> |
+        <a href="https://docs.mcp-use.com/python/server/index">Python Docs</a> |
         <a href="https://docs.mcp-use.com/typescript/server/getting-started">TypeScript Docs</a>
       </p>
     </td>
