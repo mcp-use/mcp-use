@@ -116,7 +116,7 @@
       <h3>🎨 Build ChatGPT Apps</h3>
       <p>Create interactive UIs with mcp-ui, react and live reload.</p>
       <p>
-        <a href="https://docs.mcp-use.com/typescript/server/mcp-ui-resources">Quick Start</a> | 
+        <a href="https://docs.mcp-use.com/typescript/server/ui-widgets">Quick Start</a> | 
         <a href="https://docs.mcp-use.com/typescript/server/templates">Templates</a>
       </p>
     </td>
