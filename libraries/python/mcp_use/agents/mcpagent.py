@@ -930,7 +930,8 @@ class MCPAgent:
 
         # 3. Build inputs --------------------------------------------------------
         history_to_use = external_history if external_history is not None else self._conversation_history
-        inputs = {"messages": [*history_to_use, HumanMessage(content=query)]}
+        langchain_history: list[BaseMessage] = [msg for msg in history_to_use if not isinstance(msg, SystemMessage)]
+        inputs = {"messages": [*langchain_history, HumanMessage(content=query)]}
 
         # 4. Stream & collect response chunks ------------------------------------
         recursion_limit = self.max_steps * 2
@@ -944,17 +945,15 @@ class MCPAgent:
                 "recursion_limit": recursion_limit,
             },
         ):
-            # Collect AI message chunks for history
-            if event.get("event") == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and getattr(chunk, "content", None):
-                    if isinstance(chunk.content, str):
-                        content = chunk.content
-                    elif hasattr(chunk.content, "__iter__"):
-                        content = "".join([item.get("text", "") for item in chunk.content])
-                    else:
-                        content = str(chunk.content)
-                    ai_message_chunks.append(content)
+            event_type = event.get("event")
+            if event_type == "on_chat_model_end":
+                # This contains the AIMessage
+                ai_message: AIMessage = event.get("data", {}).get("output")
+                self.add_to_history(ai_message)
+            if event_type == "on_tool_end":
+                # This contains the ToolMessage
+                tool_message: ToolMessage = event.get("data", {}).get("output")
+                self.add_to_history(tool_message)
 
             yield event
 
