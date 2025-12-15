@@ -151,7 +151,7 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
 
             async def _arun(
                 self,
-                config: RunnableConfig | None = None,
+                config: RunnableConfig = None,
                 **kwargs: Any,
             ) -> str | dict:
                 """Asynchronously execute the tool with given arguments.
