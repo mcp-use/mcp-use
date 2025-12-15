@@ -8,7 +8,7 @@
  * Required: OPENAI_API_KEY (or ANTHROPIC_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY)
  */
 
-import { MCPAgent } from "mcp-use/agent";
+import { MCPAgent } from "../../../dist/src/agents";
 
 async function simplifiedModeExample() {
   console.log("🚀 Simplified Mode Example\n");
@@ -123,15 +123,13 @@ async function multiProviderExample() {
 }
 
 // Run examples
-if (import.meta.url === `file://${process.argv[1]}`) {
-  (async () => {
-    try {
-      await simplifiedModeExample();
-      await simplifiedModeWithConfigExample();
-      // await multiProviderExample(); // Uncomment to test multiple providers
-    } catch (error) {
-      console.error("\n❌ Error:", error);
-      process.exit(1);
-    }
-  })();
-}
+(async () => {
+  try {
+    await simplifiedModeExample();
+    await simplifiedModeWithConfigExample();
+    // await multiProviderExample(); // Uncomment to test multiple providers
+  } catch (error) {
+    console.error("\n❌ Error:", error);
+    process.exit(1);
+  }
+})();

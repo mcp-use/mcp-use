@@ -10,25 +10,23 @@
  * Required: OPENAI_API_KEY
  */
 
-import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "../../../index.js";
+import { MCPAgent } from "../../../dist/src/agents";
 
 async function runAirbnbExample() {
   // Create MCPClient with Airbnb configuration
-  const config = {
-    mcpServers: {
-      airbnb: {
-        command: "npx",
-        args: ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
-      },
+  const mcpServers = {
+    airbnb: {
+      command: "npx",
+      args: ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"],
     },
   };
-  const client = new MCPClient(config);
   // Create LLM - you can choose between different models
-  const llm = new ChatOpenAI({ model: "gpt-4o" });
-
   // Create agent with the client
-  const agent = new MCPAgent({ llm, client, maxSteps: 30 });
+  const agent = new MCPAgent({
+    llm: "openai/gpt-5.1",
+    mcpServers,
+    maxSteps: 30,
+  });
 
   try {
     // Run a query to search for accommodations
@@ -42,10 +40,8 @@ async function runAirbnbExample() {
     console.error(`\nResult: ${result}`);
   } finally {
     // Ensure we clean up resources properly
-    await client.closeAllSessions();
+    await agent.close();
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runAirbnbExample().catch(console.error);
-}
+runAirbnbExample().catch(console.error);

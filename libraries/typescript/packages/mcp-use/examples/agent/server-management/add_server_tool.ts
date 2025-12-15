@@ -9,7 +9,8 @@
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "../../../index.js";
+import { MCPAgent } from "../../../dist/src/agents";
+import { MCPClient } from "../../../dist/src/client";
 import { LangChainAdapter } from "../../../src/adapters/langchain_adapter.js";
 import { ServerManager } from "../../../src/managers/server_manager.js";
 import { AddMCPServerFromConfigTool } from "../../../src/managers/tools/add_server_from_config.js";
@@ -87,6 +88,4 @@ async function main() {
   await client.closeAllSessions();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
-}
+main().catch(console.error);

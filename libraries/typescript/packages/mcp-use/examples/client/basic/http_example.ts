@@ -18,20 +18,17 @@
  * Required: OPENAI_API_KEY
  */
 
-import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "../../../index.js";
+import { MCPAgent } from "../../../dist/src/agents";
 
 async function main() {
-  const config = { mcpServers: { http: { url: "https://gitmcp.io/docs" } } };
-
-  // Create MCPClient from config
-  const client = MCPClient.fromDict(config);
-
-  // Create LLM
-  const llm = new ChatOpenAI({ model: "gpt-4o" });
+  const mcpServers = { http: { url: "https://gitmcp.io/docs" } };
 
   // Create agent with the client
-  const agent = new MCPAgent({ llm, client, maxSteps: 30 });
+  const agent = new MCPAgent({
+    llm: "openai/gpt-5.1",
+    mcpServers,
+    maxSteps: 30,
+  });
 
   // Run the query
   const result = await agent.run({
@@ -43,6 +40,4 @@ async function main() {
   await agent.close();
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
-}
+main().catch(console.error);

@@ -13,7 +13,8 @@
  */
 
 // CommonJS imports using require()
-const { MCPClient, MCPAgent } = require("../../../dist/index.cjs");
+const { MCPClient } = require("../../../dist/src/client.cjs");
+const { MCPAgent } = require("../../../dist/src/agents.cjs");
 const { ChatOpenAI } = require("@langchain/openai");
 
 async function runCommonJSExample() {

@@ -15,21 +15,20 @@
  * Required: ANTHROPIC_API_KEY
  */
 
-import { ChatAnthropic } from "@langchain/anthropic";
-import { MCPAgent, MCPClient } from "../../../index.js";
+import { MCPAgent } from "../../../dist/src/agents";
 
 async function runBlenderExample() {
   // Create MCPClient with Blender MCP configuration
-  const config = {
-    mcpServers: { blender: { command: "uvx", args: ["blender-mcp"] } },
+  const mcpServers = {
+    blender: { command: "uvx", args: ["blender-mcp"] },
   };
-  const client = MCPClient.fromDict(config);
-
-  // Create LLM
-  const llm = new ChatAnthropic({ model: "claude-3-5-sonnet-20240620" });
 
   // Create agent with the client
-  const agent = new MCPAgent({ llm, client, maxSteps: 30 });
+  const agent = new MCPAgent({
+    llm: "anthropic/claude-3-5-sonnet-20240620",
+    mcpServers,
+    maxSteps: 30,
+  });
 
   try {
     // Run the query
@@ -41,10 +40,8 @@ async function runBlenderExample() {
     console.error(`\nResult: ${result}`);
   } finally {
     // Ensure we clean up resources properly
-    await client.closeAllSessions();
+    await agent.close();
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runBlenderExample().catch(console.error);
-}
+runBlenderExample().catch(console.error);

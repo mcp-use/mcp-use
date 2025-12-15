@@ -8,7 +8,7 @@
  * Required: OPENAI_API_KEY
  */
 
-import { MCPAgent } from "mcp-use/agent";
+import { MCPAgent } from "../../../dist/src/agents";
 
 const mcpServers = {
   everything: {
@@ -19,7 +19,7 @@ const mcpServers = {
 
 async function main() {
   const agent = new MCPAgent({
-    llm: "openai/gpt-4o",
+    llm: "openai/gpt-5.1",
     mcpServers,
     maxSteps: 30,
   });
@@ -32,6 +32,7 @@ async function main() {
     maxSteps: 30,
   });
   console.log(`\nResult: ${result}`);
+  await agent.close();
 }
 
 main().catch(console.error);

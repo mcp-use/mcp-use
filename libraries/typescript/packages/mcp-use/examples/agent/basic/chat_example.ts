@@ -8,11 +8,11 @@
  *
  * Note: Make sure to load your environment variables before running this example.
  * Required: OPENAI_API_KEY
+ * Required deps: @langchain/openai
  */
 
 import readline from "node:readline";
-import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent } from "mcp-use/agent";
+import { MCPAgent } from "../../../dist/src/agents";
 
 async function runMemoryChat() {
   // Config file path - change this to your config file
@@ -26,8 +26,11 @@ async function runMemoryChat() {
   console.error("Initializing chat...");
 
   // Create agent with memory enabled
-  const llm = new ChatOpenAI({ model: "gpt-4o-mini" });
-  const agent = new MCPAgent({ llm, mcpServers, maxSteps: 30 });
+  const agent = new MCPAgent({
+    llm: "openai/gpt-5.1",
+    mcpServers,
+    maxSteps: 30,
+  });
 
   console.error("\n===== Interactive MCP Chat =====");
   console.error("Type 'exit' or 'quit' to end the conversation");
@@ -82,10 +85,8 @@ async function runMemoryChat() {
   } finally {
     // Clean up
     rl.close();
-    await client.closeAllSessions();
+    await agent.close();
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runMemoryChat().catch(console.error);
-}
+runMemoryChat().catch(console.error);

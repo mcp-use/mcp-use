@@ -13,10 +13,11 @@
  * Required: ANTHROPIC_API_KEY
  */
 
-import type { StreamEvent } from "../../../index.js";
+import type { StreamEvent } from "@langchain/core/tracers/log_stream.js";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createTextStreamResponse } from "ai";
-import { MCPAgent, MCPClient } from "../../../index.js";
+import { MCPAgent } from "../../../dist/src/agents";
+import { MCPClient } from "../../../dist/src/client";
 
 // Utility function to convert streamEvents to AI SDK compatible stream
 async function* streamEventsToAISDK(
@@ -254,6 +255,4 @@ export {
   streamEventsToAISDKWithTools,
 };
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runAllExamples().catch(console.error);
-}
+runAllExamples().catch(console.error);

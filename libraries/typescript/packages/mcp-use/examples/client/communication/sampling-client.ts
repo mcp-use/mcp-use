@@ -11,8 +11,11 @@
  * 2. Run this client: tsx examples/client/sampling-client.ts
  */
 
-import { MCPClient } from "mcp-use";
-import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type {
+  CreateMessageRequest,
+  TextContent,
+} from "@mcp-use/modelcontextprotocol-sdk/types";
+import { MCPClient } from "../../../dist/src/client";
 
 // Mock LLM function - replace this with your actual LLM integration
 async function mockLLM(prompt: string): Promise<string> {
@@ -127,7 +130,7 @@ async function main() {
     const sentimentResult = await connector.callTool("analyze-sentiment", {
       text: "I love this product! It's amazing!",
     });
-    console.log("   Result:", sentimentResult.content[0].text);
+    console.log("   Result:", (sentimentResult.content[0] as TextContent).text);
     console.log();
 
     // Test summarize-text tool
@@ -136,7 +139,7 @@ async function main() {
       text: "This is a long piece of text that needs to be summarized. It contains multiple sentences and ideas that should be condensed into a shorter form while preserving the key information.",
       maxLength: 20,
     });
-    console.log("   Result:", summaryResult.content[0].text);
+    console.log("   Result:", (summaryResult.content[0] as TextContent).text);
     console.log();
 
     // Test translate-text tool
@@ -145,7 +148,7 @@ async function main() {
       text: "Hello, world!",
       targetLanguage: "Spanish",
     });
-    console.log("   Result:", translateResult.content[0].text);
+    console.log("   Result:", (translateResult.content[0] as TextContent).text);
     console.log();
 
     console.log("✅ All tests completed successfully!");
