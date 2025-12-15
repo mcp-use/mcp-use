@@ -65,8 +65,6 @@ const config = {
 4. Preview the example:
    ```bash
    pnpm preview
-   # or use the simple server:
-   pnpm serve
    ```
 
 ## Development

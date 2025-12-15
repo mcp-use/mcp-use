@@ -685,6 +685,9 @@ importers:
       '@mcp-use/cli':
         specifier: workspace:*
         version: link:../../../../cli
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.0.2
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -694,7 +697,13 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../../..
+      zod:
+        specifier: ^4.1.13
+        version: 4.2.0
     devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.0.2
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -748,12 +757,9 @@ importers:
         specifier: workspace:*
         version: link:../../..
     devDependencies:
-      '@mcp-use/cli':
-        specifier: workspace:*
-        version: link:../../../../cli
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.0.2
 
   packages/mcp-use/examples/server/oauth/auth0:
     dependencies:
@@ -790,12 +796,22 @@ importers:
       mcp-use:
         specifier: workspace:*
         version: link:../../..
+      zod:
+        specifier: ^4.1.13
+        version: 4.2.0
 
   packages/mcp-use/examples/server/simple:
     dependencies:
       mcp-use:
         specifier: workspace:*
         version: link:../../..
+      zod:
+        specifier: ^4.1.13
+        version: 4.2.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.0.2
 
 packages:
 
