@@ -278,6 +278,8 @@ class TestMCPAgentStream:
         executor = MagicMock()
         captured_inputs = []
 
+        red_pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
         human_message = HumanMessage(
             content=[
                 {"type": "text", "text": "What is in this image?"},
@@ -286,7 +288,7 @@ class TestMCPAgentStream:
                     "input": {
                         "name": "screenshot.png",
                         "mime_type": "image/png",
-                        "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",  # base64 for a 1x1 red pixel PNG
+                        "data": red_pixel,  # base64 for a 1x1 red pixel PNG
                     },
                 },
             ]
