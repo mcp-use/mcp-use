@@ -404,9 +404,8 @@ export async function whoamiCommand(): Promise<void> {
 
     const apiKey = await getApiKey();
     if (apiKey) {
-      // Show first and last 4 characters
-      const masked =
-        apiKey.substring(0, 8) + "..." + apiKey.substring(apiKey.length - 4);
+      // Show first 6 characters
+      const masked = apiKey.substring(0, 6) + "...";
       console.log(chalk.white("API Key: ") + chalk.gray(masked));
     }
   } catch (error) {
