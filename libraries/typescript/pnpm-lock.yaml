@@ -624,67 +624,31 @@ importers:
         specifier: ^7.3.0
         version: 7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/mcp-use/examples/server/apps-sdk:
+  packages/mcp-use/examples/server/basic/simple:
     dependencies:
-      '@openai/apps-sdk-ui':
-        specifier: ^0.2.1
-        version: 0.2.1(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(tailwindcss@4.1.18)
-      '@tanstack/react-query':
-        specifier: ^5.90.12
-        version: 5.90.12(react@19.2.3)
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
-      express:
-        specifier: ^5.2.1
-        version: 5.2.1
       mcp-use:
         specifier: workspace:*
-        version: link:../../..
-      node-mocks-http:
-        specifier: ^1.17.2
-        version: 1.17.2(@types/express@5.0.6)(@types/node@25.0.2)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.3
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.3(react@19.2.3)
-      react-router:
-        specifier: ^7.10.1
-        version: 7.10.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      tailwindcss:
-        specifier: ^4.1.18
-        version: 4.1.18
+        version: link:../../../..
       zod:
         specifier: ^4.1.13
         version: 4.2.0
     devDependencies:
-      '@tailwindcss/vite':
-        specifier: ^4.1.18
-        version: 4.1.18(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
-      '@vitejs/plugin-react':
-        specifier: ^5.1.2
-        version: 5.1.2(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      vite:
-        specifier: ^7.3.0
-        version: 7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.0.2
 
-  packages/mcp-use/examples/server/conformance:
+  packages/mcp-use/examples/server/features/conformance:
     dependencies:
       mcp-use:
         specifier: workspace:*
-        version: link:../../..
+        version: link:../../../..
       zod:
         specifier: ^4.1.13
         version: 4.2.0
     devDependencies:
       '@mcp-use/cli':
         specifier: workspace:*
-        version: link:../../../../cli
+        version: link:../../../../../cli
       '@types/node':
         specifier: ^25.0.2
         version: 25.0.2
@@ -692,11 +656,11 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
-  packages/mcp-use/examples/server/elicitation:
+  packages/mcp-use/examples/server/features/elicitation:
     dependencies:
       mcp-use:
         specifier: workspace:*
-        version: link:../../..
+        version: link:../../../..
       zod:
         specifier: ^4.1.13
         version: 4.2.0
@@ -708,58 +672,24 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
-  packages/mcp-use/examples/server/mcp-ui:
-    dependencies:
-      cors:
-        specifier: ^2.8.5
-        version: 2.8.5
-      express:
-        specifier: ^5.2.1
-        version: 5.2.1
-      mcp-use:
-        specifier: workspace:*
-        version: link:../../..
-      node-mocks-http:
-        specifier: ^1.17.2
-        version: 1.17.2(@types/express@5.0.6)(@types/node@25.0.2)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.3
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.3(react@19.2.3)
-      react-router:
-        specifier: ^7.10.1
-        version: 7.10.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      tailwindcss:
-        specifier: ^4.1.18
-        version: 4.1.18
-      zod:
-        specifier: ^4.1.13
-        version: 4.2.0
-    devDependencies:
-      '@tailwindcss/vite':
-        specifier: ^4.1.18
-        version: 4.1.18(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
-      '@vitejs/plugin-react':
-        specifier: ^5.1.2
-        version: 5.1.2(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      vite:
-        specifier: ^7.3.0
-        version: 7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/mcp-use/examples/server/notifications:
+  packages/mcp-use/examples/server/features/notifications:
     dependencies:
       mcp-use:
         specifier: workspace:*
-        version: link:../../..
+        version: link:../../../..
     devDependencies:
       '@types/node':
         specifier: ^25.0.2
         version: 25.0.2
+
+  packages/mcp-use/examples/server/features/sampling:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      zod:
+        specifier: ^4.1.13
+        version: 4.2.0
 
   packages/mcp-use/examples/server/oauth/auth0:
     dependencies:
@@ -791,27 +721,97 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
-  packages/mcp-use/examples/server/sampling:
+  packages/mcp-use/examples/server/ui/apps-sdk:
     dependencies:
+      '@openai/apps-sdk-ui':
+        specifier: ^0.2.1
+        version: 0.2.1(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(tailwindcss@4.1.18)
+      '@tanstack/react-query':
+        specifier: ^5.90.12
+        version: 5.90.12(react@19.2.3)
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
       mcp-use:
         specifier: workspace:*
-        version: link:../../..
-      zod:
-        specifier: ^4.1.13
-        version: 4.2.0
-
-  packages/mcp-use/examples/server/simple:
-    dependencies:
-      mcp-use:
-        specifier: workspace:*
-        version: link:../../..
+        version: link:../../../..
+      node-mocks-http:
+        specifier: ^1.17.2
+        version: 1.17.2(@types/express@5.0.6)(@types/node@25.0.2)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.3
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.3(react@19.2.3)
+      react-router:
+        specifier: ^7.10.1
+        version: 7.10.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      tailwindcss:
+        specifier: ^4.1.18
+        version: 4.1.18
       zod:
         specifier: ^4.1.13
         version: 4.2.0
     devDependencies:
-      '@types/node':
-        specifier: ^25.0.2
-        version: 25.0.2
+      '@tailwindcss/vite':
+        specifier: ^4.1.18
+        version: 4.1.18(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitejs/plugin-react':
+        specifier: ^5.1.2
+        version: 5.1.2(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      vite:
+        specifier: ^7.3.0
+        version: 7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/mcp-use/examples/server/ui/mcp-ui:
+    dependencies:
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      node-mocks-http:
+        specifier: ^1.17.2
+        version: 1.17.2(@types/express@5.0.6)(@types/node@25.0.2)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.3
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.3(react@19.2.3)
+      react-router:
+        specifier: ^7.10.1
+        version: 7.10.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      tailwindcss:
+        specifier: ^4.1.18
+        version: 4.1.18
+      zod:
+        specifier: ^4.1.13
+        version: 4.2.0
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.1.18
+        version: 4.1.18(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitejs/plugin-react':
+        specifier: ^5.1.2
+        version: 5.1.2(vite@7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      vite:
+        specifier: ^7.3.0
+        version: 7.3.0(@types/node@25.0.2)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
 packages:
 
