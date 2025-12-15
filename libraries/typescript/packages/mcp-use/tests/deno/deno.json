@@ -6,7 +6,6 @@
     "@mcp-ui/server": "npm:@mcp-ui/server@^5.15.0",
     "mcp-use/server": "../../dist/src/server/index.js",
     "zod": "npm:zod@^4.1.13",
-    "zod/v4": "npm:zod@^4.1.13/v4",
     "jose": "npm:jose@^6.1.2",
     "hono": "npm:hono@^4.10.7",
     "hono/cors": "npm:hono@^4.10.7/cors",

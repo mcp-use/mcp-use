@@ -3,6 +3,7 @@
   "specifiers": {
     "npm:@mcp-ui/server@^5.15.0": "5.15.0_zod@4.1.13",
     "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.4": "1.24.3-mcp-use.4_zod@4.1.13_ajv@8.17.1_express@5.1.0",
+    "npm:@types/node@*": "24.2.0",
     "npm:hono@^4.10.7": "4.10.7",
     "npm:jose@^6.1.2": "6.1.2",
     "npm:zod@^4.1.13": "4.1.13"
@@ -50,6 +51,12 @@
         "raw-body",
         "zod",
         "zod-to-json-schema"
+      ]
+    },
+    "@types/node@24.2.0": {
+      "integrity": "sha512-3xyG3pMCq3oYCNg7/ZP+E1ooTaGB4cG8JWRsqqOYQdbWNY4zbaV0Ennrd7stjiJEFZCaybcIgpTjJWHRfBSIDw==",
+      "dependencies": [
+        "undici-types"
       ]
     },
     "accepts@2.0.0": {
@@ -504,6 +511,9 @@
         "media-typer",
         "mime-types"
       ]
+    },
+    "undici-types@7.10.0": {
+      "integrity": "sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag=="
     },
     "unpipe@1.0.0": {
       "integrity": "sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ=="
