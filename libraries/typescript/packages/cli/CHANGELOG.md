@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.6.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [0262b5c]
+  - mcp-use@1.11.0-canary.9
+  - @mcp-use/inspector@0.13.0-canary.9
+
 ## 2.6.0-canary.8
 
 ### Minor Changes
