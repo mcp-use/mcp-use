@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from langchain_core.agents import AgentFinish
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient
@@ -233,3 +233,47 @@ class TestMCPAgentStream:
 
             assert history_was_used, "External history was not used"
             assert outputs[-1] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_stream_persists_tool_messages_in_history(self):
+        """stream() should persist full tool exchange (AI tool_calls + ToolMessage) to history."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client, max_steps=5, memory_enabled=True)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        agent._agent_executor = executor
+        agent._initialized = True
+
+        async def mock_astream(inputs, stream_mode=None, config=None):
+            # Tool call message (AIMessage with tool_calls)
+            yield {
+                "agent": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[{"name": "add", "args": {"a": 2, "b": 2}, "id": "call_1"}],
+                        )
+                    ]
+                }
+            }
+            # Tool result message
+            yield {"tools": {"messages": [ToolMessage(content="4", tool_call_id="call_1")]}}
+            # Final assistant response
+            yield {"agent": {"messages": [AIMessage(content="4")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
+        outputs = []
+        async for item in agent.stream("Add 2 and 2 using the add tool", manage_connector=False):
+            outputs.append(item)
+
+        history = agent.get_conversation_history()
+
+        assert len(history) >= 3, "Expected at least HumanMessage + ToolMessage + final AIMessage"
+        assert isinstance(history[0], HumanMessage), "First message should be HumanMessage"
+        assert any(isinstance(m, ToolMessage) and m.content == "4" for m in history), "ToolMessage not persisted"
+        assert isinstance(history[-1], AIMessage), "Last message should be AIMessage"
+        assert outputs[-1] == "4"
