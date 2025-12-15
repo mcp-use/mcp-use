@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.12
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- Updated dependencies [68d1520]
+  - mcp-use@1.11.0-canary.12
+
 ## 0.13.0-canary.11
 
 ### Patch Changes

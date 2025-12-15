@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.8.1-canary.4
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+
 ## 0.8.1-canary.3
 
 ### Patch Changes
