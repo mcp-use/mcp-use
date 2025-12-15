@@ -26,6 +26,7 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
+    ToolMessage,
 )
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
@@ -677,7 +678,7 @@ class MCPAgent:
             # Convert messages to format expected by LangChain agent
             langchain_history = []
             for msg in history_to_use:
-                if isinstance(msg, HumanMessage | AIMessage):
+                if isinstance(msg, HumanMessage | AIMessage | ToolMessage):
                     langchain_history.append(msg)
 
             inputs = {"messages": [*langchain_history, HumanMessage(content=query)]}
@@ -762,9 +763,9 @@ class MCPAgent:
                                             tool_input_str = tool_input_str[:97] + "..."
 
                                 # Track tool results and yield AgentStep
-                                if hasattr(message, "type") and message.type == "tool":
+                                if isinstance(message, ToolMessage):
                                     observation = message.content
-                                    tool_call_id = getattr(message, "tool_call_id", None)
+                                    tool_call_id = message.tool_call_id
 
                                     if tool_call_id and tool_call_id in pending_tool_calls:
                                         action = pending_tool_calls.pop(tool_call_id)
@@ -804,7 +805,7 @@ class MCPAgent:
                                             break  # Break out of the message loop
 
                                 # Track final AI message (without tool calls = final response)
-                                if isinstance(message, AIMessage) and not getattr(message, "tool_calls", None):
+                                if isinstance(message, AIMessage) and not message.tool_calls:
                                     final_output = self._normalize_output(message.content)
                                     logger.info("✅ Agent finished with output")
 
@@ -826,11 +827,9 @@ class MCPAgent:
                     logger.warning(f"⚠️ Max restarts ({max_restarts}) reached. Continuing with current tools.")
                     break
 
-            # 4. Update conversation history
-            if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
-                if final_output:
-                    self.add_to_history(AIMessage(content=final_output))
+            # 4. Update conversation history (store full transcript including tool exchange)
+            if self.memory_enabled and external_history is None:
+                self._conversation_history = [msg for msg in accumulated_messages if not isinstance(msg, SystemMessage)]
 
             # 5. Handle structured output if requested
             if output_schema and final_output:
@@ -852,7 +851,7 @@ class MCPAgent:
                         final_output, structured_llm, output_schema, schema_description
                     )
 
-                    if self.memory_enabled:
+                    if self.memory_enabled and external_history is None:
                         self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
 
                     logger.info("✅ Structured output successful")
