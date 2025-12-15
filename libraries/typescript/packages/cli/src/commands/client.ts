@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { createInterface } from "node:readline";
-import { MCPClient } from "mcp-use";
-import type { MCPSession } from "mcp-use";
+import { MCPClient } from "mcp-use/client";
+import type { MCPSession } from "mcp-use/client";
 import {
   getActiveSession,
   getSession,

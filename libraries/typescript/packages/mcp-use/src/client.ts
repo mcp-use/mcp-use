@@ -80,6 +80,10 @@ export {
   VMCodeExecutor,
 } from "./client/codeExecutor.js";
 
+// Export MCPSession and related types for CLI and other consumers
+export { MCPSession } from "./session.js";
+export type { CallToolResult, Notification, Root, Tool } from "./session.js";
+
 /**
  * Node.js-specific MCPClient implementation
  *

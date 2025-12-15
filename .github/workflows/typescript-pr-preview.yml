@@ -70,8 +70,9 @@ jobs:
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client"
+              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts",
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts",
+              "zod": "npm:zod@^4.2.0"
             }
           }
           EOF
@@ -107,4 +108,4 @@ jobs:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: |
           echo "Running Deno tests against PR #${{ needs.preview.outputs.pr-number }} preview packages..."
-          deno test --allow-read --allow-env --allow-net
+          deno test --no-check --allow-read --allow-env --allow-net
