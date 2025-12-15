@@ -8,6 +8,7 @@
     "mcp-use": "1.10.6"
   },
   "changesets": [
+    "cuddly-keys-lay",
     "easy-jars-nail",
     "icy-worms-deny",
     "loud-pillows-lay",

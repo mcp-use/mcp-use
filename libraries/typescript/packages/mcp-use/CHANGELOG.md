@@ -1,5 +1,15 @@
 # mcp-use
 
+## 1.11.0-canary.14
+
+### Patch Changes
+
+- f5dfa51: chore: organized examples folder for typescript
+  fix: inspector chat was using node modules
+- Updated dependencies [f5dfa51]
+  - @mcp-use/inspector@0.13.0-canary.14
+  - @mcp-use/cli@2.6.0-canary.14
+
 ## 1.11.0-canary.13
 
 ### Patch Changes
