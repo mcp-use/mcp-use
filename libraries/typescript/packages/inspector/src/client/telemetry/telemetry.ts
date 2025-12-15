@@ -191,15 +191,8 @@ export class Telemetry {
 
   private generateUserId(): string {
     // Generate a random UUID v4 using crypto.getRandomValues for secure randomness
-    const cryptoObj =
-      typeof window !== "undefined" &&
-      window.crypto &&
-      window.crypto.getRandomValues
-        ? window.crypto
-        : typeof crypto !== "undefined" && crypto.getRandomValues
-          ? crypto
-          : undefined;
-    if (cryptoObj && cryptoObj.getRandomValues) {
+    const cryptoObj = window.crypto;
+    if (cryptoObj) {
       // UUID v4 template: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
       const buffer = new Uint8Array(16);
       cryptoObj.getRandomValues(buffer);
