@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.10
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+- Updated dependencies [14c015e]
+  - mcp-use@1.11.0-canary.10
+
 ## 0.13.0-canary.9
 
 ### Patch Changes

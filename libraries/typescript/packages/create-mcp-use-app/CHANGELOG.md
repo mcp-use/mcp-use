@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.8.1-canary.3
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+
 ## 0.8.1-canary.2
 
 ### Patch Changes

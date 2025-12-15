@@ -8,6 +8,7 @@
     "mcp-use": "1.10.6"
   },
   "changesets": [
+    "many-rocks-joke",
     "witty-walls-ask"
   ]
 }
