@@ -93,6 +93,41 @@ tag: "New"
   - **Fix**: Various formatting and linting improvements
 </Update>
 
+<Update label="v1.10.0 - December 2025">
+  ## API Improvements & Session Management
+  Enhanced APIs with better type safety and improved session management capabilities.
+
+  ### Breaking Changes
+  - **Breaking**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. Factory function still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+  - **Breaking**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct session methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+  - **Breaking**: Standardized OAuth environment variables to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+
+  ### New Features
+  - **New**: Client Capabilities API with `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks
+  - **New**: Session Notifications API with `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks
+  - **New**: Session Info API with `ctx.session.sessionId` to access current session ID in tool callbacks
+  - **New**: Resource Template Flat Structure support with `uriTemplate` directly on definition (in addition to nested structure)
+  - **New**: Resource Template Callback Signatures now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`
+  - **New**: Type Exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types
+
+  ### Improvements
+  - **Enhancement**: Enhanced type inference for resource template callbacks with better overload support
+  - **Enhancement**: Server now captures and stores client capabilities during initialization
+  - **Enhancement**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.)
+  - **Enhancement**: Major documentation refactoring and restructuring for better organization
+
+  ### Fixes (v1.10.1 - v1.10.6)
+  - **Fix**: Stateless mode for Deno runtime
+  - **Fix**: Added CORS support to `getHandler()` method
+  - **Fix**: Deno 5 compatibility improvements
+  - **Fix**: Deno 3 compatibility fixes
+  - **Fix**: Zod error handling improvements
+  - **Fix**: Zod import in official SDK
+  - **Fix**: Clear transport when session becomes idle
+  - **Fix**: Allow agent to access resources and prompts
+  - **Enhancement**: Added repository metadata in package.json
+</Update>
+
 <Update label="v1.9.0 - December 2025">
   ## Elicitation Support
   Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
