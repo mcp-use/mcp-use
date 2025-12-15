@@ -659,13 +659,18 @@
   ],
   "logo": {
     "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "dark": "/logo/dark.svg",
+    "href": "https://mcp-use.com"
   },
   "navbar": {
     "links": [
       {
         "label": "Examples",
         "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
+      },      
+      {
+        "label": "Blog",
+        "href": "https://mcp-use.com/blog"
       },
       {
         "label": "Discord",
