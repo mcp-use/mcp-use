@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.6.0-canary.11
+
+### Patch Changes
+
+- cf72b53: fix: import from mcp-use/client instead of main entry to avoid mixing dependencies
+- Updated dependencies [cf72b53]
+  - mcp-use@1.11.0-canary.11
+  - @mcp-use/inspector@0.13.0-canary.11
+
 ## 2.6.0-canary.10
 
 ### Patch Changes

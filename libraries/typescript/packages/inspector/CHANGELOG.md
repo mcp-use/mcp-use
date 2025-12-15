@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [cf72b53]
+  - mcp-use@1.11.0-canary.11
+
 ## 0.13.0-canary.10
 
 ### Patch Changes
