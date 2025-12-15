@@ -50,6 +50,9 @@ export interface RedisClient {
   exists(key: string | string[]): Promise<number>;
   keys(pattern: string): Promise<string[]>;
   expire?(key: string, seconds: number): Promise<boolean | number>; // node-redis v5+
+  sAdd?(key: string, ...members: string[]): Promise<number>; // Redis SET operations
+  sRem?(key: string, ...members: string[]): Promise<number>; // Redis SET operations
+  sMembers?(key: string): Promise<string[]>; // Redis SET operations
   publish?(channel: string, message: string): Promise<number>; // node-redis v5+ / ioredis
   subscribe?(
     channel: string,
@@ -226,6 +229,10 @@ export class RedisSessionStore implements SessionStore {
 
   /**
    * List all session IDs
+   *
+   * WARNING: Uses KEYS command which blocks Redis. For production systems with
+   * many sessions, consider using SCAN instead or maintaining a separate SET of
+   * active session IDs.
    */
   async keys(): Promise<string[]> {
     try {
@@ -289,6 +296,9 @@ export class RedisSessionStore implements SessionStore {
   /**
    * Clear all sessions (useful for testing)
    * WARNING: This will delete all sessions with the configured prefix
+   *
+   * NOTE: Uses KEYS command which blocks Redis. This is acceptable for testing
+   * but should be avoided in production with large datasets.
    */
   async clear(): Promise<void> {
     try {

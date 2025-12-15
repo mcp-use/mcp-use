@@ -13,6 +13,7 @@ import {
 } from "../../../src/server/index.js";
 import type {
   SessionMetadata,
+  SessionData,
   RedisClient,
 } from "../../../src/server/index.js";
 

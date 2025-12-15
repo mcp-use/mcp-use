@@ -138,6 +138,13 @@ export class RedisStreamManager implements StreamManager {
   }
 
   /**
+   * Get the Redis key for the active sessions SET
+   */
+  private getActiveSessionsKey(): string {
+    return `${this.prefix}active`;
+  }
+
+  /**
    * Register an active SSE stream and subscribe to Redis channel
    */
   async create(
@@ -157,11 +164,30 @@ export class RedisStreamManager implements StreamManager {
         await this.client.expire(availableKey, this.heartbeatInterval * 2);
       }
 
+      // Add sessionId to active sessions SET for efficient broadcast
+      const activeSessionsKey = this.getActiveSessionsKey();
+      if (this.client.sAdd) {
+        await this.client.sAdd(activeSessionsKey, sessionId);
+        // Set expiry on the SET key to match session TTL
+        if (this.client.expire) {
+          await this.client.expire(
+            activeSessionsKey,
+            this.heartbeatInterval * 2
+          );
+        }
+      }
+
       // Set up heartbeat to keep session alive
       const heartbeat = setInterval(async () => {
         try {
           if (this.client.expire) {
             await this.client.expire(availableKey, this.heartbeatInterval * 2);
+            // Also refresh the active sessions SET expiry
+            const activeSessionsKey = this.getActiveSessionsKey();
+            await this.client.expire(
+              activeSessionsKey,
+              this.heartbeatInterval * 2
+            );
           }
         } catch (error) {
           console.warn(
@@ -225,19 +251,34 @@ export class RedisStreamManager implements StreamManager {
     try {
       if (!sessionIds) {
         // Broadcast to ALL active sessions across all servers
-        const pattern = `available:${this.prefix}*`;
-        const keys = await this.client.keys(pattern);
-
-        for (const key of keys) {
-          const sessionId = key.replace(`available:${this.prefix}`, "");
-          const channel = this.getChannel(sessionId);
-          // Use regular client for publishing (pubSubClient is in subscriber mode)
-          if (!this.client.publish) {
-            throw new Error(
-              "[RedisStreamManager] Redis client does not support publish method"
-            );
+        // Use SET-based tracking instead of KEYS for non-blocking operation
+        const activeSessionsKey = this.getActiveSessionsKey();
+        if (this.client.sMembers) {
+          const sessionIds = await this.client.sMembers(activeSessionsKey);
+          for (const sessionId of sessionIds) {
+            const channel = this.getChannel(sessionId);
+            // Use regular client for publishing (pubSubClient is in subscriber mode)
+            if (!this.client.publish) {
+              throw new Error(
+                "[RedisStreamManager] Redis client does not support publish method"
+              );
+            }
+            await this.client.publish(channel, data);
           }
-          await this.client.publish(channel, data);
+        } else {
+          // Fallback to KEYS if SET operations are not available (should not happen in production)
+          const pattern = `available:${this.prefix}*`;
+          const keys = await this.client.keys(pattern);
+          for (const key of keys) {
+            const sessionId = key.replace(`available:${this.prefix}`, "");
+            const channel = this.getChannel(sessionId);
+            if (!this.client.publish) {
+              throw new Error(
+                "[RedisStreamManager] Redis client does not support publish method"
+              );
+            }
+            await this.client.publish(channel, data);
+          }
         }
       } else {
         // Send to specific sessions
@@ -293,6 +334,12 @@ export class RedisStreamManager implements StreamManager {
       // Delete availability key
       await this.client.del(this.getAvailableKey(sessionId));
 
+      // Remove sessionId from active sessions SET
+      const activeSessionsKey = this.getActiveSessionsKey();
+      if (this.client.sRem) {
+        await this.client.sRem(activeSessionsKey, sessionId);
+      }
+
       // Close local controller if exists
       const controller = this.localControllers.get(sessionId);
       if (controller) {
@@ -345,6 +392,21 @@ export class RedisStreamManager implements StreamManager {
         clearInterval(heartbeat);
       }
       this.heartbeats.clear();
+
+      // Delete only availability keys for sessions owned by THIS server instance
+      // This is important when multiple servers share the same Redis instance
+      const activeSessionsKey = this.getActiveSessionsKey();
+      const sessionIdsToCleanup = Array.from(this.localControllers.keys());
+      
+      for (const sessionId of sessionIdsToCleanup) {
+        // Delete availability key
+        await this.client.del(this.getAvailableKey(sessionId));
+        
+        // Remove from active sessions SET
+        if (this.client.sRem) {
+          await this.client.sRem(activeSessionsKey, sessionId);
+        }
+      }
 
       // Close all local controllers
       for (const controller of this.localControllers.values()) {
