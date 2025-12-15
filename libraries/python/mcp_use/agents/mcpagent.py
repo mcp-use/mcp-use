@@ -21,7 +21,13 @@ from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain_core.agents import AgentAction
 from langchain_core.globals import set_debug
 from langchain_core.language_models import BaseLanguageModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
@@ -512,7 +518,8 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            result = await self._remote_agent.run(query, max_steps, external_history, output_schema)
+            query_str: str = query if isinstance(query, str) else self._message_text(query)
+            result = await self._remote_agent.run(query_str, max_steps, external_history, output_schema)
             return result
 
         success = True
@@ -665,7 +672,8 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema):
+            query_str: str = query if isinstance(query, str) else self._message_text(query)
+            async for item in self._remote_agent.stream(query_str, max_steps, external_history, output_schema):
                 yield item
             return
 
@@ -710,7 +718,7 @@ class MCPAgent:
             # Convert messages to format expected by LangChain agent
             langchain_history = []
             for msg in history_to_use:
-                if isinstance(msg, HumanMessage | AIMessage):
+                if isinstance(msg, HumanMessage | AIMessage | ToolMessage):
                     langchain_history.append(msg)
 
             inputs = {"messages": [*langchain_history, human_query]}
@@ -795,9 +803,9 @@ class MCPAgent:
                                             tool_input_str = tool_input_str[:97] + "..."
 
                                 # Track tool results and yield AgentStep
-                                if hasattr(message, "type") and message.type == "tool":
+                                if isinstance(message, ToolMessage):
                                     observation = message.content
-                                    tool_call_id = getattr(message, "tool_call_id", None)
+                                    tool_call_id = message.tool_call_id
 
                                     if tool_call_id and tool_call_id in pending_tool_calls:
                                         action = pending_tool_calls.pop(tool_call_id)
@@ -837,7 +845,7 @@ class MCPAgent:
                                             break  # Break out of the message loop
 
                                 # Track final AI message (without tool calls = final response)
-                                if isinstance(message, AIMessage) and not getattr(message, "tool_calls", None):
+                                if isinstance(message, AIMessage) and not message.tool_calls:
                                     final_output = self._normalize_output(message.content)
                                     logger.info("✅ Agent finished with output")
 
@@ -859,11 +867,9 @@ class MCPAgent:
                     logger.warning(f"⚠️ Max restarts ({max_restarts}) reached. Continuing with current tools.")
                     break
 
-            # 4. Update conversation history
-            if self.memory_enabled:
-                self.add_to_history(human_query)
-                if final_output:
-                    self.add_to_history(AIMessage(content=final_output))
+            # 4. Update conversation history (store full transcript including tool exchange)
+            if self.memory_enabled and external_history is None:
+                self._conversation_history = [msg for msg in accumulated_messages if not isinstance(msg, SystemMessage)]
 
             # 5. Handle structured output if requested
             if output_schema and final_output:
@@ -885,7 +891,7 @@ class MCPAgent:
                         final_output, structured_llm, output_schema, schema_description
                     )
 
-                    if self.memory_enabled:
+                    if self.memory_enabled and external_history is None:
                         self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
 
                     logger.info("✅ Structured output successful")
@@ -965,12 +971,13 @@ class MCPAgent:
         # 3. Build inputs --------------------------------------------------------
         human_query = self._ensure_human_message(query)
         history_to_use = external_history if external_history is not None else self._conversation_history
-        inputs = {"messages": [*history_to_use, human_query]}
+        langchain_history: list[BaseMessage] = [msg for msg in history_to_use if not isinstance(msg, SystemMessage)]
+        inputs = {"messages": [*langchain_history, human_query]}
 
         # 4. Stream & collect response chunks ------------------------------------
         recursion_limit = self.max_steps * 2
         # Collect AI message content from streaming chunks
-        ai_message_chunks = []
+        turn_messages = []
 
         async for event in self._agent_executor.astream_events(
             inputs,
@@ -979,28 +986,26 @@ class MCPAgent:
                 "recursion_limit": recursion_limit,
             },
         ):
-            # Collect AI message chunks for history
-            if event.get("event") == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and getattr(chunk, "content", None):
-                    if isinstance(chunk.content, str):
-                        content = chunk.content
-                    elif hasattr(chunk.content, "__iter__"):
-                        content = "".join([item.get("text", "") for item in chunk.content])
-                    else:
-                        content = str(chunk.content)
-                    ai_message_chunks.append(content)
+            event_type = event.get("event")
+            if event_type == "on_chat_model_end":
+                # This contains the AIMessage
+                ai_message: AIMessage = event.get("data", {}).get("output")
+                turn_messages.append(ai_message)
+            if event_type == "on_tool_end":
+                # This contains the ToolMessage
+                tool_message: ToolMessage = event.get("data", {}).get("output")
+                turn_messages.append(tool_message)
 
             yield event
 
         # 5. Update conversation history with both messages ---------------------
-        if self.memory_enabled:
+        # If external_history is provided, treat it as per-call input (do not mutate internal memory).
+        persist_to_memory = self.memory_enabled and external_history is None
+        if persist_to_memory:
             # Add human message first
-            self.add_to_history(human_query)
-            # Add AI message if we collected any chunks
-            if ai_message_chunks:
-                ai_content = "".join(ai_message_chunks)
-                self.add_to_history(AIMessage(content=ai_content))
+            self.add_to_history(self._ensure_human_message(query))
+            for message in turn_messages:
+                self.add_to_history(message)
 
         # 6. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
