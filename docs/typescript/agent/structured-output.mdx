@@ -16,9 +16,7 @@ When you provide a Zod schema to the agent:
 4. **Formatting retries**: If the output doesn't match the schema format, the system retries up to 3 times to format it correctly
 5. **Guaranteed structure**: You always get data matching your schema or an error
 
-<Info>
-**Zod Integration**: We use Zod for schema definition 
-</Info>
+
 
 ## Benefits
 
@@ -50,8 +48,7 @@ Responses are validated at runtime, ensuring your code always receives correctly
 
 ## Basic Example
 
-<CodeGroup>
-```typescript TypeScript
+```typescript
 import { z } from 'zod'
 import { ChatOpenAI } from '@langchain/openai'
 import { MCPAgent, MCPClient } from 'mcp-use'
@@ -89,44 +86,6 @@ async function main() {
 main().catch(console.error)
 ```
 
-```typescript TypeScript
-import { z } from 'zod'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-
-// Define the schema using Zod
-const WeatherInfo = z.object({
-    city: z.string().describe('City name'),
-    temperature: z.number().describe('Temperature in Celsius'),
-    condition: z.string().describe('Weather condition'),
-    humidity: z.number().describe('Humidity percentage')
-})
-
-// TypeScript type inferred from schema
-type WeatherInfo = z.infer<typeof WeatherInfo>
-
-async function main() {
-    // Setup client and agent
-    const client = new MCPClient({ mcpServers: {...} })
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
-    const agent = new MCPAgent({ llm, client })
-
-    // Get structured output
-    const weather = await agent.run({
-        prompt: 'Get the current weather in San Francisco',
-        schema: WeatherInfo
-    })
-
-    console.log(`Temperature in ${weather.city}: ${weather.temperature}°C`)
-    console.log(`Condition: ${weather.condition}`)
-    console.log(`Humidity: ${weather.humidity}%`)
-
-    await client.closeAllSessions()
-}
-
-main().catch(console.error)
-```
-</CodeGroup>
 
 <Note>
 **Schema-Aware Prompts**: When using `streamEvents()`, the query is automatically enhanced with schema information before execution, helping the agent understand what data structure is needed. When using `run()` or `stream()`, structured output conversion happens after execution completes.

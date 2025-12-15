@@ -169,60 +169,8 @@ for await (const _ of agent.prettyStreamEvents({
 }
 ```
 
-## Choosing the Right Streaming Method
-
-<CardGroup cols={3}>
-  <Card title="Use stream() when:" icon="list-ordered">
-    • You want to show step-by-step progress
-    • You need to process each tool call individually
-    • You're building a workflow UI
-    • You want simple, clean step tracking
-  </Card>
-  <Card title="Use streamEvents() when:" icon="code">
-    • You need fine-grained control over events
-    • You're building real-time chat interfaces
-    • You want to stream LLM reasoning text
-    • You need custom event filtering
-  </Card>
-  <Card title="Use prettyStreamEvents() when:" icon="sparkles">
-    • Building CLI tools and scripts
-    • During development and debugging
-    • You want formatted output without custom code
-    • Creating demos and tutorials
-  </Card>
-</CardGroup>
-
 ## Examples
 
-### Getting the Final Result from stream()
-
-The `stream()` method returns an `AsyncGenerator` that yields `AgentStep` objects during execution and returns the final result when complete:
-
-```typescript
-const stream = agent.stream('Your query here')
-let finalResult: string = ''
-
-for await (const step of stream) {
-    // Process each step
-    console.log(`Tool: ${step.action.tool}`)
-}
-
-// To get the final result, you need to handle the generator's return value
-const { done, value } = await stream.next()
-if (done) {
-    finalResult = value // Final result is here
-}
-```
-
-Alternatively, you can use a helper to consume the generator:
-
-```typescript
-let result = ''
-for await (const step of stream) {
-    // Process steps
-}
-// The generator's return value contains the final result
-```
 
 ## Next Steps
 
