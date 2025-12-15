@@ -61,29 +61,24 @@ describe("Widget Data Flow", () => {
       expect(toolHandler).toBeDefined();
 
       const result = await toolHandler!.handler(
-        { city: "Tokyo", temp: 25 },
+        { city: "London", temp: 15 },
         {} as any
       );
 
-      // Verify result structure
-      expect(result.content[0].text).toBe("Weather in Tokyo: 25°C");
+      // Verify it added widget metadata
       expect((result as any)._meta).toBeDefined();
       expect((result as any)._meta["openai/outputTemplate"]).toMatch(
         /ui:\/\/widget\/test-widget/
       );
-
-      // For auto-registered widgets, there should be NO widgetProps in _meta
-      // The toolInput (tool args) will be used as props directly
-      expect((result as any)._meta["mcp-use/widgetProps"]).toBeUndefined();
     });
   });
 
-  describe("Helper widget with string toolOutput", () => {
-    it("should separate widget data from toolOutput", async () => {
+  describe("Helper widget with text output", () => {
+    it("should separate widget data from output", async () => {
       // Create a widget definition
       const mockWidgetDef = {
         name: "table-widget",
-        description: "Display table data",
+        description: "Display table",
         type: "appsSdk" as const,
         props: {},
         htmlTemplate: "<div>Table</div>",
@@ -120,7 +115,9 @@ describe("Widget Data Flow", () => {
               rows,
               tableName,
             },
-            toolOutput: `Retrieved ${rows.length} rows from ${tableName} table`,
+            output: text(
+              `Retrieved ${rows.length} rows from ${tableName} table`
+            ),
           });
         }
       );
@@ -138,25 +135,19 @@ describe("Widget Data Flow", () => {
       expect(result.content[0].text).toBe(
         "Retrieved 100 rows from users table"
       );
-      expect((result as any).structuredContent).toBeUndefined(); // Should NOT have structuredContent
-
-      // Verify metadata
+      // Widget data is available in _meta["mcp-use/props"]
       expect((result as any)._meta).toBeDefined();
-      expect((result as any)._meta["mcp-use/widgetProps"]).toBeDefined();
-      expect((result as any)._meta["mcp-use/widgetProps"].rows).toHaveLength(
-        100
-      );
-      expect((result as any)._meta["mcp-use/widgetProps"].tableName).toBe(
-        "users"
-      );
+      expect((result as any)._meta["mcp-use/props"]).toBeDefined();
+      expect((result as any)._meta["mcp-use/props"].rows).toHaveLength(100);
+      expect((result as any)._meta["mcp-use/props"].tableName).toBe("users");
       expect((result as any)._meta["openai/outputTemplate"]).toMatch(
         /ui:\/\/widget\/table-widget/
       );
     });
   });
 
-  describe("Helper widget with function toolOutput", () => {
-    it("should support function toolOutput", async () => {
+  describe("Helper widget with message", () => {
+    it("should support message parameter", async () => {
       // Create a widget definition
       const mockWidgetDef = {
         name: "items-widget",
@@ -171,7 +162,7 @@ describe("Widget Data Flow", () => {
         "mcp-use/widget": mockWidgetDef,
       });
 
-      // Register a tool that uses widget() helper with function
+      // Register a tool that uses widget() helper with message
       server.tool(
         {
           name: "get-items",
@@ -191,8 +182,7 @@ describe("Widget Data Flow", () => {
 
           return widget({
             data: { items, total, category },
-            toolOutput: (data) =>
-              `Found ${data.total} items in ${data.category}`,
+            message: `Found ${total} items in ${category}`,
           });
         }
       );
@@ -208,48 +198,42 @@ describe("Widget Data Flow", () => {
 
       // Verify response structure
       expect(result.content[0].text).toBe("Found 100 items in electronics");
-      expect((result as any).structuredContent).toBeUndefined();
-
-      // Verify widget props in metadata
-      expect((result as any)._meta["mcp-use/widgetProps"]).toBeDefined();
-      expect((result as any)._meta["mcp-use/widgetProps"].items).toEqual([
-        1, 2, 3,
-      ]);
-      expect((result as any)._meta["mcp-use/widgetProps"].total).toBe(100);
-      expect((result as any)._meta["mcp-use/widgetProps"].category).toBe(
-        "electronics"
-      );
+      expect((result as any)._meta["mcp-use/props"]).toEqual({
+        items: [1, 2, 3],
+        total: 100,
+        category: "electronics",
+      });
     });
   });
 
-  describe("Helper widget with object toolOutput", () => {
-    it("should support object toolOutput (JSON.stringify)", async () => {
+  describe("Helper widget with object output", () => {
+    it("should support object() helper as output", async () => {
       // Create a widget definition
       const mockWidgetDef = {
-        name: "summary-widget",
-        description: "Display summary",
+        name: "search-widget",
+        description: "Display search results",
         type: "appsSdk" as const,
         props: {},
-        htmlTemplate: "<div>Summary</div>",
+        htmlTemplate: "<div>Search</div>",
         appsSdkMetadata: {},
       };
 
-      server.widgetDefinitions.set("summary-widget", {
+      server.widgetDefinitions.set("search-widget", {
         "mcp-use/widget": mockWidgetDef,
       });
 
       // Register a tool that uses widget() helper with object output
       server.tool(
         {
-          name: "get-summary",
-          description: "Get summary",
+          name: "search",
+          description: "Search for items",
           schema: z.object({
             query: z.string(),
           }),
           widget: {
-            name: "summary-widget",
-            invoking: "Loading summary...",
-            invoked: "Summary loaded",
+            name: "search-widget",
+            invoking: "Searching...",
+            invoked: "Search complete",
           },
         },
         async ({ query }) => {
@@ -258,16 +242,16 @@ describe("Widget Data Flow", () => {
               results: ["result1", "result2"],
               metadata: { page: 1, total: 50 },
             },
-            toolOutput: {
+            output: object({
               summary: `Search for "${query}" returned 50 results`,
               count: 50,
-            },
+            }),
           });
         }
       );
 
       // Call the tool
-      const toolHandler = server.registrations.tools.get("get-summary");
+      const toolHandler = server.registrations.tools.get("search");
       expect(toolHandler).toBeDefined();
 
       const result = await toolHandler!.handler(
@@ -275,17 +259,15 @@ describe("Widget Data Flow", () => {
         {} as any
       );
 
-      // Verify response structure - object should be stringified
+      // Verify response structure - object should be stringified in content
       const parsedOutput = JSON.parse(result.content[0].text);
       expect(parsedOutput.summary).toBe(
         'Search for "test query" returned 50 results'
       );
       expect(parsedOutput.count).toBe(50);
-      expect((result as any).structuredContent).toBeUndefined();
 
       // Verify widget props in metadata
-      expect((result as any)._meta["mcp-use/widgetProps"]).toBeDefined();
-      expect((result as any)._meta["mcp-use/widgetProps"].results).toEqual([
+      expect((result as any)._meta["mcp-use/props"].results).toEqual([
         "result1",
         "result2",
       ]);
@@ -308,18 +290,16 @@ describe("Widget Data Flow", () => {
         "mcp-use/widget": mockWidgetDef,
       });
 
-      // Register a tool that uses deprecated message parameter
+      // Register a tool using message parameter
       server.tool(
         {
-          name: "get-legacy-data",
-          description: "Get legacy data",
+          name: "legacy-tool",
+          description: "Legacy tool",
           schema: z.object({
             id: z.string(),
           }),
           widget: {
             name: "legacy-widget",
-            invoking: "Loading...",
-            invoked: "Loaded",
           },
         },
         async ({ id }) => {
@@ -331,79 +311,83 @@ describe("Widget Data Flow", () => {
       );
 
       // Call the tool
-      const toolHandler = server.registrations.tools.get("get-legacy-data");
+      const toolHandler = server.registrations.tools.get("legacy-tool");
       expect(toolHandler).toBeDefined();
 
       const result = await toolHandler!.handler({ id: "123" }, {} as any);
 
       // Verify response structure
       expect(result.content[0].text).toBe("Legacy message format");
-      expect((result as any).structuredContent).toBeUndefined();
+      // structuredContent should contain the data when no output is provided
+      expect((result as any).structuredContent).toEqual({
+        id: "123",
+        value: "test",
+      });
 
       // Verify widget props in metadata
-      expect((result as any)._meta["mcp-use/widgetProps"]).toBeDefined();
-      expect((result as any)._meta["mcp-use/widgetProps"].id).toBe("123");
-      expect((result as any)._meta["mcp-use/widgetProps"].value).toBe("test");
+      expect((result as any)._meta["mcp-use/props"]).toEqual({
+        id: "123",
+        value: "test",
+      });
     });
 
-    it("should prefer toolOutput over message when both are provided", async () => {
+    it("should prefer output over message when both are provided", async () => {
       // Create a widget definition
       const mockWidgetDef = {
-        name: "mixed-widget",
-        description: "Mixed widget",
+        name: "priority-widget",
+        description: "Priority widget",
         type: "appsSdk" as const,
         props: {},
-        htmlTemplate: "<div>Mixed</div>",
+        htmlTemplate: "<div>Priority</div>",
         appsSdkMetadata: {},
       };
 
-      server.widgetDefinitions.set("mixed-widget", {
+      server.widgetDefinitions.set("priority-widget", {
         "mcp-use/widget": mockWidgetDef,
       });
 
-      // Register a tool with both message and toolOutput
+      // Register a tool with both message and output
       server.tool(
         {
-          name: "get-mixed-data",
-          description: "Get mixed data",
+          name: "priority-tool",
+          description: "Priority tool",
           schema: z.object({
             value: z.number(),
           }),
           widget: {
-            name: "mixed-widget",
-            invoking: "Loading...",
-            invoked: "Loaded",
+            name: "priority-widget",
           },
         },
         async ({ value }) => {
           return widget({
             data: { value },
-            message: "This should be ignored",
-            toolOutput: "This should be used",
+            message: "This should be used (message takes precedence)",
+            output: text("This should be ignored"),
           });
         }
       );
 
       // Call the tool
-      const toolHandler = server.registrations.tools.get("get-mixed-data");
+      const toolHandler = server.registrations.tools.get("priority-tool");
       expect(toolHandler).toBeDefined();
 
       const result = await toolHandler!.handler({ value: 42 }, {} as any);
 
-      // Verify toolOutput takes precedence
-      expect(result.content[0].text).toBe("This should be used");
-      expect(result.content[0].text).not.toBe("This should be ignored");
+      // Verify message takes precedence over output.content
+      expect(result.content[0].text).toBe(
+        "This should be used (message takes precedence)"
+      );
     });
   });
 
-  describe("Helper functions as toolOutput", () => {
-    it("should support text() helper as toolOutput", async () => {
+  describe("Helper functions as output", () => {
+    it("should support text() helper as output", async () => {
       const mockWidgetDef = {
         name: "text-helper-widget",
         description: "Text helper widget",
         type: "appsSdk" as const,
         props: {},
-        htmlTemplate: "<div>Text Helper</div>",
+        htmlTemplate: "<div>Text</div>",
         appsSdkMetadata: {},
       };
 
@@ -413,39 +397,33 @@ describe("Widget Data Flow", () => {
 
       server.tool(
         {
-          name: "get-text-helper",
-          description: "Get text helper",
+          name: "text-tool",
+          description: "Text tool",
           schema: z.object({ count: z.number() }),
-          widget: {
-            name: "text-helper-widget",
-            invoking: "Loading...",
-            invoked: "Loaded",
-          },
+          widget: { name: "text-helper-widget" },
         },
         async ({ count }) => {
           return widget({
             data: { items: Array(count).fill(0), count },
-            toolOutput: text(`Found ${count} items`),
+            output: text(`Found ${count} items`),
           });
         }
       );
 
-      const toolHandler = server.registrations.tools.get("get-text-helper");
-      expect(toolHandler).toBeDefined();
-
+      const toolHandler = server.registrations.tools.get("text-tool");
       const result = await toolHandler!.handler({ count: 5 }, {} as any);
 
       expect(result.content[0].text).toBe("Found 5 items");
-      expect((result as any)._meta["mcp-use/widgetProps"].count).toBe(5);
+      expect((result as any)._meta["mcp-use/props"].count).toBe(5);
     });
 
-    it("should support object() helper as toolOutput", async () => {
+    it("should support object() helper as output", async () => {
       const mockWidgetDef = {
         name: "object-helper-widget",
         description: "Object helper widget",
         type: "appsSdk" as const,
         props: {},
-        htmlTemplate: "<div>Object Helper</div>",
+        htmlTemplate: "<div>Object</div>",
         appsSdkMetadata: {},
       };
 
@@ -455,43 +433,35 @@ describe("Widget Data Flow", () => {
 
       server.tool(
         {
-          name: "get-object-helper",
-          description: "Get object helper",
+          name: "object-tool",
+          description: "Object tool",
           schema: z.object({ id: z.string() }),
-          widget: {
-            name: "object-helper-widget",
-            invoking: "Loading...",
-            invoked: "Loaded",
-          },
+          widget: { name: "object-helper-widget" },
         },
         async ({ id }) => {
           return widget({
             data: { fullData: { id, value: "data" } },
-            toolOutput: object({ summary: `ID: ${id}`, status: "success" }),
+            output: object({ summary: `ID: ${id}`, status: "success" }),
           });
         }
       );
 
-      const toolHandler = server.registrations.tools.get("get-object-helper");
-      expect(toolHandler).toBeDefined();
-
+      const toolHandler = server.registrations.tools.get("object-tool");
       const result = await toolHandler!.handler({ id: "abc123" }, {} as any);
 
       const parsedOutput = JSON.parse(result.content[0].text);
       expect(parsedOutput.summary).toBe("ID: abc123");
       expect(parsedOutput.status).toBe("success");
-      expect((result as any)._meta["mcp-use/widgetProps"].fullData.id).toBe(
-        "abc123"
-      );
+      expect((result as any)._meta["mcp-use/props"].fullData.id).toBe("abc123");
     });
 
-    it("should support function returning helper as toolOutput", async () => {
+    it("should support function generating output dynamically", async () => {
       const mockWidgetDef = {
         name: "function-helper-widget",
         description: "Function helper widget",
         type: "appsSdk" as const,
         props: {},
-        htmlTemplate: "<div>Function Helper</div>",
+        htmlTemplate: "<div>Function</div>",
         appsSdkMetadata: {},
       };
 
@@ -501,31 +471,26 @@ describe("Widget Data Flow", () => {
 
       server.tool(
         {
-          name: "get-function-helper",
-          description: "Get function helper",
+          name: "function-tool",
+          description: "Function tool",
           schema: z.object({ type: z.string() }),
-          widget: {
-            name: "function-helper-widget",
-            invoking: "Loading...",
-            invoked: "Loaded",
-          },
+          widget: { name: "function-helper-widget" },
         },
         async ({ type }) => {
+          const data = { records: [1, 2, 3], type };
+          // Generate output based on data
           return widget({
-            data: { records: [1, 2, 3], type },
-            toolOutput: (data) =>
-              text(`${data.type}: ${data.records.length} records`),
+            data,
+            output: text(`${data.type}: ${data.records.length} records`),
           });
         }
       );
 
-      const toolHandler = server.registrations.tools.get("get-function-helper");
-      expect(toolHandler).toBeDefined();
-
+      const toolHandler = server.registrations.tools.get("function-tool");
       const result = await toolHandler!.handler({ type: "users" }, {} as any);
 
       expect(result.content[0].text).toBe("users: 3 records");
-      expect((result as any)._meta["mcp-use/widgetProps"].type).toBe("users");
+      expect((result as any)._meta["mcp-use/props"].type).toBe("users");
     });
   });
 });

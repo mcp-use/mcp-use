@@ -1,10 +1,8 @@
 ---
 title: "Redis Storage"
 description: "Using Redis for persistent, distributed session storage with full MCP feature support"
-icon: redis
+icon: "); -webkit-mask-image: url('/images/icons/redis.svg'); mask-image: url('/images/icons/redis.svg');/*"
 ---
-
-# Redis Storage
 
 Redis storage consists of two components:
 
@@ -12,6 +10,37 @@ Redis storage consists of two components:
 2. **`RedisStreamManager`** - Manages distributed notifications via Redis Pub/Sub
 
 Together, they enable horizontal scaling with full MCP feature support.
+
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant ServerA as Server A<br/>(has SSE connection)
+    participant RedisSessionStore as RedisSessionStore
+    participant RedisStreamManager as RedisStreamManager
+    participant Redis as Redis
+    participant ServerB as Server B<br/>(handles request)
+    
+    Note over Client,ServerA: 1. Client opens SSE connection
+    Client->>ServerA: GET /mcp<br/>Accept: text/event-stream
+    ServerA->>RedisStreamManager: Register SSE controller
+    RedisStreamManager->>Redis: SUBSCRIBE channel
+    
+    Note over Client,ServerB: 2. Load balancer routes HTTP request
+    Client->>ServerB: POST /mcp<br/>session-id: abc-123
+    ServerB->>RedisSessionStore: Get session metadata
+    RedisSessionStore->>Redis: GET session:abc-123
+    Redis-->>RedisSessionStore: Session data
+    RedisSessionStore-->>ServerB: Session metadata
+    
+    Note over ServerB,Client: 3. Server B needs to send notification
+    ServerB->>RedisStreamManager: Send notification
+    RedisStreamManager->>Redis: PUBLISH channel<br/>event data
+    Redis-->>RedisStreamManager: Message delivered
+    RedisStreamManager-->>ServerA: Receive via Pub/Sub
+    ServerA->>Client: Push via SSE<br/>event: notification
+```
 
 ## Installation
 
@@ -55,138 +84,9 @@ const server = new MCPServer({
 server.start({ port: 3000 });
 ```
 
-## Full Distributed Setup
-
-For load-balanced deployments with distributed notifications:
-
-```typescript
-import { 
-  MCPServer, 
-  RedisSessionStore, 
-  RedisStreamManager 
-} from 'mcp-use/server';
-import { createClient } from 'redis';
-
-// Create two Redis clients (Pub/Sub requires dedicated client)
-const redis = createClient({
-  url: process.env.REDIS_URL,
-  password: process.env.REDIS_PASSWORD,
-});
-const pubSubRedis = redis.duplicate();
-
-await redis.connect();
-await pubSubRedis.connect();
-
-// Create session metadata store
-const sessionStore = new RedisSessionStore({
-  client: redis,
-  prefix: 'mcp:session:',     // Optional: custom key prefix
-  defaultTTL: 3600,            // Optional: 1 hour default TTL (in seconds)
-});
-
-// Create stream manager for distributed notifications
-const streamManager = new RedisStreamManager({
-  client: redis,
-  pubSubClient: pubSubRedis,
-  prefix: 'mcp:stream:',       // Optional: custom channel prefix
-  heartbeatInterval: 10,        // Optional: heartbeat interval in seconds
-});
-
-// Use with MCP server
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  sessionStore,    // Stores metadata (capabilities, log level, etc.)
-  streamManager     // Handles active SSE connections & notifications
-});
-
-server.start({ port: 3000 });
-
-// Cleanup on shutdown
-process.on('SIGTERM', async () => {
-  await streamManager.close();
-  await sessionStore.close();
-  await pubSubRedis.quit();
-  await redis.quit();
-  process.exit(0);
-});
-```
-
-## Configuration Options
-
-### RedisSessionStore Options
-
-```typescript
-const sessionStore = new RedisSessionStore({
-  client: redis,              // Required: Redis client instance
-  prefix: 'mcp:session:',     // Optional: Key prefix (default: 'mcp:session:')
-  defaultTTL: 3600,          // Optional: Default TTL in seconds (default: 300)
-});
-```
-
-### RedisStreamManager Options
-
-```typescript
-const streamManager = new RedisStreamManager({
-  client: redis,              // Required: Redis client for regular operations
-  pubSubClient: pubSubRedis,  // Required: Dedicated client for Pub/Sub
-  prefix: 'mcp:stream:',      // Optional: Channel prefix (default: 'mcp:stream:')
-  heartbeatInterval: 10,     // Optional: Heartbeat interval in seconds (default: 30)
-});
-```
-
-## Distributed Notifications & Sampling
-
-When using `RedisStreamManager`, notifications and sampling work across distributed servers. See the [main documentation](/typescript/server/session-management#distributed-notifications-flow) for details.
-
-### Example: Sending Notifications
-
-```typescript
-import { MCPServer, RedisStreamManager, RedisSessionStore } from 'mcp-use/server';
-
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  sessionStore: new RedisSessionStore({ ... }),
-  streamManager: new RedisStreamManager({ ... })
-});
-
-// Resource with subscription support
-server.resource('/data', async () => {
-  return {
-    contents: [{
-      uri: '/data',
-      text: 'Initial data'
-    }]
-  };
-});
-
-// Later, when data changes - notification works across ALL servers
-server.sendResourceListChanged();  // ← Reaches client even if on different server!
-```
-
-## Two Redis Clients Required
-
-Redis Pub/Sub requires a dedicated client. Use separate clients:
-
-```typescript
-const redis = createClient({ ... });
-const pubSubRedis = redis.duplicate();
-```
-
-## Cleanup on Shutdown
-
-```typescript
-process.on('SIGTERM', async () => {
-  await streamManager.close();  // Close SSE connections
-  await sessionStore.close();    // Close Redis connection
-  await pubSubRedis.quit();
-  await redis.quit();
-  process.exit(0);
-});
-```
 
 ## Related Documentation
 
 - [Session Management Overview](/typescript/server/session-management)
 - [In-Memory Storage](/typescript/server/session-management/memory-storage)
+- [File System Storage](/typescript/server/session-management/filesystem-storage)

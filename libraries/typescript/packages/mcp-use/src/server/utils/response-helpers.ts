@@ -575,9 +575,11 @@ export function binary(base64Data: string, mimeType: string): CallToolResult {
  */
 export interface WidgetResponseConfig {
   /** Widget-only data passed to useWidget().props (hidden from model) */
-  props: Record<string, any>;
+  props?: Record<string, any>;
+  /** @deprecated Use `props` instead - Legacy alias for props */
+  data?: Record<string, any>;
   /** Response helper result that the model sees (text(), json(), etc.) */
-  output: CallToolResult | TypedCallToolResult<any>;
+  output?: CallToolResult | TypedCallToolResult<any>;
   /** Optional override for the text message */
   message?: string;
 }
@@ -613,23 +615,36 @@ export interface WidgetResponseConfig {
  * ```
  */
 export function widget(config: WidgetResponseConfig): CallToolResult {
-  const { props, output, message } = config;
+  // Support both 'data' (legacy) and 'props' (new API)
+  const props = config.props || config.data || {};
+  const { output, message } = config;
 
   // Build the final content array
   const finalContent = message
     ? [{ type: "text" as const, text: message }]
-    : output.content || [{ type: "text" as const, text: "" }];
+    : output?.content || [{ type: "text" as const, text: "" }];
 
-  return {
-    content: finalContent,
-    ...(output.structuredContent && {
-      structuredContent: output.structuredContent,
-    }),
-    _meta: {
-      ...(output._meta || {}),
-      "mcp-use/props": props,
-    },
+  // Build metadata, always creating _meta
+  const meta: Record<string, unknown> = {
+    ...(output?._meta || {}),
+    "mcp-use/props": props,
   };
+
+  // Build result
+  const result: CallToolResult = {
+    content: finalContent,
+    _meta: meta,
+  };
+
+  // Include structuredContent from output if present, otherwise use props/data
+  if (output?.structuredContent) {
+    result.structuredContent = output.structuredContent;
+  } else if (Object.keys(props).length > 0) {
+    // If no output provided, use props/data as structuredContent
+    result.structuredContent = props;
+  }
+
+  return result;
 }
 
 export function mix(...results: CallToolResult[]): CallToolResult {

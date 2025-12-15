@@ -273,7 +273,8 @@ sequenceDiagram
 
 mcp-use supports multiple storage providers for session management:
 
-- **[In-Memory Storage](/typescript/server/session-management/memory-storage)** - Default, fast, but sessions lost on restart
+- **[In-Memory Storage](/typescript/server/session-management/memory-storage)** - Fast, but sessions lost on restart
+- **[File System Storage](/typescript/server/session-management/filesystem-storage)** - Default in development, persists to disk, sessions survive hot reloads
 - **[Redis Storage](/typescript/server/session-management/redis-storage)** - Persistent, distributed, supports full MCP features
 
 ## Session Configuration
@@ -485,4 +486,5 @@ const server = new MCPServer({
 - [Server Configuration](/typescript/server/configuration)
 - [Deployment Guide](/typescript/server/deployment-mcp-use)
 - [In-Memory Storage](/typescript/server/session-management/memory-storage)
+- [File System Storage](/typescript/server/session-management/filesystem-storage)
 - [Redis Storage](/typescript/server/session-management/redis-storage)
