@@ -21,9 +21,13 @@ import { LangChainAdapter } from 'mcp-use/adapters'
 
 **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
 
+**Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+
 ### WebSocket Transport Removed
 
 WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
+
+**Learn more:** [Client Configuration](/typescript/client/client-configuration)
 
 ## Features
 
@@ -80,6 +84,8 @@ const server = new MCPServer({
 **Deprecated:**
 - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
 
+**Learn more:** [Session Management](/typescript/server/session-management)
+
 ### Favicon Support for Widgets
 
 Added favicon configuration for widget pages:
@@ -96,9 +102,13 @@ const server = createMCPServer({
 - CLI build process includes favicon in widget HTML pages
 - Long-term caching (1 year) for favicon assets
 
+**Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+
 ### CLI Client Support
 
 Added dedicated CLI client support for better command-line integration and testing.
+
+**Learn more:** [CLI Client](/typescript/client/cli)
 
 ### Enhanced Session Methods
 
@@ -132,6 +142,8 @@ Added dedicated CLI client support for better command-line integration and testi
 ### React Router Migration
 
 Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
+
+**Learn more:** [useMcp Hook](/typescript/client/usemcp)
 
 ### Session & Transport Fixes
 
