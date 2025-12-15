@@ -9,7 +9,7 @@ from typing import Any, TypeVar
 from uuid import UUID
 
 import httpx
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
 from mcp_use.logging import logger
@@ -84,37 +84,6 @@ class RemoteAgent:
                 pool=10.0,  # 10 seconds to get connection from pool
             )
         )
-
-    def _serialize_query(self, query: str | HumanMessage) -> dict[str, Any]:
-        """Normalize query input to the API's message payload format."""
-        if isinstance(query, str):
-            return {"role": "user", "content": query}
-
-        if not isinstance(query, HumanMessage):
-            raise TypeError("query must be a string or HumanMessage for remote execution")
-
-        content = query.content
-
-        if isinstance(content, list):
-            for part in content:
-                if not isinstance(part, dict):
-                    raise ValueError("Remote execution only supports text content blocks in HumanMessage")
-                if part.get("type") != "text":
-                    raise ValueError(
-                        "Remote agent does not yet support non-text HumanMessage content "
-                        "(e.g., file attachments or media). Use a local agent for file inputs."
-                    )
-        elif not isinstance(content, str):
-            raise ValueError("HumanMessage content must be text or a list of text blocks for remote execution")
-
-        message_payload: dict[str, Any] = {"role": "user", "content": content}
-
-        if query.metadata:
-            message_payload["metadata"] = query.metadata
-        if getattr(query, "name", None):
-            message_payload["name"] = query.name
-
-        return message_payload
 
     def _pydantic_to_json_schema(self, model_class: type[T]) -> dict[str, Any]:
         """Convert a Pydantic model to JSON schema for API transmission.
@@ -229,16 +198,12 @@ class RemoteAgent:
 
     async def stream(
         self,
-        query: str | HumanMessage,
+        query: str,
         max_steps: int | None = None,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
     ) -> AsyncGenerator[str, None]:
-        """Stream the execution of a query on the remote agent using HTTP streaming.
-
-        Accepts plain string input or a ``HumanMessage`` with text-only content.
-        File or media attachments are not yet supported for remote execution.
-        """
+        """Stream the execution of a query on the remote agent using HTTP streaming."""
         if external_history is not None:
             logger.warning("External history is not yet supported for remote execution")
 
@@ -251,7 +216,7 @@ class RemoteAgent:
         stream_url = f"{self.base_url}{API_CHAT_STREAM_ENDPOINT.format(chat_id=chat_id)}"
 
         # Prepare the request payload
-        request_payload = {"messages": [self._serialize_query(query)], "max_steps": max_steps or 30}
+        request_payload = {"messages": [{"role": "user", "content": query}], "max_steps": max_steps or 30}
         if output_schema is not None:
             request_payload["output_schema"] = self._pydantic_to_json_schema(output_schema)
 
@@ -293,7 +258,7 @@ class RemoteAgent:
 
     async def run(
         self,
-        query: str | HumanMessage,
+        query: str,
         max_steps: int | None = None,
         external_history: list[BaseMessage] | None = None,
         output_schema: type[T] | None = None,
@@ -302,9 +267,6 @@ class RemoteAgent:
         Executes the agent and returns the final result.
         This method uses HTTP streaming to avoid timeouts for long-running tasks.
         It consumes the entire stream and returns only the final result.
-
-        Accepts plain string input or a ``HumanMessage`` with text-only content.
-        File or media attachments are not yet supported for remote execution.
         """
         final_result = None
         steps_taken = 0
