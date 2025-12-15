@@ -19,6 +19,8 @@ import {
   Bell,
   Check,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Command,
   Copy,
   FolderOpen,
@@ -71,6 +73,41 @@ function getTabCount(tabId: string, server: MCPConnection): number {
   return 0;
 }
 
+function CollapseButton({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onToggle}
+          className={cn(
+            "shrink-0 p-1.5 rounded-md transition-all duration-500 ease-in-out cursor-pointer",
+            "text-muted-foreground hover:text-foreground",
+            "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          )}
+          aria-label={collapsed ? "Expand tabs" : "Collapse tabs"}
+          type="button"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 transition-transform duration-500 ease-in-out" />
+          ) : (
+            <ChevronLeft className="h-4 w-4 transition-transform duration-500 ease-in-out" />
+          )}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{collapsed ? "Expand tabs" : "Collapse tabs"}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function LayoutHeader({
   connections,
   selectedServer,
@@ -83,6 +120,8 @@ export function LayoutHeader({
   const { tunnelUrl } = useInspector();
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
+
+  const [collapsed, setCollapsed] = useState(false);
 
   const handleCopy = async () => {
     if (!tunnelUrl) return;
@@ -150,6 +189,8 @@ export function LayoutHeader({
             <Tabs
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
+              collapsed={collapsed}
+              onCollapsedChange={setCollapsed}
             >
               <TabsList className="w-full justify-center">
                 {tabs.map((tab) => {
@@ -160,7 +201,10 @@ export function LayoutHeader({
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
-                      className="[&>svg]:mr-0 flex-1 flex-row gap-2 relative"
+                      className={cn(
+                        "[&>svg]:mr-0 flex-1 flex-row gap-2 relative",
+                        collapsed && "pl-2"
+                      )}
                     >
                       {count > 0 && (
                         <span
@@ -198,41 +242,54 @@ export function LayoutHeader({
 
           {/* Tabs */}
           {selectedServer && (
-            <Tabs
-              value={activeTab}
-              onValueChange={(tab) => onTabChange(tab as TabType)}
-            >
-              <TabsList className="overflow-x-auto">
-                {tabs.map((tab) => {
-                  const count = getTabCount(tab.id, selectedServer);
+            <div className="flex items-center gap-2">
+              <Tabs
+                value={activeTab}
+                onValueChange={(tab) => onTabChange(tab as TabType)}
+                collapsed={collapsed}
+                onCollapsedChange={setCollapsed}
+              >
+                <TabsList className="overflow-x-auto" collapsible>
+                  {tabs.map((tab) => {
+                    const count = getTabCount(tab.id, selectedServer);
+                    const tooltipText =
+                      count > 0 ? `${tab.label} (${count})` : tab.label;
 
-                  return (
-                    <TabsTrigger
-                      key={tab.id}
-                      value={tab.id}
-                      icon={tab.icon}
-                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2 relative"
-                    >
-                      <div className="items-center gap-2 hidden lg:flex">
-                        {tab.label}
-                        {count > 0 && (
-                          <span
-                            className={cn(
-                              activeTab === tab.id
-                                ? " dark:bg-black "
-                                : "dark:bg-zinc-700",
-                              "bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
-                            )}
-                          >
-                            {count}
-                          </span>
+                    return (
+                      <TabsTrigger
+                        value={tab.id}
+                        icon={tab.icon}
+                        className={cn(
+                          "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
+                          collapsed && "pl-4"
                         )}
-                      </div>
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </Tabs>
+                        title={tooltipText}
+                      >
+                        <div className="items-center gap-2 hidden lg:flex">
+                          {tab.label}
+                          {count > 0 && (
+                            <span
+                              className={cn(
+                                activeTab === tab.id
+                                  ? " dark:bg-black "
+                                  : "dark:bg-zinc-700",
+                                "bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
+                              )}
+                            >
+                              {count}
+                            </span>
+                          )}
+                        </div>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </Tabs>
+              <CollapseButton
+                collapsed={collapsed}
+                onToggle={() => setCollapsed(!collapsed)}
+              />
+            </div>
           )}
 
           {/* Tunnel Badge */}

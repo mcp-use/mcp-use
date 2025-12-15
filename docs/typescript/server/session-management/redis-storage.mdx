@@ -1,0 +1,92 @@
+---
+title: "Redis Storage"
+description: "Using Redis for persistent, distributed session storage with full MCP feature support"
+icon: "); -webkit-mask-image: url('/images/icons/redis.svg'); mask-image: url('/images/icons/redis.svg');/*"
+---
+
+Redis storage consists of two components:
+
+1. **`RedisSessionStore`** - Stores serializable session metadata (capabilities, client info, etc.)
+2. **`RedisStreamManager`** - Manages distributed notifications via Redis Pub/Sub
+
+Together, they enable horizontal scaling with full MCP feature support.
+
+## Architecture
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant ServerA as Server A<br/>(has SSE connection)
+    participant RedisSessionStore as RedisSessionStore
+    participant RedisStreamManager as RedisStreamManager
+    participant Redis as Redis
+    participant ServerB as Server B<br/>(handles request)
+    
+    Note over Client,ServerA: 1. Client opens SSE connection
+    Client->>ServerA: GET /mcp<br/>Accept: text/event-stream
+    ServerA->>RedisStreamManager: Register SSE controller
+    RedisStreamManager->>Redis: SUBSCRIBE channel
+    
+    Note over Client,ServerB: 2. Load balancer routes HTTP request
+    Client->>ServerB: POST /mcp<br/>session-id: abc-123
+    ServerB->>RedisSessionStore: Get session metadata
+    RedisSessionStore->>Redis: GET session:abc-123
+    Redis-->>RedisSessionStore: Session data
+    RedisSessionStore-->>ServerB: Session metadata
+    
+    Note over ServerB,Client: 3. Server B needs to send notification
+    ServerB->>RedisStreamManager: Send notification
+    RedisStreamManager->>Redis: PUBLISH channel<br/>event data
+    Redis-->>RedisStreamManager: Message delivered
+    RedisStreamManager-->>ServerA: Receive via Pub/Sub
+    ServerA->>Client: Push via SSE<br/>event: notification
+```
+
+## Installation
+
+Install the Redis client library:
+
+```bash
+yarn add redis
+# or
+yarn add ioredis
+```
+
+## Basic Setup
+
+### Session Metadata Only
+
+For single-server deployments with persistent sessions:
+
+```typescript
+import { MCPServer, RedisSessionStore } from 'mcp-use/server';
+import { createClient } from 'redis';
+
+const redis = createClient({
+  url: process.env.REDIS_URL,
+  password: process.env.REDIS_PASSWORD,
+});
+
+await redis.connect();
+
+const sessionStore = new RedisSessionStore({
+  client: redis,
+  prefix: 'mcp:session:',     // Optional: custom key prefix
+  defaultTTL: 3600,            // Optional: 1 hour default TTL (in seconds)
+});
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore
+});
+
+server.start({ port: 3000 });
+```
+
+
+## Related Documentation
+
+- [Session Management Overview](/typescript/server/session-management)
+- [In-Memory Storage](/typescript/server/session-management/memory-storage)
+- [File System Storage](/typescript/server/session-management/filesystem-storage)

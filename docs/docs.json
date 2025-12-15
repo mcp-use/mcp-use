@@ -543,6 +543,16 @@
                     ]
                   },
                   {
+                    "group": "Session Management",
+                    "icon": "key-round",
+                    "pages": [
+                      "typescript/server/session-management",
+                      "typescript/server/session-management/memory-storage",
+                      "typescript/server/session-management/filesystem-storage",
+                      "typescript/server/session-management/redis-storage"
+                    ]
+                  },
+                  {
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [

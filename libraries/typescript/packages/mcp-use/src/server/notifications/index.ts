@@ -8,5 +8,8 @@ export {
   getActiveSessions,
   sendNotification,
   sendNotificationToSession,
+  sendToolsListChanged,
+  sendResourcesListChanged,
+  sendPromptsListChanged,
   type NotificationServerContext,
 } from "./notification-registration.js";

@@ -40,7 +40,24 @@ export type UseMcpOptions = {
   autoReconnect?: boolean | number;
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
-  /** Transport type preference: 'auto' (HTTP with SSE fallback), 'http' (HTTP only), 'sse' (SSE only) */
+  /**
+   * Transport type preference.
+   *
+   * @deprecated The 'sse' option is deprecated. Use 'http' or 'auto' instead.
+   *
+   * As of MCP spec 2025-11-25, the old HTTP+SSE transport is deprecated in favor
+   * of Streamable HTTP (unified endpoint). StreamableHTTP still supports SSE for
+   * notifications - it just uses a single /mcp endpoint instead of separate endpoints.
+   *
+   * **Backward compatibility:** 'sse' option still works and is maintained.
+   *
+   * Options:
+   * - 'auto': Try HTTP (Streamable HTTP), fallback to SSE if needed (recommended)
+   * - 'http': Use Streamable HTTP only (recommended for new code)
+   * - 'sse': Use old SSE transport (deprecated, but still works)
+   *
+   * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+   */
   transportType?: "auto" | "http" | "sse";
   /**
    * Prevent automatic authentication popup/redirect on initial connection (default: false)
@@ -209,6 +226,29 @@ export type UseMcpResult = {
       content: { type: string; text?: string; [key: string]: any };
     }>;
   }>;
+  /**
+   * Refresh the tools list from the server.
+   * Called automatically when notifications/tools/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshTools: () => Promise<void>;
+  /**
+   * Refresh the resources list from the server.
+   * Called automatically when notifications/resources/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshResources: () => Promise<void>;
+  /**
+   * Refresh the prompts list from the server.
+   * Called automatically when notifications/prompts/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshPrompts: () => Promise<void>;
+  /**
+   * Refresh all lists (tools, resources, prompts) from the server.
+   * Useful after reconnection or for manual refresh.
+   */
+  refreshAll: () => Promise<void>;
   /** Manually attempts to reconnect if the state is 'failed'. */
   retry: () => void;
   /** Disconnects the client from the MCP server. */
