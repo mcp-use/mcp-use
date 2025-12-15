@@ -12,7 +12,8 @@
 
 /* globals Deno */
 
-import { MCPServer } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use/server";
+import z from "zod/v4";
 import {
   assertEquals,
   assertExists,
@@ -30,20 +31,12 @@ Deno.test("MCP Server - Create and register tool", async () => {
     {
       name: "echo",
       description: "Echo back the input message",
-      inputs: [
-        {
-          name: "message",
-          type: "string",
-          description: "Message to echo",
-          required: true,
-        },
-      ],
+      schema: z.object({
+        message: z.string(),
+      }),
     },
-    async (params: Record<string, any>) => {
-      const message = params.message as string;
-      return {
-        content: [{ type: "text", text: `Echo: ${message}` }],
-      };
+    async ({ message }) => {
+      return text(`Echo: ${message}`);
     }
   );
 
@@ -63,15 +56,14 @@ Deno.test("MCP Server - Resource registration", async () => {
   });
 
   // Register a resource
-  server.resource({
-    uri: "test://example",
-    name: "Test Resource",
-    description: "A test resource",
-    mimeType: "text/plain",
-    readCallback: async () => {
-      return "Test content";
+  server.resource(
+    {
+      uri: "test://example",
+      name: "Test Resource",
+      description: "A test resource",
     },
-  });
+    async () => text("Test content")
+  );
 
   // Verify server exists
   assertExists(server);
@@ -90,18 +82,12 @@ Deno.test("MCP Server - Prompt registration", async () => {
     {
       name: "test-prompt",
       description: "A test prompt",
-      args: [
-        {
-          name: "topic",
-          type: "string",
-          description: "The topic",
-          required: true,
-        },
-      ],
+      schema: z.object({
+        topic: z.string(),
+      }),
     },
-    async (params: Record<string, any>) => {
-      const topic = params.topic as string;
-      return `Tell me about ${topic}`;
+    async ({ topic }) => {
+      return text(`Tell me about ${topic}`);
     }
   );
 
@@ -123,7 +109,7 @@ Deno.test("MCP Server - Multiple registrations", async () => {
       name: "tool1",
       description: "First tool",
     },
-    async () => ({ content: [{ type: "text", text: "Tool 1" }] })
+    async () => text("Tool 1")
   );
 
   server.tool(
@@ -131,15 +117,16 @@ Deno.test("MCP Server - Multiple registrations", async () => {
       name: "tool2",
       description: "Second tool",
     },
-    async () => ({ content: [{ type: "text", text: "Tool 2" }] })
+    async () => text("Tool 2")
   );
 
-  server.resource({
-    uri: "test://res1",
-    name: "Resource 1",
-    mimeType: "text/plain",
-    readCallback: async () => "Content 1",
-  });
+  server.resource(
+    {
+      uri: "test://res1",
+      name: "Resource 1",
+    },
+    async () => text("Content 1")
+  );
 
   // Verify server exists
   assertExists(server);
