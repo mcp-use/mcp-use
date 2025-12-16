@@ -492,7 +492,10 @@ export default PostHog;
             ...mod.widgetMetadata,
             title: mod.widgetMetadata.title || widgetName,
             description: mod.widgetMetadata.description,
-            inputs: schemaField?.shape || {},
+            // Pass the full Zod schema object directly (don't extract .shape)
+            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+            // and raw shapes, so we preserve the full schema here
+            inputs: schemaField || {},
           };
         }
         // Give a moment for any background esbuild operations to complete
