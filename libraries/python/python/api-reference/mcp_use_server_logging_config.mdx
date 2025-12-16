@@ -1,0 +1,76 @@
+---
+title: "Config"
+description: "Configurable logging setup for MCP servers API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/config.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/config.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/config.py</a>
+</Callout>
+
+Configurable logging setup for MCP servers.
+
+## InspectorLogFilter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> InspectorLogFilter</div>
+
+Filter that hides inspector-related access logs.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.config import InspectorLogFilter
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="inspector_path" type="str" default='/inspector' >   File path </ParamField>
+
+**Signature**
+```python wrap
+def __init__(inspector_path: str = "/inspector"):
+```
+
+</Card>
+</div>
+
+
+## setup_logging
+<Card type="info">
+### `function` setup_logging
+
+Set up logging configuration for MCP server.
+
+
+```python
+from mcp_use.server.logging.config import setup_logging
+```
+
+**Parameters**
+><ParamField body="debug_level" type="int" default="0" >   Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc) </ParamField>
+><ParamField body="log_level" type="str" default='INFO' >   Logging level (DEBUG, INFO, WARNING, ERROR) </ParamField>
+><ParamField body="show_inspector_logs" type="bool" default="False" >   Whether to show inspector-related access logs (default: False) </ParamField>
+><ParamField body="inspector_path" type="str" default='/inspector' >   Path prefix for inspector routes </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="dict" >Uvicorn logging configuration dict</ResponseField>
+
+**Signature**
+```python wrap
+def setup_logging(
+debug_level: int = 0,
+    log_level: str = "INFO",
+    show_inspector_logs: bool = False,
+    inspector_path: str = "/inspector"
+):
+```
+
+</Card>

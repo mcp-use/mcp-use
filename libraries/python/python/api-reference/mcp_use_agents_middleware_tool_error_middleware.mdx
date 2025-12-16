@@ -1,0 +1,17 @@
+---
+title: "Tool Error Middleware"
+description: "Middleware for handling tool validation and execution errors API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/middleware/tool_error_middleware.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/middleware/tool_error_middleware.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/middleware/tool_error_middleware.py</a>
+</Callout>
+
+Middleware for handling tool validation and execution errors.
+
+This middleware wraps tool calls to catch any exceptions (including ValidationErrors)
+and returns them as formatted error messages to the LLM, enabling automatic retry.
