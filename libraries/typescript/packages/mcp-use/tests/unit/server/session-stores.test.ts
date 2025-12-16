@@ -244,7 +244,7 @@ describe("RedisSessionStore", () => {
           return count;
         },
         async keys(pattern: string) {
-          const prefix = pattern.replace("*", "");
+          const prefix = pattern.replace(/\*/g, "");
           return Array.from(storage.keys()).filter((k) => {
             const item = storage.get(k);
             return (

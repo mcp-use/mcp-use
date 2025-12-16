@@ -214,7 +214,7 @@ describe("RedisStreamManager", () => {
           }).length;
         },
         async keys(pattern: string) {
-          const prefix = pattern.replace("*", "");
+          const prefix = pattern.replace(/\*/g, "");
           return Array.from(storage.keys()).filter((k) => k.startsWith(prefix));
         },
         async expire(key: string, seconds: number) {
