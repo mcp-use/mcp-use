@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.20
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+- Updated dependencies [a90ac6f]
+  - mcp-use@1.11.0-canary.20
+
 ## 0.13.0-canary.19
 
 ### Patch Changes

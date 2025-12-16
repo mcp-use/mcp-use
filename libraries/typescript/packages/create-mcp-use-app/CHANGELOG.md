@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.8.1-canary.5
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+
 ## 0.8.1-canary.4
 
 ### Patch Changes
