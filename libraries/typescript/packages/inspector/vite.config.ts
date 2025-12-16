@@ -85,6 +85,14 @@ export default defineConfig({
       ),
       "node:stream": path.resolve(__dirname, "./src/client/stubs/stream.js"),
       "node:process": path.resolve(__dirname, "./src/client/stubs/process.js"),
+      "node:child_process": path.resolve(
+        __dirname,
+        "./src/client/stubs/child_process.js"
+      ),
+      child_process: path.resolve(
+        __dirname,
+        "./src/client/stubs/child_process.js"
+      ),
     },
   },
   define: {
@@ -115,10 +123,6 @@ export default defineConfig({
         "langfuse-langchain",
         "langfuse",
         "@e2b/code-interpreter",
-        "node:stream",
-        "node:process",
-        "child_process",
-        "fs",
         "os",
       ],
       onwarn(warning, warn) {
