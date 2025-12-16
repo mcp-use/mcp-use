@@ -1,0 +1,56 @@
+---
+title: "State"
+description: "Shared state for MCP server logging API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/state.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/state.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/state.py</a>
+</Callout>
+
+Shared state for MCP server logging.
+
+
+## get_method_info
+<Card type="info">
+### `function` get_method_info
+
+Get method info for current thread.
+
+```python
+from mcp_use.server.logging.state import get_method_info
+```
+
+**Returns**
+><ResponseField name="returns" type="dict | None" />
+
+**Signature**
+```python wrap
+def get_method_info():
+```
+
+</Card>
+
+
+## set_method_info
+<Card type="info">
+### `function` set_method_info
+
+Store method info for current thread.
+
+```python
+from mcp_use.server.logging.state import set_method_info
+```
+
+**Parameters**
+><ParamField body="info" type="dict | None" required="True" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def set_method_info(info: dict | None):
+```
+
+</Card>

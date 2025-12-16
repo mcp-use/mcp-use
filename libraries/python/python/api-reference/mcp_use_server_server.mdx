@@ -1,0 +1,105 @@
+---
+title: "Server"
+description: "Server API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/server.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/server.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/server.py</a>
+</Callout>
+
+## MCPServer
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPServer</div>
+
+Main MCP Server class with integrated inspector and development tools.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.server import MCPServer
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="name" type="str | None" default="None" >   Name identifier </ParamField>
+><ParamField body="version" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="instructions" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="middleware" type="list[Middleware] | None" default="None" >   Middleware instance </ParamField>
+><ParamField body="debug" type="bool" default="False" >   Enable debug/verbose mode </ParamField>
+><ParamField body="mcp_path" type="str" default='/mcp' >   File path </ParamField>
+><ParamField body="docs_path" type="str" default='/docs' >   File path </ParamField>
+><ParamField body="inspector_path" type="str" default='/inspector' >   File path </ParamField>
+><ParamField body="openmcp_path" type="str" default='/openmcp.json' >   File path </ParamField>
+><ParamField body="show_inspector_logs" type="bool" default="False" >   Boolean flag </ParamField>
+><ParamField body="pretty_print_jsonrpc" type="bool" default="False" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def __init__(name: str | None = None, version: str | None = None, instructions: str | None = None, middleware: list[Middleware] | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/inspector", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False):
+```
+
+</Card>
+<Card type="info">
+### `property` debug
+
+Whether debug mode is enabled.
+
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def debug():
+```
+
+</Card>
+
+<Card type="info">
+### `method` include_router
+
+Include a router's tools, resources, and prompts into this server.
+
+        Similar to FastAPI's include_router, this allows you to organize your
+        MCP server into multiple files/modules.
+
+        Example:
+            ```python
+            from mcp_use.server import MCPServer, MCPRouter
+
+            # In routes/math.py
+            router = MCPRouter()
+
+            @router.tool()
+            def add(a: int, b: int) -> int:
+                return a + b
+
+            # In main.py
+            server = MCPServer(name="my-server")
+            server.include_router(router, prefix="math")  # Tool becomes "math_add"
+            server.include_router(other_router, enabled=False)  # Skip this router
+            ```
+
+
+**Parameters**
+><ParamField body="router" type="MCPRouter" required="True" >   The MCPRouter instance to include </ParamField>
+><ParamField body="prefix" type="str" default='' >   Optional prefix to add to all tool names (e.g., "math" -> "math_add") </ParamField>
+><ParamField body="enabled" type="bool" default="True" >   Whether to enable this router (default True). Set to False to skip registration. </ParamField>
+
+**Signature**
+```python wrap
+def include_router(router: MCPRouter, prefix: str = "", enabled: bool = True):
+```
+
+</Card>
+
+</div>
