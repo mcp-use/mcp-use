@@ -106,7 +106,7 @@ export function JsonRpcLoggerView({
     let es: globalThis.EventSource | null = null;
     try {
       const params = new URLSearchParams();
-      params.set("replay", "3");
+      params.set("replay", "50");
       // Add timestamp to ensure fresh connection
       params.set("_t", Date.now().toString());
       if (serverIds && serverIds.length > 0) {
@@ -203,6 +203,11 @@ export function JsonRpcLoggerView({
         );
       });
     }
+
+    // Sort by timestamp (newest first)
+    result = [...result].sort((a, b) => {
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
 
     return result;
   }, [items, searchQuery, serverIds]);
