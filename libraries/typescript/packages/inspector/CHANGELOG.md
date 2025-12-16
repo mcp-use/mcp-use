@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.19
+
+### Patch Changes
+
+- 1adbb26: fix: register rpc logs in background
+  - mcp-use@1.11.0-canary.19
+
 ## 0.13.0-canary.18
 
 ### Patch Changes
