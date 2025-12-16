@@ -344,9 +344,9 @@ print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
 cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/client": "npm:mcp-use@${MCP_USE_VERSION}/client",
-    "mcp-use/server": "npm:mcp-use@${MCP_USE_VERSION}/server",
-    "zod": "npm:zod@^4.2.0"
+    "mcp-use/client": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/client",
+    "mcp-use/server": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/server",
+    "zod": "npm:zod@4.2.0"
   }
 }
 
@@ -356,7 +356,7 @@ print_success "Created deno.json with mcp-use@$MCP_USE_VERSION dependency"
 # Set environment variables BEFORE deploying the function
 print_info "Setting environment variables for edge function..."
 FUNCTION_BASE_URL="https://${PROJECT_ID}.supabase.co/functions/v1/${FUNCTION_NAME}"
-CSP_URLS="https://${PROJECT_ID}.supabase.co"
+CSP_URLS="https://${PROJECT_ID}.supabase.co,https://*.supabase.com"
 
 # Set MCP_URL
 if supabase secrets set MCP_URL="$FUNCTION_BASE_URL" --project-ref "$PROJECT_ID"; then
