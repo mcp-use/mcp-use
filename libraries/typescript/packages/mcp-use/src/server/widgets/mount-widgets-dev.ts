@@ -534,15 +534,21 @@ export default PostHog;
       if (mod.widgetMetadata) {
         metadata = mod.widgetMetadata;
 
-        // Convert Zod schema to JSON schema for props if available
-        if (metadata.inputs) {
-          // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
+        // Handle inputs field (preferred) or props field (deprecated) for Zod schema
+        const schemaField = metadata.inputs || metadata.props;
+        if (schemaField) {
           try {
-            // Store the zod schema shape for inputs
-            metadata.inputs = (metadata.inputs as any).shape || metadata.inputs;
+            // Store the zod schema shape
+            const extractedShape = (schemaField as any).shape || schemaField;
+            // Store in inputs field (normalize to preferred field)
+            metadata.inputs = extractedShape;
+            // Also set props as alias for backward compatibility
+            if (!metadata.inputs && metadata.props) {
+              metadata.inputs = metadata.props;
+            }
           } catch (error) {
             console.warn(
-              `[WIDGET] Failed to extract props schema for ${widget.name}:`,
+              `[WIDGET] Failed to extract schema for ${widget.name}:`,
               error
             );
           }

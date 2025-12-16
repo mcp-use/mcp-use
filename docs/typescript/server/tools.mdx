@@ -171,14 +171,14 @@ server.tool({
 
 ## Returning Widgets from Tools
 
-Tools can return interactive UI widgets using the `widget()` helper and the `returnsWidget` option. This automatically configures the tool to render widgets in the Inspector and ChatGPT.
+Tools can return interactive UI widgets using the `widget()` helper with the `widget` config option. This automatically configures the tool to render widgets in the Inspector and ChatGPT.
 
-<Warning>
- You must set the `returnsWidget` option to `true` in the tool definition to return a widget.
-</Warning>
+<Note>
+You must include the `widget: { name, ... }` config in your tool definition when returning widgets. This sets up all the registration-time metadata needed for proper widget rendering.
+</Note>
 
 ```typescript
-import { widget } from 'mcp-use/server';
+import { widget, text } from 'mcp-use/server';
 import { z } from 'zod';
 
 server.tool({
@@ -199,16 +199,20 @@ server.tool({
   
   // Return widget with runtime data only
   return widget({
-    data: weatherData,
+    props: weatherData,
+    output: text(`Weather in ${city}: ${weatherData.temp}°C`),
     message: `Current weather in ${city}`
   });
 });
 ```
 
 **How it works:**
-- `widget: { name, invoking, invoked, ... }` - Configures all widget metadata at registration time
-- `widget()` helper - Returns runtime data (structured content and optional message)
-- The widget must exist in your `resources/` folder and be registered with the server
+- `widget: { name, invoking, invoked, ... }` on tool definition - Configures all widget metadata at registration time
+- `widget({ props, output, message })` helper - Returns runtime data only:
+  - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
+  - `output` - Optional response helper (text(), object(), etc.) that the model sees
+  - `message` - Optional text message override
+- The widget must exist in your `resources/` folder as a `.tsx` file or folder
 
 See [UI Widgets](./ui-widgets) for complete widget creation and registration documentation.
 

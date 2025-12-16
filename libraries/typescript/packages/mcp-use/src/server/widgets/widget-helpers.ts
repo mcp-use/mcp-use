@@ -369,9 +369,9 @@ export function createWidgetRegistration(
   htmlTemplate: string;
   appsSdkMetadata: Record<string, any>;
 } {
-  // Use props field with fallback to inputs/schema for backward compatibility
-  const props = (metadata.props ||
-    metadata.inputs ||
+  // Use inputs field (preferred) with fallback to props/schema for backward compatibility
+  const props = (metadata.inputs ||
+    metadata.props ||
     metadata.schema ||
     {}) as import("../types/resource.js").WidgetProps;
   const description =

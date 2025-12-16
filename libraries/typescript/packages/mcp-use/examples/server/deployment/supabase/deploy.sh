@@ -272,8 +272,17 @@ if [ -f "supabase/config.toml" ]; then
         echo "" >> supabase/config.toml
         echo "[functions.$FUNCTION_NAME]" >> supabase/config.toml
         echo "verify_jwt = false" >> supabase/config.toml
-        echo "static_files = [ \"./functions/$FUNCTION_NAME/dist/**/*.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\", \"./functions/$FUNCTION_NAME/dist/public/**/*\" ]" >> supabase/config.toml
+        # Only include HTML files and metadata - JS/CSS served from Storage
+        echo "static_files = [ \"./functions/$FUNCTION_NAME/dist/resources/widgets/**/index.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\" ]" >> supabase/config.toml
         print_success "Added function configuration to config.toml"
+    else
+        # Update existing static_files configuration if it exists
+        if grep -q "static_files = " supabase/config.toml; then
+            # Use sed to update the static_files line to only include HTML and metadata
+            sed -i.bak "s|static_files = .*|static_files = [ \"./functions/$FUNCTION_NAME/dist/resources/widgets/**/index.html\", \"./functions/$FUNCTION_NAME/dist/mcp-use.json\" ]|g" supabase/config.toml
+            rm -f supabase/config.toml.bak
+            print_success "Updated static_files configuration in config.toml"
+        fi
     fi
 else
     print_error "supabase/config.toml not found"
@@ -282,6 +291,12 @@ fi
 
 # Build the project
 print_info "Building the project..."
+# Optional: Clean dist directory before building to prevent stale assets
+if [ -d "dist" ]; then
+    print_info "Cleaning dist directory..."
+    rm -rf dist
+fi
+
 # MCP_URL: Where widget assets (JS/CSS) are stored (storage bucket)
 MCP_URL="https://${PROJECT_ID}.supabase.co/storage/v1/object/public/${BUCKET_NAME}"
 export MCP_URL
@@ -310,13 +325,33 @@ FUNCTION_DIR="supabase/functions/$FUNCTION_NAME"
 mkdir -p "$FUNCTION_DIR"
 print_success "Created $FUNCTION_DIR"
 
-# Copy dist to function directory
-print_info "Copying build artifacts..."
+# Copy ONLY HTML files and metadata to function directory
+# Heavy JS/CSS assets are served from Storage
+print_info "Copying HTML files and metadata..."
 if [ -d "$FUNCTION_DIR/dist" ]; then
     rm -rf "$FUNCTION_DIR/dist"
 fi
-cp -r dist "$FUNCTION_DIR/"
-print_success "Copied dist to $FUNCTION_DIR"
+
+mkdir -p "$FUNCTION_DIR/dist/resources/widgets"
+mkdir -p "$FUNCTION_DIR/dist"
+
+# Copy only index.html from each widget
+if [ -d "dist/resources/widgets" ]; then
+    for widget_dir in dist/resources/widgets/*/; do
+        if [ -d "$widget_dir" ] && [ -f "$widget_dir/index.html" ]; then
+            widget_name=$(basename "$widget_dir")
+            mkdir -p "$FUNCTION_DIR/dist/resources/widgets/$widget_name"
+            cp "$widget_dir/index.html" "$FUNCTION_DIR/dist/resources/widgets/$widget_name/"
+        fi
+    done
+fi
+
+# Copy mcp-use.json if it exists
+if [ -f "dist/mcp-use.json" ]; then
+    cp "dist/mcp-use.json" "$FUNCTION_DIR/dist/"
+fi
+
+print_success "Copied HTML files and metadata to $FUNCTION_DIR"
 
 # Check if index.ts exists, if not copy from current root
 if [ ! -f "$FUNCTION_DIR/index.ts" ]; then
@@ -344,11 +379,12 @@ print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
 cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/client": "npm:mcp-use@${MCP_USE_VERSION}/client",
-    "mcp-use/server": "npm:mcp-use@${MCP_USE_VERSION}/server",
+    "mcp-use/client": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/client",
+    "mcp-use/server": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/server",
     "zod": "npm:zod@^4.2.0"
   }
 }
+
 
 EOF
 print_success "Created deno.json with mcp-use@$MCP_USE_VERSION dependency"
@@ -437,24 +473,14 @@ RETRY_COUNT=0
 RETRY_DELAY=2
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    # Check if server responds (400, 406, or 200 are all valid "server is up" responses)
-    RESPONSE=$(curl -s -w "\n%{http_code}" -m 5 "$MCP_ENDPOINT" 2>&1)
-    HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-    BODY=$(echo "$RESPONSE" | sed '$d')
+    # Use POST request - the /mcp endpoint is SSE so GET hangs, but POST returns immediately
+    # with 415 (Unsupported Media Type) or similar, proving the server is up
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 5 -X POST "$MCP_ENDPOINT" 2>/dev/null) || HTTP_CODE="000"
     
-    # MCP server can return:
-    # - 400: Bad request (server is up but rejecting the request format)
-    # - 406: Not Acceptable (expects text/event-stream header)
-    # - 200: Success
-    # All indicate the server is functioning
-    if [ "$HTTP_CODE" = "400" ]; then
-        print_success "MCP server is up and running!"
-        break
-    elif [ "$HTTP_CODE" = "406" ] && echo "$BODY" | grep -q "text/event-stream"; then
-        print_success "MCP server is up and running!"
-        break
-    elif [ "$HTTP_CODE" = "200" ]; then
-        print_success "MCP server is up and running!"
+    # Any response code > 0 means the server is responding
+    # Common codes: 415 (wrong content type), 400 (bad request), 405 (method not allowed)
+    if [ "$HTTP_CODE" != "000" ] && [ "$HTTP_CODE" != "502" ] && [ "$HTTP_CODE" != "503" ] && [ "$HTTP_CODE" != "504" ]; then
+        print_success "MCP server is up and running! (HTTP $HTTP_CODE)"
         break
     fi
     

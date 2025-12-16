@@ -417,43 +417,54 @@ The `mix()` helper merges content arrays and combines `structuredContent` and `_
 
 ### widget()
 
-Creates a response that displays an OpenAI Apps SDK widget (ChatGPT integration).
+Creates a response that returns runtime data for an OpenAI Apps SDK widget. Used in conjunction with the `widget` config on your tool definition.
 
-
-<Warning>
-Then **`name`** should correspond to the name of the widget file or the folder name in the resources folder.
-</Warning>
+<Note>
+The `widget()` helper only handles **runtime data**. Widget configuration (name, invoking status, etc.) must be set on the tool's `widget` config property at registration time.
+</Note>
 
 ```typescript
-import { widget } from 'mcp-use/server';
+import { widget, text } from 'mcp-use/server';
+import z from 'zod';
 
 server.tool({
   name: 'show-weather',
   schema: z.object({ city: z.string() }),
-  async ({ city }) => {
-    const weatherData = await fetchWeather(city);
-    return widget({
-      name: 'weather-display',
-      data: weatherData,
-      message: `Showing weather for ${city}`,
-      invoking: 'Fetching weather data...',
-      invoked: 'Weather data loaded',
-      widgetAccessible: true,
-      resultCanProduceWidget: true
-    });
+  // Widget configuration goes here (registration-time)
+  widget: {
+    name: 'weather-display',      // Must match widget in resources/
+    invoking: 'Fetching weather data...',
+    invoked: 'Weather data loaded',
+    widgetAccessible: true,
+    resultCanProduceWidget: true
   }
+}, async ({ city }) => {
+  const weatherData = await fetchWeather(city);
+  
+  // widget() helper returns runtime data only
+  return widget({
+    props: {
+      city,
+      temperature: weatherData.temp,
+      conditions: weatherData.conditions,
+      humidity: weatherData.humidity
+    },
+    output: text(`Weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`),
+    message: `Showing weather for ${city}`
+  });
 });
 ```
 
-**Configuration**:
-- `name`: Widget name (must exist in resources folder)
-- `data`: Structured data passed to the widget
-- `message`: Display message (default: "Displaying {name}")
-- `invoking`: Status while tool is running (optional)
-- `invoked`: Status after completion (optional)
-- `widgetAccessible`: Whether widget can call tools (default: true)
+**Parameters:**
+- `props` - Widget-only data passed to `useWidget().props` in your widget component (hidden from the model)
+- `output` - Optional response helper (text(), object(), etc.) that defines what the model sees
+- `message` - Optional text message override (used if no output provided)
 
-**Returns**: `CallToolResult` with OpenAI widget metadata
+**Returns**: `CallToolResult` with widget props in `_meta["mcp-use/props"]` and tool output in `content`
+
+<Tip>
+The widget name must match a `.tsx` file or folder in your `resources/` directory. The widget will receive the `props` data via the `useWidget()` hook, while the model sees the `output` or `message` in the conversation.
+</Tip>
 
 ## Type Safety
 
