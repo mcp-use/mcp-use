@@ -980,15 +980,15 @@ export function ToolsTab({
                 }`}
               />
             </div>
-            {!rpcPanelCollapsed && (
-              <div className="flex-1 overflow-hidden min-h-0">
-                <JsonRpcLoggerView
-                  serverIds={[serverId]}
-                  onCountChange={setRpcMessageCount}
-                  onClearRef={clearRpcMessagesRef}
-                />
-              </div>
-            )}
+            <div
+              className={`flex-1 overflow-hidden min-h-0 ${rpcPanelCollapsed ? "hidden" : ""}`}
+            >
+              <JsonRpcLoggerView
+                serverIds={[serverId]}
+                onCountChange={setRpcMessageCount}
+                onClearRef={clearRpcMessagesRef}
+              />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>

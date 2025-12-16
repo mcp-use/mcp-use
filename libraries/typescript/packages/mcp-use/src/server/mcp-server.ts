@@ -53,6 +53,9 @@ import {
   getActiveSessions,
   sendNotification,
   sendNotificationToSession,
+  sendToolsListChanged,
+  sendResourcesListChanged,
+  sendPromptsListChanged,
 } from "./notifications/index.js";
 import {
   findSessionContext,
@@ -119,6 +122,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public serverPort?: number;
   public serverHost: string;
   public serverBaseUrl?: string;
+  public favicon?: string;
   public registeredTools: string[] = [];
   public registeredPrompts: string[] = [];
   public registeredResources: string[] = [];
@@ -206,6 +210,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
+    this.favicon = config.favicon;
 
     // Create native SDK server instance with capabilities
     this.nativeServer = new OfficialMcpServer(
@@ -311,8 +316,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 widgetConfig.resultCanProduceWidget ?? true,
             };
 
-            // Set _meta on the result
-            (result as any)._meta = responseMeta;
+            // Set _meta on the result, merging with any existing _meta (e.g., from widget() helper)
+            (result as any)._meta = {
+              ...(result._meta || {}),
+              ...responseMeta,
+            };
 
             // Update message if empty
             if (
@@ -881,6 +889,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public getActiveSessions = getActiveSessions;
   public sendNotification = sendNotification;
   public sendNotificationToSession = sendNotificationToSession;
+  public sendToolsListChanged = sendToolsListChanged;
+  public sendResourcesListChanged = sendResourcesListChanged;
+  public sendPromptsListChanged = sendPromptsListChanged;
 
   /**
    * Notify subscribed clients that a resource has been updated
@@ -1289,6 +1300,7 @@ export function createMCPServer(
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,
     oauth: config.oauth,
+    favicon: config.favicon,
   }) as any;
 
   return instance as unknown as McpServerInstance<boolean>;

@@ -22,6 +22,7 @@ import {
   createWidgetUIResource,
   type WidgetServerConfig,
 } from "./widget-helpers.js";
+import z from "zod";
 
 /**
  * Minimal server interface for UI resource registration
@@ -238,66 +239,114 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       }
     }
 
-    server.tool(
-      {
-        name: definition.name,
-        title: definition.title,
-        description: definition.description,
-        inputs: convertPropsToInputs(definition.props),
-        annotations: definition.toolAnnotations,
-        _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
-      },
-      async (params: Record<string, unknown>) => {
-        // Create the UIResource with user-provided params
-        const uiResource = await createWidgetUIResource(
-          definition,
-          params,
-          serverConfig
+    // Determine the input schema - check if props is a Zod schema
+    // Also check for deprecated inputs/schema fields from widget metadata
+    const widgetMetadata = definition._meta?.["mcp-use/widget"] as
+      | { props?: unknown; inputs?: unknown; schema?: unknown }
+      | undefined;
+
+    // Check props, then fall back to deprecated inputs/schema fields
+    const propsOrSchema =
+      definition.props ||
+      widgetMetadata?.props ||
+      widgetMetadata?.inputs ||
+      widgetMetadata?.schema;
+
+    // Check if it's a Zod schema
+    const isZodSchema =
+      propsOrSchema &&
+      typeof propsOrSchema === "object" &&
+      propsOrSchema instanceof z.ZodObject;
+
+    // Build tool definition with appropriate schema format
+    const toolDefinition: ToolDefinition = {
+      name: definition.name,
+      title: definition.title,
+      description: definition.description,
+      annotations: definition.toolAnnotations,
+      _meta: Object.keys(toolMetadata).length > 0 ? toolMetadata : undefined,
+    };
+
+    if (isZodSchema) {
+      // Pass Zod schema directly - the tool registration will convert it to JSON schema
+      toolDefinition.schema = propsOrSchema as z.ZodObject<any>;
+    } else if (propsOrSchema) {
+      // Legacy WidgetProps format - convert to InputDefinition array
+      toolDefinition.inputs = convertPropsToInputs(
+        propsOrSchema as import("../types/resource.js").WidgetProps
+      );
+    }
+
+    server.tool(toolDefinition, async (params: Record<string, unknown>) => {
+      // Create the UIResource with user-provided params
+      const uiResource = await createWidgetUIResource(
+        definition,
+        params,
+        serverConfig
+      );
+
+      // For Apps SDK, return _meta at top level with only text in content
+      if (definition.type === "appsSdk") {
+        // Generate a unique URI with random ID for each invocation
+        const randomId = Math.random().toString(36).substring(2, 15);
+        const uniqueUri = generateWidgetUri(
+          definition.name,
+          server.buildId,
+          ".html",
+          randomId
         );
 
-        // For Apps SDK, return _meta at top level with only text in content
-        if (definition.type === "appsSdk") {
-          // Generate a unique URI with random ID for each invocation
-          const randomId = Math.random().toString(36).substring(2, 15);
-          const uniqueUri = generateWidgetUri(
-            definition.name,
-            server.buildId,
-            ".html",
-            randomId
-          );
+        // Update toolMetadata with the unique URI and widget props
+        const uniqueToolMetadata = {
+          ...toolMetadata,
+          "openai/outputTemplate": uniqueUri,
+          "mcp-use/props": params, // Pass params as widget props
+        };
 
-          // Update toolMetadata with the unique URI
-          const uniqueToolMetadata = {
-            ...toolMetadata,
-            "openai/outputTemplate": uniqueUri,
-          };
-
-          return {
-            _meta: uniqueToolMetadata,
+        // Generate tool output (what the model sees)
+        let toolOutputResult;
+        if (definition.toolOutput) {
+          // Use provided toolOutput (function or static)
+          toolOutputResult =
+            typeof definition.toolOutput === "function"
+              ? definition.toolOutput(params)
+              : definition.toolOutput;
+        } else {
+          // Default: text summary
+          toolOutputResult = {
             content: [
               {
                 type: "text" as const,
                 text: `Displaying ${displayName}`,
               },
             ],
-            // structuredContent will be injected as window.openai.toolOutput by Apps SDK
-            structuredContent: params,
           };
         }
 
-        // For other types, return standard response
+        // Ensure content exists (required by CallToolResult)
+        const content = toolOutputResult.content || [
+          { type: "text" as const, text: `Displaying ${displayName}` },
+        ];
+
         return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Displaying ${displayName}`,
-              description: `Show MCP-UI widget for ${displayName}`,
-            },
-            uiResource,
-          ],
+          _meta: uniqueToolMetadata,
+          content: content,
+          structuredContent: toolOutputResult.structuredContent,
         };
       }
-    );
+
+      // For other types, return standard response
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Displaying ${displayName}`,
+            description: `Show MCP-UI widget for ${displayName}`,
+          },
+          uiResource,
+        ],
+      };
+    });
   }
 
   return server;

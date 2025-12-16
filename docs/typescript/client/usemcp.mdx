@@ -68,7 +68,7 @@ const mcp = useMcp({ url })
 // 'failed' → Connection failed (check mcp.error)
 ```
 
-### Handling Connection States
+Handling Connection States
 
 ```typescript
 function ConnectionStatus() {
@@ -106,40 +106,48 @@ function ConnectionStatus() {
 
 ```typescript
 interface UseMcpOptions {
-  // Required
-  url: string                              // MCP server URL
-
   // Connection
+  url?: string                             // MCP server URL (optional)
   enabled?: boolean                        // Enable/disable connection (default: true)
   customHeaders?: Record<string, string>   // Custom headers (auth, etc.)
-  transportType?: 'auto' | 'http' | 'sse'  // Transport preference
+  transportType?: 'auto' | 'http' | 'sse'  // Transport preference (default: 'auto')
   timeout?: number                         // Connection timeout (ms, default: 30000)
   sseReadTimeout?: number                  // SSE read timeout (ms, default: 300000)
 
   // OAuth
   clientName?: string                      // OAuth client name
   clientUri?: string                       // OAuth client URI
-  callbackUrl?: string                     // OAuth callback URL
-  preventAutoAuth?: boolean                // Prevent automatic OAuth (show auth button)
+  callbackUrl?: string                     // OAuth callback URL (default: /oauth/callback)
+  preventAutoAuth?: boolean                // Prevent automatic OAuth (show auth button, default: false)
   useRedirectFlow?: boolean                // Use redirect instead of popup (default: false)
-  onPopupWindow?: (win: Window) => void    // OAuth popup window handler
-  storageKeyPrefix?: string                // localStorage key prefix
+  onPopupWindow?: (url: string, features: string, window: Window | null) => void    // OAuth popup handler
+  storageKeyPrefix?: string                // localStorage key prefix (default: 'mcp:auth')
 
   // Reconnection
-  autoRetry?: boolean | number             // Auto-retry on failure
-  autoReconnect?: number                   // Auto-reconnect delay (ms)
+  autoRetry?: boolean | number             // Auto-retry on failure (boolean or delay in ms)
+  autoReconnect?: boolean | number         // Auto-reconnect on drop (boolean or delay in ms, default: 3000)
 
   // Client info
   clientConfig?: {
     name?: string                          // Client name
     version?: string                       // Client version
   }
+
+  // Advanced
+  debug?: boolean                          // Enable verbose debug logging
+  popupFeatures?: string                   // OAuth popup window features string
+  wrapTransport?: (transport: any, serverId: string) => any  // Transport wrapper for interceptors
+
+  // Callbacks
+  onNotification?: (notification: Notification) => void  // Handle server notifications
+  samplingCallback?: (params: CreateMessageRequest["params"]) => Promise<CreateMessageResult>  // Handle sampling requests
+  onElicitation?: (params: ElicitRequestFormParams | ElicitRequestURLParams) => Promise<ElicitResult>  // Handle elicitation requests
 }
 ```
 
 ## Authentication
 
-### Bearer Token Authentication
+### Bearer Token
 
 ```typescript
 const mcp = useMcp({
@@ -150,11 +158,11 @@ const mcp = useMcp({
 })
 ```
 
-### OAuth Authentication
+### OAuth
 
 mcp-use supports two OAuth flow modes:
 
-#### Popup Flow (Default)
+**Popup Flow**
 
 Opens OAuth in a popup window. Best for web applications.
 
@@ -178,7 +186,7 @@ const mcp = useMcp({
 // 5. Connection retries with token
 ```
 
-#### Redirect Flow
+**Redirect Flow**
 
 Redirects the main window. Best for mobile or when popups are blocked.
 
@@ -191,7 +199,7 @@ const mcp = useMcp({
 })
 ```
 
-#### Manual Authentication Trigger
+**Manual Authentication Trigger**
 
 Prevent automatic OAuth and show a manual login button:
 
@@ -226,46 +234,27 @@ Create an OAuth callback route to handle OAuth redirects:
 // app/oauth/callback/page.tsx (Next.js App Router)
 // or pages/oauth/callback.tsx (Next.js Pages Router)
 import { onMcpAuthorization } from 'mcp-use/auth'
-import { useEffect, useState } from 'react'
+// Also available from: import { onMcpAuthorization } from 'mcp-use/react'
+import { useEffect } from 'react'
 
 export default function OAuthCallback() {
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
-  const [error, setError] = useState<string>('')
-
   useEffect(() => {
+    // The function handles everything internally:
+    // - Displays success/error UI directly in this callback window
+    // - Posts message to opener window for popup flow
+    // - Automatically redirects for redirect flow
+    // - No need for error handling - it's handled internally
     onMcpAuthorization()
-      .then(() => {
-        setStatus('success')
-        // Redirect back to app after brief delay
-        setTimeout(() => {
-          window.location.href = '/'
-        }, 1000)
-      })
-      .catch((err) => {
-        setStatus('error')
-        setError(err.message)
-      })
   }, [])
 
-  if (status === 'processing') {
-    return <div>Completing authentication...</div>
-  }
-
-  if (status === 'success') {
-    return <div>✅ Authentication successful! Redirecting...</div>
-  }
-
-  return (
-    <div>
-      <h1>❌ Authentication Failed</h1>
-      <p>{error}</p>
-      <button onClick={() => window.location.href = '/'}>
-        Return to app
-      </button>
-    </div>
-  )
+  // Simple loading state while processing
+  return <div>Processing authentication...</div>
 }
 ```
+
+<Note>
+The `onMcpAuthorization()` function handles all success and error cases internally. For popup flow, it posts a message to the opener window (which `useMcp` listens for automatically). For redirect flow, it handles the navigation. You don't need custom error handling in your callback component.
+</Note>
 
 ## Calling Tools
 
@@ -497,8 +486,6 @@ function ChatInterface() {
 - ⚡ **Streaming responses**: Real-time token streaming for better UX
 - 🔄 **Agent persistence**: Reuse the same agent across messages for memory
 
-### Supported LLM Providers
-
 MCPAgent works with any LangChain chat model:
 
 ```typescript
@@ -564,183 +551,6 @@ function RobustConnection() {
 }
 ```
 
-## Automatic Reconnection
-
-```typescript
-const mcp = useMcp({
-  url: 'http://localhost:3000/mcp',
-  autoReconnect: 3000,  // Reconnect after 3 seconds if connection drops
-  autoRetry: 5000,      // Retry every 5 seconds on failure
-})
-
-// The hook automatically:
-// - Detects connection drops
-// - Waits specified delay
-// - Attempts reconnection
-// - Maintains state across retries
-```
-
-## Debugging and Logs
-
-```typescript
-function ConnectionDebugger() {
-  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
-
-  return (
-    <div>
-      <h3>Connection Logs</h3>
-      <div className="logs">
-        {mcp.log.map((entry, i) => (
-          <div key={i} className={entry.level}>
-            [{new Date(entry.timestamp).toLocaleTimeString()}]
-            [{entry.level}] {entry.message}
-          </div>
-        ))}
-      </div>
-
-      <button onClick={mcp.clearStorage}>
-        Clear OAuth Tokens
-      </button>
-    </div>
-  )
-}
-```
-
-## Transport Selection
-
-The hook supports multiple transports with automatic fallback:
-
-```typescript
-// Automatic (default): Try HTTP, fallback to SSE
-const mcp1 = useMcp({
-  url: 'http://localhost:3000/mcp',
-  transportType: 'auto'  // Default
-})
-
-// Force HTTP only
-const mcp2 = useMcp({
-  url: 'http://localhost:3000/mcp',
-  transportType: 'http'
-})
-
-// Force SSE only
-const mcp3 = useMcp({
-  url: 'http://localhost:3000/mcp',
-  transportType: 'sse'
-})
-```
-
-## Complete Example: Todo App
-
-```typescript
-import { useMcp } from 'mcp-use/react'
-import { useState, useEffect } from 'react'
-
-function TodoApp() {
-  const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    customHeaders: {
-      Authorization: `Bearer ${process.env.API_KEY}`
-    },
-    autoReconnect: 3000
-  })
-
-  const [todos, setTodos] = useState([])
-  const [newTodo, setNewTodo] = useState('')
-
-  // Load todos when connected
-  useEffect(() => {
-    if (mcp.state === 'ready') {
-      loadTodos()
-    }
-  }, [mcp.state])
-
-  const loadTodos = async () => {
-    try {
-      const result = await mcp.callTool('list-todos', {})
-      setTodos(result.todos || [])
-    } catch (error) {
-      console.error('Failed to load todos:', error)
-    }
-  }
-
-  const addTodo = async () => {
-    if (!newTodo.trim()) return
-
-    try {
-      await mcp.callTool('create-todo', {
-        text: newTodo,
-        completed: false
-      })
-      setNewTodo('')
-      await loadTodos()
-    } catch (error) {
-      console.error('Failed to create todo:', error)
-    }
-  }
-
-  const toggleTodo = async (id: string) => {
-    try {
-      await mcp.callTool('toggle-todo', { id })
-      await loadTodos()
-    } catch (error) {
-      console.error('Failed to toggle todo:', error)
-    }
-  }
-
-  if (mcp.state === 'discovering') {
-    return <div>Connecting to server...</div>
-  }
-
-  if (mcp.state === 'failed') {
-    return (
-      <div>
-        <p>Connection failed: {mcp.error}</p>
-        <button onClick={mcp.retry}>Retry</button>
-      </div>
-    )
-  }
-
-  if (mcp.state !== 'ready') {
-    return <div>Authenticating...</div>
-  }
-
-  return (
-    <div>
-      <h1>Todos</h1>
-
-      <div>
-        <input
-          value={newTodo}
-          onChange={e => setNewTodo(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addTodo()}
-          placeholder="Add a todo..."
-        />
-        <button onClick={addTodo}>Add</button>
-      </div>
-
-      <ul>
-        {todos.map(todo => (
-          <li key={todo.id}>
-            <input
-              type="checkbox"
-              checked={todo.completed}
-              onChange={() => toggleTodo(todo.id)}
-            />
-            <span style={{ textDecoration: todo.completed ? 'line-through' : 'none' }}>
-              {todo.text}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="status">
-        Connected to {mcp.tools.length} tools
-      </div>
-    </div>
-  )
-}
-```
 
 ## API Reference
 
@@ -751,22 +561,49 @@ function TodoApp() {
 | `state` | `'discovering' \| 'authenticating' \| 'pending_auth' \| 'ready' \| 'failed'` | Current connection state |
 | `tools` | `Tool[]` | Available tools from the server |
 | `resources` | `Resource[]` | Available resources |
+| `resourceTemplates` | `ResourceTemplate[]` | Available resource templates |
 | `prompts` | `Prompt[]` | Available prompt templates |
+| `serverInfo` | `{ name: string; version?: string } \| undefined` | Server information from initialize response |
+| `capabilities` | `Record<string, any> \| undefined` | Server capabilities from initialize response |
 | `error` | `string \| undefined` | Error message if connection failed |
 | `log` | `Array<{level, message, timestamp}>` | Connection log entries |
 | `authUrl` | `string \| undefined` | OAuth authorization URL (if manual auth needed) |
+| `client` | `BrowserMCPClient \| null` | Underlying client instance for creating agents |
 
 ### Methods
 
-#### `callTool(name, args)`
+#### `callTool(name, args, options?)`
 
-Execute a tool on the MCP server.
+Execute a tool on the MCP server with optional timeout configuration.
+
+**Parameters:**
+- `name: string` - Tool name to execute
+- `args?: Record<string, unknown>` - Tool arguments
+- `options?` - Optional configuration:
+  - `timeout?: number` - Request timeout in milliseconds (default: 60000)
+  - `maxTotalTimeout?: number` - Maximum total timeout even with progress resets
+  - `resetTimeoutOnProgress?: boolean` - Reset timeout when progress notifications received
+  - `signal?: AbortSignal` - AbortSignal for request cancellation
 
 ```typescript
+// Basic tool call
 const result = await mcp.callTool('tool-name', {
   param1: 'value1',
   param2: 'value2'
 })
+
+// Tool call with extended timeout (useful for long-running tools or sampling)
+const result = await mcp.callTool('analyze-data', { dataset: 'large' }, {
+  timeout: 300000,              // 5 minutes
+  resetTimeoutOnProgress: true  // Reset timer on progress updates
+})
+
+// Tool call with abort signal
+const controller = new AbortController()
+const result = await mcp.callTool('query', { search: 'term' }, {
+  signal: controller.signal
+})
+// Later: controller.abort()
 ```
 
 #### `readResource(uri)`
@@ -876,194 +713,10 @@ Clear OAuth tokens and disconnect.
 mcp.clearStorage()  // Removes tokens from localStorage
 ```
 
-## Advanced Patterns
-
-### Conditional Connection
-
-```typescript
-function ConditionalMcp({ enabled }: { enabled: boolean }) {
-  const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    enabled: enabled  // Only connect when enabled is true
-  })
-
-  return (
-    <div>
-      {enabled ? (
-        <div>Connection state: {mcp.state}</div>
-      ) : (
-        <div>Connection disabled</div>
-      )}
-    </div>
-  )
-}
-```
-
-### Multiple Independent Connections
-
-```typescript
-function MultiServerApp() {
-  const github = useMcp({ url: 'https://api.github.com/mcp' })
-  const linear = useMcp({ url: 'https://mcp.linear.app/mcp' })
-  const custom = useMcp({ url: 'http://localhost:3000/mcp' })
-
-  // Each connection is independent
-  return (
-    <div>
-      <div>GitHub: {github.state} ({github.tools.length} tools)</div>
-      <div>Linear: {linear.state} ({linear.tools.length} tools)</div>
-      <div>Custom: {custom.state} ({custom.tools.length} tools)</div>
-    </div>
-  )
-}
-```
-
-### Custom Connection Flow
-
-```typescript
-function CustomConnectionFlow() {
-  const [url, setUrl] = useState('')
-  const [shouldConnect, setShouldConnect] = useState(false)
-
-  const mcp = useMcp({
-    url: url,
-    enabled: shouldConnect && url !== ''
-  })
-
-  const handleConnect = () => {
-    if (url) {
-      setShouldConnect(true)
-    }
-  }
-
-  const handleDisconnect = () => {
-    setShouldConnect(false)
-    mcp.disconnect()
-  }
-
-  return (
-    <div>
-      <input
-        value={url}
-        onChange={e => setUrl(e.target.value)}
-        placeholder="MCP Server URL"
-        disabled={shouldConnect}
-      />
-
-      {!shouldConnect ? (
-        <button onClick={handleConnect}>Connect</button>
-      ) : (
-        <button onClick={handleDisconnect}>Disconnect</button>
-      )}
-
-      {mcp.state === 'ready' && (
-        <div>✅ Connected with {mcp.tools.length} tools</div>
-      )}
-    </div>
-  )
-}
-```
-
-## Best Practices
-
-### 1. Handle All Connection States
-
-Always handle all possible states to provide good UX:
-
-```typescript
-const renderConnectionState = (mcp: UseMcpResult) => {
-  switch (mcp.state) {
-    case 'discovering':
-      return <Spinner />
-    case 'authenticating':
-      return <div>Check popup for authentication...</div>
-    case 'pending_auth':
-      return <button onClick={mcp.authenticate}>Authenticate</button>
-    case 'ready':
-      return <div>✅ Connected</div>
-    case 'failed':
-      return <div>❌ {mcp.error} <button onClick={mcp.retry}>Retry</button></div>
-  }
-}
-```
-
-### 2. Wait for 'ready' State
-
-Don't call methods until connected:
-
-```typescript
-const handleAction = async () => {
-  if (mcp.state !== 'ready') {
-    alert('Not connected yet')
-    return
-  }
-
-  await mcp.callTool('my-tool', {})
-}
-```
-
-### 3. Clean Up on Unmount
-
-The hook automatically disconnects on unmount, but you can force cleanup:
-
-```typescript
-useEffect(() => {
-  return () => {
-    mcp.disconnect()
-  }
-}, [])
-```
-
-### 4. Secure API Keys
-
-Never hardcode API keys:
-
-```typescript
-// ❌ Bad
-const mcp = useMcp({
-  customHeaders: { Authorization: 'Bearer sk_live_12345' }
-})
-
-// ✅ Good
-const mcp = useMcp({
-  customHeaders: {
-    Authorization: `Bearer ${process.env.REACT_APP_API_KEY}`
-  }
-})
-```
-
-## TypeScript Types
-
-```typescript
-import type { UseMcpOptions, UseMcpResult } from 'mcp-use/react'
-
-// Full type definitions available
-const options: UseMcpOptions = {
-  url: 'http://localhost:3000/mcp',
-  customHeaders: { Authorization: 'Bearer xxx' },
-  autoRetry: true,
-  transportType: 'auto'
-}
-
-const mcp: UseMcpResult = useMcp(options)
-```
-
-## Comparison with MCPClient
-
-| Feature | useMcp Hook | MCPClient Class |
-|---------|-------------|-----------------|
-| Use case | React apps | Any TypeScript app |
-| Multi-server | Single server | Multiple servers |
-| Reconnection | Automatic | Manual |
-| React state | Built-in | Manual useState |
-| Chat support | Built-in | Via MCPAgent |
-| Best for | UI components | Background services, agents |
-
-For multi-server AI agents, use [`MCPClient`](/typescript/client/client-configuration) + [`MCPAgent`](/typescript/agent/agent-configuration) instead.
 
 ## Next Steps
 
 - [Authentication](/typescript/client/authentication) - OAuth and custom auth setup
 - [MCPClient](/typescript/client/client-configuration) - Multi-server class-based client
-- [Building Agents](/typescript/agent/building-custom-agents) - AI agents with MCP tools
-- [Connection Types](/typescript/client/connection-types) - HTTP, SSE, WebSocket, stdio
+- [Building Agents](/typescript/agent) - AI agents with MCP tools
+- [Client Configuration](/typescript/client/client-configuration) - HTTP, SSE, stdio connection types

@@ -1,0 +1,273 @@
+---
+title: "Overview"
+description: "Understanding MCP session lifecycle, stateful vs stateless modes, and pluggable session storage"
+icon: list
+---
+
+MCP servers can operate in two modes: **stateful** (with session tracking) and **stateless** (no session tracking).
+
+## Session Lifecycle
+
+### 1. Session Initialization
+
+A session begins when a client sends an `initialize` request:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    
+    Client->>Server: POST /mcp<br/>(no mcp-session-id header)<br/>{ method: "initialize", ... }
+    
+    Note over Server: Creates new session<br/>Generates unique session ID<br/>Stores session data
+    
+    Server-->>Client: 200 OK<br/>Mcp-Session-Id: abc-123<br/>{ result: { ... } }
+```
+
+### 2. Subsequent Requests
+
+After initialization, the client includes the session ID in all requests:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    
+    Client->>Server: POST /mcp<br/>Mcp-Session-Id: abc-123<br/>{ method: "tools/call", ... }
+    
+    Note over Server: Validates session ID<br/>Retrieves session data<br/>Processes request with context
+    
+    Server-->>Client: 200 OK<br/>{ result: { ... } }
+```
+
+### 3. Session Termination
+
+Sessions can end in several ways:
+
+- **Client closes**: Client sends DELETE request to `/mcp`
+- **Idle timeout**: Session expires after inactivity (default: 5 minutes)
+- **Server restart**: In-memory sessions are lost (see [Storage Providers](/typescript/server/session-management/memory-storage))
+
+### 4. Session Not Found (404)
+
+**Per the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management)**, when a client sends a request with an invalid or expired session ID, the server **MUST** return HTTP 404:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    
+    Client->>Server: POST /mcp<br/>Mcp-Session-Id: stale-123<br/>{ method: "tools/call", ... }
+    
+    Note over Server: Checks session store<br/>Session not found
+    
+    Server-->>Client: 404 Not Found<br/>{ error: "Session not found" }
+    
+    Note over Client: Client must re-initialize
+    
+    Client->>Server: POST /mcp<br/>(no session-id)<br/>{ method: "initialize", ... }
+    
+    Server-->>Client: 200 OK<br/>Mcp-Session-Id: new-456
+```
+
+Modern MCP clients (like [mcp-use client](/typescript/client)) automatically handle 404 responses by sending a new `initialize` request.
+
+## Stateful vs Stateless Modes
+
+### Stateful Mode (Default for Node.js)
+
+In stateful mode, the server tracks sessions across requests:
+
+```typescript
+import { MCPServer } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  stateless: false  // Explicitly enable stateful mode
+});
+
+server.start({ port: 3000 });
+```
+
+**Auto-detection:** When `stateless` is not explicitly set, the server automatically detects mode per-request:
+- Client sends `Accept: application/json, text/event-stream` → Stateful mode
+- Client sends `Accept: application/json` only → Stateless mode
+
+This enables compatibility with k6, curl, and other HTTP-only clients while maintaining full SSE support for capable clients.
+
+**Features:**
+- Session tracking with unique IDs
+- Client capability storage (sampling, elicitation, roots)
+- SSE streaming with resumability
+- Resource subscriptions and notifications
+- Idle session cleanup
+
+**Use cases:**
+- Development and debugging
+- Single-instance deployments
+- Applications requiring persistent client context
+- Servers using sampling, elicitation, or notifications
+
+### Stateless Mode (Default for Deno)
+
+In stateless mode, each request is independent:
+
+```typescript
+import { MCPServer } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  stateless: true  // Force stateless mode
+});
+
+server.start({ port: 3000 });
+```
+
+**Features:**
+- No session tracking
+- New server instance per request
+- No memory of previous requests
+- Horizontal scaling friendly
+
+**Use cases:**
+- Edge functions (Cloudflare Workers, Deno Deploy)
+- Serverless deployments (AWS Lambda, Vercel)
+- Load-balanced distributed systems
+- Simple, stateless APIs
+
+**Auto-detection:**
+```typescript
+// Auto-detects based on runtime
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0'
+  // stateless: true on Deno/edge runtimes
+  // stateless: false on Node.js
+});
+```
+
+
+## Storage Providers
+
+mcp-use supports multiple storage providers for session management:
+
+- **[In-Memory Storage](/typescript/server/session-management/memory-storage)** - Fast, but sessions lost on restart
+- **[File System Storage](/typescript/server/session-management/filesystem-storage)** - Default in development, persists to disk, sessions survive hot reloads
+- **[Redis Storage](/typescript/server/session-management/redis-storage)** - Persistent, distributed, supports full MCP features
+
+## Session Configuration
+
+### Idle Timeout
+
+Configure how long sessions remain active without requests:
+
+```typescript
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionIdleTimeoutMs: 600000  // 10 minutes (default: 5 minutes)
+});
+```
+
+## Deployment Patterns
+
+### Single Server
+
+Simple development/single-instance deployment:
+
+```typescript
+import { MCPServer } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0'
+  // Uses InMemorySessionStore + InMemoryStreamManager (defaults)
+});
+```
+
+**Characteristics:**
+- ✅ All features work (notifications, sampling, subscriptions)
+- ✅ No external dependencies
+- ❌ Sessions lost on restart
+- ❌ Can't scale horizontally
+### Persistent Sessions 
+
+Session metadata survives restarts, but still single server:
+
+```typescript
+import { MCPServer, RedisSessionStore } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new RedisSessionStore({ client: redis })
+  // streamManager defaults to InMemoryStreamManager
+});
+```
+
+**Characteristics:**
+- ✅ Session metadata persists across restarts
+- ✅ Notifications work (single server)
+- ❌ Can't distribute across multiple instances
+- ⚠️ Active SSE connections still lost on restart
+
+### Distributed
+Complete horizontal scaling with all MCP features:
+
+```typescript
+import { 
+  MCPServer, 
+  RedisSessionStore, 
+  RedisStreamManager 
+} from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new RedisSessionStore({ client: redis }),
+  streamManager: new RedisStreamManager({ client: redis, pubSubClient: pubSubRedis })
+});
+```
+
+**Characteristics:**
+- ✅ Full horizontal scaling
+- ✅ Notifications work across ALL servers
+- ✅ Sampling works across instances
+- ✅ Resource subscriptions work distributed
+- ✅ Load balancer can route requests anywhere
+- ✅ Session metadata persists
+
+
+### Stateless
+
+No sessions, no state:
+
+```typescript
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  stateless: true
+  // No session or stream managers needed
+});
+```
+
+**Characteristics:**
+- ✅ Infinite horizontal scaling
+- ✅ No Redis needed
+- ❌ No notifications
+- ❌ No sampling
+- ❌ No resource subscriptions
+- ❌ No SSE streaming
+
+
+
+## Related Documentation
+
+- [MCP Specification - Session Management](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management)
+- [Server Configuration](/typescript/server/configuration)
+- [Deployment Guide](/typescript/server/deployment-mcp-use)
+- [In-Memory Storage](/typescript/server/session-management/memory-storage)
+- [File System Storage](/typescript/server/session-management/filesystem-storage)
+- [Redis Storage](/typescript/server/session-management/redis-storage)

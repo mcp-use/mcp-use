@@ -1,0 +1,25 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.5.6",
+    "create-mcp-use-app": "0.8.0",
+    "@mcp-use/inspector": "0.12.6",
+    "mcp-use": "1.10.6"
+  },
+  "changesets": [
+    "clear-dogs-hunt",
+    "cuddly-keys-lay",
+    "easy-jars-nail",
+    "heavy-flies-fail",
+    "icy-worms-deny",
+    "loud-pillows-lay",
+    "lucky-meteors-accept",
+    "odd-mangos-deny",
+    "quiet-flies-say",
+    "smart-owls-arrive",
+    "swift-pandas-wave",
+    "wide-loops-pull",
+    "witty-walls-ask"
+  ]
+}

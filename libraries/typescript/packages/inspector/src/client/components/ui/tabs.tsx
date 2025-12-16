@@ -3,10 +3,18 @@
 import type { LucideIcon } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/client/lib/utils";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/client/components/ui/tooltip";
 
 interface TabsContextType {
   activeValue: string;
   handleValueChange: (value: string) => void;
+  collapsed: boolean;
+  handleCollapsedChange: (collapsed: boolean) => void;
 }
 
 const TabsContext = React.createContext<TabsContextType | undefined>(undefined);
@@ -21,6 +29,8 @@ function useTabs() {
 
 interface TabsListContextType {
   variant: "default" | "underline";
+  collapsed: boolean;
+  handleCollapsedChange: (collapsed: boolean) => void;
 }
 
 const TabsListContext = React.createContext<TabsListContextType | undefined>(
@@ -38,6 +48,8 @@ interface TabsProps {
   value?: string;
   onValueChange?: (value: string) => void;
   className?: string;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 function Tabs({
@@ -47,11 +59,14 @@ function Tabs({
   value,
   onValueChange,
   className,
+  collapsed: collapsedProp,
+  onCollapsedChange,
   ...props
 }: TabsProps & { ref?: React.RefObject<HTMLDivElement | null> }) {
   const [activeValue, setActiveValue] = React.useState(defaultValue || "");
   const isControlled = value !== undefined;
-
+  const isCollapsedControlled = collapsedProp !== undefined;
+  const [collapsed, setCollapsed] = React.useState(false);
   const handleValueChange = React.useCallback(
     (val: string) => {
       if (!isControlled) {
@@ -63,12 +78,25 @@ function Tabs({
   );
 
   const currentValue = isControlled ? value : activeValue;
+  const currentCollapsed = isCollapsedControlled ? collapsedProp : collapsed;
+
+  const handleCollapsedChange = React.useCallback(
+    (collapsed: boolean) => {
+      if (!isCollapsedControlled) {
+        setCollapsed(collapsed);
+      }
+      onCollapsedChange?.(collapsed);
+    },
+    [isCollapsedControlled, onCollapsedChange]
+  );
 
   return (
     <TabsContext
       value={{
         activeValue: currentValue,
         handleValueChange,
+        collapsed: currentCollapsed,
+        handleCollapsedChange,
       }}
     >
       <div
@@ -87,6 +115,7 @@ interface TabsListProps {
   children: React.ReactNode;
   className?: string;
   variant?: "default" | "underline";
+  collapsible?: boolean;
 }
 
 function TabsList({
@@ -94,9 +123,10 @@ function TabsList({
   children,
   className,
   variant = "default",
+  collapsible = false,
   ...props
 }: TabsListProps & { ref?: React.RefObject<HTMLDivElement | null> }) {
-  const { activeValue } = useTabs();
+  const { activeValue, collapsed, handleCollapsedChange } = useTabs();
   const [indicatorStyle, setIndicatorStyle] = React.useState({
     width: 0,
     left: 0,
@@ -104,31 +134,38 @@ function TabsList({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const resizeObserverRef = React.useRef<ResizeObserver | null>(null);
   const debounceTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const childrenArray = React.Children.toArray(children);
-  const activeIndex = childrenArray.findIndex(
-    (child) =>
-      React.isValidElement(child) &&
-      (child.props as { value: string }).value === activeValue
-  );
+  // We don't need activeIndex anymore since we use data attributes to find the active tab
 
   // Debounced update function
   const updateIndicator = React.useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const triggers = container.querySelectorAll("button");
-    const activeTrigger = triggers[activeIndex] as HTMLElement;
+    // Find the inner div that contains the tabs (excluding the toggle button)
+    const tabsContainer = container.querySelector(
+      "div:first-child"
+    ) as HTMLElement;
+    if (!tabsContainer) return;
 
-    if (activeTrigger) {
-      const containerRect = container.getBoundingClientRect();
+    // Find the active button by data attribute (works even when wrapped in Tooltip)
+    const activeTrigger = tabsContainer.querySelector(
+      `button[data-tab-value="${activeValue}"]`
+    ) as HTMLElement;
+
+    if (activeTrigger && activeValue) {
+      // Use tabsContainer as reference for positioning
+      const containerRect = tabsContainer.getBoundingClientRect();
       const triggerRect = activeTrigger.getBoundingClientRect();
 
       setIndicatorStyle({
         width: triggerRect.width,
         left: triggerRect.left - containerRect.left,
       });
+    } else {
+      // Reset if no active trigger found
+      setIndicatorStyle({ width: 0, left: 0 });
     }
-  }, [activeIndex]);
+  }, [activeValue]);
 
   // Debounced version of updateIndicator
   const debouncedUpdateIndicator = React.useCallback(() => {
@@ -138,12 +175,12 @@ function TabsList({
     debounceTimeoutRef.current = setTimeout(updateIndicator, 16); // ~60fps
   }, [updateIndicator]);
 
-  // Update indicator when active tab changes
+  // Update indicator when active tab changes or collapsed state changes
   React.useEffect(() => {
     // Use a small delay to ensure DOM is updated
     const timeoutId = setTimeout(updateIndicator, 10);
     return () => clearTimeout(timeoutId);
-  }, [updateIndicator]);
+  }, [updateIndicator, collapsed]);
 
   // Set up ResizeObserver for the container
   React.useEffect(() => {
@@ -157,13 +194,18 @@ function TabsList({
 
     resizeObserverRef.current.observe(container);
 
-    // Also observe all button elements for size changes
-    const triggers = container.querySelectorAll("button");
-    triggers.forEach((trigger) => {
-      if (resizeObserverRef.current) {
-        resizeObserverRef.current.observe(trigger);
-      }
-    });
+    // Also observe all button elements for size changes (excluding toggle button)
+    const tabsContainer = container.querySelector(
+      "div:first-child"
+    ) as HTMLElement;
+    if (tabsContainer) {
+      const triggers = tabsContainer.querySelectorAll("button[data-tab-value]");
+      triggers.forEach((trigger) => {
+        if (resizeObserverRef.current) {
+          resizeObserverRef.current.observe(trigger);
+        }
+      });
+    }
 
     return () => {
       if (resizeObserverRef.current) {
@@ -185,24 +227,22 @@ function TabsList({
     return () => window.removeEventListener("resize", handleResize);
   }, [debouncedUpdateIndicator]);
 
-  // Apply dynamic styles using data attributes
-  React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+  // Apply dynamic styles using inline styles for better reliability
+  const indicatorRef = React.useRef<HTMLSpanElement>(null);
 
-    const glider = container.querySelector("[data-width]") as HTMLElement;
-    if (glider) {
-      glider.style.width = `${indicatorStyle.width}px`;
-      glider.style.left = `${indicatorStyle.left}px`;
+  React.useEffect(() => {
+    if (indicatorRef.current) {
+      indicatorRef.current.style.width = `${indicatorStyle.width}px`;
+      indicatorRef.current.style.left = `${indicatorStyle.left}px`;
     }
   }, [indicatorStyle]);
 
   return (
-    <TabsListContext value={{ variant }}>
+    <TabsListContext value={{ variant, collapsed, handleCollapsedChange }}>
       <div
         ref={containerRef}
         className={cn(
-          "relative flex bg-none",
+          "relative flex items-center bg-none gap-1",
           variant === "default" &&
             "p-1 rounded-full border border-zinc-300 dark:border-zinc-600",
           variant === "underline" &&
@@ -211,17 +251,18 @@ function TabsList({
         )}
         {...props}
       >
-        {children}
-        <span
-          className={cn(
-            "absolute transition-all duration-200 ease-out z-0",
-            variant === "default" &&
-              "bg-white dark:bg-zinc-700 rounded-full h-[calc(100%-8px)] top-1 border border-zinc-300 dark:border-zinc-600",
-            variant === "underline" && "bottom-0 h-0.5 bg-black dark:bg-white"
-          )}
-          data-width={indicatorStyle.width}
-          data-left={indicatorStyle.left}
-        />
+        <div role="tablist" className="flex-1 flex items-center relative">
+          {children}
+          <span
+            ref={indicatorRef}
+            className={cn(
+              "absolute transition-all duration-500 ease-in-out z-0",
+              variant === "default" &&
+                "bg-white dark:bg-zinc-700 rounded-full h-[calc(100%)] top-0 border border-zinc-300 dark:border-zinc-600",
+              variant === "underline" && "bottom-0 h-0.5 bg-black dark:bg-white"
+            )}
+          />
+        </div>
       </div>
     </TabsListContext>
   );
@@ -234,7 +275,29 @@ interface TabsTriggerProps {
   className?: string;
   disabled?: boolean;
   icon?: LucideIcon;
+  title?: string;
 }
+
+// conditional tooltip wrapper if collapsed
+const ConditionalTooltip = ({
+  children,
+  title,
+  collapsed,
+}: {
+  children: React.ReactNode;
+  title: string | undefined;
+  collapsed: boolean;
+}) => {
+  if (!title || !collapsed) return children;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger>{children}</TooltipTrigger>
+        <TooltipContent>{title}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
 
 /**
  * TabsTrigger component with optional Lucide icon support.
@@ -248,40 +311,76 @@ interface TabsTriggerProps {
  * </TabsTrigger>
  * ```
  */
-function TabsTrigger({
-  ref,
-  children,
-  value,
-  className,
-  disabled,
-  icon: Icon,
-  ...props
-}: TabsTriggerProps & { ref?: React.RefObject<HTMLButtonElement | null> }) {
-  const { activeValue, handleValueChange } = useTabs();
-  const tabsListContext = useTabsList();
-  const variant = tabsListContext?.variant || "default";
-  const isActive = activeValue === value;
+const TabsTrigger = React.forwardRef<
+  HTMLButtonElement,
+  TabsTriggerProps & { ref?: React.RefObject<HTMLButtonElement | null> }
+>(
+  (
+    {
+      children,
+      value,
+      className,
+      disabled,
+      icon: Icon,
+      title: titleProp,
+      ...props
+    },
+    ref
+  ) => {
+    const { activeValue, handleValueChange, collapsed } = useTabs();
+    const tabsListContext = useTabsList();
+    const variant = tabsListContext?.variant || "default";
+    const isActive = activeValue === value;
 
-  return (
-    <button
-      ref={ref}
-      disabled={disabled}
-      onClick={() => handleValueChange(value)}
-      className={cn(
-        "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
-        variant === "default" && "rounded-md px-4 py-2.5",
-        variant === "underline" && "px-6 py-3 border-b-2 border-transparent",
-        isActive && "text-foreground",
-        !isActive && "text-muted-foreground hover:text-foreground",
-        className
-      )}
-      {...props}
-    >
-      {Icon && <Icon className="mr-2 h-4 w-4" />}
-      {children}
-    </button>
-  );
-}
+    // Use title prop when provided (for collapsed mode tooltips)
+    const title = collapsed && titleProp ? titleProp : undefined;
+
+    return (
+      <ConditionalTooltip title={titleProp as string} collapsed={collapsed}>
+        <button
+          ref={ref}
+          disabled={disabled}
+          onClick={() => handleValueChange(value)}
+          data-tab-value={value}
+          data-tab-active={isActive}
+          role="tab"
+          aria-selected={isActive ? "true" : "false"}
+          title={title}
+          className={cn(
+            "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+            variant === "default" && "py-2.5",
+            variant === "default" && "rounded-md px-4",
+            // variant === "default" && collapsed && "rounded-md px-1.5 aspect-square",
+            variant === "underline" &&
+              "px-6 py-3 border-b-2 border-transparent",
+            isActive && "text-foreground",
+            !isActive && "text-muted-foreground hover:text-foreground",
+            className
+          )}
+          {...props}
+        >
+          {Icon && (
+            <Icon
+              className={cn(
+                "h-4 w-4 transition-all duration-500 ease-in-out",
+                !collapsed && "mr-2",
+                collapsed && "mr-0!"
+              )}
+            />
+          )}
+          <span
+            className={cn(
+              "transition-all duration-500 ease-in-out overflow-hidden",
+              collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+            )}
+          >
+            {children}
+          </span>
+        </button>
+      </ConditionalTooltip>
+    );
+  }
+);
 TabsTrigger.displayName = "TabsTrigger";
 
 interface TabsContentProps {
@@ -318,4 +417,4 @@ function TabsContent({
 }
 TabsContent.displayName = "TabsContent";
 
-export { Tabs, TabsContent, TabsList, TabsTrigger, useTabs };
+export { Tabs, TabsContent, TabsList, TabsTrigger, useTabs, useTabsList };

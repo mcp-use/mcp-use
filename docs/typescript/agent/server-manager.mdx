@@ -1,7 +1,7 @@
 ---
 title: 'Server Manager'
 description: 'Dynamic multi-server orchestration for agents'
-icon: 'sitemap'
+icon: 'server'
 ---
 
 The Server Manager enables intelligent orchestration of multiple MCP servers, allowing agents to dynamically discover, connect to, and utilize tools from different servers without loading everything upfront.
@@ -70,40 +70,23 @@ const client = new MCPClient({
 
 // Enable Server Manager
 const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4' }),
+    llm: new ChatOpenAI({ model: 'gpt-4o' }),
     client,
     useServerManager: true  // This is the magic switch!
 })
 ```
 
-```typescript TypeScript
-import { MCPClient, MCPAgent } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-// Create client with multiple servers
-const client = new MCPClient({
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest']
-        },
-        filesystem: {
-            command: 'uvx',
-            args: ['mcp-server-filesystem', '/tmp']
-        }
-    }
-})
-
-// Enable Server Manager
-const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4' }),
-    client,
-    useServerManager: true  // This is the magic switch!
-})
-```
 </CodeGroup>
 
 ## Tool Discovery Flow
+
+The agent uses the management tools to discover and connect to servers:
+
+1. **List available servers**: Use `list_mcp_servers` to see what servers are configured
+2. **Connect to a server**: Use `connect_to_mcp_server` to activate a server and load its tools
+3. **Use server tools**: Once connected, the server's tools become available to the agent
+4. **Switch servers**: Connect to a different server to access its tools
+5. **Disconnect**: Use `disconnect_from_mcp_server` to deactivate the current server
 
 ## Management Tools Deep Dive
 
@@ -115,131 +98,12 @@ const agent = new MCPAgent({
 | `connect_to_mcp_server` | Activate a server and load its tools | "Connect to the filesystem server" |
 | `get_active_mcp_server` | Check current connection status | "Which server am I currently using?" |
 | `disconnect_from_mcp_server` | Deactivate server and remove its tools | "Disconnect from current server" |
-| `search_mcp_tools` | Semantic search across all server tools | "Find tools for image processing" |
+| `add_mcp_server_from_config` | Add a new server dynamically from configuration | "Add a new server with this configuration" |
 
-### Smart Tool Search Example
-
-<CodeGroup>
-```typescript TypeScript
-// Agent automatically discovers and uses the right tools
-const result = await agent.run(`
-I need to:
-1. Find tools for web scraping
-2. Connect to the right server
-3. Scrape data from https://example.com
-4. Save it to a file
-
-Start by searching for relevant tools.
-`)
-```
-
-```typescript TypeScript
-// Agent automatically discovers and uses the right tools
-const result = await agent.run(`
-I need to:
-1. Find tools for web scraping
-2. Connect to the right server
-3. Scrape data from https://example.com
-4. Save it to a file
-
-Start by searching for relevant tools.
-`)
-```
-</CodeGroup>
-
-**Agent Process:**
-```mermaid
-graph LR
-    Search[Search Tools] --> Connect[Connect Server]
-    Connect --> Use[Use Tools]
-```
-
-## Real-World Use Cases
-
-### 1. Multi-Server Data Pipeline
-
-<CodeGroup>
-```typescript TypeScript
-const result = await agent.run(`
-Create a data pipeline that:
-1. Scrapes product data from an e-commerce site
-2. Processes and cleans the data
-3. Saves it to a CSV file
-4. Loads it into a SQLite database
-
-Figure out which servers and tools you need.
-`)
-```
-
-```typescript TypeScript
-const result = await agent.run(`
-Create a data pipeline that:
-1. Scrapes product data from an e-commerce site
-2. Processes and cleans the data
-3. Saves it to a CSV file
-4. Loads it into a SQLite database
-
-Figure out which servers and tools you need.
-`)
-```
-</CodeGroup>
-
-**Server Flow:**
-```
-playwright → filesystem → database
-    ↓            ↓          ↓
- scraping → save CSV → load data
-```
-
-### 2. Content Creation Workflow
-
-<CodeGroup>
-```typescript TypeScript
-const result = await agent.run(`
-I want to:
-1. Search for trending topics online
-2. Generate an image based on the topic
-3. Write a blog post about it
-4. Save everything to files
-
-What tools do I need for this?
-`)
-```
-
-```typescript TypeScript
-const result = await agent.run(`
-I want to:
-1. Search for trending topics online
-2. Generate an image based on the topic
-3. Write a blog post about it
-4. Save everything to files
-
-What tools do I need for this?
-`)
-```
-</CodeGroup>
-
-## Performance Benefits
-
-The Server Manager provides focused tool access:
-
-- **Without Server Manager**: All 100+ tools from all servers loaded at once, overwhelming the model
-- **With Server Manager**: Only 5-15 relevant tools from the active server, providing clear focus
-
-##  Core Features
-
-The Server Manager provides these powerful capabilities:
-
-- **Dynamic Tool Addition**: Server tools automatically added with full schemas
-- **Real-time Updates**: Tool list updates immediately when connecting/disconnecting
-- **Clean Architecture**: Direct tool access with proper schemas
-- **Model Understanding**: Tools come with native schemas and validation
-- **Smart Logging**: Detailed insights into tool changes and server status
 
 ## Complete Example
 
-<CodeGroup>
-```typescript TypeScript
+```typescript 
 import { MCPClient, MCPAgent } from 'mcp-use'
 import { ChatOpenAI } from '@langchain/openai'
 
@@ -255,7 +119,7 @@ async function demoServerManager() {
 
     // Agent with Server Manager
     const agent = new MCPAgent({
-        llm: new ChatOpenAI({ model: 'gpt-4' }),
+        llm: new ChatOpenAI({ model: 'gpt-4o' }),
         client,
         useServerManager: true,
         verbose: true  // See the magic happen!
@@ -284,57 +148,7 @@ async function demoServerManager() {
 demoServerManager().catch(console.error)
 ```
 
-```typescript TypeScript
-import { MCPClient, MCPAgent } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
-
-async function demoServerManager() {
-    // Multi-server configuration
-    const client = new MCPClient({
-        mcpServers: {
-            web: { command: 'npx', args: ['@playwright/mcp@latest'] },
-            files: { command: 'uvx', args: ['mcp-server-filesystem', '/tmp'] },
-            database: { command: 'uvx', args: ['mcp-server-sqlite'] }
-        }
-    })
-
-    // Agent with Server Manager
-    const agent = new MCPAgent({
-        llm: new ChatOpenAI({ model: 'gpt-4' }),
-        client,
-        useServerManager: true,
-        verbose: true  // See the magic happen!
-    })
-
-    // Complex multi-server task
-    const result = await agent.run(`
-    I need to build a complete data collection system:
-
-    1. First, show me what servers and tools are available
-    2. Scrape product information from https://example-store.com
-    3. Clean and structure the data
-    4. Save it as both JSON and CSV files
-    5. Load the data into a SQLite database
-    6. Generate a summary report
-
-    Guide me through each step and show me how you discover and use the right tools.
-    `)
-
-    console.log('Task completed!')
-    console.log(result)
-
-    await client.closeAllSessions()
-}
-
-demoServerManager().catch(console.error)
-```
-</CodeGroup>
 
 The Server Manager transforms your MCP agent from a static tool user into an intelligent, adaptive assistant that can dynamically discover and utilize the perfect tools for any task!
 
-## Bring Your Own Server Manager
-
-For ultimate control, you can create your own server manager. By implementing the `BaseServerManager` abstract class, you can define custom logic for tool discovery, dynamic tool creation, or integration with other systems. The server manager's primary role is to provide tools **to the agent**. These can be management tools for connecting to external MCP servers, or, as shown below, custom tools that operate entirely within the agent's environment without needing an external server.
-
-Here’s a minimal example of a custom server manager that provides a single, hard-coded tool directly to the agent.
 

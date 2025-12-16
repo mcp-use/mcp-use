@@ -44,6 +44,23 @@ export function isAbsolute(filepath) {
   return filepath.startsWith("/");
 }
 
+export function parse(filepath) {
+  // Parse a path string into an object with root, dir, base, ext, and name
+  const root = filepath.startsWith("/") ? "/" : "";
+  const dir = dirname(filepath);
+  const base = basename(filepath);
+  const ext = extname(filepath);
+  const name = ext ? base.slice(0, -ext.length) : base;
+
+  return {
+    root,
+    dir,
+    base,
+    ext,
+    name,
+  };
+}
+
 export const sep = "/";
 export const delimiter = ":";
 
@@ -55,6 +72,7 @@ export default {
   extname,
   normalize,
   isAbsolute,
+  parse,
   sep,
   delimiter,
 };

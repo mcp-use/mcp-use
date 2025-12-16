@@ -1,0 +1,81 @@
+---
+title: "Utils"
+description: "Utils API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/utils.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/utils.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/utils.py</a>
+</Callout>
+
+
+## estimate_tokens
+<Card type="info">
+### `function` estimate_tokens
+
+Rough estimate of token count (approximately 4 characters per token).
+
+```python
+from mcp_use.server.utils.utils import estimate_tokens
+```
+
+**Parameters**
+><ParamField body="text" type="str" required="True" >   String value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="int" />
+
+**Signature**
+```python wrap
+def estimate_tokens(text: str):
+```
+
+</Card>
+
+
+## get_local_network_ip
+<Card type="info">
+### `function` get_local_network_ip
+
+Get the local network IP address.
+
+```python
+from mcp_use.server.utils.utils import get_local_network_ip
+```
+
+**Returns**
+><ResponseField name="returns" type="str | None" />
+
+**Signature**
+```python wrap
+def get_local_network_ip():
+```
+
+</Card>
+
+
+## get_return_type
+<Card type="info">
+### `function` get_return_type
+
+Get the return type annotation from a function or callable class.
+
+```python
+from mcp_use.server.utils.utils import get_return_type
+```
+
+**Parameters**
+><ParamField body="func_or_callable" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="type" />
+
+**Signature**
+```python wrap
+def get_return_type(func_or_callable):
+```
+
+</Card>

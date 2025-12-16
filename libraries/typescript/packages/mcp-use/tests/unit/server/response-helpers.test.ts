@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { widget } from "../../../src/server/utils/response-helpers.js";
+import { widget, text } from "../../../src/server/utils/response-helpers.js";
 
 describe("widget() helper", () => {
-  it("should return basic widget response structure", () => {
+  it("should return basic widget response structure with data", () => {
     const result = widget({
-      name: "test-widget",
       data: { foo: "bar" },
     });
 
@@ -13,43 +12,48 @@ describe("widget() helper", () => {
     expect(result).toHaveProperty("structuredContent");
   });
 
-  it("should generate URI with random ID pattern", () => {
+  it("should store data in mcp-use/props metadata", () => {
+    const testData = { foo: "bar", baz: 123 };
     const result = widget({
-      name: "test-widget",
-      data: { foo: "bar" },
+      data: testData,
     });
 
-    const uri = result._meta?.["openai/outputTemplate"] as string;
-    expect(uri).toMatch(/^ui:\/\/widget\/test-widget-[a-z0-9]+\.html$/);
+    expect(result._meta?.["mcp-use/props"]).toEqual(testData);
   });
 
-  it("should include buildId in URI when provided", () => {
+  it("should support props field as primary API", () => {
+    const testData = { foo: "bar" };
     const result = widget({
-      name: "test-widget",
-      data: { foo: "bar" },
-      buildId: "abc123",
+      props: testData,
     });
 
-    const uri = result._meta?.["openai/outputTemplate"] as string;
-    expect(uri).toMatch(/^ui:\/\/widget\/test-widget-abc123-[a-z0-9]+\.html$/);
+    expect(result._meta?.["mcp-use/props"]).toEqual(testData);
+    expect(result.structuredContent).toEqual(testData);
   });
 
-  it("should use default message when not provided", () => {
+  it("should prefer props over data when both provided", () => {
     const result = widget({
-      name: "test-widget",
+      props: { from: "props" },
+      data: { from: "data" },
+    });
+
+    expect(result._meta?.["mcp-use/props"]).toEqual({ from: "props" });
+  });
+
+  it("should use empty content when no message or output provided", () => {
+    const result = widget({
       data: { foo: "bar" },
     });
 
     expect(result.content).toHaveLength(1);
     expect(result.content[0]).toEqual({
       type: "text",
-      text: "Displaying test-widget",
+      text: "",
     });
   });
 
   it("should use custom message when provided", () => {
     const result = widget({
-      name: "test-widget",
       data: { foo: "bar" },
       message: "Custom message",
     });
@@ -61,67 +65,49 @@ describe("widget() helper", () => {
     });
   });
 
-  it("should include invoking status when provided", () => {
+  it("should use output.content when provided without message", () => {
     const result = widget({
-      name: "test-widget",
       data: { foo: "bar" },
-      invoking: "Loading data...",
+      output: text("Output from text helper"),
     });
 
-    expect(result._meta?.["openai/toolInvocation/invoking"]).toBe(
-      "Loading data..."
-    );
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0]).toEqual({
+      type: "text",
+      text: "Output from text helper",
+    });
   });
 
-  it("should include invoked status when provided", () => {
+  it("should prefer message over output.content", () => {
     const result = widget({
-      name: "test-widget",
       data: { foo: "bar" },
-      invoked: "Data loaded",
+      output: text("This should be ignored"),
+      message: "Custom message takes priority",
     });
 
-    expect(result._meta?.["openai/toolInvocation/invoked"]).toBe("Data loaded");
+    expect(result.content[0].text).toBe("Custom message takes priority");
   });
 
-  it("should set widgetAccessible to true by default", () => {
+  it("should merge output._meta with widget metadata", () => {
+    const outputWithMeta = {
+      content: [{ type: "text" as const, text: "Test" }],
+      _meta: {
+        customField: "custom value",
+      },
+    };
+
     const result = widget({
-      name: "test-widget",
       data: { foo: "bar" },
+      output: outputWithMeta,
     });
 
-    expect(result._meta?.["openai/widgetAccessible"]).toBe(true);
-  });
-
-  it("should allow overriding widgetAccessible", () => {
-    const result = widget({
-      name: "test-widget",
-      data: { foo: "bar" },
-      widgetAccessible: false,
+    expect(result._meta).toMatchObject({
+      customField: "custom value",
+      "mcp-use/props": { foo: "bar" },
     });
-
-    expect(result._meta?.["openai/widgetAccessible"]).toBe(false);
   });
 
-  it("should set resultCanProduceWidget to true by default", () => {
-    const result = widget({
-      name: "test-widget",
-      data: { foo: "bar" },
-    });
-
-    expect(result._meta?.["openai/resultCanProduceWidget"]).toBe(true);
-  });
-
-  it("should allow overriding resultCanProduceWidget", () => {
-    const result = widget({
-      name: "test-widget",
-      data: { foo: "bar" },
-      resultCanProduceWidget: false,
-    });
-
-    expect(result._meta?.["openai/resultCanProduceWidget"]).toBe(false);
-  });
-
-  it("should pass data through in structuredContent", () => {
+  it("should pass data through in structuredContent when no output", () => {
     const testData = {
       foo: "bar",
       nested: {
@@ -131,50 +117,51 @@ describe("widget() helper", () => {
     };
 
     const result = widget({
-      name: "test-widget",
       data: testData,
     });
 
     expect(result.structuredContent).toEqual(testData);
   });
 
-  it("should include all metadata fields", () => {
+  it("should use output.structuredContent when provided", () => {
+    const outputData = { outputKey: "outputValue" };
     const result = widget({
-      name: "test-widget",
       data: { foo: "bar" },
-      message: "Test message",
-      invoking: "Loading...",
-      invoked: "Loaded",
-      widgetAccessible: false,
-      resultCanProduceWidget: false,
-      buildId: "build123",
+      output: {
+        content: [{ type: "text" as const, text: "Test" }],
+        structuredContent: outputData,
+      },
     });
 
-    expect(result._meta).toMatchObject({
-      "openai/widgetAccessible": false,
-      "openai/resultCanProduceWidget": false,
-      "openai/toolInvocation/invoking": "Loading...",
-      "openai/toolInvocation/invoked": "Loaded",
-    });
-    expect(result._meta?.["openai/outputTemplate"]).toMatch(
-      /^ui:\/\/widget\/test-widget-build123-[a-z0-9]+\.html$/
-    );
+    expect(result.structuredContent).toEqual(outputData);
   });
 
-  it("should generate unique URIs on each call", () => {
-    const result1 = widget({
-      name: "test-widget",
+  it("should handle output without structuredContent", () => {
+    const result = widget({
       data: { foo: "bar" },
+      output: text("Just text output"),
     });
 
-    const result2 = widget({
-      name: "test-widget",
-      data: { foo: "bar" },
+    // When output has no structuredContent, use data as structuredContent
+    expect(result.structuredContent).toEqual({ foo: "bar" });
+  });
+
+  it("should always create _meta even with minimal config", () => {
+    const result = widget({
+      data: {},
     });
 
-    const uri1 = result1._meta?.["openai/outputTemplate"];
-    const uri2 = result2._meta?.["openai/outputTemplate"];
+    expect(result._meta).toBeDefined();
+    expect(result._meta?.["mcp-use/props"]).toEqual({});
+  });
 
-    expect(uri1).not.toBe(uri2);
+  it("should handle empty props/data", () => {
+    const result = widget({
+      props: {},
+      message: "Test",
+    });
+
+    expect(result._meta?.["mcp-use/props"]).toEqual({});
+    expect(result.structuredContent).toBeUndefined();
   });
 });

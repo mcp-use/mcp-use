@@ -16,7 +16,7 @@ In the MCP protocol, tools represent server capabilities that clients can invoke
 - **Error handling**: Built-in error reporting and handling
 
 <Tip>
-**Common Use Cases**: Tools can perform file operations, make API calls, query databases, execute system commands, process data, and much more. Each MCP server exposes its own set of specialized tools.
+If you are looking to define tools for your MCP server, see the [Tools](/typescript/server/tools) guide.
 </Tip>
 
 ## Listing Available Tools
@@ -27,101 +27,36 @@ To see what tools are available from a connected MCP server:
 ```typescript TypeScript
 import { MCPClient } from 'mcp-use'
 
-async function listTools() {
-    // Initialize client with server configuration
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
+const client = new MCPClient({
+    mcpServers: {
+        // Your server definitions here 
     }
-    const client = new MCPClient(config)
+})
 
-    // Connect to servers
-    await client.createAllSessions()
+// Connect to servers
+await client.createAllSessions()
 
-    // Get a session for a specific server
-    const session = client.getSession('my_server')
+// Get a session for a specific server
+const session = client.getSession('my_server')
 
-    // List all available tools - always returns fresh data
-    const tools = await session.listTools()
+// List all available tools - always returns fresh data
+const tools = await session.listTools()
 
-    for (const tool of tools) {
-        console.log(`Tool: ${tool.name}`)
-        console.log(`Description: ${tool.description}`)
-        console.log(`Schema: ${JSON.stringify(tool.inputSchema)}`)
-        console.log('---')
-    }
-
-    await client.closeAllSessions()
+for (const tool of tools) {
+    console.log(`Tool: ${tool.name}`)
+    console.log(`Description: ${tool.description}`)
+    console.log(`Schema: ${JSON.stringify(tool.inputSchema)}`)
+    console.log('---')
 }
 
-// Run the example
-listTools().catch(console.error)
-```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-async function listTools() {
-    // Initialize client with server configuration
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-
-    // Connect to servers
-    await client.createAllSessions()
-
-    // Get a session for a specific server
-    const session = client.getSession('my_server')
-
-    // List all available tools - always returns fresh data
-    const tools = await session.listTools()
-
-    for (const tool of tools) {
-        console.log(`Tool: ${tool.name}`)
-        console.log(`Description: ${tool.description}`)
-        console.log(`Schema: ${JSON.stringify(tool.inputSchema)}`)
-        console.log('---')
-    }
-
-    await client.closeAllSessions()
-}
-
-// Run the example
-listTools().catch(console.error)
+await client.closeAllSessions()
 ```
 </CodeGroup>
 
-### Dynamic Tool Lists
+<Tip>
+Check the [Configuration](./client-configuration) guide for more information on how to configure your client and connect to servers.
+</Tip>
 
-<Info>
-MCP servers can dynamically add, remove, or modify tools at runtime. When this happens, servers send a `ToolListChangedNotification` to inform clients that the tool list has changed.
-</Info>
-
-The `listTools()` method always fetches fresh data from the server, ensuring you have the most current information:
-
-**Important:** Always use `await session.listTools()` instead of the deprecated `session.tools` property:
-
-<CodeGroup>
-```typescript TypeScript
-// ✅ Recommended - always returns fresh data
-const tools = await session.listTools()
-
-// ⚠️ Deprecated - may return stale data
-// const tools = session.tools
-```
-
-```typescript TypeScript
-// ✅ Recommended - always returns fresh data
-const tools = await session.listTools()
-
-// ⚠️ Deprecated - may return stale data
-// const tools = session.tools
-```
-</CodeGroup>
 
 ## Calling Tools
 
@@ -131,73 +66,33 @@ Tools are executed using the `call_tool` method:
 ```typescript TypeScript
 import { MCPClient } from 'mcp-use'
 
-async function callToolExample() {
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
+const config = {
+    mcpServers: {
+        // Your server definitions here
     }
-    const client = new MCPClient(config)
-    await client.createAllSessions()
+}
+const client = new MCPClient(config)
+await client.createAllSessions()
 
-    const session = client.getSession('filesystem_server')
+const session = client.getSession('filesystem_server')
 
-    // Call a tool with arguments
-    const result = await session.callTool(
-        'read_file',
-        {
-            path: '/path/to/file.txt',
-            encoding: 'utf-8'
-        }
-    )
-
-    // Handle the result
-    if (result.isError) {
-        console.error(`Error: ${result.content}`)
-    } else {
-        console.log(`File content: ${result.content}`)
+// Call a tool with arguments
+const result = await session.callTool(
+    'read_file',
+    {
+        path: '/path/to/file.txt',
+        encoding: 'utf-8'
     }
+)
 
-    await client.closeAllSessions()
+// Handle the result
+if (result.isError) {
+    console.error(`Error: ${result.content}`)
+} else {
+    console.log(`File content: ${result.content}`)
 }
 
-callToolExample().catch(console.error)
-```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-async function callToolExample() {
-    const config = {
-        mcpServers: {
-            // Your server definitions here
-        }
-    }
-    const client = new MCPClient(config)
-    await client.createAllSessions()
-
-    const session = client.getSession('filesystem_server')
-
-    // Call a tool with arguments
-    const result = await session.callTool(
-        'read_file',
-        {
-            path: '/path/to/file.txt',
-            encoding: 'utf-8'
-        }
-    )
-
-    // Handle the result
-    if (result.isError) {
-        console.error(`Error: ${result.content}`)
-    } else {
-        console.log(`File content: ${result.content}`)
-    }
-
-    await client.closeAllSessions()
-}
-
-callToolExample().catch(console.error)
+await client.closeAllSessions()
 ```
 </CodeGroup>
 
@@ -214,15 +109,6 @@ Configure custom timeouts for tool execution:
 // Tool call with extended timeout
 const result = await session.callTool('long_running_task', { data: '...' }, {
     timeout: 300000, // 5 minutes
-})
-```
-
-```typescript TypeScript
-// Tool call with progress-based timeout reset
-// This allows the timeout to reset whenever the server sends a progress notification
-const result = await session.callTool('sampling_task', { prompt: '...' }, {
-    timeout: 60000, // 1 minute initial timeout
-    resetTimeoutOnProgress: true // Reset timeout when progress is received
 })
 ```
 </CodeGroup>
@@ -245,27 +131,8 @@ Tool calls return a `CallToolResult` object with:
 // Example of handling tool results
 const result = await session.callTool('search_web', { query: 'MCP protocol' })
 
-if (result.isError) {
-    console.error(`Tool execution failed: ${result.content}`)
-} else {
-    // Process successful result
-    for (const item of result.content) {
-        console.log(`Found: ${item}`)
-    }
-}
-```
-
-```typescript TypeScript
-// Example of handling tool results
-const result = await session.callTool('search_web', { query: 'MCP protocol' })
-
-if (result.isError) {
-    console.error(`Tool execution failed: ${result.content}`)
-} else {
-    // Process successful result
-    for (const item of result.content) {
-        console.log(`Found: ${item}`)
-    }
+for (const item of result.content) {
+    console.log(`Found: ${item}`)
 }
 ```
 </CodeGroup>
@@ -276,28 +143,11 @@ Always handle potential errors when calling tools:
 
 <CodeGroup>
 ```typescript TypeScript
-try {
-    const result = await session.callTool('risky_operation', { param: 'value' })
-    if (result.isError) {
-        console.error(`Tool reported error: ${result.content}`)
-    } else {
-        console.log(`Success: ${result.content}`)
-    }
-} catch (error) {
-    console.error(`Connection or protocol error: ${error}`)
-}
-```
-
-```typescript TypeScript
-try {
-    const result = await session.callTool('risky_operation', { param: 'value' })
-    if (result.isError) {
-        console.error(`Tool reported error: ${result.content}`)
-    } else {
-        console.log(`Success: ${result.content}`)
-    }
-} catch (error) {
-    console.error(`Connection or protocol error: ${error}`)
+const result = await session.callTool('risky_operation', { param: 'value' })
+if (result.isError) {
+    console.error(`Tool reported error: ${result.content}`)
+} else {
+    console.log(`Success: ${result.content}`)
 }
 ```
 </CodeGroup>

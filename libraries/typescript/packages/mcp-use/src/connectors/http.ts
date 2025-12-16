@@ -15,6 +15,7 @@ export interface HttpConnectorOptions extends ConnectorInitOptions {
   sseReadTimeout?: number; // SSE read timeout (ms)
   clientInfo?: { name: string; version: string };
   preferSse?: boolean; // Force SSE transport instead of trying streamable HTTP first
+  disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
 }
 
 export class HttpConnector extends BaseConnector {
@@ -24,6 +25,7 @@ export class HttpConnector extends BaseConnector {
   private readonly sseReadTimeout: number;
   private readonly clientInfo: { name: string; version: string };
   private readonly preferSse: boolean;
+  private readonly disableSseFallback: boolean;
   private transportType: "streamable-http" | "sse" | null = null;
   private streamableTransport: StreamableHTTPClientTransport | null = null;
 
@@ -43,6 +45,7 @@ export class HttpConnector extends BaseConnector {
       version: "1.0.0",
     };
     this.preferSse = opts.preferSse ?? false;
+    this.disableSseFallback = opts.disableSseFallback ?? false;
   }
 
   /** Establish connection to the MCP implementation via HTTP (streamable or SSE). */
@@ -133,6 +136,15 @@ export class HttpConnector extends BaseConnector {
         const authError = new Error("Authentication required") as any;
         authError.code = 401;
         throw authError;
+      }
+
+      // Check if SSE fallback is disabled
+      if (this.disableSseFallback) {
+        logger.info("SSE fallback disabled - failing connection");
+        await this.cleanupResources();
+        throw new Error(
+          `Streamable HTTP connection failed: ${fallbackReason}. SSE fallback is disabled.`
+        );
       }
 
       // Always try SSE fallback for maximum compatibility

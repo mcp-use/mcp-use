@@ -1,0 +1,48 @@
+---
+title: "In-Memory Storage"
+description: "Using in-memory session storage for development and single-instance deployments"
+icon: memory-stick
+---
+
+
+`InMemorySessionStore` stores session metadata in the server's memory. This is the default storage provider when no custom `sessionStore` is provided.
+
+## Usage
+
+```typescript
+import { MCPServer, InMemorySessionStore } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new InMemorySessionStore()  // Default, can be omitted
+});
+```
+
+## Characteristics
+
+### Advantages
+
+- ✅ **Fast** - No I/O overhead, all operations are in-memory
+- ✅ **No dependencies** - Works out of the box, no Redis or database needed
+- ✅ **Simple** - Zero configuration required
+- ✅ **All features work** - Notifications, sampling, subscriptions all work on a single server
+
+### Limitations
+
+- ❌ **Sessions lost on restart** - All session data is cleared when the server restarts
+- ❌ **Not distributed** - Cannot share sessions across multiple server instances
+- ❌ **Memory bound** - All sessions must fit in server memory
+
+## When to Upgrade
+
+Upgrade to [Redis Storage](/typescript/server/session-management/redis-storage) when you need:
+- Sessions to persist across server restarts
+- Multiple server instances behind a load balancer
+- Distributed notifications/sampling across servers
+
+## Related Documentation
+
+- [Session Management Overview](/typescript/server/session-management)
+- [File System Storage](/typescript/server/session-management/filesystem-storage)
+- [Redis Storage](/typescript/server/session-management/redis-storage)

@@ -325,6 +325,29 @@ interface BaseUIResourceDefinition {
   exposeAsTool?: boolean;
   /** Tool annotations when registered as a tool */
   toolAnnotations?: ToolAnnotations;
+  /**
+   * For auto-registered widgets: function or helper that generates the tool output (what the model sees).
+   * If not provided, defaults to a summary message.
+   * @example
+   * ```typescript
+   * // As a function
+   * toolOutput: (params) => text(`Found ${params.count} items`)
+   *
+   * // As a static helper
+   * toolOutput: text('Processing complete')
+   *
+   * // With object helper
+   * toolOutput: (params) => object({ count: params.count })
+   * ```
+   */
+  toolOutput?:
+    | ((
+        params: Record<string, any>
+      ) =>
+        | import("@mcp-use/modelcontextprotocol-sdk/types.js").CallToolResult
+        | import("../utils/response-helpers.js").TypedCallToolResult<any>)
+    | import("@mcp-use/modelcontextprotocol-sdk/types.js").CallToolResult
+    | import("../utils/response-helpers.js").TypedCallToolResult<any>;
 
   _meta?: Record<string, unknown>;
 }

@@ -1,5 +1,162 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.20
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+- Updated dependencies [a90ac6f]
+  - mcp-use@1.11.0-canary.20
+
+## 0.13.0-canary.19
+
+### Patch Changes
+
+- 1adbb26: fix: register rpc logs in background
+  - mcp-use@1.11.0-canary.19
+
+## 0.13.0-canary.18
+
+### Patch Changes
+
+- 2902a2e: chore(inspector): fixed console logs warns
+- d7797b6: fix: fix widget props registration
+- Updated dependencies [d7797b6]
+- Updated dependencies [168a2e1]
+  - mcp-use@1.11.0-canary.18
+
+## 0.13.0-canary.17
+
+### Patch Changes
+
+- c24cafb: ## Inspector: Faster Direct-to-Proxy Fallback
+  - **Reduced connection timeout from 30s to 5s** for faster fallback when direct connections fail
+  - **Removed automatic HTTP → SSE transport fallback** since SSE is deprecated
+    - Added `disableSseFallback` option to `HttpConnector` to prevent automatic fallback to SSE transport
+    - Inspector now explicitly uses HTTP transport only, relying on Direct → Proxy fallback instead
+    - Users can still manually select SSE transport if needed
+  - **Total fallback time: ~6 seconds** (5s timeout + 1s delay) instead of ~31 seconds
+
+  ## Deployment: Fixed Supabase Health Check
+  - **Fixed deploy.sh MCP server health check** to use POST instead of GET
+    - SSE endpoints hang on GET requests, causing script to timeout
+    - POST requests return immediately (415 error), proving server is up
+    - Script now correctly detects when deployment is complete and shows success summary with URLs
+
+- Updated dependencies [c24cafb]
+  - mcp-use@1.11.0-canary.17
+
+## 0.13.0-canary.16
+
+### Patch Changes
+
+- Updated dependencies [7eb280f]
+  - mcp-use@1.11.0-canary.16
+
+## 0.13.0-canary.15
+
+### Patch Changes
+
+- 0a7a19a: fix: was importing node modules in the browser
+  - mcp-use@1.11.0-canary.15
+
+## 0.13.0-canary.14
+
+### Patch Changes
+
+- f5dfa51: chore: organized examples folder for typescript
+  fix: inspector chat was using node modules
+- Updated dependencies [f5dfa51]
+  - mcp-use@1.11.0-canary.14
+
+## 0.13.0-canary.13
+
+### Patch Changes
+
+- f7623fc: chore: remove dead code
+  - mcp-use@1.11.0-canary.13
+
+## 0.13.0-canary.12
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- Updated dependencies [68d1520]
+  - mcp-use@1.11.0-canary.12
+
+## 0.13.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [cf72b53]
+  - mcp-use@1.11.0-canary.11
+
+## 0.13.0-canary.10
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+- Updated dependencies [14c015e]
+  - mcp-use@1.11.0-canary.10
+
+## 0.13.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [0262b5c]
+  - mcp-use@1.11.0-canary.9
+
+## 0.13.0-canary.8
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - mcp-use@1.11.0-canary.8
+
+## 0.13.0-canary.7
+
+### Patch Changes
+
+- 9acf03b: fix: drop react-router-dom in favor of react-router
+- Updated dependencies [9acf03b]
+  - mcp-use@1.11.0-canary.7
+
+## 0.13.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+
+## 0.13.0-canary.5
+
+### Patch Changes
+
+- 861546b: fix: favicon url generator
+- Updated dependencies [0b2292d]
+  - mcp-use@1.11.0-canary.5
+
+## 0.13.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+
+## 0.13.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+
 ## 0.12.6
 
 ### Patch Changes
@@ -44,6 +201,28 @@
 - b3d69ed: fix: zod import in official sdk
 - Updated dependencies [b3d69ed]
   - mcp-use@1.10.1
+
+## 0.12.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+
+## 0.12.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+
+## 0.12.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - mcp-use@1.10.1-canary.0
 
 ## 0.12.0
 

@@ -1,15 +1,16 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "1.10.6",
-  "packageManager": "pnpm@10.6.1",
+  "version": "1.11.0-canary.20",
+  "packageManager": "pnpm@10.26.0+sha512.3b3f6c725ebe712506c0ab1ad4133cf86b1f4b687effce62a9b38b4d72e3954242e643190fc51fa1642949c735f403debd44f5cb0edd657abe63a8b6a7e1e402",
   "description": "Opinionated MCP Framework for TypeScript (@modelcontextprotocol/sdk compatible) - Build MCP Agents, Clients and Servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mcp-use/mcp-use.git"
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/mcp-use"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
@@ -33,27 +34,43 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./adapters": {
+      "types": "./dist/src/adapters/index.d.ts",
+      "import": "./dist/src/adapters/index.js",
+      "require": "./dist/src/adapters/index.cjs"
     },
     "./agent": {
       "types": "./dist/src/agents/index.d.ts",
-      "import": "./dist/src/agents/index.js"
+      "import": "./dist/src/agents/index.js",
+      "require": "./dist/src/agents/index.cjs"
     },
     "./auth": {
       "types": "./dist/src/auth/index.d.ts",
-      "import": "./dist/src/auth/index.js"
+      "import": "./dist/src/auth/index.js",
+      "require": "./dist/src/auth/index.cjs"
     },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
-      "import": "./dist/src/browser.js"
+      "import": "./dist/src/browser.js",
+      "require": "./dist/src/browser.cjs"
+    },
+    "./client": {
+      "types": "./dist/src/client.d.ts",
+      "import": "./dist/src/client.js",
+      "require": "./dist/src/client.cjs"
     },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
-      "import": "./dist/src/react/index.js"
+      "import": "./dist/src/react/index.js",
+      "require": "./dist/src/react/index.cjs"
     },
     "./server": {
       "types": "./dist/src/server/index.d.ts",
-      "import": "./dist/src/server/index.js"
+      "import": "./dist/src/server/index.js",
+      "require": "./dist/src/server/index.cjs"
     }
   },
   "main": "./dist/index.js",
@@ -66,7 +83,7 @@
     "dist"
   ],
   "engines": {
-    "node": ">=22.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
@@ -88,6 +105,13 @@
     "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
     "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
     "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
+    "test:scale:capability": "tsx tests/scale/capability-matrix.ts",
+    "test:scale:load": "tsx tests/scale/load-mixed-workload.ts --clients=100 --duration=300000 --rpm=10",
+    "test:scale:notifications": "tsx tests/scale/notification-stress.ts --clients=100 --per-batch=10 --batches=5",
+    "test:scale:longevity": "tsx tests/scale/long-running-sessions.ts --duration=1",
+    "test:scale:chaos": "tsx tests/scale/chaos-test.ts",
+    "test:scale:all": "npm run test:scale:capability && npm run test:scale:load && npm run test:scale:notifications",
+    "scale:server": "tsx tests/scale/test-server.ts",
     "watch": "tsc --watch",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build",
@@ -96,45 +120,49 @@
     "release:minor": "npm version minor --tag-version-prefix=v && git push --follow-tags",
     "release:major": "npm version major --tag-version-prefix=v && git push --follow-tags",
     "prepare": "husky",
-    "example:airbnb": "tsx examples/client/airbnb_use.ts",
-    "example:browser": "tsx examples/client/browser_use.ts",
-    "example:chat": "tsx examples/client/chat_example.ts",
-    "example:stream": "tsx examples/client/stream_example.ts",
+    "example:airbnb": "tsx examples/typescript/agent/integrations/airbnb_use.ts",
+    "example:browser": "tsx examples/typescript/agent/integrations/browser_use.ts",
+    "example:chat": "tsx examples/typescript/agent/basic/chat_example.ts",
+    "example:stream": "tsx examples/typescript/agent/advanced/stream_example.ts",
     "example:stream_events": "tsx examples/client/stream_events_example.ts",
-    "example:ai_sdk": "tsx examples/client/ai_sdk_example.ts",
-    "example:filesystem": "tsx examples/client/filesystem_use.ts",
-    "example:http": "tsx examples/client/http_example.ts",
-    "example:everything": "tsx examples/client/mcp_everything.ts",
-    "example:multi": "tsx examples/client/multi_server_example.ts",
+    "example:ai_sdk": "tsx examples/typescript/agent/frameworks/ai_sdk_example.ts",
+    "example:filesystem": "tsx examples/typescript/agent/integrations/filesystem_use.ts",
+    "example:http": "tsx examples/typescript/client/basic/http_example.ts",
+    "example:everything": "tsx examples/typescript/agent/basic/mcp_everything.ts",
+    "example:multi": "tsx examples/typescript/agent/server-management/multi_server_example.ts",
     "example:sandbox": "tsx examples/client/sandbox_everything.ts",
     "example:oauth": "tsx examples/client/simple_oauth_example.ts",
-    "example:blender": "tsx examples/client/blender_use.ts",
-    "example:add_server": "tsx examples/client/add_server_tool.ts",
-    "example:structured": "tsx examples/client/structured_output.ts",
-    "example:observability": "tsx examples/client/observability.ts",
-    "example:code_mode": "tsx examples/client/code_mode_example.ts",
-    "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/client/code_mode_e2b_example.ts",
-    "example:server:notification": "tsx examples/server/notification-example/src/server.ts",
-    "example:client:notification": "tsx examples/client/notification-client.ts",
-    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/notifications/src/server.ts & sleep 3 && tsx examples/client/notification-client.ts",
-    "example:server:sampling": "tsx examples/server/sampling/src/server.ts",
-    "example:client:sampling": "tsx examples/client/sampling-client.ts",
-    "example:server:elicitation": "tsx examples/server/elicitation/src/server.ts",
-    "example:sampling": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/sampling/src/server.ts & sleep 3 && tsx examples/client/sampling-client.ts",
-    "example:server:oauth:supabase": "tsx examples/server/oauth/supabase/src/server.ts",
-    "example:client:oauth:auth0": "tsx examples/server/oauth/auth0/src/server.ts",
-    "example:client:oauth:workos": "tsx examples/server/oauth/workos/src/server.ts",
-    "example:client:oauth:keycloak": "tsx examples/server/oauth/keycloak/src/server.ts"
+    "example:blender": "tsx examples/typescript/agent/integrations/blender_use.ts",
+    "example:add_server": "tsx examples/typescript/agent/server-management/add_server_tool.ts",
+    "example:structured": "tsx examples/typescript/agent/advanced/structured_output.ts",
+    "example:observability": "tsx examples/typescript/agent/advanced/observability.ts",
+    "example:simplified": "tsx examples/typescript/agent/basic/simplified_agent_example.ts",
+    "example:commonjs": "node examples/typescript/client/basic/commonjs_example.cjs",
+    "example:code_mode": "tsx examples/typescript/agent/code-mode/code_mode_example.ts",
+    "example:code_mode_e2b": "source .env 2>/dev/null || true && tsx examples/typescript/agent/code-mode/code_mode_e2b_example.ts",
+    "example:server:notification": "tsx examples/typescript/server/features/notifications/src/server.ts",
+    "example:client:notification": "tsx examples/typescript/client/communication/notification-client.ts",
+    "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/typescript/server/features/notifications/src/server.ts & sleep 3 && tsx examples/typescript/client/communication/notification-client.ts",
+    "example:server:sampling": "tsx examples/typescript/server/features/sampling/src/server.ts",
+    "example:client:sampling": "tsx examples/typescript/client/communication/sampling-client.ts",
+    "example:server:elicitation": "tsx examples/typescript/server/features/elicitation/src/server.ts",
+    "example:sampling": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/typescript/server/features/sampling/src/server.ts & sleep 3 && tsx examples/typescript/client/communication/sampling-client.ts",
+    "example:server:oauth:supabase": "tsx examples/typescript/server/oauth/supabase/src/server.ts",
+    "example:client:oauth:auth0": "tsx examples/typescript/server/oauth/auth0/src/server.ts",
+    "example:client:oauth:workos": "tsx examples/typescript/server/oauth/workos/src/server.ts",
+    "example:client:oauth:keycloak": "tsx examples/typescript/server/oauth/keycloak/src/server.ts"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",
     "@langchain/anthropic": "^1.0.0",
+    "@langchain/core": "^1.0.0",
     "@langchain/openai": "^1.0.0",
     "ai": "^4.0.0 || ^5.0.0",
+    "langchain": "^1.0.0",
     "langfuse": "^3.38.6",
     "langfuse-langchain": "^3.38.6",
     "react": "^18.0.0 || ^19.0.0",
-    "react-router-dom": "^7.0.0"
+    "react-router": "^7.0.0"
   },
   "peerDependenciesMeta": {
     "@e2b/code-interpreter": {
@@ -143,10 +171,16 @@
     "@langchain/anthropic": {
       "optional": true
     },
+    "@langchain/core": {
+      "optional": true
+    },
     "@langchain/openai": {
       "optional": true
     },
     "ai": {
+      "optional": true
+    },
+    "langchain": {
       "optional": true
     },
     "langfuse": {
@@ -157,43 +191,39 @@
     }
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.6",
-    "@langchain/core": "^1.1.0",
-    "@mcp-ui/server": "^5.15.0",
+    "@hono/node-server": "^1.19.7",
+    "@mcp-ui/server": "^5.16.2",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
     "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.4",
-    "express": "^5.2.0",
-    "hono": "^4.10.7",
-    "jose": "^6.1.2",
-    "langchain": "^1.1.1",
-    "posthog-js": "^1.302.2",
-    "posthog-node": "^5.14.1",
+    "express": "^5.2.1",
+    "hono": "^4.11.1",
+    "jose": "^6.1.3",
+    "posthog-js": "^1.306.1",
+    "posthog-node": "^5.17.2",
     "ws": "^8.18.3",
-    "zod": "^4.1.13"
+    "zod": "^4.2.0"
   },
   "optionalDependencies": {
     "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
-    "winston": "^3.18.3"
+    "redis": "^5.10.0",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^6.2.0",
-    "@langchain/anthropic": "^1.1.3",
-    "@langchain/openai": "^1.1.3",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
+    "@antfu/eslint-config": "^6.7.1",
+    "@langchain/anthropic": "^1.3.0",
+    "@langchain/openai": "^1.2.0",
     "@types/ws": "^8.18.1",
-    "ai": "^5.0.104",
-    "esbuild": "^0.27.0",
-    "eslint": "^9.39.1",
-    "eslint-plugin-format": "^1.0.2",
+    "ai": "^5.0.113",
+    "esbuild": "^0.27.1",
+    "eslint": "^9.39.2",
+    "eslint-plugin-format": "^1.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "react": "^19.2.0",
+    "react": "^19.2.3",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.15"
   },
   "lint-staged": {
     "*.{js,ts}": [

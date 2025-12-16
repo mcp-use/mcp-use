@@ -87,13 +87,13 @@ export function McpUseProvider({
   const [routerError, setRouterError] = useState<Error | null>(null);
   const [isRouterLoading, setIsRouterLoading] = useState(true);
 
-  // Load react-router-dom dynamically on mount
+  // Load react-router dynamically on mount
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       try {
-        const routerModule = await import("react-router-dom");
+        const routerModule = await import("react-router");
         if (mounted) {
           setBrowserRouter(() => routerModule.BrowserRouter);
           setIsRouterLoading(false);
@@ -102,11 +102,11 @@ export function McpUseProvider({
         if (mounted) {
           setRouterError(
             new Error(
-              "❌ react-router-dom not installed!\n\n" +
+              "❌ react-router not installed!\n\n" +
                 "To use MCP widgets with McpUseProvider, you need to install:\n\n" +
-                "  npm install react-router-dom\n" +
+                "  npm install react-router\n" +
                 "  # or\n" +
-                "  pnpm add react-router-dom\n\n" +
+                "  pnpm add react-router\n\n" +
                 "This dependency is automatically included in projects created with 'create-mcp-use-app'."
             )
           );

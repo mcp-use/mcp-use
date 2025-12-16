@@ -1,0 +1,123 @@
+---
+title: "Search Tools"
+description: "Search Tools API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/managers/tools/search_tools.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/managers/tools/search_tools.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/managers/tools/search_tools.py</a>
+</Callout>
+
+## SearchToolsTool
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> SearchToolsTool</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.managers.tools.search_tools import SearchToolsTool
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="name" type="ClassVar" required="True" >   Name identifier </ParamField>
+<ParamField body="description" type="ClassVar" required="True" >   Parameter value </ParamField>
+<ParamField body="args_schema" type="ClassVar" required="True" >   Parameter value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+Initialize with server manager and create a search tool.
+
+**Parameters**
+><ParamField body="server_manager" required="True" >   Server name or configuration </ParamField>
+
+**Signature**
+```python wrap
+def __init__(server_manager):
+```
+
+</Card>
+</div>
+
+## ToolSearchEngine
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ToolSearchEngine</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.managers.tools.search_tools import ToolSearchEngine
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the tool search engine.
+
+
+**Parameters**
+><ParamField body="server_manager" default="None" >   The ServerManager instance to get tools from </ParamField>
+><ParamField body="use_caching" type="bool" default="True" >   Whether to cache query results </ParamField>
+
+**Signature**
+```python wrap
+def __init__(server_manager = None, use_caching: bool = True):
+```
+
+</Card>
+</div>
+
+## ToolSearchInput
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ToolSearchInput</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.managers.tools.search_tools import ToolSearchInput
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+<ParamField body="top_k" type="int" required="True" >   Integer value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+Create a new model by parsing and validating input data from keyword arguments.
+
+        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+        validated to form a valid model.
+
+        `self` is explicitly positional-only to allow `self` as a field name.
+
+**Parameters**
+><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(data: Any):
+```
+
+</Card>
+</div>

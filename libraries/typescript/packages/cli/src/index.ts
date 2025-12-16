@@ -9,6 +9,7 @@ import path from "node:path";
 import open from "open";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { deployCommand } from "./commands/deploy.js";
+import { createClientCommand } from "./commands/client.js";
 
 const program = new Command();
 
@@ -309,6 +310,17 @@ async function buildWidgets(
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
 
+  // Read favicon config from package.json
+  const packageJsonPath = path.join(projectPath, "package.json");
+  let favicon = "";
+  try {
+    const pkgContent = await fs.readFile(packageJsonPath, "utf-8");
+    const pkg = JSON.parse(pkgContent);
+    favicon = pkg.mcpUse?.favicon || "";
+  } catch {
+    // No package.json or no mcpUse config, that's fine
+  }
+
   const builtWidgets: Array<{ name: string; metadata: any }> = [];
 
   for (const entry of entries) {
@@ -325,7 +337,14 @@ async function buildWidgets(
     const relativeResourcesPath = path
       .relative(tempDir, resourcesDir)
       .replace(/\\/g, "/");
-    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory */\n@source "${relativeResourcesPath}";\n`;
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+    const relativeMcpUsePath = path
+      .relative(tempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
+    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory and mcp-use package */\n@source "${relativeResourcesPath}";\n@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";\n`;
     await fs.writeFile(path.join(tempDir, "styles.css"), cssContent, "utf8");
 
     // Create entry file
@@ -347,7 +366,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widgetName} Widget</title>
+    <title>${widgetName} Widget</title>${
+      favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>
@@ -461,11 +485,17 @@ export default PostHog;
       try {
         const mod = await metadataServer.ssrLoadModule(entryPath);
         if (mod.widgetMetadata) {
+          // Handle props (preferred) or inputs (deprecated) field
+          const schemaField =
+            mod.widgetMetadata.props || mod.widgetMetadata.inputs;
           widgetMetadata = {
             ...mod.widgetMetadata,
             title: mod.widgetMetadata.title || widgetName,
             description: mod.widgetMetadata.description,
-            inputs: mod.widgetMetadata.inputs?.shape || {},
+            // Pass the full Zod schema object directly (don't extract .shape)
+            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+            // and raw shapes, so we preserve the full schema here
+            inputs: schemaField || {},
           };
         }
         // Give a moment for any background esbuild operations to complete
@@ -1120,5 +1150,8 @@ program
       fromSource: options.fromSource,
     });
   });
+
+// Client command
+program.addCommand(createClientCommand());
 
 program.parse();

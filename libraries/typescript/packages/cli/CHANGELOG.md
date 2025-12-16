@@ -1,5 +1,210 @@
 # @mcp-use/cli
 
+## 2.6.0-canary.20
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+- Updated dependencies [a90ac6f]
+  - @mcp-use/inspector@0.13.0-canary.20
+  - mcp-use@1.11.0-canary.20
+
+## 2.6.0-canary.19
+
+### Patch Changes
+
+- Updated dependencies [1adbb26]
+  - @mcp-use/inspector@0.13.0-canary.19
+  - mcp-use@1.11.0-canary.19
+
+## 2.6.0-canary.18
+
+### Patch Changes
+
+- Updated dependencies [2902a2e]
+- Updated dependencies [d7797b6]
+- Updated dependencies [168a2e1]
+  - @mcp-use/inspector@0.13.0-canary.18
+  - mcp-use@1.11.0-canary.18
+
+## 2.6.0-canary.17
+
+### Patch Changes
+
+- c24cafb: ## Inspector: Faster Direct-to-Proxy Fallback
+  - **Reduced connection timeout from 30s to 5s** for faster fallback when direct connections fail
+  - **Removed automatic HTTP → SSE transport fallback** since SSE is deprecated
+    - Added `disableSseFallback` option to `HttpConnector` to prevent automatic fallback to SSE transport
+    - Inspector now explicitly uses HTTP transport only, relying on Direct → Proxy fallback instead
+    - Users can still manually select SSE transport if needed
+  - **Total fallback time: ~6 seconds** (5s timeout + 1s delay) instead of ~31 seconds
+
+  ## Deployment: Fixed Supabase Health Check
+  - **Fixed deploy.sh MCP server health check** to use POST instead of GET
+    - SSE endpoints hang on GET requests, causing script to timeout
+    - POST requests return immediately (415 error), proving server is up
+    - Script now correctly detects when deployment is complete and shows success summary with URLs
+
+- Updated dependencies [c24cafb]
+  - mcp-use@1.11.0-canary.17
+  - @mcp-use/inspector@0.13.0-canary.17
+
+## 2.6.0-canary.16
+
+### Patch Changes
+
+- Updated dependencies [7eb280f]
+  - mcp-use@1.11.0-canary.16
+  - @mcp-use/inspector@0.13.0-canary.16
+
+## 2.6.0-canary.15
+
+### Patch Changes
+
+- Updated dependencies [0a7a19a]
+  - @mcp-use/inspector@0.13.0-canary.15
+  - mcp-use@1.11.0-canary.15
+
+## 2.6.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [f5dfa51]
+  - @mcp-use/inspector@0.13.0-canary.14
+  - mcp-use@1.11.0-canary.14
+
+## 2.6.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [f7623fc]
+  - @mcp-use/inspector@0.13.0-canary.13
+  - mcp-use@1.11.0-canary.13
+
+## 2.6.0-canary.12
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- Updated dependencies [68d1520]
+  - @mcp-use/inspector@0.13.0-canary.12
+  - mcp-use@1.11.0-canary.12
+
+## 2.6.0-canary.11
+
+### Patch Changes
+
+- cf72b53: fix: import from mcp-use/client instead of main entry to avoid mixing dependencies
+- Updated dependencies [cf72b53]
+  - mcp-use@1.11.0-canary.11
+  - @mcp-use/inspector@0.13.0-canary.11
+
+## 2.6.0-canary.10
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+- Updated dependencies [14c015e]
+  - @mcp-use/inspector@0.13.0-canary.10
+  - mcp-use@1.11.0-canary.10
+
+## 2.6.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [0262b5c]
+  - mcp-use@1.11.0-canary.9
+  - @mcp-use/inspector@0.13.0-canary.9
+
+## 2.6.0-canary.8
+
+### Minor Changes
+
+- 3945a10: **Breaking Changes:**
+  - LangChain adapter no longer exported from main entry point. Import from `mcp-use/adapters` instead:
+
+    ```ts
+    // Before
+    import { LangChainAdapter } from "mcp-use";
+
+    // After
+    import { LangChainAdapter } from "mcp-use/adapters";
+    ```
+
+  - Moved `@langchain/core` and `langchain` from dependencies to optional peer dependencies
+
+  **Features:**
+  - Added favicon support for widget pages. Configure via `favicon` option in `ServerConfig`:
+    ```ts
+    const server = createMCPServer({
+      name: "my-server",
+      version: "1.0.0",
+      favicon: "favicon.ico", // Path relative to public/ directory
+    });
+    ```
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process now includes favicon in widget HTML pages
+
+  **Improvements:**
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode now watches for widget file/directory deletions and cleans up build artifacts
+  - Added long-term caching (1 year) for favicon assets
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - mcp-use@1.11.0-canary.8
+  - @mcp-use/inspector@0.13.0-canary.8
+
+## 2.6.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [9acf03b]
+  - @mcp-use/inspector@0.13.0-canary.7
+  - mcp-use@1.11.0-canary.7
+
+## 2.6.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [0b2292d]
+- Updated dependencies [861546b]
+  - mcp-use@1.11.0-canary.5
+  - @mcp-use/inspector@0.13.0-canary.5
+
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
+## 2.6.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: added support for cli client
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 2.5.6
 
 ### Patch Changes
@@ -48,6 +253,31 @@
 - Updated dependencies [b3d69ed]
   - @mcp-use/inspector@0.12.1
   - mcp-use@1.10.1
+
+## 2.5.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+  - @mcp-use/inspector@0.12.1-canary.2
+
+## 2.5.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
+## 2.5.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - @mcp-use/inspector@0.12.1-canary.0
+  - mcp-use@1.10.1-canary.0
 
 ## 2.5.0
 

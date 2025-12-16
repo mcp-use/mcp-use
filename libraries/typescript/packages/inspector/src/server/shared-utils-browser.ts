@@ -83,7 +83,7 @@ export async function* handleChatRequestStream(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  const { MCPAgent, MCPClient } = await import("mcp-use");
+  const { MCPAgent, MCPClient } = await import("mcp-use/browser");
 
   // Create LLM instance based on provider
   let llm: BaseLLM;
@@ -113,7 +113,8 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
@@ -248,7 +249,7 @@ export async function handleChatRequest(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  const { MCPAgent, MCPClient } = await import("mcp-use");
+  const { MCPAgent, MCPClient } = await import("mcp-use/browser");
 
   // Create LLM instance based on provider
   let llm: BaseLLM;
@@ -278,7 +279,8 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
@@ -385,6 +387,7 @@ export interface WidgetData {
   uri: string;
   toolInput: Record<string, any>;
   toolOutput: any;
+  toolResponseMetadata?: Record<string, any>;
   resourceData: any;
   toolId: string;
   timestamp: number;
@@ -425,11 +428,13 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    theme,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -439,6 +444,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasResourceData: !!resourceData,
     hasToolInput: !!toolInput,
     hasToolOutput: !!toolOutput,
+    hasToolResponseMetadata: !!toolResponseMetadata,
+    toolResponseMetadata,
     hasWidgetCSP: !!widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
@@ -464,12 +471,14 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     timestamp: Date.now(),
     widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    theme,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);
@@ -536,6 +545,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     devServerBaseUrl,
@@ -586,6 +596,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   const safeToolOutput = JSON.stringify(toolOutput ?? null)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e");
+  const safeToolResponseMetadata = JSON.stringify(toolResponseMetadata ?? null)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e");
   const safeToolId = JSON.stringify(toolId);
   const safeWidgetStateKey = JSON.stringify(widgetStateKey);
   // Safely serialize theme, defaulting to 'light' if not provided
@@ -612,7 +625,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         const openaiAPI = {
           toolInput: ${safeToolInput},
           toolOutput: ${safeToolOutput},
-          toolResponseMetadata: null,
+          toolResponseMetadata: ${safeToolResponseMetadata},
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},

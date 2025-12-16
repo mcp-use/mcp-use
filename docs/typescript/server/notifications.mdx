@@ -97,6 +97,10 @@ MCP defines standard notification methods that clients may handle:
 Notify clients when the available tools have changed:
 
 ```typescript
+// Convenience method
+await server.sendToolsListChanged();
+
+// Or using the general notification method
 await server.sendNotification("notifications/tools/list_changed");
 ```
 
@@ -105,6 +109,10 @@ await server.sendNotification("notifications/tools/list_changed");
 Notify clients when resources have been updated:
 
 ```typescript
+// Convenience method
+await server.sendResourcesListChanged();
+
+// Or using the general notification method
 await server.sendNotification("notifications/resources/list_changed");
 ```
 
@@ -113,6 +121,10 @@ await server.sendNotification("notifications/resources/list_changed");
 Notify clients when prompts have changed:
 
 ```typescript
+// Convenience method
+await server.sendPromptsListChanged();
+
+// Or using the general notification method
 await server.sendNotification("notifications/prompts/list_changed");
 ```
 

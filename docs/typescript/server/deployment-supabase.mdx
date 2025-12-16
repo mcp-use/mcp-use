@@ -1,7 +1,7 @@
 ---
 title: Supabase
 description: Deploy your MCP server on Supabase Edge Functions
-icon: "); -webkit-mask-image: url('https://simpleicons.org/icons/supabase.svg'); mask-image: url('https://simpleicons.org/icons/supabase.svg');/*"
+icon: "); -webkit-mask-image: url('/images/icons/supabase.svg'); mask-image: url('/images/icons/supabase.svg');/*"
 ---
 
 This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions](https://supabase.com/docs/guides/functions), which runs on Deno and provides a serverless environment for your MCP applications.
@@ -22,10 +22,27 @@ This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions]
   allowFullScreen
 ></iframe>
 
+## Install the Supabase CLI
+
+<CodeGroup>
+```bash npm
+npm install supabase --save-dev
+```
+```bash pnpm
+pnpm add -D supabase
+```
+```bash yarn
+yarn add -D supabase
+```
+```bash brew
+brew install supabase/tap/supabase
+```
+</CodeGroup>
+
 ## Create your mcp-use project
 
 ```bash
-npx create-mcp-use-app your-project-name
+npx create-mcp-use-app@latest your-project-name
 ```
 
 This will create a new directory called `your-project-name` with a basic MCP server setup.
@@ -34,16 +51,78 @@ This will create a new directory called `your-project-name` with a basic MCP ser
 
 ```bash
 cd your-project-name
-yarn
 ```
 
-## Init supabase project
+<CodeGroup>
+```bash npm
+npm install
+```
+```bash pnpm
+pnpm install
+```
+```bash yarn
+yarn
+```
+</CodeGroup>
+
+## Initialize Supabase Project
+
+### 1. Initialize the project
 
 ```bash
 supabase init
 ```
 
 This will create a new directory called `supabase` with a basic Supabase project setup.
+
+### 2. Login to Supabase
+
+If you just installed the Supabase CLI, you'll need to login:
+
+```bash
+supabase login
+```
+
+### 3. Link to your Supabase project
+
+Link your local project to your Supabase project:
+
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
+```
+
+You can find your project reference ID in your [Supabase dashboard](https://supabase.com/dashboard) under Project Settings.
+
+
+### 4. Start Docker
+
+Docker must be running before deployment. Here's how to start it:
+
+<CodeGroup>
+```bash macOS
+# If you have Docker Desktop installed:
+open -a Docker
+
+# Verify Docker is running:
+docker info
+```
+```bash Linux
+# Start Docker service:
+sudo systemctl start docker
+
+# Verify Docker is running:
+docker info
+```
+```bash Windows
+# Open Docker Desktop from Start Menu or run:
+# "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+
+# Verify Docker is running (in PowerShell):
+docker info
+```
+</CodeGroup>
+
+If you see "Docker is required for widgets data. Please start Docker and try again." error, make sure Docker Desktop is running and try the deployment again.
 
 ## Quick Deployment
 
@@ -85,9 +164,12 @@ The deployment script automatically:
 8. ✅ Uploads widgets to the storage bucket
 
 <Note>
-  **Prerequisites for the script** - Supabase CLI installed (`npm install -g
-  supabase`) - Logged in to Supabase (`supabase login`) - Docker running (for
-  deployment)
+  **Prerequisites for the script** 
+  - Supabase CLI installed (`npm install -g supabase`)
+  - Project initialized (`supabase init`)
+  - Logged in to Supabase (`supabase login`)
+  - Project linked (`supabase link --project-ref YOUR_PROJECT_REF`)
+  - Docker running (for deployment)
 </Note>
 
 For manual deployment or to understand each step in detail, continue reading below.
@@ -102,6 +184,18 @@ If you don't have a Supabase project yet:
 
 ```bash
 supabase init
+```
+
+Then login to Supabase:
+
+```bash
+supabase login
+```
+
+And link to your Supabase project:
+
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
 ```
 
 ### 2. Create an Edge Function
@@ -192,8 +286,19 @@ echo $MCP_URL
 # should output: https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/widgets
 echo $MCP_SERVER_URL
 # should output: https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME
+```
+
+<CodeGroup>
+```bash npm
+npm run build
+```
+```bash pnpm
 pnpm build
 ```
+```bash yarn
+yarn build
+```
+</CodeGroup>
 
 ### 6. Copy the dist folder to the function directory
 
