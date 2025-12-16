@@ -534,17 +534,17 @@ export default PostHog;
       if (mod.widgetMetadata) {
         metadata = mod.widgetMetadata;
 
-        // Handle inputs field (preferred) or props field (deprecated) for Zod schema
-        const schemaField = metadata.inputs || metadata.props;
+        // Handle props field (preferred) or inputs field (deprecated) for Zod schema
+        const schemaField = metadata.props || metadata.inputs;
         if (schemaField) {
           try {
-            // Store the zod schema shape
-            const extractedShape = (schemaField as any).shape || schemaField;
-            // Store in inputs field (normalize to preferred field)
-            metadata.inputs = extractedShape;
-            // Also set props as alias for backward compatibility
-            if (!metadata.inputs && metadata.props) {
-              metadata.inputs = metadata.props;
+            // Pass the full Zod schema object directly (don't extract .shape)
+            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+            // and raw shapes, so we preserve the full schema here
+            metadata.props = schemaField;
+            // Also set inputs as alias for backward compatibility
+            if (!metadata.inputs) {
+              metadata.inputs = schemaField;
             }
           } catch (error) {
             console.warn(
