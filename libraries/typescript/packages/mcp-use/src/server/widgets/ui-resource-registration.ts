@@ -258,6 +258,20 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       typeof propsOrSchema === "object" &&
       propsOrSchema instanceof z.ZodObject;
 
+    // Check if it's a JSON Schema object (from production build)
+    // A JSON Schema has either $schema or (type === "object" with properties)
+    let isJsonSchema = false;
+    if (propsOrSchema && typeof propsOrSchema === "object" && !isZodSchema) {
+      const hasSchemaKey = Object.prototype.hasOwnProperty.call(
+        propsOrSchema,
+        "$schema"
+      );
+      const hasTypeObject =
+        (propsOrSchema as any).type === "object" &&
+        Object.prototype.hasOwnProperty.call(propsOrSchema, "properties");
+      isJsonSchema = hasSchemaKey || hasTypeObject;
+    }
+
     // Build tool definition with appropriate schema format
     const toolDefinition: ToolDefinition = {
       name: definition.name,
@@ -270,6 +284,32 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     if (isZodSchema) {
       // Pass Zod schema directly - the tool registration will convert it to JSON schema
       toolDefinition.schema = propsOrSchema as z.ZodObject<any>;
+    } else if (isJsonSchema) {
+      // JSON Schema from production build - convert properties to InputDefinition array
+      const jsonSchema = propsOrSchema as {
+        properties?: Record<
+          string,
+          { type?: string; description?: string; default?: unknown }
+        >;
+        required?: string[];
+      };
+      if (jsonSchema.properties) {
+        const requiredFields = new Set(jsonSchema.required || []);
+        toolDefinition.inputs = Object.entries(jsonSchema.properties).map(
+          ([name, prop]) => ({
+            name,
+            type: (prop.type || "string") as
+              | "string"
+              | "number"
+              | "boolean"
+              | "object"
+              | "array",
+            description: prop.description,
+            required: requiredFields.has(name),
+            default: prop.default,
+          })
+        );
+      }
     } else if (propsOrSchema) {
       // Legacy WidgetProps format - convert to InputDefinition array
       toolDefinition.inputs = convertPropsToInputs(

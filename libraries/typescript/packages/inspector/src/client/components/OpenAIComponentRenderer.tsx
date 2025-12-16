@@ -94,21 +94,45 @@ function OpenAIComponentRendererBase({
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
 
+  // Refs to hold latest values without triggering effect re-runs
+  // This prevents infinite loops caused by object/function reference changes
+  const toolArgsRef = useRef(toolArgs);
+  const toolResultRef = useRef(toolResult);
+  const readResourceRef = useRef(readResource);
+  const serverBaseUrlRef = useRef(serverBaseUrl);
+  const resolvedThemeRef = useRef(resolvedTheme);
+
+  // Keep refs updated with latest values
+  useEffect(() => {
+    toolArgsRef.current = toolArgs;
+    toolResultRef.current = toolResult;
+    readResourceRef.current = readResource;
+    serverBaseUrlRef.current = serverBaseUrl;
+    resolvedThemeRef.current = resolvedTheme;
+  });
+
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
+      // Access latest values from refs to avoid stale closures
+      const currentToolArgs = toolArgsRef.current;
+      const currentToolResult = toolResultRef.current;
+      const currentReadResource = readResourceRef.current;
+      const currentServerBaseUrl = serverBaseUrlRef.current;
+      const currentResolvedTheme = resolvedThemeRef.current;
+
       try {
         // Extract structured content from tool result (the actual tool parameters)
-        const structuredContent = toolResult?.structuredContent || null;
+        const structuredContent = currentToolResult?.structuredContent || null;
 
         // Fetch the HTML resource client-side (where the connection exists)
-        const resourceData = await readResource(componentUrl);
+        const resourceData = await currentReadResource(componentUrl);
 
         // Extract CSP metadata from tool result
         // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
         let widgetCSP = null;
         const metaSource =
-          toolResult?._meta || toolResult?.contents?.[0]?._meta;
+          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
         if (metaSource?.["openai/widgetCSP"]) {
           widgetCSP = metaSource["openai/widgetCSP"];
         }
@@ -121,13 +145,13 @@ function OpenAIComponentRendererBase({
           hasMetaSource: !!metaSource,
           hasMcpUseProps: !!metaSource?.["mcp-use/props"],
           widgetProps,
-          toolArgs,
+          toolArgs: currentToolArgs,
           structuredContent,
           metaKeys: metaSource ? Object.keys(metaSource) : [],
         });
 
         // toolInput should be the original tool call arguments from toolArgs
-        const finalToolInput = toolArgs;
+        const finalToolInput = currentToolArgs;
 
         // Update state with final values
         setWidgetToolInput(finalToolInput);
@@ -144,7 +168,7 @@ function OpenAIComponentRendererBase({
 
         // Check for dev mode widget - check both _meta locations
         const metaForWidget =
-          toolResult?._meta || toolResult?.contents?.[0]?._meta;
+          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
 
         // Use dev mode if metadata says so
         const computedUseDevMode =
@@ -166,11 +190,11 @@ function OpenAIComponentRendererBase({
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
-          theme: resolvedTheme, // Pass the current theme to prevent flash
+          theme: currentResolvedTheme, // Pass the current theme to prevent flash
         };
 
-        if (computedUseDevMode && widgetName && serverBaseUrl) {
-          const devServerBaseUrl = new URL(serverBaseUrl).origin;
+        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
+          const devServerBaseUrl = new URL(currentServerBaseUrl).origin;
           const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
@@ -197,7 +221,7 @@ function OpenAIComponentRendererBase({
           );
         }
 
-        if (computedUseDevMode && widgetName && serverBaseUrl) {
+        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
           const proxyUrl = `/inspector/api/dev-widget/${toolId}`;
           setWidgetUrl(proxyUrl);
@@ -220,12 +244,10 @@ function OpenAIComponentRendererBase({
   }, [
     componentUrl,
     serverId,
-    toolArgs,
-    toolResult,
     toolId,
-    readResource,
-    serverBaseUrl,
-    resolvedTheme, // Include theme so widget data is updated when theme changes
+    // Note: toolArgs, toolResult, readResource, and serverBaseUrl are intentionally
+    // excluded to prevent re-running when these references change but values are the same.
+    // resolvedTheme is handled by a separate effect that updates iframe globals.
   ]);
 
   // Helper to update window.openai globals inside iframe

@@ -10,6 +10,7 @@ import open from "open";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createClientCommand } from "./commands/client.js";
+import { toJSONSchema } from "zod";
 
 const program = new Command();
 
@@ -488,14 +489,41 @@ export default PostHog;
           // Handle props (preferred) or inputs (deprecated) field
           const schemaField =
             mod.widgetMetadata.props || mod.widgetMetadata.inputs;
+
+          // Check if schemaField is a Zod v4 schema (has ~standard property from Standard Schema)
+          // and convert to JSON Schema for serialization using Zod v4's built-in toJsonSchema
+          let inputsValue = schemaField || {};
+          if (
+            schemaField &&
+            typeof schemaField === "object" &&
+            "~standard" in schemaField
+          ) {
+            // Convert Zod schema to JSON Schema for manifest serialization
+            try {
+              inputsValue = toJSONSchema(schemaField);
+            } catch (conversionError) {
+              console.warn(
+                chalk.yellow(
+                  `    ⚠ Could not convert schema for ${widgetName}, using raw schema`
+                )
+              );
+            }
+          }
+
+          // Destructure to exclude props (raw Zod schema) from being serialized
+          const {
+            props: _rawProps,
+            inputs: _rawInputs,
+            ...restMetadata
+          } = mod.widgetMetadata;
+
           widgetMetadata = {
-            ...mod.widgetMetadata,
+            ...restMetadata,
             title: mod.widgetMetadata.title || widgetName,
             description: mod.widgetMetadata.description,
-            // Pass the full Zod schema object directly (don't extract .shape)
-            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
-            // and raw shapes, so we preserve the full schema here
-            inputs: schemaField || {},
+            // Store the converted JSON Schema (props field is used by production mount)
+            props: inputsValue,
+            inputs: inputsValue,
           };
         }
         // Give a moment for any background esbuild operations to complete
