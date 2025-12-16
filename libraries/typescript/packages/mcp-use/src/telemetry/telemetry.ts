@@ -29,6 +29,30 @@ import {
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
 
+
+/**
+ * Generate a cryptographically secure random string for session/user IDs, cross-platform.
+ */
+function secureRandomString(): string {
+  // Browser
+  if (typeof window !== 'undefined' && window.crypto && typeof window.crypto.getRandomValues === "function") {
+    // 8 random bytes, 16 hex characters
+    const array = new Uint8Array(8);
+    window.crypto.getRandomValues(array);
+    return Array.from(array, v => v.toString(16).padStart(2, '0')).join('');
+  }
+  // Node.js
+  try {
+    // Dynamically require crypto to avoid issues in browser
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const crypto = require('crypto');
+    return crypto.randomBytes(8).toString('hex');
+  } catch (e) {
+    // As absolute last fallback (should never happen), use Math.random (rare/broken case)
+    return Math.random().toString(36).substring(2, 15);
+  }
+}
+
 // ============================================================================
 // Runtime Environment Detection
 // ============================================================================
@@ -532,7 +556,7 @@ export class Telemetry {
       try {
         return `session-${generateUUID()}`;
       } catch (uuidError) {
-        return `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        return `session-${Date.now()}-${secureRandomString()}`;
       }
     }
   }
@@ -560,7 +584,7 @@ export class Telemetry {
       try {
         sessionId = `session-${generateUUID()}`;
       } catch (uuidError) {
-        sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        sessionId = `session-${Date.now()}-${secureRandomString()}`;
       }
       return sessionId;
     }
