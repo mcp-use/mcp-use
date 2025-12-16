@@ -21,7 +21,7 @@ on:
       - 'libraries/typescript/packages/mcp-use/src/server/**'
       - 'libraries/typescript/packages/mcp-use/package.json'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
-      - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
+      - 'libraries/typescript/packages/mcp-use/examples/server/features/conformance/**'
       - '.github/workflows/conformance.yml'
   pull_request:
     branches:
@@ -33,7 +33,7 @@ on:
       - 'libraries/typescript/packages/mcp-use/src/server/**'
       - 'libraries/typescript/packages/mcp-use/package.json'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
-      - 'libraries/typescript/packages/mcp-use/examples/server/conformance/**'
+      - 'libraries/typescript/packages/mcp-use/examples/server/features/conformance/**'
       - '.github/workflows/conformance.yml'
 
 permissions:
@@ -85,7 +85,7 @@ jobs:
 
       - name: Install TypeScript conformance server dependencies
         if: ${{ github.event_name != 'workflow_dispatch' || !inputs.python_only }}
-        working-directory: libraries/typescript/packages/mcp-use/examples/server/conformance
+        working-directory: libraries/typescript/packages/mcp-use/examples/server/features/conformance
         run: pnpm install
 
       - name: Build server list
@@ -99,7 +99,7 @@ jobs:
             if [[ $SERVERS != '[' ]]; then
               SERVERS+=','
             fi
-            SERVERS+='{"name":"typescript","start-command":"PORT=3000 npx tsx src/server.ts","url":"http://localhost:3000/mcp","working-directory":"libraries/typescript/packages/mcp-use/examples/server/conformance"}'
+            SERVERS+='{"name":"typescript","start-command":"PORT=3000 npx tsx src/server.ts","url":"http://localhost:3000/mcp","working-directory":"libraries/typescript/packages/mcp-use/examples/server/features/conformance"}'
           fi
           SERVERS+=']'
           echo "servers=$SERVERS" >> $GITHUB_OUTPUT

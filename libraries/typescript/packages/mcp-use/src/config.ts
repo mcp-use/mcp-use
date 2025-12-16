@@ -31,6 +31,8 @@ export function createConnectorFromConfig(
       authToken: serverConfig.auth_token || serverConfig.authToken,
       // Only force SSE if explicitly requested
       preferSse: serverConfig.preferSse || transport === "sse",
+      // Disable SSE fallback if explicitly disabled in config
+      disableSseFallback: serverConfig.disableSseFallback,
       ...connectorOptions,
     });
   }

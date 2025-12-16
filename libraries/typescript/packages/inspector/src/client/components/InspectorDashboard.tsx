@@ -92,9 +92,10 @@ function ConnectionTester({
   const mcpHook = useMcp({
     url: urlError ? undefined : finalUrl, // Don't connect if URL is invalid
     callbackUrl,
+    timeout: 5000, // 5 seconds for faster fallback to proxy mode
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
-    transportType: config.transportType || "http",
+    transportType: config.transportType || "http", // Respect user's transport choice, default to HTTP (no auto-fallback to SSE)
     enabled: !urlError, // Disable connection if URL is invalid
   });
 

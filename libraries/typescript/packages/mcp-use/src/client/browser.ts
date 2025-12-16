@@ -66,6 +66,8 @@ export class BrowserMCPClient extends BaseMCPClient {
       clientOptions,
       samplingCallback,
       elicitationCallback,
+      disableSseFallback,
+      preferSse,
     } = serverConfig;
 
     if (!url) {
@@ -81,6 +83,8 @@ export class BrowserMCPClient extends BaseMCPClient {
       clientOptions, // ← Pass client options (capabilities, etc.) to connector
       samplingCallback, // ← Pass sampling callback to connector
       elicitationCallback, // ← Pass elicitation callback to connector
+      disableSseFallback, // ← Disable automatic SSE fallback
+      preferSse, // ← Use SSE transport directly
     };
 
     // Debug: Log if clientOptions are being passed

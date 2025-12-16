@@ -7,11 +7,11 @@ import type { z } from "zod";
 export interface WidgetMetadata {
   title?: string;
   description?: string;
-  /** Zod schema for widget props validation (preferred) or InputDefinition array */
-  props?: z.ZodObject<any> | InputDefinition[];
-  /** @deprecated Use `props` instead - Zod schema for input validation */
+  /** Zod schema for widget input validation (preferred) or InputDefinition array */
   inputs?: z.ZodObject<any> | InputDefinition[];
-  /** @deprecated Use `props` instead - Alias for inputs to align with tool naming convention */
+  /** @deprecated Use `inputs` instead - Zod schema for widget props validation */
+  props?: z.ZodObject<any> | InputDefinition[];
+  /** @deprecated Use `inputs` instead - Alias for inputs to align with tool naming convention */
   schema?: z.ZodObject<any> | InputDefinition[];
   /**
    * For auto-registered widgets: function or helper that generates the tool output (what the model sees).

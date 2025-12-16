@@ -294,6 +294,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const serverConfig: any = {
           url: url,
           transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
+          // Disable SSE fallback when using explicit HTTP transport (not SSE)
+          // This prevents automatic HTTP → SSE fallback at the connector level
+          disableSseFallback: transportTypeParam === "http",
+          // Use SSE transport when explicitly requested
+          preferSse: transportTypeParam === "sse",
         };
 
         // Add custom headers if provided

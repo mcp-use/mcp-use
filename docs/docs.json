@@ -86,7 +86,8 @@
             "icon": "",
             "pages": [
               "home/mcp101",
-              "typescript/server/creating-apps-sdk-server"
+              "typescript/server/creating-apps-sdk-server",
+              "guides/chatgpt-apps-flow"
             ]
           }
         ]
