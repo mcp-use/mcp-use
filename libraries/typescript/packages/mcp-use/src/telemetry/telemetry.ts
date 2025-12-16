@@ -29,7 +29,6 @@ import {
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
 
-
 // ============================================================================
 // Runtime Environment Detection
 // ============================================================================
@@ -274,7 +273,10 @@ export class Telemetry {
       // Skip Scarf in browser environments to avoid CORS errors
       if (this._runtimeEnvironment !== "browser") {
         try {
-          this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000);
+          this._scarfClient = new ScarfEventLogger(
+            this.SCARF_GATEWAY_URL,
+            3000
+          );
         } catch (e) {
           logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
           this._scarfClient = null;
@@ -467,7 +469,6 @@ export class Telemetry {
           }
           break;
       }
-
     } catch (e) {
       this._currUserId = this.UNKNOWN_USER_ID;
     }
