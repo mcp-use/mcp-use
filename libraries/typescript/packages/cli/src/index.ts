@@ -485,9 +485,9 @@ export default PostHog;
       try {
         const mod = await metadataServer.ssrLoadModule(entryPath);
         if (mod.widgetMetadata) {
-          // Handle inputs (preferred) or props (deprecated) field
+          // Handle props (preferred) or inputs (deprecated) field
           const schemaField =
-            mod.widgetMetadata.inputs || mod.widgetMetadata.props;
+            mod.widgetMetadata.props || mod.widgetMetadata.inputs;
           widgetMetadata = {
             ...mod.widgetMetadata,
             title: mod.widgetMetadata.title || widgetName,
