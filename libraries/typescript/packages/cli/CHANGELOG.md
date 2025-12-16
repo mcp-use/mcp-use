@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.6.1-canary.0
+
+### Patch Changes
+
+- 6fc856c: fix: widget props not picked up if zod
+- Updated dependencies [6fc856c]
+  - @mcp-use/inspector@0.13.1-canary.0
+  - mcp-use@1.11.1-canary.0
+
 ## 2.6.0
 
 ### Minor Changes
