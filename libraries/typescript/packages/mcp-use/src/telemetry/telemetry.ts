@@ -269,12 +269,31 @@ export class Telemetry {
       // Initialize PostHog based on environment
       this._posthogLoading = this._initPostHog();
 
-      // Initialize Scarf (works in all environments with fetch)
-      try {
-        this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000);
-      } catch (e) {
-        logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
+      // Initialize Scarf (server-side only - doesn't support CORS for browser requests)
+      // Skip Scarf in browser environments to avoid CORS errors
+      if (this._runtimeEnvironment !== "browser") {
+        try {
+          this._scarfClient = new ScarfEventLogger(
+            this.SCARF_GATEWAY_URL,
+            3000
+          );
+        } catch (e) {
+          logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
+          this._scarfClient = null;
+        }
+      } else {
         this._scarfClient = null;
+      }
+
+      // Track package download asynchronously (non-blocking)
+      // This runs after construction completes and only tracks on first use or version upgrade
+      if (this._storageCapability === "filesystem" && this._scarfClient) {
+        // Use setTimeout to ensure this runs after constructor completes
+        setTimeout(() => {
+          this.trackPackageDownload({ triggered_by: "initialization" }).catch(
+            (e) => logger.debug(`Failed to track package download: ${e}`)
+          );
+        }, 0);
       }
     }
   }
@@ -442,21 +461,15 @@ export class Telemetry {
         case "session-only":
         default:
           // Generate a session-based ID (prefixed to identify it's not persistent)
-          this._currUserId = `session-${generateUUID()}`;
-          logger.debug(
-            `Using session-based user ID (${this._runtimeEnvironment} environment)`
-          );
+          try {
+            this._currUserId = `session-${generateUUID()}`;
+          } catch (uuidError) {
+            // Fallback to timestamp-based ID if crypto API is not available
+            this._currUserId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+          }
           break;
       }
-
-      // Track package download for persistent storage types
-      if (this._storageCapability === "filesystem" && this._currUserId) {
-        this._trackPackageDownloadInternal(this._currUserId, {
-          triggered_by: "user_id_property",
-        }).catch((e) => logger.debug(`Failed to track package download: ${e}`));
-      }
     } catch (e) {
-      logger.debug(`Failed to get/create user ID: ${e}`);
       this._currUserId = this.UNKNOWN_USER_ID;
     }
 
@@ -465,33 +478,63 @@ export class Telemetry {
 
   /**
    * Get or create user ID from filesystem (Node.js/Bun)
+   * Falls back to session ID if filesystem operations fail
    */
   private _getUserIdFromFilesystem(): string {
-    // Lazy import of Node.js modules
-    const fs = require("node:fs");
-    const os = require("node:os");
-    const path = require("node:path");
+    try {
+      // Try to load Node.js modules
+      // In CJS context, require should work
+      // In ESM context, this will fail but we'll fall back gracefully
+      let fs: any, os: any, path: any;
 
-    if (!this._userIdPath) {
-      this._userIdPath = path.join(
-        this._getCacheHome(os, path),
-        "mcp_use_3",
-        "telemetry_user_id"
-      );
+      try {
+        fs = require("node:fs");
+        os = require("node:os");
+        path = require("node:path");
+      } catch (requireError) {
+        // require not available (ESM build) - fall back to session ID
+        // Generate session-based ID as fallback
+        try {
+          const sessionId = `session-${generateUUID()}`;
+          return sessionId;
+        } catch (uuidError) {
+          return `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        }
+      }
+
+      // If we got here, fs/os/path are available
+      if (!this._userIdPath) {
+        this._userIdPath = path.join(
+          this._getCacheHome(os, path),
+          "mcp_use_3",
+          "telemetry_user_id"
+        );
+      }
+
+      const isFirstTime = !fs.existsSync(this._userIdPath);
+
+      if (isFirstTime) {
+        fs.mkdirSync(path.dirname(this._userIdPath), { recursive: true });
+        let newUserId: string;
+        try {
+          newUserId = generateUUID();
+        } catch (uuidError) {
+          newUserId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        }
+        fs.writeFileSync(this._userIdPath, newUserId);
+        return newUserId;
+      }
+
+      const userId = fs.readFileSync(this._userIdPath, "utf-8").trim();
+      return userId;
+    } catch (e) {
+      // Final fallback - generate a session ID
+      try {
+        return `session-${generateUUID()}`;
+      } catch (uuidError) {
+        return `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      }
     }
-
-    const isFirstTime = !fs.existsSync(this._userIdPath);
-
-    if (isFirstTime) {
-      logger.debug(`Creating user ID path: ${this._userIdPath}`);
-      fs.mkdirSync(path.dirname(this._userIdPath), { recursive: true });
-      const newUserId = generateUUID();
-      fs.writeFileSync(this._userIdPath, newUserId);
-      logger.debug(`User ID path created: ${this._userIdPath}`);
-      return newUserId;
-    }
-
-    return fs.readFileSync(this._userIdPath, "utf-8").trim();
   }
 
   /**
@@ -502,16 +545,24 @@ export class Telemetry {
       let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
 
       if (!userId) {
-        userId = generateUUID();
+        try {
+          userId = generateUUID();
+        } catch (uuidError) {
+          userId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+        }
         localStorage.setItem(USER_ID_STORAGE_KEY, userId);
-        logger.debug(`Created new browser user ID`);
       }
 
       return userId;
     } catch (e) {
-      logger.debug(`localStorage access failed: ${e}`);
       // Fallback to session-based
-      return `session-${generateUUID()}`;
+      let sessionId: string;
+      try {
+        sessionId = `session-${generateUUID()}`;
+      } catch (uuidError) {
+        sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+      }
+      return sessionId;
     }
   }
 
@@ -554,6 +605,9 @@ export class Telemetry {
       return;
     }
 
+    // Get user ID (this will trigger lazy initialization if needed)
+    const currentUserId = this.userId;
+
     // Add metadata to all events
     const properties = { ...event.properties };
     properties.mcp_use_version = getPackageVersion();
@@ -564,9 +618,8 @@ export class Telemetry {
     // Send to PostHog (Node.js)
     if (this._posthogNodeClient) {
       try {
-        logger.debug(`CAPTURE: PostHog Node Event ${event.name}`);
         this._posthogNodeClient.capture({
-          distinctId: this.userId,
+          distinctId: currentUserId,
           event: event.name,
           properties,
         });
@@ -578,10 +631,9 @@ export class Telemetry {
     // Send to PostHog (Browser)
     if (this._posthogBrowserClient) {
       try {
-        logger.debug(`CAPTURE: PostHog Browser Event ${event.name}`);
         this._posthogBrowserClient.capture(event.name, {
           ...properties,
-          distinct_id: this.userId,
+          distinct_id: currentUserId,
         });
       } catch (e) {
         logger.debug(
@@ -595,7 +647,7 @@ export class Telemetry {
       try {
         const scarfProperties: Record<string, any> = {
           ...properties,
-          user_id: this.userId,
+          user_id: currentUserId,
           event: event.name,
         };
         await this._scarfClient.logEvent(scarfProperties);

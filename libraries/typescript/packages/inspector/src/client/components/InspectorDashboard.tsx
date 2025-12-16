@@ -161,12 +161,6 @@ export function InspectorDashboard() {
     null
   );
 
-  // Log connections on every render to debug
-  console.warn(
-    "[InspectorDashboard] Render - connections:",
-    connections.map((c) => ({ id: c.id, state: c.state }))
-  );
-
   // Track inspector open on mount
   useEffect(() => {
     const telemetry = Telemetry.getInstance();
