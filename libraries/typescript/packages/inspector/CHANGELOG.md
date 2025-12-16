@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.15
+
+### Patch Changes
+
+- 0a7a19a: fix: was importing node modules in the browser
+  - mcp-use@1.11.0-canary.15
+
 ## 0.13.0-canary.14
 
 ### Patch Changes

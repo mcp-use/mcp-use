@@ -8,6 +8,7 @@
     "mcp-use": "1.10.6"
   },
   "changesets": [
+    "clear-dogs-hunt",
     "cuddly-keys-lay",
     "easy-jars-nail",
     "icy-worms-deny",
