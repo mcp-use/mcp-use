@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.9.1
+
+### Patch Changes
+
+- c225250: fix: add typescript to dev deps
+
 ## 0.9.1-canary.0
 
 ### Patch Changes
