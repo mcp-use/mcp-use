@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.13.1
+
+### Patch Changes
+
+- abf0e0f: fix: widget props not picked up if zod
+- Updated dependencies [abf0e0f]
+  - mcp-use@1.11.1
+
 ## 0.13.1-canary.0
 
 ### Patch Changes
