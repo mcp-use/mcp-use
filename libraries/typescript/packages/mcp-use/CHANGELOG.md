@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.11.0-canary.18
+
+### Patch Changes
+
+- d7797b6: fix: fix widget props registration
+- 168a2e1: fix: improve supabase deploy docs + tel user id + scarf issue
+- Updated dependencies [2902a2e]
+- Updated dependencies [d7797b6]
+  - @mcp-use/inspector@0.13.0-canary.18
+  - @mcp-use/cli@2.6.0-canary.18
+
 ## 1.11.0-canary.17
 
 ### Patch Changes

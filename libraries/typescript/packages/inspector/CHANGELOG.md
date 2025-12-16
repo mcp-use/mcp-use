@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.13.0-canary.18
+
+### Patch Changes
+
+- 2902a2e: chore(inspector): fixed console logs warns
+- d7797b6: fix: fix widget props registration
+- Updated dependencies [d7797b6]
+- Updated dependencies [168a2e1]
+  - mcp-use@1.11.0-canary.18
+
 ## 0.13.0-canary.17
 
 ### Patch Changes
