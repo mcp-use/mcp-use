@@ -47,7 +47,7 @@ function secureRandomString(): string {
   // Node.js
   try {
     // Dynamically require crypto to avoid issues in browser
-     
+
     const crypto = require("crypto");
     return crypto.randomBytes(8).toString("hex");
   } catch (e) {
