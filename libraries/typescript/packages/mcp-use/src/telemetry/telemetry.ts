@@ -575,7 +575,7 @@ export class Telemetry {
         try {
           userId = generateUUID();
         } catch (uuidError) {
-          userId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+          userId = `${Date.now()}-${secureRandomString()}`;
         }
         localStorage.setItem(USER_ID_STORAGE_KEY, userId);
       }
