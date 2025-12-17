@@ -13,6 +13,161 @@ import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 
 const execAsync = promisify(exec);
 
+/**
+ * Parse environment variables from .env file
+ */
+async function parseEnvFile(filePath: string): Promise<Record<string, string>> {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    const envVars: Record<string, string> = {};
+    const lines = content.split("\n");
+
+    let currentKey: string | null = null;
+    let currentValue = "";
+
+    for (let line of lines) {
+      // Trim whitespace
+      line = line.trim();
+
+      // Skip empty lines and comments
+      if (!line || line.startsWith("#")) {
+        continue;
+      }
+
+      // Check if this is a continuation of a multiline value
+      if (currentKey && !line.includes("=")) {
+        currentValue += "\n" + line;
+        continue;
+      }
+
+      // If we have a pending key-value pair, save it
+      if (currentKey) {
+        envVars[currentKey] = currentValue.replace(/^["']|["']$/g, "");
+        currentKey = null;
+        currentValue = "";
+      }
+
+      // Parse KEY=VALUE
+      const equalIndex = line.indexOf("=");
+      if (equalIndex === -1) {
+        continue;
+      }
+
+      const key = line.substring(0, equalIndex).trim();
+      let value = line.substring(equalIndex + 1).trim();
+
+      // Validate key format (alphanumeric and underscore)
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+        console.log(
+          chalk.yellow(`⚠️  Skipping invalid environment variable key: ${key}`)
+        );
+        continue;
+      }
+
+      // Handle quoted values
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+        envVars[key] = value;
+      } else if (value.startsWith('"') || value.startsWith("'")) {
+        // Start of multiline value
+        currentKey = key;
+        currentValue = value.slice(1);
+      } else {
+        envVars[key] = value;
+      }
+    }
+
+    // Save any pending multiline value
+    if (currentKey) {
+      envVars[currentKey] = currentValue.replace(/^["']|["']$/g, "");
+    }
+
+    return envVars;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`Environment file not found: ${filePath}`);
+    }
+    throw new Error(
+      `Failed to parse environment file: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Parse environment variable from KEY=VALUE string
+ */
+function parseEnvVar(envStr: string): { key: string; value: string } {
+  const equalIndex = envStr.indexOf("=");
+  if (equalIndex === -1) {
+    throw new Error(
+      `Invalid environment variable format: "${envStr}". Expected KEY=VALUE`
+    );
+  }
+
+  const key = envStr.substring(0, equalIndex).trim();
+  const value = envStr.substring(equalIndex + 1);
+
+  // Validate key format
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+    throw new Error(
+      `Invalid environment variable key: "${key}". Keys must start with a letter or underscore and contain only letters, numbers, and underscores.`
+    );
+  }
+
+  return { key, value };
+}
+
+/**
+ * Build environment variables from file and flags
+ */
+async function buildEnvVars(
+  options: DeployOptions
+): Promise<Record<string, string>> {
+  const envVars: Record<string, string> = {};
+
+  // Parse env file if provided
+  if (options.envFile) {
+    try {
+      const fileEnv = await parseEnvFile(options.envFile);
+      Object.assign(envVars, fileEnv);
+      console.log(
+        chalk.gray(
+          `Loaded ${Object.keys(fileEnv).length} variable(s) from ${options.envFile}`
+        )
+      );
+    } catch (error) {
+      console.log(
+        chalk.red(
+          `✗ ${error instanceof Error ? error.message : "Failed to load env file"}`
+        )
+      );
+      process.exit(1);
+    }
+  }
+
+  // Parse individual env flags (these override file values)
+  if (options.env && options.env.length > 0) {
+    for (const envStr of options.env) {
+      try {
+        const { key, value } = parseEnvVar(envStr);
+        envVars[key] = value;
+      } catch (error) {
+        console.log(
+          chalk.red(
+            `✗ ${error instanceof Error ? error.message : "Invalid env variable"}`
+          )
+        );
+        process.exit(1);
+      }
+    }
+  }
+
+  return envVars;
+}
+
 interface DeployOptions {
   open?: boolean;
   name?: string;
@@ -20,6 +175,8 @@ interface DeployOptions {
   runtime?: "node" | "python";
   fromSource?: boolean;
   new?: boolean;
+  env?: string[];
+  envFile?: string;
 }
 
 /**
@@ -531,6 +688,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       const buildCommand = await detectBuildCommand(cwd);
       const startCommand = await detectStartCommand(cwd);
 
+      // Build environment variables
+      const envVars = await buildEnvVars(options);
+
       console.log();
       console.log(chalk.white("Deployment configuration:"));
       console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
@@ -541,6 +701,16 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
       if (startCommand) {
         console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
+      }
+      if (envVars && Object.keys(envVars).length > 0) {
+        console.log(
+          chalk.gray(`  Environment:   `) +
+            chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
+        );
+        console.log(
+          chalk.gray(`                 `) +
+            chalk.gray(Object.keys(envVars).join(", "))
+        );
       }
       console.log();
 
@@ -605,6 +775,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           port,
           buildCommand,
           startCommand,
+          env: Object.keys(envVars).length > 0 ? envVars : undefined,
         },
         healthCheckPath: "/healthz",
       };
@@ -661,6 +832,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       const buildCommand = await detectBuildCommand(cwd);
       const startCommand = await detectStartCommand(cwd);
 
+      // Build environment variables
+      const envVars = await buildEnvVars(options);
+
       console.log(chalk.white("Deployment configuration:"));
       console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
       console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
@@ -670,6 +844,16 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
       if (startCommand) {
         console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
+      }
+      if (envVars && Object.keys(envVars).length > 0) {
+        console.log(
+          chalk.gray(`  Environment:   `) +
+            chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
+        );
+        console.log(
+          chalk.gray(`                 `) +
+            chalk.gray(Object.keys(envVars).join(", "))
+        );
       }
       console.log();
 
@@ -768,6 +952,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           port,
           buildCommand,
           startCommand,
+          env: Object.keys(envVars).length > 0 ? envVars : undefined,
         },
         healthCheckPath: "/healthz",
       };

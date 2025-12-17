@@ -1174,6 +1174,11 @@ program
     "--new",
     "Force creation of new deployment instead of reusing linked deployment"
   )
+  .option(
+    "--env <key=value...>",
+    "Environment variables (can be used multiple times)"
+  )
+  .option("--env-file <path>", "Path to .env file with environment variables")
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -1182,6 +1187,8 @@ program
       runtime: options.runtime,
       fromSource: options.fromSource,
       new: options.new,
+      env: options.env,
+      envFile: options.envFile,
     });
   });
 
