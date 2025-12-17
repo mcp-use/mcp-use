@@ -64,7 +64,13 @@ async function listDeploymentsCommand(): Promise<void> {
     const api = await McpUseAPI.create();
     const deployments = await api.listDeployments();
 
-    if (deployments.length === 0) {
+    // Sort deployments by created date (newest first)
+    const sortedDeployments = [...deployments].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    if (sortedDeployments.length === 0) {
       console.log(chalk.yellow("No deployments found."));
       console.log(
         chalk.gray(
@@ -74,7 +80,9 @@ async function listDeploymentsCommand(): Promise<void> {
       return;
     }
 
-    console.log(chalk.cyan.bold(`\n📦 Deployments (${deployments.length})\n`));
+    console.log(
+      chalk.cyan.bold(`\n📦 Deployments (${sortedDeployments.length})\n`)
+    );
 
     // Print table header
     console.log(
@@ -85,7 +93,7 @@ async function listDeploymentsCommand(): Promise<void> {
     console.log(chalk.gray("─".repeat(130)));
 
     // Print each deployment
-    for (const deployment of deployments) {
+    for (const deployment of sortedDeployments) {
       const id = formatId(deployment.id).padEnd(40);
       const name = deployment.name.substring(0, 24).padEnd(25);
       const statusColor = getStatusColor(deployment.status);
