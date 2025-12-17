@@ -23,7 +23,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather for a city",
-  inputs: propSchema,
+  props: propSchema,
 };
 
 type WeatherProps = z.infer<typeof propSchema>;
@@ -32,7 +32,7 @@ const WeatherWidget: React.FC = () => {
   // Use the useWidget hook to get props from OpenAI Apps SDK
   const { props, theme } = useWidget<WeatherProps>();
 
-  console.log(props);
+  console.log(props); // the widget props
 
   const { city, weather, temperature } = props;
   const getWeatherIcon = (weatherType: string) => {
