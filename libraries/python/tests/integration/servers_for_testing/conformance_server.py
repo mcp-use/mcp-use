@@ -154,12 +154,20 @@ async def test_embedded_resource() -> EmbeddedResource:
 
 
 # tools-call-mixed-content - Return list of content types
-@mcp.tool(name="test_mixed_content")
-async def test_mixed_content() -> list:
-    """A tool that returns mixed content (text + image)."""
+@mcp.tool(name="test_multiple_content_types")
+async def test_multiple_content_types() -> list:
+    """A tool that returns multiple content types (text + image + embedded resource)."""
     return [
-        TextContent(type="text", text="Here is some text content"),
+        TextContent(type="text", text="Multiple content types test:"),
         ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png"),
+        EmbeddedResource(
+            type="resource",
+            resource=TextResourceContents(
+                uri="test://mixed-content-resource",
+                mimeType="application/json",
+                text='{"test":"data","value":123}',
+            ),
+        ),
     ]
 
 
