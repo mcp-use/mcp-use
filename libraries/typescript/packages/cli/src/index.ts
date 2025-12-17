@@ -1170,6 +1170,10 @@ program
     "--from-source",
     "Deploy from local source code (even for GitHub repos)"
   )
+  .option(
+    "--new",
+    "Force creation of new deployment instead of reusing linked deployment"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -1177,6 +1181,7 @@ program
       port: options.port ? parseInt(options.port, 10) : undefined,
       runtime: options.runtime,
       fromSource: options.fromSource,
+      new: options.new,
     });
   });
 

@@ -376,10 +376,53 @@ export class McpUseAPI {
   /**
    * Redeploy deployment
    */
-  async redeployDeployment(deploymentId: string): Promise<Deployment> {
-    return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
-      method: "POST",
-    });
+  async redeployDeployment(
+    deploymentId: string,
+    filePath?: string
+  ): Promise<Deployment> {
+    if (filePath) {
+      // Redeploy with file upload (for local source)
+      const { readFile } = await import("node:fs/promises");
+      const { basename } = await import("node:path");
+      const { stat } = await import("node:fs/promises");
+
+      // Check file size
+      const stats = await stat(filePath);
+      const maxSize = 2 * 1024 * 1024;
+      if (stats.size > maxSize) {
+        throw new Error(
+          `File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`
+        );
+      }
+
+      const fileBuffer = await readFile(filePath);
+      const formData = new FormData();
+      const blob = new Blob([fileBuffer], { type: "application/gzip" });
+      formData.append("source_file", blob, basename(filePath));
+
+      const headers: Record<string, string> = {};
+      if (this.apiKey) headers["x-api-key"] = this.apiKey;
+
+      const response = await fetch(
+        `${this.baseUrl}/deployments/${deploymentId}/redeploy`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Redeploy failed: ${error}`);
+      }
+      return response.json();
+    } else {
+      // Redeploy GitHub source
+      return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
+        method: "POST",
+      });
+    }
   }
 
   /**

@@ -1,14 +1,15 @@
 import chalk from "chalk";
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { exec } from "node:child_process";
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
+import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
 import { isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
-import open from "open";
+import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 
 const execAsync = promisify(exec);
 
@@ -18,6 +19,7 @@ interface DeployOptions {
   port?: number;
   runtime?: "node" | "python";
   fromSource?: boolean;
+  new?: boolean;
 }
 
 /**
@@ -542,6 +544,56 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
       console.log();
 
+      // Check if project is linked to an existing deployment
+      const api = await McpUseAPI.create();
+      const existingLink = !options.new ? await getProjectLink(cwd) : null;
+
+      if (existingLink) {
+        try {
+          // Verify deployment still exists
+          const existingDeployment = await api.getDeployment(
+            existingLink.deploymentId
+          );
+
+          if (existingDeployment && existingDeployment.status !== "failed") {
+            console.log(chalk.green(`✓ Found linked deployment`));
+            console.log(
+              chalk.gray(`  Redeploying to maintain the same URL...`)
+            );
+            console.log(
+              chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
+            );
+
+            // Redeploy
+            const deployment = await api.redeployDeployment(
+              existingLink.deploymentId
+            );
+
+            // Update link timestamp
+            await saveProjectLink(cwd, {
+              ...existingLink,
+              linkedAt: new Date().toISOString(),
+            });
+
+            // Display progress
+            await displayDeploymentProgress(api, deployment);
+
+            // Open in browser if requested
+            if (options.open && deployment.domain) {
+              console.log();
+              console.log(chalk.gray("Opening deployment in browser..."));
+              await open(`https://${deployment.domain}`);
+            }
+            return; // Exit early
+          }
+        } catch (error) {
+          // Deployment not found or error - continue to create new
+          console.log(
+            chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
+          );
+        }
+      }
+
       // Create deployment request
       const deploymentRequest: CreateDeploymentRequest = {
         name: projectName,
@@ -559,12 +611,23 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
       // Create deployment
       console.log(chalk.gray("Creating deployment..."));
-      const api = await McpUseAPI.create();
       const deployment = await api.createDeployment(deploymentRequest);
 
       console.log(
         chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
       );
+
+      // Save project link
+      await saveProjectLink(cwd, {
+        deploymentId: deployment.id,
+        deploymentName: projectName,
+        deploymentUrl: deployment.domain,
+        linkedAt: new Date().toISOString(),
+      });
+      console.log(
+        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
+      );
+      console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
 
       // Display progress
       await displayDeploymentProgress(api, deployment);
@@ -642,6 +705,60 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         process.exit(1);
       }
 
+      // Check if project is linked to an existing deployment
+      const api = await McpUseAPI.create();
+      const existingLink = !options.new ? await getProjectLink(cwd) : null;
+
+      if (existingLink) {
+        try {
+          // Verify deployment still exists
+          const existingDeployment = await api.getDeployment(
+            existingLink.deploymentId
+          );
+
+          if (existingDeployment && existingDeployment.status !== "failed") {
+            console.log(chalk.green(`✓ Found linked deployment`));
+            console.log(
+              chalk.gray(`  Redeploying to maintain the same URL...`)
+            );
+            console.log(
+              chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
+            );
+
+            // Redeploy with file upload
+            const deployment = await api.redeployDeployment(
+              existingLink.deploymentId,
+              tarballPath
+            );
+
+            // Clean up tarball
+            await fs.unlink(tarballPath);
+
+            // Update link timestamp
+            await saveProjectLink(cwd, {
+              ...existingLink,
+              linkedAt: new Date().toISOString(),
+            });
+
+            // Display progress
+            await displayDeploymentProgress(api, deployment);
+
+            // Open in browser if requested
+            if (options.open && deployment.domain) {
+              console.log();
+              console.log(chalk.gray("Opening deployment in browser..."));
+              await open(`https://${deployment.domain}`);
+            }
+            return; // Exit early
+          }
+        } catch (error) {
+          // Deployment not found or error - continue to create new
+          console.log(
+            chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
+          );
+        }
+      }
+
       // Create deployment request
       const deploymentRequest: CreateDeploymentRequest = {
         name: projectName,
@@ -657,7 +774,6 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
       // Create deployment with file upload
       console.log(chalk.gray("Creating deployment..."));
-      const api = await McpUseAPI.create();
       const deployment = await api.createDeploymentWithUpload(
         deploymentRequest,
         tarballPath
@@ -669,6 +785,18 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       console.log(
         chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
       );
+
+      // Save project link
+      await saveProjectLink(cwd, {
+        deploymentId: deployment.id,
+        deploymentName: projectName,
+        deploymentUrl: deployment.domain,
+        linkedAt: new Date().toISOString(),
+      });
+      console.log(
+        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
+      );
+      console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
 
       // Display progress
       await displayDeploymentProgress(api, deployment);
