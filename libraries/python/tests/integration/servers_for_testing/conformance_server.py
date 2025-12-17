@@ -173,7 +173,7 @@ async def test_multiple_content_types() -> list:
 
 # tools-call-with-logging
 @mcp.tool(name="test_logging-bla")
-async def test_logging_bla(ctx: Context) -> str:
+async def test_logging_tool(ctx: Context) -> str:
     """A tool that emits log messages at various levels."""
     await ctx.debug("Debug message from tool")
     await ctx.info("Info message from tool")
