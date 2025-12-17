@@ -12,6 +12,7 @@ import json
 from dataclasses import dataclass
 from typing import get_args
 
+from mcp.server.fastmcp.prompts.base import UserMessage
 from mcp.types import (
     AudioContent,
     EmbeddedResource,
@@ -274,18 +275,20 @@ def test_prompt_with_arguments(arg1: str = "general", arg2: str = "formal") -> s
 
 # prompts-get-embedded-resource (resourceUri parameter for conformance test)
 @mcp.prompt(name="test_prompt_with_embedded_resource", description="A prompt with embedded resource")
-def test_prompt_with_embedded_resource(resourceUri: str = "config://embedded") -> list:
+def test_prompt_with_embedded_resource(resourceUri: str) -> list:
     """A prompt that includes an embedded resource."""
     return [
-        TextContent(type="text", text="Here is the configuration:"),
-        EmbeddedResource(
-            type="resource",
-            resource=TextResourceContents(
-                uri=resourceUri,
-                mimeType="application/json",
-                text='{"setting": "value"}',
-            ),
+        UserMessage(
+            content=EmbeddedResource(
+                type="resource",
+                resource=TextResourceContents(
+                    uri=resourceUri,
+                    mimeType="text/plain",
+                    text="Embedded resource content for testing.",
+                ),
+            )
         ),
+        UserMessage(content=TextContent(type="text", text="Please process the embedded resource above.")),
     ]
 
 
@@ -294,8 +297,8 @@ def test_prompt_with_embedded_resource(resourceUri: str = "config://embedded") -
 def test_prompt_with_image() -> list:
     """A prompt that includes image content."""
     return [
-        TextContent(type="text", text="Here is a test image:"),
-        ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png"),
+        UserMessage(content=TextContent(type="text", text="Here is a test image:")),
+        UserMessage(content=ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png")),
     ]
 
 
