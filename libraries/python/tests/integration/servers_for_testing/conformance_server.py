@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import get_args
 
 from mcp.types import (
+    AudioContent,
     EmbeddedResource,
     ImageContent,
     SamplingMessage,
@@ -28,6 +29,8 @@ mcp = MCPServer(
     name="ConformanceTestServer",
     version="1.0.0",
     instructions="MCP Conformance Test Server implementing all supported features.",
+    debug=True,
+    pretty_print_jsonrpc=False,
 )
 
 # =============================================================================
@@ -120,10 +123,19 @@ def test_simple_text(message: str = "Hello, World!") -> str:
 
 
 # tools-call-image - Return ImageContent directly
-@mcp.tool(name="test_image")
-async def test_image() -> ImageContent:
+@mcp.tool(name="test_image_content")
+async def test_image_content() -> ImageContent:
     """A tool that returns image content."""
     return ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png")
+
+
+# tools-call-audio - Return AudioContent directly
+@mcp.tool(name="test_audio_content")
+async def test_audio_content() -> AudioContent:
+    """A tool that returns audio content."""
+    return AudioContent(
+        type="audio", data="UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA", mimeType="audio/wav"
+    )
 
 
 # tools-call-embedded-resource - Return EmbeddedResource directly
@@ -151,8 +163,8 @@ async def test_mixed_content() -> list:
 
 
 # tools-call-with-logging
-@mcp.tool(name="test_logging")
-async def test_logging(ctx: Context) -> str:
+@mcp.tool(name="test_logging-bla")
+async def test_logging_bla(ctx: Context) -> str:
     """A tool that emits log messages at various levels."""
     await ctx.debug("Debug message from tool")
     await ctx.info("Info message from tool")
@@ -255,9 +267,9 @@ def test_simple_prompt() -> str:
 
 # prompts-get-with-args (parameters optional with defaults)
 @mcp.prompt(name="test_prompt_with_arguments", description="A prompt that accepts arguments")
-def test_prompt_with_arguments(topic: str = "general", style: str = "formal") -> str:
+def test_prompt_with_arguments(arg1: str = "general", arg2: str = "formal") -> str:
     """A prompt that generates content about a topic in a specific style."""
-    return f"Please write about {topic} in a {style} style."
+    return f"Please write about {arg1} in a {arg2} style."
 
 
 # prompts-get-embedded-resource (resourceUri parameter for conformance test)
