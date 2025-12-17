@@ -62,7 +62,7 @@ server.tool(
       tagline: "Build MCP servers with UI widgets in minutes",
       description:
         "mcp-use is a modern framework for building Model Context Protocol (MCP) servers with automatic UI widget registration, making it easy to create interactive AI tools and resources.",
-      founded: "2024",
+      founded: "2025",
       mission:
         "To simplify the development of MCP servers and make AI integration accessible for developers",
       values: [
