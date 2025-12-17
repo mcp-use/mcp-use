@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.9.2
+
+### Patch Changes
+
+- 9216c25: chore: updated templates to use MCPServer instead of createMcpServer
+
 ## 0.9.1
 
 ### Patch Changes
