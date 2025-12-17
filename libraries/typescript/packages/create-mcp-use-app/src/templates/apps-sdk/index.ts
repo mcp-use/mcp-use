@@ -1,8 +1,10 @@
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 
-const server = createMCPServer("test-app", {
+const server = new MCPServer({
+  name: "apps-sdk-mcp-server",
   version: "1.0.0",
-  description: "Test MCP server with automatic UI widget registration",
+  description: "MCP server with OpenAI Apps SDK integration",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
