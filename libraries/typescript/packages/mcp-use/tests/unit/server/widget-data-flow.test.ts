@@ -197,7 +197,9 @@ describe("Widget Data Flow", () => {
       );
 
       // Verify response structure
-      expect(result.content[0].text).toBe("Found 100 items in electronics");
+      expect((result.content as any)[0]?.text).toBe(
+        "Found 100 items in electronics"
+      );
       expect((result as any)._meta["mcp-use/props"]).toEqual({
         items: [1, 2, 3],
         total: 100,
@@ -374,7 +376,7 @@ describe("Widget Data Flow", () => {
       const result = await toolHandler!.handler({ value: 42 }, {} as any);
 
       // Verify message takes precedence over output.content
-      expect(result.content[0].text).toBe(
+      expect((result.content as any)[0]?.text).toBe(
         "This should be used (message takes precedence)"
       );
     });
