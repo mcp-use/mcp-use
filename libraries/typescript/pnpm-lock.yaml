@@ -15,7 +15,7 @@ overrides:
   langchain: ^1.0.1
   react: ^19.2.0
   react-dom: ^19.2.0
-  zod: ^4.1.13
+  zod: ^4.2.0
   jsondiffpatch: '>=0.7.2'
   esbuild: '>=0.25.0'
   vite: ^7.3.0
@@ -135,7 +135,7 @@ importers:
         specifier: ^8.18.3
         version: 8.18.3
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@types/ws':
@@ -212,7 +212,7 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@tailwindcss/vite':
@@ -258,7 +258,7 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@tailwindcss/vite':
@@ -310,7 +310,7 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@tailwindcss/vite':
@@ -552,7 +552,7 @@ importers:
         specifier: ^8.18.3
         version: 8.18.3
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@antfu/eslint-config':
@@ -642,7 +642,7 @@ importers:
         specifier: workspace:*
         version: link:../../../..
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@types/node':
@@ -655,7 +655,7 @@ importers:
         specifier: workspace:*
         version: link:../../../..
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@mcp-use/cli':
@@ -674,7 +674,7 @@ importers:
         specifier: workspace:*
         version: link:../../../..
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@types/node':
@@ -690,7 +690,7 @@ importers:
         specifier: workspace:*
         version: link:../../../..
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@types/node':
@@ -703,7 +703,7 @@ importers:
         specifier: workspace:*
         version: link:../../../..
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
 
   packages/mcp-use/examples/server/oauth/auth0:
@@ -769,7 +769,7 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@tailwindcss/vite':
@@ -812,7 +812,7 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
       zod:
-        specifier: ^4.1.13
+        specifier: ^4.2.0
         version: 4.2.0
     devDependencies:
       '@tailwindcss/vite':
@@ -834,13 +834,13 @@ packages:
     resolution: {integrity: sha512-BwV7DU/lAm3Xn6iyyvZdWgVxgLu3SNXzl5y57gMvkW4nGhAOV5269IrJzQwGt03bb107sa6H6uJwWxc77zXoGA==}
     engines: {node: '>=18'}
     peerDependencies:
-      zod: ^4.1.13
+      zod: ^4.2.0
 
   '@ai-sdk/provider-utils@3.0.19':
     resolution: {integrity: sha512-W41Wc9/jbUVXVwCN/7bWa4IKe8MtxO3EyA0Hfhx6grnmiYlCvpI8neSYWFE0zScXJkgA/YK3BRybzgyiXuu6JA==}
     engines: {node: '>=18'}
     peerDependencies:
-      zod: ^4.1.13
+      zod: ^4.2.0
 
   '@ai-sdk/provider@2.0.0':
     resolution: {integrity: sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA==}
@@ -851,7 +851,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       react: ^19.2.0
-      zod: ^4.1.13
+      zod: ^4.2.0
     peerDependenciesMeta:
       zod:
         optional: true
@@ -922,7 +922,7 @@ packages:
     resolution: {integrity: sha512-TGNDEUuEstk/DKu0/TflXAEt+p+p/WhTlFzEnoosvbaDU2LTjm42igSdlL0VijrKpWejtOKxX0b8A7uc+XiSAQ==}
     hasBin: true
     peerDependencies:
-      zod: ^4.1.13
+      zod: ^4.2.0
     peerDependenciesMeta:
       zod:
         optional: true
@@ -1508,7 +1508,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@langchain/core': ^1.0.1
-      zod: ^4.1.13
+      zod: ^4.2.0
       zod-to-json-schema: ^3.x
     peerDependenciesMeta:
       zod-to-json-schema:
@@ -1540,7 +1540,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
-      zod: ^4.1.13
+      zod: ^4.2.0
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
@@ -1550,7 +1550,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
-      zod: ^4.1.13
+      zod: ^4.2.0
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
@@ -3084,7 +3084,7 @@ packages:
     resolution: {integrity: sha512-26vivpSO/mzZj0k1Si2IpsFspp26ttQICHRySQiMrtWcRd5mnJMX2a8sG28vmZ38C+JUn1cWmfZrsLMxkSMw9g==}
     engines: {node: '>=18'}
     peerDependencies:
-      zod: ^4.1.13
+      zod: ^4.2.0
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
@@ -5448,7 +5448,7 @@ packages:
     hasBin: true
     peerDependencies:
       ws: ^8.18.0
-      zod: ^4.1.13
+      zod: ^4.2.0
     peerDependenciesMeta:
       ws:
         optional: true
@@ -6796,13 +6796,13 @@ packages:
   zod-to-json-schema@3.25.0:
     resolution: {integrity: sha512-HvWtU2UG41LALjajJrML6uQejQhNJx+JBO9IflpSja4R03iNWfKXrj6W2h7ljuLyc1nKS+9yDyL/9tD1U/yBnQ==}
     peerDependencies:
-      zod: ^4.1.13
+      zod: ^4.2.0
 
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      zod: ^4.1.13
+      zod: ^4.2.0
 
   zod@4.2.0:
     resolution: {integrity: sha512-Bd5fw9wlIhtqCCxotZgdTOMwGm1a0u75wARVEY9HMs1X17trvA/lMi4+MGK5EUfYkXVTbX8UDiDKW4OgzHVUZw==}
