@@ -199,7 +199,8 @@
                       "python/agent/memory-management",
                       "python/agent/structured-output",
                       "python/agent/streaming",
-                      "python/agent/interactive-chat-patterns"
+                      "python/agent/interactive-chat-patterns",
+                      "python/agent/RunnableConfig"
                     ]
                   },
                   "python/agent/server-manager",

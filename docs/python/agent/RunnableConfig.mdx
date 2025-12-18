@@ -1,0 +1,83 @@
+---
+title: RunnableConfig and Message ID
+description: Learn how to securely pass sensitive data to tools without exposing it to the LLM, and how message IDs help identify messages in a chat flow.
+icon: security
+---
+
+# RunnableConfig for Tools
+
+`MCPAgent` provides a secure mechanism to pass sensitive or context-specific data to tools **without exposing that data to the LLM**.  
+This is useful when your tools require values such as:
+
+- Employee IDs  
+- Email addresses  
+- Session metadata  
+- Permissions  
+- User roles  
+- Internal system identifiers  
+
+By attaching metadata to the agent, **mcp-use** automatically converts it into a `RunnableConfig`, which is sent only to tools — not to the LLM.
+
+---
+
+## Why Use Metadata?
+
+Many tools require contextual information that should never appear in an LLM prompt.  
+For example:
+
+- A tool may need a user’s employee ID to fetch internal records.  
+- A tool may need a session ID for logging.  
+- A tool may need an email ID to retrieve a profile.  
+
+Instead of sending these values inside the natural-language prompt (dangerous and unnecessary), you can pass them securely using metadata.
+
+---
+
+## Passing Metadata to the Agent
+
+```python
+import uuid
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+client = MCPClient(config=config)
+llm = ChatOpenAI(model="gpt-4o-mini")
+
+metadata = {"emp_id": "156", "email": "tom@flix.com"}
+message_id = str(uuid.uuid4())
+
+agent = MCPAgent(
+    llm=llm,
+    client=client,
+    metadata=metadata,    # Passed securely to tools
+    message_id=message_id # Used to tag all messages
+)
+
+response = await agent.run("What's my name?")
+print(response)  # → My name is Tom.
+```
+
+We can access the config data by using config.get("metadata") as shown below
+The tool:
+```python
+from mcp.server.fastmcp import FastMCP
+from langchain_core.runnables import RunnableConfig
+
+mcp = FastMCP()
+
+emp_ids = {"156": {"name": "Tom"}}
+
+@mcp.tool()
+def get_emp_name(config: RunnableConfig | None = None):
+    """Tool used to retrieve the employee's name using secure metadata."""
+    emp_id = config.get("metadata").get("emp_id")
+    name = emp_ids[emp_id]["name"]
+    return f"My name is {name}"
+```
+
+This ID will be automatically attached to:
+User messages,
+AI messages,
+Tool request messages,
+Tool response messages
+
