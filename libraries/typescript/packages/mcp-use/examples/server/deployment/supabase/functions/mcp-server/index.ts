@@ -1,5 +1,5 @@
 // MCP Server deployed on Supabase Edge Functions
-import { MCPServer } from "https://esm.sh/mcp-use@1.2.5-canary.4/server";
+import { MCPServer, text } from "npm:mcp-use/server";
 
 const server = new MCPServer({
   name: "test-app",
@@ -15,9 +15,9 @@ server.tool(
     description: "Get my city",
   },
   async () => {
-    return { content: [{ type: "text", text: `My city is San Francisco` }] };
+    return text(`My city is San Francisco`);
   }
 );
 
 // Start the server - automatically handles CORS for Deno/Supabase
-await server.listen();
+server.listen().catch(console.error);

@@ -116,19 +116,16 @@ describe("Widget Helper Integration Tests", () => {
       {
         name: "manual-comparison-tool",
         description: "Manual tool using widget() helper",
-        inputs: {
-          message: {
-            type: "string",
-            description: "A message",
-          },
-        },
+        schema: z.object({
+          message: z.string().describe("A message"),
+        }),
         widget: {
           name: "comparison-widget",
         },
       },
-      async (params) => {
+      async (params: { message: string }) => {
         return widget({
-          data: params,
+          props: params,
           message: "Displaying comparison-widget",
         });
       }
@@ -150,7 +147,7 @@ describe("Widget Helper Integration Tests", () => {
       },
       async () => {
         return widget({
-          data: { foo: "bar" },
+          props: { foo: "bar" },
           message: "Custom message",
         });
       }
@@ -186,7 +183,7 @@ describe("Widget Helper Integration Tests", () => {
 
       // Tool call returns error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("not found");
+      expect((result.content as any)[0]?.text).toContain("not found");
     });
 
     it("should be callable as tool when exposeAsTool is undefined (default)", async () => {
@@ -245,13 +242,15 @@ describe("Widget Helper Integration Tests", () => {
 
       // Check content structure
       expect(manualResult.content).toHaveLength(1);
-      expect(manualResult.content[0]).toHaveProperty("type", "text");
-      expect(manualResult.content[0]).toHaveProperty("text");
-      expect(manualResult.content[0].text).toBe("Displaying comparison-widget");
+      expect((manualResult.content as any)[0]).toHaveProperty("type", "text");
+      expect((manualResult.content as any)[0]).toHaveProperty("text");
+      expect((manualResult.content as any)[0].text).toBe(
+        "Displaying comparison-widget"
+      );
 
       expect(autoResult.content).toHaveLength(1);
-      expect(autoResult.content[0]).toHaveProperty("type", "text");
-      expect(autoResult.content[0]).toHaveProperty("text");
+      expect((autoResult.content as any)[0]).toHaveProperty("type", "text");
+      expect((autoResult.content as any)[0]).toHaveProperty("text");
 
       // Both should have valid widget URIs
       const manualUri = manualResult._meta?.["openai/outputTemplate"];
@@ -270,7 +269,7 @@ describe("Widget Helper Integration Tests", () => {
       });
 
       // Verify custom metadata
-      expect(result.content[0].text).toBe("Custom message");
+      expect((result.content as any)[0]?.text).toBe("Custom message");
       expect(result._meta?.["openai/toolInvocation/invoking"]).toBe(
         "Custom invoking..."
       );

@@ -225,8 +225,7 @@ export interface ToolDefinition<
    * }, async ({ city }) => {
    *   const data = await fetchWeather(city);
    *   return widget({
-   *     name: "weather-display",
-   *     data: { city, ...data }
+   *     props: { city, ...data }
    *   });
    * });
    * ```

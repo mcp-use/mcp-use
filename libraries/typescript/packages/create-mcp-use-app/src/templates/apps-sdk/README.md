@@ -88,7 +88,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'My widget description',
-  inputs: propSchema,
+  props: propSchema,
 };
 
 const MyWidget: React.FC = () => {
@@ -146,7 +146,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display user information',
-  inputs: propSchema,
+  props: propSchema,
 };
 ```
 
@@ -295,7 +295,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display a message',
-  inputs: propSchema,
+  props: propSchema,
 };
 
 type Props = z.infer<typeof propSchema>;
@@ -320,11 +320,13 @@ export default MyWidget;
 You can mix Apps SDK widgets with regular MCP tools:
 
 ```typescript
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: 'get-data',
   description: 'Fetch data from API',
   cb: async () => {
-    return { content: [{ type: 'text', text: 'Data' }] };
+    return text('Data');
   },
 });
 ```

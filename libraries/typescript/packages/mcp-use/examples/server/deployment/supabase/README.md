@@ -44,4 +44,4 @@ Use the automated deployment script to deploy your MCP server to Supabase:
 
 ## Documentation
 
-For a complete deployment guide and manual steps, see the [Deploying to Supabase](https://docs.mcp-use.com/typescript/server/deployment-supabase) documentation.
+For a complete deployment guide and manual steps, see the [Deploying to Supabase](https://docs.mcp-use.com/typescript/server/deployment/supabase) documentation.

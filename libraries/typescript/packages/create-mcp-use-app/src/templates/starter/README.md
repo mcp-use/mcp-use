@@ -26,14 +26,16 @@ This starter template demonstrates all major MCP features:
 ### 1. Traditional Tools
 
 ```typescript
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: 'greet',
   description: 'Greet someone by name',
-  inputs: [{ name: 'name', type: 'string', required: true }],
-  cb: async ({ name }) => {
-    return { content: [{ type: 'text', text: `Hello, ${name}!` }] }
+  schema: z.object({name:z.string()}),
+}, async ({ name }) => {
+    return text(`Hello, ${name}!`)
   },
-})
+)
 ```
 
 ### 2. Resources
@@ -265,14 +267,14 @@ await client.getPrompt('review-code', { code: 'const x = 1;' })
 server.tool({
   name: 'my-tool',
   description: 'My custom tool',
-  inputs: [{ name: 'param', type: 'string', required: true }],
-  cb: async ({ param }) => {
+  schema: z.object({
+    param: z.string(),
+  })
+}, async ({ param }) => {
     // Your logic here
-    return {
-      content: [{ type: 'text', text: `Result: ${param}` }],
-    }
+    return text(param)
   },
-})
+)
 ```
 
 ### Adding New React Widgets

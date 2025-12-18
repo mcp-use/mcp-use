@@ -45,21 +45,18 @@ server.resource({
 })
 
 // Define a tool
+import { z } from "zod";
+
 server.tool({
   name: 'greet',
   description: 'Greets a person',
-  inputs: [
-    {
-      name: 'name',
-      type: 'string',
-      description: 'The name to greet',
-      required: true,
-    },
-  ],
-  cb: async ({ name }) => {
-    return `Hello, ${name}!`
+  schema: z.object({
+    name: z.string().describe('The name to greet'),
+  })
+},async callback({ name }) {
+    return `Hello, ${name}!`;
   },
-})
+)
 
 // Define a prompt
 server.prompt({

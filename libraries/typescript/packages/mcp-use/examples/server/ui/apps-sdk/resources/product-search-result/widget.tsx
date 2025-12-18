@@ -13,7 +13,7 @@ import "../styles.css";
 export const widgetMetadata: WidgetMetadata = {
   description:
     "Display product search results with filtering, state management, and tool interactions",
-  inputs: propSchema,
+  props: propSchema,
 };
 
 const ProductSearchResult: React.FC = () => {

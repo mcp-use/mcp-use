@@ -20,7 +20,8 @@
     "start": "mcp-use start"
   },
   "dependencies": {
-    "mcp-use": "workspace:*"
+    "mcp-use": "workspace:*",
+    "zod": "^4.2.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.2"
