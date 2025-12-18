@@ -7,10 +7,11 @@ import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import open from "open";
-import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
-import { deployCommand } from "./commands/deploy.js";
-import { createClientCommand } from "./commands/client.js";
 import { toJSONSchema } from "zod";
+import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { createClientCommand } from "./commands/client.js";
+import { deployCommand } from "./commands/deploy.js";
+import { createDeploymentsCommand } from "./commands/deployments.js";
 
 const program = new Command();
 
@@ -1169,6 +1170,15 @@ program
     "--from-source",
     "Deploy from local source code (even for GitHub repos)"
   )
+  .option(
+    "--new",
+    "Force creation of new deployment instead of reusing linked deployment"
+  )
+  .option(
+    "--env <key=value...>",
+    "Environment variables (can be used multiple times)"
+  )
+  .option("--env-file <path>", "Path to .env file with environment variables")
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -1176,10 +1186,16 @@ program
       port: options.port ? parseInt(options.port, 10) : undefined,
       runtime: options.runtime,
       fromSource: options.fromSource,
+      new: options.new,
+      env: options.env,
+      envFile: options.envFile,
     });
   });
 
 // Client command
 program.addCommand(createClientCommand());
+
+// Deployments command
+program.addCommand(createDeploymentsCommand());
 
 program.parse();
