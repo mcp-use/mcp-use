@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.9.3
+
+### Patch Changes
+
+- 9a8cb3a: chore(docs): updated examples and docs to use preferred methods
+
 ## 0.9.3-canary.0
 
 ### Patch Changes

@@ -1,5 +1,21 @@
 # @mcp-use/cli
 
+## 2.7.0
+
+### Minor Changes
+
+- 9a8cb3a: feat: added deployments management to the cli
+- 9a8cb3a: feat: added support for project linking in cli
+- 9a8cb3a: feat(cli): allow setting env vars for the deployment while deploying
+
+### Patch Changes
+
+- 9a8cb3a: fix(cli): port detection
+- 9a8cb3a: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [9a8cb3a]
+  - @mcp-use/inspector@0.13.2
+  - mcp-use@1.11.2
+
 ## 2.7.0-canary.1
 
 ### Patch Changes
