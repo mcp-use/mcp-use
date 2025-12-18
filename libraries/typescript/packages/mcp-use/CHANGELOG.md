@@ -1,5 +1,15 @@
 # mcp-use
 
+## 1.11.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [0f3550c]
+- Updated dependencies [0f3550c]
+- Updated dependencies [0f3550c]
+  - @mcp-use/cli@2.7.0-canary.0
+  - @mcp-use/inspector@0.13.2-canary.0
+
 ## 1.11.1
 
 ### Patch Changes

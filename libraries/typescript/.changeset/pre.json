@@ -7,5 +7,9 @@
     "@mcp-use/inspector": "0.13.1",
     "mcp-use": "1.11.1"
   },
-  "changesets": []
+  "changesets": [
+    "hip-goats-hug",
+    "hot-plants-walk",
+    "lazy-books-burn"
+  ]
 }

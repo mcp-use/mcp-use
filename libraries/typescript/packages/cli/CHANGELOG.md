@@ -1,5 +1,18 @@
 # @mcp-use/cli
 
+## 2.7.0-canary.0
+
+### Minor Changes
+
+- 0f3550c: feat: added deployments management to the cli
+- 0f3550c: feat: added support for project linking in cli
+- 0f3550c: feat(cli): allow setting env vars for the deployment while deploying
+
+### Patch Changes
+
+- mcp-use@1.11.2-canary.0
+- @mcp-use/inspector@0.13.2-canary.0
+
 ## 2.6.1
 
 ### Patch Changes
