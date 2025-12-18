@@ -1,7 +1,7 @@
 ---
 title: RunnableConfig and Message ID
 description: Learn how to securely pass sensitive data to tools without exposing it to the LLM, and how message IDs help identify messages in a chat flow.
-icon: security
+icon: code
 ---
 
 # RunnableConfig for Tools
@@ -74,6 +74,7 @@ def get_emp_name(config: RunnableConfig | None = None):
     name = emp_ids[emp_id]["name"]
     return f"My name is {name}"
 ```
+# Message ID
 
 This ID will be automatically attached to:
 User messages,
@@ -81,3 +82,4 @@ AI messages,
 Tool request messages,
 Tool response messages
 
+We use BaseMessage of langchain and ID is an optional field which will be set by message_id
