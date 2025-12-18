@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 2.7.0-canary.1
+
+### Patch Changes
+
+- 681c929: fix(cli): port detection
+- 681c929: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [681c929]
+  - @mcp-use/inspector@0.13.2-canary.1
+  - mcp-use@1.11.2-canary.1
+
 ## 2.7.0-canary.0
 
 ### Minor Changes

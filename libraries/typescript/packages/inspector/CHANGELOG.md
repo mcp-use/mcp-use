@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.13.2-canary.1
+
+### Patch Changes
+
+- 681c929: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [681c929]
+  - mcp-use@1.11.2-canary.1
+
 ## 0.13.2-canary.0
 
 ### Patch Changes

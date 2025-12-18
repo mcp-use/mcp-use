@@ -8,8 +8,10 @@
     "mcp-use": "1.11.1"
   },
   "changesets": [
+    "cozy-pants-jog",
     "hip-goats-hug",
     "hot-plants-walk",
-    "lazy-books-burn"
+    "lazy-books-burn",
+    "warm-toys-accept"
   ]
 }
