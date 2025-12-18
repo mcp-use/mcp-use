@@ -93,7 +93,7 @@ import { propSchema } from './types';
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results with filtering',
-  inputs: propSchema,
+  props: propSchema,
 };
 
 const ProductSearchResult: React.FC = () => {
@@ -125,7 +125,7 @@ export const widgetMetadata: WidgetMetadata = {
   description: string,
   
   // Required: Zod schema defining the widget's input parameters
-  inputs: z.ZodObject<...>,
+  props: z.ZodObject<...>,
   
   // Optional: Control automatic tool registration (defaults to true)
   exposeAsTool?: boolean,
@@ -157,7 +157,7 @@ By default, widgets are automatically registered as both MCP tools and resources
   ```typescript
   export const widgetMetadata: WidgetMetadata = {
     description: 'Display weather',
-    inputs: propSchema,
+    props: propSchema,
     // exposeAsTool: true (default, can be omitted)
   };
   ```
@@ -166,7 +166,7 @@ By default, widgets are automatically registered as both MCP tools and resources
   ```typescript
   export const widgetMetadata: WidgetMetadata = {
     description: 'Display weather',
-    inputs: propSchema,
+    props: propSchema,
     exposeAsTool: false  // Don't auto-register as tool
   };
   ```
@@ -266,7 +266,7 @@ const { props } = useWidget();
 ```typescript
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results with filtering',
-  inputs: z.object({
+  props: z.object({
     query: z.string(),
   }),
 };
@@ -441,7 +441,7 @@ server.tool({
 // resources/weather-display/widget.tsx
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather information',
-  inputs: propSchema,
+  props: propSchema,
   exposeAsTool: false  // Only accessible via custom tools
 };
 ```

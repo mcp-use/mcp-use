@@ -962,23 +962,19 @@ npm install mcp-use @mcp-use/inspector
 **Create your MCP server:**
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer, text } from 'mcp-use/server'
+import { z } from 'zod'
 
 const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
 
 server.tool({
   name: 'hello',
   description: 'Say hello',
-  inputs: [{ name: 'name', type: 'string', required: true }],
-  cb: async ({ name }) => {
-    return {
-      content: [{ type: 'text', text: `Hello, ${name}!` }]
-    }
-  }
+  schema: z.object({ name: z.string().describe('The name to say hello to') }),
+}, async ({ name }) => {
+  return text(`Hello, ${name}!`);
 })
 
-// Inspector auto-mounts at /inspector
-await server.listen(3000)
 ```
 
 **Open the inspector:**

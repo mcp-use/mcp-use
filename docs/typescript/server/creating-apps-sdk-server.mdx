@@ -103,7 +103,7 @@ const propSchema = z.object({
 // Export metadata for automatic registration
 export const widgetMetadata: WidgetMetadata = {
   description: "Display a user profile card with avatar and information",
-  inputs: propSchema,
+  props: propSchema,
 };
 
 type UserProfileProps = z.infer<typeof propSchema>;
@@ -182,10 +182,8 @@ You can mix automatic widgets with traditional tools:
 server.tool({
   name: "get-user-data",
   description: "Fetch user information from the database",
-  inputs: [
-    { name: "userId", type: "string", required: true },
-  ],
-  cb: async ({ userId }) => {
+  schema: z.object({ userId: z.string().describe("The user ID to fetch") }),
+}, async ({ userId }) => {
     // Simulate API call
     const userData = {
       name: "John Doe",
@@ -195,17 +193,8 @@ server.tool({
       bio: "Software developer passionate about AI",
     };
 
-    return {
-      content: [
-        {
-          type: "text",
-          text: `User data retrieved for ${userId}`,
-        },
-      ],
-      structuredContent: userData,
-    };
-  },
-});
+    return text(`User data retrieved for ${userId}`);
+  });
 
 // Display user profile using the widget
 // The LLM can now call 'user-profile' tool with the data
@@ -377,7 +366,7 @@ The easiest deployment option:
 npx @mcp-use/cli deploy
 ```
 
-See the [Deployment Guide](./deployment-mcp-use) for details.
+See the [Deployment Guide](./deployment/mcp-use) for details.
 
 ### Manual Deployment
 
@@ -448,13 +437,13 @@ import type { WidgetMetadata } from "mcp-use/react";
 // ✅ Good: Single purpose
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather for a city",
-  inputs: z.object({ city: z.string() }),
+  props: z.object({ city: z.string() }),
 };
 
 // ❌ Bad: Too many responsibilities
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather, forecast, map, and news",
-  inputs: z.object({
+  props: z.object({
     /* too many fields */
   }),
 };
@@ -478,7 +467,7 @@ export const widgetMetadata: WidgetMetadata = {
 
 **Solutions**:
 - Use `useWidget()` hook (not React props)
-- Ensure `widgetMetadata.inputs` is a valid Zod schema
+- Ensure `widgetMetadata.props` is a valid Zod schema
 - Verify tool parameters match schema
 - Check Apps SDK is injecting `window.openai.toolInput`
 
@@ -504,14 +493,15 @@ appsSdkMetadata: {
 
 - [UI Widgets Overview](./ui-widgets) - Deep dive into automatic widget registration
 - [Project Templates](./templates) - Explore available templates
-- [Deployment Guide](./deployment-mcp-use) - Deploy your server to production
+- [Deployment Guide](./deployment/mcp-use) - Deploy your server to production
 
 ## Example: Complete Server
 
 Here's a complete example combining everything:
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer, mix, text, object } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
   name: "weather-app",
@@ -524,10 +514,8 @@ const server = new MCPServer({
 server.tool({
   name: "fetch-weather",
   description: "Fetch current weather for a city",
-  inputs: [
-    { name: "city", type: "string", required: true },
-  ],
-  cb: async ({ city }) => {
+  schema: z.object({ city: z.string().describe("The city to fetch weather for") }),
+}, async ({ city }) => {
     // Simulate API call
     const weather = {
       city,
@@ -536,17 +524,11 @@ server.tool({
       humidity: 65,
     };
 
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Weather for ${city}: ${weather.condition}, ${weather.temperature}°C`,
-        },
-      ],
-      structuredContent: weather,
-    };
-  },
-});
+    return  mix(
+      text(`Weather for ${city}: ${weather.condition}, ${weather.temperature}°C`), 
+      object(weather)
+    );
+  });
 
 // Widgets in resources/ folder are automatically registered
 // - resources/display-weather.tsx

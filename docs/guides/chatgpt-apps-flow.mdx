@@ -285,7 +285,7 @@ import { z } from 'zod';
 // Define widget metadata - auto-generates tool!
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather information for a city',
-  inputs: z.object({
+  props: z.object({
     city: z.string(),
     temperature: z.number(),
     conditions: z.string(),
@@ -605,7 +605,7 @@ import { z } from 'zod';
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather information',
-  inputs: z.object({
+  props: z.object({
     city: z.string(),
     temperature: z.number(),
     conditions: z.string(),

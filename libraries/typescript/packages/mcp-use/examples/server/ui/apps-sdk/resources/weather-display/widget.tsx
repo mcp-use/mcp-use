@@ -13,7 +13,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather information in a beautiful card",
-  inputs: propSchema,
+  props: propSchema,
   // Set to false to prevent auto-registration as a tool
   // This widget will only be used through custom tools
   exposeAsTool: false,

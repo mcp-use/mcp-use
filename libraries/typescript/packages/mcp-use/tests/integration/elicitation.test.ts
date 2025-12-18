@@ -35,7 +35,6 @@ describe("Elicitation Integration Tests", () => {
       {
         name: "form-mode-simple",
         description: "Simple form mode elicitation",
-        inputs: [],
       },
       async (_: any, ctx: any) => {
         const result = await ctx.elicit(
@@ -61,7 +60,6 @@ describe("Elicitation Integration Tests", () => {
       {
         name: "form-mode-validation",
         description: "Form mode with validation",
-        inputs: [],
       },
       async (_: any, ctx: any) => {
         const result = await ctx.elicit(
@@ -94,7 +92,6 @@ describe("Elicitation Integration Tests", () => {
       {
         name: "url-mode-test",
         description: "URL mode elicitation",
-        inputs: [],
       },
       async (_: any, ctx: any) => {
         const result = await ctx.elicit(
@@ -118,7 +115,6 @@ describe("Elicitation Integration Tests", () => {
       {
         name: "with-timeout",
         description: "Elicitation with timeout",
-        inputs: [],
       },
       async (_: any, ctx: any) => {
         const result = await ctx.elicit(

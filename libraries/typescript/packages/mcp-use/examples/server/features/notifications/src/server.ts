@@ -26,6 +26,7 @@
  */
 
 import { MCPServer } from "mcp-use/server";
+import z from "zod";
 
 // Track current mode
 let currentMode: "ping" | "pong" = "ping";
@@ -58,7 +59,6 @@ server.tool(
   {
     name: "ping-pong",
     description: "Dynamic tool that responds with current mode (ping or pong)",
-    inputs: [],
   },
   async () => {
     return {
@@ -78,7 +78,6 @@ server.tool(
     name: "toggle-mode",
     description:
       "Toggle between ping and pong mode, then notify all clients to refresh tools",
-    inputs: [],
   },
   async () => {
     const oldMode = currentMode;
@@ -111,7 +110,6 @@ server.tool(
   {
     name: "get-mode",
     description: "Check the current ping/pong mode",
-    inputs: [],
   },
   async () => {
     return {
@@ -130,16 +128,11 @@ server.tool(
   {
     name: "broadcast",
     description: "Send a custom notification to all connected clients",
-    inputs: [
-      {
-        name: "message",
-        type: "string",
-        description: "The message to broadcast",
-        required: true,
-      },
-    ],
+    schema: z.object({
+      message: z.string().describe("The message to broadcast"),
+    }),
   },
-  async ({ message }: { message: string }) => {
+  async ({ message }) => {
     const sessions = server.getActiveSessions();
 
     await server.sendNotification("custom/broadcast", {

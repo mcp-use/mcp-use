@@ -248,6 +248,8 @@ server.use(morgan(morganFormat, {
 }))
 
 // Use logger in tools
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: 'example_tool',
   cb: async (params) => {
@@ -258,7 +260,7 @@ server.tool({
       const result = await performOperation(params)
       logger.debug('Tool result', { result })
 
-      return { content: [{ type: 'text', text: result }] }
+      return text(result)
     } catch (error) {
       logger.error('Tool error', { error: error.message, stack: error.stack })
       throw error
@@ -411,49 +413,35 @@ const server = new MCPServer({
 Validate and sanitize all inputs:
 
 ```typescript
+import { error, text } from 'mcp-use/server'
 import validator from 'validator'
+import { z } from 'zod'
 import DOMPurify from 'isomorphic-dompurify'
 
 server.tool({
   name: 'process_input',
-  inputs: [
-    { name: 'email', type: 'string', required: true },
-    { name: 'url', type: 'string', required: true },
-    { name: 'html', type: 'string', required: false }
-  ],
-  cb: async ({ email, url, html }) => {
+  schema: z.object({
+    email: z.string().describe('The email address to validate'),
+    url: z.string().describe('The URL to validate'),
+    html: z.string().describe('The HTML to sanitize').optional()
+  }),
+}, async ({ email, url, html }) => {
     // Validate email
     if (!validator.isEmail(email)) {
-      return {
-        content: [{
-          type: 'text',
-          text: 'Invalid email address'
-        }]
-      }
+      return error('Invalid email address');
     }
 
     // Validate URL
     if (!validator.isURL(url, { require_protocol: true })) {
-      return {
-        content: [{
-          type: 'text',
-          text: 'Invalid URL'
-        }]
-      }
+      return error('Invalid URL');
     }
 
     // Sanitize HTML if provided
     const cleanHtml = html ? DOMPurify.sanitize(html) : ''
 
     // Process validated inputs
-    return {
-      content: [{
-        type: 'text',
-        text: 'Inputs validated and processed'
-      }]
-    }
-  }
-})
+    return text('Inputs validated and processed');
+  });
 ```
 
 ### Secure Headers
