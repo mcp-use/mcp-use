@@ -1,5 +1,25 @@
 # mcp-use
 
+## 1.11.2-canary.1
+
+### Patch Changes
+
+- 681c929: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [681c929]
+- Updated dependencies [681c929]
+  - @mcp-use/cli@2.7.0-canary.1
+  - @mcp-use/inspector@0.13.2-canary.1
+
+## 1.11.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [0f3550c]
+- Updated dependencies [0f3550c]
+- Updated dependencies [0f3550c]
+  - @mcp-use/cli@2.7.0-canary.0
+  - @mcp-use/inspector@0.13.2-canary.0
+
 ## 1.11.1
 
 ### Patch Changes
@@ -1423,7 +1443,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -1736,7 +1756,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -1948,7 +1968,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy

@@ -111,7 +111,7 @@ describe("Widget Data Flow", () => {
           }));
 
           return widget({
-            data: {
+            props: {
               rows,
               tableName,
             },
@@ -132,7 +132,7 @@ describe("Widget Data Flow", () => {
       );
 
       // Verify response structure
-      expect(result.content[0].text).toBe(
+      expect((result.content as any)[0]?.text).toBe(
         "Retrieved 100 rows from users table"
       );
       // Widget data is available in _meta["mcp-use/props"]
@@ -181,7 +181,7 @@ describe("Widget Data Flow", () => {
           const total = 100;
 
           return widget({
-            data: { items, total, category },
+            props: { items, total, category },
             message: `Found ${total} items in ${category}`,
           });
         }
@@ -197,7 +197,9 @@ describe("Widget Data Flow", () => {
       );
 
       // Verify response structure
-      expect(result.content[0].text).toBe("Found 100 items in electronics");
+      expect((result.content as any)[0]?.text).toBe(
+        "Found 100 items in electronics"
+      );
       expect((result as any)._meta["mcp-use/props"]).toEqual({
         items: [1, 2, 3],
         total: 100,
@@ -238,7 +240,7 @@ describe("Widget Data Flow", () => {
         },
         async ({ query }) => {
           return widget({
-            data: {
+            props: {
               results: ["result1", "result2"],
               metadata: { page: 1, total: 50 },
             },
@@ -260,7 +262,7 @@ describe("Widget Data Flow", () => {
       );
 
       // Verify response structure - object should be stringified in content
-      const parsedOutput = JSON.parse(result.content[0].text);
+      const parsedOutput = JSON.parse((result.content as any)[0]?.text);
       expect(parsedOutput.summary).toBe(
         'Search for "test query" returned 50 results'
       );
@@ -304,7 +306,7 @@ describe("Widget Data Flow", () => {
         },
         async ({ id }) => {
           return widget({
-            data: { id, value: "test" },
+            props: { id, value: "test" },
             message: "Legacy message format", // Deprecated but should still work
           });
         }
@@ -317,7 +319,7 @@ describe("Widget Data Flow", () => {
       const result = await toolHandler!.handler({ id: "123" }, {} as any);
 
       // Verify response structure
-      expect(result.content[0].text).toBe("Legacy message format");
+      expect((result.content as any)[0]?.text).toBe("Legacy message format");
       // structuredContent should contain the data when no output is provided
       expect((result as any).structuredContent).toEqual({
         id: "123",
@@ -360,7 +362,7 @@ describe("Widget Data Flow", () => {
         },
         async ({ value }) => {
           return widget({
-            data: { value },
+            props: { value },
             message: "This should be used (message takes precedence)",
             output: text("This should be ignored"),
           });
@@ -374,7 +376,7 @@ describe("Widget Data Flow", () => {
       const result = await toolHandler!.handler({ value: 42 }, {} as any);
 
       // Verify message takes precedence over output.content
-      expect(result.content[0].text).toBe(
+      expect((result.content as any)[0]?.text).toBe(
         "This should be used (message takes precedence)"
       );
     });
@@ -404,7 +406,7 @@ describe("Widget Data Flow", () => {
         },
         async ({ count }) => {
           return widget({
-            data: { items: Array(count).fill(0), count },
+            props: { items: Array(count).fill(0), count },
             output: text(`Found ${count} items`),
           });
         }
@@ -413,7 +415,7 @@ describe("Widget Data Flow", () => {
       const toolHandler = server.registrations.tools.get("text-tool");
       const result = await toolHandler!.handler({ count: 5 }, {} as any);
 
-      expect(result.content[0].text).toBe("Found 5 items");
+      expect((result.content as any)[0]?.text).toBe("Found 5 items");
       expect((result as any)._meta["mcp-use/props"].count).toBe(5);
     });
 
@@ -440,7 +442,7 @@ describe("Widget Data Flow", () => {
         },
         async ({ id }) => {
           return widget({
-            data: { fullData: { id, value: "data" } },
+            props: { fullData: { id, value: "data" } },
             output: object({ summary: `ID: ${id}`, status: "success" }),
           });
         }
@@ -449,7 +451,7 @@ describe("Widget Data Flow", () => {
       const toolHandler = server.registrations.tools.get("object-tool");
       const result = await toolHandler!.handler({ id: "abc123" }, {} as any);
 
-      const parsedOutput = JSON.parse(result.content[0].text);
+      const parsedOutput = JSON.parse((result.content as any)[0]?.text);
       expect(parsedOutput.summary).toBe("ID: abc123");
       expect(parsedOutput.status).toBe("success");
       expect((result as any)._meta["mcp-use/props"].fullData.id).toBe("abc123");
@@ -480,7 +482,7 @@ describe("Widget Data Flow", () => {
           const data = { records: [1, 2, 3], type };
           // Generate output based on data
           return widget({
-            data,
+            props: data,
             output: text(`${data.type}: ${data.records.length} records`),
           });
         }
@@ -489,7 +491,7 @@ describe("Widget Data Flow", () => {
       const toolHandler = server.registrations.tools.get("function-tool");
       const result = await toolHandler!.handler({ type: "users" }, {} as any);
 
-      expect(result.content[0].text).toBe("users: 3 records");
+      expect((result.content as any)[0]?.text).toBe("users: 3 records");
       expect((result as any)._meta["mcp-use/props"].type).toBe("users");
     });
   });

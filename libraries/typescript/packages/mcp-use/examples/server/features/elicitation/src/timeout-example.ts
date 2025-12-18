@@ -21,7 +21,6 @@ server.tool(
   {
     name: "collect-feedback",
     description: "Collect user feedback with no timeout",
-    inputs: [],
   },
   async (params, ctx) => {
     // No timeout specified - waits indefinitely for user
@@ -55,7 +54,6 @@ server.tool(
   {
     name: "quick-confirmation",
     description: "Quick confirmation with 30-second timeout",
-    inputs: [],
   },
   async (params, ctx) => {
     try {
@@ -104,7 +102,6 @@ server.tool(
   {
     name: "timed-authorization",
     description: "Authorization with 2-minute timeout",
-    inputs: [],
   },
   async (params, ctx) => {
     try {

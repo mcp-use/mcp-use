@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.6.1",
+    "create-mcp-use-app": "0.9.2",
+    "@mcp-use/inspector": "0.13.1",
+    "mcp-use": "1.11.1"
+  },
+  "changesets": [
+    "cozy-pants-jog",
+    "hip-goats-hug",
+    "hot-plants-walk",
+    "lazy-books-burn",
+    "warm-toys-accept"
+  ]
+}

@@ -95,22 +95,11 @@ server.tool({
   name: 'get_weather',
   title: 'Get Weather',
   description: 'Get current weather for a city',
-  inputs: [
-    {
-      name: 'city',
-      type: 'string',
-      description: 'City name',
-      required: true
-    },
-    {
-      name: 'units',
-      type: 'string',
-      description: 'Temperature units (celsius or fahrenheit)',
-      required: false,
-      default: 'fahrenheit'
-    }
-  ],
-  cb: async ({ city, units = 'fahrenheit' }) => {
+  schema: z.object({
+    city: z.string().describe('City name'),
+    units: z.string().describe('Temperature units (celsius or fahrenheit)').optional().default('fahrenheit')
+  }),
+}, async ({ city, units = 'fahrenheit' }) => {
     try {
       const weather = await weatherService.getCurrentWeather(city)
 
@@ -119,56 +108,30 @@ server.tool({
         temp = Math.round((temp - 32) * 5 / 9)
       }
 
-      return {
-        content: [{
-          type: 'text',
-          text: `Weather in ${city}:\n` +
+      return text(`Weather in ${city}:\n` +
                 `Temperature: ${temp}°${units === 'celsius' ? 'C' : 'F'}\n` +
                 `Condition: ${weather.condition}\n` +
                 `Humidity: ${weather.humidity}%\n` +
                 `Wind Speed: ${weather.windSpeed} mph\n` +
-                `Pressure: ${weather.pressure} mb`
-        }]
-      }
+                `Pressure: ${weather.pressure} mb`);
     } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error fetching weather for ${city}: ${error.message}`
-        }]
-      }
+      return error(`Error fetching weather for ${city}: ${error.message}`);
     }
   }
-})
+);
 
 // Tool: Get forecast
 server.tool({
   name: 'get_forecast',
   title: 'Get Weather Forecast',
   description: 'Get weather forecast for multiple days',
-  inputs: [
-    {
-      name: 'city',
-      type: 'string',
-      description: 'City name',
-      required: true
-    },
-    {
-      name: 'days',
-      type: 'number',
-      description: 'Number of days (1-7)',
-      required: false,
-      default: 3
-    }
-  ],
-  cb: async ({ city, days = 3 }) => {
+  schema: z.object({
+    city: z.string().describe('City name'),
+    days: z.number().describe('Number of days (1-7)').optional().default(3)
+  }),
+}, async ({ city, days = 3 }) => {
     if (days < 1 || days > 7) {
-      return {
-        content: [{
-          type: 'text',
-          text: 'Please specify days between 1 and 7'
-        }]
-      }
+      return error('Please specify days between 1 and 7');
     }
 
     try {
@@ -180,22 +143,12 @@ server.tool({
         `  Precipitation: ${day.precipitation}%`
       ).join('\n\n')
 
-      return {
-        content: [{
-          type: 'text',
-          text: `${days}-day forecast for ${city}:\n\n${forecastText}`
-        }]
-      }
+      return text(`${days}-day forecast for ${city}:\n\n${forecastText}`);
     } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error fetching forecast: ${error.message}`
-        }]
-      }
+      return error(`Error fetching forecast: ${error.message}`);
     }
   }
-})
+);
 
 // Resource: Current conditions for all monitored cities
 server.resource({
@@ -208,23 +161,14 @@ server.resource({
     audience: ['user', 'assistant'],
     priority: 0.8
   },
-  readCallback: async () => {
+}, async () => {
     const cities = ['New York', 'London', 'Tokyo', 'Paris', 'Sydney']
-    const weatherData: Record<string, WeatherData> = {}
-
-    for (const city of cities) {
-      weatherData[city] = await weatherService.getCurrentWeather(city)
-    }
-
-    return {
-      contents: [{
-        uri: 'weather://monitored',
-        mimeType: 'application/json',
-        text: JSON.stringify(weatherData, null, 2)
-      }]
-    }
+    return object(cities.map(city => ({
+      city,
+      weather: await weatherService.getCurrentWeather(city)
+    })));
   }
-})
+);
 
 // Resource Template: City-specific weather
 server.resourceTemplate({
@@ -235,53 +179,33 @@ server.resourceTemplate({
     description: 'Weather data for a specific city',
     mimeType: 'application/json'
   },
-  readCallback: async (uri, params) => {
+}, async (uri, params) => {
     try {
       const weather = await weatherService.getCurrentWeather(params.cityName)
       const forecast = await weatherService.getForecast(params.cityName, 3)
 
-      return {
-        contents: [{
-          uri: uri.toString(),
-          mimeType: 'application/json',
-          text: JSON.stringify({
-            city: params.cityName,
-            current: weather,
-            forecast,
-            timestamp: new Date().toISOString()
-          }, null, 2)
-        }]
-      }
+      return object({
+        city: params.cityName,
+        current: weather,
+        forecast,
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
-      return {
-        contents: [{
-          uri: uri.toString(),
-          mimeType: 'text/plain',
-          text: `Error: Unable to fetch weather for ${params.cityName}`
-        }]
-      }
+      return error(`Error: Unable to fetch weather for ${params.cityName}`);
     }
   }
-})
+);
 
 // Prompt: Weather report generation
 server.prompt({
   name: 'weather_report',
   title: 'Weather Report Prompt',
   description: 'Generate a weather report prompt',
-  args: [
-    {
-      name: 'city',
-      type: 'string',
-      required: true
-    },
-    {
-      name: 'style',
-      type: 'string',
-      required: false
-    }
-  ],
-  cb: async ({ city, style = 'professional' }) => {
+  schema: z.object({
+    city: z.string().describe('City to display'),
+    style: z.string().describe('Style of the report').optional().default('professional')
+  }),
+}, async ({ city, style = 'professional' }) => {
     const weather = await weatherService.getCurrentWeather(city)
     const forecast = await weatherService.getForecast(city, 3)
 
@@ -289,7 +213,7 @@ server.prompt({
       professional: 'Use a professional, meteorological tone',
       casual: 'Use a friendly, conversational tone',
       brief: 'Be concise and to the point'
-    }
+    };
 
     return {
       messages: [
@@ -304,7 +228,7 @@ server.prompt({
       ]
     }
   }
-})
+)
 
 // UI Widget: Weather Dashboard
 server.uiResource({
@@ -313,25 +237,11 @@ server.uiResource({
   widget: 'weather-dashboard',
   title: 'Weather Dashboard',
   description: 'Interactive weather visualization',
-  props: {
-    city: {
-      type: 'string',
-      description: 'City to display',
-      required: true
-    },
-    showForecast: {
-      type: 'boolean',
-      description: 'Show forecast section',
-      required: false,
-      default: true
-    },
-    theme: {
-      type: 'string',
-      description: 'Dashboard theme (light or dark)',
-      required: false,
-      default: 'light'
-    }
-  },
+  schema: z.object({
+    city: z.string().describe('City to display'),
+    showForecast: z.boolean().describe('Show forecast section').optional().default(true),
+    theme: z.string().describe('Dashboard theme (light or dark)').optional().default('light')
+  }),
   size: ['800px', '600px'],
   annotations: {
     audience: ['user'],
@@ -407,37 +317,16 @@ server.tool({
   name: 'execute_query',
   title: 'Execute SQL Query',
   description: 'Execute a SQL query against the database',
-  inputs: [
-    {
-      name: 'query',
-      type: 'string',
-      description: 'SQL query to execute',
-      required: true
-    },
-    {
-      name: 'params',
-      type: 'array',
-      description: 'Query parameters for prepared statement',
-      required: false
-    },
-    {
-      name: 'limit',
-      type: 'number',
-      description: 'Maximum number of rows to return',
-      required: false,
-      default: 100
-    }
-  ],
-  cb: async ({ query, params = [], limit = 100 }) => {
+  schema: z.object({
+    query: z.string().describe('SQL query to execute'),
+    params: z.array(z.string()).describe('Query parameters for prepared statement').optional(),
+    limit: z.number().describe('Maximum number of rows to return').optional().default(100)
+  }),
+}, async ({ query, params = [], limit = 100 }) => {
     // Security: Only allow SELECT queries in this example
     const normalizedQuery = query.trim().toLowerCase()
     if (!normalizedQuery.startsWith('select')) {
-      return {
-        content: [{
-          type: 'text',
-          text: 'Error: Only SELECT queries are allowed'
-        }]
-      }
+      return error('Error: Only SELECT queries are allowed')
     }
 
     try {
@@ -449,38 +338,23 @@ server.tool({
 
       const result = await pool.query(finalQuery, params)
 
-      return {
-        content: [{
-          type: 'text',
-          text: `Query executed successfully.\nRows returned: ${result.rowCount}\n\n` +
-                `Results:\n${JSON.stringify(result.rows, null, 2)}`
-        }]
-      }
+      return text(`Query executed successfully.\nRows returned: ${result.rowCount}\n\n` +
+                `Results:\n${JSON.stringify(result.rows, null, 2)}`)
     } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Query error: ${error.message}`
-        }]
-      }
+      return error(`Query error: ${error.message}`)
     }
   }
-})
+)
 
 // Tool: Get table schema
 server.tool({
   name: 'get_schema',
   title: 'Get Table Schema',
   description: 'Get the schema of a database table',
-  inputs: [
-    {
-      name: 'tableName',
-      type: 'string',
-      description: 'Name of the table',
-      required: true
-    }
-  ],
-  cb: async ({ tableName }) => {
+  schema: z.object({
+    tableName: z.string().describe('Name of the table'),
+  }),
+}, async ({ tableName }) => {
     try {
       const query = `
         SELECT
@@ -497,12 +371,7 @@ server.tool({
       const result = await pool.query(query, [tableName])
 
       if (result.rows.length === 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Table '${tableName}' not found`
-          }]
-        }
+        return error(`Table '${tableName}' not found`)
       }
 
       const schema = result.rows.map(col =>
@@ -512,22 +381,12 @@ server.tool({
         `${col.column_default ? ` DEFAULT ${col.column_default}` : ''}`
       ).join('\n')
 
-      return {
-        content: [{
-          type: 'text',
-          text: `Schema for table '${tableName}':\n\n${schema}`
-        }]
-      }
+      return text(`Schema for table '${tableName}':\n\n${schema}`)
     } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error fetching schema: ${error.message}`
-        }]
-      }
+      return error(`Error fetching schema: ${error.message}`)
     }
   }
-})
+)
 
 // Resource: Database statistics
 server.resource({
@@ -540,7 +399,7 @@ server.resource({
     audience: ['assistant'],
     priority: 0.7
   },
-  readCallback: async () => {
+}, async () => {
     try {
       const stats = await pool.query(`
         SELECT
@@ -559,47 +418,27 @@ server.resource({
         LIMIT 10
       `)
 
-      return {
-        contents: [{
-          uri: 'db://statistics',
-          mimeType: 'application/json',
-          text: JSON.stringify({
-            overview: stats.rows[0],
-            topTables: tableStats.rows,
-            timestamp: new Date().toISOString()
-          }, null, 2)
-        }]
-      }
+      return object({
+        overview: stats.rows[0],
+        topTables: tableStats.rows,
+        timestamp: new Date().toISOString()
+      })
     } catch (error) {
-      return {
-        contents: [{
-          uri: 'db://statistics',
-          mimeType: 'text/plain',
-          text: `Error fetching statistics: ${error.message}`
-        }]
-      }
+      return error(`Error fetching statistics: ${error.message}`)
     }
   }
-})
+)
 
 // Prompt: Query generation
 server.prompt({
   name: 'generate_query',
   title: 'SQL Query Generation',
   description: 'Generate SQL query from natural language',
-  args: [
-    {
-      name: 'description',
-      type: 'string',
-      required: true
-    },
-    {
-      name: 'tables',
-      type: 'array',
-      required: false
-    }
-  ],
-  cb: async ({ description, tables = [] }) => {
+  schema: z.object({
+    description: z.string().describe('Description of the query to generate'),
+    tables: z.array(z.string()).describe('Tables to use in the query').optional(),
+  }),
+}, async ({ description, tables = [] }) => {
     // Get available tables if not provided
     if (tables.length === 0) {
       const result = await pool.query(`
@@ -629,7 +468,7 @@ server.prompt({
       ]
     }
   }
-})
+)
 
 // UI Widget: Query Builder
 server.uiResource({
@@ -741,123 +580,47 @@ function validatePath(filePath: string): string {
 server.tool({
   name: 'list_directory',
   description: 'List contents of a directory',
-  inputs: [
-    {
-      name: 'path',
-      type: 'string',
-      description: 'Directory path relative to base',
-      required: false,
-      default: '.'
-    },
-    {
-      name: 'showHidden',
-      type: 'boolean',
-      description: 'Show hidden files',
-      required: false,
-      default: false
-    }
-  ],
-  cb: async ({ path: dirPath = '.', showHidden = false }) => {
+  schema: z.object({
+    path: z.string().describe('Directory path relative to base').optional().default('.'),
+    showHidden: z.boolean().describe('Show hidden files').optional().default(false),
+  }),
+}, async ({ path: dirPath = '.', showHidden = false }) => {   
     try {
       const fullPath = validatePath(dirPath)
       const items = await fs.readdir(fullPath, { withFileTypes: true })
-
-      const entries = await Promise.all(
-        items
-          .filter(item => showHidden || !item.name.startsWith('.'))
-          .map(async item => {
-            const itemPath = path.join(fullPath, item.name)
-            const stats = await fs.stat(itemPath)
-
-            return {
-              name: item.name,
-              type: item.isDirectory() ? 'directory' : 'file',
-              size: stats.size,
-              modified: stats.mtime.toISOString()
-            }
-          })
-      )
-
-      const formatted = entries
-        .sort((a, b) => {
-          if (a.type !== b.type) return a.type === 'directory' ? -1 : 1
-          return a.name.localeCompare(b.name)
-        })
-        .map(entry =>
-          `${entry.type === 'directory' ? '📁' : '📄'} ${entry.name}` +
-          ` (${entry.type === 'file' ? `${entry.size} bytes` : 'directory'})`
-        )
-        .join('\n')
-
-      return {
-        content: [{
-          type: 'text',
-          text: `Contents of ${dirPath}:\n\n${formatted}`
-        }]
-      }
+      return text(`Contents of ${dirPath}:\n\n${items.join('\n')}`)
     } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error listing directory: ${error.message}`
-        }]
-      }
+      return error(`Error listing directory: ${error.message}`)
     }
   }
-})
+)
 
 // Tool: Read file content
 server.tool({
   name: 'read_file',
   description: 'Read the contents of a file',
-  inputs: [
-    {
-      name: 'path',
-      type: 'string',
-      description: 'File path relative to base',
-      required: true
-    },
-    {
-      name: 'encoding',
-      type: 'string',
-      description: 'File encoding (utf8, base64, etc)',
-      required: false,
-      default: 'utf8'
-    }
-  ],
-  cb: async ({ path: filePath, encoding = 'utf8' }) => {
+  schema: z.object({
+    path: z.string().describe('File path relative to base'),
+    encoding: z.string().describe('File encoding (utf8, base64, etc)').optional().default('utf8'),
+  }),
+}, async ({ path: filePath, encoding = 'utf8' }) => {
     try {
       const fullPath = validatePath(filePath)
       const stats = await fs.stat(fullPath)
 
       if (stats.size > MAX_FILE_SIZE) {
-        return {
-          content: [{
-            type: 'text',
-            text: `File too large (${stats.size} bytes). Maximum size: ${MAX_FILE_SIZE} bytes`
-          }]
-        }
+        return error(`File too large (${stats.size} bytes). Maximum size: ${MAX_FILE_SIZE} bytes`)
       }
 
       const content = await fs.readFile(fullPath, encoding as any)
       const mimeType = mime.lookup(fullPath) || 'text/plain'
 
-      return {
-        content: [{
-          type: 'text',
-          text: `File: ${filePath}\nType: ${mimeType}\nSize: ${stats.size} bytes\n\n---\n\n${content}`
-        }]
-      }
+      return text(`File: ${filePath}\nType: ${mimeType}\nSize: ${stats.size} bytes\n\n---\n\n${content}`)
     } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error reading file: ${error.message}`
-        }]
-      }
+      return error(`Error reading file: ${error.message}`)
     }
   }
-})
+)
 
 // Resource Template: File access
 server.resourceTemplate({
@@ -867,56 +630,32 @@ server.resourceTemplate({
     name: 'File Content',
     description: 'Access file contents'
   },
-  readCallback: async (uri, params) => {
+}, async (uri, params) => {
     try {
       const fullPath = validatePath(params.path)
       const stats = await fs.stat(fullPath)
       const mimeType = mime.lookup(fullPath) || 'application/octet-stream'
 
       if (stats.size > MAX_FILE_SIZE) {
-        return {
-          contents: [{
-            uri: uri.toString(),
-            mimeType: 'text/plain',
-            text: `File too large: ${stats.size} bytes`
-          }]
-        }
+        return error(`File too large: ${stats.size} bytes`)
       }
 
       // Determine how to read based on MIME type
       if (mimeType.startsWith('text/') || mimeType === 'application/json') {
         const content = await fs.readFile(fullPath, 'utf8')
-        return {
-          contents: [{
-            uri: uri.toString(),
-            mimeType,
-            text: content
-          }]
-        }
+        return text(content)
       } else {
         const content = await fs.readFile(fullPath)
-        return {
-          contents: [{
-            uri: uri.toString(),
-            mimeType,
-            blob: content.toString('base64')
-          }]
-        }
+        return binary(content.toString('base64'), mimeType)
       }
     } catch (error) {
-      return {
-        contents: [{
-          uri: uri.toString(),
-          mimeType: 'text/plain',
-          text: `Error: ${error.message}`
-        }]
-      }
+      return error(`Error: ${error.message}`)
     }
   }
-})
+)
 
 // Start server
-server.listen(3000)
+await server.listen(3000)
 ```
 
 ## Best Practices Summary

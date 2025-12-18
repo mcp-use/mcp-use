@@ -93,7 +93,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'My widget description',
-  inputs: propSchema,
+  props: propSchema,
   // exposeAsTool defaults to true - widget auto-registers as tool
 };
 
@@ -117,7 +117,7 @@ You can prevent auto-registration and create custom tools using the `widget()` h
 // In your widget file
 export const widgetMetadata: WidgetMetadata = {
   description: 'Weather display widget',
-  inputs: propSchema,
+  props: propSchema,
   exposeAsTool: false,  // Don't auto-register as tool
 };
 
@@ -126,12 +126,16 @@ import { widget } from 'mcp-use/server';
 
 server.tool({
   name: 'get-current-weather',
-  inputs: z.object({ city: z.string() }),
+  schema: z.object({ city: z.string() }),
+  widget: {
+    name: 'weather-display',  // Configure widget at registration time
+    invoking: 'Fetching weather...',
+    invoked: 'Weather loaded'
+  }
 }, async ({ city }) => {
   const weatherData = await fetchWeather(city);
   return widget({
-    name: 'weather-display',
-    data: weatherData,
+    props: weatherData,  // Runtime data only
     message: `Current weather in ${city}`
   });
 });
@@ -174,7 +178,7 @@ const MyWidget: React.FC = () => {
 
 ### Defining Widget Metadata
 
-Use Zod schemas to define widget inputs:
+Use Zod schemas to define widget props:
 
 ```typescript
 import { z } from 'zod';
@@ -188,7 +192,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display user information',
-  inputs: propSchema,
+  props: propSchema,
 };
 ```
 
@@ -337,7 +341,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display a message',
-  inputs: propSchema,
+  props: propSchema,
 };
 
 type Props = z.infer<typeof propSchema>;
@@ -362,11 +366,13 @@ export default MyWidget;
 You can mix Apps SDK widgets with regular MCP tools:
 
 ```typescript
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: 'get-data',
   description: 'Fetch data from API',
   cb: async () => {
-    return { content: [{ type: 'text', text: 'Data' }] };
+    return text('Data');
   },
 });
 ```

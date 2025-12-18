@@ -1270,6 +1270,18 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  * ```
  */
 
+/**
+ * @deprecated Use `new MCPServer({ name, ... })` instead. This factory function is maintained for backward compatibility.
+ *
+ * @example
+ * ```typescript
+ * // Old (deprecated)
+ * const server = createMCPServer('my-server', { version: '1.0.0' })
+ *
+ * // New (recommended)
+ * const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
+ * ```
+ */
 // Overload: when OAuth is configured
 
 export function createMCPServer(

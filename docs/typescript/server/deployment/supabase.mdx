@@ -237,11 +237,13 @@ const server = new MCPServer({
 });
 
 // Define your tools
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: "get-my-city",
   description: "Get my city",
   cb: async () => {
-    return { content: [{ type: "text", text: `My city is San Francisco` }] };
+    return text(`My city is San Francisco`);
   },
 });
 await server.listen();

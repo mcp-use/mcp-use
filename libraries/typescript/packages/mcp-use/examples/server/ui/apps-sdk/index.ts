@@ -142,7 +142,7 @@ server.tool(
 
     // Return widget with runtime data only
     return widget({
-      data: {
+      props: {
         city,
         temperature: weather.temperature,
         conditions: weather.conditions,

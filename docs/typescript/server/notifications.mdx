@@ -137,17 +137,19 @@ Progress notifications (`notifications/progress`) are used to keep clients infor
 When using `ctx.sample()` in tool callbacks, progress notifications are automatically sent every 5 seconds:
 
 ```typescript
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: 'long_llm_task',
   cb: async (params, ctx?: ToolContext) => {
-    if (!ctx) return { content: [{ type: 'text', text: 'No context' }] }
+    if (!ctx) return text('No context')
     
     // Progress notifications are sent automatically every 5 seconds
     const result = await ctx.sample({
       messages: [{ role: 'user', content: { type: 'text', text: params.prompt } }]
     })
     
-    return { content: [{ type: 'text', text: result.content.text }] }
+    return text(result.content.text)
   }
 })
 ```
@@ -157,6 +159,8 @@ server.tool({
 You can also send progress notifications manually using `ctx.reportProgress()`:
 
 ```typescript
+import { text } from 'mcp-use/server';
+
 server.tool({
   name: 'process_data',
   cb: async (params, ctx?: ToolContext) => {
@@ -174,7 +178,7 @@ server.tool({
       await ctx.reportProgress(100, 100, 'Complete')
     }
     
-    return { content: [{ type: 'text', text: 'Done' }] }
+    return text('Done')
   }
 })
 ```
