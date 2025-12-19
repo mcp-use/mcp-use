@@ -88,6 +88,32 @@ Switch to a different server's detail view.
 3. Select server from results
 4. Inspector navigates to that server's view
 
+### Add to Client
+
+**Actions:** "Open in Cursor", "Open in Claude Code", "Open in Claude Desktop", "Open in VS Code", "Open in Gemini CLI", "Open in Codex CLI"
+
+Quickly add the current MCP server to various AI clients and code editors. Each action provides the appropriate installation method:
+
+- **Cursor & VS Code**: Deep links that open the client's MCP installation dialog
+- **Claude Desktop**: Downloads a `.mcpb` configuration file
+- **Claude Code, Gemini CLI, Codex CLI**: Copies CLI commands or configuration to clipboard
+
+<Frame>
+  <img src="/images/inspector/cmd-k-add-to-client.png" alt="Add to Client commands in Command Palette" />
+</Frame>
+
+You can also access these options via the "Add to Client" dropdown button in the header:
+
+<Frame>
+  <img src="/images/inspector/add-to-client-dropdown.png" alt="Add to Client dropdown menu" />
+</Frame>
+
+**Workflow:**
+1. Press `Cmd/Ctrl + K`
+2. Type "Open in" or the client name (e.g., "Cursor", "VS Code")
+3. Select the desired client
+4. Follow the installation instructions (deep link opens automatically, or command/config is copied to clipboard)
+
 ### Documentation Links
 
 Access documentation and resources:
@@ -107,6 +133,10 @@ Results are organized into categories for easy navigation:
 ### Navigation
 
 Global navigation actions like "Connect Server".
+
+### Open in Client
+
+Quick actions to add the current MCP server to various AI clients and code editors. Each client has its own icon for easy identification.
 
 ### Connected Servers
 
@@ -182,6 +212,7 @@ The command palette uses icons to identify item types:
 - 🔗 **Link**: External links
 - 💬 **Discord**: Community links
 - 🖥️ **Server**: Server connections
+- **Client Icons**: Each "Open in Client" command displays the client's icon (Cursor, Claude, VS Code, Gemini, Codex)
 
 ## Tips and Tricks
 

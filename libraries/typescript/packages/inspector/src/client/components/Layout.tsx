@@ -36,6 +36,7 @@ export function Layout({ children }: LayoutProps) {
     setActiveTab,
     navigateToItem,
     setTunnelUrl,
+    tunnelUrl,
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -461,6 +462,8 @@ export function Layout({ children }: LayoutProps) {
           resources={aggregatedResources}
           savedRequests={savedRequests}
           connections={connections}
+          selectedServer={selectedServer}
+          tunnelUrl={tunnelUrl}
           onNavigate={handleCommandPaletteNavigate}
           onServerSelect={handleServerSelect}
         />
