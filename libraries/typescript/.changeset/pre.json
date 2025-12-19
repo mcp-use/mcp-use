@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.13.2",
     "mcp-use": "1.11.2"
   },
-  "changesets": []
+  "changesets": [
+    "neat-shirts-grin"
+  ]
 }

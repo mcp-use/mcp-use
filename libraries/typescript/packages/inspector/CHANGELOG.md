@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.14.0-canary.0
+
+### Minor Changes
+
+- 841cccf: feat(inspector): added support for prompt rendering and add to client dropdown
+
+### Patch Changes
+
+- mcp-use@1.11.3-canary.0
+
 ## 0.13.2
 
 ### Patch Changes
