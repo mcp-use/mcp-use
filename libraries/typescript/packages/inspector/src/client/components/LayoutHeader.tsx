@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AddToClientDropdown } from "./AddToClientDropdown";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
@@ -121,7 +122,7 @@ export function LayoutHeader({
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const handleCopy = async () => {
     if (!tunnelUrl) return;
@@ -161,6 +162,14 @@ export function LayoutHeader({
 
           {/* Right: GitHub and Theme Icons */}
           <div className="flex-1 flex justify-end items-center gap-2">
+            {selectedServer && (
+              <AddToClientDropdown
+                serverUrl={tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url}
+                serverName={selectedServer.name}
+                headers={selectedServer.customHeaders}
+                className="p-2"
+              />
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="sm" asChild>
@@ -379,8 +388,15 @@ export function LayoutHeader({
           )}
         </div>
 
-        {/* Right side: Theme Toggle + Command Palette + GitHub Button + Logo */}
+        {/* Right side: Add to Client + Theme Toggle + Command Palette + GitHub Button + Logo */}
         <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          {selectedServer && (
+            <AddToClientDropdown
+              serverUrl={tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url}
+              serverName={selectedServer.name}
+              headers={selectedServer.customHeaders}
+            />
+          )}
           <Tooltip>
             <TooltipTrigger>
               <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
