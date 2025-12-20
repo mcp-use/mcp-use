@@ -159,7 +159,7 @@ def get_time() -> str:
     return datetime.now().isoformat()
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", debug=True)
+    server.run(transport="streamable-http", run_debug=True)
 ```
 
 ### Transport Options
@@ -179,7 +179,7 @@ server.run(transport="streamable-http", host="0.0.0.0", port=8000)
 Enable debug mode for development features:
 
 ```python
-server = MCPServer(name="My Server", debug=True)
+server = MCPServer(name="My Server", run_debug=True)
 ```
 
 Debug mode provides:
