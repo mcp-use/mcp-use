@@ -1,0 +1,106 @@
+{
+  "name": "MCP-Use Development Environment",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bookworm",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12",
+      "installTools": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20",
+      "nodeGypDependencies": true,
+      "pnpmVersion": "latest"
+    },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "github.copilot",
+        "redhat.vscode-yaml",
+        "bradlc.vscode-tailwindcss"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.formatting.provider": "black",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ]
+      }
+    }
+  },
+  
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  
+  "forwardPorts": [
+    3000,
+    8000,
+    8080
+  ],
+  
+  "portsAttributes": {
+    "3000": {
+      "label": "MCP Inspector",
+      "onAutoForward": "notify"
+    },
+    "8000": {
+      "label": "Python Dev Server",
+      "onAutoForward": "silent"
+    },
+    "8080": {
+      "label": "Additional Dev Server",
+      "onAutoForward": "silent"
+    }
+  },
+  
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/node/.ssh,readonly,type=bind,consistency=cached"
+  ],
+  
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/workspace/node_modules/.bin",
+    "PYTHONPATH": "/workspace/libraries/python:${containerEnv:PYTHONPATH}"
+  },
+  
+  "containerEnv": {
+    "UV_INDEX": "${localEnv:UV_INDEX}",
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
+  },
+  
+  "remoteUser": "node",
+  
+  "workspaceFolder": "/workspace",
+  
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+}
