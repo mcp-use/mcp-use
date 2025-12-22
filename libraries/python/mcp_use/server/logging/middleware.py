@@ -54,11 +54,16 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request_with_body)
 
         # Capture response body for logging (need to read and reconstruct)
+        # Skip for streaming responses (SSE) as capturing breaks the stream
         # Limit to 1MB to prevent memory issues with large responses
         max_body_size = 1024 * 1024
         response_body: bytes | None = None
         response_too_large = False
-        if self.debug_level >= 2 and method_info:
+        is_streaming = (
+            response.headers.get("content-type", "").startswith("text/event-stream")
+            or response.status_code == 202  # Accepted - usually means async/streaming
+        )
+        if (self.debug_level >= 2 or self.pretty_print_jsonrpc) and method_info and not is_streaming:
             body_iterator = getattr(response, "body_iterator", None)
             if body_iterator is not None:
                 chunks = []
@@ -83,8 +88,8 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         if method_info:
             await self._log_access_info(request, method_info, response, start_time)
 
-        # Log debug info only in DEBUG=2 mode
-        if self.debug_level >= 2 and method_info:
+        # Log debug info in DEBUG=2 mode OR when pretty_print_jsonrpc is enabled
+        if (self.debug_level >= 2 or self.pretty_print_jsonrpc) and method_info:
             await self._log_debug_info(request, method_info, body_bytes, response_body, start_time, response_too_large)
 
         return response
@@ -150,7 +155,7 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
             except json.JSONDecodeError:
                 request_formatted = request_text
 
-            syntax = Syntax(request_formatted, "json", theme=CODE_THEME)
+            syntax = Syntax(request_formatted, "json", theme=CODE_THEME, word_wrap=True)
             _console.print(
                 Panel(
                     syntax,
@@ -168,7 +173,7 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
                     response_formatted = json.dumps(response_json, indent=2)
                 except json.JSONDecodeError:
                     response_formatted = response_text
-                syntax = Syntax(response_formatted, "json", theme=CODE_THEME)
+                syntax = Syntax(response_formatted, "json", theme=CODE_THEME, word_wrap=True)
                 _console.print(Panel(syntax, title=f"[bold cyan]{display}[/] Response", title_align="left"))
             elif response_too_large:
                 _console.print(f"[dim]{display} Response: <response too large to display>[/dim]")
