@@ -31,9 +31,7 @@ class ConnectionGuard(Middleware):
 class LoggingMiddleware(Middleware):
     """Minimal logging."""
 
-    async def on_request(
-        self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]
-    ) -> Any:
+    async def on_request(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
         start = time.time()
         sid = context.session_id or "anonymous"
         print(f"[{context.method}] sid={sid}")
@@ -75,9 +73,7 @@ class RateLimitingMiddleware(Middleware):
         now = datetime.now()
         self.seen[sid] = [t for t in self.seen[sid] if (now - t).total_seconds() < 60]
         if len(self.seen[sid]) >= self.max:
-            raise Exception(
-                f"Rate limit exceeded ({self.max}/min) for session {sid[:8]}"
-            )
+            raise Exception(f"Rate limit exceeded ({self.max}/min) for session {sid[:8]}")
         self.seen[sid].append(now)
         return await call_next(context)
 
