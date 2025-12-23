@@ -20,6 +20,14 @@ from mcp_use.server import MCPServer
 from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 
 
+class ConnectionGuard(Middleware):
+    async def on_initialize(self, context, call_next):
+        client_name = context.message.clientInfo.name
+        print(f"Incoming connection from: {client_name}")
+
+        return await call_next(context)
+
+
 class LoggingMiddleware(Middleware):
     """Minimal logging."""
 
@@ -90,6 +98,7 @@ server = MCPServer(
         AuthenticationMiddleware(),
         RateLimitingMiddleware(max_requests_per_minute=10),
         ValidationMiddleware(),
+        ConnectionGuard(),
     ],
     debug=True,
     pretty_print_jsonrpc=True,
@@ -114,7 +123,12 @@ def session_id() -> dict[str, Any]:
     }
 
 
-@server.resource(uri="info://middleware", name="middleware_info", title="Middleware Info", mime_type="text/plain")
+@server.resource(
+    uri="info://middleware",
+    name="middleware_info",
+    title="Middleware Info",
+    mime_type="text/plain",
+)
 def middleware_info() -> str:
     """List active middleware."""
     return f"""Active Middleware:
@@ -127,7 +141,12 @@ Generated at: {datetime.now().isoformat()}
 """
 
 
-@server.resource(uri="data://config", name="config", title="Server Configuration", mime_type="application/json")
+@server.resource(
+    uri="data://config",
+    name="config",
+    title="Server Configuration",
+    mime_type="application/json",
+)
 def get_config() -> str:
     """Server configuration."""
     return """{
@@ -159,4 +178,4 @@ Resources:
 
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", port=8000)
+    server.run(transport="streamable-http", port=8001)
