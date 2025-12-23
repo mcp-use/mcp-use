@@ -20,10 +20,20 @@ from mcp_use.server import MCPServer
 from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 
 
+class ConnectionGuard(Middleware):
+    async def on_initialize(self, context, call_next):
+        client_name = context.message.clientInfo.name
+        print(f"Incoming connection from: {client_name}")
+
+        return await call_next(context)
+
+
 class LoggingMiddleware(Middleware):
     """Minimal logging."""
 
-    async def on_request(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+    async def on_request(
+        self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]
+    ) -> Any:
         start = time.time()
         sid = context.session_id or "anonymous"
         print(f"[{context.method}] sid={sid}")
@@ -65,7 +75,9 @@ class RateLimitingMiddleware(Middleware):
         now = datetime.now()
         self.seen[sid] = [t for t in self.seen[sid] if (now - t).total_seconds() < 60]
         if len(self.seen[sid]) >= self.max:
-            raise Exception(f"Rate limit exceeded ({self.max}/min) for session {sid[:8]}")
+            raise Exception(
+                f"Rate limit exceeded ({self.max}/min) for session {sid[:8]}"
+            )
         self.seen[sid].append(now)
         return await call_next(context)
 
@@ -90,6 +102,7 @@ server = MCPServer(
         AuthenticationMiddleware(),
         RateLimitingMiddleware(max_requests_per_minute=10),
         ValidationMiddleware(),
+        ConnectionGuard(),
     ],
     debug=True,
     pretty_print_jsonrpc=True,
@@ -114,7 +127,12 @@ def session_id() -> dict[str, Any]:
     }
 
 
-@server.resource(uri="info://middleware", name="middleware_info", title="Middleware Info", mime_type="text/plain")
+@server.resource(
+    uri="info://middleware",
+    name="middleware_info",
+    title="Middleware Info",
+    mime_type="text/plain",
+)
 def middleware_info() -> str:
     """List active middleware."""
     return f"""Active Middleware:
@@ -127,7 +145,12 @@ Generated at: {datetime.now().isoformat()}
 """
 
 
-@server.resource(uri="data://config", name="config", title="Server Configuration", mime_type="application/json")
+@server.resource(
+    uri="data://config",
+    name="config",
+    title="Server Configuration",
+    mime_type="application/json",
+)
 def get_config() -> str:
     """Server configuration."""
     return """{
@@ -159,4 +182,4 @@ Resources:
 
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", port=8000)
+    server.run(transport="streamable-http", port=8001)
