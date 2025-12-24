@@ -156,6 +156,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (clientRef.current) {
         try {
           const serverName = "inspector-server";
+          const session = clientRef.current.getSession(serverName);
+
+          // Clean up health check monitoring if it exists
+          if (session && (session as any)._healthCheckCleanup) {
+            (session as any)._healthCheckCleanup();
+            (session as any)._healthCheckCleanup = null;
+          }
+
           await clientRef.current.closeSession(serverName);
         } catch (err) {
           if (!quiet) addLog("warn", "Error closing session:", err);
@@ -286,6 +294,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const serverConfig: any = {
           url: url,
           transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
+          // Disable SSE fallback when using explicit HTTP transport (not SSE)
+          // This prevents automatic HTTP → SSE fallback at the connector level
+          disableSseFallback: transportTypeParam === "http",
+          // Use SSE transport when explicitly requested
+          preferSse: transportTypeParam === "sse",
         };
 
         // Add custom headers if provided
@@ -335,9 +348,32 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Wire up notification handler BEFORE initializing
         // This ensures the handler is registered before setupNotificationHandler() is called during connect()
-        if (onNotification) {
-          session.on("notification", onNotification);
-        }
+        session.on("notification", (notification) => {
+          // Call user's callback first
+          onNotification?.(notification);
+
+          // Auto-refresh lists on list_changed notifications
+          if (notification.method === "notifications/tools/list_changed") {
+            addLog("info", "Tools list changed, auto-refreshing...");
+            refreshTools().catch((err) =>
+              addLog("warn", "Auto-refresh tools failed:", err)
+            );
+          } else if (
+            notification.method === "notifications/resources/list_changed"
+          ) {
+            addLog("info", "Resources list changed, auto-refreshing...");
+            refreshResources().catch((err) =>
+              addLog("warn", "Auto-refresh resources failed:", err)
+            );
+          } else if (
+            notification.method === "notifications/prompts/list_changed"
+          ) {
+            addLog("info", "Prompts list changed, auto-refreshing...");
+            refreshPrompts().catch((err) =>
+              addLog("warn", "Auto-refresh prompts failed:", err)
+            );
+          }
+        });
 
         // Now initialize the session (this connects to server and caches tools, resources, prompts)
         await session.initialize();
@@ -356,6 +392,90 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
+
+        // Set up connection health monitoring
+        // This detects when the SSE stream is broken (e.g., server restart) and triggers reconnection
+        const setupConnectionMonitoring = () => {
+          let healthCheckInterval: NodeJS.Timeout | null = null;
+          let lastSuccessfulCheck = Date.now();
+          const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
+          const HEALTH_CHECK_TIMEOUT = 30000; // Consider dead after 30 seconds of no response
+
+          const checkConnectionHealth = async () => {
+            if (!isMountedRef.current || stateRef.current !== "ready") {
+              if (healthCheckInterval) {
+                clearInterval(healthCheckInterval);
+                healthCheckInterval = null;
+              }
+              return;
+            }
+
+            try {
+              // Try a simple operation to verify the connection is alive
+              // We use listTools as a lightweight health check
+              await session.connector.listTools();
+              lastSuccessfulCheck = Date.now();
+            } catch (err) {
+              const timeSinceLastSuccess = Date.now() - lastSuccessfulCheck;
+
+              // If we haven't had a successful check in a while, consider connection dead
+              if (timeSinceLastSuccess > HEALTH_CHECK_TIMEOUT) {
+                addLog(
+                  "warn",
+                  `Connection appears to be broken (no response for ${Math.round(timeSinceLastSuccess / 1000)}s), attempting to reconnect...`
+                );
+
+                if (healthCheckInterval) {
+                  clearInterval(healthCheckInterval);
+                  healthCheckInterval = null;
+                }
+
+                // Trigger reconnection if autoReconnect is enabled
+                if (autoReconnectRef.current && isMountedRef.current) {
+                  setState("discovering");
+                  addLog("info", "Auto-reconnecting to MCP server...");
+
+                  // Small delay before reconnecting
+                  setTimeout(
+                    () => {
+                      if (
+                        isMountedRef.current &&
+                        stateRef.current === "discovering"
+                      ) {
+                        connect();
+                      }
+                    },
+                    typeof autoReconnectRef.current === "number"
+                      ? autoReconnectRef.current
+                      : DEFAULT_RECONNECT_DELAY
+                  );
+                }
+              }
+            }
+          };
+
+          // Start health check interval
+          healthCheckInterval = setInterval(
+            checkConnectionHealth,
+            HEALTH_CHECK_INTERVAL
+          );
+
+          // Return cleanup function
+          return () => {
+            if (healthCheckInterval) {
+              clearInterval(healthCheckInterval);
+              healthCheckInterval = null;
+            }
+          };
+        };
+
+        // Only set up monitoring if autoReconnect is enabled
+        if (autoReconnect) {
+          const cleanup = setupConnectionMonitoring();
+
+          // Store cleanup function for later
+          (session as any)._healthCheckCleanup = cleanup;
+        }
 
         // Track successful connection
         Tel.getInstance()
@@ -911,6 +1031,91 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [state]);
 
   /**
+   * Refresh the tools list from the server
+   * Called automatically on notifications/tools/list_changed or manually by user
+   */
+  const refreshTools = useCallback(async () => {
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      addLog("debug", "Cannot refresh tools - client not ready");
+      return;
+    }
+    addLog("debug", "Refreshing tools list");
+    try {
+      const serverName = "inspector-server";
+      const session = clientRef.current.getSession(serverName);
+      if (!session) {
+        addLog("warn", "No active session found for tools refresh");
+        return;
+      }
+      // Re-fetch tools from the server
+      const toolsResult = await session.connector.listTools();
+      setTools(toolsResult || []);
+      addLog("info", "Tools list refreshed successfully");
+    } catch (err) {
+      addLog("warn", "Failed to refresh tools:", err);
+    }
+  }, [addLog]);
+
+  /**
+   * Refresh the resources list from the server
+   * Called automatically on notifications/resources/list_changed or manually by user
+   */
+  const refreshResources = useCallback(async () => {
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      addLog("debug", "Cannot refresh resources - client not ready");
+      return;
+    }
+    addLog("debug", "Refreshing resources list");
+    try {
+      const serverName = "inspector-server";
+      const session = clientRef.current.getSession(serverName);
+      if (!session) {
+        addLog("warn", "No active session found for resources refresh");
+        return;
+      }
+      const resourcesResult = await session.connector.listAllResources();
+      setResources(resourcesResult.resources || []);
+      addLog("info", "Resources list refreshed successfully");
+    } catch (err) {
+      addLog("warn", "Failed to refresh resources:", err);
+    }
+  }, [addLog]);
+
+  /**
+   * Refresh the prompts list from the server
+   * Called automatically on notifications/prompts/list_changed or manually by user
+   */
+  const refreshPrompts = useCallback(async () => {
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      addLog("debug", "Cannot refresh prompts - client not ready");
+      return;
+    }
+    addLog("debug", "Refreshing prompts list");
+    try {
+      const serverName = "inspector-server";
+      const session = clientRef.current.getSession(serverName);
+      if (!session) {
+        addLog("warn", "No active session found for prompts refresh");
+        return;
+      }
+      const promptsResult = await session.connector.listPrompts();
+      setPrompts(promptsResult.prompts || []);
+      addLog("info", "Prompts list refreshed successfully");
+    } catch (err) {
+      addLog("warn", "Failed to refresh prompts:", err);
+    }
+  }, [addLog]);
+
+  /**
+   * Refresh all lists (tools, resources, prompts) from the server
+   * Useful after reconnection or for manual refresh
+   */
+  const refreshAll = useCallback(async () => {
+    addLog("info", "Refreshing all lists (tools, resources, prompts)");
+    await Promise.all([refreshTools(), refreshResources(), refreshPrompts()]);
+  }, [refreshTools, refreshResources, refreshPrompts, addLog]);
+
+  /**
    * Get a prompt template with arguments
    *
    * @param name - Name of the prompt template
@@ -1121,6 +1326,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     listResources,
     listPrompts,
     getPrompt,
+    refreshTools,
+    refreshResources,
+    refreshPrompts,
+    refreshAll,
     retry,
     disconnect,
     authenticate,

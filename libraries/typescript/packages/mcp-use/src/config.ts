@@ -3,7 +3,6 @@ import type { ConnectorInitOptions } from "./connectors/base.js";
 import { readFileSync } from "node:fs";
 import { HttpConnector } from "./connectors/http.js";
 import { StdioConnector } from "./connectors/stdio.js";
-import { WebSocketConnector } from "./connectors/websocket.js";
 
 export function loadConfigFile(filepath: string): Record<string, any> {
   const raw = readFileSync(filepath, "utf-8");
@@ -32,14 +31,8 @@ export function createConnectorFromConfig(
       authToken: serverConfig.auth_token || serverConfig.authToken,
       // Only force SSE if explicitly requested
       preferSse: serverConfig.preferSse || transport === "sse",
-      ...connectorOptions,
-    });
-  }
-
-  if ("ws_url" in serverConfig) {
-    return new WebSocketConnector(serverConfig.ws_url, {
-      headers: serverConfig.headers,
-      authToken: serverConfig.auth_token,
+      // Disable SSE fallback if explicitly disabled in config
+      disableSseFallback: serverConfig.disableSseFallback,
       ...connectorOptions,
     });
   }

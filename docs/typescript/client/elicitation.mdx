@@ -1,7 +1,7 @@
 ---
 title: "Elicitation"
 description: "Interactive user input during tool execution"
-icon: "hand-pointer"
+icon: "check"
 ---
 
 Elicitation enables MCP tools to request additional information from users during execution. This creates interactive workflows where tools can dynamically gather data, credentials, or approvals as needed.
@@ -54,7 +54,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@mcp-use/modelcontextprotocol-sdk/types.js';
 
 async function elicitationCallback(
   params: ElicitRequestFormParams | ElicitRequestURLParams
@@ -114,7 +114,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from '@modelcontextprotocol/sdk/types.js';
+} from '@mcp-use/modelcontextprotocol-sdk/types.js';
 
 function MyComponent() {
   const { tools, callTool, state } = useMcp({
@@ -240,55 +240,6 @@ async function handleFormElicitation(
 **Best Practice**: Implement client-side validation for better UX, but remember that the server always validates as the final authority. Never rely solely on client-side validation.
 </Note>
 
-### Example: React Form Component
-
-```typescript
-import { useState } from 'react';
-
-function ElicitationForm({ params, onSubmit, onCancel }) {
-  const [formData, setFormData] = useState({});
-  const schema = params.requestedSchema;
-  
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit({
-      action: 'accept',
-      data: formData,
-    });
-  };
-  
-  return (
-    <div className="elicitation-modal">
-      <h3>{params.message}</h3>
-      <form onSubmit={handleSubmit}>
-        {Object.entries(schema.properties || {}).map(([name, field]) => (
-          <div key={name}>
-            <label>{field.title || name}</label>
-            {field.description && <p>{field.description}</p>}
-            
-            <input
-              type={field.type === 'number' ? 'number' : 'text'}
-              defaultValue={field.default}
-              onChange={(e) => setFormData({
-                ...formData,
-                [name]: field.type === 'number' 
-                  ? parseFloat(e.target.value)
-                  : e.target.value
-              })}
-              required={schema.required?.includes(name)}
-            />
-          </div>
-        ))}
-        
-        <button type="submit">Submit</button>
-        <button type="button" onClick={() => onCancel({ action: 'cancel' })}>
-          Cancel
-        </button>
-      </form>
-    </div>
-  );
-}
-```
 
 ## URL Mode Elicitation
 
@@ -347,58 +298,6 @@ async function handleUrlElicitation(
 }
 ```
 
-### Example: React OAuth Flow
-
-```typescript
-function OAuthElicitation({ params, onComplete }) {
-  const [loading, setLoading] = useState(false);
-  
-  const handleAuthorize = () => {
-    // Open OAuth URL in popup
-    const width = 600;
-    const height = 700;
-    const left = (window.innerWidth - width) / 2;
-    const top = (window.innerHeight - height) / 2;
-    
-    const popup = window.open(
-      params.url,
-      'OAuth Authorization',
-      `width=${width},height=${height},left=${left},top=${top}`
-    );
-    
-    setLoading(true);
-    
-    // Poll for popup closure
-    const checkPopup = setInterval(() => {
-      if (popup?.closed) {
-        clearInterval(checkPopup);
-        setLoading(false);
-        
-        // User completed or closed the popup
-        const success = window.confirm('Did you complete the authorization?');
-        onComplete({
-          action: success ? 'accept' : 'decline',
-        });
-      }
-    }, 500);
-  };
-  
-  return (
-    <div className="oauth-modal">
-      <h3>{params.message}</h3>
-      <p>You will be redirected to complete the authorization.</p>
-      
-      <button onClick={handleAuthorize} disabled={loading}>
-        {loading ? 'Waiting for authorization...' : 'Authorize'}
-      </button>
-      
-      <button onClick={() => onComplete({ action: 'decline' })}>
-        Cancel
-      </button>
-    </div>
-  );
-}
-```
 
 ## Response Structure
 
@@ -419,110 +318,6 @@ interface ElicitResult {
 | **decline** | User explicitly declined to provide information | Omit |
 | **cancel** | User dismissed the request without making a choice | Omit |
 
-### Response Examples
-
-**Accept (Form Mode)**:
-```typescript
-return {
-  action: 'accept',
-  data: {
-    name: 'John Doe',
-    email: 'john@example.com',
-    age: 30,
-  },
-};
-```
-
-**Accept (URL Mode)**:
-```typescript
-return {
-  action: 'accept',
-  // No data field needed - authorization completed externally
-};
-```
-
-**Decline**:
-```typescript
-return {
-  action: 'decline',
-  // User chose not to provide the requested information
-};
-```
-
-**Cancel**:
-```typescript
-return {
-  action: 'cancel',
-  // User closed the dialog or dismissed the request
-};
-```
-
-## Complete Example: React App with Elicitation
-
-```typescript
-import { useMcp } from 'mcp-use/react';
-import { useState } from 'react';
-
-function App() {
-  const [elicitationRequest, setElicitationRequest] = useState(null);
-  
-  const { tools, callTool } = useMcp({
-    url: 'http://localhost:3000/mcp',
-    onElicitation: async (params) => {
-      // Show elicitation UI and wait for user response
-      return new Promise((resolve) => {
-        setElicitationRequest({
-          params,
-          resolve,
-        });
-      });
-    },
-  });
-  
-  const handleElicitationResponse = (result) => {
-    if (elicitationRequest) {
-      elicitationRequest.resolve(result);
-      setElicitationRequest(null);
-    }
-  };
-  
-  return (
-    <div>
-      <h1>MCP Application</h1>
-      
-      {/* Your main app UI */}
-      <ToolsList tools={tools} onCallTool={callTool} />
-      
-      {/* Elicitation modal */}
-      {elicitationRequest && (
-        <ElicitationModal
-          params={elicitationRequest.params}
-          onResponse={handleElicitationResponse}
-        />
-      )}
-    </div>
-  );
-}
-
-function ElicitationModal({ params, onResponse }) {
-  if (params.mode === 'url') {
-    return (
-      <OAuthElicitation 
-        params={params} 
-        onComplete={onResponse}
-      />
-    );
-  } else {
-    return (
-      <ElicitationForm 
-        params={params}
-        onSubmit={onResponse}
-        onCancel={() => onResponse({ action: 'cancel' })}
-      />
-    );
-  }
-}
-```
 
 ## Error Handling
 
@@ -543,64 +338,6 @@ try {
 }
 ```
 
-To handle this gracefully:
-
-```typescript
-const client = new MCPClient(config, {
-  elicitationCallback: async (params) => {
-    console.warn('Elicitation requested but not implemented');
-    // Always decline if not implemented
-    return { action: 'decline' };
-  },
-});
-```
-
-## Security Best Practices
-
-<Warning>
-**Critical Security Rules**:
-
-1. **Always use URL mode for sensitive data** - Never collect passwords, API keys, or credentials through form mode
-2. **Validate URLs** - Before opening URL mode elicitations, verify the domain is expected
-3. **User consent** - Always show the URL to users and get explicit consent before navigating
-4. **Secure context** - Open URL mode elicitations in a secure browser context (new window/tab with noopener)
-5. **No auto-submit** - Never automatically submit form data without user review
-</Warning>
-
-### URL Validation Example
-
-```typescript
-const ALLOWED_DOMAINS = ['auth.example.com', 'oauth.github.com'];
-
-async function safeElicitationCallback(params) {
-  if (params.mode === 'url') {
-    const url = new URL(params.url);
-    
-    // Validate domain
-    if (!ALLOWED_DOMAINS.includes(url.hostname)) {
-      console.warn(`Untrusted domain: ${url.hostname}`);
-      return {
-        action: 'decline',
-      };
-    }
-    
-    // Show URL and get consent
-    const consent = await getUserConsent(
-      `Allow navigation to ${url.hostname}?`
-    );
-    
-    if (!consent) {
-      return { action: 'decline' };
-    }
-    
-    // Proceed with authorization
-    window.open(params.url, '_blank', 'noopener,noreferrer');
-    // ... handle completion
-  }
-  
-  // ... handle form mode
-}
-```
 
 ## Next Steps
 

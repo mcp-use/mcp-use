@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useMcp } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
@@ -92,9 +92,10 @@ function ConnectionTester({
   const mcpHook = useMcp({
     url: urlError ? undefined : finalUrl, // Don't connect if URL is invalid
     callbackUrl,
+    timeout: 5000, // 5 seconds for faster fallback to proxy mode
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
-    transportType: config.transportType || "http",
+    transportType: config.transportType || "http", // Respect user's transport choice, default to HTTP (no auto-fallback to SSE)
     enabled: !urlError, // Disable connection if URL is invalid
   });
 
@@ -158,12 +159,6 @@ export function InspectorDashboard() {
   );
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null
-  );
-
-  // Log connections on every render to debug
-  console.warn(
-    "[InspectorDashboard] Render - connections:",
-    connections.map((c) => ({ id: c.id, state: c.state }))
   );
 
   // Track inspector open on mount
@@ -286,7 +281,6 @@ export function InspectorDashboard() {
 
       // Map UI transport type to actual transport type
       // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
-      // "WebSocket" in UI means "WebSocket" which uses 'sse' transport
       const actualTransportType = transportType === "SSE" ? "http" : "sse";
 
       // Store pending connection config - don't add to saved connections yet

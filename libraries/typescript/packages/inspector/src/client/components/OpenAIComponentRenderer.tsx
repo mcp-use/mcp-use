@@ -94,35 +94,73 @@ function OpenAIComponentRendererBase({
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
 
+  // Refs to hold latest values without triggering effect re-runs
+  // This prevents infinite loops caused by object/function reference changes
+  const toolArgsRef = useRef(toolArgs);
+  const toolResultRef = useRef(toolResult);
+  const readResourceRef = useRef(readResource);
+  const serverBaseUrlRef = useRef(serverBaseUrl);
+  const resolvedThemeRef = useRef(resolvedTheme);
+
+  // Keep refs updated with latest values
+  useEffect(() => {
+    toolArgsRef.current = toolArgs;
+    toolResultRef.current = toolResult;
+    readResourceRef.current = readResource;
+    serverBaseUrlRef.current = serverBaseUrl;
+    resolvedThemeRef.current = resolvedTheme;
+  });
+
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
+      // Access latest values from refs to avoid stale closures
+      const currentToolArgs = toolArgsRef.current;
+      const currentToolResult = toolResultRef.current;
+      const currentReadResource = readResourceRef.current;
+      const currentServerBaseUrl = serverBaseUrlRef.current;
+      const currentResolvedTheme = resolvedThemeRef.current;
+
       try {
         // Extract structured content from tool result (the actual tool parameters)
-        const structuredContent = toolResult?.structuredContent || null;
+        const structuredContent = currentToolResult?.structuredContent || null;
 
         // Fetch the HTML resource client-side (where the connection exists)
-        const resourceData = await readResource(componentUrl);
-
-        // For Apps SDK widgets, use structuredContent as toolInput (the actual tool parameters)
-        // toolArgs might be empty or from the initial invocation, structuredContent has the real data
-        const computedToolInput = structuredContent || toolArgs;
-        setWidgetToolInput(computedToolInput);
-        setWidgetToolOutput(structuredContent);
+        const resourceData = await currentReadResource(componentUrl);
 
         // Extract CSP metadata from tool result
         // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
         let widgetCSP = null;
         const metaSource =
-          toolResult?._meta || toolResult?.contents?.[0]?._meta;
+          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
         if (metaSource?.["openai/widgetCSP"]) {
           widgetCSP = metaSource["openai/widgetCSP"];
         }
 
+        // Extract widget props from _meta["mcp-use/props"]
+        const widgetProps = metaSource?.["mcp-use/props"] || null;
+
+        // Debug logging
+        console.log("[OpenAIComponentRenderer] Widget data extraction:", {
+          hasMetaSource: !!metaSource,
+          hasMcpUseProps: !!metaSource?.["mcp-use/props"],
+          widgetProps,
+          toolArgs: currentToolArgs,
+          structuredContent,
+          metaKeys: metaSource ? Object.keys(metaSource) : [],
+        });
+
+        // toolInput should be the original tool call arguments from toolArgs
+        const finalToolInput = currentToolArgs;
+
+        // Update state with final values
+        setWidgetToolInput(finalToolInput);
+        setWidgetToolOutput(structuredContent);
+
         // pass props as url params (toolInput, toolOutput)
         const urlParams = new URLSearchParams();
         const params = {
-          toolInput: widgetToolInput,
+          toolInput: finalToolInput,
           toolOutput: structuredContent,
           toolId,
         };
@@ -130,7 +168,7 @@ function OpenAIComponentRendererBase({
 
         // Check for dev mode widget - check both _meta locations
         const metaForWidget =
-          toolResult?._meta || toolResult?.contents?.[0]?._meta;
+          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
 
         // Use dev mode if metadata says so
         const computedUseDevMode =
@@ -144,17 +182,20 @@ function OpenAIComponentRendererBase({
         const widgetDataToStore: any = {
           serverId,
           uri: componentUrl,
-          toolInput: computedToolInput,
-          toolOutput: structuredContent,
+          toolInput: finalToolInput, // Original tool call arguments
+          toolOutput: structuredContent, // Tool output (structured data)
+          toolResponseMetadata: widgetProps
+            ? { "mcp-use/props": widgetProps }
+            : null, // Widget-specific props
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
-          theme: resolvedTheme, // Pass the current theme to prevent flash
+          theme: currentResolvedTheme, // Pass the current theme to prevent flash
         };
 
-        if (computedUseDevMode && widgetName && serverBaseUrl) {
-          const devServerBaseUrl = new URL(serverBaseUrl).origin;
-          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}?${urlParams.toString()}`;
+        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
+          const devServerBaseUrl = new URL(currentServerBaseUrl).origin;
+          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
         }
@@ -180,13 +221,13 @@ function OpenAIComponentRendererBase({
           );
         }
 
-        if (computedUseDevMode && widgetName && serverBaseUrl) {
+        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
-          const proxyUrl = `/inspector/api/dev-widget/${toolId}?${urlParams.toString()}`;
+          const proxyUrl = `/inspector/api/dev-widget/${toolId}`;
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
-          const prodUrl = `/inspector/api/resources/widget/${toolId}?${urlParams.toString()}`;
+          const prodUrl = `/inspector/api/resources/widget/${toolId}`;
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);
@@ -203,12 +244,10 @@ function OpenAIComponentRendererBase({
   }, [
     componentUrl,
     serverId,
-    toolArgs,
-    toolResult,
     toolId,
-    readResource,
-    serverBaseUrl,
-    resolvedTheme, // Include theme so widget data is updated when theme changes
+    // Note: toolArgs, toolResult, readResource, and serverBaseUrl are intentionally
+    // excluded to prevent re-running when these references change but values are the same.
+    // resolvedTheme is handled by a separate effect that updates iframe globals.
   ]);
 
   // Helper to update window.openai globals inside iframe
@@ -262,9 +301,8 @@ function OpenAIComponentRendererBase({
 
             // Dispatch the set_globals event to notify React components
             try {
-              const CustomEventConstructor =
-                iframeWindow.CustomEvent as typeof window.CustomEvent;
-              const globalsEvent = new CustomEventConstructor(
+              // Use global CustomEvent constructor
+              const globalsEvent = new (iframeWindow as any).CustomEvent(
                 "openai:set_globals",
                 {
                   detail: {
@@ -785,17 +823,16 @@ function OpenAIComponentRendererBase({
         displayMode !== "pip" && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
             <IframeConsole iframeId={toolId} enabled={true} />
-            {useDevMode && (
-              <WidgetInspectorControls
-                displayMode={displayMode}
-                onDisplayModeChange={handleDisplayModeChange}
-                toolInput={widgetToolInput}
-                toolOutput={widgetToolOutput}
-                toolResult={toolResult}
-                iframeRef={iframeRef}
-                toolId={toolId}
-              />
-            )}
+            {/* Always show debug controls in inspector */}
+            <WidgetInspectorControls
+              displayMode={displayMode}
+              onDisplayModeChange={handleDisplayModeChange}
+              toolInput={widgetToolInput}
+              toolOutput={widgetToolOutput}
+              toolResult={toolResult}
+              iframeRef={iframeRef}
+              toolId={toolId}
+            />
           </div>
         )}
       <div

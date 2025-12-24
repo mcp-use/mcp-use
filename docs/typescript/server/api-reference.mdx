@@ -165,18 +165,10 @@ tool(definition: ToolDefinition): this
 server.tool({
   name: 'calculate',
   description: 'Perform calculations',
-  inputs: [
-    { name: 'expression', type: 'string', required: true }
-  ],
-  cb: async ({ expression }) => {
-    const result = eval(expression) // Note: Use safe evaluation in production
-    return {
-      content: [{
-        type: 'text',
-        text: `Result: ${result}`
-      }]
-    }
-  }
+  schema: z.object({ expression: z.string().describe('The expression to evaluate') }),
+}, async ({ expression }) => {
+  const result = eval(expression) // Note: Use safe evaluation in production
+  return text(`Result: ${result}`);
 })
 ```
 
@@ -309,14 +301,9 @@ server.uiResource({
   widget: 'analytics-dashboard',
   title: 'Analytics Dashboard',
   description: 'Interactive analytics visualization',
-  props: {
-    timeRange: {
-      type: 'string',
-      description: 'Time range for data',
-      required: false,
-      default: '7d'
-    }
-  },
+  props: z.object({
+    timeRange: z.string().describe('Time range for data').optional().default('7d')
+  }),
   size: ['800px', '600px']
 })
 ```

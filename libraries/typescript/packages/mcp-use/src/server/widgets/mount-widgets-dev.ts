@@ -12,6 +12,7 @@ import type { WidgetMetadata } from "../types/widget.js";
 import { pathHelpers, getCwd } from "../utils/runtime.js";
 import {
   setupPublicRoutes,
+  setupFaviconRoute,
   registerWidgetFromTemplate,
 } from "./widget-helpers.js";
 import type {
@@ -106,6 +107,30 @@ export async function mountWidgetsDev(
 
   // Create a temp directory for widget entry files
   const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
+
+  // Clean up stale widget directories in .mcp-use
+  try {
+    // Check if .mcp-use exists
+    await fs.access(tempDir);
+
+    // Get list of current widget names
+    const currentWidgetNames = new Set(entries.map((e) => e.name));
+
+    // Read existing directories in .mcp-use
+    const existingDirs = await fs.readdir(tempDir, { withFileTypes: true });
+
+    // Remove directories that are not in current widgets
+    for (const dirent of existingDirs) {
+      if (dirent.isDirectory() && !currentWidgetNames.has(dirent.name)) {
+        const staleDir = pathHelpers.join(tempDir, dirent.name);
+        await fs.rm(staleDir, { recursive: true, force: true });
+        console.log(`[WIDGETS] Cleaned up stale widget: ${dirent.name}`);
+      }
+    }
+  } catch {
+    // .mcp-use doesn't exist yet, no cleanup needed
+  }
+
   await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
   // Import dev dependencies - these are optional and only needed for dev mode
@@ -168,10 +193,18 @@ export async function mountWidgetsDev(
     const relativeResourcesPath = pathHelpers
       .relative(widgetTempDir, resourcesPath)
       .replace(/\\/g, "/");
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = pathHelpers.join(getCwd(), "node_modules", "mcp-use");
+    const relativeMcpUsePath = pathHelpers
+      .relative(widgetTempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
     const cssContent = `@import "tailwindcss";
 
-/* Configure Tailwind to scan the resources directory */
+/* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
+@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
 `;
     await fs.writeFile(
       pathHelpers.join(widgetTempDir, "styles.css"),
@@ -196,7 +229,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widget.name} Widget</title>
+    <title>${widget.name} Widget</title>${
+      serverConfig.favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>
@@ -263,6 +301,70 @@ if (container && Component) {
       const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
       server.watcher.add(resourcesPath);
       console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+
+      // Watch for file deletions and clean up corresponding .mcp-use directories
+      server.watcher.on("unlink", async (filePath: string) => {
+        // Check if the deleted file is a widget file
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Single file widget (e.g., widget-name.tsx)
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          const widgetName = relativePath.replace(/\.tsx?$/, "");
+          const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+        // Folder-based widget (e.g., widget-name/widget.tsx)
+        else if (relativePath.endsWith("widget.tsx")) {
+          const parts = relativePath.split("/");
+          if (parts.length === 2) {
+            const widgetName = parts[0];
+            const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+            try {
+              await fs.access(widgetDir);
+              await fs.rm(widgetDir, { recursive: true, force: true });
+              console.log(
+                `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+              );
+            } catch {
+              // Widget directory doesn't exist, nothing to clean up
+            }
+          }
+        }
+      });
+
+      // Watch for directory deletions (folder-based widgets)
+      server.watcher.on("unlinkDir", async (dirPath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, dirPath);
+
+        // Check if this is a top-level directory in resources/
+        if (relativePath && !relativePath.includes("/")) {
+          const widgetName = relativePath;
+          const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Cleaned up stale widget (directory removed): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+      });
     },
   };
 
@@ -398,6 +500,9 @@ export default PostHog;
   // Serve static files from public directory in dev mode
   setupPublicRoutes(app, false);
 
+  // Setup favicon route at server root
+  setupFaviconRoute(app, serverConfig.favicon, false);
+
   // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware
   // (like the inspector) which might intercept the request and return the wrong content
   app.use(`${baseRoute}/*`, async (c: Context) => {
@@ -429,15 +534,21 @@ export default PostHog;
       if (mod.widgetMetadata) {
         metadata = mod.widgetMetadata;
 
-        // Convert Zod schema to JSON schema for props if available
-        if (metadata.inputs) {
-          // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
+        // Handle props field (preferred) or inputs field (deprecated) for Zod schema
+        const schemaField = metadata.props || metadata.inputs;
+        if (schemaField) {
           try {
-            // Store the zod schema shape for inputs
-            metadata.inputs = (metadata.inputs as any).shape || metadata.inputs;
+            // Pass the full Zod schema object directly (don't extract .shape)
+            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+            // and raw shapes, so we preserve the full schema here
+            metadata.props = schemaField;
+            // Also set inputs as alias for backward compatibility
+            if (!metadata.inputs) {
+              metadata.inputs = schemaField;
+            }
           } catch (error) {
             console.warn(
-              `[WIDGET] Failed to extract props schema for ${widget.name}:`,
+              `[WIDGET] Failed to extract schema for ${widget.name}:`,
               error
             );
           }

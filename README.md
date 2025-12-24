@@ -289,24 +289,28 @@ npm install
 ```
 
 ```typescript
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use/server";
 import { z } from "zod";
 
-const server = createMCPServer("my-server", {
+const server = new MCPServer({
+  name: "my-server",
   version: "1.0.0",
   description: "My custom MCP server",
 });
 
 // Define a tool
-server.tool("get_weather", {
-  description: "Get weather for a city",
-  parameters: z.object({
-    city: z.string().describe("City name"),
-  }),
-  execute: async ({ city }) => {
-    return { temperature: 72, condition: "sunny", city };
+server.tool(
+  {
+    name: "get_weather",
+    description: "Get weather for a city",
+    schema: z.object({
+      city: z.string().describe("City name"),
+    }),
   },
-});
+  async ({ city }) => {
+    return text(`Temperature: 72°F, Condition: sunny, City: ${city}`);
+  }
+);
 
 // Start server with auto-inspector
 server.listen(3000);

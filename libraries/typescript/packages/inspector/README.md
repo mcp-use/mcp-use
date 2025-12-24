@@ -96,9 +96,10 @@ Opens the inspector in your browser at `http://localhost:8080`
 When you create an MCP server with `mcp-use`, the inspector is automatically available at `/inspector`:
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from 'mcp-use/server'
 
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
 })
 

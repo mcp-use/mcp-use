@@ -540,9 +540,10 @@ function McpConnectionWrapper({
   const mcpHook = useMcp({
     url: finalUrl,
     callbackUrl,
+    timeout: 5000, // 5 seconds for faster fallback to proxy mode
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
-    transportType: transportType || "http", // Default to 'http' for Streamable HTTP
+    transportType: transportType || "http", // Respect user's transport choice, default to HTTP (no auto-fallback to SSE)
     preventAutoAuth: true, // Show auth button instead of auto-triggering OAuth
     useRedirectFlow: true, // Use redirect instead of popup for better UX
     enabled: wrapTransportReady, // Only connect when wrapper is ready

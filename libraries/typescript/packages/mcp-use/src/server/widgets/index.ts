@@ -48,6 +48,7 @@ export {
   readWidgetHtml,
   registerWidgetFromTemplate,
   setupPublicRoutes,
+  setupFaviconRoute,
   type WidgetServerConfig,
 } from "./widget-helpers.js";
 
@@ -87,6 +88,7 @@ export async function mountWidgets(
     serverPort: (server as any).serverPort || 3000,
     cspUrls: getCSPUrls(),
     buildId: (server as any).buildId,
+    favicon: (server as any).favicon,
   };
 
   const registerWidget: RegisterWidgetCallback = (widgetDef) => {

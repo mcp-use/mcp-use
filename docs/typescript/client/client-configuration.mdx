@@ -1,5 +1,5 @@
 ---
-title: "Client Configuration"
+title: "Configuration"
 description: "Configure your MCP client to connect to servers"
 icon: "cog"
 ---
@@ -9,6 +9,10 @@ The MCPClient is your gateway to connecting with MCP servers. This guide covers 
 <Info>
 **Looking for agent configuration?** If you're building AI agents that interact with MCP servers, see the [Agent Configuration](/typescript/agent/agent-configuration) guide instead.
 </Info>
+
+<Tip>
+**Using in browser or React?** This guide uses the Node.js import (`mcp-use`). For browser or React environments, see the [Environments](/typescript/client/environments) guide to learn about the different entry points.
+</Tip>
 
 ## Quick Start
 
@@ -29,25 +33,139 @@ const config = {
 
 const client = new MCPClient(config)
 ```
-
-```typescript TypeScript
-import { MCPClient } from 'mcp-use'
-
-// Configure your MCP servers
-const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
-
-const client = new MCPClient(config)
-```
 </CodeGroup>
 
+
+## Connection Types
+
+MCP servers communicate with clients using different transport protocols. The mcp-use client supports multiple connection types, each optimized for different use cases.
+
+### Supported Connection Types
+
+The client supports two primary connection types:
+
+- **STDIO**: Local process communication via standard input/output
+- **HTTP/SSE**: Remote servers via HTTP with Server-Sent Events
+
+<Tip>
+The connection type is automatically detected based on your server configuration. You don't need to specify it explicitly - just provide the appropriate parameters (`command` for STDIO, `url` for HTTP).
+</Tip>
+
+### When to Use Each Type
+
+| Connection Type | Best For | Use Cases |
+|----------------|----------|-----------|
+| **STDIO** | Local development | Testing servers locally, file system access, no network setup needed |
+| **HTTP/SSE** | Production deployment | Remote servers, load balancing, authentication, multiple clients |
+
+<Note>
+**Transport Migration Notice (MCP Spec 2025-11-25)**
+
+The old SSE transport (separate POST and SSE endpoints) is deprecated in favor of **Streamable HTTP** (unified endpoint).
+
+**Your existing code still works!** The `sse` transport option is maintained for backward compatibility.
+
+**What changed:**
+- **Old way**: POST `/messages` for requests, GET `/sse` for notifications (two endpoints)
+- **New way**: POST `/mcp` and GET `/mcp` (one unified endpoint)
+- **SSE still works** for notifications - just through the unified endpoint
+
+**Migration (when convenient):**
+
+```typescript
+// Old (deprecated, but still works)
+const mcp = useMcp({
+  url: 'http://localhost:3000/sse',
+  transportType: 'sse'
+});
+
+// New (recommended)
+const mcp = useMcp({
+  url: 'http://localhost:3000/mcp',
+  transportType: 'http'  // or 'auto'
+});
+```
+
+**No action required** for existing code. Migrate at your own pace.
+
+Learn more: [MCP Spec - Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http)
+</Note>
+
+## Automatic Session Management
+
+mcp-use clients automatically handle session lifecycle and recovery per the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management).
+
+### Automatic 404 Recovery
+
+When using HTTP/SSE transports, the client automatically handles server restarts and expired sessions:
+
+```mermaid
+sequenceDiagram
+    participant App as Your App
+    participant Client as mcp-use Client
+    participant Server as MCP Server
+    
+    Note over App,Server: Normal operation
+    App->>Client: callTool("fetch_data")
+    Client->>Server: POST /mcp<br/>session-id: abc-123
+    Server-->>Client: 200 OK + result
+    Client-->>App: Tool result
+    
+    Note over Server: SERVER RESTARTS
+    
+    Note over App,Server: Next request
+    App->>Client: callTool("another_tool")
+    Client->>Server: POST /mcp<br/>session-id: abc-123
+    Server-->>Client: 404 Session not found
+    
+    Note over Client: Auto-detect 404<br/>Clear stale session<br/>Re-initialize
+    
+    Client->>Server: POST /mcp<br/>(no session-id)<br/>initialize
+    Server-->>Client: 200 OK<br/>new session-id: def-456
+    
+    Client->>Server: POST /mcp<br/>session-id: def-456<br/>Retry callTool
+    Server-->>Client: 200 OK + result
+    Client-->>App: Tool result
+```
+
+**How it works:**
+
+1. Client makes request with session ID
+2. Server returns 404 (session expired or server restarted)
+3. **Client automatically**:
+   - Detects 404 error with active session
+   - Clears stale session ID
+   - Sends new `initialize` request
+   - Retries original request with new session
+4. Original request succeeds - **completely transparent to your app**
+
+**Benefits:**
+
+- ✅ No manual reconnection required
+- ✅ Seamless recovery from server restarts
+- ✅ Works for both HTTP and SSE transports
+- ✅ Complies with MCP specification
+- ✅ Automatic in inspector, React hooks, and Node.js clients
+
+**Logging:**
+
+Watch for these log messages to see automatic recovery in action:
+
+```
+[StreamableHttp] Session not found (404), re-initializing per MCP spec...
+[StreamableHttp] Re-initialization successful, retrying request
+```
+
+### Session Persistence
+
+HTTP/SSE connections maintain session state across requests:
+
+- **Session ID**: Automatically managed by the client
+- **Client capabilities**: Preserved across requests
+- **Server capabilities**: Cached after initialization
+- **Subscriptions**: Maintained for resource updates
+
+STDIO connections are stateless and don't use sessions.
 
 ## Server Configuration
 
@@ -92,6 +210,19 @@ For servers that run as local child processes:
 - `args`: Array of command-line arguments
 - `env`: Environment variables for the server process
 
+**Example:**
+```json
+{
+  "mcpServers": {
+    "stdio_server": {
+      "command": "npx",
+      "args": ["@my-mcp/server"],
+      "env": {}
+    }
+  }
+}
+```
+
 **HTTP/HTTPS Servers (Remote):**
 
 For servers accessible via HTTP endpoints:
@@ -99,9 +230,19 @@ For servers accessible via HTTP endpoints:
 - `url`: Full URL to the MCP server endpoint
 - `headers`: Custom HTTP headers (useful for authentication)
 
-<Info>
-The client automatically infers the connection type based on your configuration. Use `command` for STDIO servers or `url` for HTTP servers. See [Connection Types](./connection-types) for detailed information.
-</Info>
+**Example:**
+```json
+{
+  "mcpServers": {
+    "http_server": {
+      "url": "http://localhost:3000",
+      "headers": {
+        "Authorization": "Bearer ${AUTH_TOKEN}"
+      }
+    }
+  }
+}
+```
 
 ### Example Configuration
 
@@ -230,5 +371,3 @@ Common client configuration errors and solutions:
 2. **Connection Timeout**: Verify server is running and network connectivity
 3. **Permission Denied**: Ensure proper file permissions and environment setup
 4. **Invalid Configuration**: Validate JSON syntax and required fields
-
-For detailed information, see the [Connection Types](./connection-types) guide.

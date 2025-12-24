@@ -7,8 +7,11 @@ import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import open from "open";
+import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
+import { createDeploymentsCommand } from "./commands/deployments.js";
 
 const program = new Command();
 
@@ -309,6 +312,17 @@ async function buildWidgets(
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
 
+  // Read favicon config from package.json
+  const packageJsonPath = path.join(projectPath, "package.json");
+  let favicon = "";
+  try {
+    const pkgContent = await fs.readFile(packageJsonPath, "utf-8");
+    const pkg = JSON.parse(pkgContent);
+    favicon = pkg.mcpUse?.favicon || "";
+  } catch {
+    // No package.json or no mcpUse config, that's fine
+  }
+
   const builtWidgets: Array<{ name: string; metadata: any }> = [];
 
   for (const entry of entries) {
@@ -325,7 +339,14 @@ async function buildWidgets(
     const relativeResourcesPath = path
       .relative(tempDir, resourcesDir)
       .replace(/\\/g, "/");
-    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory */\n@source "${relativeResourcesPath}";\n`;
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+    const relativeMcpUsePath = path
+      .relative(tempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
+    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory and mcp-use package */\n@source "${relativeResourcesPath}";\n@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";\n`;
     await fs.writeFile(path.join(tempDir, "styles.css"), cssContent, "utf8");
 
     // Create entry file
@@ -347,7 +368,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widgetName} Widget</title>
+    <title>${widgetName} Widget</title>${
+      favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>
@@ -461,11 +487,44 @@ export default PostHog;
       try {
         const mod = await metadataServer.ssrLoadModule(entryPath);
         if (mod.widgetMetadata) {
+          // Handle props (preferred) or inputs (deprecated) field
+          const schemaField =
+            mod.widgetMetadata.props || mod.widgetMetadata.inputs;
+
+          // Check if schemaField is a Zod v4 schema (has ~standard property from Standard Schema)
+          // and convert to JSON Schema for serialization using Zod v4's built-in toJsonSchema
+          let inputsValue = schemaField || {};
+          if (
+            schemaField &&
+            typeof schemaField === "object" &&
+            "~standard" in schemaField
+          ) {
+            // Convert Zod schema to JSON Schema for manifest serialization
+            try {
+              inputsValue = toJSONSchema(schemaField);
+            } catch (conversionError) {
+              console.warn(
+                chalk.yellow(
+                  `    ⚠ Could not convert schema for ${widgetName}, using raw schema`
+                )
+              );
+            }
+          }
+
+          // Destructure to exclude props (raw Zod schema) from being serialized
+          const {
+            props: _rawProps,
+            inputs: _rawInputs,
+            ...restMetadata
+          } = mod.widgetMetadata;
+
           widgetMetadata = {
-            ...mod.widgetMetadata,
+            ...restMetadata,
             title: mod.widgetMetadata.title || widgetName,
             description: mod.widgetMetadata.description,
-            inputs: mod.widgetMetadata.inputs?.shape || {},
+            // Store the converted JSON Schema (props field is used by production mount)
+            props: inputsValue,
+            inputs: inputsValue,
           };
         }
         // Give a moment for any background esbuild operations to complete
@@ -894,7 +953,17 @@ program
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
-      const port = parseInt(options.port, 10);
+      // Priority: --port flag > process.env.PORT > default
+      // Check if --port or -p was explicitly provided in command line
+      const portFlagProvided =
+        process.argv.includes("--port") ||
+        process.argv.includes("-p") ||
+        process.argv.some((arg) => arg.startsWith("--port=")) ||
+        process.argv.some((arg) => arg.startsWith("-p="));
+
+      const port = portFlagProvided
+        ? parseInt(options.port, 10) // Flag explicitly provided, use it
+        : parseInt(process.env.PORT || options.port || "3000", 10); // Check env, then default
 
       console.log(
         `\x1b[36m\x1b[1mmcp-use\x1b[0m \x1b[90mVersion: ${packageJson.version}\x1b[0m\n`
@@ -1111,6 +1180,15 @@ program
     "--from-source",
     "Deploy from local source code (even for GitHub repos)"
   )
+  .option(
+    "--new",
+    "Force creation of new deployment instead of reusing linked deployment"
+  )
+  .option(
+    "--env <key=value...>",
+    "Environment variables (can be used multiple times)"
+  )
+  .option("--env-file <path>", "Path to .env file with environment variables")
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -1118,7 +1196,16 @@ program
       port: options.port ? parseInt(options.port, 10) : undefined,
       runtime: options.runtime,
       fromSource: options.fromSource,
+      new: options.new,
+      env: options.env,
+      envFile: options.envFile,
     });
   });
+
+// Client command
+program.addCommand(createClientCommand());
+
+// Deployments command
+program.addCommand(createDeploymentsCommand());
 
 program.parse();

@@ -4,6 +4,8 @@ description: "Build AI agents powered by MCP servers"
 icon: "list-start"
 ---
 
+import { CodeSandbox } from '/snippets/codesandbox.jsx'
+
 # MCP Agents
 
 **mcp-use** provides a complete agent framework for building AI applications that leverage MCP servers. The MCPAgent combines LLM integration, tool orchestration, and memory management to create powerful, autonomous AI agents.
@@ -33,20 +35,20 @@ yarn add mcp-use
 ```
 </CodeGroup>
 
-You'll also need an LLM provider SDK:
+You'll also need a LangChain LLM provider package:
 
 <CodeGroup>
 ```bash OpenAI
-npm install openai
+npm install @langchain/openai
 ```
 ```bash Anthropic
-npm install @anthropic-ai/sdk
+npm install @langchain/anthropic
 ```
 ```bash Google
-npm install @google/generative-ai
+npm install @langchain/google-genai
 ```
 ```bash Groq
-npm install groq-sdk
+npm install @langchain/groq
 ```
 </CodeGroup>
 
@@ -55,46 +57,38 @@ npm install groq-sdk
 Here's a basic example of creating and running an agent:
 
 ```typescript
-import { MCPClient } from 'mcp-use'
-import { MCPAgent } from 'mcp-use/agent'
-import OpenAI from 'openai'
+import { MCPAgent, MCPClient } from "mcp-use";
+import { ChatOpenAI } from "@langchain/openai";
 
-// Configure MCP servers
-const config = {
+const client = new MCPClient({
   mcpServers: {
     filesystem: {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-filesystem', './workspace']
-    }
-  }
-}
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
+});
 
-// Create client
-const client = new MCPClient(config)
-await client.createAllSessions()
+const llm = new ChatOpenAI({ model: "gpt-5.1" });
 
-// Initialize LLM
-const llm = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-})
+const agent = new MCPAgent({ llm, client, maxSteps: 50 });
 
-// Create agent
-const agent = new MCPAgent({
-  llm,
-  client,
-  model: 'gpt-4',
-  systemPrompt: 'You are a helpful assistant with access to file system tools.'
-})
-
-// Run agent
-const result = await agent.run('List all TypeScript files in the workspace')
-console.log(result)
-
-// Cleanup
-await client.closeAllSessions()
+agent.run({ 
+  prompt: "What is in the current folder?" 
+}).then(async (response) => {
+  console.log(response);
+  await agent.close();
+});
 ```
 
+
+<CodeSandbox title="Edit mcp-use-get-started-agent" id="sweet-drake-m76ys6"></CodeSandbox>
+
+
+
 ## Architecture Overview
+
+
 
 The MCPAgent framework is built around several core components that work together to enable intelligent, tool-using AI applications.
 
@@ -135,7 +129,8 @@ Generate type-safe responses with Zod schema validation. The agent can return st
 ```typescript
 import { z } from 'zod'
 
-const result = await agent.run('Analyze the file structure', {
+const result = await agent.run({
+  prompt: 'Analyze the file structure',
   schema: z.object({
     totalFiles: z.number(),
     fileTypes: z.array(z.string()),
@@ -154,139 +149,48 @@ console.log(result.totalFiles)
 Stream agent responses in real-time for better user experience and immediate feedback:
 
 ```typescript
-for await (const chunk of agent.stream('Write a report')) {
-  if (chunk.type === 'text') {
-    process.stdout.write(chunk.content)
+// Step-by-step streaming
+for await (const step of agent.stream({ prompt: 'Write a report' })) {
+  console.log(`Tool: ${step.action.tool}`)
+}
+
+// Pretty formatted streaming (great for CLI tools)
+for await (const _ of agent.prettyStreamEvents({ 
+  prompt: 'Analyze the codebase',
+  maxSteps: 20 
+})) {
+  // Automatic syntax highlighting and formatting
+}
+
+// Low-level event streaming
+for await (const event of agent.streamEvents({ prompt: 'Generate content' })) {
+  if (event.event === 'on_chat_model_stream') {
+    process.stdout.write(event.data?.chunk?.content || '')
   }
 }
 ```
 
 **Learn more**: [Streaming →](/typescript/agent/streaming)
 
-### **Interactive Patterns**
+### **Memory Management**
 
-Build interactive, multi-turn conversations where agents can ask questions, request clarification, and maintain context:
-
-```typescript
-const conversation = agent.createConversation()
-
-await conversation.send('Analyze the sales data')
-await conversation.send('Now compare it with last quarter')
-await conversation.send('Generate a summary report')
-```
-
-**Learn more**: [Interactive Chat Patterns →](/typescript/agent/interactive-chat-patterns)
-
-## Agent Lifecycle
-
-Understanding the agent lifecycle helps you build robust applications:
+Control conversation history with built-in memory management. The agent automatically maintains context across multiple interactions:
 
 ```typescript
-// 1. Initialize client and connect to servers
-const client = new MCPClient(config)
-await client.createAllSessions()
-
-// 2. Create agent with LLM and configuration
-const agent = new MCPAgent({ llm, client, model })
-
-// 3. Run agent tasks
-const result = await agent.run('Your task here')
-
-// 4. Clean up resources
-await client.closeAllSessions()
-```
-
-## MCPAgent API
-
-The `MCPAgent` class provides a clean API for agent interactions:
-
-```typescript
-class MCPAgent {
-  // Basic execution
-  run(prompt: string, options?: RunOptions): Promise<string>
-  
-  // Streaming
-  stream(prompt: string, options?: StreamOptions): AsyncIterator<Chunk>
-  
-  // Structured output
-  run<T>(prompt: string, options: { schema: ZodSchema<T> }): Promise<T>
-  
-  // Conversation management
-  createConversation(): Conversation
-  
-  // Configuration
-  updateSystemPrompt(prompt: string): void
-}
-```
-
-## Advanced Features
-
-### Server Manager
-
-For multi-server setups, the Server Manager helps agents intelligently route tool calls to the appropriate server:
-
-**Learn more**: [Server Manager →](/typescript/agent/server-manager)
-
-### Custom Agents
-
-Build specialized agents by extending the base `MCPAgent` class:
-
-**Learn more**: [Building Custom Agents →](/typescript/agent/building-custom-agents)
-
-### Observability
-
-Monitor and debug your agents with built-in observability features:
-
-**Learn more**: [Observability →](/typescript/agent/observability)
-
-## Best Practices
-
-### API Key Management
-
-Always use environment variables for API keys:
-
-```typescript
-// .env file
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-
-// In your code
-import { config } from 'dotenv'
-config()
-
-const llm = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const agent = new MCPAgent({
+  llm,
+  client,
+  memoryEnabled: true  // Enable automatic memory management
 })
+
+await agent.run({ prompt: "Hello, my name is Alice" })
+await agent.run({ prompt: "What's my name?" })  // Agent remembers Alice
+
+// Clear history when needed
+agent.clearConversationHistory()
 ```
 
-### Error Handling
-
-Always handle potential errors:
-
-```typescript
-try {
-  const result = await agent.run(prompt)
-  console.log(result)
-} catch (error) {
-  if (error.code === 'RATE_LIMIT') {
-    // Handle rate limiting
-  } else {
-    // Handle other errors
-  }
-}
-```
-
-### Resource Cleanup
-
-Clean up resources when done:
-
-```typescript
-try {
-  await agent.run(prompt)
-} finally {
-  await client.closeAllSessions()
-}
-```
+**Learn more**: [Memory Management →](/typescript/agent/memory-management)
 
 ## Next Steps
 
@@ -294,20 +198,12 @@ try {
   <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
     Configure your agent and LLM settings
   </Card>
-  <Card title="LLM Integration" icon="brain" href="/typescript/agent/llm-integration">
+  <Card title="LLM Integration" icon="brain-circuit" href="/typescript/agent/llm-integration">
     Integrate with OpenAI, Anthropic, Google, or Groq
   </Card>
-  <Card title="Structured Output" icon="brackets-curly" href="/typescript/agent/structured-output">
+  <Card title="Structured Output" icon="braces" href="/typescript/agent/structured-output">
     Generate type-safe responses with Zod schemas
   </Card>
-  <Card title="Streaming" icon="wave-pulse" href="/typescript/agent/streaming">
-    Stream agent responses in real-time
-  </Card>
-  <Card title="Interactive Patterns" icon="messages" href="/typescript/agent/interactive-chat-patterns">
-    Build multi-turn conversations
-  </Card>
-  <Card title="Custom Agents" icon="code" href="/typescript/agent/building-custom-agents">
-    Extend the agent framework for your needs
-  </Card>
+ 
 </CardGroup>
 

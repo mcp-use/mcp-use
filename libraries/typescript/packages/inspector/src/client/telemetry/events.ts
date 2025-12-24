@@ -89,7 +89,7 @@ export interface MCPServerConnectionEventData {
   serverId: string;
   serverUrl: string;
   success: boolean;
-  connectionType?: "http" | "sse" | "websocket";
+  connectionType?: "http" | "sse";
   error?: string;
 }
 

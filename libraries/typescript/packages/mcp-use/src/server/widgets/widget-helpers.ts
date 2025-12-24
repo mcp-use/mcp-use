@@ -351,7 +351,9 @@ export function createWidgetRegistration(
     | {
         title?: string;
         description?: string;
+        props?: unknown;
         inputs?: unknown;
+        schema?: unknown;
         [key: string]: unknown;
       },
   html: string,
@@ -367,7 +369,10 @@ export function createWidgetRegistration(
   htmlTemplate: string;
   appsSdkMetadata: Record<string, any>;
 } {
-  const props = (metadata.inputs ||
+  // Use props field (preferred) with fallback to inputs/schema for backward compatibility
+  const props = (metadata.props ||
+    metadata.inputs ||
+    metadata.schema ||
     {}) as import("../types/resource.js").WidgetProps;
   const description =
     (metadata.description as string | undefined) || `Widget: ${widgetName}`;
@@ -625,6 +630,57 @@ export function setupPublicRoutes(
         return new Response(content, {
           status: 200,
           headers: { "Content-Type": contentType },
+        });
+      }
+      return c.notFound();
+    } catch {
+      return c.notFound();
+    }
+  });
+}
+
+/**
+ * Setup favicon route at server root
+ *
+ * Serves the configured favicon file at /favicon.ico so it appears
+ * for the entire server domain (e.g., aaa.bbb.com/favicon.ico)
+ *
+ * @param app - Hono app instance to mount routes on
+ * @param faviconPath - Path to favicon file relative to public directory
+ * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ *
+ * @example
+ * ```typescript
+ * // For development mode
+ * setupFaviconRoute(app, 'favicon.ico', false);
+ *
+ * // For production mode
+ * setupFaviconRoute(app, 'favicon.ico', true);
+ * ```
+ */
+export function setupFaviconRoute(
+  app: HonoType,
+  faviconPath: string | undefined,
+  useDistDirectory: boolean = false
+): void {
+  if (!faviconPath) {
+    return; // No favicon configured
+  }
+
+  app.get("/favicon.ico", async (c: Context) => {
+    const basePath = useDistDirectory ? "dist/public" : "public";
+    const fullPath = pathHelpers.join(getCwd(), basePath, faviconPath);
+
+    try {
+      if (await fsHelpers.existsSync(fullPath)) {
+        const content = await fsHelpers.readFile(fullPath);
+        const contentType = getContentType(faviconPath);
+        return new Response(content, {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+          },
         });
       }
       return c.notFound();

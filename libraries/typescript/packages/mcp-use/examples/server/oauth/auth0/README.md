@@ -317,7 +317,6 @@ auth0 roles permissions add ROLE_ID --api-id "http://localhost:3001/" --permissi
 server.tool({
   name: "my-custom-tool",
   description: "My custom tool (requires tool:custom)",
-  inputs: [],
   cb: async (_args: any, context: any) => {
     const payload = context?.get?.("payload");
     if (!hasPermissions(payload, ["tool:custom"])) {

@@ -1,5 +1,382 @@
 # @mcp-use/inspector
 
+## 0.13.2
+
+### Patch Changes
+
+- 9a8cb3a: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [9a8cb3a]
+  - mcp-use@1.11.2
+
+## 0.13.2-canary.1
+
+### Patch Changes
+
+- 681c929: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [681c929]
+  - mcp-use@1.11.2-canary.1
+
+## 0.13.2-canary.0
+
+### Patch Changes
+
+- mcp-use@1.11.2-canary.0
+
+## 0.13.1
+
+### Patch Changes
+
+- abf0e0f: fix: widget props not picked up if zod
+- Updated dependencies [abf0e0f]
+  - mcp-use@1.11.1
+
+## 0.13.1-canary.0
+
+### Patch Changes
+
+- 6fc856c: fix: widget props not picked up if zod
+- Updated dependencies [6fc856c]
+  - mcp-use@1.11.1-canary.0
+
+## 0.13.0
+
+### Minor Changes
+
+- 8a2e84e: ## Breaking Changes
+
+  ### LangChain Adapter Export Path Changed
+
+  The LangChain adapter is no longer exported from the main entry point. Import from `mcp-use/adapters` instead:
+
+  ```typescript
+  // Before
+  import { LangChainAdapter } from "mcp-use";
+
+  // After
+  import { LangChainAdapter } from "mcp-use/adapters";
+  ```
+
+  **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
+
+  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+
+  ### WebSocket Transport Removed
+
+  WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
+
+  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+
+  ## Features
+
+  ### Session Management Architecture with Redis Support
+
+  Implements a pluggable session management architecture enabling distributed deployments with cross-server notifications, sampling, and resource subscriptions.
+
+  **New Interfaces:**
+  - `SessionStore` - Pluggable interface for storing session metadata
+    - `InMemorySessionStore` (production default)
+    - `FileSystemSessionStore` (dev mode default)
+    - `RedisSessionStore` (distributed deployments)
+  - `StreamManager` - Manages active SSE connections
+    - `InMemoryStreamManager` (default)
+    - `RedisStreamManager` (distributed via Redis Pub/Sub)
+
+  **Server Configuration:**
+
+  ```typescript
+  // Development (default - FileSystemSessionStore for hot reload)
+  const server = new MCPServer({
+    name: "dev-server",
+    version: "1.0.0",
+  });
+
+  // Production distributed (cross-server notifications)
+  import { RedisSessionStore, RedisStreamManager } from "mcp-use/server";
+  const server = new MCPServer({
+    name: "prod-server",
+    version: "1.0.0",
+    sessionStore: new RedisSessionStore({ client: redis }),
+    streamManager: new RedisStreamManager({
+      client: redis,
+      pubSubClient: pubSubRedis,
+    }),
+  });
+  ```
+
+  **Client Improvements:**
+  - Auto-refresh tools/resources/prompts when receiving list change notifications
+  - Manual refresh methods: `refreshTools()`, `refreshResources()`, `refreshPrompts()`, `refreshAll()`
+  - Automatic 404 handling and re-initialization per MCP spec
+
+  **Convenience Methods:**
+  - `sendToolsListChanged()` - Notify clients when tools list changes
+  - `sendResourcesListChanged()` - Notify clients when resources list changes
+  - `sendPromptsListChanged()` - Notify clients when prompts list changes
+
+  **Development Experience:**
+  - FileSystemSessionStore persists sessions to `.mcp-use/sessions.json` in dev mode
+  - Sessions survive server hot reloads
+  - Auto-cleanup of expired sessions (>24 hours)
+
+  **Deprecated:**
+  - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
+
+  **Learn more:** [Session Management](/typescript/server/session-management)
+
+  ### Favicon Support for Widgets
+
+  Added favicon configuration for widget pages:
+
+  ```typescript
+  const server = createMCPServer({
+    name: "my-server",
+    version: "1.0.0",
+    favicon: "favicon.ico", // Path relative to public/ directory
+  });
+  ```
+
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process includes favicon in widget HTML pages
+  - Long-term caching (1 year) for favicon assets
+
+  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+
+  ### CLI Client Support
+
+  Added dedicated CLI client support for better command-line integration and testing.
+
+  **Learn more:** [CLI Client](/typescript/client/cli)
+
+  ### Enhanced Session Methods
+  - `callTool()` method now defaults args to an empty object
+  - New `requireSession()` method for reliable session retrieval
+
+  ## Improvements
+
+  ### Widget Build System
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode watches for widget file/directory deletions and cleans up build artifacts
+
+  ### Dependency Management
+  - Added support for Node >= 18
+  - Added CommonJS module support
+
+  ### Documentation & Metadata
+  - Updated agent documentation and method signatures
+  - Added repository metadata to package.json
+
+  ## Fixes
+
+  ### Widget Fixes
+  - Fixed widget styling isolation - widgets no longer pick up mcp-use styles
+  - Fixed favicon URL generator for proper asset resolution
+
+  ### React Router Migration
+
+  Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
+
+  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+
+  ### Session & Transport Fixes
+  - Fixed transport cleanup when session becomes idle
+  - Fixed agent access to resources and prompts
+
+  ### Code Quality
+  - Formatting and linting improvements across packages
+
+### Patch Changes
+
+- 8a2e84e: fix: was importing node modules in the browser
+- 8a2e84e: chore: organized examples folder for typescript
+  fix: inspector chat was using node modules
+- 8a2e84e: chore: remove dead code
+- 8a2e84e: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- 8a2e84e: chore(inspector): fixed console logs warns
+- 8a2e84e: fix: fix widget props registration
+- 8a2e84e: fix: register rpc logs in background
+- 8a2e84e: chore: fixed codeql vulnerabilities
+- 8a2e84e: ## Inspector: Faster Direct-to-Proxy Fallback
+  - **Reduced connection timeout from 30s to 5s** for faster fallback when direct connections fail
+  - **Removed automatic HTTP → SSE transport fallback** since SSE is deprecated
+    - Added `disableSseFallback` option to `HttpConnector` to prevent automatic fallback to SSE transport
+    - Inspector now explicitly uses HTTP transport only, relying on Direct → Proxy fallback instead
+    - Users can still manually select SSE transport if needed
+  - **Total fallback time: ~6 seconds** (5s timeout + 1s delay) instead of ~31 seconds
+
+  ## Deployment: Fixed Supabase Health Check
+  - **Fixed deploy.sh MCP server health check** to use POST instead of GET
+    - SSE endpoints hang on GET requests, causing script to timeout
+    - POST requests return immediately (415 error), proving server is up
+    - Script now correctly detects when deployment is complete and shows success summary with URLs
+
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+  - mcp-use@1.11.0
+
+## 0.13.0-canary.20
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+- Updated dependencies [a90ac6f]
+  - mcp-use@1.11.0-canary.20
+
+## 0.13.0-canary.19
+
+### Patch Changes
+
+- 1adbb26: fix: register rpc logs in background
+  - mcp-use@1.11.0-canary.19
+
+## 0.13.0-canary.18
+
+### Patch Changes
+
+- 2902a2e: chore(inspector): fixed console logs warns
+- d7797b6: fix: fix widget props registration
+- Updated dependencies [d7797b6]
+- Updated dependencies [168a2e1]
+  - mcp-use@1.11.0-canary.18
+
+## 0.13.0-canary.17
+
+### Patch Changes
+
+- c24cafb: ## Inspector: Faster Direct-to-Proxy Fallback
+  - **Reduced connection timeout from 30s to 5s** for faster fallback when direct connections fail
+  - **Removed automatic HTTP → SSE transport fallback** since SSE is deprecated
+    - Added `disableSseFallback` option to `HttpConnector` to prevent automatic fallback to SSE transport
+    - Inspector now explicitly uses HTTP transport only, relying on Direct → Proxy fallback instead
+    - Users can still manually select SSE transport if needed
+  - **Total fallback time: ~6 seconds** (5s timeout + 1s delay) instead of ~31 seconds
+
+  ## Deployment: Fixed Supabase Health Check
+  - **Fixed deploy.sh MCP server health check** to use POST instead of GET
+    - SSE endpoints hang on GET requests, causing script to timeout
+    - POST requests return immediately (415 error), proving server is up
+    - Script now correctly detects when deployment is complete and shows success summary with URLs
+
+- Updated dependencies [c24cafb]
+  - mcp-use@1.11.0-canary.17
+
+## 0.13.0-canary.16
+
+### Patch Changes
+
+- Updated dependencies [7eb280f]
+  - mcp-use@1.11.0-canary.16
+
+## 0.13.0-canary.15
+
+### Patch Changes
+
+- 0a7a19a: fix: was importing node modules in the browser
+  - mcp-use@1.11.0-canary.15
+
+## 0.13.0-canary.14
+
+### Patch Changes
+
+- f5dfa51: chore: organized examples folder for typescript
+  fix: inspector chat was using node modules
+- Updated dependencies [f5dfa51]
+  - mcp-use@1.11.0-canary.14
+
+## 0.13.0-canary.13
+
+### Patch Changes
+
+- f7623fc: chore: remove dead code
+  - mcp-use@1.11.0-canary.13
+
+## 0.13.0-canary.12
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- Updated dependencies [68d1520]
+  - mcp-use@1.11.0-canary.12
+
+## 0.13.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [cf72b53]
+  - mcp-use@1.11.0-canary.11
+
+## 0.13.0-canary.10
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+- Updated dependencies [14c015e]
+  - mcp-use@1.11.0-canary.10
+
+## 0.13.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [0262b5c]
+  - mcp-use@1.11.0-canary.9
+
+## 0.13.0-canary.8
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - mcp-use@1.11.0-canary.8
+
+## 0.13.0-canary.7
+
+### Patch Changes
+
+- 9acf03b: fix: drop react-router-dom in favor of react-router
+- Updated dependencies [9acf03b]
+  - mcp-use@1.11.0-canary.7
+
+## 0.13.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+
+## 0.13.0-canary.5
+
+### Patch Changes
+
+- 861546b: fix: favicon url generator
+- Updated dependencies [0b2292d]
+  - mcp-use@1.11.0-canary.5
+
+## 0.13.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+
+## 0.13.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: removed websocket transport support
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+
 ## 0.12.6
 
 ### Patch Changes
@@ -44,6 +421,28 @@
 - b3d69ed: fix: zod import in official sdk
 - Updated dependencies [b3d69ed]
   - mcp-use@1.10.1
+
+## 0.12.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+
+## 0.12.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+
+## 0.12.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - mcp-use@1.10.1-canary.0
 
 ## 0.12.0
 
@@ -721,7 +1120,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -1006,7 +1405,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -1215,7 +1614,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy

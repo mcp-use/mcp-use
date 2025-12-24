@@ -20,6 +20,8 @@ export interface ServerConfig {
   cspUrls: string[];
   /** Build ID from manifest for cache busting (optional) */
   buildId?: string;
+  /** Path to favicon file relative to public directory (optional) */
+  favicon?: string;
 }
 
 /**

@@ -1,0 +1,766 @@
+---
+title: "Google Cloud Run"
+description: "Deploy a production-ready MCP server built with mcp-use(TS) to Google Cloud Run"
+icon: "google"
+---
+
+
+## 1. Introduction
+
+### Overview
+
+In this lab, you will build and deploy a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server using **mcp-use TypeScript**. MCP servers are useful for providing LLMs with access to external tools and services. You will configure it as a secure, production-ready service on Cloud Run that can be accessed from multiple clients. Then you will connect to the remote MCP server from Gemini CLI.
+
+### What you'll do
+
+We will use **mcp-use TypeScript** to create a **zoo MCP server** that has two tools: `get_animals_by_species` and `get_animal_details`. mcp-use provides a quick, type-safe way to build MCP servers with full TypeScript support.
+
+### What you'll learn
+
+- Deploy the MCP server to Cloud Run
+- Secure your server's endpoint by requiring authentication for all requests, ensuring only authorized clients and agents can communicate with it
+- Connect to your secure MCP server endpoint from Gemini CLI
+- Build ChatGPT Apps with interactive widgets
+
+## 2. Project Setup
+
+1. If you don't already have a Google Account, you must [create a Google Account](https://accounts.google.com/SignUp).
+   - Use a personal account instead of a work or school account. Work and school accounts may have restrictions that prevent you from enabling the APIs needed for this lab.
+2. Sign-in to the [Google Cloud Console](https://console.cloud.google.com/).
+3. [Enable billing](https://console.cloud.google.com/billing) in the Cloud Console.
+   - Completing this lab should cost less than $1 USD in Cloud resources.
+   - You can follow the steps at the end of this lab to delete resources to avoid further charges.
+   - New users are eligible for the [$300 USD Free Trial](http://cloud.google.com/free).
+4. [Create a new project](https://console.cloud.google.com/projectcreate) or choose to reuse an existing project.
+
+## 3. Open Cloud Shell Editor
+
+1. Click this link to navigate directly to [Cloud Shell Editor](https://ide.cloud.google.com/)
+2. If prompted to authorize at any point today, click **Authorize** to continue.
+3. If the terminal doesn't appear at the bottom of the screen, open it:
+   - Click **View**
+   - Click **Terminal**
+4. In the terminal, set your project with this command:
+   - Format:
+     ```bash
+     gcloud config set project [PROJECT_ID]
+     ```
+   - Example:
+     ```bash
+     gcloud config set project lab-project-id-example
+     ```
+   - If you can't remember your project id:
+     - You can list all your project ids with:
+       ```bash
+       gcloud projects list | awk '/PROJECT_ID/{print $2}'
+       ```
+5. You should see this message:
+   ```
+   Updated property [core/project].
+   ```
+   If you see a `WARNING` and are asked `Do you want to continue (Y/n)?`, then you have likely entered the project ID incorrectly. Press `n`, press `Enter`, and try to run the `gcloud config set project` command again.
+
+## 4. Enable APIs
+
+In the terminal, enable the APIs:
+
+```bash
+gcloud services enable \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com
+```
+
+If prompted to authorize, click **Authorize** to continue.
+
+This command may take a few minutes to complete, but it should eventually produce a successful message similar to this one:
+
+```
+Operation "operations/acf.p2-73d90d00-47ee-447a-b600" finished successfully.
+```
+
+## 5. Create the zoo MCP server
+
+To provide valuable context for improving the use of LLMs with MCP, set up a zoo MCP server with **mcp-use TypeScript** — a standard framework for working with the Model Context Protocol. mcp-use provides a quick, type-safe way to build MCP servers with full TypeScript support. This MCP server provides data about animals at a fictional zoo. For simplicity, we store the data in memory. For a production MCP server, you probably want to provide data from sources like databases or APIs.
+
+1. Create a new MCP server project using `create-mcp-use-app`:
+   ```bash
+   npx create-mcp-use-app mcp-on-cloudrun
+   cd mcp-on-cloudrun
+   npm install
+   ```
+
+   This command will:
+   - Create a complete TypeScript MCP server project structure
+   - Install all necessary dependencies (mcp-use, zod, TypeScript, React, etc.)
+   - Set up pre-configured build tools and dev server
+   - Create example files to get you started
+
+2. Open the MCP server entry point file:
+   ```bash
+   cloudshell edit ~/mcp-on-cloudrun/index.ts
+   ```
+
+3. Replace the contents with the following zoo MCP server source code:
+
+```typescript
+import { MCPServer, text, object, array } from 'mcp-use/server';
+import { z } from 'zod';
+
+// Dictionary of animals at the zoo
+
+interface Animal {
+  species: string;
+  name: string;
+  age: number;
+  enclosure: string;
+  trail: string;
+}
+
+const ZOO_ANIMALS: Animal[] = [
+  {
+    species: 'lion',
+    name: 'Leo',
+    age: 7,
+    enclosure: 'The Big Cat Plains',
+    trail: 'Savannah Heights',
+  },
+  {
+    species: 'lion',
+    name: 'Nala',
+    age: 6,
+    enclosure: 'The Big Cat Plains',
+    trail: 'Savannah Heights',
+  },
+  {
+    species: 'lion',
+    name: 'Simba',
+    age: 3,
+    enclosure: 'The Big Cat Plains',
+    trail: 'Savannah Heights',
+  },
+  {
+    species: 'penguin',
+    name: 'Chilly',
+    age: 3,
+    enclosure: 'The Arctic Exhibit',
+    trail: 'Polar Path',
+  },
+  {
+    species: 'penguin',
+    name: 'Pingu',
+    age: 6,
+    enclosure: 'The Arctic Exhibit',
+    trail: 'Polar Path',
+  },
+  {
+    species: 'elephant',
+    name: 'Trunkers',
+    age: 10,
+    enclosure: 'The Pachyderm Sanctuary',
+    trail: 'Savannah Heights',
+  },
+  {
+    species: 'bear',
+    name: 'Smokey',
+    age: 10,
+    enclosure: 'The Grizzly Gulch',
+    trail: 'Polar Path',
+  },
+  {
+    species: 'giraffe',
+    name: 'Longneck',
+    age: 5,
+    enclosure: 'The Tall Grass Plains',
+    trail: 'Savannah Heights',
+  },
+
+  {
+    species: 'antelope',
+    name: 'Speedy',
+    age: 2,
+    enclosure: 'The Tall Grass Plains',
+    trail: 'Savannah Heights',
+  },
+
+  {
+    species: 'antelope',
+    name: 'Swift',
+    age: 5,
+    enclosure: 'The Tall Grass Plains',
+    trail: 'Savannah Heights',
+  },
+
+  {
+    species: 'polar bear',
+    name: 'Blizzard',
+    age: 5,
+    enclosure: 'The Arctic Exhibit',
+    trail: 'Polar Path',
+  },
+  {
+    species: 'polar bear',
+    name: 'Iceberg',
+    age: 9,
+    enclosure: 'The Arctic Exhibit',
+    trail: 'Polar Path',
+  },
+  {
+    species: 'walrus',
+    name: 'Moby',
+    age: 8,
+    enclosure: 'The Walrus Cove',
+    trail: 'Polar Path',
+  },
+  {
+    species: 'walrus',
+    name: 'Flippers',
+    age: 9,
+    enclosure: 'The Walrus Cove',
+    trail: 'Polar Path',
+  },
+];
+
+// Create the MCP server
+const server = new MCPServer({
+  name: 'Zoo Animal MCP Server 🦁🐧🐻',
+  version: '1.0.0',
+  description: 'A MCP server for querying zoo animal information',
+});
+
+// Tool: Get animals by species
+server.tool(
+  {
+    name: 'get_animals_by_species',
+    description:
+      'Retrieves all animals of a specific species from the zoo. Can also be used to collect the base data for aggregate queries of animals of a specific species - like counting the number of penguins or finding the oldest lion.',
+    schema: z.object({
+      species: z
+        .string()
+        .describe("The species of the animal (e.g., 'lion', 'penguin')"),
+    }),
+  },
+  async ({ species }) => {
+    console.log(`>>> 🛠️ Tool: 'get_animals_by_species' called for '${species}'`);
+    const animals = ZOO_ANIMALS.filter(
+      (animal) => animal.species.toLowerCase() === species.toLowerCase()
+    );
+    return array(animals);
+  }
+);
+
+// Tool: Get animal details by name
+server.tool(
+  {
+    name: 'get_animal_details',
+    description: 'Retrieves the details of a specific animal by its name.',
+    schema: z.object({
+      name: z.string().describe('The name of the animal'),
+    }),
+  },
+  async ({ name }) => {
+    console.log(`>>> 🛠️ Tool: 'get_animal_details' called for '${name}'`);
+    const animal = ZOO_ANIMALS.find(
+      (a) => a.name.toLowerCase() === name.toLowerCase()
+    );
+    if (animal) {
+      return object(animal);
+    }
+    return object({});
+  }
+);
+
+// Start the server
+const port = parseInt(process.env.PORT || '8080', 10);
+console.log(`🚀 MCP server started on port ${port}`);
+await server.listen(port);
+```
+
+   The `create-mcp-use-app` template already includes the necessary imports and server setup. We've replaced the example code with our zoo server implementation.
+
+## 6. Building ChatGPT Apps with Your MCP Server
+
+One of the powerful features of mcp-use is its built-in support for building **ChatGPT Apps** with interactive widgets. This allows you to create rich, interactive user interfaces that go beyond simple text responses.
+
+### What are ChatGPT Apps?
+
+ChatGPT Apps enable developers to build rich, interactive user interfaces using the **OpenAI Apps SDK**. Widgets can:
+- Display data in tables, carousels, or custom layouts
+- Allow users to filter, sort, or manipulate results
+- Persist state across conversations
+- Call MCP tools directly from the UI
+
+### Adding a Widget to Your Zoo Server
+
+Let's add an interactive widget to display animal information in a beautiful card format.
+
+1. The `resources` directory should already exist from `create-mcp-use-app`. Create a widget component `resources/animal-card.tsx`:
+   ```bash
+   cloudshell edit ~/mcp-on-cloudrun/resources/animal-card.tsx
+   ```
+
+2. Add the following widget code:
+
+```tsx
+import React from 'react';
+import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
+import { z } from 'zod';
+
+const propsSchema = z.object({
+    name: z.string(),
+    species: z.string(),
+    age: z.number(),
+    enclosure: z.string(),
+    trail: z.string(),
+})
+// Define widget metadata - this auto-generates a tool!
+export const widgetMetadata: WidgetMetadata = {
+  description: 'Display detailed information about a zoo animal',
+  props: propsSchema
+};
+
+type AnimalCardProps = z.infer<typeof propsSchema>;
+
+const AnimalCard: React.FC = () => {
+  const { props } = useWidget<AnimalCardProps>();
+
+  return (
+    <McpUseProvider autoSize>
+      <div style={{
+        padding: '20px',
+        borderRadius: '8px',
+        border: '1px solid #e0e0e0',
+        backgroundColor: '#f9f9f9',
+        fontFamily: 'system-ui, sans-serif'
+      }}>
+        <h2 style={{ marginTop: 0, color: '#333' }}>{props.name}</h2>
+        <div style={{ marginBottom: '10px' }}>
+          <strong>Species:</strong> {props.species}
+        </div>
+        <div style={{ marginBottom: '10px' }}>
+          <strong>Age:</strong> {props.age} years old
+        </div>
+        <div style={{ marginBottom: '10px' }}>
+          <strong>Enclosure:</strong> {props.enclosure}
+        </div>
+        <div>
+          <strong>Trail:</strong> {props.trail}
+        </div>
+      </div>
+    </McpUseProvider>
+  );
+};
+
+export default AnimalCard;
+```
+
+3. Update your `src/index.ts` to return widgets from tools. Add this new tool that returns a widget:
+
+```typescript
+import { widget, text } from 'mcp-use/server';
+
+// Tool: Get animal details with widget
+server.tool(
+  {
+    name: 'get_animal_details_widget',
+    description: 'Retrieves the details of a specific animal by its name and displays it in an interactive widget.',
+    schema: z.object({
+      name: z.string().describe('The name of the animal'),
+    }),
+    widget: {
+      name: 'animal-card',
+      invoking: 'Loading animal details...',
+      invoked: 'Animal details loaded',
+    },
+  },
+  async ({ name }) => {
+    console.log(`>>> 🛠️ Tool: 'get_animal_details_widget' called for '${name}'`);
+    const animal = ZOO_ANIMALS.find(
+      (a) => a.name.toLowerCase() === name.toLowerCase()
+    );
+    
+    if (animal) {
+      return widget({
+        props: {
+          name: animal.name,
+          species: animal.species,
+          age: animal.age,
+          enclosure: animal.enclosure,
+          trail: animal.trail,
+        },
+        output: text(`Found ${animal.name}, a ${animal.age}-year-old ${animal.species} in ${animal.enclosure}.`),
+      });
+    }
+    
+    return text(`Animal "${name}" not found in the zoo.`);
+  }
+);
+```
+
+### Widget Features
+
+With mcp-use widgets, you get:
+- **Automatic Registration**: Widgets in the `resources/` folder are automatically discovered
+- **Type Safety**: Full TypeScript support with Zod schema validation
+- **State Management**: Built-in state persistence with `useWidget()` hook
+- **Tool Calls**: Widgets can call other MCP tools directly
+- **Hot Reload**: Changes reflect immediately during development
+
+For more information on building ChatGPT Apps, see the [Building ChatGPT Apps Guide](/guides/chatgpt-apps-flow).
+
+Your code is complete! It is time to deploy the MCP server to Cloud Run.
+
+## 7. Deploying to Cloud Run
+
+Now deploy an MCP server to Cloud Run directly from the source code.
+
+1. Create and open a new `Dockerfile` for deploying to Cloud Run:
+   ```bash
+   cloudshell edit ~/mcp-on-cloudrun/Dockerfile
+   ```
+
+2. Include the following code in the Dockerfile:
+
+```dockerfile
+# Use the official Node.js image
+FROM node:22-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (needed for build)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build TypeScript and widgets (mcp-use build handles everything)
+RUN npm run build
+
+# Allow statements and log messages to immediately appear in the logs
+ENV NODE_ENV=production
+
+# Expose port (Cloud Run sets PORT env var)
+EXPOSE $PORT
+
+# Run the MCP server (mcp-use start runs the built server)
+CMD ["npm", "start"]
+```
+
+3. Create a `.dockerignore` file to exclude unnecessary files:
+   ```bash
+   cat > .dockerignore << 'EOF'
+   node_modules
+   .git
+   .gitignore
+   *.md
+   .env
+   .env.local
+   EOF
+   ```
+
+4. Create a service account named `mcp-server-sa`:
+   ```bash
+   gcloud iam service-accounts create mcp-server-sa --display-name="MCP Server Service Account"
+   ```
+
+5. Add storage.objectViewer role to the service account:
+
+```bash 
+PROJECT_NUMBER=$(gcloud projects describe $GOOGLE_CLOUD_PROJECT --format="value(projectNumber)")
+
+gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
+  --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+  --role="roles/storage.objectViewer"
+```
+
+6. Run the `gcloud` command to deploy the application to Cloud Run:
+   ```bash
+   cd ~/mcp-on-cloudrun
+   gcloud run deploy zoo-mcp-server \
+     --service-account=mcp-server-sa@$GOOGLE_CLOUD_PROJECT.iam.gserviceaccount.com \
+     --no-allow-unauthenticated \
+     --region=europe-west1 \
+     --source=. \
+     --labels=dev-tutorial=codelab-mcp
+   ```
+
+   Use the `--no-allow-unauthenticated` flag to require authentication. This is important for security reasons. If you don't require authentication, anyone can call your MCP server and potentially cause damage to your system.
+
+7. Confirm the creation of a new Artifact Registry repository. Since it is your first time deploying to Cloud Run from source code, you will see:
+   ```
+   Deploying from source requires an Artifact Registry Docker repository to store built containers. A repository named
+   [cloud-run-source-deploy] in region [europe-west1] will be created.
+
+   Do you want to continue (Y/n)?
+   ```
+   Type `Y` and press `Enter`, this will create an Artifact Registry repository for your deployment. This is required for storing the MCP server Docker container for the Cloud Run service.
+
+8. After a few minutes, you will see a message like:
+   ```
+   Service [zoo-mcp-server] revision [zoo-mcp-server-12345-abc] has been deployed and is serving 100 percent of traffic.
+   ```
+
+You have deployed your MCP server. Now you can use it.
+
+## 8. Add the Remote MCP Server to Gemini CLI
+
+Now that you've successfully deployed a remote MCP server, you can connect to it using various applications like Google Code Assist or Gemini CLI. In this section, we will establish a connection to your new remote MCP server using [Gemini CLI](https://github.com/google-gemini/gemini-cli).
+
+1. Give your user account permission to call the remote MCP server:
+   ```bash
+   gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
+     --member=user:$(gcloud config get-value account) \
+     --role='roles/run.invoker'
+   ```
+
+2. Save your Google Cloud credentials and project number in environment variables for use in the Gemini Settings file:
+   ```bash
+   export PROJECT_NUMBER=$(gcloud projects describe $GOOGLE_CLOUD_PROJECT --format="value(projectNumber)")
+   export ID_TOKEN=$(gcloud auth print-identity-token)
+   ```
+
+3. Make a `.gemini` folder if it has not already been created:
+   ```bash
+   mkdir -p ~/.gemini
+   ```
+
+4. Open your Gemini CLI Settings file:
+   ```bash
+   cloudshell edit ~/.gemini/settings.json
+   ```
+
+5. Replace your Gemini CLI settings file to add the Cloud Run MCP server:
+   ```json
+   {
+     "ide": {
+       "hasSeenNudge": true
+     },
+     "mcpServers": {
+       "zoo-remote": {
+         "httpUrl": "https://zoo-mcp-server-$PROJECT_NUMBER.europe-west1.run.app/mcp",
+         "headers": {
+           "Authorization": "Bearer $ID_TOKEN"
+         }
+       }
+     },
+     "security": {
+       "auth": {
+         "selectedType": "cloud-shell"
+       }
+     }
+   }
+   ```
+
+6. Start the Gemini CLI in Cloud Shell:
+   ```bash
+   gemini
+   ```
+   You may need to press `Enter` to accept some default settings.
+
+7. Have gemini list the MCP tools available to it within its context:
+   ```
+   /mcp
+   ```
+
+8. Ask gemini to find something in the zoo:
+   ```
+   Where can I find penguins?
+   ```
+   The Gemini CLI should know to use the `zoo-remote` MCP Server and will ask if you would like to allow execution of MCP.
+
+9. Use the down arrow, then press `Enter` to select:
+   ```
+   Yes, always allow all tools from server "zoo-remote"
+   ```
+
+The output should show the correct answer and a display box showing that the MCP server was used.
+
+You have done it! You have successfully deployed a remote MCP server to Cloud Run and tested it using Gemini CLI.
+
+When you are ready to end your session, type `/quit` and then press `Enter` to exit Gemini CLI.
+
+**Debugging**
+
+If you see an error like this:
+
+```
+🔍 Attempting OAuth discovery for 'zoo-remote'...
+❌ 'zoo-remote' requires authentication but no OAuth configuration found
+Error connecting to MCP server 'zoo-remote': MCP server 'zoo-remote' requires authentication. Please configure OAuth or check server settings.
+```
+
+It is likely that the ID Token has timed out and requires setting the `ID_TOKEN` again.
+
+1. Type `/quit` and then press `Enter` to exit Gemini CLI.
+2. Set your project in your terminal:
+   ```bash
+   gcloud config set project [PROJECT_ID]
+   ```
+3. Restart on step 2 above
+
+## 9. (Optional) Verify Tool Calls in Server Logs
+
+To verify that your Cloud Run MCP server was called, check the service logs.
+
+```bash
+gcloud run services logs read zoo-mcp-server --region europe-west1 --limit=5
+```
+
+You should see an output log that confirms a tool call was made. 🛠️
+
+```
+2025-08-05 19:50:31 INFO:     169.254.169.126:39444 - "POST /mcp HTTP/1.1" 200 OK
+2025-08-05 19:50:31 [INFO]: Processing request of type CallToolRequest
+2025-08-05 19:50:31 >>> 🛠️ Tool: 'get_animals_by_species' called for 'penguin'
+```
+
+## 10. (Optional) Add MCP prompt to Server
+
+An MCP prompt can speed up your workflow for prompts you run often by creating a shorthand for a longer prompt.
+
+Gemini CLI automatically converts MCP prompts into [custom slash commands](https://cloud.google.com/blog/topics/developers-practitioners/gemini-cli-custom-slash-commands?e=48754805) so that you can invoke an MCP prompt by typing `/prompt_name` where `prompt_name` is the name of your MCP prompt.
+
+Create an MCP prompt so you can quickly find an animal in the zoo by typing `/find animal` into Gemini CLI.
+
+1. Add this code to your `src/index.ts` file above the server.listen() call:
+
+```typescript
+// Prompt: Find animal location
+server.prompt(
+  {
+    name: 'find',
+    description: 'Find which exhibit and trail a specific animal might be located.',
+    schema: z.object({
+      animal: z.string().describe('The name or species of the animal to find'),
+    }),
+  },
+  async ({ animal }) => {
+    return text(
+      `Please find the exhibit and trail information for ${animal} in the zoo. ` +
+        `Respond with '[animal] can be found in the [exhibit] on the [trail].' ` +
+        `Example: Penguins can be found in The Arctic Exhibit on the Polar Path.`
+    );
+  }
+);
+```
+
+2. Re-deploy your application to Cloud Run:
+   ```bash
+   gcloud run deploy zoo-mcp-server \
+     --region=europe-west1 \
+     --source=. \
+     --labels=dev-tutorial=codelab-mcp
+   ```
+
+3. Refresh your ID_TOKEN for your remote MCP server:
+   ```bash
+   export ID_TOKEN=$(gcloud auth print-identity-token)
+   ```
+
+4. After the new version of your application is deployed, start Gemini CLI:
+   ```bash
+   gemini
+   ```
+
+5. In the prompt use the new custom command that you created:
+   ```
+   /find --animal="lions"
+   ```
+   OR
+   ```
+   /find lions
+   ```
+
+You should see that Gemini CLI calls the `get_animals_by_species` tool and formats the response as instructed by the MCP prompt!
+
+
+## 11. Use Gemini Flash Lite for faster responses (Optional)
+
+Gemini CLI lets you choose the model you are using.
+
+- **Gemini 2.5 Pro** is Google's state-of-the-art thinking model, capable of reasoning over complex problems in code, math, and STEM, as well as analyzing large datasets, codebases, and documents using long context.
+- **Gemini 2.5 Flash** is Google's best model in terms of price-performance, offering well-rounded capabilities. 2.5 Flash is best for large scale processing, low-latency, high volume tasks that require thinking, and agentic use cases.
+- **Gemini 2.5 Flash Lite** is Google's fastest flash model optimized for cost-efficiency and high throughput.
+
+Since the requests related to finding the zoo animals don't require thinking or reasoning, try speeding things up by using a faster model.
+
+1. After the new version of your application is deployed, start Gemini CLI:
+   ```bash
+   gemini --model=gemini-2.5-flash-lite
+   ```
+
+2. In the prompt use the new custom command that you created:
+   ```
+   /find lions
+   ```
+
+You should still see that Gemini CLI calls the `get_animals_by_species` tool and formats the response as instructed by the MCP prompt, but the answer should appear much faster!
+
+### Debugging
+
+If you see an error like this:
+
+```
+✕ Unknown command: /find --animal="lions"
+```
+
+Try to run `/mcp` and if it outputs `zoo-remote - Disconnected`, you might have to re-deploy, or run the following commands again:
+
+```bash
+gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
+  --member=user:$(gcloud config get-value account) \
+  --role='roles/run.invoker'
+
+export PROJECT_NUMBER=$(gcloud projects describe $GOOGLE_CLOUD_PROJECT --format="value(projectNumber)")
+export ID_TOKEN=$(gcloud auth print-identity-token)
+```
+
+## Conclusion
+
+Congratulations! You have successfully deployed and connected to a secure remote MCP server built with mcp-use TypeScript.
+
+### What You've Accomplished
+
+- ✅ Created a production-ready MCP server with TypeScript
+- ✅ Deployed it securely to Google Cloud Run with authentication
+- ✅ Connected to it from Gemini CLI
+- ✅ Added interactive ChatGPT Apps widgets
+- ✅ Learned how to use MCP prompts for faster workflows
+
+### Continue Learning
+
+This lab demonstrates the fundamentals of deploying MCP servers. You can extend this by:
+
+- Adding more tools and resources
+- Integrating with databases or external APIs
+- Building more complex ChatGPT Apps widgets
+- Adding authentication and authorization
+- Scaling your server for high traffic
+
+### (Optional) Clean up
+
+If you are not continuing on to the next lab and you would like to clean up what you have created, you can delete your Cloud project to avoid incurring additional charges.
+
+While Cloud Run does not charge when the service is not in use, you might still be charged for storing the container image in Artifact Registry. Deleting your Cloud project stops billing for all the resources used within that project.
+
+If you would like, delete the project:
+
+```bash
+gcloud projects delete $GOOGLE_CLOUD_PROJECT
+```
+
+You may also want to delete unnecessary resources from your cloudshell disk. You can:
+
+1. Delete the codelab project directory:
+   ```bash
+   rm -rf ~/mcp-on-cloudrun
+   ```
+
+2. Warning! This next action can't be undone! If you would like to delete everything on your Cloud Shell to free up space, you can [delete your **whole** home directory](https://cloud.google.com/shell/docs/resetting-cloud-shell). Be careful that everything you want to keep is saved somewhere else.
+   ```bash
+   sudo rm -rf $HOME
+   ```

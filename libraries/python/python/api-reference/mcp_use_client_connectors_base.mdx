@@ -1,0 +1,325 @@
+---
+title: "Base"
+description: "Base connector for MCP implementations API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/base.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/base.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/base.py</a>
+</Callout>
+
+Base connector for MCP implementations.
+
+This module provides the base connector interface that all MCP connectors
+must implement.
+
+## BaseConnector
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> BaseConnector</div>
+
+Base class for MCP connectors.
+
+    This class defines the interface that all MCP connectors must implement.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.client.connectors.base import BaseConnector
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize base connector with common attributes.
+
+**Parameters**
+><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
+><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+
+**Signature**
+```python wrap
+def __init__(sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` call_tool
+
+Call an MCP tool with automatic reconnection handling.
+
+
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   The name of the tool to call. </ParamField>
+><ParamField body="arguments" type="dict[str, Any]" required="True" >   The arguments to pass to the tool. </ParamField>
+><ParamField body="read_timeout_seconds" type="datetime.timedelta | None" default="None" >   timeout seconds when calling tool </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.CallToolResult" >The result of the tool call.</ResponseField>
+
+**Signature**
+```python wrap
+def call_tool(
+name: str,
+    arguments: dict[str,
+    Any],
+    read_timeout_seconds: datetime.timedelta | None = None
+):
+```
+
+</Card>
+
+<Card type="info">
+### `property` client_info
+
+Get the client info for the connector.
+
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.Implementation" />
+
+**Signature**
+```python wrap
+def client_info():
+```
+
+</Card>
+
+<Card type="info">
+### `method` connect
+
+Establish a connection to the MCP implementation.
+
+
+**Signature**
+```python wrap
+def connect():
+```
+
+</Card>
+
+<Card type="info">
+### `method` disconnect
+
+Close the connection to the MCP implementation.
+
+
+**Signature**
+```python wrap
+def disconnect():
+```
+
+</Card>
+
+<Card type="info">
+### `method` get_prompt
+
+Get a prompt by name.
+
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="arguments" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.GetPromptResult" />
+
+**Signature**
+```python wrap
+def get_prompt(name: str, arguments: dict[str, typing.Any] | None = None):
+```
+
+</Card>
+
+<Card type="info">
+### `method` initialize
+
+Initialize the MCP session and return session information.
+
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.InitializeResult | None" />
+
+**Signature**
+```python wrap
+def initialize():
+```
+
+</Card>
+
+<Card type="info">
+### `property` is_connected
+
+Check if the connector is actually connected and the connection is alive.
+
+        This property checks not only the connected flag but also verifies that
+        the underlying connection manager and streams are still active.
+
+
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def is_connected():
+```
+
+</Card>
+
+<Card type="info">
+### `method` list_prompts
+
+List all available prompts from the MCP implementation.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Prompt]" />
+
+**Signature**
+```python wrap
+def list_prompts():
+```
+
+</Card>
+
+<Card type="info">
+### `method` list_resources
+
+List all available resources from the MCP implementation.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Resource]" />
+
+**Signature**
+```python wrap
+def list_resources():
+```
+
+</Card>
+
+<Card type="info">
+### `method` list_tools
+
+List all available tools from the MCP implementation.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Tool]" />
+
+**Signature**
+```python wrap
+def list_tools():
+```
+
+</Card>
+
+<Card type="info">
+### `property` prompts
+
+Get the list of available prompts.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_prompts()' instead to ensure
+            you always get the latest data.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Prompt]" />
+
+**Signature**
+```python wrap
+def prompts():
+```
+
+</Card>
+
+<Card type="info">
+### `property` public_identifier
+
+Get the identifier for the connector.
+
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def public_identifier():
+```
+
+</Card>
+
+<Card type="info">
+### `method` read_resource
+
+Read a resource by URI.
+
+
+**Parameters**
+><ParamField body="uri" type="pydantic.networks.AnyUrl" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="mcp.types.ReadResourceResult" />
+
+**Signature**
+```python wrap
+def read_resource(uri: pydantic.networks.AnyUrl):
+```
+
+</Card>
+
+<Card type="info">
+### `property` resources
+
+Get the list of available resources.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_resources()` instead to ensure
+            you always get the latest data.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Resource]" />
+
+**Signature**
+```python wrap
+def resources():
+```
+
+</Card>
+
+<Card type="info">
+### `property` tools
+
+Get the list of available tools.
+
+        .. deprecated::
+            This property is deprecated because it may return stale data when the server
+            sends list change notifications. Use `await list_tools()` instead to ensure
+            you always get the latest data.
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Tool]" />
+
+**Signature**
+```python wrap
+def tools():
+```
+
+</Card>
+
+</div>
