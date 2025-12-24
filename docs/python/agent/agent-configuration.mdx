@@ -253,7 +253,7 @@ If you want more control over how tools are created, you can work with the adapt
 import asyncio
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from mcp_use.client import MCPClient
 from mcp_use.adapters import LangChainAdapter
@@ -419,7 +419,7 @@ agent = MCPAgent(
 For more advanced customization, you can provide a custom system prompt template:
 
 ```python
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 custom_template = ChatPromptTemplate.from_messages([
     ("system", "You are an expert {domain} assistant. {instructions}"),
