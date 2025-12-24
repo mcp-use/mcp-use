@@ -67,6 +67,9 @@ Initialize a new MCPAgent instance.
 ><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for remote API calls. </ParamField>
 ><ParamField body="callbacks" type="list | None" default="None" >   List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler. </ParamField>
 ><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="retry_on_error" type="bool" default="True" >   Whether to retry tool calls that fail due to validation errors. </ParamField>
+><ParamField body="metadata" type="dict[str]" default="None" > Specific data to be passed to tools without passing through llm. </ParamField>
+><ParamField body="message_id" type="str" default="None" > Unique Id to be passed to each message in a chat. </ParamField>
 ><ParamField body="retry_on_error" type="bool" default="True" >   Whether to enable automatic error handling for tool calls. When True, tool errors </ParamField>
 
 **Signature**
