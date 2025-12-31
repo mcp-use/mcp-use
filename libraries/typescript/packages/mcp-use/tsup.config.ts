@@ -40,7 +40,6 @@ export default defineConfig({
     // Keep optional display dependencies external (uses Node.js built-ins, incompatible with neutral platform)
     "chalk",
     "cli-highlight",
-    "winston",
     "supports-color",
     // Keep react-router-dom external (optional, for widgets)
     "react-router-dom",

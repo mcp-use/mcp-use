@@ -43,11 +43,11 @@ export type { StoredState } from "./auth/types.js";
 
 // Re-export useful SDK types
 export type {
-    OAuthClientInformation,
-    OAuthMetadata,
-    OAuthTokens
+  OAuthClientInformation,
+  OAuthMetadata,
+  OAuthTokens
 } from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
 
 // Export version information (global)
-export { VERSION, getPackageVersion } from "./version.js";
+export { getPackageVersion, VERSION } from "./version.js";
 
