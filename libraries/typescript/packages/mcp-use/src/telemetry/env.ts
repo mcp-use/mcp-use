@@ -70,7 +70,9 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
 /**
  * Determine storage capability based on runtime environment
  */
-export function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
+export function getStorageCapability(
+  env: RuntimeEnvironment
+): StorageCapability {
   switch (env) {
     case "node":
     case "bun":
@@ -112,4 +114,3 @@ export function getRuntimeEnvironment(): RuntimeEnvironment {
 export function isBrowserEnvironment(): boolean {
   return getRuntimeEnvironment() === "browser";
 }
-

@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-import { BaseTelemetryEvent } from "./events.js";
-import { TelemetryProvider } from "./provider.js";
+import type { BaseTelemetryEvent } from "./events.js";
+import type { TelemetryProvider } from "./provider.js";
 import { getPackageVersion } from "./utils.js";
-import { getRuntimeEnvironment, getStorageCapability, RuntimeEnvironment, StorageCapability } from "./env.js";
+import type { RuntimeEnvironment, StorageCapability } from "./env.js";
+import { getRuntimeEnvironment, getStorageCapability } from "./env.js";
 import { generateUUID, secureRandomString } from "./id-utils.js";
 
 // Simple logger shim
@@ -69,14 +70,16 @@ type PostHogNodeClient = {
 };
 
 export class NodeTelemetryProvider implements TelemetryProvider {
-  private readonly PROJECT_API_KEY = "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
+  private readonly PROJECT_API_KEY =
+    "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
   private readonly HOST = "https://eu.i.posthog.com";
-  private readonly SCARF_GATEWAY_URL = "https://mcpuse.gateway.scarf.sh/events-ts";
-  
+  private readonly SCARF_GATEWAY_URL =
+    "https://mcpuse.gateway.scarf.sh/events-ts";
+
   private _posthogNodeClient: PostHogNodeClient | null = null;
   private _posthogLoading: Promise<void> | null = null;
   private _scarfClient: ScarfEventLogger | null = null;
-  
+
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
   private _currUserId: string | null = null;
@@ -95,10 +98,7 @@ export class NodeTelemetryProvider implements TelemetryProvider {
 
       // Initialize Scarf
       try {
-        this._scarfClient = new ScarfEventLogger(
-          this.SCARF_GATEWAY_URL,
-          3000
-        );
+        this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000);
       } catch (e) {
         logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
         this._scarfClient = null;
@@ -177,7 +177,7 @@ export class NodeTelemetryProvider implements TelemetryProvider {
         case "localStorage":
         case "session-only":
         default:
-           // Fallback for non-filesystem Node environments (e.g. Lambda ephemeral)
+          // Fallback for non-filesystem Node environments (e.g. Lambda ephemeral)
           try {
             this._currUserId = `session-${generateUUID()}`;
           } catch (uuidError) {
@@ -288,10 +288,14 @@ export class NodeTelemetryProvider implements TelemetryProvider {
       if (!fs.existsSync(this._versionDownloadPath)) {
         shouldTrack = true;
         firstDownload = true;
-        fs.mkdirSync(path.dirname(this._versionDownloadPath), { recursive: true });
+        fs.mkdirSync(path.dirname(this._versionDownloadPath), {
+          recursive: true,
+        });
         fs.writeFileSync(this._versionDownloadPath, currentVersion);
       } else {
-        const savedVersion = fs.readFileSync(this._versionDownloadPath, "utf-8").trim();
+        const savedVersion = fs
+          .readFileSync(this._versionDownloadPath, "utf-8")
+          .trim();
         if (currentVersion > savedVersion) {
           shouldTrack = true;
           firstDownload = false;
@@ -317,7 +321,10 @@ export class NodeTelemetryProvider implements TelemetryProvider {
   }
 
   isEnabled(): boolean {
-    return !this._disabled && (this._posthogNodeClient !== null || this._scarfClient !== null);
+    return (
+      !this._disabled &&
+      (this._posthogNodeClient !== null || this._scarfClient !== null)
+    );
   }
 
   async capture(event: BaseTelemetryEvent, source?: string): Promise<void> {
@@ -331,7 +338,10 @@ export class NodeTelemetryProvider implements TelemetryProvider {
     const properties = { ...event.properties };
     properties.mcp_use_version = getPackageVersion();
     properties.language = "typescript";
-    properties.source = source || (process.env?.MCP_USE_TELEMETRY_SOURCE || this._runtimeEnvironment);
+    properties.source =
+      source ||
+      process.env?.MCP_USE_TELEMETRY_SOURCE ||
+      this._runtimeEnvironment;
     properties.runtime = this._runtimeEnvironment;
 
     // Send to PostHog
@@ -382,4 +392,3 @@ export class NodeTelemetryProvider implements TelemetryProvider {
     }
   }
 }
-

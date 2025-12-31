@@ -31,11 +31,7 @@ export type {
   Content,
 } from "./events.js";
 
-export {
-  Telemetry,
-  Tel,
-  setTelemetrySource,
-} from "./telemetry.js";
+export { Telemetry, Tel, setTelemetrySource } from "./telemetry.js";
 
 export { isBrowserEnvironment } from "./env.js";
 export type { RuntimeEnvironment } from "./env.js";

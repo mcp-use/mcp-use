@@ -1,6 +1,6 @@
 /**
  * Browser entry point - exports OAuth utilities and MCP client for browser-based MCP usage
- * 
+ *
  * Note: MCPAgent and RemoteAgent are NOT exported here as they require Node.js dependencies
  * (langchain, fs, child_process). Use them from the server build instead.
  */
@@ -45,9 +45,8 @@ export type { StoredState } from "./auth/types.js";
 export type {
   OAuthClientInformation,
   OAuthMetadata,
-  OAuthTokens
+  OAuthTokens,
 } from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
 
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./version.js";
-

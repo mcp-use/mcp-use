@@ -1,43 +1,47 @@
 import { getRuntimeEnvironment } from "./env.js";
+import type {
+  ConnectorInitEventData,
+  MCPAgentExecutionEventData,
+  MCPClientInitEventData,
+  MCPServerTelemetryInfo,
+  ServerContextEventData,
+  ServerInitializeEventData,
+  ServerPromptCallEventData,
+  ServerResourceCallEventData,
+  ServerToolCallEventData,
+} from "./events.js";
 import {
   BaseTelemetryEvent,
   ClientAddServerEvent,
   ClientRemoveServerEvent,
   ConnectorInitEvent,
-  ConnectorInitEventData,
   createServerRunEventData,
   MCPAgentExecutionEvent,
-  MCPAgentExecutionEventData,
   MCPClientInitEvent,
-  MCPClientInitEventData,
-  MCPServerTelemetryInfo,
   ServerContextEvent,
-  ServerContextEventData,
   ServerInitializeEvent,
-  ServerInitializeEventData,
   ServerPromptCallEvent,
-  ServerPromptCallEventData,
   ServerResourceCallEvent,
-  ServerResourceCallEventData,
   ServerRunEvent,
   ServerToolCallEvent,
-  ServerToolCallEventData
 } from "./events.js";
-import { TelemetryProvider } from "./provider.js";
+import type { TelemetryProvider } from "./provider.js";
 
 // No-op provider default
 class NoOpTelemetryProvider implements TelemetryProvider {
   async capture(_event: BaseTelemetryEvent, _source?: string) {}
-  isEnabled() { return false; }
+  isEnabled() {
+    return false;
+  }
 }
 
 /**
  * Unified Telemetry class.
- * 
+ *
  * This class is a lightweight facade. It delegates actual event capture and persistence
  * to a TelemetryProvider. This ensures that the core telemetry logic does not
  * depend on environment-specific libraries (like 'fs', 'posthog-node', 'posthog-js').
- * 
+ *
  * You must call `Tel.getInstance().use(new Provider())` at your application entry point.
  */
 export class Telemetry {
@@ -152,7 +156,9 @@ export class Telemetry {
     await this.capture(event);
   }
 
-  async trackServerResourceCall(data: ServerResourceCallEventData): Promise<void> {
+  async trackServerResourceCall(
+    data: ServerResourceCallEventData
+  ): Promise<void> {
     if (!this.isEnabled) return;
     const event = new ServerResourceCallEvent(data);
     await this.capture(event);
@@ -197,10 +203,10 @@ export class Telemetry {
     await this.capture(event);
   }
 
-  // React Hook / Browser specific events - simplified to generic capture for now 
+  // React Hook / Browser specific events - simplified to generic capture for now
   // as the event classes for these might not be exported from events.ts yet.
   // The original implementation used anonymous objects passed to capture.
-  
+
   async trackUseMcpConnection(data: {
     url: string;
     transportType: string;
@@ -219,19 +225,19 @@ export class Telemetry {
     // but the interface expects BaseTelemetryEvent.
     // Let's create an ad-hoc event class here.
     class UseMcpConnectionEvent extends BaseTelemetryEvent {
-        name = "usemcp_connection";
-        get properties() {
-            return {
-                url_domain: new URL(data.url).hostname,
-                transport_type: data.transportType,
-                success: data.success,
-                error_type: data.errorType ?? null,
-                connection_time_ms: data.connectionTimeMs ?? null,
-                has_oauth: data.hasOAuth,
-                has_sampling: data.hasSampling,
-                has_elicitation: data.hasElicitation,
-            };
-        }
+      name = "usemcp_connection";
+      get properties() {
+        return {
+          url_domain: new URL(data.url).hostname,
+          transport_type: data.transportType,
+          success: data.success,
+          error_type: data.errorType ?? null,
+          connection_time_ms: data.connectionTimeMs ?? null,
+          has_oauth: data.hasOAuth,
+          has_sampling: data.hasSampling,
+          has_elicitation: data.hasElicitation,
+        };
+      }
     }
     await this.capture(new UseMcpConnectionEvent());
   }
@@ -245,15 +251,15 @@ export class Telemetry {
     if (!this.isEnabled) return;
 
     class UseMcpToolCallEvent extends BaseTelemetryEvent {
-        name = "usemcp_tool_call";
-        get properties() {
-            return {
-                tool_name: data.toolName,
-                success: data.success,
-                error_type: data.errorType ?? null,
-                execution_time_ms: data.executionTimeMs ?? null,
-            };
-        }
+      name = "usemcp_tool_call";
+      get properties() {
+        return {
+          tool_name: data.toolName,
+          success: data.success,
+          error_type: data.errorType ?? null,
+          execution_time_ms: data.executionTimeMs ?? null,
+        };
+      }
     }
     await this.capture(new UseMcpToolCallEvent());
   }
@@ -266,14 +272,14 @@ export class Telemetry {
     if (!this.isEnabled) return;
 
     class UseMcpResourceReadEvent extends BaseTelemetryEvent {
-        name = "usemcp_resource_read";
-        get properties() {
-            return {
-                resource_uri_scheme: data.resourceUri.split(":")[0],
-                success: data.success,
-                error_type: data.errorType ?? null,
-            };
-        }
+      name = "usemcp_resource_read";
+      get properties() {
+        return {
+          resource_uri_scheme: data.resourceUri.split(":")[0],
+          success: data.success,
+          error_type: data.errorType ?? null,
+        };
+      }
     }
     await this.capture(new UseMcpResourceReadEvent());
   }

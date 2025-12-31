@@ -1,4 +1,4 @@
-import { BaseTelemetryEvent } from "./events.js";
+import type { BaseTelemetryEvent } from "./events.js";
 
 export interface TelemetryProvider {
   /**
@@ -25,10 +25,9 @@ export interface TelemetryProvider {
    * Shutdown the provider (node only)
    */
   shutdown?(): void;
-  
+
   /**
    * Check if telemetry is enabled
    */
   isEnabled(): boolean;
 }
-

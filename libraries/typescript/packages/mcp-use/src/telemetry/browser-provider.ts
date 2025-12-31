@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-import { BaseTelemetryEvent } from "./events.js";
-import { TelemetryProvider } from "./provider.js";
+import type { BaseTelemetryEvent } from "./events.js";
+import type { TelemetryProvider } from "./provider.js";
 import { getPackageVersion } from "./utils.js";
 import { generateUUID, secureRandomString } from "./id-utils.js";
 
@@ -31,9 +30,10 @@ const logger = {
 const USER_ID_STORAGE_KEY = "mcp_use_user_id";
 
 export class BrowserTelemetryProvider implements TelemetryProvider {
-  private readonly PROJECT_API_KEY = "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
+  private readonly PROJECT_API_KEY =
+    "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
   private readonly HOST = "https://eu.i.posthog.com";
-  
+
   private _posthogBrowserClient: PostHogBrowserClient | null = null;
   private _posthogLoading: Promise<void> | null = null;
   private _currUserId: string | null = null;
@@ -41,7 +41,7 @@ export class BrowserTelemetryProvider implements TelemetryProvider {
 
   constructor() {
     this._disabled = this._checkTelemetryDisabled();
-    
+
     if (!this._disabled) {
       this._posthogLoading = this._initPostHogBrowser();
     }
@@ -94,21 +94,21 @@ export class BrowserTelemetryProvider implements TelemetryProvider {
     try {
       if (typeof localStorage !== "undefined") {
         this._currUserId = localStorage.getItem(USER_ID_STORAGE_KEY);
-        
+
         if (!this._currUserId) {
-            try {
-                this._currUserId = generateUUID();
-            } catch (uuidError) {
-                this._currUserId = `${Date.now()}-${secureRandomString()}`;
-            }
-            localStorage.setItem(USER_ID_STORAGE_KEY, this._currUserId!);
+          try {
+            this._currUserId = generateUUID();
+          } catch (uuidError) {
+            this._currUserId = `${Date.now()}-${secureRandomString()}`;
+          }
+          localStorage.setItem(USER_ID_STORAGE_KEY, this._currUserId!);
         }
       } else {
         // Session-only fallback
         try {
-            this._currUserId = `session-${generateUUID()}`;
+          this._currUserId = `session-${generateUUID()}`;
         } catch (uuidError) {
-            this._currUserId = `session-${Date.now()}-${secureRandomString()}`;
+          this._currUserId = `session-${Date.now()}-${secureRandomString()}`;
         }
       }
     } catch (e) {
@@ -169,4 +169,3 @@ export class BrowserTelemetryProvider implements TelemetryProvider {
     }
   }
 }
-

@@ -30,11 +30,15 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
-import { ServerDropdown } from "./ServerDropdown";
+
+// Dynamic import for ServerDropdown to avoid bundling react-router in embedded mode
+let ServerDropdownComponent:
+  | typeof import("./ServerDropdown").ServerDropdown
+  | null = null;
 
 interface LayoutHeaderProps {
   connections: MCPConnection[];
@@ -126,8 +130,32 @@ export function LayoutHeader({
   const { tunnelUrl } = useInspector();
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
-
   const [collapsed, setCollapsed] = useState(true);
+  const [ServerDropdown, setServerDropdown] =
+    useState<typeof ServerDropdownComponent>(null);
+
+  // Dynamically load ServerDropdown only when not in embedded mode
+  useEffect(() => {
+    if (!embedded && !ServerDropdownComponent) {
+      import("./ServerDropdown")
+        .then((module) => {
+          ServerDropdownComponent = module.ServerDropdown;
+          setServerDropdown(ServerDropdownComponent);
+        })
+        .catch(() => {
+          // react-router not available - ServerDropdown won't be used
+          console.warn(
+            "ServerDropdown not available (react-router not installed)"
+          );
+        });
+    } else if (embedded) {
+      // In embedded mode, ensure it's null
+      setServerDropdown(null);
+    } else {
+      // Already loaded
+      setServerDropdown(ServerDropdownComponent);
+    }
+  }, [embedded]);
 
   // Filter tabs based on showTabs prop (only in embedded mode)
   const visibleTabs =

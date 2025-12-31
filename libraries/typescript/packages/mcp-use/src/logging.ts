@@ -65,7 +65,7 @@ class ConsoleLogger {
     const timestamp = new Date().toLocaleTimeString("en-US", { hour12: false });
     const levelUpper = level.toUpperCase();
     const metaStr = meta ? ` ${JSON.stringify(meta)}` : "";
-    
+
     return `${timestamp} [${this.name}] ${levelUpper}: ${message}${metaStr}`;
   }
 
