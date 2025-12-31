@@ -17,6 +17,7 @@ interface UseAutoConnectOptions {
   ) => void;
   removeConnection: (id: string) => void;
   configLoaded: boolean;
+  embedded?: boolean;
 }
 
 interface AutoConnectState {
@@ -75,6 +76,7 @@ export function useAutoConnect({
   addConnection,
   removeConnection,
   configLoaded: contextConfigLoaded,
+  embedded = false,
 }: UseAutoConnectOptions): AutoConnectState {
   const navigate = useNavigate();
   const [isAutoConnecting, setIsAutoConnecting] = useState(false);
@@ -107,10 +109,15 @@ export function useAutoConnect({
         config;
 
       // Prepare proxy configuration if using proxy
+      // Use __INSPECTOR_API_URL__ if set (embedded mode), otherwise window.location.origin
+      const apiUrl = typeof window !== "undefined"
+        ? (window as any).__INSPECTOR_API_URL__ || window.location.origin
+        : window.location.origin;
+      
       const proxyConfig =
         connectionType === "Via Proxy"
           ? {
-              proxyAddress: `${window.location.origin}/inspector/api/proxy/mcp`,
+              proxyAddress: `${apiUrl}/inspector/api/proxy/mcp`,
               customHeaders: customHeaders || {},
             }
           : customHeaders && Object.keys(customHeaders).length > 0
@@ -135,16 +142,18 @@ export function useAutoConnect({
       if (existing) {
         // Connection already exists
         if (existing.state === "ready") {
-          // Already connected - navigate immediately
+          // Already connected - navigate immediately (unless in embedded mode)
           console.warn(
-            "[useAutoConnect] Connection already ready, navigating to server"
+            "[useAutoConnect] Connection already ready" + (embedded ? "" : ", navigating to server")
           );
-          const urlParams = new URLSearchParams(window.location.search);
-          const tunnelUrl = urlParams.get("tunnelUrl");
-          const newUrl = tunnelUrl
-            ? `/?server=${encodeURIComponent(existing.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-            : `/?server=${encodeURIComponent(existing.id)}`;
-          navigate(newUrl);
+          if (!embedded) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tunnelUrl = urlParams.get("tunnelUrl");
+            const newUrl = tunnelUrl
+              ? `/?server=${encodeURIComponent(existing.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+              : `/?server=${encodeURIComponent(existing.id)}`;
+            navigate(newUrl);
+          }
         } else {
           // Connection exists but not ready - track it for navigation when ready
           console.warn(
@@ -161,7 +170,7 @@ export function useAutoConnect({
         attemptConnection(config);
       }
     },
-    [connections, navigate, attemptConnection]
+    [connections, navigate, attemptConnection, embedded]
   );
 
   // Load config and initiate auto-connect
@@ -211,17 +220,19 @@ export function useAutoConnect({
     // Handle successful connection first (don't block by hasTriedBothModes)
     if (connection?.state === "ready") {
       console.warn(
-        "[useAutoConnect] Connection succeeded, navigating to server"
+        "[useAutoConnect] Connection succeeded" + (embedded ? "" : ", navigating to server")
       );
 
-      // Navigate using the connection ID (which is the original URL)
-      // Preserve tunnelUrl parameter if present
-      const urlParams = new URLSearchParams(window.location.search);
-      const tunnelUrl = urlParams.get("tunnelUrl");
-      const newUrl = tunnelUrl
-        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(connection.id)}`;
-      navigate(newUrl);
+      if (!embedded) {
+        // Navigate using the connection ID (which is the original URL)
+        // Preserve tunnelUrl parameter if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const tunnelUrl = urlParams.get("tunnelUrl");
+        const newUrl = tunnelUrl
+          ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
+          : `/?server=${encodeURIComponent(connection.id)}`;
+        navigate(newUrl);
+      }
 
       setTimeout(() => {
         setAutoConnectConfig(null);
@@ -293,7 +304,7 @@ export function useAutoConnect({
           }, 1000);
         });
       } else {
-        // Both modes failed - clear loading, reset state, and navigate home
+        // Both modes failed - clear loading, reset state, and navigate home (unless embedded)
         toast.error(
           "Cannot connect to server. Please check the URL and try again."
         );
@@ -306,8 +317,10 @@ export function useAutoConnect({
           setHasTriedBothModes(true);
           retryScheduledRef.current = false;
 
-          // Navigate to home page after connection failure
-          navigate("/");
+          // Navigate to home page after connection failure (skip in embedded mode)
+          if (!embedded) {
+            navigate("/");
+          }
         });
       }
     }
@@ -319,6 +332,7 @@ export function useAutoConnect({
     attemptConnection,
     removeConnection,
     navigate,
+    embedded,
   ]);
 
   // Clear loading state for connections that complete without retry

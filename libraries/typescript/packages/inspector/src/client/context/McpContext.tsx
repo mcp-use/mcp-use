@@ -1,6 +1,14 @@
+import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
+import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
+import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
+import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type {
+  CreateMessageResult,
+  ElicitResult,
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { useMcp } from "mcp-use/react";
-import React, { type ReactNode } from "react";
 import {
   createContext,
   use,
@@ -9,15 +17,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
-import type {
-  CreateMessageResult,
-  ElicitResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
-import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
-import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
 
 // Empty function constants for sampling operations
 const EMPTY_APPROVE_SAMPLING = () => {};
@@ -1176,6 +1177,16 @@ export function McpProvider({
     },
     [connections]
   );
+
+  // Enable proxy fallback using useAutoConnect hook
+  // Pass embedded flag to control navigation behavior
+  useAutoConnect({
+    connections,
+    addConnection,
+    removeConnection,
+    configLoaded,
+    embedded,
+  });
 
   const updateConnectionConfig = useCallback(
     (
