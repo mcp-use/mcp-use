@@ -1,3 +1,13 @@
+import { Tel } from "../telemetry/index.js";
+import { NodeTelemetryProvider } from "../telemetry/node-provider.js";
+
+// Initialize telemetry with Node provider
+try {
+  Tel.getInstance().use(new NodeTelemetryProvider());
+} catch (e) {
+  // Ignore initialization errors (e.g. if environment variables are missing)
+}
+
 export {
   MCPServer,
   createMCPServer,

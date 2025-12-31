@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AddToClientDropdown } from "./AddToClientDropdown";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
@@ -155,7 +154,7 @@ export function LayoutHeader({
       <div className="flex lg:hidden flex-col gap-3">
         <div className="flex items-center justify-between w-full">
           {/* Left: Server Selector (Icon + Chevron) - hide in embedded mode */}
-          {!embedded && (
+          {!embedded && ServerDropdown && (
             <div className="flex-1 flex justify-start">
               <ServerDropdown
                 connections={connections}
@@ -252,7 +251,7 @@ export function LayoutHeader({
         {/* Left side: Server dropdown + Tabs + Tunnel Badge */}
         <div className="flex items-center flex-wrap gap-2 md:space-x-6 space-x-2">
           {/* Server Selection Dropdown - hide in embedded mode */}
-          {!embedded && (
+          {!embedded && ServerDropdown && (
             <ServerDropdown
               connections={connections}
               selectedServer={selectedServer}

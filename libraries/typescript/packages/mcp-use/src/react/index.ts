@@ -9,7 +9,19 @@ export { useMcp } from "./useMcp.js";
 // Re-export auth callback handler for OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
 
-// Re-export unified telemetry (auto-detects browser/Node.js)
+import { Tel } from "../telemetry/index.js";
+import { BrowserTelemetryProvider } from "../telemetry/browser-provider.js";
+
+// Initialize telemetry with Browser provider
+if (typeof window !== "undefined") {
+  try {
+    Tel.getInstance().use(new BrowserTelemetryProvider());
+  } catch (e) {
+    // Ignore initialization errors
+  }
+}
+
+// Re-export unified telemetry (now safe for browser)
 export { Tel, Telemetry, setTelemetrySource } from "../telemetry/index.js";
 
 // Backwards compatibility aliases

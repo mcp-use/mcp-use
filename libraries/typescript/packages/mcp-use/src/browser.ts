@@ -1,11 +1,12 @@
 /**
- * Browser entry point - exports OAuth utilities and MCP client/agent for browser-based MCP usage
+ * Browser entry point - exports OAuth utilities and MCP client for browser-based MCP usage
+ * 
+ * Note: MCPAgent and RemoteAgent are NOT exported here as they require Node.js dependencies
+ * (langchain, fs, child_process). Use them from the server build instead.
  */
 
-// Export core client and agent classes - these work in both Node.js and browser
+// Export core client class - works in both Node.js and browser
 export { BrowserMCPClient as MCPClient } from "./client/browser.js";
-export { MCPAgent } from "./agents/mcp_agent.js";
-export { RemoteAgent } from "./agents/remote.js";
 
 // Export adapters
 export { BaseAdapter } from "./adapters/index.js";
@@ -24,24 +25,15 @@ export { BrowserOAuthClientProvider } from "./auth/browser-provider.js";
 export { onMcpAuthorization } from "./auth/callback.js";
 export type { StoredState } from "./auth/types.js";
 
-// Export logging (uses browser console in browser environments)
-export { Logger, logger } from "./logging.js";
+// Note: Logger and Telemetry not exported from browser build to avoid winston/posthog-node dependencies
+// Import them from the main package or server build if needed in Node.js environments
 
-// Export unified telemetry (auto-detects browser/Node.js)
-export { Tel, Telemetry, setTelemetrySource } from "./telemetry/index.js";
+// Note: ObservabilityManager not exported from browser build
+// It has logging dependencies that pull in winston
 
-// Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "./telemetry/index.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "./telemetry/index.js";
-
-// Export observability
-export {
-  type ObservabilityConfig,
-  ObservabilityManager,
-} from "./observability/index.js";
-
-// Export AI SDK utilities
-export * from "./agents/utils/index.js";
+// Export AI SDK utilities (browser-safe only)
+// Note: Removed wildcard export to avoid bundling Node.js dependencies
+// Import specific utilities from the server build if needed
 
 // !!! NEVER EXPORT @langchain/core types it causes OOM errors when building the package
 // Note: Message classes are not re-exported to avoid forcing TypeScript to deeply analyze
@@ -51,10 +43,11 @@ export * from "./agents/utils/index.js";
 
 // Re-export useful SDK types
 export type {
-  OAuthClientInformation,
-  OAuthMetadata,
-  OAuthTokens,
+    OAuthClientInformation,
+    OAuthMetadata,
+    OAuthTokens
 } from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
 
 // Export version information (global)
-export { getPackageVersion, VERSION } from "./version.js";
+export { VERSION, getPackageVersion } from "./version.js";
+

@@ -35,10 +35,10 @@ export {
   Telemetry,
   Tel,
   setTelemetrySource,
-  isBrowserEnvironment,
 } from "./telemetry.js";
 
-export type { RuntimeEnvironment } from "./telemetry.js";
+export { isBrowserEnvironment } from "./env.js";
+export type { RuntimeEnvironment } from "./env.js";
 
 export {
   extractModelInfo,

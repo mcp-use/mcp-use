@@ -1,9 +1,24 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
-import { logger } from "../logging.js";
 import { Tel } from "../telemetry/index.js";
+import { BrowserTelemetryProvider } from "../telemetry/browser-provider.js";
 import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
+
+// Initialize telemetry with Browser provider
+try {
+  Tel.getInstance().use(new BrowserTelemetryProvider());
+} catch (e) {
+  // Ignore
+}
+
+// Simple logger shim to avoid winston dependency in browser
+const logger = {
+  debug: (msg: string) => console.debug(`[BrowserMCPClient] ${msg}`),
+  info: (msg: string) => console.info(`[BrowserMCPClient] ${msg}`),
+  warn: (msg: string) => console.warn(`[BrowserMCPClient] ${msg}`),
+  error: (msg: string) => console.error(`[BrowserMCPClient] ${msg}`),
+};
 
 /**
  * Browser-compatible MCPClient implementation

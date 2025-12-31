@@ -1,7 +1,14 @@
 import type { BaseConnector } from "../connectors/base.js";
-import { logger } from "../logging.js";
 import { MCPSession } from "../session.js";
 import { Tel } from "../telemetry/index.js";
+
+// Simple logger shim to avoid winston dependency in browser
+const logger = {
+  debug: (msg: string) => console.debug(`[BaseMCPClient] ${msg}`),
+  info: (msg: string) => console.info(`[BaseMCPClient] ${msg}`),
+  warn: (msg: string) => console.warn(`[BaseMCPClient] ${msg}`),
+  error: (msg: string) => console.error(`[BaseMCPClient] ${msg}`),
+};
 
 /**
  * Base MCPClient class with shared functionality
