@@ -6,6 +6,7 @@ import {
   ArrowUpFromLine,
 } from "lucide-react";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
+import { getApiUrl } from "@/client/utils/api";
 
 type RpcDirection = "send" | "receive" | string;
 
@@ -63,7 +64,7 @@ export function JsonRpcLoggerView({
         params.set("serverIds", serverIds.join(","));
       }
       const response = await fetch(
-        `/inspector/api/rpc/log?${params.toString()}`,
+        getApiUrl(`/inspector/api/rpc/log?${params.toString()}`),
         {
           method: "DELETE",
         }
@@ -112,7 +113,9 @@ export function JsonRpcLoggerView({
       if (serverIds && serverIds.length > 0) {
         params.set("serverIds", serverIds.join(","));
       }
-      const streamUrl = `/inspector/api/rpc/stream?${params.toString()}`;
+      const streamUrl = getApiUrl(
+        `/inspector/api/rpc/stream?${params.toString()}`
+      );
       console.log("[RPC Logger] Connecting to SSE stream:", streamUrl);
       es = new globalThis.EventSource(streamUrl);
       es.onopen = () => {

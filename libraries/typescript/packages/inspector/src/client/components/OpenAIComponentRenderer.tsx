@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpContext } from "../context/McpContext";
 import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
+import { getApiUrl } from "../utils/api";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { IframeConsole } from "./IframeConsole";
 import { Spinner } from "./ui/spinner";
@@ -202,7 +203,7 @@ function OpenAIComponentRendererBase({
 
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
         const storeResponse = await fetch(
-          "/inspector/api/resources/widget/store",
+          getApiUrl("/inspector/api/resources/widget/store"),
           {
             method: "POST",
             headers: {
@@ -223,11 +224,13 @@ function OpenAIComponentRendererBase({
 
         if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
-          const proxyUrl = `/inspector/api/dev-widget/${toolId}`;
+          const proxyUrl = getApiUrl(`/inspector/api/dev-widget/${toolId}`);
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
-          const prodUrl = `/inspector/api/resources/widget/${toolId}`;
+          const prodUrl = getApiUrl(
+            `/inspector/api/resources/widget/${toolId}`
+          );
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);

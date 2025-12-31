@@ -1,4 +1,5 @@
 import { rpcLogBus, type RpcLogEvent } from "../server/rpc-log-bus.js";
+import { getApiUrl } from "./utils/api.js";
 
 // Browser-side RPC log bus that sends events to server
 // This is a thin wrapper that publishes to the shared log bus
@@ -22,7 +23,7 @@ export const browserRpcLogBus = {
     // Also send to server for SSE streaming
     try {
       console.log("[RPC Log Bus Browser] Sending to server...");
-      const response = await fetch("/inspector/api/rpc/log", {
+      const response = await fetch(getApiUrl("/inspector/api/rpc/log"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

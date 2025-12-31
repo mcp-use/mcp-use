@@ -1,6 +1,7 @@
 import type { BaseTelemetryEvent } from "./events.js";
 import { MCPInspectorOpenEvent } from "./events.js";
 import { getPackageVersion } from "./utils.js";
+import { getApiUrl } from "../utils/api.js";
 
 // Environment detection function
 function isBrowserEnvironment(): boolean {
@@ -52,8 +53,6 @@ function getCacheKey(key: string): string {
 export class Telemetry {
   private static instance: Telemetry | null = null;
 
-  private readonly POSTHOG_PROXY_URL = "/inspector/api/tel/posthog";
-  private readonly SCARF_PROXY_URL = "/inspector/api/tel/scarf";
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;
@@ -81,7 +80,7 @@ export class Telemetry {
       // Initialize PostHog proxy client (sends to server)
       try {
         this._posthogClient = new TelemetryEventLogger(
-          this.POSTHOG_PROXY_URL,
+          getApiUrl("/inspector/api/tel/posthog"),
           3000
         );
       } catch {
@@ -92,7 +91,7 @@ export class Telemetry {
       // Initialize Scarf proxy client (sends to server)
       try {
         this._scarfClient = new TelemetryEventLogger(
-          this.SCARF_PROXY_URL,
+          getApiUrl("/inspector/api/tel/scarf"),
           3000
         );
       } catch {

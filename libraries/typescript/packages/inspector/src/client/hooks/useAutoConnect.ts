@@ -2,6 +2,7 @@ import type { MCPConnection } from "@/client/context/McpContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { getApiUrl } from "../utils/api";
 
 interface UseAutoConnectOptions {
   connections: MCPConnection[];
@@ -184,7 +185,7 @@ export function useAutoConnect({
     }
 
     // Fallback to config.json
-    fetch("/inspector/config.json")
+    fetch(getApiUrl("/inspector/config.json"))
       .then((res) => res.json())
       .then((configData: { autoConnectUrl: string | null }) => {
         setConfigLoaded(true);

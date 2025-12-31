@@ -129,6 +129,7 @@ interface McpContextType {
   connectServer: (id: string) => void;
   disconnectServer: (id: string) => void;
   configLoaded: boolean;
+  embedded?: boolean;
 }
 
 const McpContext = createContext<McpContextType | null>(null);
@@ -753,11 +754,38 @@ function McpConnectionWrapper({
   return null;
 }
 
-export function McpProvider({ children }: { children: ReactNode }) {
-  // Load initial connections from localStorage
+interface McpProviderProps {
+  children: ReactNode;
+  /** Embedded mode - disables localStorage, uses single pre-configured server */
+  embedded?: boolean;
+  /** Initial server configuration for embedded mode */
+  initialServer?: {
+    url: string;
+    name?: string;
+    transportType?: "http" | "sse";
+    proxyConfig?: {
+      proxyAddress?: string;
+      customHeaders?: Record<string, string>;
+    };
+    customHeaders?: Record<string, string>;
+    auth?: {
+      type?: "oauth2";
+      client_id?: string;
+      redirect_url?: string;
+      scope?: string;
+    };
+  };
+}
+
+export function McpProvider({
+  children,
+  embedded = false,
+  initialServer,
+}: McpProviderProps) {
+  // Load initial connections from localStorage (unless in embedded mode)
   const [connections, setConnections] = useState<MCPConnection[]>([]);
-  const [configLoaded, setConfigLoaded] = useState(false);
-  const [autoConnect, setAutoConnect] = useState(true);
+  const [configLoaded, setConfigLoaded] = useState(embedded); // In embedded mode, config is immediately "loaded"
+  const [autoConnect, setAutoConnect] = useState(!embedded); // Disable autoConnect in embedded mode
 
   // Store configs separately to persist across reloads
   // This mirrors the connections state but contains only config data
@@ -774,8 +802,64 @@ export function McpProvider({ children }: { children: ReactNode }) {
     }>
   >([]);
 
-  // Initialize from localStorage
+  // Initialize from localStorage (or from initialServer in embedded mode)
   useEffect(() => {
+    // Skip localStorage in embedded mode
+    if (embedded && initialServer) {
+      // Initialize with the provided server configuration
+      const serverConfig = {
+        id: initialServer.url,
+        url: initialServer.url,
+        name: initialServer.name || "MCP Server",
+        proxyConfig: initialServer.proxyConfig,
+        transportType: initialServer.transportType,
+        customHeaders: initialServer.customHeaders,
+      };
+
+      setConnectionConfigs([serverConfig]);
+      setConnections([
+        {
+          id: serverConfig.id,
+          url: serverConfig.url,
+          name: serverConfig.name,
+          state: "discovering",
+          tools: [],
+          resources: [],
+          prompts: [],
+          error: null,
+          authUrl: null,
+          customHeaders:
+            serverConfig.customHeaders ||
+            serverConfig.proxyConfig?.customHeaders,
+          transportType: serverConfig.transportType,
+          proxyConfig: serverConfig.proxyConfig,
+          notifications: [],
+          unreadNotificationCount: 0,
+          markNotificationRead: () => {},
+          markAllNotificationsRead: () => {},
+          clearNotifications: () => {},
+          pendingSamplingRequests: [],
+          approveSampling: EMPTY_APPROVE_SAMPLING,
+          rejectSampling: EMPTY_REJECT_SAMPLING,
+          pendingElicitationRequests: [],
+          approveElicitation: EMPTY_APPROVE_ELICITATION,
+          rejectElicitation: EMPTY_REJECT_ELICITATION,
+          callTool: async () => {},
+          readResource: async () => {},
+          listPrompts: async () => {},
+          getPrompt: async () => {},
+          authenticate: () => {},
+          retry: () => {},
+          clearStorage: () => {},
+          disconnect: () => {},
+          client: null,
+        },
+      ]);
+      setConfigLoaded(true);
+      return;
+    }
+
+    // Standard mode: load from localStorage
     try {
       const savedConfigs = localStorage.getItem("mcp-inspector-connections");
       if (savedConfigs) {
@@ -833,21 +917,21 @@ export function McpProvider({ children }: { children: ReactNode }) {
     } finally {
       setConfigLoaded(true);
     }
-  }, []);
+  }, [embedded, initialServer]);
 
-  // Save to localStorage whenever configs change
+  // Save to localStorage whenever configs change (skip in embedded mode)
   useEffect(() => {
-    if (!configLoaded) return;
+    if (!configLoaded || embedded) return;
     localStorage.setItem(
       "mcp-inspector-connections",
       JSON.stringify(connectionConfigs)
     );
-  }, [connectionConfigs, configLoaded]);
+  }, [connectionConfigs, configLoaded, embedded]);
 
   useEffect(() => {
-    if (!configLoaded) return;
+    if (!configLoaded || embedded) return;
     localStorage.setItem("mcp-inspector-auto-connect", String(autoConnect));
-  }, [autoConnect, configLoaded]);
+  }, [autoConnect, configLoaded, embedded]);
 
   const addConnection = useCallback(
     (
@@ -1190,6 +1274,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       connectServer,
       disconnectServer,
       configLoaded,
+      embedded,
     }),
     [
       connections,
@@ -1200,6 +1285,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
       connectServer,
       disconnectServer,
       configLoaded,
+      embedded,
     ]
   );
 
@@ -1207,8 +1293,9 @@ export function McpProvider({ children }: { children: ReactNode }) {
     <McpContext.Provider value={contextValue}>
       {children}
       {/* Render a wrapper for each configured connection */}
+      {/* In embedded mode, always render. In standalone mode, only render when autoConnect is enabled */}
       {configLoaded &&
-        autoConnect &&
+        (embedded || autoConnect) &&
         connectionConfigs.map((config) => {
           const wrapperKey = `${config.id || config.url}-${config.proxyConfig?.proxyAddress ? "proxy" : "direct"}`;
           console.warn(

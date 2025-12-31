@@ -24,6 +24,10 @@
     ".": {
       "types": "./dist/server/index.d.ts",
       "import": "./dist/server/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
     }
   },
   "main": "./dist/server/index.js",
@@ -39,10 +43,11 @@
     "dev:client": "vite --port 3000",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
-    "build": "npm run build:client && npm run build:server && npm run build:cli",
+    "build": "npm run build:client && npm run build:server && npm run build:cli && npm run build:client-lib",
     "build:client": "vite build",
-    "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
+    "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
+    "build:client-lib": "tsup src/client/index.ts --format esm --out-dir dist --external react --external react-dom --external react-router --external mcp-use --external 'mcp-use/react' --external '@radix-ui/*' --external lucide-react --external sonner --external framer-motion --external motion --external next-themes --external class-variance-authority --external clsx --external tailwind-merge --external cmdk --external markdown-to-jsx --external 'react-syntax-highlighter' --external '@mcp-ui/client' --external '@ai-sdk/react' --external '@langchain/*'",
     "prepublishOnly": "pnpm --filter mcp-use build && pnpm build",
     "start": "node dist/server/server.js",
     "preview": "vite preview",

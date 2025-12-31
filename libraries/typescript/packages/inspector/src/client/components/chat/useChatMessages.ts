@@ -1,6 +1,7 @@
 import type { AuthConfig, LLMConfig, Message } from "./types";
 import { useCallback, useState } from "react";
 import { hashString } from "./utils";
+import { getApiUrl } from "../../utils/api";
 
 interface UseChatMessagesProps {
   mcpServerUrl: string;
@@ -63,7 +64,7 @@ export function useChatMessages({
         }
 
         // Call the streaming chat API endpoint
-        const response = await fetch("/inspector/api/chat/stream", {
+        const response = await fetch(getApiUrl("/inspector/api/chat/stream"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
