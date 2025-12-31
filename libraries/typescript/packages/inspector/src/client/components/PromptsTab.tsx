@@ -73,8 +73,11 @@ export function PromptsTab({
   );
   const [rpcMessageCount, setRpcMessageCount] = useState(0);
   const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
+  const [isMaximized, setIsMaximized] = useState(false);
   const rpcPanelRef = useRef<ImperativePanelHandle>(null);
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
+  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+  const topPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -407,6 +410,67 @@ export function PromptsTab({
     }
   }, []);
 
+  const handleDeleteResult = useCallback((index: number) => {
+    setResults((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleFullscreen = useCallback(
+    (index: number) => {
+      // On mobile, show fullscreen view
+      if (isMobile) {
+        setMobileView("response");
+      } else {
+        // On desktop, open in new window
+        const result = results[index];
+        if (result) {
+          const newWindow = window.open("", "_blank", "width=800,height=600");
+          if (newWindow) {
+            const resultData = result.result;
+            newWindow.document.write(`
+            <html>
+              <head>
+                <title>${result.promptName} Result</title>
+                <style>
+                  body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+                  pre { white-space: pre-wrap; word-wrap: break-word; }
+                </style>
+              </head>
+              <body>
+                <h2>${result.promptName}</h2>
+                <pre>${JSON.stringify(resultData, null, 2)}</pre>
+              </body>
+            </html>
+          `);
+            newWindow.document.close();
+          }
+        }
+      }
+    },
+    [isMobile, results]
+  );
+
+  const handleMaximize = useCallback(() => {
+    if (!isMaximized) {
+      // Maximize: collapse left panel and top panel
+      if (leftPanelRef.current) {
+        leftPanelRef.current.collapse();
+      }
+      if (topPanelRef.current) {
+        topPanelRef.current.collapse();
+      }
+      setIsMaximized(true);
+    } else {
+      // Restore: expand left panel and top panel
+      if (leftPanelRef.current) {
+        leftPanelRef.current.expand();
+      }
+      if (topPanelRef.current) {
+        topPanelRef.current.expand();
+      }
+      setIsMaximized(false);
+    }
+  }, [isMaximized]);
+
   const openSaveDialog = useCallback(() => {
     if (!selectedPrompt) return;
     setPromptName("");
@@ -566,6 +630,8 @@ export function PromptsTab({
                   results={results}
                   copiedResult={copiedResult}
                   onCopy={handleCopyResult}
+                  onDelete={handleDeleteResult}
+                  onFullscreen={handleFullscreen}
                 />
               </motion.div>
             )}
@@ -578,7 +644,9 @@ export function PromptsTab({
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel
+        ref={leftPanelRef}
         defaultSize={33}
+        collapsible
         className="flex flex-col h-full relative"
       >
         <ResizablePanelGroup
@@ -698,7 +766,7 @@ export function PromptsTab({
 
       <ResizablePanel defaultSize={67}>
         <ResizablePanelGroup direction="vertical">
-          <ResizablePanel defaultSize={40}>
+          <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
             <PromptExecutionPanel
               selectedPrompt={selectedPrompt}
               promptArgs={promptArgs}
@@ -718,6 +786,10 @@ export function PromptsTab({
                 results={results}
                 copiedResult={copiedResult}
                 onCopy={handleCopyResult}
+                onDelete={handleDeleteResult}
+                onFullscreen={handleFullscreen}
+                onMaximize={handleMaximize}
+                isMaximized={isMaximized}
               />
             </div>
           </ResizablePanel>

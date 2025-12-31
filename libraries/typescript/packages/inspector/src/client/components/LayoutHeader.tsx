@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AddToClientDropdown } from "./AddToClientDropdown";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
 import { ServerDropdown } from "./ServerDropdown";
@@ -127,7 +128,7 @@ export function LayoutHeader({
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   // Filter tabs based on showTabs prop (only in embedded mode)
   const visibleTabs =
