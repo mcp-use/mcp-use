@@ -207,8 +207,7 @@
   "optionalDependencies": {
     "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
-    "redis": "^5.10.0",
-    "winston": "^3.19.0"
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.7.1",
