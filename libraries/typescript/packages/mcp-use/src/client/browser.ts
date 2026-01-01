@@ -1,7 +1,7 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { logger } from "../logging.js";
-import { Tel } from "../telemetry/index.js";
+import { Tel } from "../telemetry/telemetry-browser.js";
 import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 

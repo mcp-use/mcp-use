@@ -46,6 +46,8 @@ export default defineConfig({
     // Keep Redis external (optional dependency, uses Node.js built-ins)
     "redis",
     "@redis/client",
+    // Keep posthog-node external for browser builds (browser uses posthog-js)
+    "posthog-node",
   ],
   esbuildOptions(options) {
     // Preserve node: prefix for Deno compatibility

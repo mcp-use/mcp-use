@@ -29,6 +29,24 @@ function resolveLevel(env: string | undefined): LogLevel {
   }
 }
 
+/**
+ * Format additional arguments for logging (Winston-compatible)
+ */
+function formatArgs(args: any[]): string {
+  if (args.length === 0) return "";
+
+  return args
+    .map((arg) => {
+      if (typeof arg === "string") return arg;
+      try {
+        return JSON.stringify(arg);
+      } catch {
+        return String(arg);
+      }
+    })
+    .join(" ");
+}
+
 // Simple console logger for all environments
 class SimpleConsoleLogger {
   private _level: LogLevel;
@@ -60,12 +78,14 @@ class SimpleConsoleLogger {
     return messageIndex <= currentIndex;
   }
 
-  private formatMessage(level: LogLevel, message: string): string {
+  private formatMessage(level: LogLevel, message: string, args: any[]): string {
     const timestamp = new Date().toLocaleTimeString("en-US", { hour12: false });
+    const extraArgs = formatArgs(args);
+    const fullMessage = extraArgs ? `${message} ${extraArgs}` : message;
 
     switch (this.format) {
       case "detailed":
-        return `${timestamp} [${this.name}] ${level.toUpperCase()}: ${message}`;
+        return `${timestamp} [${this.name}] ${level.toUpperCase()}: ${fullMessage}`;
       case "emoji": {
         const emojiMap: Record<LogLevel, string> = {
           error: "❌",
@@ -76,53 +96,53 @@ class SimpleConsoleLogger {
           debug: "🔍",
           silly: "🤪",
         };
-        return `${timestamp} [${this.name}] ${emojiMap[level] || ""} ${level.toUpperCase()}: ${message}`;
+        return `${timestamp} [${this.name}] ${emojiMap[level] || ""} ${level.toUpperCase()}: ${fullMessage}`;
       }
       case "minimal":
       default:
-        return `${timestamp} [${this.name}] ${level}: ${message}`;
+        return `${timestamp} [${this.name}] ${level}: ${fullMessage}`;
     }
   }
 
-  error(message: string): void {
+  error(message: string, ...args: any[]): void {
     if (this.shouldLog("error")) {
-      console.error(this.formatMessage("error", message));
+      console.error(this.formatMessage("error", message, args));
     }
   }
 
-  warn(message: string): void {
+  warn(message: string, ...args: any[]): void {
     if (this.shouldLog("warn")) {
-      console.warn(this.formatMessage("warn", message));
+      console.warn(this.formatMessage("warn", message, args));
     }
   }
 
-  info(message: string): void {
+  info(message: string, ...args: any[]): void {
     if (this.shouldLog("info")) {
-      console.info(this.formatMessage("info", message));
+      console.info(this.formatMessage("info", message, args));
     }
   }
 
-  debug(message: string): void {
+  debug(message: string, ...args: any[]): void {
     if (this.shouldLog("debug")) {
-      console.debug(this.formatMessage("debug", message));
+      console.debug(this.formatMessage("debug", message, args));
     }
   }
 
-  http(message: string): void {
+  http(message: string, ...args: any[]): void {
     if (this.shouldLog("http")) {
-      console.log(this.formatMessage("http", message));
+      console.log(this.formatMessage("http", message, args));
     }
   }
 
-  verbose(message: string): void {
+  verbose(message: string, ...args: any[]): void {
     if (this.shouldLog("verbose")) {
-      console.log(this.formatMessage("verbose", message));
+      console.log(this.formatMessage("verbose", message, args));
     }
   }
 
-  silly(message: string): void {
+  silly(message: string, ...args: any[]): void {
     if (this.shouldLog("silly")) {
-      console.log(this.formatMessage("silly", message));
+      console.log(this.formatMessage("silly", message, args));
     }
   }
 

@@ -30,57 +30,31 @@ import {
 import { getPackageVersion } from "./utils.js";
 
 /**
- * Generate a cryptographically secure random string for session/user IDs, cross-platform.
+ * Generate a cryptographically secure random string for session/user IDs (Node.js only).
  */
 function secureRandomString(): string {
-  // Browser
-  if (
-    typeof window !== "undefined" &&
-    window.crypto &&
-    typeof window.crypto.getRandomValues === "function"
-  ) {
-    // 8 random bytes, 16 hex characters
-    const array = new Uint8Array(8);
-    window.crypto.getRandomValues(array);
-    return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
-  }
-  // Node.js
+  // Node.js - use crypto module
   try {
-    // Dynamically require crypto to avoid issues in browser
-
     const crypto = require("crypto");
     return crypto.randomBytes(8).toString("hex");
   } catch (e) {
-    // As absolute last fallback (should never happen), use Math.random (rare/broken case)
+    // Fallback to Math.random (should not happen in Node.js)
     return Math.random().toString(36).substring(2, 15);
   }
 }
 
-// ============================================================================
-// Runtime Environment Detection
-// ============================================================================
-
-/**
- * Detected runtime environment types
- */
 export type RuntimeEnvironment =
   | "node"
-  | "browser"
   | "cloudflare-workers"
   | "edge"
   | "deno"
   | "bun"
   | "unknown";
 
-/**
- * Storage capabilities for user ID persistence
- */
-type StorageCapability = "filesystem" | "localStorage" | "session-only";
-
-const USER_ID_STORAGE_KEY = "mcp_use_user_id";
+type StorageCapability = "filesystem" | "session-only";
 
 /**
- * Detect the current runtime environment
+ * Detect the current runtime environment (Node.js environments)
  */
 function detectRuntimeEnvironment(): RuntimeEnvironment {
   try {
@@ -107,12 +81,6 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
       return "edge";
     }
 
-    // Check for browser FIRST (before Node.js check)
-    // In browser, window and document are defined
-    if (typeof window !== "undefined" && typeof document !== "undefined") {
-      return "browser";
-    }
-
     // Check for Node.js
     if (
       typeof process !== "undefined" &&
@@ -135,18 +103,6 @@ function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
     case "node":
     case "bun":
       return "filesystem";
-    case "browser":
-      // Check if localStorage is actually available (might be disabled)
-      try {
-        if (typeof localStorage !== "undefined") {
-          localStorage.setItem("__mcp_use_test__", "1");
-          localStorage.removeItem("__mcp_use_test__");
-          return "localStorage";
-        }
-      } catch {
-        // localStorage might be disabled (private browsing, etc.)
-      }
-      return "session-only";
     case "deno":
       // Deno has file system access but needs permissions
       // For now, treat as session-only to be safe
@@ -170,7 +126,7 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
  * Check if we're in a browser environment
  */
 export function isBrowserEnvironment(): boolean {
-  return getRuntimeEnvironment() === "browser";
+  return false; // Node.js implementation - never browser
 }
 
 // Simple Scarf event logger implementation
@@ -209,7 +165,7 @@ class ScarfEventLogger {
   }
 }
 
-// PostHog types for both Node and Browser
+// PostHog types for Node
 type PostHogNodeClient = {
   capture: (params: {
     distinctId: string;
@@ -220,19 +176,11 @@ type PostHogNodeClient = {
   shutdown: () => void;
 };
 
-type PostHogBrowserClient = {
-  capture: (eventName: string, properties?: Record<string, any>) => void;
-  identify: (distinctId: string, properties?: Record<string, any>) => void;
-  reset: () => void;
-  opt_out_capturing: () => void;
-  opt_in_capturing: () => void;
-};
-
 /**
- * Unified Telemetry class that works in both Node.js and browser environments.
+ * Node.js Telemetry class that works in Node.js environments only.
  *
- * Automatically detects the runtime environment and uses the appropriate
- * PostHog library (posthog-node for Node.js, posthog-js for browser).
+ * Uses posthog-node for telemetry, require("crypto") for secure random strings,
+ * and filesystem for user ID persistence.
  *
  * Usage: Tel.getInstance().trackMCPClientInit(...)
  */
@@ -248,7 +196,6 @@ export class Telemetry {
 
   private _currUserId: string | null = null;
   private _posthogNodeClient: PostHogNodeClient | null = null;
-  private _posthogBrowserClient: PostHogBrowserClient | null = null;
   private _posthogLoading: Promise<void> | null = null;
   private _scarfClient: ScarfEventLogger | null = null;
   private _runtimeEnvironment: RuntimeEnvironment;
@@ -278,12 +225,10 @@ export class Telemetry {
 
     if (telemetryDisabled) {
       this._posthogNodeClient = null;
-      this._posthogBrowserClient = null;
       this._scarfClient = null;
-      logger.debug("Telemetry disabled via environment/localStorage");
+      logger.debug("Telemetry disabled via environment variable");
     } else if (!canSupportTelemetry) {
       this._posthogNodeClient = null;
-      this._posthogBrowserClient = null;
       this._scarfClient = null;
       logger.debug(
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
@@ -293,22 +238,14 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
 
-      // Initialize PostHog based on environment
-      this._posthogLoading = this._initPostHog();
+      // Initialize PostHog
+      this._posthogLoading = this._initPostHogNode();
 
-      // Initialize Scarf (server-side only - doesn't support CORS for browser requests)
-      // Skip Scarf in browser environments to avoid CORS errors
-      if (this._runtimeEnvironment !== "browser") {
-        try {
-          this._scarfClient = new ScarfEventLogger(
-            this.SCARF_GATEWAY_URL,
-            3000
-          );
-        } catch (e) {
-          logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
-          this._scarfClient = null;
-        }
-      } else {
+      // Initialize Scarf (server-side only)
+      try {
+        this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000);
+      } catch (e) {
+        logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
         this._scarfClient = null;
       }
 
@@ -334,54 +271,7 @@ export class Telemetry {
       return true;
     }
 
-    // Check localStorage (Browser)
-    if (
-      typeof localStorage !== "undefined" &&
-      localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false"
-    ) {
-      return true;
-    }
-
     return false;
-  }
-
-  private async _initPostHog(): Promise<void> {
-    const isBrowser = this._runtimeEnvironment === "browser";
-
-    if (isBrowser) {
-      await this._initPostHogBrowser();
-    } else {
-      await this._initPostHogNode();
-    }
-  }
-
-  private async _initPostHogBrowser(): Promise<void> {
-    try {
-      // Dynamic import of posthog-js
-      const posthogModule = await import("posthog-js");
-      const posthog = (posthogModule as any).default || posthogModule.posthog;
-
-      if (!posthog || typeof posthog.init !== "function") {
-        throw new Error("posthog-js module did not export expected interface");
-      }
-
-      // Initialize PostHog for browser
-      posthog.init(this.PROJECT_API_KEY, {
-        api_host: this.HOST,
-        persistence: "localStorage",
-        autocapture: false, // We only want explicit captures
-        capture_pageview: false, // We don't want automatic pageview tracking
-        disable_session_recording: true, // No session recording
-        loaded: () => {
-          logger.debug("PostHog browser client initialized");
-        },
-      });
-
-      this._posthogBrowserClient = posthog as PostHogBrowserClient;
-    } catch (e) {
-      logger.warn(`Failed to initialize PostHog browser telemetry: ${e}`);
-      this._posthogBrowserClient = null;
-    }
   }
 
   private async _initPostHogNode(): Promise<void> {
@@ -465,11 +355,7 @@ export class Telemetry {
    * Check if telemetry is enabled.
    */
   get isEnabled(): boolean {
-    return (
-      this._posthogNodeClient !== null ||
-      this._posthogBrowserClient !== null ||
-      this._scarfClient !== null
-    );
+    return this._posthogNodeClient !== null || this._scarfClient !== null;
   }
 
   get userId(): string {
@@ -482,9 +368,6 @@ export class Telemetry {
         case "filesystem":
           this._currUserId = this._getUserIdFromFilesystem();
           break;
-        case "localStorage":
-          this._currUserId = this._getUserIdFromLocalStorage();
-          break;
         case "session-only":
         default:
           // Generate a session-based ID (prefixed to identify it's not persistent)
@@ -492,7 +375,7 @@ export class Telemetry {
             this._currUserId = `session-${generateUUID()}`;
           } catch (uuidError) {
             // Fallback to timestamp-based ID if crypto API is not available
-            this._currUserId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+            this._currUserId = `session-${Date.now()}-${secureRandomString()}`;
           }
           break;
       }
@@ -564,35 +447,6 @@ export class Telemetry {
     }
   }
 
-  /**
-   * Get or create user ID from localStorage (Browser)
-   */
-  private _getUserIdFromLocalStorage(): string {
-    try {
-      let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
-
-      if (!userId) {
-        try {
-          userId = generateUUID();
-        } catch (uuidError) {
-          userId = `${Date.now()}-${secureRandomString()}`;
-        }
-        localStorage.setItem(USER_ID_STORAGE_KEY, userId);
-      }
-
-      return userId;
-    } catch (e) {
-      // Fallback to session-based
-      let sessionId: string;
-      try {
-        sessionId = `session-${generateUUID()}`;
-      } catch (uuidError) {
-        sessionId = `session-${Date.now()}-${secureRandomString()}`;
-      }
-      return sessionId;
-    }
-  }
-
   private _getCacheHome(os: any, path: any): string {
     // XDG_CACHE_HOME for Linux and manually set envs
     const envVar = process.env.XDG_CACHE_HOME;
@@ -624,11 +478,7 @@ export class Telemetry {
       await this._posthogLoading;
     }
 
-    if (
-      !this._posthogNodeClient &&
-      !this._posthogBrowserClient &&
-      !this._scarfClient
-    ) {
+    if (!this._posthogNodeClient && !this._scarfClient) {
       return;
     }
 
@@ -652,20 +502,6 @@ export class Telemetry {
         });
       } catch (e) {
         logger.debug(`Failed to track PostHog Node event ${event.name}: ${e}`);
-      }
-    }
-
-    // Send to PostHog (Browser)
-    if (this._posthogBrowserClient) {
-      try {
-        this._posthogBrowserClient.capture(event.name, {
-          ...properties,
-          distinct_id: currentUserId,
-        });
-      } catch (e) {
-        logger.debug(
-          `Failed to track PostHog Browser event ${event.name}: ${e}`
-        );
       }
     }
 
@@ -867,7 +703,7 @@ export class Telemetry {
   }
 
   // ============================================================================
-  // React Hook / Browser specific events
+  // React Hook / Browser specific events (no-ops in Node.js)
   // ============================================================================
 
   async trackUseMcpConnection(data: {
@@ -880,21 +716,7 @@ export class Telemetry {
     hasSampling: boolean;
     hasElicitation: boolean;
   }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_connection",
-      properties: {
-        url_domain: new URL(data.url).hostname, // Only domain for privacy
-        transport_type: data.transportType,
-        success: data.success,
-        error_type: data.errorType ?? null,
-        connection_time_ms: data.connectionTimeMs ?? null,
-        has_oauth: data.hasOAuth,
-        has_sampling: data.hasSampling,
-        has_elicitation: data.hasElicitation,
-      },
-    });
+    // No-op in Node.js - this is browser-specific
   }
 
   async trackUseMcpToolCall(data: {
@@ -903,17 +725,7 @@ export class Telemetry {
     errorType?: string | null;
     executionTimeMs?: number | null;
   }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_tool_call",
-      properties: {
-        tool_name: data.toolName,
-        success: data.success,
-        error_type: data.errorType ?? null,
-        execution_time_ms: data.executionTimeMs ?? null,
-      },
-    });
+    // No-op in Node.js - this is browser-specific
   }
 
   async trackUseMcpResourceRead(data: {
@@ -921,48 +733,24 @@ export class Telemetry {
     success: boolean;
     errorType?: string | null;
   }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_resource_read",
-      properties: {
-        resource_uri_scheme: data.resourceUri.split(":")[0], // Only scheme for privacy
-        success: data.success,
-        error_type: data.errorType ?? null,
-      },
-    });
+    // No-op in Node.js - this is browser-specific
   }
 
   // ============================================================================
-  // Browser-specific Methods
+  // Browser-specific Methods (no-ops in Node.js)
   // ============================================================================
 
   /**
-   * Identify the current user (useful for linking sessions)
-   * Browser only - no-op in Node.js
+   * Identify the current user (browser only - no-op in Node.js)
    */
   identify(userId: string, properties?: Record<string, any>): void {
-    if (this._posthogBrowserClient) {
-      try {
-        this._posthogBrowserClient.identify(userId, properties);
-      } catch (e) {
-        logger.debug(`Failed to identify user: ${e}`);
-      }
-    }
+    // No-op in Node.js
   }
 
   /**
-   * Reset the user identity (useful for logout)
-   * Browser only - no-op in Node.js
+   * Reset the user identity (browser only - no-op in Node.js)
    */
   reset(): void {
-    if (this._posthogBrowserClient) {
-      try {
-        this._posthogBrowserClient.reset();
-      } catch (e) {
-        logger.debug(`Failed to reset user: ${e}`);
-      }
-    }
     this._currUserId = null;
   }
 

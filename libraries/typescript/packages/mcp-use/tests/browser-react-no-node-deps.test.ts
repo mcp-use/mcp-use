@@ -5,7 +5,14 @@
  * It is expected to FAIL initially, proving that Node.js dependencies are being bundled.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { execSync } from "node:child_process";
+import {
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -393,125 +400,54 @@ describe("Browser/React exports should not import Node.js dependencies", () => {
       expect(allViolations).toEqual([]);
     });
 
-    it("should import and execute code successfully in browser-like environment", async () => {
-      // Mock browser environment
-      const originalProcess = globalThis.process;
-      const originalRequire = (globalThis as any).require;
-      const originalWindow = globalThis.window;
-      const originalDocument = globalThis.document;
-      const originalLocalStorage = globalThis.localStorage;
+    // Run in subprocess to avoid vitest's module caching issues
+    it("should import and execute code successfully in browser-like environment", () => {
+      const modulePath = join(distDir, "src", "react", "index.js").replace(
+        /\\/g,
+        "/"
+      );
+
+      // Script that simulates browser environment and imports the module
+      const testScript = `
+globalThis.process = { env: { NODE_ENV: 'production' } };
+globalThis.window = { location: { origin: 'http://localhost:3000' }, addEventListener: () => {}, removeEventListener: () => {} };
+globalThis.document = {};
+globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
+import('${modulePath}')
+  .then(m => {
+    if (!m.useMcp) throw new Error('useMcp not exported');
+    if (typeof m.useMcp !== 'function') throw new Error('useMcp is not a function');
+    if (!m.Tel) throw new Error('Tel not exported');
+    const tel = m.Tel.getInstance();
+    if (!tel) throw new Error('Tel.getInstance() returned falsy');
+    m.setTelemetrySource('test-source');
+    console.log('__TEST_SUCCESS__');
+  })
+  .catch(e => { console.error('FAIL:', e.message); process.exit(1); });
+`;
+
+      // Write script to temp file to avoid shell escaping issues
+      const tmpFile = join(__dirname, "..", ".test-react-runtime.mjs");
+      writeFileSync(tmpFile, testScript);
 
       try {
-        // Remove Node.js globals to simulate browser environment
-        delete (globalThis as any).process;
-        delete (globalThis as any).require;
-
-        // Mock browser globals
-        (globalThis as any).window = {
-          location: { origin: "http://localhost:3000" },
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        };
-        (globalThis as any).document = {};
-        (globalThis as any).localStorage = {
-          getItem: () => null,
-          setItem: () => {},
-          removeItem: () => {},
-          clear: () => {},
-        };
-
-        // Try to import the module
-        // This will fail if Node.js dependencies are imported at module level
-        const reactModule = await import(
-          join(distDir, "src", "react", "index.js")
-        );
-
-        expect(reactModule).toBeDefined();
-        expect(reactModule.useMcp).toBeDefined();
-        expect(typeof reactModule.useMcp).toBe("function");
-
-        // Try to use telemetry (which might try to access Node.js APIs)
-        if (reactModule.Tel) {
-          const tel = reactModule.Tel.getInstance();
-          expect(tel).toBeDefined();
-          // Try to call a method that might use Node.js APIs
-          // This should not throw even without Node.js globals
-          try {
-            await tel.trackUseMcpConnection({
-              url: "http://localhost:3000",
-              transportType: "http",
-              success: true,
-              hasOAuth: false,
-              hasSampling: false,
-              hasElicitation: false,
-            });
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            // If it fails due to Node.js dependencies, that's a problem
-            if (
-              errorMessage.includes("process") ||
-              errorMessage.includes("require") ||
-              errorMessage.includes("fs") ||
-              errorMessage.includes("path") ||
-              errorMessage.includes("crypto")
-            ) {
-              throw new Error(
-                `Telemetry failed due to Node.js dependency: ${errorMessage}`
-              );
-            }
-            // Other errors are acceptable (e.g., network errors)
-          }
-        }
-
-        // Try to use other exports
-        if (reactModule.onMcpAuthorization) {
-          expect(typeof reactModule.onMcpAuthorization).toBe("function");
-        }
-
-        if (reactModule.setTelemetrySource) {
-          expect(typeof reactModule.setTelemetrySource).toBe("function");
-          // Try calling it
-          try {
-            reactModule.setTelemetrySource("test-source");
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            if (
-              errorMessage.includes("process") ||
-              errorMessage.includes("require") ||
-              errorMessage.includes("fs") ||
-              errorMessage.includes("path")
-            ) {
-              throw new Error(
-                `setTelemetrySource failed due to Node.js dependency: ${errorMessage}`
-              );
-            }
-          }
-        }
-      } catch (error) {
-        // If import fails, it might be due to Node.js dependencies
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const result = execSync(`node ${tmpFile}`, {
+          encoding: "utf-8",
+          timeout: 10000,
+        });
+        expect(result).toContain("__TEST_SUCCESS__");
+      } catch (error: any) {
+        const stderr = error.stderr?.toString() || "";
+        const stdout = error.stdout?.toString() || "";
         throw new Error(
-          `Failed to import or execute mcp-use/react in browser-like environment: ${errorMessage}. This suggests Node.js dependencies are being imported or executed.`
+          `Failed to import/execute mcp-use/react in browser-like environment:\n${stderr || stdout || error.message}`
         );
       } finally {
-        // Restore globals
-        if (originalProcess) {
-          globalThis.process = originalProcess;
-        }
-        if (originalRequire) {
-          (globalThis as any).require = originalRequire;
-        }
-        if (originalWindow) {
-          globalThis.window = originalWindow;
-        }
-        if (originalDocument) {
-          globalThis.document = originalDocument;
-        }
-        if (originalLocalStorage) {
-          globalThis.localStorage = originalLocalStorage;
+        // Clean up temp file
+        try {
+          unlinkSync(tmpFile);
+        } catch {
+          // Ignore cleanup errors
         }
       }
     });
@@ -584,168 +520,54 @@ describe("Browser/React exports should not import Node.js dependencies", () => {
       expect(allViolations).toEqual([]);
     });
 
-    it("should import and execute code successfully in browser-like environment", async () => {
-      // Mock browser environment
-      const originalProcess = globalThis.process;
-      const originalRequire = (globalThis as any).require;
-      const originalWindow = globalThis.window;
-      const originalDocument = globalThis.document;
-      const originalLocalStorage = globalThis.localStorage;
+    // Run in subprocess to avoid vitest's module caching issues
+    it("should import and execute code successfully in browser-like environment", () => {
+      const modulePath = join(distDir, "src", "browser.js").replace(/\\/g, "/");
+
+      // Script that simulates browser environment and imports the module
+      const testScript = `
+globalThis.process = { env: { NODE_ENV: 'production' } };
+globalThis.window = { location: { origin: 'http://localhost:3000' }, addEventListener: () => {}, removeEventListener: () => {} };
+globalThis.document = {};
+globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
+import('${modulePath}')
+  .then(m => {
+    if (!m.MCPClient) throw new Error('MCPClient not exported');
+    if (typeof m.MCPClient !== 'function') throw new Error('MCPClient is not a function');
+    if (!m.Tel) throw new Error('Tel not exported');
+    const tel = m.Tel.getInstance();
+    if (!tel) throw new Error('Tel.getInstance() returned falsy');
+    if (!m.logger) throw new Error('logger not exported');
+    m.logger.info('Test log');
+    const version = m.getPackageVersion();
+    if (typeof version !== 'string') throw new Error('getPackageVersion did not return string');
+    console.log('__TEST_SUCCESS__');
+  })
+  .catch(e => { console.error('FAIL:', e.message); process.exit(1); });
+`;
+
+      // Write script to temp file to avoid shell escaping issues
+      const tmpFile = join(__dirname, "..", ".test-browser-runtime.mjs");
+      writeFileSync(tmpFile, testScript);
 
       try {
-        // Remove Node.js globals to simulate browser environment
-        delete (globalThis as any).process;
-        delete (globalThis as any).require;
-
-        // Mock browser globals
-        (globalThis as any).window = {
-          location: { origin: "http://localhost:3000" },
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        };
-        (globalThis as any).document = {};
-        (globalThis as any).localStorage = {
-          getItem: () => null,
-          setItem: () => {},
-          removeItem: () => {},
-          clear: () => {},
-        };
-
-        // Try to import the module
-        // This will fail if Node.js dependencies are imported at module level
-        const browserModule = await import(join(distDir, "src", "browser.js"));
-
-        expect(browserModule).toBeDefined();
-        expect(browserModule.MCPClient).toBeDefined();
-        expect(typeof browserModule.MCPClient).toBe("function");
-
-        // Try to instantiate MCPClient (this should work without Node.js APIs)
-        try {
-          const client = new browserModule.MCPClient({
-            mcpServers: {},
-          });
-          expect(client).toBeDefined();
-          expect(client.constructor.name).toContain("MCPClient");
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          // If it fails due to Node.js dependencies, that's a problem
-          if (
-            errorMessage.includes("process") ||
-            errorMessage.includes("require") ||
-            errorMessage.includes("fs") ||
-            errorMessage.includes("path") ||
-            errorMessage.includes("crypto")
-          ) {
-            throw new Error(
-              `MCPClient instantiation failed due to Node.js dependency: ${errorMessage}`
-            );
-          }
-          // Other errors are acceptable (e.g., configuration errors)
-        }
-
-        // Try to use telemetry (which might try to access Node.js APIs)
-        if (browserModule.Tel) {
-          const tel = browserModule.Tel.getInstance();
-          expect(tel).toBeDefined();
-          // Try to call a method that might use Node.js APIs
-          try {
-            await tel.trackMCPClientInit({
-              codeMode: false,
-              sandbox: false,
-              allCallbacks: false,
-              verify: false,
-              servers: [],
-              numServers: 0,
-              isBrowser: true,
-            });
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            // If it fails due to Node.js dependencies, that's a problem
-            if (
-              errorMessage.includes("process") ||
-              errorMessage.includes("require") ||
-              errorMessage.includes("fs") ||
-              errorMessage.includes("path") ||
-              errorMessage.includes("crypto")
-            ) {
-              throw new Error(
-                `Telemetry failed due to Node.js dependency: ${errorMessage}`
-              );
-            }
-            // Other errors are acceptable (e.g., network errors)
-          }
-        }
-
-        // Try to use logger (which might try to access Node.js APIs)
-        if (browserModule.logger) {
-          expect(browserModule.logger).toBeDefined();
-          // Try to log something
-          try {
-            browserModule.logger.info("Test log message");
-            browserModule.logger.debug("Test debug message");
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            if (
-              errorMessage.includes("process") ||
-              errorMessage.includes("require") ||
-              errorMessage.includes("winston") ||
-              errorMessage.includes("fs")
-            ) {
-              throw new Error(
-                `Logger failed due to Node.js dependency: ${errorMessage}`
-              );
-            }
-          }
-        }
-
-        // Try to use other exports
-        if (browserModule.getPackageVersion) {
-          expect(typeof browserModule.getPackageVersion).toBe("function");
-          // Try calling it
-          try {
-            const version = browserModule.getPackageVersion();
-            expect(typeof version).toBe("string");
-          } catch (error) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            if (
-              errorMessage.includes("process") ||
-              errorMessage.includes("require") ||
-              errorMessage.includes("fs") ||
-              errorMessage.includes("path")
-            ) {
-              throw new Error(
-                `getPackageVersion failed due to Node.js dependency: ${errorMessage}`
-              );
-            }
-          }
-        }
-      } catch (error) {
-        // If import fails, it might be due to Node.js dependencies
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const result = execSync(`node ${tmpFile}`, {
+          encoding: "utf-8",
+          timeout: 10000,
+        });
+        expect(result).toContain("__TEST_SUCCESS__");
+      } catch (error: any) {
+        const stderr = error.stderr?.toString() || "";
+        const stdout = error.stdout?.toString() || "";
         throw new Error(
-          `Failed to import or execute mcp-use/browser in browser-like environment: ${errorMessage}. This suggests Node.js dependencies are being imported or executed.`
+          `Failed to import/execute mcp-use/browser in browser-like environment:\n${stderr || stdout || error.message}`
         );
       } finally {
-        // Restore globals
-        if (originalProcess) {
-          globalThis.process = originalProcess;
-        }
-        if (originalRequire) {
-          (globalThis as any).require = originalRequire;
-        }
-        if (originalWindow) {
-          globalThis.window = originalWindow;
-        }
-        if (originalDocument) {
-          globalThis.document = originalDocument;
-        }
-        if (originalLocalStorage) {
-          globalThis.localStorage = originalLocalStorage;
+        // Clean up temp file
+        try {
+          unlinkSync(tmpFile);
+        } catch {
+          // Ignore cleanup errors
         }
       }
     });

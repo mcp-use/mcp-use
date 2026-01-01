@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { BrowserMCPClient } from "../client/browser.js";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
-import { Tel } from "../telemetry/index.js";
+import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
