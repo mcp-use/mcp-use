@@ -34,11 +34,14 @@ import { getPackageVersion } from "./utils.js";
  */
 function secureRandomString(): string {
   // Node.js - use crypto module
+  // Note: Using require() here instead of dynamic import because this function
+  // is called synchronously. In ESM-only environments, this will fail gracefully
+  // and fall back to Math.random(). The try-catch ensures compatibility.
   try {
     const crypto = require("crypto");
     return crypto.randomBytes(8).toString("hex");
   } catch (e) {
-    // Fallback to Math.random (should not happen in Node.js)
+    // Fallback to Math.random (should not happen in Node.js, but handles ESM-only environments)
     return Math.random().toString(36).substring(2, 15);
   }
 }

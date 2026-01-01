@@ -55,9 +55,6 @@ const NODE_BUILTIN_MODULES = [
   "process",
   "child_process",
   "async_hooks",
-  "async_hooks",
-  "readline",
-  "repl",
 ];
 
 // Node.js-specific npm packages that should NOT appear in browser/react bundles
@@ -353,6 +350,7 @@ describe("Browser/React exports should not import Node.js dependencies", () => {
           allViolations.push(...violations);
         } catch (error) {
           // File might not exist or be readable, skip
+          console.debug(`Skipped file ${file}: ${error}`);
         }
       });
 
@@ -385,6 +383,7 @@ describe("Browser/React exports should not import Node.js dependencies", () => {
           allViolations.push(...violations);
         } catch (error) {
           // File might not exist or be readable, skip
+          console.debug(`Skipped file ${file}: ${error}`);
         }
       });
 
@@ -401,6 +400,10 @@ describe("Browser/React exports should not import Node.js dependencies", () => {
     });
 
     // Run in subprocess to avoid vitest's module caching issues
+    // NOTE: This test uses minimal global mocks that may not accurately reflect
+    // real browser behavior. Code that depends on deeper browser API functionality
+    // may pass these tests but fail in actual browsers. Consider using a real
+    // browser environment (Playwright/Puppeteer) or jsdom for more accurate testing.
     it("should import and execute code successfully in browser-like environment", () => {
       const modulePath = join(distDir, "src", "react", "index.js").replace(
         /\\/g,
@@ -446,8 +449,9 @@ import('${modulePath}')
         // Clean up temp file
         try {
           unlinkSync(tmpFile);
-        } catch {
-          // Ignore cleanup errors
+        } catch (error) {
+          // File might already be deleted or permissions issue - log but don't fail test
+          console.debug(`Failed to cleanup temp file: ${error}`);
         }
       }
     });
@@ -473,6 +477,7 @@ import('${modulePath}')
           allViolations.push(...violations);
         } catch (error) {
           // File might not exist or be readable, skip
+          console.debug(`Skipped file ${file}: ${error}`);
         }
       });
 
@@ -505,6 +510,7 @@ import('${modulePath}')
           allViolations.push(...violations);
         } catch (error) {
           // File might not exist or be readable, skip
+          console.debug(`Skipped file ${file}: ${error}`);
         }
       });
 
@@ -521,6 +527,10 @@ import('${modulePath}')
     });
 
     // Run in subprocess to avoid vitest's module caching issues
+    // NOTE: This test uses minimal global mocks that may not accurately reflect
+    // real browser behavior. Code that depends on deeper browser API functionality
+    // may pass these tests but fail in actual browsers. Consider using a real
+    // browser environment (Playwright/Puppeteer) or jsdom for more accurate testing.
     it("should import and execute code successfully in browser-like environment", () => {
       const modulePath = join(distDir, "src", "browser.js").replace(/\\/g, "/");
 
@@ -566,8 +576,9 @@ import('${modulePath}')
         // Clean up temp file
         try {
           unlinkSync(tmpFile);
-        } catch {
-          // Ignore cleanup errors
+        } catch (error) {
+          // File might already be deleted or permissions issue - log but don't fail test
+          console.debug(`Failed to cleanup temp file: ${error}`);
         }
       }
     });

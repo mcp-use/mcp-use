@@ -25,7 +25,22 @@ function generateUUID(): string {
   ) {
     return (globalThis.crypto as any).randomUUID();
   }
-  // Fallback for older environments
+  // Fallback for older environments - use crypto.getRandomValues if available
+  if (
+    typeof globalThis !== "undefined" &&
+    globalThis.crypto &&
+    typeof (globalThis.crypto as any).getRandomValues === "function"
+  ) {
+    const array = new Uint8Array(16);
+    (globalThis.crypto as any).getRandomValues(array);
+    // Convert to hex string
+    const hex = Array.from(array, (v) => v.toString(16).padStart(2, "0")).join(
+      ""
+    );
+    return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}`;
+  }
+  // Last resort fallback - not cryptographically secure but better than nothing
+  // This should rarely be reached in modern browsers
   return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
 }
 import {
@@ -59,7 +74,17 @@ function secureRandomString(): string {
     window.crypto.getRandomValues(array);
     return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
   }
-  // Fallback to Math.random (should not happen in browser)
+  // Fallback to crypto.getRandomValues if available
+  if (
+    typeof globalThis !== "undefined" &&
+    globalThis.crypto &&
+    typeof (globalThis.crypto as any).getRandomValues === "function"
+  ) {
+    const array = new Uint8Array(8);
+    (globalThis.crypto as any).getRandomValues(array);
+    return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
+  }
+  // Last resort fallback - not cryptographically secure (should not happen in browser)
   return Math.random().toString(36).substring(2, 15);
 }
 
@@ -212,7 +237,12 @@ export class Telemetry {
     try {
       // Dynamic import of posthog-js
       const posthogModule = await import("posthog-js");
-      const posthog = (posthogModule as any).default || posthogModule.posthog;
+      // Type assertion for posthog module structure - use unknown to avoid type conflicts
+      const posthogModuleTyped = posthogModule as unknown as {
+        default?: any;
+        posthog?: any;
+      };
+      const posthog = posthogModuleTyped.default || posthogModuleTyped.posthog;
 
       if (!posthog || typeof posthog.init !== "function") {
         throw new Error("posthog-js module did not export expected interface");
@@ -323,6 +353,19 @@ export class Telemetry {
    */
   private _getUserIdFromLocalStorage(): string {
     try {
+      // Check if localStorage is actually available and accessible
+      if (typeof localStorage === "undefined") {
+        throw new Error("localStorage is not available");
+      }
+
+      // Test write access (localStorage might throw in private browsing mode)
+      try {
+        localStorage.setItem("__mcp_use_test__", "1");
+        localStorage.removeItem("__mcp_use_test__");
+      } catch (testError) {
+        throw new Error(`localStorage is not writable: ${testError}`);
+      }
+
       let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
 
       if (!userId) {
@@ -336,6 +379,8 @@ export class Telemetry {
 
       return userId;
     } catch (e) {
+      // Log specific error for debugging (localStorage failures are common in private browsing)
+      logger.debug(`Failed to access localStorage for user ID: ${e}`);
       // Fallback to session-based
       let sessionId: string;
       try {
