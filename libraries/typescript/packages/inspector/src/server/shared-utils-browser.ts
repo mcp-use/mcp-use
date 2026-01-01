@@ -83,7 +83,8 @@ export async function* handleChatRequestStream(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  const { MCPAgent, MCPClient } = await import("mcp-use/browser");
+  // Import from main entry (not browser) since this runs server-side
+  const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
   let llm: BaseLLM;
@@ -249,7 +250,8 @@ export async function handleChatRequest(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  const { MCPAgent, MCPClient } = await import("mcp-use/browser");
+  // Import from main entry (not browser) since this runs server-side
+  const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
   let llm: BaseLLM;
