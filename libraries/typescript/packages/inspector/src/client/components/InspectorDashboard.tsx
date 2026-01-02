@@ -629,6 +629,7 @@ export function InspectorDashboard() {
                         <ServerIcon
                           serverUrl={connection.url}
                           serverName={connection.name}
+                          serverIcon={connection.serverInfo?.icon}
                           size="md"
                         />
                         <h4 className="font-semibold text-sm">

@@ -4,3 +4,4 @@
  */
 
 export * from "./proxy-config.js";
+export * from "./favicon-detector.js";

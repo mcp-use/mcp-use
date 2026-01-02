@@ -6,11 +6,12 @@ import type {
   Tool,
 } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sanitizeUrl } from "../utils/url-sanitize.js";
-import { BrowserMCPClient } from "../client/browser.js";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
+import { BrowserMCPClient } from "../client/browser.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
+import { detectFavicon } from "../utils/favicon-detector.js";
+import { sanitizeUrl } from "../utils/url-sanitize.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
@@ -89,6 +90,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const [serverInfo, setServerInfo] = useState<{
     name: string;
     version?: string;
+    icon?: string;
   }>();
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
@@ -99,6 +101,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null);
+  const iconLoadingPromiseRef = useRef<Promise<string | null> | null>(null);
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
@@ -505,6 +508,64 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         if (serverInfo) {
           console.log("[useMcp] Server info:", serverInfo);
           setServerInfo(serverInfo);
+
+          // Start icon loading in background and store the promise
+          const loadIconPromise = (async () => {
+            try {
+              // Check if server provided icons in the serverInfo
+              const serverIcons = (serverInfo as any).icons;
+              if (
+                serverIcons &&
+                Array.isArray(serverIcons) &&
+                serverIcons.length > 0
+              ) {
+                // Server provided icons - use the first one
+                const iconUrl = serverIcons[0].src || serverIcons[0].url;
+                if (iconUrl) {
+                  addLog("info", "Server provided icon:", iconUrl);
+                  // Fetch and convert to base64 for storage
+                  const res = await fetch(iconUrl);
+                  const blob = await res.blob();
+                  const base64 = await new Promise<string>(
+                    (resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result as string);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(blob);
+                    }
+                  );
+
+                  if (isMountedRef.current) {
+                    setServerInfo((prev) =>
+                      prev ? { ...prev, icon: base64 } : undefined
+                    );
+                    addLog("debug", "Server icon converted to base64");
+                  }
+                  return base64;
+                }
+              }
+
+              // No server-provided icons - try auto-detection
+              if (url) {
+                const faviconBase64 = await detectFavicon(url);
+                if (faviconBase64 && isMountedRef.current) {
+                  setServerInfo((prev) =>
+                    prev ? { ...prev, icon: faviconBase64 } : undefined
+                  );
+                  addLog("debug", "Favicon detected and added to serverInfo");
+                  return faviconBase64;
+                }
+              }
+
+              return null;
+            } catch (err) {
+              addLog("debug", "Icon loading failed (non-critical):", err);
+              return null;
+            }
+          })();
+
+          // Store the promise so ensureIconLoaded() can await it
+          iconLoadingPromiseRef.current = loadIconPromise;
         }
 
         if (capabilities) {
@@ -1137,6 +1198,35 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [refreshTools, refreshResources, refreshPrompts, addLog]);
 
   /**
+   * Ensure the server icon is loaded and available
+   * Waits for the background icon loading to complete
+   *
+   * @returns Promise that resolves with the base64 icon or null
+   */
+  const ensureIconLoaded = useCallback(async (): Promise<string | null> => {
+    if (stateRef.current !== "ready") {
+      addLog("warn", "Cannot ensure icon loaded - not connected");
+      return null;
+    }
+
+    // If icon is already available, return it immediately
+    if (serverInfo?.icon) {
+      return serverInfo.icon;
+    }
+
+    // If icon loading is in progress, wait for it
+    if (iconLoadingPromiseRef.current) {
+      addLog("debug", "Waiting for icon to finish loading...");
+      const icon = await iconLoadingPromiseRef.current;
+      return icon;
+    }
+
+    // No icon loading in progress and no icon available
+    addLog("debug", "No icon available and no loading in progress");
+    return null;
+  }, [serverInfo, addLog]);
+
+  /**
    * Get a prompt template with arguments
    *
    * @param name - Name of the prompt template
@@ -1356,5 +1446,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     disconnect,
     authenticate,
     clearStorage,
+    ensureIconLoaded,
   };
 }

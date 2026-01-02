@@ -94,6 +94,7 @@ export function ServerList() {
                     <ServerIcon
                       serverUrl={connection.url}
                       serverName={connection.name}
+                      serverIcon={connection.serverInfo?.icon}
                       size="lg"
                     />
                     <div className="space-y-1">
