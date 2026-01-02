@@ -37,6 +37,9 @@ export function Layout({ children }: LayoutProps) {
     navigateToItem,
     setTunnelUrl,
     tunnelUrl,
+    isEmbedded,
+    embeddedConfig,
+    setEmbeddedMode,
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -44,6 +47,25 @@ export function Layout({ children }: LayoutProps) {
     null
   );
   const savedRequests = useSavedRequests();
+
+  // Initialize embedded mode from URL params once on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const embedded = urlParams.get("embedded") === "true";
+    const embeddedConfigParam = urlParams.get("embeddedConfig");
+
+    if (embedded) {
+      let config: { backgroundColor?: string; padding?: string } = {};
+      if (embeddedConfigParam) {
+        try {
+          config = JSON.parse(embeddedConfigParam);
+        } catch (error) {
+          console.error("Failed to parse embeddedConfig:", error);
+        }
+      }
+      setEmbeddedMode(true, config);
+    }
+  }, []); // Only run once on mount
 
   // Read tunnelUrl from query parameters and store in context
   useEffect(() => {
@@ -139,6 +161,7 @@ export function Layout({ children }: LayoutProps) {
     addConnection,
     removeConnection,
     configLoaded,
+    embedded: isEmbedded,
   });
 
   // Track command palette open
@@ -426,9 +449,21 @@ export function Layout({ children }: LayoutProps) {
     );
   }
 
+  // Apply embedded styling
+  const containerStyle: React.CSSProperties = isEmbedded
+    ? {
+        backgroundColor: embeddedConfig.backgroundColor || "#f3f3f3",
+        padding: embeddedConfig.padding || "0.5rem",
+      }
+    : {};
+
+  const containerClassName = isEmbedded
+    ? "h-screen flex flex-col gap-2 sm:gap-4"
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+
   return (
     <TooltipProvider>
-      <div className="h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4">
+      <div className={containerClassName} style={containerStyle}>
         {/* Header */}
         <LayoutHeader
           connections={connections}
@@ -438,6 +473,7 @@ export function Layout({ children }: LayoutProps) {
           onTabChange={setActiveTab}
           onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
           onOpenConnectionOptions={handleOpenConnectionOptions}
+          embedded={isEmbedded}
         />
 
         {/* Main Content */}

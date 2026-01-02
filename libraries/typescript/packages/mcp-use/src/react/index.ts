@@ -6,15 +6,34 @@
 export type { UseMcpOptions, UseMcpResult } from "./types.js";
 export { useMcp } from "./useMcp.js";
 
+// Re-export AddToClientDropdown component
+export { AddToClientDropdown } from "./AddToClientDropdown.js";
+
+// Re-export MCP client utilities through utils index
+export {
+  generateCursorDeepLink,
+  generateVSCodeDeepLink,
+  downloadMcpbFile,
+  generateClaudeCodeCommand,
+  generateGeminiCLICommand,
+  generateCodexConfig,
+  getEnvVarInstructions,
+  generateMcpbConfig,
+} from "../utils/index.js";
+
 // Re-export auth callback handler for OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
 
-// Re-export unified telemetry (auto-detects browser/Node.js)
-export { Tel, Telemetry, setTelemetrySource } from "../telemetry/index.js";
+// Re-export browser telemetry (browser-specific implementation)
+export {
+  Tel,
+  Telemetry,
+  setTelemetrySource,
+} from "../telemetry/telemetry-browser.js";
 
 // Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "../telemetry/index.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/index.js";
+export { Tel as BrowserTelemetry } from "../telemetry/telemetry-browser.js";
+export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/telemetry-browser.js";
 
 // Re-export core types for convenience when using hook result
 export type {

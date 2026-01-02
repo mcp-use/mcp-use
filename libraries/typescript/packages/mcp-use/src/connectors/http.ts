@@ -16,6 +16,8 @@ export interface HttpConnectorOptions extends ConnectorInitOptions {
   clientInfo?: { name: string; version: string };
   preferSse?: boolean; // Force SSE transport instead of trying streamable HTTP first
   disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
+  gatewayUrl?: string; // Optional gateway URL to route requests through
+  serverId?: string; // Optional server ID for gateway observability
 }
 
 export class HttpConnector extends BaseConnector {
@@ -26,6 +28,8 @@ export class HttpConnector extends BaseConnector {
   private readonly clientInfo: { name: string; version: string };
   private readonly preferSse: boolean;
   private readonly disableSseFallback: boolean;
+  private readonly gatewayUrl?: string;
+  private readonly serverId?: string;
   private transportType: "streamable-http" | "sse" | null = null;
   private streamableTransport: StreamableHTTPClientTransport | null = null;
 
@@ -36,6 +40,18 @@ export class HttpConnector extends BaseConnector {
     this.headers = { ...(opts.headers ?? {}) };
     if (opts.authToken) {
       this.headers.Authorization = `Bearer ${opts.authToken}`;
+    }
+
+    // Gateway support
+    this.gatewayUrl = opts.gatewayUrl;
+    this.serverId = opts.serverId;
+    if (this.gatewayUrl) {
+      // When using gateway, add target URL header for routing
+      this.headers["X-Target-URL"] = this.baseUrl;
+      // Add server ID header for observability tracking
+      if (this.serverId) {
+        this.headers["X-Server-Id"] = this.serverId;
+      }
     }
 
     this.timeout = opts.timeout ?? 30000; // Default 30 seconds
@@ -55,7 +71,11 @@ export class HttpConnector extends BaseConnector {
       return;
     }
 
-    const baseUrl = this.baseUrl;
+    // Use gateway URL if provided, otherwise use base URL
+    // Gateway supports both: POST / with X-Target-URL header OR POST /https://target.com/path
+    const baseUrl = this.gatewayUrl
+      ? this.gatewayUrl.replace(/\/$/, "")
+      : this.baseUrl;
 
     // If preferSse is set, skip directly to SSE
     if (this.preferSse) {
@@ -142,9 +162,7 @@ export class HttpConnector extends BaseConnector {
       if (this.disableSseFallback) {
         logger.info("SSE fallback disabled - failing connection");
         await this.cleanupResources();
-        throw new Error(
-          `Streamable HTTP connection failed: ${fallbackReason}. SSE fallback is disabled.`
-        );
+        throw new Error(`Streamable HTTP connection failed: ${fallbackReason}`);
       }
 
       // Always try SSE fallback for maximum compatibility

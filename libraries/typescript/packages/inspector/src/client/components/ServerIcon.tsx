@@ -7,8 +7,9 @@ import { useEffect, useState } from "react";
 interface ServerIconProps {
   serverUrl?: string;
   serverName?: string;
+  serverIcon?: string; // Base64-encoded icon from mcp.serverInfo.icon
   className?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xs";
 }
 
 function getBaseDomain(hostname: string): string {
@@ -96,10 +97,13 @@ async function fetchAndCacheImage(
 export function ServerIcon({
   serverUrl,
   serverName,
+  serverIcon,
   className,
   size = "md",
 }: ServerIconProps) {
-  const [faviconUrl, setFaviconUrl] = useState<string | null>(null);
+  const [faviconUrl, setFaviconUrl] = useState<string | null>(
+    serverIcon || null
+  );
   const [faviconError, setFaviconError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
@@ -111,7 +115,17 @@ export function ServerIcon({
     xs: "w-4 h-4",
   };
 
+  // Update favicon when serverIcon prop changes
   useEffect(() => {
+    if (serverIcon) {
+      setFaviconUrl(serverIcon);
+      setFaviconError(false);
+    }
+  }, [serverIcon]);
+
+  useEffect(() => {
+    // Skip detection if we already have an icon from serverInfo
+    if (serverIcon) return;
     if (!serverUrl) return;
 
     const fetchFavicon = async () => {

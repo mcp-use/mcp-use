@@ -107,6 +107,9 @@ export {
   isExpressMiddleware,
 } from "./connect-adapter.js";
 
+// MCP Proxy middleware for CORS proxying
+export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
+
 export type {
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,

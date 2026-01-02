@@ -71,6 +71,11 @@
       "types": "./dist/src/server/index.d.ts",
       "import": "./dist/src/server/index.js",
       "require": "./dist/src/server/index.cjs"
+    },
+    "./utils": {
+      "types": "./dist/src/utils/index.d.ts",
+      "import": "./dist/src/utils/index.js",
+      "require": "./dist/src/utils/index.cjs"
     }
   },
   "main": "./dist/index.js",
@@ -207,8 +212,7 @@
   "optionalDependencies": {
     "chalk": "^5.6.2",
     "cli-highlight": "^2.1.11",
-    "redis": "^5.10.0",
-    "winston": "^3.19.0"
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^6.7.1",

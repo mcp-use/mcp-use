@@ -8,9 +8,13 @@ import { McpProvider } from "./context/McpContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
 function App() {
+  // Check if embedded mode is active from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEmbedded = urlParams.get("embedded") === "true";
+
   return (
     <ThemeProvider>
-      <McpProvider>
+      <McpProvider embedded={isEmbedded}>
         <InspectorProvider>
           <Router basename="/inspector">
             <Routes>

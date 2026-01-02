@@ -125,6 +125,8 @@ export type UseMcpResult = {
   serverInfo?: {
     name: string;
     version?: string;
+    /** Base64-encoded favicon auto-detected from server domain */
+    icon?: string;
   };
   /** Server capabilities from the initialize response */
   capabilities?: Record<string, any>;
@@ -144,6 +146,17 @@ export type UseMcpResult = {
    * this URL can be presented to the user to complete authentication manually in a new tab.
    */
   authUrl?: string;
+  /**
+   * OAuth tokens if authentication was completed
+   * Available when state is 'ready' and OAuth was used
+   */
+  authTokens?: {
+    access_token: string;
+    token_type: string;
+    expires_at?: number;
+    refresh_token?: string;
+    scope?: string;
+  };
   /** Array of internal log messages (useful for debugging) */
   log: {
     level: "debug" | "info" | "warn" | "error";
@@ -262,6 +275,21 @@ export type UseMcpResult = {
   authenticate: () => void;
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void;
+  /**
+   * Ensure the server icon is loaded and available in serverInfo
+   * Returns a promise that resolves when the icon is ready
+   * Use this before server creation to guarantee the icon is available
+   *
+   * @returns Promise that resolves with the base64 icon or null if not available
+   *
+   * @example
+   * ```typescript
+   * // Wait for icon before creating server
+   * const icon = await mcp.ensureIconLoaded();
+   * // Now mcp.serverInfo.icon is guaranteed to be set (if icon exists)
+   * ```
+   */
+  ensureIconLoaded: () => Promise<string | null>;
   /**
    * The underlying BrowserMCPClient instance.
    * Use this to create an MCPAgent for AI chat functionality.

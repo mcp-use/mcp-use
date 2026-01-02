@@ -26,6 +26,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useMcp } from "mcp-use/react";
+import { applyProxyConfig } from "mcp-use/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -64,22 +65,14 @@ function ConnectionTester({
   let urlError: string | null = null;
 
   try {
-    if (config.proxyConfig?.proxyAddress) {
-      const proxyUrl = new URL(config.proxyConfig.proxyAddress);
-      const originalUrl = new URL(config.url);
-      finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`;
-
-      customHeaders["X-Target-URL"] = config.url;
-    } else {
-      // Validate the URL even if not using proxy
-      new URL(config.url);
-    }
+    // Validate URL format
+    new URL(config.url);
+    // Apply proxy configuration if provided
+    const proxyResult = applyProxyConfig(config.url, config.proxyConfig);
+    finalUrl = proxyResult.url;
+    customHeaders = proxyResult.headers;
   } catch (err) {
     urlError = `Invalid URL format. Please include the protocol (http:// or https://).\nExample: https://${config.url}`;
-  }
-
-  if (config.proxyConfig?.customHeaders) {
-    customHeaders = { ...customHeaders, ...config.proxyConfig.customHeaders };
   }
 
   // Show error immediately if URL is invalid
@@ -636,6 +629,7 @@ export function InspectorDashboard() {
                         <ServerIcon
                           serverUrl={connection.url}
                           serverName={connection.name}
+                          serverIcon={connection.serverInfo?.icon}
                           size="md"
                         />
                         <h4 className="font-semibold text-sm">
