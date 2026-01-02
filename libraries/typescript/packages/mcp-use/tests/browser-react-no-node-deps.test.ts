@@ -5,7 +5,7 @@
  * It is expected to FAIL initially, proving that Node.js dependencies are being bundled.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import {
   readFileSync,
   readdirSync,
@@ -434,7 +434,7 @@ import('${modulePath}')
       writeFileSync(tmpFile, testScript);
 
       try {
-        const result = execSync(`node ${tmpFile}`, {
+        const result = execFileSync("node", [tmpFile], {
           encoding: "utf-8",
           timeout: 10000,
         });
