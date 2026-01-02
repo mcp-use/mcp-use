@@ -71,6 +71,11 @@
       "types": "./dist/src/server/index.d.ts",
       "import": "./dist/src/server/index.js",
       "require": "./dist/src/server/index.cjs"
+    },
+    "./utils": {
+      "types": "./dist/src/utils/index.d.ts",
+      "import": "./dist/src/utils/index.js",
+      "require": "./dist/src/utils/index.cjs"
     }
   },
   "main": "./dist/index.js",

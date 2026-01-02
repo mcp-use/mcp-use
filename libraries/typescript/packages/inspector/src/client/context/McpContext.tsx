@@ -1,5 +1,6 @@
 import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
 import { useMcp } from "mcp-use/react";
+import { applyProxyConfig } from "mcp-use/utils";
 import React, { type ReactNode } from "react";
 import {
   createContext,
@@ -169,26 +170,10 @@ function McpConnectionWrapper({
       : "/inspector/oauth/callback";
 
   // Apply proxy configuration if provided
-  let finalUrl = url;
-  let customHeaders: Record<string, string> = {};
-
-  if (proxyConfig?.proxyAddress) {
-    // If proxy is configured, use the proxy address as the URL
-    // For MCP connections, we need to append the SSE endpoint to the proxy URL
-    const proxyUrl = new URL(proxyConfig.proxyAddress);
-    const originalUrl = new URL(url);
-
-    // Construct the final proxy URL by combining proxy base with original path
-    finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`;
-
-    // Add original URL as a header so the proxy knows where to forward the request
-    customHeaders["X-Target-URL"] = url;
-  }
-
-  // Merge any additional custom headers
-  if (proxyConfig?.customHeaders) {
-    customHeaders = { ...customHeaders, ...proxyConfig.customHeaders };
-  }
+  const { url: finalUrl, headers: customHeaders } = applyProxyConfig(
+    url,
+    proxyConfig
+  );
 
   // Sampling state management
   const [pendingSamplingRequests, setPendingSamplingRequests] = useState<

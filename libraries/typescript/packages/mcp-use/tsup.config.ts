@@ -11,6 +11,7 @@ export default defineConfig({
     "src/client.ts",
     "src/react/index.ts",
     "src/server/index.ts",
+    "src/utils/index.ts",
     "src/client/prompts.ts",
   ],
   format: ["cjs", "esm"],
