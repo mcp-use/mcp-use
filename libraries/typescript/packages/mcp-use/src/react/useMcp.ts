@@ -94,6 +94,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
+  const [authTokens, setAuthTokens] =
+    useState<UseMcpResult["authTokens"]>(undefined);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null);
@@ -508,6 +510,25 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         if (capabilities) {
           console.log("[useMcp] Server capabilities:", capabilities);
           setCapabilities(capabilities);
+        }
+
+        // Get OAuth tokens if authentication was used
+        if (authProviderRef.current) {
+          const tokens = await authProviderRef.current.tokens();
+          if (tokens?.access_token) {
+            // Calculate expires_at from expires_in if available
+            const expiresAt = tokens.expires_in
+              ? Date.now() + tokens.expires_in * 1000
+              : undefined;
+
+            setAuthTokens({
+              access_token: tokens.access_token,
+              token_type: tokens.token_type || "Bearer",
+              expires_at: expiresAt,
+              refresh_token: tokens.refresh_token,
+              scope: tokens.scope,
+            });
+          }
         }
 
         return "success";
@@ -1320,6 +1341,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     error,
     log,
     authUrl,
+    authTokens,
     client: clientRef.current,
     callTool,
     readResource,

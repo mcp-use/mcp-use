@@ -144,6 +144,17 @@ export type UseMcpResult = {
    * this URL can be presented to the user to complete authentication manually in a new tab.
    */
   authUrl?: string;
+  /**
+   * OAuth tokens if authentication was completed
+   * Available when state is 'ready' and OAuth was used
+   */
+  authTokens?: {
+    access_token: string;
+    token_type: string;
+    expires_at?: number;
+    refresh_token?: string;
+    scope?: string;
+  };
   /** Array of internal log messages (useful for debugging) */
   log: {
     level: "debug" | "info" | "warn" | "error";

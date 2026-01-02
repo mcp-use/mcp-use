@@ -142,9 +142,7 @@ export class HttpConnector extends BaseConnector {
       if (this.disableSseFallback) {
         logger.info("SSE fallback disabled - failing connection");
         await this.cleanupResources();
-        throw new Error(
-          `Streamable HTTP connection failed: ${fallbackReason}. SSE fallback is disabled.`
-        );
+        throw new Error(`Streamable HTTP connection failed: ${fallbackReason}`);
       }
 
       // Always try SSE fallback for maximum compatibility
