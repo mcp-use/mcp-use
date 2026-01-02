@@ -51,9 +51,11 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
     return c.notFound();
   });
 
-  // Redirect root path to /inspector
+  // Redirect root path to /inspector (preserving query parameters)
   app.get("/", (c) => {
-    return c.redirect("/inspector");
+    const url = new URL(c.req.url);
+    const queryString = url.search; // includes the '?' if there are params
+    return c.redirect(`/inspector${queryString}`);
   });
 
   // Serve the main HTML file for /inspector and all other routes (SPA routing)
