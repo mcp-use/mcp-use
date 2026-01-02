@@ -1,13 +1,31 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
 import { isPortAvailable } from "./utils.js";
 
 const execAsync = promisify(exec);
+
+// Parse command line arguments for port
+function parsePortFromArgs(): number | null {
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--port" && i + 1 < args.length) {
+      const parsedPort = Number.parseInt(args[i + 1], 10);
+      if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+        console.error(
+          `Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`
+        );
+        process.exit(1);
+      }
+      return parsedPort;
+    }
+  }
+  return null;
+}
 
 const app = new Hono();
 
@@ -28,10 +46,20 @@ async function startServer() {
     const isDev =
       process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
-    let port = 3001;
+    // Check for port from command line arguments first
+    const cliPort = parsePortFromArgs();
+    let port = cliPort ?? 3001;
     const available = await isPortAvailable(port);
 
     if (!available) {
+      // If port was explicitly specified via CLI, fail immediately
+      if (cliPort !== null) {
+        console.error(
+          `❌ Port ${port} is not available. Please stop the process using this port and try again.`
+        );
+        process.exit(1);
+      }
+
       if (isDev) {
         console.error(
           `❌❌❌ Port ${port} is not available (probably used by Vite dev server as fallback so you should stop port 3000). Please stop the process using this port and try again.`

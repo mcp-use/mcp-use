@@ -45,6 +45,7 @@ interface LayoutHeaderProps {
   onTabChange: (tab: TabType) => void;
   onCommandPaletteOpen: () => void;
   onOpenConnectionOptions: (connectionId: string | null) => void;
+  embedded?: boolean;
 }
 
 const tabs = [
@@ -117,6 +118,7 @@ export function LayoutHeader({
   onTabChange,
   onCommandPaletteOpen,
   onOpenConnectionOptions,
+  embedded = false,
 }: LayoutHeaderProps) {
   const { tunnelUrl } = useInspector();
   const showTunnelBadge = selectedServer && tunnelUrl;
@@ -142,54 +144,62 @@ export function LayoutHeader({
       {/* Mobile Layout */}
       <div className="flex lg:hidden flex-col gap-3">
         <div className="flex items-center justify-between w-full">
-          {/* Left: Server Selector (Icon + Chevron) */}
-          <div className="flex-1 flex justify-start">
-            <ServerDropdown
-              connections={connections}
-              selectedServer={selectedServer}
-              onServerSelect={onServerSelect}
-              onOpenConnectionOptions={onOpenConnectionOptions}
-              mobileMode={true}
-            />
-          </div>
-
-          {/* Middle: Logo (centered, no text) */}
-          <div className="flex-shrink-0 flex justify-center">
-            <div className="scale-150">
-              <LogoAnimated state="collapsed" />
-            </div>
-          </div>
-
-          {/* Right: GitHub and Theme Icons */}
-          <div className="flex-1 flex justify-end items-center gap-2">
-            {selectedServer && (
-              <AddToClientDropdown
-                serverUrl={tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url}
-                serverName={selectedServer.name}
-                headers={selectedServer.customHeaders}
-                className="p-2"
+          {/* Left: Server Selector (Icon + Chevron) - Hidden in embedded mode */}
+          {!embedded && (
+            <div className="flex-1 flex justify-start">
+              <ServerDropdown
+                connections={connections}
+                selectedServer={selectedServer}
+                onServerSelect={onServerSelect}
+                onOpenConnectionOptions={onOpenConnectionOptions}
+                mobileMode={true}
               />
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="sm" asChild>
-                  <a
-                    href="https://github.com/mcp-use/mcp-use"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2"
-                    aria-label="GitHub"
-                  >
-                    <GithubIcon className="h-4 w-4" />
-                  </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Give us a star ⭐</p>
-              </TooltipContent>
-            </Tooltip>
-            <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
-          </div>
+            </div>
+          )}
+
+          {/* Middle: Logo (centered, no text) - Hidden in embedded mode */}
+          {!embedded && (
+            <div className="flex-shrink-0 flex justify-center">
+              <div className="scale-150">
+                <LogoAnimated state="collapsed" />
+              </div>
+            </div>
+          )}
+
+          {/* Right: GitHub and Theme Icons - Hidden in embedded mode */}
+          {!embedded && (
+            <div className="flex-1 flex justify-end items-center gap-2">
+              {selectedServer && (
+                <AddToClientDropdown
+                  serverUrl={
+                    tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                  }
+                  serverName={selectedServer.name}
+                  headers={selectedServer.customHeaders}
+                  className="p-2"
+                />
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href="https://github.com/mcp-use/mcp-use"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2"
+                      aria-label="GitHub"
+                    >
+                      <GithubIcon className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Give us a star ⭐</p>
+                </TooltipContent>
+              </Tooltip>
+              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+            </div>
+          )}
         </div>
 
         {/* Mobile Tabs - Icons Only */}
@@ -241,13 +251,15 @@ export function LayoutHeader({
       <div className="hidden lg:flex items-center justify-between gap-3">
         {/* Left side: Server dropdown + Tabs + Tunnel Badge */}
         <div className="flex items-center flex-wrap gap-2 md:space-x-6 space-x-2">
-          {/* Server Selection Dropdown */}
-          <ServerDropdown
-            connections={connections}
-            selectedServer={selectedServer}
-            onServerSelect={onServerSelect}
-            onOpenConnectionOptions={onOpenConnectionOptions}
-          />
+          {/* Server Selection Dropdown - Hidden in embedded mode */}
+          {!embedded && (
+            <ServerDropdown
+              connections={connections}
+              selectedServer={selectedServer}
+              onServerSelect={onServerSelect}
+              onOpenConnectionOptions={onOpenConnectionOptions}
+            />
+          )}
 
           {/* Tabs */}
           {selectedServer && (
@@ -388,59 +400,63 @@ export function LayoutHeader({
           )}
         </div>
 
-        {/* Right side: Add to Client + Theme Toggle + Command Palette + GitHub Button + Logo */}
-        <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-          {selectedServer && (
-            <AddToClientDropdown
-              serverUrl={tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url}
-              serverName={selectedServer.name}
-              headers={selectedServer.customHeaders}
-            />
-          )}
-          <Tooltip>
-            <TooltipTrigger>
-              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Toggle theme</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full px-1 -mx-3 flex gap-1"
-                onClick={onCommandPaletteOpen}
-              >
-                <Command className="size-4" />
-                <span className="text-base font-mono hidden sm:inline">K</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Command Palette</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" asChild>
-                <a
-                  href="https://github.com/mcp-use/mcp-use"
-                  className="flex items-center gap-2"
-                  target="_blank"
-                  rel="noopener noreferrer"
+        {/* Right side: Add to Client + Theme Toggle + Command Palette + GitHub Button + Logo - Hidden in embedded mode */}
+        {!embedded && (
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+            {selectedServer && (
+              <AddToClientDropdown
+                serverUrl={tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url}
+                serverName={selectedServer.name}
+                headers={selectedServer.customHeaders}
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger>
+                <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Toggle theme</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full px-1 -mx-3 flex gap-1"
+                  onClick={onCommandPaletteOpen}
                 >
-                  <GithubIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline">Github</span>
-                </a>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Give us a star ⭐</p>
-            </TooltipContent>
-          </Tooltip>
+                  <Command className="size-4" />
+                  <span className="text-base font-mono hidden sm:inline">
+                    K
+                  </span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Command Palette</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" asChild>
+                  <a
+                    href="https://github.com/mcp-use/mcp-use"
+                    className="flex items-center gap-2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <GithubIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Github</span>
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Give us a star ⭐</p>
+              </TooltipContent>
+            </Tooltip>
 
-          <LogoAnimated state="expanded" />
-        </div>
+            <LogoAnimated state="expanded" />
+          </div>
+        )}
       </div>
     </header>
   );

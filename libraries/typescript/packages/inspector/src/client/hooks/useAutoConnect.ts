@@ -16,6 +16,7 @@ interface UseAutoConnectOptions {
   ) => void;
   removeConnection: (id: string) => void;
   configLoaded: boolean;
+  embedded?: boolean;
 }
 
 interface AutoConnectState {
@@ -32,6 +33,13 @@ interface ConnectionConfig {
   requestTimeout?: number;
   resetTimeoutOnProgress?: boolean;
   maxTotalTimeout?: number;
+  auth?: {
+    access_token: string;
+    token_type?: string;
+    expires_at?: number;
+    refresh_token?: string;
+    scope?: string;
+  };
 }
 
 /**
@@ -54,6 +62,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
         requestTimeout: parsed.requestTimeout,
         resetTimeoutOnProgress: parsed.resetTimeoutOnProgress,
         maxTotalTimeout: parsed.maxTotalTimeout,
+        auth: parsed.auth,
       };
     }
   } catch {
@@ -74,6 +83,7 @@ export function useAutoConnect({
   addConnection,
   removeConnection,
   configLoaded: contextConfigLoaded,
+  embedded = false,
 }: UseAutoConnectOptions): AutoConnectState {
   const navigate = useNavigate();
   const [isAutoConnecting, setIsAutoConnecting] = useState(false);
@@ -102,18 +112,65 @@ export function useAutoConnect({
   // Unified connection attempt function
   const attemptConnection = useCallback(
     (config: ConnectionConfig) => {
-      const { url, name, transportType, connectionType, customHeaders } =
+      const { url, name, transportType, connectionType, customHeaders, auth } =
         config;
+
+      console.log("[useAutoConnect] Config received:", config);
+      console.log(
+        "[useAutoConnect] Custom headers before auth:",
+        customHeaders
+      );
+      console.log("[useAutoConnect] Auth config:", auth);
+
+      // Merge custom headers with auth if provided
+      const finalCustomHeaders = { ...customHeaders };
+
+      // If auth tokens are provided, add as Authorization header AND store in localStorage (embedded mode uses session storage)
+      if (auth?.access_token) {
+        const tokenType = auth.token_type || "bearer";
+        // Capitalize first letter of token type (Bearer, not bearer)
+        const formattedTokenType =
+          tokenType.charAt(0).toUpperCase() + tokenType.slice(1);
+        finalCustomHeaders.Authorization = `${formattedTokenType} ${auth.access_token}`;
+
+        console.log(
+          "[useAutoConnect] Added Authorization header:",
+          finalCustomHeaders.Authorization
+        );
+
+        // Store tokens for auth refresh (use sessionStorage in embedded mode to avoid persistence)
+        if (typeof window !== "undefined" && !embedded) {
+          const storageKey = `mcp:auth:${url}`;
+          const oauthData = {
+            access_token: auth.access_token,
+            token_type: auth.token_type || "bearer",
+            expires_at: auth.expires_at,
+            refresh_token: auth.refresh_token,
+            scope: auth.scope || "",
+          };
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(oauthData));
+            console.log(`[useAutoConnect] Pre-stored OAuth tokens for ${url}`);
+          } catch (error) {
+            console.error(
+              "[useAutoConnect] Failed to store OAuth tokens:",
+              error
+            );
+          }
+        }
+      }
+
+      console.log("[useAutoConnect] Final custom headers:", finalCustomHeaders);
 
       // Prepare proxy configuration if using proxy
       const proxyConfig =
         connectionType === "Via Proxy"
           ? {
               proxyAddress: `${window.location.origin}/inspector/api/proxy/mcp`,
-              customHeaders: customHeaders || {},
+              customHeaders: finalCustomHeaders,
             }
-          : customHeaders && Object.keys(customHeaders).length > 0
-            ? { proxyAddress: undefined, customHeaders }
+          : Object.keys(finalCustomHeaders).length > 0
+            ? { proxyAddress: undefined, customHeaders: finalCustomHeaders }
             : undefined;
 
       console.warn(

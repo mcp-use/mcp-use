@@ -27,7 +27,7 @@ import {
   generateCursorDeepLink,
   generateGeminiCLICommand,
   generateVSCodeDeepLink,
-} from "@/client/utils/mcpClientUtils";
+} from "mcp-use/react";
 import { toast } from "sonner";
 
 // Discord Icon Component

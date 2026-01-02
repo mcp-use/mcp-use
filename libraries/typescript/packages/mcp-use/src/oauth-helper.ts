@@ -269,6 +269,7 @@ export class OAuthHelper {
         response_types: ["code"],
         token_endpoint_auth_method: "none", // Use public client (no secret)
         scope: this.config.scope || "read write",
+        logo_uri: "https://mcp-use.com/logo.png",
       };
 
       console.log("🔐 [OAuthHelper] Registering OAuth client dynamically:", {

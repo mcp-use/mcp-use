@@ -25,7 +25,7 @@ import {
   generateGeminiCLICommand,
   generateVSCodeDeepLink,
   getEnvVarInstructions,
-} from "@/client/utils/mcpClientUtils";
+} from "mcp-use/react";
 import { Check, ChevronDown, Copy } from "lucide-react";
 import { VSCodeIcon } from "./ui/client-icons";
 import { useState } from "react";

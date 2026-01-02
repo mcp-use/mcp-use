@@ -1,7 +1,14 @@
+import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
+import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
 import { MCPServerRemovedEvent, Telemetry } from "@/client/telemetry";
+import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type {
+  CreateMessageResult,
+  ElicitResult,
+} from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import { useMcp } from "mcp-use/react";
 import { applyProxyConfig } from "mcp-use/utils";
-import React, { type ReactNode } from "react";
 import {
   createContext,
   use,
@@ -10,15 +17,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
-import type {
-  CreateMessageResult,
-  ElicitResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
-import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
-import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
 
 // Empty function constants for sampling operations
 const EMPTY_APPROVE_SAMPLING = () => {};
@@ -150,6 +150,7 @@ function McpConnectionWrapper({
   connectionId,
   onUpdate,
   onRemove: _onRemove,
+  embedded,
 }: {
   url: string;
   name: string;
@@ -161,7 +162,20 @@ function McpConnectionWrapper({
   connectionId: string;
   onUpdate: (connection: MCPConnection) => void;
   onRemove: () => void;
+  embedded?: boolean;
 }) {
+  // Check if OAuth tokens are pre-stored in localStorage (only relevant in non-embedded mode)
+  const storageKeyPrefix = embedded ? "mcp-embedded:auth" : "mcp:auth";
+  const storageKey = `${storageKeyPrefix}:${url}`;
+  const hasPreStoredOAuthTokens = (() => {
+    if (typeof window === "undefined" || embedded) return false;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored !== null;
+    } catch {
+      return false;
+    }
+  })();
   // Configure OAuth callback URL
   // Use /inspector/oauth/callback for proper routing in the inspector
   const callbackUrl =
@@ -384,7 +398,7 @@ function McpConnectionWrapper({
         const requestId = `sampling-${requestIdCounter.current++}`;
         const newRequest = {
           id: requestId,
-          request: { params },
+          request: { method: "sampling/createMessage" as const, params },
           timestamp: Date.now(),
           serverName: name,
           resolve,
@@ -529,10 +543,11 @@ function McpConnectionWrapper({
     customHeaders:
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: transportType || "http", // Respect user's transport choice, default to HTTP (no auto-fallback to SSE)
-    preventAutoAuth: true, // Show auth button instead of auto-triggering OAuth
+    preventAutoAuth: !hasPreStoredOAuthTokens, // Allow auto-auth if tokens are pre-stored
     useRedirectFlow: true, // Use redirect instead of popup for better UX
     enabled: wrapTransportReady, // Only connect when wrapper is ready
     wrapTransport: wrapTransportFn,
+    storageKeyPrefix: storageKeyPrefix, // Use different storage for embedded mode
     onNotification: (notification) => {
       onNotificationReceived({
         id: globalThis.crypto.randomUUID(),
@@ -738,8 +753,14 @@ function McpConnectionWrapper({
   return null;
 }
 
-export function McpProvider({ children }: { children: ReactNode }) {
-  // Load initial connections from localStorage
+export function McpProvider({
+  children,
+  embedded = false,
+}: {
+  children: ReactNode;
+  embedded?: boolean;
+}) {
+  // Load initial connections from localStorage (skip in embedded mode)
   const [connections, setConnections] = useState<MCPConnection[]>([]);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [autoConnect, setAutoConnect] = useState(true);
@@ -759,8 +780,14 @@ export function McpProvider({ children }: { children: ReactNode }) {
     }>
   >([]);
 
-  // Initialize from localStorage
+  // Initialize from localStorage (skip in embedded mode)
   useEffect(() => {
+    // In embedded mode, skip localStorage loading and mark as loaded immediately
+    if (embedded) {
+      setConfigLoaded(true);
+      return;
+    }
+
     try {
       const savedConfigs = localStorage.getItem("mcp-inspector-connections");
       if (savedConfigs) {
@@ -818,21 +845,21 @@ export function McpProvider({ children }: { children: ReactNode }) {
     } finally {
       setConfigLoaded(true);
     }
-  }, []);
+  }, [embedded]);
 
-  // Save to localStorage whenever configs change
+  // Save to localStorage whenever configs change (skip in embedded mode)
   useEffect(() => {
-    if (!configLoaded) return;
+    if (!configLoaded || embedded) return;
     localStorage.setItem(
       "mcp-inspector-connections",
       JSON.stringify(connectionConfigs)
     );
-  }, [connectionConfigs, configLoaded]);
+  }, [connectionConfigs, configLoaded, embedded]);
 
   useEffect(() => {
-    if (!configLoaded) return;
+    if (!configLoaded || embedded) return;
     localStorage.setItem("mcp-inspector-auto-connect", String(autoConnect));
-  }, [autoConnect, configLoaded]);
+  }, [autoConnect, configLoaded, embedded]);
 
   const addConnection = useCallback(
     (
@@ -1212,6 +1239,7 @@ export function McpProvider({ children }: { children: ReactNode }) {
               connectionId={config.id || config.url}
               onUpdate={handleConnectionUpdate}
               onRemove={() => removeConnection(config.id || config.url)}
+              embedded={embedded}
             />
           );
         })}
