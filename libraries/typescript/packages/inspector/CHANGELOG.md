@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.0-canary.2
+
+### Patch Changes
+
+- 93fd156: fix: query url handling in built mode was not preserving args
+  - mcp-use@1.12.0-canary.2
+
 ## 0.14.0-canary.1
 
 ### Minor Changes
