@@ -1,3 +1,5 @@
+import { Button } from "@/client/components/ui/button";
+import { Card, CardContent } from "@/client/components/ui/card";
 import {
   Activity,
   CheckCircle2,
@@ -10,10 +12,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Button } from "@/client/components/ui/button";
-import { Card, CardContent } from "@/client/components/ui/card";
-import { useMcpContext } from "../../client/context/McpContext";
 import type { MCPConnection } from "../../client/context/McpContext";
+import { useMcpContext } from "../../client/context/McpContext";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
 

@@ -3,5 +3,5 @@
  * @module utils
  */
 
-export * from "./proxy-config.js";
 export * from "./favicon-detector.js";
+export * from "./proxy-config.js";
