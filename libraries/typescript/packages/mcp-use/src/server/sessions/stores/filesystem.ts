@@ -99,26 +99,16 @@ export class FileSystemSessionStore implements SessionStore {
       const now = Date.now();
 
       // Clean up expired sessions during load
-      let loadedCount = 0;
-      let expiredCount = 0;
-
       for (const [sessionId, metadata] of Object.entries(parsed)) {
         const sessionMetadata = metadata as SessionMetadata;
         const age = now - sessionMetadata.lastAccessedAt;
 
         if (age > this.maxAgeMs) {
-          expiredCount++;
           continue; // Skip expired sessions
         }
 
         this.sessions.set(sessionId, sessionMetadata);
-        loadedCount++;
       }
-
-      console.log(
-        `[FileSystemSessionStore] Loaded ${loadedCount} session(s) from ${this.filePath}` +
-          (expiredCount > 0 ? ` (cleaned up ${expiredCount} expired)` : "")
-      );
     } catch (error: any) {
       if (error.code === "ENOENT") {
         // File doesn't exist - this is fine for first run

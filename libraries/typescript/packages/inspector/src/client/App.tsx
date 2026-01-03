@@ -9,6 +9,9 @@ import {
 } from "mcp-use/react";
 import { useMemo } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
+import { toast } from "sonner";
+import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
+import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
 import { InspectorProvider } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
@@ -39,6 +42,75 @@ function App() {
         }}
         onServerStateChange={(id: string, state: McpServer["state"]) => {
           console.log("[Inspector] Server state changed:", id, state);
+        }}
+        onSamplingRequest={(request, serverId, serverName, approve, reject) => {
+          const toastId = toast(
+            <SamplingRequestToast
+              requestId={request.id}
+              serverName={serverName}
+              onViewDetails={() => {
+                const event = new CustomEvent("navigate-to-sampling", {
+                  detail: { requestId: request.id },
+                });
+                window.dispatchEvent(event);
+                toast.dismiss(toastId);
+              }}
+              onApprove={(defaultResponse) => {
+                approve(request.id, defaultResponse);
+                toast.success("Sampling request approved");
+                toast.dismiss(toastId);
+              }}
+              onDeny={() => {
+                reject(request.id, "User denied from toast");
+                toast.dismiss(toastId);
+              }}
+            />,
+            { duration: Infinity }
+          );
+        }}
+        onElicitationRequest={(
+          request,
+          serverId,
+          serverName,
+          approve,
+          reject
+        ) => {
+          const mode = request.request.mode || "form";
+          const message = request.request.message;
+          const url =
+            mode === "url" && "url" in request.request
+              ? request.request.url
+              : undefined;
+
+          const toastId = toast(
+            <ElicitationRequestToast
+              requestId={request.id}
+              serverName={serverName}
+              mode={mode}
+              message={message}
+              url={url}
+              onViewDetails={() => {
+                const event = new CustomEvent("navigate-to-elicitation", {
+                  detail: { requestId: request.id },
+                });
+                window.dispatchEvent(event);
+                toast.dismiss(toastId);
+              }}
+              onOpenUrl={
+                mode === "url" && url
+                  ? () => {
+                      window.open(url, "_blank");
+                      toast.dismiss(toastId);
+                    }
+                  : undefined
+              }
+              onCancel={() => {
+                reject(request.id, "User cancelled from toast");
+                toast.dismiss(toastId);
+              }}
+            />,
+            { duration: Infinity }
+          );
         }}
       >
         <InspectorProvider>

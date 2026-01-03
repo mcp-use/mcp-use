@@ -17,8 +17,8 @@ import React, {
   type ReactNode,
 } from "react";
 import type { StorageProvider } from "./storage/StorageProvider.js";
-import { useMcp } from "./useMcp.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
+import { useMcp } from "./useMcp.js";
 
 // ===== Types =====
 
@@ -127,6 +127,20 @@ interface McpServerWrapperProps {
   options: McpServerOptions;
   onUpdate: (server: McpServer) => void;
   rpcWrapTransport?: (transport: any, serverId: string) => any;
+  onGlobalSamplingRequest?: (
+    request: PendingSamplingRequest,
+    serverId: string,
+    serverName: string,
+    approve: (requestId: string, result: CreateMessageResult) => void,
+    reject: (requestId: string, error?: string) => void
+  ) => void;
+  onGlobalElicitationRequest?: (
+    request: PendingElicitationRequest,
+    serverId: string,
+    serverName: string,
+    approve: (requestId: string, result: ElicitResult) => void,
+    reject: (requestId: string, error?: string) => void
+  ) => void;
 }
 
 /**
@@ -137,6 +151,8 @@ function McpServerWrapper({
   options,
   onUpdate,
   rpcWrapTransport,
+  onGlobalSamplingRequest,
+  onGlobalElicitationRequest,
 }: McpServerWrapperProps) {
   const {
     name,
@@ -283,9 +299,25 @@ function McpServerWrapper({
 
         // Call app-specific handler if provided
         onSamplingRequest?.(request);
+
+        // Call global handler if provided
+        onGlobalSamplingRequest?.(
+          request,
+          id,
+          name || id,
+          approveSampling,
+          rejectSampling
+        );
       });
     },
-    [id, name, onSamplingRequest]
+    [
+      id,
+      name,
+      onSamplingRequest,
+      onGlobalSamplingRequest,
+      approveSampling,
+      rejectSampling,
+    ]
   );
 
   // Elicitation handlers
@@ -336,9 +368,25 @@ function McpServerWrapper({
 
         // Call app-specific handler if provided
         onElicitationRequest?.(request);
+
+        // Call global handler if provided
+        onGlobalElicitationRequest?.(
+          request,
+          id,
+          name || id,
+          approveElicitation,
+          rejectElicitation
+        );
       });
     },
-    [id, name, onElicitationRequest]
+    [
+      id,
+      name,
+      onElicitationRequest,
+      onGlobalElicitationRequest,
+      approveElicitation,
+      rejectElicitation,
+    ]
   );
 
   // Use the core useMcp hook with our callbacks
@@ -490,6 +538,38 @@ export interface McpClientProviderProps {
    * Callback when a server's state changes
    */
   onServerStateChange?: (id: string, state: McpServer["state"]) => void;
+
+  /**
+   * Callback when a sampling request is received from any server
+   * @param request The sampling request details
+   * @param serverId The ID of the server that sent the request
+   * @param serverName The name of the server
+   * @param approve Function to approve the request
+   * @param reject Function to reject the request
+   */
+  onSamplingRequest?: (
+    request: PendingSamplingRequest,
+    serverId: string,
+    serverName: string,
+    approve: (requestId: string, result: CreateMessageResult) => void,
+    reject: (requestId: string, error?: string) => void
+  ) => void;
+
+  /**
+   * Callback when an elicitation request is received from any server
+   * @param request The elicitation request details
+   * @param serverId The ID of the server that sent the request
+   * @param serverName The name of the server
+   * @param approve Function to approve the request
+   * @param reject Function to reject the request
+   */
+  onElicitationRequest?: (
+    request: PendingElicitationRequest,
+    serverId: string,
+    serverName: string,
+    approve: (requestId: string, result: ElicitResult) => void,
+    reject: (requestId: string, error?: string) => void
+  ) => void;
 }
 
 /**
@@ -534,6 +614,8 @@ export function McpClientProvider({
   onServerAdded,
   onServerRemoved,
   onServerStateChange,
+  onSamplingRequest,
+  onElicitationRequest,
 }: McpClientProviderProps) {
   const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
   const [servers, setServers] = useState<McpServer[]>([]);
@@ -784,6 +866,8 @@ export function McpClientProvider({
           options={config.options}
           onUpdate={handleServerUpdate}
           rpcWrapTransport={rpcWrapTransport}
+          onGlobalSamplingRequest={onSamplingRequest}
+          onGlobalElicitationRequest={onElicitationRequest}
         />
       ))}
     </McpClientContext.Provider>
