@@ -69,5 +69,20 @@ export type {
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
 
+// Export multi-server client provider and hooks
+export {
+  McpClientProvider,
+  useMcpClient,
+  useMcpServer,
+} from "./McpClientProvider.js";
+export type {
+  McpServer,
+  McpServerOptions,
+  McpClientContextType,
+  McpNotification,
+  PendingSamplingRequest,
+  PendingElicitationRequest,
+} from "./McpClientProvider.js";
+
 // Export WidgetMetadata type for widget developers
 export type { WidgetMetadata } from "../server/types/widget.js";

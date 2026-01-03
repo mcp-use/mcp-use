@@ -17,6 +17,11 @@ export type UseMcpOptions = {
   url?: string;
   /** Enable/disable the connection (similar to TanStack Query). When false, no connection will be attempted (default: true) */
   enabled?: boolean;
+  /** Proxy configuration for routing through a proxy server */
+  proxyConfig?: {
+    proxyAddress?: string;
+    customHeaders?: Record<string, string>;
+  };
   /** OAuth client name for registration (if dynamic registration is used) */
   clientName?: string;
   /** OAuth client URI for registration (if dynamic registration is used) */
