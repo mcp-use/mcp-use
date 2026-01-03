@@ -22,18 +22,20 @@ export type UseMcpOptions = {
     proxyAddress?: string;
     customHeaders?: Record<string, string>;
   };
-  /** OAuth client name for registration (if dynamic registration is used) */
-  clientName?: string;
-  /** OAuth client URI for registration (if dynamic registration is used) */
-  clientUri?: string;
   /** Custom callback URL for OAuth redirect (defaults to /oauth/callback on the current origin) */
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /** Custom configuration for the MCP client identity */
+  /** Client configuration for both OAuth registration and MCP protocol identification */
   clientConfig?: {
+    /** Client name (used for OAuth registration and MCP initialize) */
     name?: string;
+    /** Client version (sent in MCP initialize request) */
     version?: string;
+    /** Client URI/homepage (used for OAuth registration) */
+    uri?: string;
+    /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
+    logo_uri?: string;
   };
   /** Custom headers that can be used to bypass auth */
   customHeaders?: Record<string, string>;
@@ -118,6 +120,8 @@ export type UseMcpOptions = {
 };
 
 export type UseMcpResult = {
+  name: string;
+
   /** List of tools available from the connected MCP server */
   tools: Tool[];
   /** List of resources available from the connected MCP server */
@@ -128,8 +132,14 @@ export type UseMcpResult = {
   prompts: Prompt[];
   /** Server information from the initialize response */
   serverInfo?: {
+    title?: string;
     name: string;
     version?: string;
+    websiteUrl?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+    }>;
     /** Base64-encoded favicon auto-detected from server domain */
     icon?: string;
   };

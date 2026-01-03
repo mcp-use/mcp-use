@@ -16,6 +16,7 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import type { StorageProvider } from "./storage/StorageProvider.js";
 import { useMcp } from "./useMcp.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
@@ -102,6 +103,8 @@ export interface McpClientContextType {
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
   getServer: (id: string) => McpServer | undefined;
+  /** Whether storage has finished loading (true if no storage provider) */
+  storageLoaded: boolean;
 }
 
 // ===== Context =====
@@ -123,19 +126,47 @@ interface McpServerWrapperProps {
   id: string;
   options: McpServerOptions;
   onUpdate: (server: McpServer) => void;
+  rpcWrapTransport?: (transport: any, serverId: string) => any;
 }
 
 /**
  * Internal component that wraps useMcp and adds notification/sampling/elicitation state
  */
-function McpServerWrapper({ id, options, onUpdate }: McpServerWrapperProps) {
+function McpServerWrapper({
+  id,
+  options,
+  onUpdate,
+  rpcWrapTransport,
+}: McpServerWrapperProps) {
   const {
     name,
     onSamplingRequest,
     onElicitationRequest,
     onNotificationReceived,
+    wrapTransport: optionsWrapTransport,
     ...mcpOptions
   } = options;
+
+  // Merge user's wrapTransport with RPC logging wrapper
+  const combinedWrapTransport = useMemo(() => {
+    if (!rpcWrapTransport && !optionsWrapTransport) return undefined;
+
+    return (transport: any) => {
+      let wrapped = transport;
+
+      // Apply RPC logging first if enabled
+      if (rpcWrapTransport) {
+        wrapped = rpcWrapTransport(wrapped, id);
+      }
+
+      // Then apply user's wrapper if provided
+      if (optionsWrapTransport) {
+        wrapped = optionsWrapTransport(wrapped, id);
+      }
+
+      return wrapped;
+    };
+  }, [rpcWrapTransport, optionsWrapTransport, id]);
 
   // Notification state
   const [notifications, setNotifications] = useState<McpNotification[]>([]);
@@ -316,6 +347,7 @@ function McpServerWrapper({ id, options, onUpdate }: McpServerWrapperProps) {
     onNotification: handleNotification,
     samplingCallback,
     onElicitation: elicitationCallback,
+    wrapTransport: combinedWrapTransport,
   });
 
   // Memoize public-facing sampling/elicitation requests (without resolve/reject)
@@ -421,59 +453,261 @@ function McpServerWrapper({ id, options, onUpdate }: McpServerWrapperProps) {
 // ===== Provider =====
 
 /**
+ * Props for McpClientProvider
+ */
+export interface McpClientProviderProps {
+  children: ReactNode;
+
+  /**
+   * Initial servers configuration (like Python MCPClient.from_dict)
+   * Servers defined here will be auto-connected on mount
+   */
+  mcpServers?: Record<string, McpServerOptions>;
+
+  /**
+   * Storage provider for persisting server configurations
+   * When provided, automatically loads servers on mount and saves on changes
+   */
+  storageProvider?: StorageProvider;
+
+  /**
+   * Enable RPC logging for debugging (browser only)
+   * Logs all MCP protocol messages to console
+   */
+  enableRpcLogging?: boolean;
+
+  /**
+   * Callback when a server is added
+   */
+  onServerAdded?: (id: string, server: McpServer) => void;
+
+  /**
+   * Callback when a server is removed
+   */
+  onServerRemoved?: (id: string) => void;
+
+  /**
+   * Callback when a server's state changes
+   */
+  onServerStateChange?: (id: string, state: McpServer["state"]) => void;
+}
+
+/**
  * Provider for managing multiple MCP server connections
  *
  * Provides a context for adding/removing servers and accessing their state.
  * Each server maintains its own connection, notification history, and
  * pending sampling/elicitation requests.
  *
+ * Supports:
+ * - Initial server configuration via `mcpServers` prop
+ * - Persistence via pluggable `storageProvider`
+ * - RPC logging for debugging
+ * - Lifecycle callbacks for state changes
+ *
  * @example
  * ```tsx
- * <McpClientProvider>
+ * // With initial servers
+ * <McpClientProvider
+ *   mcpServers={{
+ *     linear: { url: "https://mcp.linear.app/sse" },
+ *     github: { url: "https://mcp.github.com/mcp" }
+ *   }}
+ * >
+ *   <MyApp />
+ * </McpClientProvider>
+ *
+ * // With persistence
+ * <McpClientProvider
+ *   storageProvider={new LocalStorageProvider("my-servers")}
+ *   enableRpcLogging={true}
+ * >
  *   <MyApp />
  * </McpClientProvider>
  * ```
  */
-export function McpClientProvider({ children }: { children: ReactNode }) {
+export function McpClientProvider({
+  children,
+  mcpServers,
+  storageProvider,
+  enableRpcLogging = false,
+  onServerAdded,
+  onServerRemoved,
+  onServerStateChange,
+}: McpClientProviderProps) {
   const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
   const [servers, setServers] = useState<McpServer[]>([]);
+  const [storageLoaded, setStorageLoaded] = useState(false);
 
-  const handleServerUpdate = useCallback((updatedServer: McpServer) => {
-    setServers((prev) => {
-      const index = prev.findIndex((s) => s.id === updatedServer.id);
-      if (index === -1) {
-        // New server
-        return [...prev, updatedServer];
+  // Load RPC transport wrapper if enabled
+  const [rpcWrapTransport, setRpcWrapTransport] = useState<
+    ((transport: any, serverId: string) => any) | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (!enableRpcLogging || typeof window === "undefined") {
+      setRpcWrapTransport(undefined);
+      return;
+    }
+
+    // Load the RPC logger dynamically
+    import("./rpc-logger.js")
+      .then((module) => {
+        console.log("[McpClientProvider] RPC logger loaded");
+        setRpcWrapTransport(() => module.wrapTransportForLogging);
+      })
+      .catch((err) => {
+        console.error("[McpClientProvider] Failed to load RPC logger:", err);
+        setRpcWrapTransport(undefined);
+      });
+  }, [enableRpcLogging]);
+
+  // Load servers from storage on mount
+  useEffect(() => {
+    const loadServers = async () => {
+      console.log(
+        "[McpClientProvider] Loading servers, storageProvider:",
+        !!storageProvider,
+        "mcpServers:",
+        mcpServers
+      );
+
+      if (!storageProvider) {
+        // No storage provider - just load from mcpServers prop if provided
+        if (mcpServers) {
+          const configs = Object.entries(mcpServers).map(([id, options]) => ({
+            id,
+            options,
+          }));
+          console.log(
+            "[McpClientProvider] Loaded from mcpServers prop:",
+            configs.length
+          );
+          setServerConfigs(configs);
+        }
+        setStorageLoaded(true);
+        return;
       }
 
-      // Check if actually changed to avoid loops
-      const current = prev[index];
-      if (
-        current.state === updatedServer.state &&
-        current.tools === updatedServer.tools &&
-        current.resources === updatedServer.resources &&
-        current.prompts === updatedServer.prompts &&
-        current.error === updatedServer.error &&
-        current.serverInfo === updatedServer.serverInfo &&
-        current.client === updatedServer.client &&
-        current.notifications === updatedServer.notifications &&
-        current.unreadNotificationCount ===
-          updatedServer.unreadNotificationCount &&
-        current.pendingSamplingRequests.length ===
-          updatedServer.pendingSamplingRequests.length &&
-        current.pendingElicitationRequests.length ===
-          updatedServer.pendingElicitationRequests.length
-      ) {
-        return prev;
-      }
+      // Has storage provider - load from storage and merge with mcpServers
+      try {
+        const storedServers = await Promise.resolve(
+          storageProvider.getServers()
+        );
 
-      const newServers = [...prev];
-      newServers[index] = updatedServer;
-      return newServers;
-    });
-  }, []);
+        console.log(
+          "[McpClientProvider] Loaded from storage:",
+          Object.keys(storedServers).length
+        );
+
+        // Merge with initial mcpServers (mcpServers takes precedence)
+        const mergedServers = { ...storedServers, ...mcpServers };
+
+        // Convert to ServerConfig array
+        const configs = Object.entries(mergedServers).map(([id, options]) => ({
+          id,
+          options,
+        }));
+
+        console.log(
+          "[McpClientProvider] Total servers after merge:",
+          configs.length
+        );
+        setServerConfigs(configs);
+        setStorageLoaded(true);
+      } catch (error) {
+        console.error(
+          "[McpClientProvider] Failed to load from storage:",
+          error
+        );
+        // Fall back to mcpServers only
+        if (mcpServers) {
+          const configs = Object.entries(mcpServers).map(([id, options]) => ({
+            id,
+            options,
+          }));
+          setServerConfigs(configs);
+        }
+        setStorageLoaded(true);
+      }
+    };
+
+    loadServers();
+  }, [storageProvider, mcpServers]); // Run when storage provider or mcpServers changes
+
+  // Save servers to storage when they change
+  useEffect(() => {
+    if (!storageProvider || !storageLoaded) return;
+
+    const saveServers = async () => {
+      try {
+        const serversToSave = serverConfigs.reduce(
+          (acc, config) => {
+            acc[config.id] = config.options;
+            return acc;
+          },
+          {} as Record<string, McpServerOptions>
+        );
+
+        await Promise.resolve(storageProvider.setServers(serversToSave));
+      } catch (error) {
+        console.error("[McpClientProvider] Failed to save to storage:", error);
+      }
+    };
+
+    saveServers();
+  }, [serverConfigs, storageProvider, storageLoaded]);
+
+  const handleServerUpdate = useCallback(
+    (updatedServer: McpServer) => {
+      setServers((prev) => {
+        const index = prev.findIndex((s) => s.id === updatedServer.id);
+        const isNewServer = index === -1;
+
+        if (isNewServer) {
+          // New server - call onServerAdded callback
+          onServerAdded?.(updatedServer.id, updatedServer);
+          return [...prev, updatedServer];
+        }
+
+        // Check if actually changed to avoid loops
+        const current = prev[index];
+        const stateChanged = current.state !== updatedServer.state;
+
+        if (
+          current.state === updatedServer.state &&
+          current.tools === updatedServer.tools &&
+          current.resources === updatedServer.resources &&
+          current.prompts === updatedServer.prompts &&
+          current.error === updatedServer.error &&
+          current.serverInfo === updatedServer.serverInfo &&
+          current.client === updatedServer.client &&
+          current.notifications === updatedServer.notifications &&
+          current.unreadNotificationCount ===
+            updatedServer.unreadNotificationCount &&
+          current.pendingSamplingRequests.length ===
+            updatedServer.pendingSamplingRequests.length &&
+          current.pendingElicitationRequests.length ===
+            updatedServer.pendingElicitationRequests.length
+        ) {
+          return prev;
+        }
+
+        // State changed - call callback
+        if (stateChanged) {
+          onServerStateChange?.(updatedServer.id, updatedServer.state);
+        }
+
+        const newServers = [...prev];
+        newServers[index] = updatedServer;
+        return newServers;
+      });
+    },
+    [onServerAdded, onServerStateChange]
+  );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
+    console.log("[McpClientProvider] addServer called:", id, options);
     setServerConfigs((prev) => {
       // Check if already exists
       if (prev.find((s) => s.id === id)) {
@@ -482,25 +716,32 @@ export function McpClientProvider({ children }: { children: ReactNode }) {
         );
         return prev;
       }
+      console.log("[McpClientProvider] Adding new server to configs:", id);
       return [...prev, { id, options }];
     });
   }, []);
 
-  const removeServer = useCallback((id: string) => {
-    // Find and disconnect the server
-    setServers((prev) => {
-      const server = prev.find((s) => s.id === id);
-      if (server?.disconnect) {
-        server.disconnect();
-      }
-      if (server?.clearStorage) {
-        server.clearStorage();
-      }
-      return prev.filter((s) => s.id !== id);
-    });
+  const removeServer = useCallback(
+    (id: string) => {
+      // Find and disconnect the server
+      setServers((prev) => {
+        const server = prev.find((s) => s.id === id);
+        if (server?.disconnect) {
+          server.disconnect();
+        }
+        if (server?.clearStorage) {
+          server.clearStorage();
+        }
+        return prev.filter((s) => s.id !== id);
+      });
 
-    setServerConfigs((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+      setServerConfigs((prev) => prev.filter((s) => s.id !== id));
+
+      // Call callback
+      onServerRemoved?.(id);
+    },
+    [onServerRemoved]
+  );
 
   const getServer = useCallback(
     (id: string) => {
@@ -515,8 +756,9 @@ export function McpClientProvider({ children }: { children: ReactNode }) {
       addServer,
       removeServer,
       getServer,
+      storageLoaded,
     }),
-    [servers, addServer, removeServer, getServer]
+    [servers, addServer, removeServer, getServer, storageLoaded]
   );
 
   return (
@@ -529,6 +771,7 @@ export function McpClientProvider({ children }: { children: ReactNode }) {
           id={config.id}
           options={config.options}
           onUpdate={handleServerUpdate}
+          rpcWrapTransport={rpcWrapTransport}
         />
       ))}
     </McpClientContext.Provider>

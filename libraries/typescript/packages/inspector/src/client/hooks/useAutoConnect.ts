@@ -1,7 +1,10 @@
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 
 interface UseAutoConnectOptions {
   connections: MCPConnection[];
@@ -381,7 +384,10 @@ export function useAutoConnect({
   useEffect(() => {
     if (isAutoConnecting && connections.length > 0 && !autoConnectConfig) {
       const hasEstablishedConnection = connections.some(
-        (conn) => conn.state !== "connecting" && conn.state !== "loading"
+        (conn) =>
+          conn.state === "ready" ||
+          conn.state === "failed" ||
+          conn.state === "pending_auth"
       );
       if (hasEstablishedConnection) {
         const timeoutId = setTimeout(() => setIsAutoConnecting(false), 500);

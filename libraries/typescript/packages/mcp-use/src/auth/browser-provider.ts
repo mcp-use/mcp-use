@@ -18,6 +18,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly serverUrlHash: string;
   readonly clientName: string;
   readonly clientUri: string;
+  readonly logoUri: string;
   readonly callbackUrl: string;
   private preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
@@ -35,6 +36,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       storageKeyPrefix?: string;
       clientName?: string;
       clientUri?: string;
+      logoUri?: string;
       callbackUrl?: string;
       preventAutoAuth?: boolean;
       useRedirectFlow?: boolean;
@@ -52,6 +54,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.clientUri =
       options.clientUri ||
       (typeof window !== "undefined" ? window.location.origin : "");
+    this.logoUri = options.logoUri || "https://mcp-use.com/logo.png";
     this.callbackUrl = sanitizeUrl(
       options.callbackUrl ||
         (typeof window !== "undefined"
@@ -77,6 +80,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       response_types: ["code"],
       client_name: this.clientName,
       client_uri: this.clientUri,
+      logo_uri: this.logoUri,
       // scope: 'openid profile email mcp', // Example scopes, adjust as needed
     };
   }

@@ -1,7 +1,7 @@
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
 import { useInspector } from "@/client/context/InspectorContext";
-import { useMcpContext } from "@/client/context/McpContext";
+import { useMcpClient } from "mcp-use/react";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
@@ -23,12 +23,37 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    connections,
-    addConnection,
-    removeConnection,
-    updateConnectionConfig,
-    configLoaded,
-  } = useMcpContext();
+    servers: connections,
+    addServer,
+    removeServer: removeConnection,
+    storageLoaded: configLoaded,
+  } = useMcpClient();
+
+  // Adapter functions for backward compatibility
+  const addConnection = useCallback(
+    (
+      url: string,
+      name?: string,
+      proxyConfig?: any,
+      transportType?: "http" | "sse"
+    ) => {
+      addServer(url, {
+        url,
+        name,
+        proxyConfig,
+        transportType,
+      });
+    },
+    [addServer]
+  );
+
+  const updateConnectionConfig = useCallback((id: string, config: any) => {
+    // To update config, we need to remove and re-add
+    // For now, just log a warning
+    console.warn(
+      "[Layout] updateConnectionConfig not yet supported in new provider"
+    );
+  }, []);
   const {
     selectedServerId,
     setSelectedServerId,

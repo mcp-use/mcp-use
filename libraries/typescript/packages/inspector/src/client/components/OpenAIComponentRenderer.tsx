@@ -1,7 +1,7 @@
 import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { useMcpContext } from "../context/McpContext";
+import { useMcpClient } from "mcp-use/react";
 import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
@@ -87,7 +87,7 @@ function OpenAIComponentRendererBase({
   );
   const toolId = toolIdRef.current;
 
-  const servers = useMcpContext();
+  const { servers } = useMcpClient();
   const server = servers.connections.find(
     (connection) => connection.id === serverId
   );
