@@ -157,7 +157,7 @@ export function ServerDropdown({
               className={cn(
                 "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
                 !selectedServer && "pl-4",
-                selectedServer && "pr-10"
+                selectedServer && "pr-20"
               )}
             >
               {selectedServer && (
@@ -168,7 +168,7 @@ export function ServerDropdown({
                 />
               )}
               <div className="flex items-center gap-2 flex-1">
-                <span className="truncate">
+                <span className="truncate lg:max-w-[120px] xl:max-w-none">
                   {selectedServer
                     ? selectedServer.serverInfo?.title ||
                       selectedServer.serverInfo?.name ||

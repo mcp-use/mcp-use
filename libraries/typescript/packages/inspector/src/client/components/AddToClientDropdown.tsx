@@ -17,6 +17,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import { Check, ChevronDown, Copy, Plus } from "lucide-react";
 import {
   downloadMcpbFile,
   generateClaudeCodeCommand,
@@ -26,10 +27,9 @@ import {
   generateVSCodeDeepLink,
   getEnvVarInstructions,
 } from "mcp-use/react";
-import { Check, ChevronDown, Copy } from "lucide-react";
-import { VSCodeIcon } from "./ui/client-icons";
 import { useState } from "react";
 import { toast } from "sonner";
+import { VSCodeIcon } from "./ui/client-icons";
 
 interface AddToClientDropdownProps {
   serverUrl: string;
@@ -350,11 +350,17 @@ export function AddToClientDropdown({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className={`bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full transition-colors px-3 ${className || ""}`}
+                className={`bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full transition-colors px-3 flex items-center justify-center ${className || ""}`}
                 aria-label="Add to Client"
               >
-                <span className="hidden sm:inline ml-2">Add to Client</span>
-                <ChevronDown className="size-3 ml-1" />
+                <span className="xl:hidden hidden sm:flex items-center gap-1">
+                  <Plus className="size-3" />
+                  Client
+                </span>
+                <span className="hidden xl:flex items-center gap-1">
+                  Add to Client
+                  <ChevronDown className="size-3" />
+                </span>
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>

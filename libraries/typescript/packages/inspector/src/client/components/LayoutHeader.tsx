@@ -448,7 +448,7 @@ export function LayoutHeader({
                     rel="noopener noreferrer"
                   >
                     <GithubIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">Github</span>
+                    <span className="hidden xl:inline">Github</span>
                   </a>
                 </Button>
               </TooltipTrigger>

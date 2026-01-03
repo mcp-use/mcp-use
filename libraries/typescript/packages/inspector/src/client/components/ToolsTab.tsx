@@ -1,4 +1,7 @@
+import { Button } from "@/client/components/ui/button";
 import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -7,23 +10,22 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
 import type { SavedRequest, ToolResult } from "./tools";
 
+import { Badge } from "@/client/components/ui/badge";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
-import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useInspector } from "@/client/context/InspectorContext";
 import {
   MCPToolExecutionEvent,
   MCPToolSavedEvent,
   Telemetry,
 } from "@/client/telemetry";
+import type { ImperativePanelHandle } from "react-resizable-panels";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import {
   SavedRequestsList,
   SaveRequestDialog,
@@ -32,8 +34,6 @@ import {
   ToolsList,
   ToolsTabHeader,
 } from "./tools";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -924,6 +924,9 @@ export function ToolsTab({
             collapsible
             minSize={5}
             collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}

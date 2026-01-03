@@ -1,4 +1,15 @@
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/client/components/ui/resizable";
+import { useInspector } from "@/client/context/InspectorContext";
+import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
 import type { Resource } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -7,25 +18,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
-import type { ResourceResult } from "./resources";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/client/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { useInspector } from "@/client/context/InspectorContext";
-import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
+import type { ResourceResult } from "./resources";
 import {
   ResourceResultDisplay,
   ResourcesList,
   ResourcesTabHeader,
 } from "./resources";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -182,7 +182,10 @@ export function ResourcesTab({
 
           setCurrentResult({
             uri: resource.uri,
-            result: null,
+            result: {
+              contents: [],
+              _meta: {},
+            },
             error: error instanceof Error ? error.message : "Unknown error",
             timestamp,
             resourceAnnotations: resource.annotations as Record<string, any>,
@@ -470,6 +473,9 @@ export function ResourcesTab({
             collapsible
             minSize={5}
             collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => setRpcPanelCollapsed(true)}
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"

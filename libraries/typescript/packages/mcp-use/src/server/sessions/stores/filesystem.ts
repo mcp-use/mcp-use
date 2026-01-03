@@ -15,11 +15,11 @@
  * - High-throughput scenarios (frequent disk I/O may impact performance)
  */
 
-import { mkdir, writeFile, rename, unlink } from "node:fs/promises";
-import { join, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import type { SessionStore } from "./index.js";
+import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { SessionMetadata } from "../session-manager.js";
+import type { SessionStore } from "./index.js";
 
 /**
  * Configuration for FileSystem session store
@@ -264,9 +264,10 @@ export class FileSystemSessionStore implements SessionStore {
       await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
       await rename(tempPath, this.filePath);
 
-      console.debug(
-        `[FileSystemSessionStore] Saved ${this.sessions.size} session(s) to ${this.filePath}`
-      );
+      // Silently save sessions without logging to reduce noise
+      // console.debug(
+      //   `[FileSystemSessionStore] Saved ${this.sessions.size} session(s) to ${this.filePath}`
+      // );
     } catch (error: any) {
       console.error(
         `[FileSystemSessionStore] Error saving sessions:`,
