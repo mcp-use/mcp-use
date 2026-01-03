@@ -88,9 +88,7 @@ function OpenAIComponentRendererBase({
   const toolId = toolIdRef.current;
 
   const { servers } = useMcpClient();
-  const server = servers.connections.find(
-    (connection) => connection.id === serverId
-  );
+  const server = servers.find((connection) => connection.id === serverId);
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
 
