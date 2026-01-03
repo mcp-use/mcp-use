@@ -66,6 +66,20 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const url = c.req.url;
   const debugMode = isDebugMode();
 
+  // Filter out noisy endpoints that create log spam
+  const pathname = new URL(url).pathname;
+  const noisyPaths = [
+    "/inspector/api/tel/", // Telemetry endpoints (posthog, scarf)
+    "/inspector/api/rpc/stream", // RPC stream (SSE)
+    "/inspector/api/rpc/log", // RPC log endpoint
+  ];
+
+  // Skip logging for noisy paths but still process the request
+  if (noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath))) {
+    await next();
+    return;
+  }
+
   // Get request body for logging
   let requestBody: any = null;
   let requestHeaders: Record<string, string> = {};
