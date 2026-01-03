@@ -1,15 +1,14 @@
 /**
  * Browser entry point - exports OAuth utilities and MCP client/agent for browser-based MCP usage
  *
- * Note: MCPAgent is NOT exported from the browser entry point because it depends on
- * Node.js-specific MCPClient (which uses fs, path, etc.). For browser usage, use:
- * - BrowserMCPClient (exported as MCPClient)
- * - useMcp hook from 'mcp-use/react'
- * - RemoteAgent for remote agent capabilities
+ * MCPAgent is now exported and works in the browser when:
+ * - A BrowserMCPClient instance is passed to it (not using simplified mode)
+ * - Or using RemoteAgent for remote agent capabilities
  */
 
-// Export core client class for browsers
+// Export core client and agent classes for browsers
 export { BrowserMCPClient as MCPClient } from "./client/browser.js";
+export { MCPAgent } from "./agents/mcp_agent.js";
 export { RemoteAgent } from "./agents/remote.js";
 
 // Export adapters
