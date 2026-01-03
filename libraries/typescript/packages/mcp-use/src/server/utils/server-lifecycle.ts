@@ -165,9 +165,7 @@ export async function startServer(
       },
       (_info: any) => {
         console.log(`[SERVER] Listening on http://${host}:${port}`);
-        console.log(
-          `[MCP] Endpoints: http://${host}:${port}/mcp and http://${host}:${port}/sse`
-        );
+        console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
       }
     );
   }
