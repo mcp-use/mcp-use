@@ -543,10 +543,12 @@ export function McpClientProvider({
   const [rpcWrapTransport, setRpcWrapTransport] = useState<
     ((transport: any, serverId: string) => any) | undefined
   >(undefined);
+  const [rpcLoggingReady, setRpcLoggingReady] = useState(false);
 
   useEffect(() => {
     if (!enableRpcLogging || typeof window === "undefined") {
       setRpcWrapTransport(undefined);
+      setRpcLoggingReady(true); // RPC logging not needed, mark as ready
       return;
     }
 
@@ -555,15 +557,25 @@ export function McpClientProvider({
       .then((module) => {
         console.log("[McpClientProvider] RPC logger loaded");
         setRpcWrapTransport(() => module.wrapTransportForLogging);
+        setRpcLoggingReady(true); // RPC logging loaded, mark as ready
       })
       .catch((err) => {
         console.error("[McpClientProvider] Failed to load RPC logger:", err);
         setRpcWrapTransport(undefined);
+        setRpcLoggingReady(true); // Failed to load, but still mark as ready to unblock
       });
   }, [enableRpcLogging]);
 
   // Load servers from storage on mount
+  // Wait for RPC logging to be ready before loading servers
   useEffect(() => {
+    if (!rpcLoggingReady) {
+      console.log(
+        "[McpClientProvider] Waiting for RPC logging to be ready before loading servers"
+      );
+      return;
+    }
+
     const loadServers = async () => {
       console.log(
         "[McpClientProvider] Loading servers, storageProvider:",
@@ -633,7 +645,7 @@ export function McpClientProvider({
     };
 
     loadServers();
-  }, [storageProvider, mcpServers]); // Run when storage provider or mcpServers changes
+  }, [storageProvider, mcpServers, rpcLoggingReady]); // Run when storage provider, mcpServers, or RPC logging ready changes
 
   // Save servers to storage when they change
   useEffect(() => {

@@ -1,11 +1,11 @@
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
 import { useInspector } from "@/client/context/InspectorContext";
-import { useMcpClient } from "mcp-use/react";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
+import { useMcpClient } from "mcp-use/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";

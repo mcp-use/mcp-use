@@ -226,7 +226,15 @@ export function useAutoConnect({
   // Load config and initiate auto-connect
   // Wait for context's configLoaded to ensure localStorage is loaded before attempting connections
   useEffect(() => {
-    if (configLoaded || !contextConfigLoaded) return;
+    // Early return if already processed
+    if (configLoaded) {
+      return;
+    }
+
+    // Wait for storage to load (contextConfigLoaded must be explicitly true)
+    if (contextConfigLoaded !== true) {
+      return;
+    }
 
     // Check for autoConnect query parameter first
     const urlParams = new URLSearchParams(window.location.search);
