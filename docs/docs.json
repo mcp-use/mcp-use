@@ -657,6 +657,10 @@
     {
       "source": "/typescript/getting-started",
       "destination": "/typescript/getting-started/quickstart"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/python/changelog/changelog"
     }
   ],
   "logo": {
