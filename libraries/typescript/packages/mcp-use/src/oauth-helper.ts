@@ -519,31 +519,3 @@ export class OAuthHelper {
     );
   }
 }
-
-/**
- * Linear-specific OAuth configuration
- */
-export const LINEAR_OAUTH_CONFIG: OAuthConfig = {
-  // No clientId needed - will use dynamic client registration
-  redirectUri:
-    typeof window !== "undefined"
-      ? window.location.origin + window.location.pathname
-      : "http://localhost:5173",
-  scope: "read write",
-  clientName: "MCP Use Example",
-};
-
-/**
- * Helper function to create OAuth-enabled MCP configuration
- */
-export function createOAuthMCPConfig(serverUrl: string, accessToken: string) {
-  return {
-    mcpServers: {
-      linear: {
-        url: serverUrl,
-        authToken: accessToken,
-        transport: "sse",
-      },
-    },
-  };
-}

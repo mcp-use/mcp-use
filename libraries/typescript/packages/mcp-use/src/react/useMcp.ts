@@ -5,12 +5,13 @@ import type {
   ResourceTemplate,
   Tool,
 } from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
 import { BrowserMCPClient } from "../client/browser.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
+import { applyProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
@@ -55,8 +56,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const {
     url,
     enabled = true,
-    clientName,
-    clientUri,
     callbackUrl = typeof window !== "undefined"
       ? sanitizeUrl(
           new URL("/oauth/callback", window.location.origin).toString()
@@ -65,6 +64,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     storageKeyPrefix = "mcp:auth",
     clientConfig = {},
     customHeaders = {},
+    proxyConfig,
     debug: _debug = false,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
@@ -80,6 +80,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     onElicitation,
   } = options;
 
+  // Apply proxy configuration if provided
+  const { url: finalUrl, headers: proxyHeaders } = useMemo(
+    () => applyProxyConfig(url || "", proxyConfig),
+    [url, proxyConfig]
+  );
+
+  // Merge proxy headers with custom headers (custom headers take precedence)
+  const allHeaders = useMemo(
+    () => ({ ...proxyHeaders, ...customHeaders }),
+    [proxyHeaders, customHeaders]
+  );
+
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
   const [tools, setTools] = useState<Tool[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -87,11 +99,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [serverInfo, setServerInfo] = useState<{
-    name: string;
-    version?: string;
-    icon?: string;
-  }>();
+  const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>();
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
@@ -269,8 +277,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (!authProviderRef.current) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
-        clientName,
-        clientUri,
+        clientName: clientConfig.name,
+        clientUri: clientConfig.uri,
+        logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
@@ -297,7 +306,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Build server config
         const serverConfig: any = {
-          url: url,
+          url: finalUrl,
           transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
           // Disable SSE fallback when using explicit HTTP transport (not SSE)
           // This prevents automatic HTTP → SSE fallback at the connector level
@@ -306,9 +315,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preferSse: transportTypeParam === "sse",
         };
 
-        // Add custom headers if provided
-        if (customHeaders && Object.keys(customHeaders).length > 0) {
-          serverConfig.headers = customHeaders;
+        // Add custom headers if provided (includes proxy headers)
+        if (allHeaders && Object.keys(allHeaders).length > 0) {
+          serverConfig.headers = allHeaders;
         }
 
         // Add OAuth token if available
@@ -724,11 +733,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     disconnect,
     url,
     storageKeyPrefix,
-    clientName,
-    clientUri,
     callbackUrl,
     clientConfig.name,
     clientConfig.version,
+    clientConfig.uri,
+    clientConfig.logo_uri,
     customHeaders,
     transportType,
     preventAutoAuth,
@@ -894,8 +903,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Recreate the auth provider WITHOUT preventAutoAuth
         const freshAuthProvider = new BrowserOAuthClientProvider(url, {
           storageKeyPrefix,
-          clientName,
-          clientUri,
+          clientName: clientConfig.name,
+          clientUri: clientConfig.uri,
+          logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
           callbackUrl,
           preventAutoAuth: false, // ← Allow OAuth to proceed
           useRedirectFlow,
@@ -957,8 +967,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useRedirectFlow,
     onPopupWindow,
     storageKeyPrefix,
-    clientName,
-    clientUri,
+    clientConfig.name,
+    clientConfig.uri,
+    clientConfig.logo_uri,
     callbackUrl,
   ]);
 
@@ -1198,35 +1209,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [refreshTools, refreshResources, refreshPrompts, addLog]);
 
   /**
-   * Ensure the server icon is loaded and available
-   * Waits for the background icon loading to complete
-   *
-   * @returns Promise that resolves with the base64 icon or null
-   */
-  const ensureIconLoaded = useCallback(async (): Promise<string | null> => {
-    if (stateRef.current !== "ready") {
-      addLog("warn", "Cannot ensure icon loaded - not connected");
-      return null;
-    }
-
-    // If icon is already available, return it immediately
-    if (serverInfo?.icon) {
-      return serverInfo.icon;
-    }
-
-    // If icon loading is in progress, wait for it
-    if (iconLoadingPromiseRef.current) {
-      addLog("debug", "Waiting for icon to finish loading...");
-      const icon = await iconLoadingPromiseRef.current;
-      return icon;
-    }
-
-    // No icon loading in progress and no icon available
-    addLog("debug", "No icon available and no loading in progress");
-    return null;
-  }, [serverInfo, addLog]);
-
-  /**
    * Get a prompt template with arguments
    *
    * @param name - Name of the prompt template
@@ -1367,8 +1349,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (!authProviderRef.current || authProviderRef.current.serverUrl !== url) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
-        clientName,
-        clientUri,
+        clientName: clientConfig.name,
+        clientUri: clientConfig.uri,
+        logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
@@ -1390,10 +1373,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled,
     storageKeyPrefix,
     callbackUrl,
-    clientName,
-    clientUri,
     clientConfig.name,
     clientConfig.version,
+    clientConfig.uri,
+    clientConfig.logo_uri,
     useRedirectFlow,
   ]);
 
@@ -1420,8 +1403,38 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     };
   }, [state, autoRetry, retry, addLog]);
 
+  /**
+   * Ensure the server icon is loaded and available
+   * Waits for the background icon loading to complete
+   *
+   * @returns Promise that resolves with the base64 icon or null
+   */
+  const ensureIconLoaded = useCallback(async (): Promise<string | null> => {
+    if (stateRef.current !== "ready") {
+      addLog("warn", "Cannot ensure icon loaded - not connected");
+      return null;
+    }
+
+    // If icon is already available, return it immediately
+    if (serverInfo?.icon) {
+      return serverInfo.icon;
+    }
+
+    // If icon loading is in progress, wait for it
+    if (iconLoadingPromiseRef.current) {
+      addLog("debug", "Waiting for icon to finish loading...");
+      const icon = await iconLoadingPromiseRef.current;
+      return icon;
+    }
+
+    // No icon loading in progress and no icon available
+    addLog("debug", "No icon available and no loading in progress");
+    return null;
+  }, [serverInfo, addLog]);
+
   return {
     state,
+    name: serverInfo?.name || url || "",
     tools,
     resources,
     resourceTemplates,

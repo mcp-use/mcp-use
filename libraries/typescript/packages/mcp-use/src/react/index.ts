@@ -69,5 +69,37 @@ export type {
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
 
+// Export multi-server client provider and hooks
+export {
+  McpClientProvider,
+  useMcpClient,
+  useMcpServer,
+} from "./McpClientProvider.js";
+export type {
+  McpServer,
+  McpServerOptions,
+  McpClientContextType,
+  McpClientProviderProps,
+  McpNotification,
+  PendingSamplingRequest,
+  PendingElicitationRequest,
+} from "./McpClientProvider.js";
+
+// Export storage providers
+export {
+  LocalStorageProvider,
+  MemoryStorageProvider,
+  type StorageProvider,
+} from "./storage/index.js";
+
+// Export RPC logger utilities
+export {
+  getRpcLogs,
+  getAllRpcLogs,
+  subscribeToRpcLogs,
+  clearRpcLogs,
+  type RpcLogEntry,
+} from "./rpc-logger.js";
+
 // Export WidgetMetadata type for widget developers
 export type { WidgetMetadata } from "../server/types/widget.js";

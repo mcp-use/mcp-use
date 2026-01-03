@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Plus,
   Search,
+  Server,
   Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -507,13 +508,11 @@ export function CommandPalette({
           );
         }
         if (category === "Connected Servers") {
+          // For connected servers, we need to find the actual server object from metadata.serverId
+          // Since we don't have access to it here, just show a generic server icon
           return (
-            <div className="bg-cyan-500/20 rounded-full p-0 flex items-center justify-center shrink-0">
-              <ServerIcon
-                serverUrl={itemName}
-                serverName={itemName}
-                size="md"
-              />
+            <div className="bg-cyan-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+              <Server className="h-4 w-4 text-cyan-500" />
             </div>
           );
         }
@@ -578,18 +577,21 @@ export function CommandPalette({
               {item.name}
             </span>
             {(item.metadata?.serverName || item.metadata?.serverId) &&
-              item.category !== "Connected Servers" && (
-                <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
-                  <ServerIcon
-                    serverUrl={item.metadata?.serverId}
-                    serverName={item.metadata?.serverName}
-                    size="sm"
-                  />
-                  <span className="text-xs font-base text-muted-foreground">
-                    {item.metadata?.serverName || item.metadata?.serverId}
-                  </span>
-                </div>
-              )}
+              item.category !== "Connected Servers" &&
+              (() => {
+                // Find the actual server object from metadata.serverId
+                const server = connections.find(
+                  (c) => c.id === item.metadata?.serverId
+                );
+                return server ? (
+                  <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
+                    <ServerIcon server={server} size="sm" />
+                    <span className="text-xs font-base text-muted-foreground">
+                      {item.metadata?.serverName || item.metadata?.serverId}
+                    </span>
+                  </div>
+                ) : null;
+              })()}
           </Command.Item>
         ))}
       </Command.List>

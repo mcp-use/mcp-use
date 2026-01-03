@@ -13,7 +13,10 @@ import {
 } from "@/client/components/ui/tooltip";
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { cn } from "@/client/lib/utils";
 import {
   Bell,
@@ -445,7 +448,7 @@ export function LayoutHeader({
                     rel="noopener noreferrer"
                   >
                     <GithubIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">Github</span>
+                    <span className="hidden xl:inline">Github</span>
                   </a>
                 </Button>
               </TooltipTrigger>

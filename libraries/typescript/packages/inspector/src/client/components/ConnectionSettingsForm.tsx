@@ -117,7 +117,7 @@ export function ConnectionSettingsForm({
     // Create a comprehensive config object with all current settings
     const config = {
       url,
-      transportType: transportType === "SSE" ? "http" : "sse",
+      transportType: "http", // HTTP only - SSE is deprecated
       connectionType,
       proxyConfig:
         connectionType === "Via Proxy" && proxyAddress.trim()
@@ -191,11 +191,8 @@ export function ConnectionSettingsForm({
         // Populate form fields with config data
         setUrl(config.url);
 
-        if (config.transportType) {
-          setTransportType(
-            config.transportType === "sse" ? "WebSocket" : "SSE"
-          );
-        }
+        // Transport type is always HTTP now (SSE is deprecated)
+        // No need to set transportType from config
 
         if (config.connectionType) {
           setConnectionType(config.connectionType);
@@ -277,25 +274,11 @@ export function ConnectionSettingsForm({
         </Button>
       )}
 
-      {/* Transport Type */}
-      <div className="space-y-2">
-        <Label className={labelClassName}>Transport Type</Label>
-        <Select value={transportType} onValueChange={setTransportType}>
-          <SelectTrigger className={cn("w-full", selectTriggerClassName)}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="SSE">Streamable HTTP</SelectItem>
-            <SelectItem value="WebSocket">Server-Sent Events (SSE)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* URL */}
       <div className="space-y-2">
         <Label className={labelClassName}>URL</Label>
         <Input
-          placeholder="http://localhost:3000/sse"
+          placeholder="http://localhost:3000"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onPaste={handlePaste}

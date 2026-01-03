@@ -1,5 +1,15 @@
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/client/components/ui/resizable";
+import { useInspector } from "@/client/context/InspectorContext";
+import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { PromptResult, SavedPrompt } from "./prompts";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -8,17 +18,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/client/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { useInspector } from "@/client/context/InspectorContext";
-import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
+import type { PromptResult, SavedPrompt } from "./prompts";
 import {
   PromptExecutionPanel,
   PromptResultDisplay,
@@ -26,8 +28,6 @@ import {
   PromptsTabHeader,
   SavedPromptsList,
 } from "./prompts";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface PromptsTabRef {
   focusSearch: () => void;
@@ -178,19 +178,7 @@ export function PromptsTab({
     if (prompt.arguments) {
       // Handle MCP SDK structure: arguments is an array of PromptArgument objects
       prompt.arguments.forEach((arg) => {
-        if (arg.default !== undefined) {
-          initialArgs[arg.name] = arg.default;
-        } else if (arg.type === "string") {
-          initialArgs[arg.name] = "";
-        } else if (arg.type === "number") {
-          initialArgs[arg.name] = 0;
-        } else if (arg.type === "boolean") {
-          initialArgs[arg.name] = false;
-        } else if (arg.type === "array") {
-          initialArgs[arg.name] = [];
-        } else if (arg.type === "object") {
-          initialArgs[arg.name] = {};
-        }
+        initialArgs[arg.name] = "";
       });
     }
     setPromptArgs(initialArgs);
@@ -394,7 +382,10 @@ export function PromptsTab({
         duration: Date.now() - startTime,
       };
 
-      setResults((prev) => [errorResult, ...prev]);
+      setResults((prev) => [
+        ...prev,
+        { ...errorResult, result: { messages: [] } },
+      ]);
     } finally {
       setIsExecuting(false);
     }
@@ -519,14 +510,12 @@ export function PromptsTab({
               >
                 Prompts
               </button>
-              {mobileView !== "list" && (
+              {mobileView === "detail" && (
                 <>
                   <span className="mx-2 text-muted-foreground">/</span>
                   <button
                     onClick={() => {
-                      if (mobileView === "response") {
-                        setMobileView("detail");
-                      }
+                      setMobileView("response");
                     }}
                     className={
                       mobileView === "detail"
@@ -699,6 +688,9 @@ export function PromptsTab({
             collapsible
             minSize={5}
             collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => setRpcPanelCollapsed(true)}
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"
