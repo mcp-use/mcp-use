@@ -8,6 +8,7 @@
     "mcp-use": "1.11.2"
   },
   "changesets": [
+    "clean-ears-greet",
     "dry-grapes-check",
     "jolly-llamas-wash",
     "neat-shirts-grin",
