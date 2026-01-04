@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.12.0-canary.6
+
+### Patch Changes
+
+- 2113c43: fix: add client sdks to add to client dropdown
+- Updated dependencies [2113c43]
+  - @mcp-use/inspector@0.14.0-canary.6
+  - @mcp-use/cli@2.8.0-canary.6
+
 ## 1.12.0-canary.5
 
 ### Patch Changes
