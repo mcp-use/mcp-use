@@ -224,3 +224,105 @@ export function getEnvVarInstructions(
 
   return instructions;
 }
+
+/**
+ * Generate TypeScript SDK integration code
+ */
+export function generateTypeScriptSDKCode(
+  url: string,
+  name: string,
+  serverId?: string,
+  headers?: Record<string, string>
+): string {
+  const id = serverId || sanitizeServerName(name);
+  const serverConfig: Record<string, unknown> = {
+    url,
+  };
+
+  if (headers && Object.keys(headers).length > 0) {
+    serverConfig.headers = headers;
+  }
+
+  const configString = JSON.stringify(serverConfig, null, 4);
+  const indentedConfig = configString
+    .split("\n")
+    .map((line, i) => (i === 0 ? line : "    " + line))
+    .join("\n");
+
+  return `import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    "${id}": ${indentedConfig}
+  }
+});
+
+await client.createAllSessions();
+
+const session = client.getSession("${id}");
+
+// Get available tools
+const tools = await session.listTools();
+console.log('Available tools:', tools.map(tool => tool.name));
+
+// Get available resources
+const resources = await session.listResources();
+console.log('Available resources:', resources.map(resource => resource.name));
+
+// Call a tool (example)
+// const result = await session.callTool("toolName", { param: "value" });
+
+// Read a resource (example)
+// const resourceContent = await session.readResource("resource-uri");`;
+}
+
+/**
+ * Generate Python SDK integration code
+ */
+export function generatePythonSDKCode(
+  url: string,
+  name: string,
+  serverId?: string,
+  headers?: Record<string, string>
+): string {
+  const id = serverId || sanitizeServerName(name);
+  const serverConfig: Record<string, unknown> = {
+    url,
+  };
+
+  if (headers && Object.keys(headers).length > 0) {
+    serverConfig.headers = headers;
+  }
+
+  const configString = JSON.stringify(serverConfig, null, 4);
+  const indentedConfig = configString
+    .split("\n")
+    .map((line, i) => (i === 0 ? line : "        " + line))
+    .join("\n");
+
+  return `from mcp_use import MCPClient
+
+client = MCPClient(config={
+    "mcpServers": {
+        "${id}": ${indentedConfig}
+    }
+})
+
+await client.create_all_sessions()
+
+session = client.get_session("${id}")
+
+# Get available tools
+tools = await session.list_tools()
+print(f"Available tools: {[tool.name for tool in tools]}")
+
+# Get available resources
+resources = await session.list_resources()
+print(f"Available resources: {[resource.name for resource in resources]}")
+
+# Call a tool (example)
+# result = await session.call_tool("tool_name", {"param": "value"})
+
+# Read a resource (example)
+# resource_content = await session.read_resource("resource_uri")`;
+}

@@ -14,6 +14,7 @@ interface AddToClientDropdownProps {
     url: string;
     name: string;
     headers?: Record<string, string>;
+    serverId?: string;
   };
   additionalItems?: Array<{
     id: string;
@@ -186,7 +187,7 @@ export function AddToClientDropdown({
               {copied ? "✓ Copied" : "Copy"}
             </button>
             <pre className="bg-gray-100 dark:bg-gray-900 p-3 pr-14 rounded-md text-xs overflow-x-auto border border-gray-300 dark:border-gray-700">
-              <code>{command}</code>
+              <code className="language-bash">{command}</code>
             </pre>
           </div>
 
@@ -200,7 +201,7 @@ export function AddToClientDropdown({
                 shell:
               </p>
               <pre className="bg-gray-100 dark:bg-gray-900 p-3 rounded-md text-xs overflow-x-auto border border-gray-300 dark:border-gray-700">
-                <code>{envInstructions}</code>
+                <code className="language-bash">{envInstructions}</code>
               </pre>
             </div>
           )}
@@ -267,7 +268,7 @@ export function AddToClientDropdown({
                 Environment Variables
               </h5>
               <pre className="bg-gray-100 dark:bg-gray-900 p-3 rounded-md text-xs overflow-x-auto border border-gray-300 dark:border-gray-700">
-                <code>{envInstructions}</code>
+                <code className="language-bash">{envInstructions}</code>
               </pre>
             </div>
           )}
@@ -280,7 +281,7 @@ export function AddToClientDropdown({
               {copied ? "✓ Copied" : "Copy"}
             </button>
             <pre className="bg-gray-100 dark:bg-gray-900 p-3 pr-14 rounded-md text-xs overflow-x-auto border border-gray-300 dark:border-gray-700">
-              <code>{command}</code>
+              <code className="language-bash">{command}</code>
             </pre>
           </div>
 
@@ -326,7 +327,7 @@ export function AddToClientDropdown({
               {copied ? "✓ Copied" : "Copy"}
             </button>
             <pre className="bg-gray-100 dark:bg-gray-900 p-3 pr-14 rounded-md text-xs overflow-x-auto border border-gray-300 dark:border-gray-700">
-              <code>{config}</code>
+              <code className="language-toml">{config}</code>
             </pre>
           </div>
 
@@ -415,7 +416,7 @@ export function AddToClientDropdown({
             />
 
             {/* Dropdown Content */}
-            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 z-50">
+            <div className="absolute right-0 mt-2 w-auto min-w-[300px] rounded-md shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 z-50">
               <div className="py-1">
                 {/* Additional Items First */}
                 {additionalItems.map((item) => (
@@ -428,7 +429,9 @@ export function AddToClientDropdown({
                     className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
                   >
                     {item.icon}
-                    <span>{item.label}</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      {item.label}
+                    </span>
                   </button>
                 ))}
 
@@ -450,7 +453,9 @@ export function AddToClientDropdown({
                       alt="Cursor"
                       className="h-4 w-4"
                     />
-                    <span>Cursor</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      Cursor
+                    </span>
                   </button>
                 )}
 
@@ -467,7 +472,9 @@ export function AddToClientDropdown({
                       alt="Claude"
                       className="h-4 w-4"
                     />
-                    <span>Claude Code</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      Claude Code
+                    </span>
                   </button>
                 )}
 
@@ -484,7 +491,9 @@ export function AddToClientDropdown({
                       alt="Claude"
                       className="h-4 w-4"
                     />
-                    <span>Claude Desktop</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      Claude Desktop
+                    </span>
                   </button>
                 )}
 
@@ -503,7 +512,9 @@ export function AddToClientDropdown({
                     >
                       <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z" />
                     </svg>
-                    <span>VS Code</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      VS Code
+                    </span>
                   </button>
                 )}
 
@@ -520,7 +531,9 @@ export function AddToClientDropdown({
                       alt="Gemini"
                       className="h-4 w-4"
                     />
-                    <span>Gemini CLI</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      Gemini CLI
+                    </span>
                   </button>
                 )}
 
@@ -537,7 +550,9 @@ export function AddToClientDropdown({
                       alt="Codex"
                       className="h-4 w-4"
                     />
-                    <span>Codex CLI</span>
+                    <span className="min-w-0 max-w-full whitespace-nowrap">
+                      Codex CLI
+                    </span>
                   </button>
                 )}
               </div>
@@ -552,25 +567,49 @@ export function AddToClientDropdown({
           {/* Backdrop */}
           <div
             className="fixed inset-0 bg-black/50 z-50"
-            onClick={() => setShowModal(false)}
+            onClick={() => {
+              setShowModal(false);
+              setSelectedClient(null);
+            }}
           />
 
           {/* Modal */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setShowModal(false);
+              setSelectedClient(null);
+            }}
+          >
             <div
-              className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-gray-200 dark:border-gray-700 p-6"
+              className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-3xl w-full max-h-[80vh] overflow-y-auto border border-gray-200 dark:border-gray-700 p-6 relative"
               onClick={(e) => e.stopPropagation()}
             >
-              {renderModalContent()}
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              {/* Close button */}
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setSelectedClient(null);
+                }}
+                className="absolute top-4 right-4 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                aria-label="Close"
+              >
+                <svg
+                  className="w-5 h-5 text-gray-500 dark:text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  Close
-                </button>
-              </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+
+              {renderModalContent()}
             </div>
           </div>
         </>

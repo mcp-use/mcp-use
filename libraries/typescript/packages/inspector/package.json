@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "vite --port 3000",
+    "dev:client": "rm -rf node_modules/.vite && vite --port 3000",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
     "build": "npm run build:client && npm run build:server && npm run build:cli",

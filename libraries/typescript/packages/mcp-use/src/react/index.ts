@@ -17,6 +17,8 @@ export {
   generateClaudeCodeCommand,
   generateGeminiCLICommand,
   generateCodexConfig,
+  generatePythonSDKCode,
+  generateTypeScriptSDKCode,
   getEnvVarInstructions,
   generateMcpbConfig,
 } from "../utils/index.js";
