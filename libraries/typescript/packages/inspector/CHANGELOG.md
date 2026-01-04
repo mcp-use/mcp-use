@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.0-canary.5
+
+### Patch Changes
+
+- 7381ec3: fix: also respect query tab param when existing server
+  - mcp-use@1.12.0-canary.5
+
 ## 0.14.0-canary.4
 
 ### Patch Changes
