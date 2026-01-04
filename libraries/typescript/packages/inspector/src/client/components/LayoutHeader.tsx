@@ -13,15 +13,12 @@ import {
 } from "@/client/components/ui/tooltip";
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
-import type { McpServer } from "mcp-use/react";
-
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
 import { cn } from "@/client/lib/utils";
 import {
   Bell,
   Check,
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Command,
@@ -30,15 +27,21 @@ import {
   Hash,
   MessageCircle,
   MessageSquare,
+  Plus,
   Wrench,
   Zap,
 } from "lucide-react";
+import type { McpServer } from "mcp-use/react";
+import { AddToClientDropdown } from "mcp-use/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AddToClientDropdown } from "./AddToClientDropdown";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
+import { SdkIntegrationModal } from "./SdkIntegrationModal";
 import { ServerDropdown } from "./ServerDropdown";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 
 interface LayoutHeaderProps {
   connections: MCPConnection[];
@@ -126,6 +129,8 @@ export function LayoutHeader({
   const { tunnelUrl } = useInspector();
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
+  const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
+  const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
 
   const [collapsed, setCollapsed] = useState(true);
 
@@ -172,16 +177,98 @@ export function LayoutHeader({
           {/* Right: GitHub and Theme Icons - Hidden in embedded mode */}
           {!embedded && (
             <div className="flex-1 flex justify-end items-center gap-2">
-              {selectedServer && (
-                <AddToClientDropdown
-                  serverUrl={
-                    tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
-                  }
-                  serverName={selectedServer.name}
-                  headers={selectedServer.customHeaders}
-                  className="p-2"
-                />
-              )}
+              {selectedServer &&
+                (() => {
+                  // Extract display name the same way ServerDropdown does
+                  const displayName =
+                    selectedServer.serverInfo?.title ||
+                    selectedServer.serverInfo?.name ||
+                    selectedServer.name;
+                  return (
+                    <>
+                      <AddToClientDropdown
+                        serverConfig={{
+                          url: tunnelUrl
+                            ? `${tunnelUrl}/mcp`
+                            : selectedServer.url,
+                          name: displayName,
+                          headers: (selectedServer as any).customHeaders,
+                          serverId: selectedServer.id,
+                        }}
+                        onSuccess={(client: string) =>
+                          toast.success(`Opening in ${client}...`)
+                        }
+                        onError={(error: Error) =>
+                          toast.error(`Failed: ${error.message}`)
+                        }
+                        additionalItems={[
+                          {
+                            id: "ts-sdk",
+                            label: "TypeScript SDK",
+                            icon: (
+                              <img
+                                src="https://cdn.simpleicons.org/typescript"
+                                alt="TypeScript"
+                                className="h-4 w-4"
+                              />
+                            ),
+                            onClick: () => setTsSdkModalOpen(true),
+                          },
+                          {
+                            id: "py-sdk",
+                            label: "Python SDK",
+                            icon: (
+                              <img
+                                src="https://cdn.simpleicons.org/python"
+                                alt="Python"
+                                className="h-4 w-4"
+                              />
+                            ),
+                            onClick: () => setPySdkModalOpen(true),
+                          },
+                        ]}
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full transition-colors px-3 flex items-center justify-center p-2"
+                            aria-label="Add to Client"
+                          >
+                            <span className="xl:hidden hidden sm:flex items-center gap-1">
+                              <Plus className="size-3" />
+                              Client
+                            </span>
+                            <span className="hidden xl:flex items-center gap-1">
+                              Add to Client
+                              <ChevronDown className="size-3" />
+                            </span>
+                          </Button>
+                        }
+                      />
+                      <SdkIntegrationModal
+                        open={tsSdkModalOpen}
+                        onOpenChange={setTsSdkModalOpen}
+                        serverUrl={
+                          tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                        }
+                        serverName={displayName}
+                        serverId={undefined}
+                        headers={(selectedServer as any).customHeaders}
+                        language="typescript"
+                      />
+                      <SdkIntegrationModal
+                        open={pySdkModalOpen}
+                        onOpenChange={setPySdkModalOpen}
+                        serverUrl={
+                          tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                        }
+                        serverName={displayName}
+                        serverId={undefined}
+                        headers={(selectedServer as any).customHeaders}
+                        language="python"
+                      />
+                    </>
+                  );
+                })()}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="sm" asChild>
@@ -406,13 +493,98 @@ export function LayoutHeader({
         {/* Right side: Add to Client + Theme Toggle + Command Palette + GitHub Button + Logo - Hidden in embedded mode */}
         {!embedded && (
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            {selectedServer && (
-              <AddToClientDropdown
-                serverUrl={tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url}
-                serverName={selectedServer.name}
-                headers={selectedServer.customHeaders}
-              />
-            )}
+            {selectedServer &&
+              (() => {
+                // Extract display name the same way ServerDropdown does
+                const displayName =
+                  selectedServer.serverInfo?.title ||
+                  selectedServer.serverInfo?.name ||
+                  selectedServer.name;
+                return (
+                  <>
+                    <AddToClientDropdown
+                      serverConfig={{
+                        url: tunnelUrl
+                          ? `${tunnelUrl}/mcp`
+                          : selectedServer.url,
+                        name: displayName,
+                        headers: (selectedServer as any).customHeaders,
+                        serverId: selectedServer.id,
+                      }}
+                      onSuccess={(client: string) =>
+                        toast.success(`Opening in ${client}...`)
+                      }
+                      onError={(error: Error) =>
+                        toast.error(`Failed: ${error.message}`)
+                      }
+                      additionalItems={[
+                        {
+                          id: "ts-sdk",
+                          label: "TypeScript SDK",
+                          icon: (
+                            <img
+                              src="https://cdn.simpleicons.org/typescript"
+                              alt="TypeScript"
+                              className="h-4 w-4"
+                            />
+                          ),
+                          onClick: () => setTsSdkModalOpen(true),
+                        },
+                        {
+                          id: "py-sdk",
+                          label: "Python SDK",
+                          icon: (
+                            <img
+                              src="https://cdn.simpleicons.org/python"
+                              alt="Python"
+                              className="h-4 w-4"
+                            />
+                          ),
+                          onClick: () => setPySdkModalOpen(true),
+                        },
+                      ]}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full transition-colors px-3 flex items-center justify-center"
+                          aria-label="Add to Client"
+                        >
+                          <span className="xl:hidden hidden sm:flex items-center gap-1">
+                            <Plus className="size-3" />
+                            Client
+                          </span>
+                          <span className="hidden xl:flex items-center gap-1">
+                            Add to Client
+                            <ChevronDown className="size-3" />
+                          </span>
+                        </Button>
+                      }
+                    />
+                    <SdkIntegrationModal
+                      open={tsSdkModalOpen}
+                      onOpenChange={setTsSdkModalOpen}
+                      serverUrl={
+                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                      }
+                      serverName={displayName}
+                      serverId={undefined}
+                      headers={(selectedServer as any).customHeaders}
+                      language="typescript"
+                    />
+                    <SdkIntegrationModal
+                      open={pySdkModalOpen}
+                      onOpenChange={setPySdkModalOpen}
+                      serverUrl={
+                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                      }
+                      serverName={displayName}
+                      serverId={undefined}
+                      headers={(selectedServer as any).customHeaders}
+                      language="python"
+                    />
+                  </>
+                );
+              })()}
             <Tooltip>
               <TooltipTrigger>
                 <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
