@@ -547,13 +547,15 @@ export function InspectorDashboard() {
       toast.error("Server is not connected and cannot be inspected");
       return;
     }
-    // Preserve tunnelUrl parameter if present
+    // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
-    const newUrl = tunnelUrl
-      ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-      : `/?server=${encodeURIComponent(connection.id)}`;
-    navigate(newUrl);
+    const tab = urlParams.get("tab");
+    const params = new URLSearchParams();
+    params.set("server", connection.id);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    if (tab) params.set("tab", tab);
+    navigate(`/?${params.toString()}`);
   };
 
   // Monitor connecting servers and remove them from the set when they connect or fail
@@ -590,13 +592,15 @@ export function InspectorDashboard() {
         (hasData && connection.state !== "discovering"))
     ) {
       setPendingNavigation(null);
-      // Preserve tunnelUrl parameter if present
+      // Preserve tunnelUrl and tab parameters if present
       const urlParams = new URLSearchParams(location.search);
       const tunnelUrl = urlParams.get("tunnelUrl");
-      const newUrl = tunnelUrl
-        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(connection.id)}`;
-      navigate(newUrl);
+      const tab = urlParams.get("tab");
+      const params = new URLSearchParams();
+      params.set("server", connection.id);
+      if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+      if (tab) params.set("tab", tab);
+      navigate(`/?${params.toString()}`);
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (

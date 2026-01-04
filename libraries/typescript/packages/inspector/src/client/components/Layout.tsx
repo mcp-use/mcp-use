@@ -1,6 +1,6 @@
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
-import { useInspector } from "@/client/context/InspectorContext";
+import { useInspector, type TabType } from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
@@ -98,6 +98,27 @@ export function Layout({ children }: LayoutProps) {
     const tunnelUrl = urlParams.get("tunnelUrl");
     setTunnelUrl(tunnelUrl);
   }, [location.search, setTunnelUrl]);
+
+  // Read tab from query parameters and set active tab
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tab = urlParams.get("tab");
+    if (tab) {
+      // Validate that tab is a valid TabType
+      const validTabs: TabType[] = [
+        "tools",
+        "prompts",
+        "resources",
+        "chat",
+        "sampling",
+        "elicitation",
+        "notifications",
+      ];
+      if (validTabs.includes(tab as TabType)) {
+        setActiveTab(tab as TabType);
+      }
+    }
+  }, [location.search, setActiveTab]);
 
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
@@ -214,13 +235,15 @@ export function Layout({ children }: LayoutProps) {
       return;
     }
     setSelectedServerId(serverId);
-    // Preserve tunnelUrl parameter if present
+    // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
-    const newUrl = tunnelUrl
-      ? `/?server=${encodeURIComponent(serverId)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-      : `/?server=${encodeURIComponent(serverId)}`;
-    navigate(newUrl);
+    const tab = urlParams.get("tab");
+    const params = new URLSearchParams();
+    params.set("server", serverId);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    if (tab) params.set("tab", tab);
+    navigate(`/?${params.toString()}`);
   };
 
   const handleOpenConnectionOptions = useCallback(
@@ -307,12 +330,17 @@ export function Layout({ children }: LayoutProps) {
       // Use the context's navigateToItem to set all state atomically
       navigateToItem(serverId, tab, itemName);
       // Navigate using query params
-      // Preserve tunnelUrl parameter if present
+      // Preserve tunnelUrl and tab parameters if present
       const urlParams = new URLSearchParams(location.search);
       const tunnelUrl = urlParams.get("tunnelUrl");
-      const newUrl = tunnelUrl
-        ? `/?server=${encodeURIComponent(serverId)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(serverId)}`;
+      const existingTab = urlParams.get("tab");
+      const params = new URLSearchParams();
+      params.set("server", serverId);
+      if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+      // Use the tab from the function parameter, or preserve existing tab if not changing
+      if (tab) params.set("tab", tab);
+      else if (existingTab) params.set("tab", existingTab);
+      const newUrl = `/?${params.toString()}`;
       console.warn("[Layout] Navigating to:", newUrl);
       navigate(newUrl);
     } else {
