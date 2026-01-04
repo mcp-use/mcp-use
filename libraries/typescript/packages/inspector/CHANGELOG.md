@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.0-canary.4
+
+### Patch Changes
+
+- ef5a71d: feat: allow to pass tab as query param
+  - mcp-use@1.12.0-canary.4
+
 ## 0.14.0-canary.3
 
 ### Minor Changes
