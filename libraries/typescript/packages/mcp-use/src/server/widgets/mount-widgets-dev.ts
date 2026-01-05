@@ -417,13 +417,19 @@ export default PostHog;
     server: {
       middlewareMode: true,
       origin: serverOrigin,
+      hmr: {
+        // Explicitly configure HMR for better cross-platform support
+        protocol: "ws",
+      },
       watch: {
         // Watch the resources directory for HMR to work
         // This ensures changes to widget source files trigger hot reload
         ignored: ["**/node_modules/**", "**/.git/**"],
-        // Include the resources directory in watch list
-        // Vite will watch files imported from outside root
-        usePolling: false,
+        // Enable polling on Linux where file watching may not work reliably
+        // (especially in Docker, WSL, VMs, or network filesystems)
+        usePolling: process.platform === "linux",
+        // If polling is enabled, check every 100ms (reasonable default)
+        interval: 100,
       },
     },
     // Explicitly tell Vite to watch files outside root

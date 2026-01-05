@@ -4,7 +4,7 @@ import { cors } from "hono/cors";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
-import { isPortAvailable } from "./utils.js";
+import { isPortAvailable, parsePortFromArgs } from "./utils.js";
 
 const app = new Hono();
 
