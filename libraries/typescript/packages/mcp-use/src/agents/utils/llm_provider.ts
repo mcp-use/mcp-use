@@ -96,15 +96,19 @@ function getAPIKey(provider: LLMProvider, config?: LLMConfig): string {
     return config.apiKey;
   }
 
-  // Check environment variables
+  // Get provider config for error message
   const providerConfig = PROVIDER_CONFIG[provider];
-  for (const envVar of providerConfig.envVars) {
-    const apiKey = process.env[envVar];
-    if (apiKey) {
-      logger.debug(
-        `Using API key from environment variable ${envVar} for provider ${provider}`
-      );
-      return apiKey;
+
+  // Check environment variables (only if process.env is available)
+  if (typeof process !== "undefined" && process.env) {
+    for (const envVar of providerConfig.envVars) {
+      const apiKey = process.env[envVar];
+      if (apiKey) {
+        logger.debug(
+          `Using API key from environment variable ${envVar} for provider ${provider}`
+        );
+        return apiKey;
+      }
     }
   }
 

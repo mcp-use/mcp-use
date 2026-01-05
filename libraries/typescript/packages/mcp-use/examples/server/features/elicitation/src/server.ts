@@ -1,4 +1,4 @@
-import { MCPServer, text, error } from "mcp-use/server";
+import { error, MCPServer, text } from "mcp-use/server";
 import z from "zod";
 
 // Create an MCP server with elicitation support

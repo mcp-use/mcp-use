@@ -25,10 +25,20 @@ async function startServer() {
     const isDev =
       process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
-    let port = 3001;
+    // Check for port from command line arguments first
+    const cliPort = parsePortFromArgs();
+    let port = cliPort ?? 3001;
     const available = await isPortAvailable(port);
 
     if (!available) {
+      // If port was explicitly specified via CLI, fail immediately
+      if (cliPort !== null) {
+        console.error(
+          `❌ Port ${port} is not available. Please stop the process using this port and try again.`
+        );
+        process.exit(1);
+      }
+
       if (isDev) {
         console.error(
           `❌❌❌ Port ${port} is not available (probably used by Vite dev server as fallback so you should stop port 3000). Please stop the process using this port and try again.`

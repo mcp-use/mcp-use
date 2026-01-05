@@ -17,18 +17,25 @@ export type UseMcpOptions = {
   url?: string;
   /** Enable/disable the connection (similar to TanStack Query). When false, no connection will be attempted (default: true) */
   enabled?: boolean;
-  /** OAuth client name for registration (if dynamic registration is used) */
-  clientName?: string;
-  /** OAuth client URI for registration (if dynamic registration is used) */
-  clientUri?: string;
+  /** Proxy configuration for routing through a proxy server */
+  proxyConfig?: {
+    proxyAddress?: string;
+    customHeaders?: Record<string, string>;
+  };
   /** Custom callback URL for OAuth redirect (defaults to /oauth/callback on the current origin) */
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /** Custom configuration for the MCP client identity */
+  /** Client configuration for both OAuth registration and MCP protocol identification */
   clientConfig?: {
+    /** Client name (used for OAuth registration and MCP initialize) */
     name?: string;
+    /** Client version (sent in MCP initialize request) */
     version?: string;
+    /** Client URI/homepage (used for OAuth registration) */
+    uri?: string;
+    /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
+    logo_uri?: string;
   };
   /** Custom headers that can be used to bypass auth */
   customHeaders?: Record<string, string>;
@@ -113,6 +120,8 @@ export type UseMcpOptions = {
 };
 
 export type UseMcpResult = {
+  name: string;
+
   /** List of tools available from the connected MCP server */
   tools: Tool[];
   /** List of resources available from the connected MCP server */
@@ -123,8 +132,16 @@ export type UseMcpResult = {
   prompts: Prompt[];
   /** Server information from the initialize response */
   serverInfo?: {
+    title?: string;
     name: string;
     version?: string;
+    websiteUrl?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+    }>;
+    /** Base64-encoded favicon auto-detected from server domain */
+    icon?: string;
   };
   /** Server capabilities from the initialize response */
   capabilities?: Record<string, any>;
@@ -144,6 +161,17 @@ export type UseMcpResult = {
    * this URL can be presented to the user to complete authentication manually in a new tab.
    */
   authUrl?: string;
+  /**
+   * OAuth tokens if authentication was completed
+   * Available when state is 'ready' and OAuth was used
+   */
+  authTokens?: {
+    access_token: string;
+    token_type: string;
+    expires_at?: number;
+    refresh_token?: string;
+    scope?: string;
+  };
   /** Array of internal log messages (useful for debugging) */
   log: {
     level: "debug" | "info" | "warn" | "error";
@@ -262,6 +290,21 @@ export type UseMcpResult = {
   authenticate: () => void;
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void;
+  /**
+   * Ensure the server icon is loaded and available in serverInfo
+   * Returns a promise that resolves when the icon is ready
+   * Use this before server creation to guarantee the icon is available
+   *
+   * @returns Promise that resolves with the base64 icon or null if not available
+   *
+   * @example
+   * ```typescript
+   * // Wait for icon before creating server
+   * const icon = await mcp.ensureIconLoaded();
+   * // Now mcp.serverInfo.icon is guaranteed to be set (if icon exists)
+   * ```
+   */
+  ensureIconLoaded: () => Promise<string | null>;
   /**
    * The underlying BrowserMCPClient instance.
    * Use this to create an MCPAgent for AI chat functionality.

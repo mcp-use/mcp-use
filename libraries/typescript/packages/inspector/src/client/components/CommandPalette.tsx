@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Plus,
   Search,
+  Server,
   Wrench,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,6 +20,16 @@ import { useNavigate } from "react-router";
 
 import { McpUseLogo } from "./McpUseLogo";
 import { ServerIcon } from "./ServerIcon";
+import { VSCodeIcon } from "./ui/client-icons";
+import {
+  downloadMcpbFile,
+  generateClaudeCodeCommand,
+  generateCodexConfig,
+  generateCursorDeepLink,
+  generateGeminiCLICommand,
+  generateVSCodeDeepLink,
+} from "mcp-use/react";
+import { toast } from "sonner";
 
 // Discord Icon Component
 function DiscordIcon({ className }: { className?: string }) {
@@ -45,6 +56,8 @@ interface CommandPaletteProps {
   resources: Resource[];
   savedRequests: SavedRequest[];
   connections: any[];
+  selectedServer?: any;
+  tunnelUrl?: string | null;
   onNavigate: (
     tab: "tools" | "prompts" | "resources",
     itemName?: string,
@@ -71,12 +84,138 @@ export function CommandPalette({
   resources,
   savedRequests,
   connections,
+  selectedServer,
+  tunnelUrl,
   onNavigate,
   onServerSelect,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // Get server URL for "Open in..." commands
+  const serverUrl = selectedServer
+    ? tunnelUrl
+      ? `${tunnelUrl}/mcp`
+      : selectedServer.url
+    : null;
+  const serverName = selectedServer?.name || "MCP Server";
+  const serverHeaders = selectedServer?.customHeaders;
+
+  // Create "Open in..." command items
+  const openInItems: CommandItem[] = selectedServer
+    ? [
+        {
+          id: "open-in-cursor",
+          name: "Open in Cursor",
+          description: "Add this server to Cursor",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            try {
+              const deepLink = generateCursorDeepLink(
+                serverUrl!,
+                serverName,
+                serverHeaders
+              );
+              window.location.href = deepLink;
+              toast.success("Opening in Cursor...");
+              onOpenChange(false);
+            } catch (error) {
+              toast.error("Failed to open in Cursor");
+            }
+          },
+        },
+        {
+          id: "open-in-claude-code",
+          name: "Open in Claude Code",
+          description: "Add this server to Claude Code CLI",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            const { command } = generateClaudeCodeCommand(
+              serverUrl!,
+              serverName,
+              serverHeaders
+            );
+            navigator.clipboard.writeText(command);
+            toast.success("Command copied to clipboard");
+            onOpenChange(false);
+          },
+        },
+        {
+          id: "open-in-claude-desktop",
+          name: "Open in Claude Desktop",
+          description: "Download .mcpb configuration file",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            try {
+              downloadMcpbFile(serverUrl!, serverName, serverHeaders);
+              toast.success("Downloaded .mcpb file");
+              onOpenChange(false);
+            } catch (error) {
+              toast.error("Failed to download configuration file");
+            }
+          },
+        },
+        {
+          id: "open-in-vscode",
+          name: "Open in VS Code",
+          description: "Add this server to VS Code",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            try {
+              const deepLink = generateVSCodeDeepLink(
+                serverUrl!,
+                serverName,
+                serverHeaders
+              );
+              window.location.href = deepLink;
+              toast.success("Opening in VS Code...");
+              onOpenChange(false);
+            } catch (error) {
+              toast.error("Failed to open in VS Code");
+            }
+          },
+        },
+        {
+          id: "open-in-gemini",
+          name: "Open in Gemini CLI",
+          description: "Add this server to Gemini CLI",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            const { command } = generateGeminiCLICommand(
+              serverUrl!,
+              serverName,
+              serverHeaders
+            );
+            navigator.clipboard.writeText(command);
+            toast.success("Command copied to clipboard");
+            onOpenChange(false);
+          },
+        },
+        {
+          id: "open-in-codex",
+          name: "Open in Codex CLI",
+          description: "Add this server to Codex CLI",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            const { config } = generateCodexConfig(
+              serverUrl!,
+              serverName,
+              serverHeaders
+            );
+            navigator.clipboard.writeText(config);
+            toast.success("Config copied to clipboard");
+            onOpenChange(false);
+          },
+        },
+      ]
+    : [];
 
   // Create global command items
   const globalItems: CommandItem[] = [
@@ -140,6 +279,7 @@ export function CommandPalette({
   // Create unified command items
   const commandItems: CommandItem[] = [
     ...globalItems,
+    ...openInItems,
     ...serverItems,
     ...tools.map((tool) => ({
       id: `tool-${tool.name}`,
@@ -285,6 +425,63 @@ export function CommandPalette({
             </div>
           );
         }
+        if (category === "Open in Client") {
+          // Determine which client icon to show based on item name
+          if (itemName?.includes("Cursor")) {
+            return (
+              <div className="bg-gray-200 dark:bg-gray-800 rounded-full p-2 flex items-center justify-center shrink-0">
+                <img
+                  src="https://cdn.simpleicons.org/cursor"
+                  alt="Cursor"
+                  className="h-4 w-4"
+                />
+              </div>
+            );
+          }
+          if (
+            itemName?.includes("Claude Code") ||
+            itemName?.includes("Claude Desktop")
+          ) {
+            return (
+              <div className="bg-orange-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+                <img
+                  src="https://cdn.simpleicons.org/claude"
+                  alt="Claude"
+                  className="h-4 w-4"
+                />
+              </div>
+            );
+          }
+          if (itemName?.includes("VS Code")) {
+            return (
+              <div className="bg-blue-600/20 rounded-full p-2 flex items-center justify-center shrink-0">
+                <VSCodeIcon className="h-4 w-4 text-blue-600" />
+              </div>
+            );
+          }
+          if (itemName?.includes("Gemini")) {
+            return (
+              <div className="bg-purple-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+                <img
+                  src="https://cdn.simpleicons.org/googlegemini"
+                  alt="Gemini"
+                  className="h-4 w-4"
+                />
+              </div>
+            );
+          }
+          if (itemName?.includes("Codex")) {
+            return (
+              <div className="bg-green-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+                <img
+                  src="https://inspector-cdn.mcp-use.com/providers/openai.png"
+                  alt="Codex"
+                  className="h-4 w-4"
+                />
+              </div>
+            );
+          }
+        }
         if (category === "Documentation") {
           // Use MCP Use logo for MCP Use related documentation items
           if (itemName?.includes("MCP Use") || itemName?.includes("mcp-use")) {
@@ -311,13 +508,11 @@ export function CommandPalette({
           );
         }
         if (category === "Connected Servers") {
+          // For connected servers, we need to find the actual server object from metadata.serverId
+          // Since we don't have access to it here, just show a generic server icon
           return (
-            <div className="bg-cyan-500/20 rounded-full p-0 flex items-center justify-center shrink-0">
-              <ServerIcon
-                serverUrl={itemName}
-                serverName={itemName}
-                size="md"
-              />
+            <div className="bg-cyan-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+              <Server className="h-4 w-4 text-cyan-500" />
             </div>
           );
         }
@@ -382,18 +577,21 @@ export function CommandPalette({
               {item.name}
             </span>
             {(item.metadata?.serverName || item.metadata?.serverId) &&
-              item.category !== "Connected Servers" && (
-                <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
-                  <ServerIcon
-                    serverUrl={item.metadata?.serverId}
-                    serverName={item.metadata?.serverName}
-                    size="sm"
-                  />
-                  <span className="text-xs font-base text-muted-foreground">
-                    {item.metadata?.serverName || item.metadata?.serverId}
-                  </span>
-                </div>
-              )}
+              item.category !== "Connected Servers" &&
+              (() => {
+                // Find the actual server object from metadata.serverId
+                const server = connections.find(
+                  (c) => c.id === item.metadata?.serverId
+                );
+                return server ? (
+                  <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
+                    <ServerIcon server={server} size="sm" />
+                    <span className="text-xs font-base text-muted-foreground">
+                      {item.metadata?.serverName || item.metadata?.serverId}
+                    </span>
+                  </div>
+                ) : null;
+              })()}
           </Command.Item>
         ))}
       </Command.List>

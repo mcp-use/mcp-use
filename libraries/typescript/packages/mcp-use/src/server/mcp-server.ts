@@ -7,93 +7,93 @@ import type {
   CreateMessageResult,
 } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import {
-  McpError,
   ErrorCode,
+  McpError,
 } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
 import { Telemetry } from "../telemetry/index.js";
 import { getPackageVersion } from "../version.js";
 
-import { uiResourceRegistration, mountWidgets } from "./widgets/index.js";
 import { mountInspectorUI } from "./inspector/index.js";
-import {
-  toolRegistration,
-  convertZodSchemaToParams,
-  createParamsSchema,
-} from "./tools/index.js";
+import { registerPrompt } from "./prompts/index.js";
 import {
   registerResource,
   registerResourceTemplate,
   ResourceSubscriptionManager,
 } from "./resources/index.js";
-import { registerPrompt } from "./prompts/index.js";
+import {
+  convertZodSchemaToParams,
+  createParamsSchema,
+  toolRegistration,
+} from "./tools/index.js";
+import { mountWidgets, uiResourceRegistration } from "./widgets/index.js";
 
 // Import and re-export tool context types for public API
 import type {
-  ToolContext,
-  SampleOptions,
-  ElicitOptions,
   ElicitFormParams,
+  ElicitOptions,
   ElicitUrlParams,
+  SampleOptions,
+  ToolContext,
 } from "./types/tool-context.js";
 
 export type {
-  ToolContext,
-  SampleOptions,
-  ElicitOptions,
   ElicitFormParams,
+  ElicitOptions,
   ElicitUrlParams,
+  SampleOptions,
+  ToolContext,
 };
 
-import { onRootsChanged, listRoots } from "./roots/index.js";
+import { getRequestContext, runWithContext } from "./context-storage.js";
+import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
 import { requestLogger } from "./logging.js";
-import type { SessionData } from "./sessions/index.js";
 import {
   getActiveSessions,
   sendNotification,
   sendNotificationToSession,
-  sendToolsListChanged,
-  sendResourcesListChanged,
   sendPromptsListChanged,
+  sendResourcesListChanged,
+  sendToolsListChanged,
 } from "./notifications/index.js";
+import type { OAuthProvider } from "./oauth/providers/types.js";
+import { setupOAuthForServer } from "./oauth/setup.js";
+import { listRoots, onRootsChanged } from "./roots/index.js";
+import type { SessionData } from "./sessions/index.js";
 import {
-  findSessionContext,
   createEnhancedContext,
+  findSessionContext,
   isValidLogLevel,
 } from "./tools/tool-execution-helpers.js";
-import { getRequestContext, runWithContext } from "./context-storage.js";
-import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
 import type { ServerConfig } from "./types/index.js";
+import type { PromptCallback, PromptDefinition } from "./types/prompt.js";
+import type {
+  ReadResourceCallback,
+  ReadResourceTemplateCallback,
+  ResourceDefinition,
+  ResourceTemplateDefinition,
+} from "./types/resource.js";
+import type {
+  InferToolInput,
+  InferToolOutput,
+  ToolCallback,
+  ToolDefinition,
+} from "./types/tool.js";
 import {
-  getEnv,
-  getServerBaseUrl as getServerBaseUrlHelper,
-  logRegisteredItems as logRegisteredItemsHelper,
-  startServer,
-  rewriteSupabaseRequest,
-  getDenoCorsHeaders,
   applyDenoCorsHeaders,
   createHonoApp,
   createHonoProxy,
-  isProductionMode as isProductionModeHelper,
-  parseTemplateUri as parseTemplateUriHelper,
+  getDenoCorsHeaders,
+  getEnv,
+  getServerBaseUrl as getServerBaseUrlHelper,
   isDeno,
+  isProductionMode as isProductionModeHelper,
+  logRegisteredItems as logRegisteredItemsHelper,
+  parseTemplateUri as parseTemplateUriHelper,
+  rewriteSupabaseRequest,
+  startServer,
 } from "./utils/index.js";
-import { setupOAuthForServer } from "./oauth/setup.js";
-import type { OAuthProvider } from "./oauth/providers/types.js";
-import type {
-  ToolDefinition,
-  ToolCallback,
-  InferToolInput,
-  InferToolOutput,
-} from "./types/tool.js";
-import type { PromptDefinition, PromptCallback } from "./types/prompt.js";
-import type {
-  ResourceDefinition,
-  ResourceTemplateDefinition,
-  ReadResourceCallback,
-  ReadResourceTemplateCallback,
-} from "./types/resource.js";
 
 class MCPServerClass<HasOAuth extends boolean = false> {
   /**
@@ -1003,9 +1003,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   async listen(port?: number): Promise<void> {
-    // Priority: parameter > PORT env var > default (3000)
+    // Priority: parameter > --port CLI arg > PORT env var > default (3000)
     const portEnv = getEnv("PORT");
-    this.serverPort = port || (portEnv ? parseInt(portEnv, 10) : 3000);
+
+    // Parse --port from command-line arguments
+    let cliPort: number | undefined;
+    const portArgIndex = process.argv.indexOf("--port");
+    if (portArgIndex !== -1 && portArgIndex + 1 < process.argv.length) {
+      const portValue = parseInt(process.argv[portArgIndex + 1], 10);
+      if (!isNaN(portValue)) {
+        cliPort = portValue;
+      }
+    }
+
+    this.serverPort =
+      port || cliPort || (portEnv ? parseInt(portEnv, 10) : 3000);
 
     // Update host from HOST env var if set
     const hostEnv = getEnv("HOST");

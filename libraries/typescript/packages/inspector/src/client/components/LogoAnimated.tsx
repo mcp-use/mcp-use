@@ -1,6 +1,6 @@
+import { cn } from "@/client/lib/utils";
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { cn } from "@/client/lib/utils";
 
 /**
  * HoverDrawLogo (timed sequence)
@@ -114,7 +114,7 @@ export default function LogoAnimated({
         </motion.svg>
       </div>
       {state === "expanded" && (
-        <div className="font-ubuntu flex flex-col items-start -space-y-1 mr-3">
+        <div className="font-ubuntu flex-col items-start -space-y-1 mr-3 hidden xl:flex">
           <h1 className="text-xl font-medium">mcp-use</h1>
           <span className="text-lg text-muted-foreground tracking-wide font-sans font-light">
             Inspector

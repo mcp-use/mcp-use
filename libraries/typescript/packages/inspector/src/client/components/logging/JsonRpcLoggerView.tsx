@@ -1,20 +1,17 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import {
-  ChevronDown,
-  ChevronRight,
   ArrowDownToLine,
   ArrowUpFromLine,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
-
-type RpcDirection = "send" | "receive" | string;
-
-interface RpcEventMessage {
-  serverId: string;
-  direction: RpcDirection;
-  message: unknown; // raw JSON-RPC payload (request/response/error)
-  timestamp?: string;
-}
+import {
+  clearRpcLogs,
+  getAllRpcLogs,
+  subscribeToRpcLogs,
+  type RpcLogEntry,
+} from "mcp-use/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface RenderableRpcItem {
   id: string;
@@ -56,26 +53,11 @@ export function JsonRpcLoggerView({
     setExpanded(new Set());
     onCountChange?.(0);
 
-    // Also clear server-side buffer to prevent replay of old events
-    try {
-      const params = new URLSearchParams();
-      if (serverIds && serverIds.length > 0) {
-        params.set("serverIds", serverIds.join(","));
-      }
-      const response = await fetch(
-        `/inspector/api/rpc/log?${params.toString()}`,
-        {
-          method: "DELETE",
-        }
-      );
-      if (!response.ok) {
-        console.warn(
-          "[RPC Logger] Failed to clear server buffer:",
-          response.status
-        );
-      }
-    } catch (err) {
-      console.warn("[RPC Logger] Error clearing server buffer:", err);
+    // Clear from mcp-use/react RPC logger
+    if (serverIds && serverIds.length > 0) {
+      serverIds.forEach((serverId) => clearRpcLogs(serverId));
+    } else {
+      clearRpcLogs(); // Clear all
     }
   };
 
@@ -103,84 +85,89 @@ export function JsonRpcLoggerView({
   }, [items.length, onCountChange]);
 
   useEffect(() => {
-    let es: globalThis.EventSource | null = null;
-    try {
-      const params = new URLSearchParams();
-      params.set("replay", "50");
-      // Add timestamp to ensure fresh connection
-      params.set("_t", Date.now().toString());
-      if (serverIds && serverIds.length > 0) {
-        params.set("serverIds", serverIds.join(","));
+    console.log("[RPC Logger] Subscribing to RPC logs for servers:", serverIds);
+
+    // Load existing logs
+    const existingLogs = getAllRpcLogs();
+    const filteredLogs =
+      serverIds && serverIds.length > 0
+        ? existingLogs.filter((log) => serverIds.includes(log.serverId))
+        : existingLogs;
+
+    // Convert to renderable items
+    const initialItems = filteredLogs
+      .map((log): RenderableRpcItem => {
+        const msg: any = log.message;
+        const method: string =
+          typeof msg?.method === "string"
+            ? msg.method
+            : msg?.result !== undefined
+              ? "result"
+              : msg?.error !== undefined
+                ? "error"
+                : "unknown";
+
+        return {
+          id: `${log.timestamp}-${Math.random().toString(36).slice(2)}`,
+          serverId: log.serverId,
+          direction: log.direction.toUpperCase(),
+          method,
+          timestamp: log.timestamp,
+          payload: log.message,
+        };
+      })
+      .reverse(); // Newest first
+
+    setItems(initialItems);
+    onCountChange?.(initialItems.length);
+
+    // Subscribe to new logs
+    const unsubscribe = subscribeToRpcLogs((entry: RpcLogEntry) => {
+      // Filter by serverIds if specified
+      if (
+        serverIds &&
+        serverIds.length > 0 &&
+        !serverIds.includes(entry.serverId)
+      ) {
+        return;
       }
-      const streamUrl = `/inspector/api/rpc/stream?${params.toString()}`;
-      console.log("[RPC Logger] Connecting to SSE stream:", streamUrl);
-      es = new globalThis.EventSource(streamUrl);
-      es.onopen = () => {
-        console.log("[RPC Logger] SSE connection opened");
-      };
-      es.onmessage = (evt) => {
-        try {
-          const data = JSON.parse(evt.data) as {
-            type?: string;
-          } & RpcEventMessage;
-          if (!data || data.type !== "rpc") return;
 
-          const { serverId, direction, message, timestamp } = data;
-          const msg: any = message as any;
-          const method: string =
-            typeof msg?.method === "string"
-              ? msg.method
-              : msg?.result !== undefined
-                ? "result"
-                : msg?.error !== undefined
-                  ? "error"
-                  : "unknown";
+      const msg: any = entry.message;
+      const method: string =
+        typeof msg?.method === "string"
+          ? msg.method
+          : msg?.result !== undefined
+            ? "result"
+            : msg?.error !== undefined
+              ? "error"
+              : "unknown";
 
-          const item: RenderableRpcItem = {
-            id: `${timestamp ?? Date.now()}-${Math.random().toString(36).slice(2)}`,
-            serverId: typeof serverId === "string" ? serverId : "unknown",
-            direction:
-              typeof direction === "string" ? direction.toUpperCase() : "",
-            method,
-            timestamp: timestamp ?? new Date().toISOString(),
-            payload: message,
-          };
+      const item: RenderableRpcItem = {
+        id: `${entry.timestamp}-${Math.random().toString(36).slice(2)}`,
+        serverId: entry.serverId,
+        direction: entry.direction.toUpperCase(),
+        method,
+        timestamp: entry.timestamp,
+        payload: entry.message,
+      };
 
-          console.log("[RPC Logger] Received RPC event:", {
-            method,
-            direction,
-            serverId,
-          });
-          setItems((prev) => {
-            const newItems = [item, ...prev].slice(0, 1000);
-            onCountChange?.(newItems.length);
-            return newItems;
-          });
-        } catch (err) {
-          console.error("[RPC Logger] Error parsing SSE message:", err);
-        }
-      };
-      es.onerror = (err) => {
-        console.error("[RPC Logger] SSE connection error:", err);
-        try {
-          es?.close();
-        } catch {
-          // Ignore close errors
-        }
-      };
-    } catch (err) {
-      console.error("[RPC Logger] Failed to create SSE connection:", err);
-    }
+      console.log("[RPC Logger] New RPC log:", {
+        method,
+        direction: entry.direction,
+        serverId: entry.serverId,
+      });
+      setItems((prev) => {
+        const newItems = [item, ...prev].slice(0, 1000);
+        onCountChange?.(newItems.length);
+        return newItems;
+      });
+    });
 
     return () => {
-      try {
-        es?.close();
-        console.log("[RPC Logger] SSE connection closed");
-      } catch {
-        // Ignore close errors
-      }
+      unsubscribe();
+      console.log("[RPC Logger] Unsubscribed from RPC logs");
     };
-  }, [serverIdsKey]); // Use normalized key to prevent unnecessary reconnections when serverIds array reference changes but contents are the same
+  }, [serverIdsKey, onCountChange]); // Use normalized key to prevent unnecessary reconnections when serverIds array reference changes but contents are the same
 
   const filteredItems = useMemo(() => {
     let result = items;

@@ -1,0 +1,22 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.7.0",
+    "create-mcp-use-app": "0.9.3",
+    "@mcp-use/inspector": "0.13.2",
+    "mcp-use": "1.11.2"
+  },
+  "changesets": [
+    "clean-ears-greet",
+    "dry-grapes-check",
+    "gold-toes-deny",
+    "jolly-llamas-wash",
+    "neat-shirts-grin",
+    "plenty-gifts-smell",
+    "silver-adults-sink",
+    "sparkly-numbers-sit",
+    "tasty-jokes-play",
+    "twelve-icons-invent"
+  ]
+}
