@@ -28,6 +28,15 @@ interface ServerConnectionModalProps {
   }) => void;
 }
 
+/**
+ * Renders a modal for viewing and editing a server connection's settings.
+ *
+ * @param connection - Existing connection to prefill the form, or `null` to start empty
+ * @param open - Whether the modal is visible
+ * @param onOpenChange - Callback invoked with the new open state when the modal is opened or closed
+ * @param onConnect - Callback invoked with the connection configuration when the user submits the form
+ * @returns The modal's JSX element
+ */
 export function ServerConnectionModal({
   connection,
   open,

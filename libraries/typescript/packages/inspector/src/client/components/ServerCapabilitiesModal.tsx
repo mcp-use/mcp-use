@@ -16,6 +16,14 @@ interface ServerCapabilitiesModalProps {
   connection: MCPConnection | null;
 }
 
+/**
+ * Render a modal that displays server information and the server's capabilities JSON.
+ *
+ * @param open - Controls whether the modal is visible
+ * @param onOpenChange - Callback invoked when the modal open state changes
+ * @param connection - The server connection whose info and capabilities are shown; if `null`, nothing is rendered
+ * @returns A JSX element containing the server information and capabilities viewer, or `null` when `connection` is `null`
+ */
 export function ServerCapabilitiesModal({
   open,
   onOpenChange,

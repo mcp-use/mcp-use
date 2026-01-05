@@ -50,6 +50,16 @@ const InspectorContext = createContext<InspectorContextType | undefined>(
   undefined
 );
 
+/**
+ * Provides Inspector context and state to descendant components.
+ *
+ * Initializes and supplies the inspector UI state (selected server, active tab,
+ * per-tab selections, tunnel URL, and embedded mode/config) along with updater
+ * callbacks and navigation/clearing helpers through React context.
+ *
+ * @param children - Elements that will receive the Inspector context
+ * @returns A context provider element that supplies inspector state and mutator functions to its children
+ */
 export function InspectorProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<InspectorState>({
     selectedServerId: null,

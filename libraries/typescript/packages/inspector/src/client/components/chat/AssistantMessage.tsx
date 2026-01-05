@@ -2,6 +2,12 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { MarkdownRenderer } from "@/client/components/shared/MarkdownRenderer";
 
+/**
+ * Button that copies the provided text to the clipboard and shows a brief visual confirmation.
+ *
+ * @param text - The string content to copy when the button is clicked.
+ * @returns A button element that copies `text` to the clipboard and displays a check icon for two seconds after a successful copy.
+ */
 function CopyButton({ text }: { text: string }) {
   const [isCopied, setIsCopied] = useState(false);
 

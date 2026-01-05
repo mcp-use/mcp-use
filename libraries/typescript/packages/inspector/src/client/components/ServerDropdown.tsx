@@ -34,6 +34,18 @@ interface ServerDropdownProps {
   mobileMode?: boolean;
 }
 
+/**
+ * Render a server selection dropdown with per-connection actions to view capabilities or open connection settings.
+ *
+ * Renders a compact trigger in mobileMode and a full trigger in desktop mode. Selecting a connection calls `onServerSelect` only if the connection exists and its state is `"ready"`; otherwise a toast error is shown. Clicking the info action opens the ServerCapabilitiesModal for that connection. Clicking the settings action invokes `onOpenConnectionOptions` with the connection id.
+ *
+ * @param connections - List of available MCP connections shown in the menu
+ * @param selectedServer - The currently selected connection (may be `undefined`)
+ * @param onServerSelect - Callback invoked with a server id when a ready server is selected
+ * @param onOpenConnectionOptions - Callback invoked with a connection id (or `null`) to open connection options
+ * @param mobileMode - If `true`, render the compact/mobile variant of the dropdown
+ * @returns The server dropdown React element
+ */
 export function ServerDropdown({
   connections,
   selectedServer,

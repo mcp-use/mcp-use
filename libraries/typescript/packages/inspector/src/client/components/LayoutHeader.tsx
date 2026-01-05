@@ -116,6 +116,24 @@ function CollapseButton({
   );
 }
 
+/**
+ * Renders the application header with server selector, tabs, tunnel badge, and global actions.
+ *
+ * Renders responsive mobile and desktop layouts showing the server dropdown, collapsible tabs with counts,
+ * tunnel URL popover and copy action, Add to Client dropdown with SDK integration modals, theme toggle,
+ * command palette trigger, GitHub link, and branding. Elements that depend on a selected server or the
+ * `embedded` prop are conditionally hidden.
+ *
+ * @param connections - Available server connections shown in the server dropdown.
+ * @param selectedServer - Currently selected server; used to populate server-specific UI and counts.
+ * @param activeTab - Currently active tab id.
+ * @param onServerSelect - Callback invoked with the selected server id.
+ * @param onTabChange - Callback invoked when the active tab changes.
+ * @param onCommandPaletteOpen - Callback invoked to open the command palette.
+ * @param onOpenConnectionOptions - Callback invoked to open connection options; receives a connection id or `null`.
+ * @param embedded - When true, hide non-essential header chrome for embedded contexts.
+ * @returns The header element containing responsive navigation and server controls.
+ */
 export function LayoutHeader({
   connections,
   selectedServer,

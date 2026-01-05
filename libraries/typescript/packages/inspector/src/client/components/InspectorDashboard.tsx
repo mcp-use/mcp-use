@@ -36,7 +36,15 @@ import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
 
-// Temporary connection tester component
+/**
+ * Validates the provided connection configuration and performs a short-lived connection attempt to confirm connectivity and authentication.
+ *
+ * If the URL is invalid or the connection fails (and no authentication URL is present), `onFailure` is invoked with an error message and any persisted connection state is cleared. If the connection reaches a ready state, `onSuccess` is invoked once. If an authentication URL is available, the tester waits for authentication instead of failing.
+ *
+ * @param config - Connection parameters: `url` (include protocol), optional `proxyConfig` ({ proxyAddress, proxyToken, customHeaders }), and optional `transportType` (`"http"` or `"sse"`, defaults to `"http"`).
+ * @param onSuccess - Called once when a successful connection is established.
+ * @param onFailure - Called once with a human-readable error message when validation or connection fails.
+ */
 function ConnectionTester({
   config,
   onSuccess,
@@ -131,6 +139,18 @@ function ConnectionTester({
   return null;
 }
 
+/**
+ * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
+ *
+ * This component displays a list of saved connections, a connection settings form, and controls
+ * for adding, editing, removing, resyncing, and inspecting servers. It coordinates connection
+ * testing (via a temporary ConnectionTester), adapts older add/update/remove semantics to the
+ * newer client API, persists UI state (auto-switch, timeouts, headers, OAuth fields), tracks
+ * transient connection and navigation state, and opens modals for connection editing and server
+ * capabilities. Telemetry for inspector opens and server additions is emitted.
+ *
+ * @returns A JSX element representing the Inspector dashboard UI.
+ */
 export function InspectorDashboard() {
   const {
     servers: connections,

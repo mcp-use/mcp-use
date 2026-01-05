@@ -102,15 +102,15 @@ export function rewriteSupabaseRequest(req: Request): Request {
 }
 
 /**
- * Start the server based on runtime environment
+ * Start the provided Hono application as an HTTP server for the current runtime.
  *
- * @param app - Hono application instance
+ * @param app - Hono application instance to serve
  * @param port - Port number to listen on
  * @param host - Hostname to bind to
- * @param options - Additional options for server startup
- * @param options.onDenoRequest - Optional callback to transform requests in Deno (e.g., for path rewriting)
- * @param options.onDenoResponse - Optional callback to transform responses in Deno (e.g., for CORS)
- * @returns Promise that resolves when server is started
+ * @param options - Optional runtime-specific hooks
+ * @param options.onDenoRequest - Transform an incoming Deno `Request` before it is passed to the application
+ * @param options.onDenoResponse - Transform a Deno `Response` before it is returned (if omitted, default CORS headers are applied)
+ * @returns Nothing.
  */
 export async function startServer(
   app: HonoType,

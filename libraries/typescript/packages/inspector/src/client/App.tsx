@@ -15,6 +15,13 @@ import { ElicitationRequestToast } from "@/client/components/elicitation/Elicita
 import { InspectorProvider } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
+/**
+ * Root React component that configures application providers, routing, and toast-based handlers for sampling and elicitation requests in the inspector UI.
+ *
+ * Creates a LocalStorageProvider for saved connections when not running in embedded mode (determined via the `embedded=true` URL parameter), initializes the MCP client with RPC logging and lifecycle callbacks, and renders the inspector routes (including the OAuth callback and main dashboard) inside theme and inspector contexts. Sampling and elicitation requests are surfaced as persistent toasts that allow viewing details, approving/denying, or opening supplied URLs.
+ *
+ * @returns The app's React element tree.
+ */
 function App() {
   // Check if embedded mode is active from URL params
   const urlParams = new URLSearchParams(window.location.search);

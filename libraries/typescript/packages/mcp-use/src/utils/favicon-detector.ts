@@ -4,9 +4,10 @@
  */
 
 /**
- * Check if a domain is a local/private server
- * @param domain - The domain to check
- * @returns true if the domain is localhost or a private IP
+ * Determine whether a domain refers to a local or private server.
+ *
+ * @param domain - Hostname or IPv4 address to evaluate
+ * @returns `true` if `domain` is `localhost` or belongs to common private/loopback IPv4 ranges (`127.*`, `10.*`, `192.168.*`, `172.*`), `false` otherwise
  */
 export function isLocalServer(domain: string): boolean {
   return (
@@ -20,9 +21,10 @@ export function isLocalServer(domain: string): boolean {
 }
 
 /**
- * Extract base domain from a hostname (e.g., "api.github.com" → "github.com")
- * @param hostname - The full hostname
- * @returns The base domain
+ * Returns the base domain composed of the last two hostname labels (e.g., "api.github.com" → "github.com").
+ *
+ * @param hostname - Full hostname to extract the base domain from
+ * @returns The base domain consisting of the last two labels, or the original `hostname` if it has two or fewer labels
  */
 function getBaseDomain(hostname: string): string {
   const parts = hostname.split(".");
@@ -33,9 +35,9 @@ function getBaseDomain(hostname: string): string {
 }
 
 /**
- * Convert blob to base64 data URL
- * @param blob - The blob to convert
- * @returns Promise with base64 data URL
+ * Convert a Blob into a base64-encoded data URL.
+ *
+ * @returns A string containing a base64 data URL representing the Blob's contents
  */
 function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,23 +51,13 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /**
- * Detect and fetch favicon for a server URL
+ * Detects and retrieves the favicon for an MCP server.
  *
- * This function:
- * 1. Extracts the domain from the server URL
- * 2. Skips local/private servers
- * 3. Tries favicon.tools.mcp-use.com API with fallbacks
- * 4. Converts the favicon to base64 for storage
+ * Attempts the server host and its base domain (when different), skipping local/private hosts,
+ * and returns the favicon as a base64 data URL if found.
  *
- * @param serverUrl - The MCP server URL (e.g., "https://mcp.linear.app/mcp")
- * @returns Promise with base64-encoded favicon data URL or null if not found
- *
- * @example
- * ```typescript
- * const favicon = await detectFavicon("https://mcp.linear.app/mcp");
- * // Returns: "data:image/png;base64,iVBORw0KGgo..."
- * // Or null if detection fails
- * ```
+ * @param serverUrl - The MCP server URL or host (e.g., "https://mcp.linear.app/mcp" or "mcp.linear.app")
+ * @returns The base64-encoded favicon data URL if detected, `null` otherwise
  */
 export async function detectFavicon(serverUrl: string): Promise<string | null> {
   try {

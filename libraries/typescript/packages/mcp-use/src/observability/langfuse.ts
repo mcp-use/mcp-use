@@ -15,7 +15,10 @@ import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { logger } from "../logging.js";
 
 /**
- * Safe environment variable access - works in both Node.js and browsers
+ * Retrieve the value of an environment variable when `process.env` is available.
+ *
+ * @param key - The environment variable name to look up
+ * @returns The variable's value if present, `undefined` otherwise
  */
 function getEnvVar(key: string): string | undefined {
   if (typeof process !== "undefined" && process.env) {
@@ -35,6 +38,16 @@ const langfuseState = {
   initPromise: null as Promise<void> | null,
 };
 
+/**
+ * Initializes Langfuse observability for the application and installs a callback handler that augments traces with optional agent metadata and tags.
+ *
+ * This will attempt to dynamically load the Langfuse LangChain integration and, if available, create and store a wrapped callback handler (and optionally a Langfuse client) on the module state so tracing can be used elsewhere in the application.
+ *
+ * @param agentId - Optional identifier for the agent to include in traces
+ * @param metadata - Optional static metadata to attach to traces; merged with dynamic metadata if a provider is supplied
+ * @param metadataProvider - Optional function that returns dynamic metadata to attach to traces at runtime
+ * @param tagsProvider - Optional function that returns an array of tags to attach to traces at runtime
+ */
 async function initializeLangfuse(
   agentId?: string,
   metadata?: Record<string, any>,

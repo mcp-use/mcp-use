@@ -26,6 +26,12 @@ interface PromptMessageCardProps {
   index: number;
 }
 
+/**
+ * Selects the badge variant to use for a given message role.
+ *
+ * @param role - The message role; expected values are "system", "user", or "assistant"
+ * @returns The badge variant name: `"default"` for system, `"outline"` for user (and unknown roles), or `"secondary"` for assistant
+ */
 function getRoleBadgeVariant(role: string) {
   switch (role) {
     case "system":
@@ -39,10 +45,25 @@ function getRoleBadgeVariant(role: string) {
   }
 }
 
+/**
+ * Format a role identifier for display by capitalizing its first letter.
+ *
+ * @param role - Role identifier (e.g., "system", "user", "assistant")
+ * @returns The input `role` with its first character converted to uppercase
+ */
 function getRoleDisplayName(role: string) {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
+/**
+ * Extracts a plain-text representation from a prompt message content for display or copying.
+ *
+ * Handles string content, explicit text fields, resource text, image placeholders, and falls back
+ * to a JSON-formatted string for other shapes.
+ *
+ * @param content - The message content to convert; may be a raw string or a structured PromptMessageContent.
+ * @returns A plain string representation of `content`. For images returns a placeholder like `[Image: image/png]`.
+ */
 function extractTextFromContent(
   content: PromptMessageContent | string
 ): string {
@@ -70,6 +91,13 @@ function extractTextFromContent(
   return JSON.stringify(content, null, 2);
 }
 
+/**
+ * Render a styled card displaying a prompt message with a role badge and a copy-to-clipboard action.
+ *
+ * @param message - The prompt message to display (role and content).
+ * @param index - The zero-based index of the message in the list.
+ * @returns A JSX element representing the prompt message card.
+ */
 export function PromptMessageCard({ message, index }: PromptMessageCardProps) {
   const [isCopied, setIsCopied] = useState(false);
 

@@ -43,6 +43,20 @@ interface PromptsTabProps {
 
 const SAVED_PROMPTS_KEY = "mcp-inspector-saved-prompts";
 
+/**
+ * Render the Prompts tab UI for browsing, selecting, executing, saving, and inspecting prompts.
+ *
+ * The component manages prompt selection, argument state, execution results, saved prompts (persisted
+ * to localStorage), keyboard navigation, responsive mobile/desktop layouts, RPC message viewing,
+ * and exposes `focusSearch` / `blurSearch` via the forwarded ref.
+ *
+ * @param ref - Optional forwarded ref exposing `focusSearch` and `blurSearch` methods.
+ * @param prompts - The list of available prompts to display.
+ * @param callPrompt - Function invoked to execute a prompt by name with an arguments object.
+ * @param serverId - Identifier for the current server; used for RPC scoping and telemetry.
+ * @param isConnected - Whether the application is currently connected to the backend (controls execution availability).
+ * @returns The PromptsTab UI element.
+ */
 export function PromptsTab({
   ref,
   prompts,

@@ -43,22 +43,13 @@ function formatForLogging(obj: any): string {
 }
 
 /**
- * Request logging middleware with timestamp, colored status codes, and MCP method info
+ * Middleware that logs incoming HTTP requests with a timestamp, color-coded status code, and optional debug details.
  *
- * Logs all HTTP requests with:
- * - Timestamp in HH:MM:SS.mmm format
- * - HTTP method and endpoint in bold
- * - MCP method name in brackets for POST requests to /mcp
- * - Color-coded status codes (green 2xx, yellow 3xx, red 4xx, magenta 5xx)
+ * Skips logging for inspector telemetry and RPC endpoints under /inspector/api/tel/, /inspector/api/rpc/stream, and /inspector/api/rpc/log.
+ * For POST requests to /mcp, includes the MCP method name when present. When DEBUG is enabled, logs request headers/body and response headers/body.
  *
- * When DEBUG environment variable is set, also logs:
- * - Request headers
- * - Full request payload/body
- * - Response headers
- * - Response body
- *
- * @param c - Hono context object
- * @param next - Hono next function
+ * @param c - Hono context for the current request/response
+ * @param next - Next middleware function to invoke
  */
 export async function requestLogger(c: Context, next: Next): Promise<void> {
   const timestamp = new Date().toISOString().substring(11, 23);

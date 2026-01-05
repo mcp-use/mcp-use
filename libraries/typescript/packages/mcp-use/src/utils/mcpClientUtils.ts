@@ -3,14 +3,20 @@
  */
 
 /**
- * Sanitize server name for use in filenames and environment variables
+ * Sanitizes a server name for use in filenames and environment variables.
+ *
+ * @param name - The original server name
+ * @returns The input with characters other than letters, digits, hyphens, or underscores replaced by `_`, then converted to lowercase
  */
 function sanitizeServerName(name: string): string {
   return name.replace(/[^a-zA-Z0-9-_]/g, "_").toLowerCase();
 }
 
 /**
- * Convert header name to environment variable name
+ * Convert an HTTP header name into a safe environment variable identifier.
+ *
+ * @param headerName - The HTTP header name to convert
+ * @returns The resulting environment variable name with non-alphanumeric characters replaced by underscores, converted to uppercase, and with leading/trailing underscores removed
  */
 function headerToEnvVar(headerName: string): string {
   return headerName
@@ -20,7 +26,11 @@ function headerToEnvVar(headerName: string): string {
 }
 
 /**
- * Generate Cursor deep link URL
+ * Builds a Cursor deep link that installs an MCP configured with the provided URL and optional headers.
+ *
+ * @param name - Display name for the server; will be sanitized for use in the link
+ * @param headers - Optional mapping of header names to values; headers are represented in the generated config as environment-variable placeholders (e.g., `{{HEADER_ENV_VAR}}`)
+ * @returns A Cursor deep link URL containing a base64-encoded JSON config with the `url` and optional header placeholders, and a sanitized `name` query parameter
  */
 export function generateCursorDeepLink(
   url: string,
@@ -44,7 +54,14 @@ export function generateCursorDeepLink(
 }
 
 /**
- * Generate VS Code deep link URL
+ * Build a VS Code deep link that installs an MCP server configuration.
+ *
+ * If `headers` are provided, each header name is mapped to a placeholder value of the form `your-<ENVVAR>-value`.
+ *
+ * @param url - The server URL to include in the configuration
+ * @param name - The display name for the server; it will be sanitized for use in the config
+ * @param headers - Optional map of HTTP header names to values; header names are converted to environment-variable-style placeholders in the generated config
+ * @returns A VS Code deep link (`vscode:mcp/install?...`) containing the URL-encoded JSON configuration
  */
 export function generateVSCodeDeepLink(
   url: string,
@@ -72,7 +89,12 @@ export function generateVSCodeDeepLink(
 }
 
 /**
- * Generate .mcpb configuration object for Claude Desktop
+ * Builds a .mcpb configuration object for an MCP server.
+ *
+ * @param url - The server URL to include in the configuration
+ * @param name - The server name; it will be sanitized for use in the config
+ * @param headers - Optional mapping of header names to values; when provided each header value is replaced with a placeholder of the form `your-ENVVAR-value` where `ENVVAR` is derived from the header name
+ * @returns An object containing `url`, a sanitized `name`, and, if provided, a `headers` mapping of header names to placeholder values
  */
 export function generateMcpbConfig(
   url: string,
@@ -97,7 +119,12 @@ export function generateMcpbConfig(
 }
 
 /**
- * Download .mcpb file
+ * Triggers a browser download of a generated .mcpb configuration file.
+ *
+ * @param url - The MCP server URL to include in the generated configuration
+ * @param name - The server name used for the configuration and as the downloaded filename (sanitized)
+ * @param headers - Optional map of HTTP headers to include in the configuration
+ * @throws Rethrows any error encountered while generating the configuration or initiating the download
  */
 export function downloadMcpbFile(
   url: string,
@@ -126,7 +153,14 @@ export function downloadMcpbFile(
 }
 
 /**
- * Generate Claude Code CLI command
+ * Builds a Claude Code CLI command to add an MCP using HTTP transport and collects environment variable metadata for any provided headers.
+ *
+ * @param url - The server URL to include in the CLI command
+ * @param name - The display name for the server; it will be sanitized for use in the command
+ * @param headers - Optional map of header names to header values; header names will be converted to environment variable placeholders in the command
+ * @returns An object containing:
+ *  - `command`: the complete `claude mcp add` CLI command string with header values referenced as environment variable placeholders, and
+ *  - `envVars`: an array of `{ name, header }` entries where `name` is the generated environment variable and `header` is the original header name
  */
 export function generateClaudeCodeCommand(
   url: string,
@@ -150,7 +184,14 @@ export function generateClaudeCodeCommand(
 }
 
 /**
- * Generate Gemini CLI command
+ * Builds a Gemini CLI command to add an MCP using HTTP transport and returns any environment-variable mappings needed for headers.
+ *
+ * If `headers` are provided, the command includes header entries that reference environment variable placeholders, and `envVars` lists the placeholder names with their corresponding header names.
+ *
+ * @param url - The MCP server URL
+ * @param name - A human-readable server name used to derive a sanitized identifier for the command
+ * @param headers - Optional mapping of header names to values; header names are converted to environment-variable placeholders in the returned command
+ * @returns An object with `command`, the assembled CLI command string, and `envVars`, an array of `{ name, header }` pairs linking environment variable names to header names
  */
 export function generateGeminiCLICommand(
   url: string,
@@ -174,7 +215,12 @@ export function generateGeminiCLICommand(
 }
 
 /**
- * Generate Codex CLI configuration
+ * Build a Codex-style INI configuration string for an MCP server and collect environment-variable metadata for any HTTP headers.
+ *
+ * @param url - The server URL to include in the configuration
+ * @param name - The server display name; used to produce a sanitized section key
+ * @param headers - Optional mapping of HTTP header names; header keys will be added to `http_headers` in the config with placeholder values and returned as environment-variable metadata
+ * @returns An object with `config`, the generated INI-style configuration string, and `envVars`, an array of `{ name, header }` pairs where `name` is the suggested environment variable and `header` is the original header name
  */
 export function generateCodexConfig(
   url: string,
@@ -210,7 +256,10 @@ export function generateCodexConfig(
 }
 
 /**
- * Get environment variable setup instructions
+ * Generate shell instructions to export required environment variables.
+ *
+ * @param envVars - Array of environment variable metadata; each item should include `name` (the environment variable name) and `header` (the corresponding HTTP header)
+ * @returns A shell snippet that exports each environment variable (one `export NAME="your-NAME-value"` line per variable), or an empty string if `envVars` is empty
  */
 export function getEnvVarInstructions(
   envVars: Array<{ name: string; header: string }>
@@ -226,7 +275,13 @@ export function getEnvVarInstructions(
 }
 
 /**
- * Generate TypeScript SDK integration code
+ * Produce a TypeScript code snippet that initializes an MCPClient configured for the given server.
+ *
+ * @param url - The server URL to include in the generated client configuration
+ * @param name - The human-readable server name used when deriving a default server id
+ * @param serverId - Optional explicit server id to use instead of a sanitized `name`
+ * @param headers - Optional HTTP headers to include in the server configuration
+ * @returns A TypeScript code snippet (as a string) that registers the server with MCPClient, creates sessions, and demonstrates common session operations
  */
 export function generateTypeScriptSDKCode(
   url: string,
@@ -277,7 +332,13 @@ console.log('Available resources:', resources.map(resource => resource.name));
 }
 
 /**
- * Generate Python SDK integration code
+ * Produce a Python code snippet that initializes an MCPClient with the provided server configuration and demonstrates basic session usage.
+ *
+ * @param url - The MCP server URL to include in the generated configuration.
+ * @param name - The server name; used to derive a sanitized identifier when `serverId` is not provided.
+ * @param serverId - Optional explicit server identifier to use in the config; if omitted, a sanitized form of `name` is used.
+ * @param headers - Optional HTTP headers to include in the server configuration (mapped directly into the generated config).
+ * @returns A Python source string that defines an `MCPClient` configured with the specified server and includes example calls for creating sessions, listing tools/resources, and placeholders for tool/resource usage.
  */
 export function generatePythonSDKCode(
   url: string,

@@ -13,7 +13,15 @@ import {
   TableRow,
 } from "@/client/components/ui/table";
 
-// Custom code block component for syntax highlighting (multiline code with triple backticks)
+/**
+ * Render a syntax-highlighted code block with a language badge and a copy-to-clipboard control.
+ *
+ * Detects the language from `className` (supports patterns like `lang-<lang>`, `language-<lang>`, or space-separated class lists) and falls back to `"text"` when not found.
+ *
+ * @param children - The code content to render.
+ * @param className - Optional class string used to infer the code language (e.g., `"lang-typescript"`, `"language-bash"`, or `"bash lang-bash"`).
+ * @returns The rendered code block element with syntax highlighting, a language label, and a copy button that copies the code to the clipboard.
+ */
 function CodeBlock({
   children,
   className,
@@ -85,7 +93,12 @@ function CodeBlock({
   );
 }
 
-// Custom inline code component (single backticks)
+/**
+ * Renders inline code with muted background, padding, rounded corners, and monospaced font.
+ *
+ * @param children - The code text to render inside the inline element.
+ * @returns The styled inline `code` element for displaying short code snippets within text.
+ */
 function InlineCode({ children }: { children: string }) {
   return (
     <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">
@@ -96,7 +109,13 @@ function InlineCode({ children }: { children: string }) {
 
 // Smart code component that differentiates between inline and block code
 // - If it has a className (e.g., lang-typescript), it's a multiline code block
-// - Otherwise, it's inline code (single backticks)
+/**
+ * Renders either a fenced code block or inline code depending on whether a `className` is present.
+ *
+ * @param children - The code text to render.
+ * @param className - Optional class name from the Markdown parser (e.g., `language-js`); when present the component renders a block code view and uses this value to infer the language.
+ * @returns The rendered code block component when `className` is provided, otherwise an inline code element.
+ */
 function Code({
   children,
   className,
@@ -113,7 +132,14 @@ function Code({
   return <InlineCode>{children}</InlineCode>;
 }
 
-// Custom list item component that handles checkboxes
+/**
+ * Renders a list item that recognizes GitHub-style task list syntax and displays a disabled checkbox when present.
+ *
+ * When the content starts with `[ ]` or `[x]` (case-insensitive) the component renders a disabled checkbox reflecting the checked state and the remaining text; otherwise it renders the children unchanged.
+ *
+ * @param children - The list item's content; may be a string, an array of nodes, or other React nodes. If a string (or an array whose first element is a string) beginning with `[ ]` or `[x]`, the component interprets it as a task list item.
+ * @returns A list item element that either includes a disabled checkbox for task list items or renders the provided children as-is.
+ */
 function ListItem({ children }: { children: React.ReactNode }) {
   // Check if this is a task list item (starts with [ ] or [x])
   if (typeof children === "string") {
@@ -159,8 +185,12 @@ interface MarkdownRendererProps {
 }
 
 /**
- * Shared Markdown renderer component with full markdown support
- * including syntax highlighting, tables, task lists, and more.
+ * Render Markdown content using custom UI components and styling.
+ *
+ * Renders the provided Markdown string into a styled React element tree with support for fenced code blocks (syntax highlighting and copy), inline code, tables, task list checkboxes, blockquotes, images, links, headings, lists, and other common Markdown elements.
+ *
+ * @param content - The Markdown source to render
+ * @returns The rendered React element tree representing the parsed Markdown content
  */
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (

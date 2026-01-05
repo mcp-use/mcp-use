@@ -31,7 +31,12 @@ import {
 } from "mcp-use/react";
 import { toast } from "sonner";
 
-// Discord Icon Component
+/**
+ * Renders a Discord-style SVG icon.
+ *
+ * @param className - Optional CSS class applied to the root SVG element
+ * @returns The SVG element for a Discord-like icon
+ */
 function DiscordIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -76,6 +81,22 @@ interface CommandItem {
   action?: () => void;
 }
 
+/**
+ * Renders a searchable command palette for navigating, selecting servers, and executing global or item-specific actions.
+ *
+ * @param isOpen - Whether the palette dialog is open
+ * @param onOpenChange - Callback invoked when the dialog open state changes
+ * @param tools - Array of available tools shown in the palette
+ * @param prompts - Array of available prompts shown in the palette
+ * @param resources - Array of available resources shown in the palette
+ * @param savedRequests - Array of saved requests shown in the palette
+ * @param connections - Array of server connection entries used to build server items and badges
+ * @param selectedServer - Optional currently selected server; when provided, enables "Open in Client" actions
+ * @param tunnelUrl - Optional tunnel base URL used to derive server URL for deep links and configs
+ * @param onNavigate - Callback to navigate to a specific tab and optionally focus an item and server
+ * @param onServerSelect - Callback invoked when a server entry is selected
+ * @returns The Command Palette React element
+ */
 export function CommandPalette({
   isOpen,
   onOpenChange,

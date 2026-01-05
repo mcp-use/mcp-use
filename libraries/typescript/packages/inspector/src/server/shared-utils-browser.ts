@@ -233,7 +233,15 @@ export async function* handleChatRequestStream(requestBody: {
 }
 
 /**
- * Handle chat API request with MCP agent (non-streaming, kept for backwards compatibility)
+ * Execute a non-streaming chat turn using an MCP agent and the specified LLM configuration.
+ *
+ * @param requestBody - Request parameters
+ * @param requestBody.mcpServerUrl - Base URL of the MCP server to connect to
+ * @param requestBody.llmConfig - LLM provider configuration (provider, model, apiKey, etc.)
+ * @param requestBody.authConfig - Optional authentication configuration for the MCP server
+ * @param requestBody.messages - Array of chat messages; only the last message with role "user" is used as the query
+ * @returns An object containing `content` with the agent's response text and `toolCalls` with recorded tool invocations (empty for this non-streaming implementation)
+ * @throws If required fields are missing, if the LLM provider is unsupported, or if no user message is found
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string;

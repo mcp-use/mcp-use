@@ -3,13 +3,14 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 
 /**
- * HoverDrawLogo (timed sequence)
+ * Render an SVG logo that runs a timed, hover-activated animation sequence and optionally shows a contextual label when expanded.
  *
- * Strict order on hover:
- * 1) Fill fades out completely
- * 2) THEN the outline draws
- * 3) THEN the fill fades back in
- */
+ * The logo animates in a strict sequence on hover: the fill fades out, the outline draws, then the fill fades back in. The whole logo is wrapped in an anchor that opens `href` in a new tab.
+ *
+ * @param className - Optional additional CSS classes applied to the outer anchor.
+ * @param state - Layout and presentation mode; `"expanded"` shows a larger logo and the right-side label, `"collapsed"` shows a compact logo without the label.
+ * @param href - Destination URL for the anchor; opened in a new tab.
+ * @returns The rendered anchor element containing the animated SVG logo and optional label.
 export default function LogoAnimated({
   className,
   state = "collapsed",

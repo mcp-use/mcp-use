@@ -25,6 +25,18 @@ interface SdkIntegrationModalProps {
   language: "typescript" | "python";
 }
 
+/**
+ * Render a modal that displays SDK integration code and copy/install instructions for a server.
+ *
+ * @param open - Whether the modal is visible
+ * @param onOpenChange - Callback invoked with the new open state when the modal is opened or closed
+ * @param serverUrl - Base URL of the server to integrate
+ * @param serverName - Display name of the server used in the generated code and UI
+ * @param serverId - Optional server identifier included in the generated code
+ * @param headers - Optional additional request headers to include in the generated code
+ * @param language - Target SDK language, either `"typescript"` or `"python"`
+ * @returns A React element rendering the SDK integration modal
+ */
 export function SdkIntegrationModal({
   open,
   onOpenChange,

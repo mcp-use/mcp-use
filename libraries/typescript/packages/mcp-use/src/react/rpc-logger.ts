@@ -78,21 +78,29 @@ class RpcLogStore {
 const rpcLogStore = new RpcLogStore();
 
 /**
- * Get RPC logs for a specific server
+ * Retrieve RPC log entries for the specified server.
+ *
+ * @param serverId - The server identifier to filter logs by
+ * @returns All `RpcLogEntry` objects associated with `serverId`
  */
 export function getRpcLogs(serverId: string): RpcLogEntry[] {
   return rpcLogStore.getLogsForServer(serverId);
 }
 
 /**
- * Get all RPC logs
+ * Retrieve all stored RPC log entries.
+ *
+ * @returns A shallow copy of the array of `RpcLogEntry` objects representing all logs
  */
 export function getAllRpcLogs(): RpcLogEntry[] {
   return rpcLogStore.getAllLogs();
 }
 
 /**
- * Subscribe to RPC log events
+ * Subscribe to receive RPC log entries as they are published.
+ *
+ * @param listener - Function invoked with each new `RpcLogEntry`
+ * @returns A function that unsubscribes the listener when called
  */
 export function subscribeToRpcLogs(
   listener: (entry: RpcLogEntry) => void
@@ -101,17 +109,20 @@ export function subscribeToRpcLogs(
 }
 
 /**
- * Clear RPC logs
+ * Remove stored RPC log entries for a specific server or all servers.
+ *
+ * @param serverId - The server identifier whose logs should be removed. If omitted, clears all logs.
  */
 export function clearRpcLogs(serverId?: string): void {
   rpcLogStore.clear(serverId);
 }
 
 /**
- * Wrap a transport to log all RPC messages
- * @param transport - The transport to wrap
- * @param serverId - Server ID for log attribution
- * @returns Wrapped transport that logs all messages
+ * Create a Transport wrapper that records every sent and received JSON-RPC message tagged with the given server ID.
+ *
+ * @param transport - The Transport instance to wrap and forward calls to
+ * @param serverId - Identifier used to attribute created log entries to a specific server
+ * @returns A Transport instance that forwards operations to the provided transport and records each message as a log entry with direction `send` or `receive`
  */
 export function wrapTransportForLogging(
   transport: Transport,

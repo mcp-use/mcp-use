@@ -19,6 +19,11 @@ type MCPConnection = McpServer;
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
 
+/**
+ * Renders a list and management UI for MCP servers, including status badges, quick actions, and a modal to view server capabilities.
+ *
+ * @returns The React element that displays MCP server connections, controls for inspecting and removing servers, and the server capabilities modal.
+ */
 export function ServerList() {
   const { servers: connections, removeServer: removeConnection } =
     useMcpClient();
