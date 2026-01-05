@@ -1,8 +1,8 @@
-import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
-} from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
+} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { logger } from "../logging.js";
 import { SseConnectionManager } from "../task_managers/sse.js";
 import type { ConnectorInitOptions } from "./base.js";

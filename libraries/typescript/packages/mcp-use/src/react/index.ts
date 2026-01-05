@@ -43,7 +43,7 @@ export type {
   Resource,
   ResourceTemplate,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 // Export OpenAI Apps SDK widget hooks and types
 export { ErrorBoundary } from "./ErrorBoundary.js";

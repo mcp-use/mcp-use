@@ -1,5 +1,5 @@
 // callback.ts
-import { auth } from "@mcp-use/modelcontextprotocol-sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust path
 import type { StoredState } from "./types.js"; // Adjust path, ensure definition includes providerOptions
 

@@ -62,7 +62,7 @@ export type {
   OAuthClientInformation,
   OAuthMetadata,
   OAuthTokens,
-} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
+} from "@modelcontextprotocol/sdk/shared/auth.js";
 
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./version.js";

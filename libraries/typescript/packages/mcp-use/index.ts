@@ -18,7 +18,7 @@ import { BaseConnector } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
 import { StdioConnector } from "./src/connectors/stdio.js";
 
-import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
 import { Logger, logger } from "./src/logging.js";
 import {
   MCPSession,
@@ -130,7 +130,7 @@ export {
 export type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Type alias for the params property of CreateMessageRequest.

@@ -7,7 +7,7 @@ import {
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
-import type { Resource } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {

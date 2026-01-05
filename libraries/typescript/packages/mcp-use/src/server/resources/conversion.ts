@@ -2,7 +2,7 @@ import type {
   CallToolResult,
   ReadResourceResult,
   ResourceContents,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Check if a result is a ReadResourceResult (has 'contents' array)

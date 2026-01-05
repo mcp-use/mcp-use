@@ -7,7 +7,7 @@ import {
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
-import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {

@@ -1,4 +1,4 @@
-import type { CallToolResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { fsHelpers, isDeno } from "./runtime.js";
 
 /**

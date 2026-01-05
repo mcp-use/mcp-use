@@ -3,8 +3,8 @@ import { z } from "zod";
 import { MCPServer } from "../../src/server/index.js";
 import { widget } from "../../src/server/utils/response-helpers.js";
 import type { WidgetMetadata } from "../../src/server/types/widget.js";
-import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 describe("Widget Helper Integration Tests", () => {
   let server: any;

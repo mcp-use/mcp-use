@@ -9,7 +9,7 @@ import type {
   Resource,
   ResourceTemplate,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 export type UseMcpOptions = {

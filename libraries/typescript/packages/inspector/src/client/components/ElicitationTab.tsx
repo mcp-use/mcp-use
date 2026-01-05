@@ -1,4 +1,4 @@
-import type { ElicitResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckSquare } from "lucide-react";

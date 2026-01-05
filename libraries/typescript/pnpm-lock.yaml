@@ -360,10 +360,10 @@ importers:
         version: 1.2.0(@langchain/core@1.1.5(@opentelemetry/api@1.9.0)(openai@6.10.0(ws@8.18.3)(zod@4.2.0)))(ws@8.18.3)
       '@mcp-ui/client':
         specifier: ^5.17.1
-        version: 5.17.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.2.0)
-      '@mcp-use/modelcontextprotocol-sdk':
-        specifier: 1.24.3-mcp-use.4
-        version: 1.24.3-mcp-use.4(@cfworker/json-schema@4.1.1)(zod@4.2.0)
+        version: 5.17.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(hono@4.11.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.2.0)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.25.1
+        version: 1.25.1(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -520,16 +520,16 @@ importers:
         version: 1.1.5(@opentelemetry/api@1.9.0)(openai@6.10.0(ws@8.18.3)(zod@4.2.0))
       '@mcp-ui/server':
         specifier: ^5.16.2
-        version: 5.16.2(@cfworker/json-schema@4.1.1)(zod@4.2.0)
+        version: 5.16.2(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)
       '@mcp-use/cli':
         specifier: workspace:*
         version: link:../cli
       '@mcp-use/inspector':
         specifier: workspace:*
         version: link:../inspector
-      '@mcp-use/modelcontextprotocol-sdk':
-        specifier: 1.24.3-mcp-use.4
-        version: 1.24.3-mcp-use.4(@cfworker/json-schema@4.1.1)(zod@4.2.0)
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.25.1
+        version: 1.25.1(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)
       express:
         specifier: ^5.2.1
         version: 5.2.1
@@ -1534,18 +1534,8 @@ packages:
   '@mcp-ui/server@5.16.2':
     resolution: {integrity: sha512-KgdEI5IdM5wrWi658y8ZBw+QWM+3XwTtezWpMKR56LIZOCJjRMhBPWWWAF0mlg/r5ngzrXklvXCQbx79PqFAwQ==}
 
-  '@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.4':
-    resolution: {integrity: sha512-OJS8SCn7KM85cSq61llPFzSbr0hR8BeIubZ1nH+Cdmkns/Z9mL1j/bp2JAREueD1+ZlBlIBBn1nkWTREGSIMPQ==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@cfworker/json-schema': ^4.1.1
-      zod: ^4.2.0
-    peerDependenciesMeta:
-      '@cfworker/json-schema':
-        optional: true
-
-  '@modelcontextprotocol/sdk@1.24.3':
-    resolution: {integrity: sha512-YgSHW29fuzKKAHTGe9zjNoo+yF8KaQPzDC2W9Pv41E7/57IfY+AMGJ/aDFlgTLcVVELoggKE4syABCE75u3NCw==}
+  '@modelcontextprotocol/sdk@1.25.1':
+    resolution: {integrity: sha512-yO28oVFFC7EBoiKdAn+VqRm+plcfv4v0xp6osG/VsCB0NlPZWi87ajbCZZ8f/RvOFLEu7//rSRmuZZ7lMoe3gQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -7540,9 +7530,9 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@mcp-ui/client@5.17.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.2.0)':
+  '@mcp-ui/client@5.17.1(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.1)(hono@4.11.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(zod@4.2.0)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.24.3(@cfworker/json-schema@4.1.1)(zod@4.2.0)
+      '@modelcontextprotocol/sdk': 1.25.1(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)
       '@quilted/threads': 3.3.1(@preact/signals-core@1.12.1)
       '@r2wc/react-to-web-component': 2.1.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@remote-dom/core': 1.10.1(@preact/signals-core@1.12.1)
@@ -7552,20 +7542,23 @@ snapshots:
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - '@preact/signals-core'
+      - hono
       - preact
       - supports-color
       - zod
 
-  '@mcp-ui/server@5.16.2(@cfworker/json-schema@4.1.1)(zod@4.2.0)':
+  '@mcp-ui/server@5.16.2(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.24.3(@cfworker/json-schema@4.1.1)(zod@4.2.0)
+      '@modelcontextprotocol/sdk': 1.25.1(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
+      - hono
       - supports-color
       - zod
 
-  '@mcp-use/modelcontextprotocol-sdk@1.24.3-mcp-use.4(@cfworker/json-schema@4.1.1)(zod@4.2.0)':
+  '@modelcontextprotocol/sdk@1.25.1(@cfworker/json-schema@4.1.1)(hono@4.11.1)(zod@4.2.0)':
     dependencies:
+      '@hono/node-server': 1.19.7(hono@4.11.1)
       ajv: 8.17.1
       ajv-formats: 3.0.1(ajv@8.17.1)
       content-type: 1.0.5
@@ -7584,27 +7577,7 @@ snapshots:
     optionalDependencies:
       '@cfworker/json-schema': 4.1.1
     transitivePeerDependencies:
-      - supports-color
-
-  '@modelcontextprotocol/sdk@1.24.3(@cfworker/json-schema@4.1.1)(zod@4.2.0)':
-    dependencies:
-      ajv: 8.17.1
-      ajv-formats: 3.0.1(ajv@8.17.1)
-      content-type: 1.0.5
-      cors: 2.8.5
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      express: 5.2.1
-      express-rate-limit: 7.5.1(express@5.2.1)
-      jose: 6.1.3
-      pkce-challenge: 5.0.1
-      raw-body: 3.0.2
-      zod: 4.2.0
-      zod-to-json-schema: 3.25.0(zod@4.2.0)
-    optionalDependencies:
-      '@cfworker/json-schema': 4.1.1
-    transitivePeerDependencies:
+      - hono
       - supports-color
 
   '@napi-rs/wasm-runtime@0.2.12':
