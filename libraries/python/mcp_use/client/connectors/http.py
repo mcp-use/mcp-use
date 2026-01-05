@@ -9,8 +9,9 @@ from typing import Any
 
 import httpx
 from mcp import ClientSession
-from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.shared.exceptions import McpError
+from mcp.types import Root
 
 from mcp_use.client.auth.oauth import BearerAuth, OAuth, OAuthClientProvider
 from mcp_use.client.connectors.base import BaseConnector
@@ -40,6 +41,8 @@ class HttpConnector(BaseConnector):
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
         verify: bool | None = True,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
         """Initialize a new HTTP connector.
 
@@ -54,6 +57,12 @@ class HttpConnector(BaseConnector):
                 - An httpx.Auth object: Use custom authentication
             sampling_callback: Optional sampling callback.
             elicitation_callback: Optional elicitation callback.
+            message_handler: Optional callback to handle messages.
+            logging_callback: Optional callback to handle log messages.
+            middleware: Optional list of middleware.
+            verify: Whether to verify SSL certificates.
+            roots: Optional initial list of roots to advertise to the server.
+            list_roots_callback: Optional custom callback to handle roots/list requests.
         """
         super().__init__(
             sampling_callback=sampling_callback,
@@ -61,6 +70,8 @@ class HttpConnector(BaseConnector):
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
         self.base_url = base_url.rstrip("/")
         self.headers = headers or {}

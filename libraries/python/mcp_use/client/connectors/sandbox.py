@@ -12,7 +12,8 @@ import time
 
 import httpx
 from mcp import ClientSession
-from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import Root
 
 from mcp_use.client.middleware import CallbackClientSession, Middleware
 from mcp_use.client.task_managers import SseConnectionManager
@@ -75,6 +76,8 @@ class SandboxConnector(BaseConnector):
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
         """Initialize a new sandbox connector.
 
@@ -88,6 +91,11 @@ class SandboxConnector(BaseConnector):
             sse_read_timeout: Timeout for the SSE connection in seconds.
             sampling_callback: Optional sampling callback.
             elicitation_callback: Optional elicitation callback.
+            message_handler: Optional callback to handle messages.
+            logging_callback: Optional callback to handle log messages.
+            middleware: Optional list of middleware.
+            roots: Optional initial list of roots to advertise to the server.
+            list_roots_callback: Optional custom callback to handle roots/list requests.
         """
         super().__init__(
             sampling_callback=sampling_callback,
@@ -95,6 +103,8 @@ class SandboxConnector(BaseConnector):
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
         if Sandbox is None:
             raise ImportError(
