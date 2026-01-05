@@ -59,6 +59,19 @@ interface ToolsTabProps {
 
 const SAVED_REQUESTS_KEY = "mcp-inspector-saved-requests";
 
+/**
+ * Render the Tools tab UI for browsing, executing, and managing tools and saved requests.
+ *
+ * Renders a responsive interface with a searchable tools list and saved-requests list, a tool execution panel, a results history (with copying, deleting, fullscreen, preview and Apps SDK resource integration), and an RPC message logger. Supports mobile-specific navigation, resizable panels for desktop, saved request persistence, keyboard navigation, execution abort/timeout handling, and telemetry for executions and saved requests.
+ *
+ * @param ref - Optional imperative ref exposing `focusSearch` and `blurSearch` methods.
+ * @param tools - Array of available tools to list and execute.
+ * @param callTool - Function to invoke a tool by name with arguments and options (timeout, reset behavior, abort signal).
+ * @param readResource - Function to fetch a resource by URI (used for Apps SDK output templates).
+ * @param serverId - Identifier for the current server (used for telemetry and RPC filtering).
+ * @param isConnected - Whether the inspector is connected to the server (affects execution UI).
+ * @returns The React element for the Tools tab.
+ */
 export function ToolsTab({
   ref,
   tools,

@@ -39,6 +39,16 @@ interface ResourcesTabProps {
   isConnected: boolean;
 }
 
+/**
+ * Render the Resources tab UI and manage its interactions (resource list, selection, result display, search, keyboard navigation, mobile/desktop layouts, copy/download/fullscreen actions, and RPC logger).
+ *
+ * @param ref - Optional ref exposing `focusSearch()` and `blurSearch()` methods for programmatic search focus control.
+ * @param resources - Array of resources to show and filter.
+ * @param readResource - Function to read a resource by its URI; used when a resource is selected.
+ * @param serverId - Identifier for the server; used for telemetry and RPC logger scope.
+ * @param isConnected - When `true`, selecting a resource triggers `readResource`; when `false`, reads are skipped.
+ * @returns The ResourcesTab React element.
+ */
 export function ResourcesTab({
   ref,
   resources,

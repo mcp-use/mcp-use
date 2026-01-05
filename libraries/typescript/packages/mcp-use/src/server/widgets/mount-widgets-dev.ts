@@ -29,17 +29,15 @@ const TMP_MCP_USE_DIR = ".mcp-use";
 export type MountWidgetsDevOptions = MountWidgetsOptions;
 
 /**
- * Mount widgets from resources/ directory in development mode with Vite HMR
+ * Mounts local widget sources under the project's resources directory into a shared Vite dev server with HMR so they can be served and inspected during development.
  *
- * Discovers TSX widget files and folders with widget.tsx, creates temporary entry files,
- * and sets up a shared Vite dev server with hot module replacement. Each widget is
- * registered as both a tool and resource for MCP-UI compatibility.
+ * Discovers top-level `.tsx`/`.ts` widget files and folders containing `widget.tsx`, generates per-widget temporary entry and HTML files under `.mcp-use`, starts a single Vite middleware server that watches the resources directory for changes, and registers each widget via the provided callback for MCP-UI compatibility.
  *
- * @param app - Hono app instance to mount routes on
- * @param serverConfig - Server configuration (baseUrl, port, CSP URLs)
- * @param registerWidget - Callback to register each discovered widget
- * @param options - Optional configuration (baseRoute, resourcesDir)
- * @returns Promise that resolves when all widgets are mounted
+ * @param app - Hono application instance to mount middleware and routes onto
+ * @param serverConfig - Server configuration (base URL, port, CSP, favicon, etc.) used to configure routes and Vite origin
+ * @param registerWidget - Callback invoked to register each discovered widget with the running server
+ * @param options - Optional overrides: `baseRoute` to change the mount path (default: `/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
+ * @returns Nothing.
  */
 export async function mountWidgetsDev(
   app: HonoType,

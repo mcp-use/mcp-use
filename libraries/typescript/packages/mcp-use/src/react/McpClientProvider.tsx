@@ -144,7 +144,20 @@ interface McpServerWrapperProps {
 }
 
 /**
- * Internal component that wraps useMcp and adds notification/sampling/elicitation state
+ * Wraps a single MCP connection (useMcp) and manages per-server notifications,
+ * pending sampling and elicitation requests, and exposes state updates to a parent.
+ *
+ * This internal component wires the MCP hook callbacks to local queues/handlers,
+ * applies optional transport wrappers (e.g., RPC logging), maintains notification
+ * history with unread tracking, and calls `onUpdate` with an enriched `McpServer`
+ * view when meaningful server state changes occur.
+ *
+ * @param id - Unique identifier for the server instance
+ * @param options - Configuration passed to the underlying MCP hook; callbacks for sampling, elicitation, and notifications are handled by this wrapper and therefore excluded from the forwarded options
+ * @param onUpdate - Callback invoked with the current `McpServer` representation when the server's meaningful state changes
+ * @param rpcWrapTransport - Optional transport wrapper (typically for RPC logging) that will be composed with the user's `wrapTransport` if provided
+ * @param onGlobalSamplingRequest - Optional global handler invoked whenever a sampling request is enqueued; receives the request, server id/name, and approve/reject handlers
+ * @param onGlobalElicitationRequest - Optional global handler invoked whenever an elicitation request is enqueued; receives the request, server id/name, and approve/reject handlers
  */
 function McpServerWrapper({
   id,
@@ -933,20 +946,10 @@ export function useMcpClient(): McpClientContextType {
 }
 
 /**
- * Hook to access a specific MCP server by ID
+ * Retrieve the McpServer object for a given server id.
  *
- * Returns the server if found, or undefined if not found.
- * Must be used within a McpClientProvider.
- *
- * @example
- * ```tsx
- * const linear = useMcpServer("linear");
- *
- * if (linear?.state === "ready") {
- *   // Use the server
- *   linear.callTool("list-issues", {});
- * }
- * ```
+ * @returns The `McpServer` for the provided `id`, or `undefined` if no matching server is registered.
+ * @throws If called outside of a `McpClientProvider` (context not available).
  */
 export function useMcpServer(id: string): McpServer | undefined {
   const { getServer } = useMcpClient();

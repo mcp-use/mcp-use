@@ -7,6 +7,12 @@ interface IconProps {
   className?: string;
 }
 
+/**
+ * Renders the Visual Studio Code logo as an inline SVG.
+ *
+ * @param className - Optional CSS class applied to the root SVG element.
+ * @returns The SVG element for the VS Code icon with `fill="currentColor"`.
+ */
 export function VSCodeIcon({ className }: IconProps) {
   return (
     <svg
@@ -20,6 +26,12 @@ export function VSCodeIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Renders the Gemini SVG icon.
+ *
+ * @param className - Optional CSS class applied to the root SVG element
+ * @returns An SVG element depicting the Gemini icon, with `fill="currentColor"`
+ */
 export function GeminiIcon({ className }: IconProps) {
   return (
     <svg
@@ -33,6 +45,12 @@ export function GeminiIcon({ className }: IconProps) {
   );
 }
 
+/**
+ * Renders the Codex SVG icon.
+ *
+ * @param className - Optional CSS class applied to the root SVG element
+ * @returns An SVG element rendering the Codex icon with currentColor fill
+ */
 export function CodexIcon({ className }: IconProps) {
   return (
     <svg

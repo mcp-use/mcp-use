@@ -67,6 +67,22 @@ interface ConnectionSettingsFormProps {
   isConnecting?: boolean;
 }
 
+/**
+ * Renders a connection settings form with controls for URL, connection type, OAuth, headers, and timeouts; supports copying the current configuration to the clipboard and pasting a JSON configuration to populate the form.
+ *
+ * The form manages sub-dialogs for Authentication, Custom Headers, and Configuration, handles Enter to trigger connection, and conditionally shows Connect/Save/Copy buttons based on props.
+ *
+ * @param onConnect - Callback invoked when the user triggers a connection (e.g., Connect button or Enter key) 
+ * @param onSave - Callback invoked when the user saves connection options via the Save Connection Options button
+ * @param onCancel - Callback invoked when the user cancels editing (optional)
+ * @param variant - Visual variant of the form; "styled" applies a dark/styled appearance
+ * @param showConnectButton - When true, renders the Connect button
+ * @param showSaveButton - When true, renders Save and optional Cancel actions
+ * @param showExportButton - When true, renders the Copy Config button that copies a JSON config to the clipboard
+ * @param isConnecting - When true, disables the Connect button and shows a connecting state
+ *
+ * @returns The JSX element for the connection settings form
+ */
 export function ConnectionSettingsForm({
   transportType,
   setTransportType,

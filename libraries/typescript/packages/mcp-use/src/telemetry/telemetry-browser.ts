@@ -13,8 +13,11 @@ import type {
 import { logger } from "../logging.js";
 
 /**
- * Browser-safe UUID generation using Web Crypto API
- * Works in browsers, Node.js 19+, Deno, Cloudflare Workers, etc.
+ * Generate a UUID-like identifier suitable for browser and similar runtimes.
+ *
+ * Uses cryptographic randomness when available and falls back to a non-cryptographic identifier if necessary.
+ *
+ * @returns A UUID-formatted string; when Web Crypto APIs are available the value is generated with cryptographic randomness, otherwise a best-effort (not cryptographically secure) fallback is returned.
  */
 function generateUUID(): string {
   // Use globalThis.crypto.randomUUID() if available (modern browsers, Node.js 19+)
@@ -60,7 +63,11 @@ import {
 import { getPackageVersion } from "./utils.js";
 
 /**
- * Generate a cryptographically secure random string for session/user IDs (browser only).
+ * Generate a short random string suitable for session or user identifiers in browser environments.
+ *
+ * Uses the Web Crypto API when available; may return a non-cryptographically secure string as a last resort.
+ *
+ * @returns A short random string — a 16-character hex string when a cryptographic RNG is available, otherwise an alphanumeric string derived from Math.random().
  */
 function secureRandomString(): string {
   // Browser - use window.crypto
@@ -95,7 +102,9 @@ type StorageCapability = "localStorage" | "session-only";
 const USER_ID_STORAGE_KEY = "mcp_use_user_id";
 
 /**
- * Detect the current runtime environment (browser only)
+ * Determine whether the current runtime is a browser environment.
+ *
+ * @returns The runtime environment: `"browser"` if running in a browser, `"unknown"` otherwise.
  */
 function detectRuntimeEnvironment(): RuntimeEnvironment {
   try {
@@ -110,7 +119,10 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
 }
 
 /**
- * Determine storage capability based on runtime environment
+ * Determine whether localStorage is available and usable in the given runtime.
+ *
+ * @param env - The detected runtime environment
+ * @returns `localStorage` if localStorage is writable and accessible, `session-only` otherwise.
  */
 function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
   if (env === "browser") {
@@ -131,6 +143,11 @@ function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
 // Cache the detected environment
 let cachedEnvironment: RuntimeEnvironment | null = null;
 
+/**
+ * Get the runtime environment, detecting it once and returning the cached value thereafter.
+ *
+ * @returns The runtime environment, either `"browser"` or `"unknown"`.
+ */
 function getRuntimeEnvironment(): RuntimeEnvironment {
   if (cachedEnvironment === null) {
     cachedEnvironment = detectRuntimeEnvironment();
@@ -139,7 +156,9 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
 }
 
 /**
- * Check if we're in a browser environment
+ * Determines whether the current runtime is a browser.
+ *
+ * @returns `true` if the runtime is a browser, `false` otherwise.
  */
 export function isBrowserEnvironment(): boolean {
   return getRuntimeEnvironment() === "browser";
@@ -655,7 +674,9 @@ export class Telemetry {
 export const Tel = Telemetry;
 
 /**
- * Convenience function to set telemetry source globally
+ * Set the global telemetry source used to tag telemetry events.
+ *
+ * @param source - Identifier to persist and include with subsequent telemetry events
  */
 export function setTelemetrySource(source: string): void {
   Tel.getInstance().setSource(source);

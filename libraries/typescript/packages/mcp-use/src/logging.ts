@@ -14,6 +14,12 @@ interface LoggerOptions {
 
 const DEFAULT_LOGGER_NAME = "mcp-use";
 
+/**
+ * Map an environment-provided debug value to a LogLevel.
+ *
+ * @param env - The raw environment string to interpret (typically the DEBUG value)
+ * @returns `"debug"` if `env` trimmed equals `"2"`, `"info"` if it equals `"1"`, otherwise `"info"`
+ */
 function resolveLevel(env: string | undefined): LogLevel {
   // Safely access environment variables
   const envValue =
@@ -30,7 +36,12 @@ function resolveLevel(env: string | undefined): LogLevel {
 }
 
 /**
- * Format additional arguments for logging (Winston-compatible)
+ * Convert an array of extra log arguments into a single space-delimited string.
+ *
+ * String values are kept as-is; non-strings are JSON-stringified when possible, falling back to `String()` on failure.
+ *
+ * @param args - The additional arguments to format for logging
+ * @returns The formatted arguments joined by spaces, or an empty string if `args` is empty
  */
 function formatArgs(args: any[]): string {
   if (args.length === 0) return "";

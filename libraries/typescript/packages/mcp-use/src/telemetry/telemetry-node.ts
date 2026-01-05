@@ -30,7 +30,11 @@ import {
 import { getPackageVersion } from "./utils.js";
 
 /**
- * Generate a cryptographically secure random string for session/user IDs (Node.js only).
+ * Produce a random identifier suitable for session or user IDs.
+ *
+ * Falls back to a Math.random-based string if Node's crypto module is unavailable.
+ *
+ * @returns A 16-character hexadecimal string generated via `crypto.randomBytes(8)`; if `crypto` is unavailable, a base-36 string produced from `Math.random()`.
  */
 function secureRandomString(): string {
   // Node.js - use crypto module
@@ -57,7 +61,9 @@ export type RuntimeEnvironment =
 type StorageCapability = "filesystem" | "session-only";
 
 /**
- * Detect the current runtime environment (Node.js environments)
+ * Determine the current runtime environment: Bun, Deno, Cloudflare Workers, Edge runtime, Node.js, or `unknown`.
+ *
+ * @returns The detected RuntimeEnvironment: `bun`, `deno`, `cloudflare-workers`, `edge`, `node`, or `unknown`.
  */
 function detectRuntimeEnvironment(): RuntimeEnvironment {
   try {
@@ -99,7 +105,10 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
 }
 
 /**
- * Determine storage capability based on runtime environment
+ * Map a runtime environment to its storage capability.
+ *
+ * @param env - Runtime environment to evaluate.
+ * @returns `"filesystem"` for environments that support filesystem access (`"node"`, `"bun"`); `"session-only"` for all others (including `"deno"`).
  */
 function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
   switch (env) {
@@ -126,7 +135,9 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
 }
 
 /**
- * Check if we're in a browser environment
+ * Indicates whether the current runtime is a browser environment.
+ *
+ * @returns `true` if running in a browser environment, `false` otherwise.
  */
 export function isBrowserEnvironment(): boolean {
   return false; // Node.js implementation - never browser

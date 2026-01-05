@@ -45,7 +45,12 @@ interface PromptResultDisplayProps {
   isMaximized?: boolean;
 }
 
-// Helper function to format relative time
+/**
+ * Format a timestamp as a compact human-readable relative time.
+ *
+ * @param timestamp - Milliseconds since the Unix epoch to compare against the current time
+ * @returns A short relative time string: `"now"` for <10s, `"<n>s ago"` for seconds, `"<n>m ago"` for minutes, `"<n>h ago"` for hours, or `"<n>d ago"` for days
+ */
 function getRelativeTime(timestamp: number): string {
   const now = Date.now();
   const diff = now - timestamp;
@@ -84,6 +89,21 @@ function extractErrorMessage(
   return null;
 }
 
+/**
+ * Renders a selectable view of prompt invocation results with controls for copying, deleting,
+ * time-relative labels, formatted/raw toggling, and optional fullscreen/maximize actions.
+ *
+ * @param results - Array of prompt results; the most recent result (results[0]) determines the current prompt group to view.
+ * @param copiedResult - Index of the result that was most recently copied, or `null` if none.
+ * @param previewMode - When `true`, enables compact preview behaviors (defaults to `true`).
+ * @param onCopy - Callback invoked with (originalResultIndex, result) when the copy action is triggered.
+ * @param onDelete - Optional callback invoked with (originalResultIndex) when the delete action is triggered.
+ * @param onFullscreen - Optional callback invoked with (originalResultIndex) to open the result in fullscreen (used on small screens).
+ * @param onTogglePreview - Optional callback to toggle preview mode (not required by the component to render).
+ * @param onMaximize - Optional callback invoked to toggle maximize/restore state.
+ * @param isMaximized - When `true`, indicates the component is currently maximized (defaults to `false`).
+ * @returns The rendered prompt results UI containing header controls, error or formatted message display, and raw JSON fallback.
+ */
 export function PromptResultDisplay({
   results,
   copiedResult,

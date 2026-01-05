@@ -11,6 +11,13 @@ interface ServerIconProps {
   size?: "sm" | "md" | "lg" | "xs";
 }
 
+/**
+ * Render a server avatar using the server's provided icon when available, falling back to a random gradient background.
+ *
+ * @param server - The server result containing `serverInfo` (used to select `icons[0].src`, `icon`, and `name`) and a fallback `name`.
+ * @param size - Visual size variant for the avatar; one of `"xs"`, `"sm"`, `"md"`, or `"lg"`, which maps to different width/height utility classes.
+ * @returns A React element that displays the server icon image (with a loading spinner overlay while the image loads) or a rounded gradient fallback if no icon is available or image loading fails.
+ */
 export function ServerIcon({
   server,
   className,

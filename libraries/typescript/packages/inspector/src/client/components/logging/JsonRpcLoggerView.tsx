@@ -28,6 +28,17 @@ interface JsonRpcLoggerViewProps {
   onClearRef?: React.MutableRefObject<(() => Promise<void>) | null>; // Ref to expose clearMessages function
 }
 
+/**
+ * Renders a scrollable JSON-RPC log viewer with realtime updates and optional filtering.
+ *
+ * Displays a list of RPC messages (newest first), allows expanding items to view JSON payloads,
+ * and updates the parent about the current message count.
+ *
+ * @param serverIds - Optional array of server IDs to restrict displayed logs to those servers.
+ * @param onCountChange - Optional callback invoked with the current number of displayed messages whenever it changes.
+ * @param onClearRef - Optional mutable ref that receives a `clearMessages` function which clears displayed logs and the underlying RPC log store.
+ * @returns A React element that presents and manages JSON-RPC log entries (supports realtime subscription, filtering, expansion, and clearing).
+ */
 export function JsonRpcLoggerView({
   serverIds,
   onCountChange,

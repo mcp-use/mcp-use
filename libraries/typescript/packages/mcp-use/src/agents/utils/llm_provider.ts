@@ -88,7 +88,12 @@ export function parseLLMString(llmString: string): {
 }
 
 /**
- * Get API key for a provider from environment variables or config
+ * Determine the API key to use for a given provider by checking `llmConfig` then provider-specific environment variables.
+ *
+ * @param provider - The LLM provider identifier (e.g., "openai").
+ * @param config - Optional LLM configuration; if `config.apiKey` is present it is returned.
+ * @returns The resolved API key string.
+ * @throws Error if no API key is found in `config.apiKey` or any of the provider's expected environment variables.
  */
 function getAPIKey(provider: LLMProvider, config?: LLMConfig): string {
   // First check if provided in config

@@ -19,6 +19,16 @@ interface LayoutProps {
   children: ReactNode;
 }
 
+/**
+ * Render the application layout that orchestrates header, main content, command palette, and server connection modal.
+ *
+ * This component wires MCP client and inspector state, synchronizes URL query parameters (server, tab, tunnelUrl, embedded),
+ * manages keyboard shortcuts, auto-connect flow, aggregated tool/prompt/resource lists, and provides adapters for legacy
+ * connection APIs while preserving backward compatibility.
+ *
+ * @param children - The main content to render within the layout's content area.
+ * @returns The React element representing the application layout.
+ */
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();

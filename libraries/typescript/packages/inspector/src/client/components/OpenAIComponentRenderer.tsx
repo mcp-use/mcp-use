@@ -46,8 +46,17 @@ function Wrapper({
 }
 
 /**
- * OpenAIComponentRenderer renders OpenAI Apps SDK components
- * Provides window.openai API bridge for component interaction via iframe
+ * Render an OpenAI Apps SDK component inside an iframe and provide a host ↔ iframe OpenAI API bridge.
+ *
+ * Manages widget lifecycle, resource storage, sizing and centering, theme syncing, display modes (inline / pip / fullscreen),
+ * postMessage handling for tool calls and followups, and optional console/inspector controls.
+ *
+ * @param componentUrl - URI of the widget/resource to load into the iframe
+ * @param serverId - MCP server identifier used to resolve server connection and dev proxy URLs
+ * @param readResource - Function to fetch resource data (HTML) for the provided `componentUrl`
+ * @param noWrapper - When true, do not render the default background wrapper around the iframe
+ * @param showConsole - When true and same-origin, show the iframe console and inspector controls
+ * @returns The rendered React element tree that embeds and manages the OpenAI App widget
  */
 function OpenAIComponentRendererBase({
   componentUrl,

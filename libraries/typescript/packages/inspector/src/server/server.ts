@@ -17,7 +17,17 @@ registerInspectorRoutes(app);
 // Register static file serving with dev proxy support (must be last as it includes catch-all route)
 registerStaticRoutesWithDevProxy(app);
 
-// Start the server
+/**
+ * Start the MCP Inspector HTTP server and return its listening port and fetch handler.
+ *
+ * Starts the Hono app on an available port (prefers a CLI-specified port, otherwise 3001;
+ * in standalone/production mode it will fall back to 3002 if 3001 is unavailable),
+ * logs server status, and attempts to open the browser when not running in production.
+ * On unrecoverable startup failures (for example, requested ports unavailable), the process
+ * will exit with code 1.
+ *
+ * @returns An object containing the resolved `port` number and the application's `fetch` handler.
+ */
 async function startServer() {
   try {
     // In development mode, use port 3001 for API server
