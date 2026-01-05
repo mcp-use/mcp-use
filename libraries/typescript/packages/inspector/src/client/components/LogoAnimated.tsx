@@ -11,6 +11,7 @@ import { useState } from "react";
  * @param state - Layout and presentation mode; `"expanded"` shows a larger logo and the right-side label, `"collapsed"` shows a compact logo without the label.
  * @param href - Destination URL for the anchor; opened in a new tab.
  * @returns The rendered anchor element containing the animated SVG logo and optional label.
+ */
 export default function LogoAnimated({
   className,
   state = "collapsed",

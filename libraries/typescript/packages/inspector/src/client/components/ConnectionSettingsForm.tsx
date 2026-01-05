@@ -72,7 +72,7 @@ interface ConnectionSettingsFormProps {
  *
  * The form manages sub-dialogs for Authentication, Custom Headers, and Configuration, handles Enter to trigger connection, and conditionally shows Connect/Save/Copy buttons based on props.
  *
- * @param onConnect - Callback invoked when the user triggers a connection (e.g., Connect button or Enter key) 
+ * @param onConnect - Callback invoked when the user triggers a connection (e.g., Connect button or Enter key)
  * @param onSave - Callback invoked when the user saves connection options via the Save Connection Options button
  * @param onCancel - Callback invoked when the user cancels editing (optional)
  * @param variant - Visual variant of the form; "styled" applies a dark/styled appearance
