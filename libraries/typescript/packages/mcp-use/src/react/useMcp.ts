@@ -120,6 +120,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const stateRef = useRef(state);
   const autoReconnectRef = useRef(autoReconnect);
   const successfulTransportRef = useRef<TransportType | null>(null);
+  // Forward refs for functions (declared later) to avoid circular dependencies
+  const connectRef = useRef<(() => Promise<void>) | null>(null);
+  const failConnectionRef = useRef<
+    ((message: string, error?: Error) => void) | null
+  >(null);
 
   /**
    * Effect: Keep refs in sync with state values
@@ -750,6 +755,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   ]);
 
   /**
+   * Effect: Update function refs to prevent stale closures
+   * Used by retry and OAuth callback handlers
+   */
+  useEffect(() => {
+    connectRef.current = connect;
+    failConnectionRef.current = failConnection;
+  }, [connect, failConnection]);
+
+  /**
    * Call a tool on the connected MCP server
    *
    * @param name - Name of the tool to call
@@ -837,18 +851,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   /**
    * Retry connection after failure
    * Only works if current state is 'failed'
+   * Note: Uses connectRef to avoid circular dependency with connect
    */
   const retry = useCallback(() => {
     if (stateRef.current === "failed") {
       addLog("info", "Retry requested...");
-      connect();
+      // Use connectRef to avoid circular dependency
+      // connectRef is kept updated via useEffect
+      connectRef.current?.();
     } else {
       addLog(
         "warn",
         `Retry called but state is not 'failed' (state: ${stateRef.current}). Ignoring.`
       );
     }
-  }, [addLog, connect]);
+  }, [addLog]);
 
   /**
    * Trigger manual OAuth authentication flow
@@ -1254,18 +1271,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   // ===== Effects =====
 
   /**
-   * Effect: Keep callback refs up to date
-   * Prevents stale closures in event listeners
-   */
-  const connectRef = useRef(connect);
-  const failConnectionRef = useRef(failConnection);
-
-  useEffect(() => {
-    connectRef.current = connect;
-    failConnectionRef.current = failConnection;
-  });
-
-  /**
    * Effect: Listen for OAuth callback messages from popup window
    * Handles successful authentication and reconnection
    */
@@ -1301,11 +1306,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                 "debug",
                 "Initiating reconnection after successful auth callback."
               );
-              connectRef.current();
+              connectRef.current?.();
             }
           }, 100);
         } else {
-          failConnectionRef.current(
+          failConnectionRef.current?.(
             `Authentication failed in callback: ${event.data.error || "Unknown reason."}`
           );
         }
@@ -1388,6 +1393,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    * after the specified delay.
    * Uses a ref to prevent duplicate scheduling which can cause render loops.
    */
+  const retryRef = useRef(retry);
+  const addLogRef = useRef(addLog);
+
+  useEffect(() => {
+    retryRef.current = retry;
+    addLogRef.current = addLog;
+  }, [retry, addLog]);
+
   useEffect(() => {
     let retryTimeoutId: number | null = null;
 
@@ -1397,11 +1410,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         retryScheduledRef.current = true;
         const delay =
           typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
-        addLog("info", `Connection failed, auto-retrying in ${delay}ms...`);
+        addLogRef.current(
+          "info",
+          `Connection failed, auto-retrying in ${delay}ms...`
+        );
         retryTimeoutId = setTimeout(() => {
           retryScheduledRef.current = false;
           if (isMountedRef.current && stateRef.current === "failed") {
-            retry();
+            retryRef.current();
           }
         }, delay) as any;
       }
@@ -1416,7 +1432,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         retryScheduledRef.current = false;
       }
     };
-  }, [state, autoRetry, retry, addLog]);
+  }, [state, autoRetry]);
 
   /**
    * Ensure the server icon is loaded and available

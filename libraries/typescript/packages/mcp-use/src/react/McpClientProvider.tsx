@@ -471,24 +471,24 @@ function McpServerWrapper({
     };
 
     // Only update if something actually changed
-    const prev = prevServerRef.current;
+    const prevServer = prevServerRef.current;
     if (
-      !prev ||
-      prev.state !== server.state ||
-      prev.error !== server.error ||
-      prev.authUrl !== server.authUrl ||
-      prev.tools.length !== server.tools.length ||
-      prev.resources.length !== server.resources.length ||
-      prev.prompts.length !== server.prompts.length ||
-      prev.serverInfo !== server.serverInfo ||
-      prev.capabilities !== server.capabilities ||
-      prev.notifications.length !== server.notifications.length ||
-      prev.unreadNotificationCount !== server.unreadNotificationCount ||
-      prev.pendingSamplingRequests.length !==
+      !prevServer ||
+      prevServer.state !== server.state ||
+      prevServer.error !== server.error ||
+      prevServer.authUrl !== server.authUrl ||
+      prevServer.tools.length !== server.tools.length ||
+      prevServer.resources.length !== server.resources.length ||
+      prevServer.prompts.length !== server.prompts.length ||
+      prevServer.serverInfo !== server.serverInfo ||
+      prevServer.capabilities !== server.capabilities ||
+      prevServer.notifications.length !== server.notifications.length ||
+      prevServer.unreadNotificationCount !== server.unreadNotificationCount ||
+      prevServer.pendingSamplingRequests.length !==
         server.pendingSamplingRequests.length ||
-      prev.pendingElicitationRequests.length !==
+      prevServer.pendingElicitationRequests.length !==
         server.pendingElicitationRequests.length ||
-      !prev.client
+      !prevServer.client
     ) {
       prevServerRef.current = server;
       onUpdateRef.current(server);
@@ -497,16 +497,29 @@ function McpServerWrapper({
     id,
     name,
     options.url,
-    mcp,
-    notifications,
+    // Primitive values that indicate meaningful state changes
+    mcp.state,
+    mcp.error,
+    mcp.authUrl,
+    // Use array LENGTHS instead of array references to avoid triggering on reference changes
+    mcp.tools.length,
+    mcp.resources.length,
+    mcp.resourceTemplates.length,
+    mcp.prompts.length,
+    // Objects excluded - manual comparison handles serverInfo/capabilities changes
+    // Functions excluded - they're stable via useCallback in useMcp
+    // mcp.log excluded - log changes shouldn't trigger provider updates
+    // mcp.client excluded - client reference stability handled by manual check
+    notifications.length,
     unreadNotificationCount,
+    publicSamplingRequests.length,
+    publicElicitationRequests.length,
+    // Callback functions are stable via useCallback
     markNotificationRead,
     markAllNotificationsRead,
     clearNotifications,
-    publicSamplingRequests,
     approveSampling,
     rejectSampling,
-    publicElicitationRequests,
     approveElicitation,
     rejectElicitation,
   ]);
