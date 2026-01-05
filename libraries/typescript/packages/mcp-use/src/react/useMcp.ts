@@ -13,6 +13,7 @@ import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
 import { applyProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
+import { getPackageVersion } from "../version.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
@@ -319,6 +320,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           disableSseFallback: transportTypeParam === "http",
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
+          clientInfo: {
+            name: "mcp-use Inspector",
+            version: getPackageVersion(),
+          },
         };
 
         // Add custom headers if provided (includes proxy headers)

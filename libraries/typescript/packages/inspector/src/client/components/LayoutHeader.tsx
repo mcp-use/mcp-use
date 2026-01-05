@@ -32,9 +32,9 @@ import {
   Zap,
 } from "lucide-react";
 import type { McpServer } from "mcp-use/react";
-import { AddToClientDropdown } from "mcp-use/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AddToClientDropdown } from "./AddToClientDropdown";
 import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
@@ -79,6 +79,15 @@ function getTabCount(tabId: string, server: MCPConnection): number {
     return server.unreadNotificationCount;
   }
   return 0;
+}
+
+function shouldShowDot(
+  tabId: string,
+  count: number,
+  collapsed: boolean
+): boolean {
+  const dotTabs = ["sampling", "elicitation", "notifications"];
+  return collapsed && count > 0 && dotTabs.includes(tabId);
 }
 
 function CollapseButton({
@@ -322,18 +331,20 @@ export function LayoutHeader({
               <TabsList className="w-full justify-center">
                 {tabs.map((tab) => {
                   const count = getTabCount(tab.id, selectedServer);
+                  const showDot = shouldShowDot(tab.id, count, collapsed);
 
                   return (
                     <TabsTrigger
                       key={tab.id}
                       value={tab.id}
                       icon={tab.icon}
+                      showDot={showDot}
                       className={cn(
                         "[&>svg]:mr-0 flex-1 flex-row gap-2 relative",
                         collapsed && "pl-2"
                       )}
                     >
-                      {count > 0 && (
+                      {count > 0 && !collapsed && (
                         <span
                           className={cn(
                             activeTab === tab.id
@@ -383,11 +394,13 @@ export function LayoutHeader({
                     const count = getTabCount(tab.id, selectedServer);
                     const tooltipText =
                       count > 0 ? `${tab.label} (${count})` : tab.label;
+                    const showDot = shouldShowDot(tab.id, count, collapsed);
 
                     return (
                       <TabsTrigger
                         value={tab.id}
                         icon={tab.icon}
+                        showDot={showDot}
                         className={cn(
                           "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
                           collapsed && "pl-4"

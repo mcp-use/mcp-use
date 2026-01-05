@@ -12,7 +12,7 @@ import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import {
   generatePythonSDKCode,
   generateTypeScriptSDKCode,
-} from "mcp-use/react";
+} from "@/client/utils/mcpClientUtils";
 import { Button } from "./ui/button";
 
 interface SdkIntegrationModalProps {

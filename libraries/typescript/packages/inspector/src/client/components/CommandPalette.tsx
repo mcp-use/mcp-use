@@ -28,7 +28,7 @@ import {
   generateCursorDeepLink,
   generateGeminiCLICommand,
   generateVSCodeDeepLink,
-} from "mcp-use/react";
+} from "@/client/utils/mcpClientUtils";
 import { toast } from "sonner";
 
 /**
