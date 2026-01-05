@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.12.0-canary.12
+
+### Minor Changes
+
+- d02b8df: chore: revert to using official sdk 1.25.1
+
+### Patch Changes
+
+- @mcp-use/cli@2.8.0-canary.12
+- @mcp-use/inspector@0.14.0-canary.12
+
 ## 1.12.0-canary.11
 
 ### Minor Changes
