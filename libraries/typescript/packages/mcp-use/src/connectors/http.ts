@@ -54,7 +54,7 @@ export class HttpConnector extends BaseConnector {
       }
     }
 
-    this.timeout = opts.timeout ?? 30000; // Default 30 seconds
+    this.timeout = opts.timeout ?? 10000; // Default 10 seconds
     this.sseReadTimeout = opts.sseReadTimeout ?? 300000; // Default 5 minutes
     this.clientInfo = opts.clientInfo ?? {
       name: "http-connector",
@@ -264,7 +264,7 @@ export class HttpConnector extends BaseConnector {
         // 2. Extract mcp-session-id from response header
         // 3. Open GET SSE stream with that session ID in header
         await this.client.connect(transport, {
-          timeout: Math.min(this.timeout, 3000),
+          timeout: this.timeout,
         });
 
         // Verify session ID is available after connect
