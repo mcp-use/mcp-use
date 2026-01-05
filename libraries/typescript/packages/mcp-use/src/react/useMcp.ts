@@ -114,6 +114,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
   const authTimeoutRef = useRef<number | null>(null);
+  const retryScheduledRef = useRef<boolean>(false);
 
   // --- Refs for values used in callbacks ---
   const stateRef = useRef(state);
@@ -1385,21 +1386,35 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    *
    * If autoRetry is enabled and connection fails, automatically retries
    * after the specified delay.
+   * Uses a ref to prevent duplicate scheduling which can cause render loops.
    */
   useEffect(() => {
     let retryTimeoutId: number | null = null;
+
     if (state === "failed" && autoRetry && connectAttemptRef.current > 0) {
-      const delay =
-        typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
-      addLog("info", `Connection failed, auto-retrying in ${delay}ms...`);
-      retryTimeoutId = setTimeout(() => {
-        if (isMountedRef.current && stateRef.current === "failed") {
-          retry();
-        }
-      }, delay) as any;
+      // Prevent duplicate scheduling - only schedule if not already scheduled
+      if (!retryScheduledRef.current) {
+        retryScheduledRef.current = true;
+        const delay =
+          typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
+        addLog("info", `Connection failed, auto-retrying in ${delay}ms...`);
+        retryTimeoutId = setTimeout(() => {
+          retryScheduledRef.current = false;
+          if (isMountedRef.current && stateRef.current === "failed") {
+            retry();
+          }
+        }, delay) as any;
+      }
+    } else if (state !== "failed") {
+      // Reset the ref when not in failed state
+      retryScheduledRef.current = false;
     }
+
     return () => {
-      if (retryTimeoutId) clearTimeout(retryTimeoutId);
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        retryScheduledRef.current = false;
+      }
     };
   }, [state, autoRetry, retry, addLog]);
 
