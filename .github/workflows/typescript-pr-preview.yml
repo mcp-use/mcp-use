@@ -66,15 +66,17 @@ jobs:
 
       - name: Create temporary deno.json with PR preview imports
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
-        # Note: Using zod@3.24.4 because @modelcontextprotocol/sdk@1.25.1 requires Zod v3
-        # (z.custom() API changed in Zod v4). Remove this pin when the SDK supports Zod v4.
+        # Note: Using external=zod to let Deno resolve zod from npm instead of esm.sh bundling it.
+        # This avoids version conflicts between mcp-use and @modelcontextprotocol/sdk.
+        # The "zod/" mapping handles subpath imports like "zod/v3" used by the SDK.
         run: |
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&deps=zod@3.24.4",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&deps=zod@3.24.4",
-              "zod": "npm:zod@3.24.4"
+              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&external=zod",
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&external=zod",
+              "zod": "npm:zod@^4.2.0",
+              "zod/": "npm:zod@^4.2.0/"
             }
           }
           EOF
@@ -87,7 +89,7 @@ jobs:
           MAX_RETRIES=30
           RETRY_COUNT=0
           RETRY_DELAY=10
-          
+
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             if curl -s -f -I "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server" > /dev/null 2>&1; then
               echo "✅ Package is available on esm.sh"
