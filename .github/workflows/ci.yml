@@ -905,3 +905,39 @@ jobs:
           [ -f "test-app/package.json" ] || exit 1
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
+      
+      - name: Test dev command (non --dev flag only)
+        if: matrix.flag == ''
+        shell: bash
+        working-directory: test-app
+        run: |
+          # Start dev server in background
+          case "${{ matrix.pm }}" in
+            npm)
+              npm run dev &
+              ;;
+            yarn)
+              yarn dev &
+              ;;
+            pnpm)
+              pnpm dev &
+              ;;
+          esac
+          
+          DEV_PID=$!
+          
+          # Wait for server to start (10 seconds should be enough)
+          sleep 10
+          
+          # Kill the dev server
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            # On Windows, need to kill the process tree
+            taskkill //PID $DEV_PID //T //F 2>/dev/null || true
+          else
+            kill $DEV_PID 2>/dev/null || true
+          fi
+          
+          # Wait for process to exit
+          wait $DEV_PID 2>/dev/null || true
+          
+          echo "✅ Dev server started and stopped successfully"

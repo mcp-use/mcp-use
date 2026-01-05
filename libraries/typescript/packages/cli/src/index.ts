@@ -92,7 +92,7 @@ function runCommand(
   const proc = spawn(command, args, {
     cwd,
     stdio: filterStderr ? (["inherit", "inherit", "pipe"] as const) : "inherit",
-    shell: false,
+    shell: process.platform === "win32",
     env: env ? { ...process.env, ...env } : process.env,
   });
 
@@ -142,7 +142,7 @@ async function startTunnel(
 
     const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+      shell: process.platform === "win32",
     });
 
     let resolved = false;
