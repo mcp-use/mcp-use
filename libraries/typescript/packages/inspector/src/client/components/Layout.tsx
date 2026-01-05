@@ -36,6 +36,7 @@ export function Layout({ children }: LayoutProps) {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServer,
     storageLoaded: configLoaded,
   } = useMcpClient();
 
@@ -57,13 +58,16 @@ export function Layout({ children }: LayoutProps) {
     [addServer]
   );
 
-  const updateConnectionConfig = useCallback((id: string, config: any) => {
-    // To update config, we need to remove and re-add
-    // For now, just log a warning
-    console.warn(
-      "[Layout] updateConnectionConfig not yet supported in new provider"
-    );
-  }, []);
+  const updateConnectionConfig = useCallback(
+    async (id: string, config: any) => {
+      try {
+        await updateServer(id, config);
+      } catch (error) {
+        console.error(`[Layout] Failed to update connection ${id}:`, error);
+      }
+    },
+    [updateServer]
+  );
   const {
     selectedServerId,
     setSelectedServerId,

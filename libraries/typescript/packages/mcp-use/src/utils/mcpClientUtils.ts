@@ -17,6 +17,16 @@ function sanitizeServerName(name: string): string {
  *
  * @param headerName - The HTTP header name to convert
  * @returns The resulting environment variable name with non-alphanumeric characters replaced by underscores, converted to uppercase, and with leading/trailing underscores removed
+ * Escape a string for safe use in shell commands
+ * Wraps the string in single quotes and escapes any single quotes within it
+ */
+function escapeShellArg(arg: string): string {
+  // Replace single quotes with the sequence: end quote, escaped quote, start quote
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
+/**
+ * Convert header name to environment variable name
  */
 function headerToEnvVar(headerName: string): string {
   return headerName
@@ -168,14 +178,15 @@ export function generateClaudeCodeCommand(
   headers?: Record<string, string>
 ): { command: string; envVars: Array<{ name: string; header: string }> } {
   const sanitizedName = sanitizeServerName(name);
-  let command = `claude mcp add --transport http "${sanitizedName}" \\\n    "${url}"`;
+  let command = `claude mcp add --transport http "${sanitizedName}" \\\n    ${escapeShellArg(url)}`;
 
   const envVars: Array<{ name: string; header: string }> = [];
 
   if (headers && Object.keys(headers).length > 0) {
     for (const [headerName] of Object.entries(headers)) {
       const envVar = headerToEnvVar(headerName);
-      command += ` \\\n    --header '${headerName}:\${${envVar}}'`;
+      // Escape header name to prevent shell injection
+      command += ` \\\n    --header ${escapeShellArg(`${headerName}:\${${envVar}}`)}`;
       envVars.push({ name: envVar, header: headerName });
     }
   }
@@ -199,14 +210,15 @@ export function generateGeminiCLICommand(
   headers?: Record<string, string>
 ): { command: string; envVars: Array<{ name: string; header: string }> } {
   const sanitizedName = sanitizeServerName(name);
-  let command = `gemini mcp add --transport http "${sanitizedName}" "${url}"`;
+  let command = `gemini mcp add --transport http "${sanitizedName}" ${escapeShellArg(url)}`;
 
   const envVars: Array<{ name: string; header: string }> = [];
 
   if (headers && Object.keys(headers).length > 0) {
     for (const [headerName] of Object.entries(headers)) {
       const envVar = headerToEnvVar(headerName);
-      command += ` \\\n  --header '${headerName}:\${${envVar}}'`;
+      // Escape header name to prevent shell injection
+      command += ` \\\n  --header ${escapeShellArg(`${headerName}:\${${envVar}}`)}`;
       envVars.push({ name: envVar, header: headerName });
     }
   }

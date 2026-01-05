@@ -1008,11 +1008,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Parse --port from command-line arguments
     let cliPort: number | undefined;
-    const portArgIndex = process.argv.indexOf("--port");
-    if (portArgIndex !== -1 && portArgIndex + 1 < process.argv.length) {
-      const portValue = parseInt(process.argv[portArgIndex + 1], 10);
-      if (!isNaN(portValue)) {
-        cliPort = portValue;
+    if (typeof process !== "undefined" && Array.isArray(process.argv)) {
+      const portArgIndex = process.argv.indexOf("--port");
+      if (portArgIndex !== -1 && portArgIndex + 1 < process.argv.length) {
+        const portValue = parseInt(process.argv[portArgIndex + 1], 10);
+        if (!isNaN(portValue)) {
+          cliPort = portValue;
+        }
       }
     }
 

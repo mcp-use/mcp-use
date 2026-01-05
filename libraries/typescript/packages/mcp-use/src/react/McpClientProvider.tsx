@@ -102,6 +102,10 @@ export interface McpClientContextType {
   servers: McpServer[];
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
+  updateServer: (
+    id: string,
+    options: Partial<McpServerOptions>
+  ) => Promise<void>;
   getServer: (id: string) => McpServer | undefined;
   /** Whether storage has finished loading (true if no storage provider) */
   storageLoaded: boolean;
@@ -879,6 +883,51 @@ export function McpClientProvider({
     [onServerRemoved]
   );
 
+  const updateServer = useCallback(
+    async (id: string, options: Partial<McpServerOptions>) => {
+      return new Promise<void>((resolve) => {
+        // Find the current server configuration
+        const currentConfig = serverConfigs.find((s) => s.id === id);
+        if (!currentConfig) {
+          console.warn(
+            `[McpClientProvider] Cannot update server "${id}" - not found`
+          );
+          resolve();
+          return;
+        }
+
+        // Merge the new options with the existing ones
+        const updatedOptions: McpServerOptions = {
+          ...currentConfig.options,
+          ...options,
+        };
+
+        // Disconnect the old server
+        setServers((prev) => {
+          const server = prev.find((s) => s.id === id);
+          if (server?.disconnect) {
+            server.disconnect();
+          }
+          if (server?.clearStorage) {
+            server.clearStorage();
+          }
+          return prev.filter((s) => s.id !== id);
+        });
+
+        // Update the config (this will trigger a new McpServerWrapper to mount)
+        setServerConfigs((prev) => {
+          const updated = prev.map((s) =>
+            s.id === id ? { id, options: updatedOptions } : s
+          );
+          // Wait for next tick to ensure disconnection is complete before resolving
+          setTimeout(() => resolve(), 0);
+          return updated;
+        });
+      });
+    },
+    [serverConfigs]
+  );
+
   const getServer = useCallback(
     (id: string) => {
       return servers.find((s) => s.id === id);
@@ -891,10 +940,11 @@ export function McpClientProvider({
       servers,
       addServer,
       removeServer,
+      updateServer,
       getServer,
       storageLoaded,
     }),
-    [servers, addServer, removeServer, getServer, storageLoaded]
+    [servers, addServer, removeServer, updateServer, getServer, storageLoaded]
   );
 
   return (
@@ -926,10 +976,13 @@ export function McpClientProvider({
  *
  * @example
  * ```tsx
- * const { servers, addServer, removeServer } = useMcpClient();
+ * const { servers, addServer, removeServer, updateServer } = useMcpClient();
  *
  * // Add a server
  * addServer("linear", { url: "https://mcp.linear.app/sse" });
+ *
+ * // Update a server's configuration
+ * await updateServer("linear", { name: "Linear Production" });
  *
  * // Access servers
  * servers.forEach(server => {

@@ -253,11 +253,6 @@ export class FileSystemSessionStore implements SessionStore {
       const tempPath = `${this.filePath}.tmp`;
       await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
       await rename(tempPath, this.filePath);
-
-      // Silently save sessions without logging to reduce noise
-      // console.debug(
-      //   `[FileSystemSessionStore] Saved ${this.sessions.size} session(s) to ${this.filePath}`
-      // );
     } catch (error: any) {
       console.error(
         `[FileSystemSessionStore] Error saving sessions:`,

@@ -128,8 +128,6 @@ export function wrapTransportForLogging(
   transport: Transport,
   serverId: string
 ): Transport {
-  console.log("[RPC Logger] Wrapping transport for server:", serverId);
-
   class LoggingTransport implements Transport {
     onclose?: () => void;
     onerror?: (error: Error) => void;

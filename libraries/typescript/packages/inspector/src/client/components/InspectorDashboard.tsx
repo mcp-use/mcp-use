@@ -156,7 +156,19 @@ export function InspectorDashboard() {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServer,
   } = useMcpClient();
+
+  // Track concurrent updates to prevent race conditions
+  const [updatingConnections, setUpdatingConnections] = useState<Set<string>>(
+    new Set()
+  );
+  const updatingConnectionsRef = useRef<Set<string>>(new Set());
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    updatingConnectionsRef.current = updatingConnections;
+  }, [updatingConnections]);
 
   // Adapter functions for backward compatibility
   const addConnection = useCallback(
@@ -177,44 +189,85 @@ export function InspectorDashboard() {
   );
 
   const updateConnectionConfig = useCallback(
-    (
+    async (
       id: string,
       config: {
         name?: string;
-        proxyConfig?: any;
+        proxyConfig?: {
+          proxyAddress?: string;
+          customHeaders?: Record<string, string>;
+        };
         transportType?: "http" | "sse";
       }
     ) => {
-      // Get the current server to preserve the URL
-      const server = connections.find((s) => s.id === id);
-      if (!server) return;
-
-      // Remove and re-add with updated config
-      removeConnection(id);
-      setTimeout(() => {
-        addConnection(
-          server.url,
-          config.name,
-          config.proxyConfig,
-          config.transportType
+      // Check if already updating this connection
+      if (updatingConnectionsRef.current.has(id)) {
+        console.warn(
+          `[InspectorDashboard] Connection ${id} is already being updated, skipping`
         );
-      }, 10);
+        return;
+      }
+
+      // Mark as updating
+      setUpdatingConnections((prev) => new Set(prev).add(id));
+
+      try {
+        // Use the new updateServer method for atomic updates
+        await updateServer(id, config);
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to update connection ${id}:`,
+          error
+        );
+      } finally {
+        // Clear the updating flag
+        setUpdatingConnections((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
     },
-    [connections, removeConnection, addConnection]
+    [updateServer]
   );
 
   const connectServer = useCallback(
-    (id: string) => {
-      // Trigger reconnection by removing and re-adding
+    async (id: string) => {
+      // Check if already updating this connection
+      if (updatingConnectionsRef.current.has(id)) {
+        console.warn(
+          `[InspectorDashboard] Connection ${id} is already being reconnected, skipping`
+        );
+        return;
+      }
+
       const server = connections.find((s) => s.id === id);
       if (!server) return;
 
-      removeConnection(id);
-      setTimeout(() => {
-        addConnection(server.url, server.name);
-      }, 10);
+      // Mark as updating
+      setUpdatingConnections((prev) => new Set(prev).add(id));
+
+      try {
+        // Trigger reconnection by updating with the same config (forces disconnect/reconnect)
+        await updateServer(id, {
+          url: server.url,
+          name: server.name,
+        });
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to reconnect server ${id}:`,
+          error
+        );
+      } finally {
+        // Clear the updating flag
+        setUpdatingConnections((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
     },
-    [connections, removeConnection, addConnection]
+    [connections, updateServer]
   );
 
   // Auto-connect state management (simplified - always true now)

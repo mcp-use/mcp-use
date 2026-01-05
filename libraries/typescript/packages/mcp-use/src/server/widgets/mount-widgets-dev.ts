@@ -255,6 +255,11 @@ if (container && Component) {
   // Build the server origin URL
   const serverOrigin = serverConfig.serverBaseUrl;
 
+  // Derive WebSocket protocol from serverBaseUrl (wss for HTTPS, ws otherwise)
+  const wsProtocol = serverConfig.serverBaseUrl.startsWith("https:")
+    ? "wss"
+    : "ws";
+
   // Create a single shared Vite dev server for all widgets
   console.log(
     `[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`
@@ -417,7 +422,8 @@ export default PostHog;
       origin: serverOrigin,
       hmr: {
         // Explicitly configure HMR for better cross-platform support
-        protocol: "ws",
+        // Use wss for HTTPS deployments, ws otherwise
+        protocol: wsProtocol,
       },
       watch: {
         // Watch the resources directory for HMR to work
