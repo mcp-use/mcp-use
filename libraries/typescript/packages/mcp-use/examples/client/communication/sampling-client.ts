@@ -92,11 +92,14 @@ async function main() {
   console.log("🚀 Starting Sampling Client Example\n");
 
   // Create client with sampling callback
+  // Configure clientInfo to identify this client to the server
+  // This is sent in the MCP initialize request and helps with server-side logging/observability
   const client = new MCPClient(
     {
       mcpServers: {
         sampling: {
           url: "http://localhost:3000/mcp",
+          clientInfo: { name: "sampling-client", version: "1.0.0" },
         },
       },
     },

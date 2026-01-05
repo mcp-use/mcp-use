@@ -4,5 +4,4 @@
  */
 
 export * from "./favicon-detector.js";
-export * from "./mcpClientUtils.js";
 export * from "./proxy-config.js";

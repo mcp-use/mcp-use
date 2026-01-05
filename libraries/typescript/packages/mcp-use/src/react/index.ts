@@ -6,23 +6,6 @@
 export type { UseMcpOptions, UseMcpResult } from "./types.js";
 export { useMcp } from "./useMcp.js";
 
-// Re-export AddToClientDropdown component
-export { AddToClientDropdown } from "./AddToClientDropdown.js";
-
-// Re-export MCP client utilities through utils index
-export {
-  generateCursorDeepLink,
-  generateVSCodeDeepLink,
-  downloadMcpbFile,
-  generateClaudeCodeCommand,
-  generateGeminiCLICommand,
-  generateCodexConfig,
-  generatePythonSDKCode,
-  generateTypeScriptSDKCode,
-  getEnvVarInstructions,
-  generateMcpbConfig,
-} from "../utils/index.js";
-
 // Re-export auth callback handler for OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
 
