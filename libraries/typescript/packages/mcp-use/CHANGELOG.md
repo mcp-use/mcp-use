@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.12.0-canary.8
+
+### Patch Changes
+
+- daf3c81: fix: prevent rendering loop when autoretry is true
+  - @mcp-use/cli@2.8.0-canary.8
+  - @mcp-use/inspector@0.14.0-canary.8
+
 ## 1.12.0-canary.7
 
 ### Patch Changes
