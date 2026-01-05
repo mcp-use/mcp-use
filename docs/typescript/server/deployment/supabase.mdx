@@ -457,6 +457,42 @@ If the deployment script **hangs** at `Initialising login role...` (no progress 
 This typically happens after multiple failed connection attempts or when the connection is interrupted unexpectedly. The ban is temporary and automatic.
 </Note>
 
+## Troubleshooting
+
+### Zod "custom" is not a function error
+
+If you encounter an error like `TypeError: e.custom is not a function` when deploying to Deno/Supabase using `esm.sh` imports, it is likely due to a version conflict between Zod v3 (required by `@modelcontextprotocol/sdk`) and Zod v4.
+
+**Solution:**
+
+Use `npm:` specifiers in your `deno.json` import map instead of `esm.sh` URLs for dependencies. Deno's npm compatibility layer handles peer dependencies better than esm.sh bundling in this case.
+
+Recommended `deno.json`:
+
+```json
+{
+  "imports": {
+    "mcp-use/": "npm:mcp-use@latest/",
+    "zod": "npm:zod@^4.2.0"
+  }
+}
+```
+
+If you must use `esm.sh`, you need to manually map conflicting Zod versions:
+
+```json
+{
+  "imports": {
+    "mcp-use/server": "https://esm.sh/mcp-use@latest/server?external=zod",
+    "mcp-use/client": "https://esm.sh/mcp-use@latest/client?external=zod",
+    "zod": "https://esm.sh/zod@3.24.4",
+    "zod/v3": "https://esm.sh/zod@3.24.4",
+    "zod/v4": "https://esm.sh/zod@4.2.0",
+    "zod/v4-mini": "https://esm.sh/zod@4.2.0"
+  }
+}
+```
+
 ## Learn More
 
 - [Supabase Edge Functions Documentation](https://supabase.com/docs/guides/functions)

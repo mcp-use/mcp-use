@@ -14,7 +14,7 @@ import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
 import { JSONDisplay } from "../shared/JSONDisplay";
-import type { ReadResourceResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 
 export interface ResourceResult {
   uri: string;

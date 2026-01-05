@@ -2,7 +2,7 @@ import type {
   Prompt,
   Resource,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { SavedRequest } from "./tools";
 import { Command } from "cmdk";
 import {

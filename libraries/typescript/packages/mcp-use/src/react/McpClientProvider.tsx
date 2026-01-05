@@ -5,7 +5,7 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import React, {
   createContext,
   useCallback,

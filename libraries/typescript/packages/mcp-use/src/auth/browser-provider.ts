@@ -3,8 +3,8 @@ import type {
   OAuthClientInformation,
   OAuthTokens,
   OAuthClientMetadata,
-} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
-import type { OAuthClientProvider } from "@mcp-use/modelcontextprotocol-sdk/client/auth.js";
+} from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary

@@ -1,5 +1,5 @@
 import { Button } from "@/client/components/ui/button";
-import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
