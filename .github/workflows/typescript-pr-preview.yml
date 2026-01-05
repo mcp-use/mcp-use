@@ -68,7 +68,7 @@ jobs:
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
         # Note: Hybrid mapping to satisfy conflicting Zod requirements:
         # - SDK imports "zod/v3" and needs "z.custom" (available in Zod v3)
-        # - Other deps import "zod/v4"
+        # - Other deps import "zod/v4" and "zod/v4-mini"
         # - We map "zod/v3" to "zod@3.24.4" (aliasing v3 import to root v3 package)
         # - We use esm.sh for zod to match the PR preview environment
         run: |
@@ -79,7 +79,10 @@ jobs:
               "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&external=zod",
               "zod": "https://esm.sh/zod@3.24.4",
               "zod/v3": "https://esm.sh/zod@3.24.4",
-              "zod/v4": "https://esm.sh/zod@4.2.0"
+              "zod/v4": "https://esm.sh/zod@4.2.0",
+              "zod/v4-mini": "https://esm.sh/zod@4.2.0",
+              "zod/v4/mini": "https://esm.sh/zod@4.2.0",
+              "zod/v4/core": "https://esm.sh/zod@4.2.0"
             }
           }
           EOF
