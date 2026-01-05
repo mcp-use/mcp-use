@@ -1,31 +1,10 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
+import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
 import { isPortAvailable } from "./utils.js";
-
-const execAsync = promisify(exec);
-
-// Parse command line arguments for port
-function parsePortFromArgs(): number | null {
-  const args = process.argv.slice(2);
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--port" && i + 1 < args.length) {
-      const parsedPort = Number.parseInt(args[i + 1], 10);
-      if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
-        console.error(
-          `Error: Port must be a number between 1 and 65535, got: ${args[i + 1]}`
-        );
-        process.exit(1);
-      }
-      return parsedPort;
-    }
-  }
-  return null;
-}
 
 const app = new Hono();
 
@@ -103,16 +82,10 @@ async function startServer() {
     // Auto-open browser in development
     if (process.env.NODE_ENV !== "production") {
       try {
-        const command =
-          process.platform === "win32"
-            ? "start"
-            : process.platform === "darwin"
-              ? "open"
-              : "xdg-open";
         const url = isDev
           ? "http://localhost:3000"
           : `http://localhost:${port}`;
-        await execAsync(`${command} ${url}`);
+        await open(url);
         console.warn(`🌐 Browser opened automatically`);
       } catch {
         const url = isDev
