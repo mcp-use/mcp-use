@@ -1029,13 +1029,13 @@ class MCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[dict]:
         """Asynchronous streaming interface.
 
         Example::
 
-            async for chunk in agent.stream("hello"):
-                print(chunk, end="|", flush=True)
+            async for chunk in agent.stream_events("hello"):
+                print(chunk)
         """
         start_time = time.time()
         success = False
