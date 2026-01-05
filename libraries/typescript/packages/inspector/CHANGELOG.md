@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.14.0-canary.10
+
+### Patch Changes
+
+- ce4647d: chore: lint & format
+- Updated dependencies [ce4647d]
+  - mcp-use@1.12.0-canary.10
+
 ## 0.14.0-canary.9
 
 ### Patch Changes
