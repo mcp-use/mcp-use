@@ -154,14 +154,30 @@ function McpServerWrapper({
   onGlobalSamplingRequest,
   onGlobalElicitationRequest,
 }: McpServerWrapperProps) {
+  // Extract callback options (these don't need to be passed to useMcp)
   const {
     name,
     onSamplingRequest,
     onElicitationRequest,
     onNotificationReceived,
     wrapTransport: optionsWrapTransport,
-    ...mcpOptions
   } = options;
+
+  // Memoize the options passed to useMcp to prevent render loops
+  // The spread operator creates new objects every render, which causes
+  // useMcp's callbacks (connect, retry) to be recreated, triggering the
+  // autoRetry effect repeatedly
+  const mcpOptions = useMemo(() => {
+    const {
+      name: _name,
+      onSamplingRequest: _onSamplingRequest,
+      onElicitationRequest: _onElicitationRequest,
+      onNotificationReceived: _onNotificationReceived,
+      wrapTransport: _wrapTransport,
+      ...rest
+    } = options;
+    return rest;
+  }, [options]);
 
   // Merge user's wrapTransport with RPC logging wrapper
   const combinedWrapTransport = useMemo(() => {
