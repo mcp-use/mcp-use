@@ -6,6 +6,87 @@ rss: true
 tag: "New"
 ---
 
+
+<Update label="v1.12.0 - January 2026">
+  ## Browser Compatibility & Multi-Server Support
+  Release focusing on browser compatibility, multi-server management, and improved React architecture.
+
+  ### Breaking Changes
+  - **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+
+  ### Browser Runtime Support
+  - **New**: Full browser compatibility - removed Node.js-specific dependencies from browser builds
+  - **New**: Browser Telemetry using `posthog-js` for browser environments, separate from Node.js telemetry
+  - **New**: Enhanced `browser.ts` entry point with improved browser-specific utilities
+  - **New**: Browser utilities:
+    - `utils/favicon-detector.ts` - Detect and extract favicons from URLs
+    - `utils/proxy-config.ts` - Proxy configuration utilities for browser environments
+    - `utils/mcpClientUtils.ts` - MCP client utilities moved from client package
+  - **New**: `MCPAgent` exported for browser usage with `BrowserMCPClient` instance or through `RemoteAgent`
+  - **Enhancement**: Comprehensive test suite to ensure `mcp-use/react` and `mcp-use/browser` do not import Node.js dependencies
+
+  ### Multi-Server Support
+  - **New**: `McpClientProvider` component to manage multiple MCP server connections in React applications
+  - **New**: Pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+  - **New**: Dynamic addition and removal of servers in React applications
+  - **New**: Multi-server React example demonstrating new capabilities
+  - **Enhancement**: Refactored `useMcp` hook for better multi-server support
+  - **Enhancement**: Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+
+  ### React Components
+  - **New**: `AddToClientDropdown` component for adding MCP servers to clients with enhanced UI and functionality
+
+  ### Server Middleware
+  - **New**: MCP Proxy Middleware (`server/middleware/mcp-proxy.ts`) - Hono middleware for proxying MCP server requests with optional authentication and request validation
+
+  ### Inspector Enhancements
+  - **Enhancement**: Improved UI responsiveness with enhanced mobile and tablet layouts and adaptive component visibility
+  - **Enhancement**: Better server management with refactored server connection handling, improved icon display, and status tracking
+  - **Enhancement**: Enhanced debugging with detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+  - **Enhancement**: Simplified connection settings by removing deprecated transport types
+  - **Enhancement**: Enhanced inspector components for better browser compatibility
+  - **Enhancement**: Improved server icon support and component interactions
+  - **Enhancement**: Added embedded mode support
+  - **Enhancement**: Better configuration handling and MCP proxy integration
+
+  ### RPC Logging
+  - **New**: Enhanced RPC logging with new `rpc-logger` module and filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+
+  ### Architecture Improvements
+  - **Refactor**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
+  - **Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+  - **Refactor**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
+  - **Refactor**: Updated components across inspector for cleaner architecture and imports
+
+  ### Bug Fixes
+  - **Fix**: Prevent rendering loop when autoretry is true in React hooks
+  - **Fix**: Respect options timeout in HTTP connector (reduced default timeout from 30 seconds to 10 seconds)
+  - **Fix**: Add client SDKs to add to client dropdown in inspector
+  - **Fix**: Server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+  - **Fix**: Linux patch for watch mode
+  - **Fix**: Query URL handling in built mode to preserve arguments
+  - **Fix**: Enhanced Zod version mapping in TypeScript PR preview workflow
+  - **Fix**: Pinned Zod version to 3.24.4 for compatibility with modelcontextprotocol/sdk
+  - **Fix**: Updated modelcontextprotocol-sdk references to new package name
+
+  ### Documentation
+  - **New**: Added troubleshooting section for Zod version conflicts in Supabase deployment
+  - **Enhancement**: Updated Supabase deployment documentation with improved compatibility information
+</Update>
+
+
+
+<Update label="v1.11.2 - December 2025">
+  ## Documentation Updates
+  - **Enhancement**: Updated examples and documentation to use preferred methods and APIs
+</Update>
+
+<Update label="v1.11.1 - December 2025">
+  ## Bug Fixes
+  - **Fix**: Widget props not picked up when using Zod schemas
+</Update>
+
+
 <Update label="v1.11.0 - December 2025">
   ## Session Management Architecture & CLI Client
   Major release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
@@ -92,6 +173,7 @@ tag: "New"
   - **Fix**: UUID generation and URL handling improvements
   - **Fix**: Various formatting and linting improvements
 </Update>
+
 
 <Update label="v1.10.0 - December 2025">
   ## API Improvements & Session Management

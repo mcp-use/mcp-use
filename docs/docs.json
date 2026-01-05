@@ -45,17 +45,12 @@
         "groups": [
           {
             "group": "Welcome",
-            "pages": [
-              "home/index"
-            ]
+            "pages": ["home/index"]
           },
           {
             "group": "Libraries",
             "icon": "library",
-            "pages": [
-              "home/redirects/python",
-              "home/redirects/typescript"
-            ]
+            "pages": ["home/redirects/python", "home/redirects/typescript"]
           },
           {
             "group": "Dev Tools",
@@ -75,7 +70,8 @@
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",
-                  "inspector/development"
+                  "inspector/development",
+                  "inspector/changelog"
                 ]
               },
               "tunneling/index"
@@ -400,9 +396,7 @@
             "groups": [
               {
                 "group": "Changelog",
-                "pages": [
-                  "python/changelog/changelog"
-                ]
+                "pages": ["python/changelog/changelog"]
               },
               {
                 "group": "Versions",
@@ -423,9 +417,7 @@
             "groups": [
               {
                 "group": "Community",
-                "pages": [
-                  "python/community/showcase"
-                ]
+                "pages": ["python/community/showcase"]
               }
             ]
           },
@@ -435,9 +427,7 @@
             "groups": [
               {
                 "group": "Blog",
-                "pages": [
-                  "python/blog/middleware"
-                ]
+                "pages": ["python/blog/middleware"]
               }
             ]
           }
@@ -600,10 +590,7 @@
               {
                 "group": "Development",
                 "icon": "folder-code",
-                "pages": [
-                  "/inspector/index",
-                  "tunneling/index"
-                ]
+                "pages": ["/inspector/index", "tunneling/index"]
               }
             ]
           },
@@ -618,9 +605,7 @@
             "groups": [
               {
                 "group": "Changelog",
-                "pages": [
-                  "typescript/changelog/changelog"
-                ]
+                "pages": ["typescript/changelog/changelog"]
               }
             ]
           },
@@ -630,9 +615,7 @@
             "groups": [
               {
                 "group": "Community",
-                "pages": [
-                  "python/community/showcase"
-                ]
+                "pages": ["python/community/showcase"]
               }
             ]
           },
