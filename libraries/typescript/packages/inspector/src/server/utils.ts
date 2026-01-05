@@ -53,6 +53,18 @@ export async function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
+// Parse port from command line arguments (--port)
+export function parsePortFromArgs(): number | null {
+  const portArgIndex = process.argv.indexOf("--port");
+  if (portArgIndex !== -1 && portArgIndex + 1 < process.argv.length) {
+    const portValue = Number.parseInt(process.argv[portArgIndex + 1], 10);
+    if (!Number.isNaN(portValue) && portValue >= 1 && portValue <= 65535) {
+      return portValue;
+    }
+  }
+  return null;
+}
+
 /**
  * Helper function to format error responses with context and timestamp
  */
