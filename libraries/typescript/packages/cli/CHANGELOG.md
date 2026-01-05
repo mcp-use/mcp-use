@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.8.0-canary.13
+
+### Patch Changes
+
+- a95e8bb: ci: add dev command testing to CI workflow & fix issue [#742](https://github.com/mcp-use/mcp-use/issues/742)
+  - mcp-use@1.12.0-canary.13
+  - @mcp-use/inspector@0.14.0-canary.13
+
 ## 2.8.0-canary.12
 
 ### Patch Changes
