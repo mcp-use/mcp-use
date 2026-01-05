@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.12.0-canary.7
+
+### Patch Changes
+
+- 4f93dc3: fix: respect options timeout in http connector
+  - @mcp-use/cli@2.8.0-canary.7
+  - @mcp-use/inspector@0.14.0-canary.7
+
 ## 1.12.0-canary.6
 
 ### Patch Changes
