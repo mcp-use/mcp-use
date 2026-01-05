@@ -66,13 +66,15 @@ jobs:
 
       - name: Create temporary deno.json with PR preview imports
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        # Note: Using zod@3.24.4 because @modelcontextprotocol/sdk@1.25.1 requires Zod v3
+        # (z.custom() API changed in Zod v4). Remove this pin when the SDK supports Zod v4.
         run: |
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts",
-              "zod": "npm:zod@^4.2.0"
+              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&deps=zod@3.24.4",
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&deps=zod@3.24.4",
+              "zod": "npm:zod@3.24.4"
             }
           }
           EOF
