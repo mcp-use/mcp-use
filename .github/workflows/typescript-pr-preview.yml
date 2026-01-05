@@ -66,17 +66,20 @@ jobs:
 
       - name: Create temporary deno.json with PR preview imports
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
-        # Note: Using external=zod to let Deno resolve zod from npm instead of esm.sh bundling it.
-        # This avoids version conflicts between mcp-use and @modelcontextprotocol/sdk.
-        # The "zod/" mapping handles subpath imports like "zod/v3" used by the SDK.
+        # Note: Hybrid mapping to satisfy conflicting Zod requirements:
+        # - SDK imports "zod/v3" and needs "z.custom" (available in Zod v3)
+        # - Other deps import "zod/v4"
+        # - We map "zod/v3" to "zod@3.24.4" (aliasing v3 import to root v3 package)
+        # - We use esm.sh for zod to match the PR preview environment
         run: |
           cat > deno.json << EOF
           {
             "imports": {
               "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&external=zod",
               "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&external=zod",
-              "zod": "npm:zod@^4.2.0",
-              "zod/": "npm:zod@^4.2.0/"
+              "zod": "https://esm.sh/zod@3.24.4",
+              "zod/v3": "https://esm.sh/zod@3.24.4",
+              "zod/v4": "https://esm.sh/zod@4.2.0"
             }
           }
           EOF
