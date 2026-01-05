@@ -11,8 +11,8 @@ import pytest
 from mcp.types import ListRootsResult, Root
 
 from mcp_use.client.connectors.base import BaseConnector
-from mcp_use.client.connectors.stdio import StdioConnector
 from mcp_use.client.connectors.http import HttpConnector
+from mcp_use.client.connectors.stdio import StdioConnector
 
 
 @pytest.fixture(autouse=True)
@@ -245,6 +245,7 @@ class TestSamplingAndElicitationCapabilities:
 
     def test_sampling_callback_stored(self):
         """Test that sampling_callback is stored when provided."""
+
         async def my_sampling_callback(params):
             pass
 
@@ -253,6 +254,7 @@ class TestSamplingAndElicitationCapabilities:
 
     def test_elicitation_callback_stored(self):
         """Test that elicitation_callback is stored when provided."""
+
         async def my_elicitation_callback(params):
             pass
 
