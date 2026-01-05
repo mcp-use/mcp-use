@@ -81,6 +81,7 @@ class StdioConnector(BaseConnector):
                 write_stream,
                 sampling_callback=self.sampling_callback,
                 elicitation_callback=self.elicitation_callback,
+                list_roots_callback=self.list_roots_callback,
                 message_handler=self._internal_message_handler,
                 logging_callback=self.logging_callback,
                 client_info=self.client_info,
