@@ -1,11 +1,15 @@
+import asyncio
 import hashlib
 import json
+import logging
 import time
 from collections import OrderedDict
 from collections.abc import Callable
 from typing import Any
 
 from .middleware import Middleware, ServerMiddlewareContext
+
+logger = logging.getLogger(__name__)
 
 
 class ToolResultCachingMiddleware(Middleware):
@@ -26,6 +30,7 @@ class ToolResultCachingMiddleware(Middleware):
         self._max_size = max_size
         self._ttl_seconds = ttl_seconds
         self._cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+        self._cache_lock = asyncio.Lock()
 
     def _generate_cache_key(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Generate deterministic SHA-256 hash for tool call.
@@ -38,7 +43,12 @@ class ToolResultCachingMiddleware(Middleware):
             A SHA-256 hash string, as the unique cache key.
         """
         # sort_keys=True guarantees {"a": 1, "b": 2} == {"b": 2, "a": 1}
-        payload = json.dumps(arguments, sort_keys=True, default=str)
+        try:
+            payload = json.dumps(arguments, sort_keys=True, default=str)
+        except Exception:
+            logger.warning("Failed to serialize arguments for tool %s, using empty payload", tool_name)
+            payload = ""
+
         key_content = f"{tool_name}:{payload}"
         return hashlib.sha256(key_content.encode()).hexdigest()
 
@@ -54,47 +64,44 @@ class ToolResultCachingMiddleware(Middleware):
         Returns:
             Result of tool execution, cached or fresh.
         """
-
-        # Safe access for arguments
-        if hasattr(context, "arguments"):
-            args = context.arguments
-        elif hasattr(context, "request") and hasattr(context.request, "params"):
-            args = context.request.params.arguments
-        else:
-            args = {}
-
-        # Safe access for tool name
-        if hasattr(context, "name"):
-            tool_name = context.name
-        elif hasattr(context, "request") and hasattr(context.request, "params"):
-            tool_name = context.request.params.name
+        # Correctly access name and arguments from the message object
+        if hasattr(context, "message") and context.message:
+            tool_name = getattr(context.message, "name", "unknown_tool")
+            args = getattr(context.message, "arguments", {})
         else:
             tool_name = "unknown_tool"
+            args = {}
 
         cache_key = self._generate_cache_key(tool_name, args)
         current_time = time.time()
 
-        if cache_key in self._cache:
-            cached_result, timestamp = self._cache[cache_key]
+        async with self._cache_lock:
+            if cache_key in self._cache:
+                cached_result, timestamp = self._cache[cache_key]
 
-            # Check if expired
-            if current_time - timestamp < self._ttl_seconds:
-                # LRU Logic: Move accessed item to the most recently used
-                self._cache.move_to_end(cache_key)
-                return cached_result
-            else:
-                # Expired: Delete and treat as miss
-                del self._cache[cache_key]
+                # Check if expired
+                if current_time - timestamp < self._ttl_seconds:
+                    # Hit: Move to MRU and return
+                    self._cache.move_to_end(cache_key)
+                    logger.debug("Cache hit for tool: %s", tool_name)
+                    return cached_result
+                else:
+                    # Expired: Delete
+                    del self._cache[cache_key]
 
-        # Execute upstream
-        result = await call_next(context)
+        try:
+            logger.debug("Cache miss for tool: %s", tool_name)
+            result = await call_next(context)
+        except Exception:
+            logger.exception("Tool execution failed for %s", tool_name)
+            raise
 
-        # Cache update
-        self._cache[cache_key] = (result, current_time)
-        self._cache.move_to_end(cache_key)
+        async with self._cache_lock:
+            self._cache[cache_key] = (result, current_time)
+            self._cache.move_to_end(cache_key)
 
-        if len(self._cache) > self._max_size:
-            # Evict oldest (FIFO behavior for LRU)
-            self._cache.popitem(last=False)
+            if len(self._cache) > self._max_size:
+                # Evict oldest (FIFO behavior for LRU)
+                self._cache.popitem(last=False)
 
         return result
