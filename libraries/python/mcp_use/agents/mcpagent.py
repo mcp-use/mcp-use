@@ -89,7 +89,7 @@ class MCPAgent:
         callbacks: list | None = None,
         chat_id: str | None = None,
         retry_on_error: bool = True,
-        metadata: dict[str] | None = None,
+        metadata: dict[str, Any] | None = None,
         message_id: str | None = None,
     ):
         """Initialize a new MCPAgent instance.

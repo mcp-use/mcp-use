@@ -101,8 +101,8 @@ agent = MCPAgent(
     system_prompt="Custom instructions for the agent",
     additional_instructions="Additional guidelines for specific tasks",
     disallowed_tools=["file_system", "network", "shell"]  # Restrict potentially dangerous tools
-    metadata = {"emp_id": value, "email":"a.b@c.com"} # use this to send sensitive data into tools without passing to the LLM
-    message_id = "choosen message id in chat usually like a UUID"
+    metadata={"emp_id": value, "email":"a.b@c.com"} # use this to send sensitive data into tools without passing to the LLM
+    message_id="choosen message id in chat usually like a UUID"
 )
 ```
 </CodeGroup>

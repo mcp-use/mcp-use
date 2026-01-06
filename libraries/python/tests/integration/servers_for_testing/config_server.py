@@ -10,12 +10,38 @@ mcp = FastMCP()
 
 @mcp.tool()
 def check_config(config: RunnableConfig | None = None):
-    "check the config and return the values"
+    """Validate the config structure and compute a total from metadata.
+
+    Args:
+        config: Configuration dictionary expected to contain:
+            - "metadata": a dict with keys "a" and "b" (numeric values).
+
+    Returns:
+        The sum of metadata["a"] and metadata["b"].
+
+    Raises:
+        ValueError: If config is None, missing required keys, or values are not numeric."""
+
+    if config is None:
+        raise ValueError("check_config: 'config' cannot be None.")
     logger.info(f" the config = {config}")
-    a = config["metadata"]["a"]
-    b = config["metadata"]["b"]
-    sum = a + b
-    return sum
+    metadata = config.get("metadata")
+    if metadata is None or not isinstance(metadata, dict):
+        raise ValueError("check_config: 'config[\"metadata\"]' must be a dict with keys 'a' and 'b'.")
+
+    try:
+        a = metadata["a"]
+        b = metadata["b"]
+    except KeyError as exc:
+        raise ValueError(f"check_config: missing required metadata key: {exc!s}") from exc
+
+    try:
+        total = a + b
+    except TypeError as exc:
+        raise ValueError(f"check_config: 'a' and 'b' must be numeric, got a={a!r}, b={b!r}.") from exc
+
+    logger.info("check_config: validated metadata with keys %s", list(metadata.keys()))
+    return total
 
 
 if __name__ == "__main__":
