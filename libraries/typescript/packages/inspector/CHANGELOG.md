@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.0-canary.14
+
+### Patch Changes
+
+- b16431b: fix(ci): improve Windows process termination in CI workflow
+  - mcp-use@1.12.0-canary.14
+
 ## 0.14.0-canary.13
 
 ### Patch Changes
