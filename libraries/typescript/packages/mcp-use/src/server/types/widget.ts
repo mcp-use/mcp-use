@@ -1,7 +1,7 @@
 import type { AppsSdkMetadata } from "./resource.js";
 import type { InputDefinition, ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
-import type { CallToolResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 
 export interface WidgetMetadata {

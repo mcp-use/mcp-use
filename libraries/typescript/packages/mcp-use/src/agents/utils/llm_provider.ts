@@ -88,7 +88,12 @@ export function parseLLMString(llmString: string): {
 }
 
 /**
- * Get API key for a provider from environment variables or config
+ * Determine the API key to use for a given provider by checking `llmConfig` then provider-specific environment variables.
+ *
+ * @param provider - The LLM provider identifier (e.g., "openai").
+ * @param config - Optional LLM configuration; if `config.apiKey` is present it is returned.
+ * @returns The resolved API key string.
+ * @throws Error if no API key is found in `config.apiKey` or any of the provider's expected environment variables.
  */
 function getAPIKey(provider: LLMProvider, config?: LLMConfig): string {
   // First check if provided in config
@@ -96,15 +101,19 @@ function getAPIKey(provider: LLMProvider, config?: LLMConfig): string {
     return config.apiKey;
   }
 
-  // Check environment variables
+  // Get provider config for error message
   const providerConfig = PROVIDER_CONFIG[provider];
-  for (const envVar of providerConfig.envVars) {
-    const apiKey = process.env[envVar];
-    if (apiKey) {
-      logger.debug(
-        `Using API key from environment variable ${envVar} for provider ${provider}`
-      );
-      return apiKey;
+
+  // Check environment variables (only if process.env is available)
+  if (typeof process !== "undefined" && process.env) {
+    for (const envVar of providerConfig.envVars) {
+      const apiKey = process.env[envVar];
+      if (apiKey) {
+        logger.debug(
+          `Using API key from environment variable ${envVar} for provider ${provider}`
+        );
+        return apiKey;
+      }
     }
   }
 

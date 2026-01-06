@@ -1,0 +1,457 @@
+---
+title: "Inspector Updates"
+description: "New updates and improvements to the MCP Inspector"
+icon: "sparkles"
+rss: true
+tag: "New"
+---
+
+<Update label="v0.14.0" description="January 2026">
+  ## Multi-Server Support & Browser Compatibility
+  Major release with multi-server management, improved UI responsiveness, and enhanced browser compatibility.
+
+### Breaking Changes
+
+- **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+
+### Multi-Server Support
+
+- **New**: Multi-server management with `McpClientProvider` to manage multiple MCP server connections
+- **New**: Dynamic addition and removal of servers in React applications
+- **New**: Pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+- **Enhancement**: Refactored `useMcp` hook for better multi-server support
+- **Enhancement**: Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+
+### UI & UX Improvements
+
+- **Enhancement**: Improved UI responsiveness with enhanced mobile and tablet layouts and adaptive component visibility
+- **Enhancement**: Better server management with refactored server connection handling, improved icon display, and status tracking
+- **Enhancement**: Enhanced debugging with detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+- **Enhancement**: Simplified connection settings by removing deprecated transport types
+- **Enhancement**: Improved server icon support and component interactions
+- **Enhancement**: Added embedded mode support
+- **New**: Support for passing tab as query parameter for direct navigation
+- **New**: Prompt rendering support with enhanced display
+- **New**: Add to Client dropdown for quickly adding MCP servers to Cursor, VS Code, Claude Desktop, and CLI tools
+
+### Browser Compatibility
+
+- **Enhancement**: Enhanced inspector components for better browser compatibility
+- **Enhancement**: Better configuration handling and MCP proxy integration
+- **Enhancement**: Improved browser-based MCP client with better connection handling
+
+### Bug Fixes
+
+- **Fix**: Query URL handling in built mode now preserves arguments correctly
+- **Fix**: Server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+- **Fix**: Add client SDKs to add to client dropdown
+- **Fix**: Respect query tab parameter when existing server is already connected
+</Update>
+
+<Update label="v0.13.2" description="December 2025">
+  ## Documentation Updates - **Enhancement**: Updated examples and documentation
+  to use preferred methods and APIs
+</Update>
+
+<Update label="v0.13.1" description="December 2025">
+  ## Bug Fixes - **Fix**: Widget props not picked up when using Zod schemas
+</Update>
+
+<Update label="v0.13.0" description="December 2025">
+  ## Session Management & Architecture Improvements
+  Major release aligned with mcp-use v1.11.0, featuring session management architecture and improved inspector capabilities.
+
+### Breaking Changes
+
+- **Breaking**: WebSocket transport support removed. Use streamable HTTP or SSE transports instead.
+- **Breaking**: LangChain adapter moved from main entry point to `mcp-use/adapters` subpath.
+
+### Session Management
+
+- **Enhancement**: Support for pluggable session management architecture with Redis support
+- **Enhancement**: Improved session persistence and connection handling
+- **Enhancement**: Better support for distributed deployments with cross-server notifications
+
+### Inspector Features
+
+- **Enhancement**: Enhanced connection handling with automatic 404 handling and re-initialization
+- **Enhancement**: Improved tool, resource, and prompt management
+- **Enhancement**: Better integration with session management architecture
+- **Enhancement**: Enhanced debugging capabilities with better error handling
+
+### Widget Support
+
+- **Enhancement**: Improved widget rendering and debugging for ChatGPT Apps
+- **Enhancement**: Better widget data handling and state management
+- **Enhancement**: Enhanced OpenAI component renderer with improved functionality
+
+### UI Improvements
+
+- **Enhancement**: Better connection settings UI
+- **Enhancement**: Improved server management interface
+- **Enhancement**: Enhanced tool result display and formatting
+</Update>
+
+<Update label="v0.12.6" description="December 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.12.5" description="December 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.12.4" description="December 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.12.3" description="December 2025">
+  ## Bug Fixes - **Fix**: Deno 3 compatibility fixes
+</Update>
+
+<Update label="v0.12.2" description="December 2025">
+  ## Bug Fixes - **Fix**: Updated Zod error handling
+</Update>
+
+<Update label="v0.12.1" description="December 2025">
+  ## Bug Fixes - **Fix**: Zod import in official SDK - **Enhancement**: Added
+  repository metadata in package.json
+</Update>
+
+<Update label="v0.12.0" description="December 2025">
+  ## Elicitation Support & API Improvements
+  Major release aligned with mcp-use v1.10.0, featuring elicitation support and enhanced inspector capabilities.
+
+### Breaking Changes
+
+- **Breaking**: Server API renamed `createMCPServer()` factory function to `MCPServer` class constructor
+- **Breaking**: Session API replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct methods: `session.tools`, `session.callTool()`, etc.
+- **Breaking**: OAuth environment variables standardized to `MCP_USE_OAUTH_*` prefix
+
+### New Features
+
+- **New**: Elicitation support in inspector - servers can request user input through clients
+- **New**: Client Capabilities API with `ctx.client.can()` and `ctx.client.capabilities()`
+- **New**: Session Notifications API with `ctx.sendNotification()` and `ctx.sendNotificationToSession()`
+- **New**: Session Info API with `ctx.session.sessionId` to access current session ID
+- **New**: Resource Template Flat Structure support with `uriTemplate` directly on definition
+- **New**: Resource Template Callback Signatures supporting multiple signatures
+
+### Improvements
+
+- **Enhancement**: Enhanced type inference for resource template callbacks
+- **Enhancement**: Client capabilities tracking during initialization
+- **Enhancement**: Major documentation refactoring and restructuring
+- **Enhancement**: Edge runtime support improvements
+- **Enhancement**: Transport bug fixes
+</Update>
+
+<Update label="v0.11.0" description="December 2025">
+  ## Elicitation Support - **New**: Added support for elicitation in inspector,
+  enabling servers to request user input through clients - **Fix**: Transport
+  bug fixes
+</Update>
+
+<Update label="v0.10.1" description="November 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.10.0" description="November 2025">
+  ## Sampling Support - **New**: Added sampling support in inspector with LLM
+  sampling capabilities - **Fix**: Long running sampling requests no longer
+  timeout after 60 seconds - **Enhancement**: Better handling of extended
+  sampling operations
+</Update>
+
+<Update label="v0.9.2" description="November 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.9.1" description="November 2025">
+  ## Bug Fixes - **Fix**: Fixed bin entry issue for pnpm installation -
+  **Enhancement**: Standardized import statement formatting across multiple
+  files
+</Update>
+
+<Update label="v0.9.0" description="November 2025">
+  ## OAuth Authentication System
+  Major release with complete OAuth 2.0 support and enhanced inspector capabilities.
+
+### New Features
+
+- **New**: Complete OAuth 2.0 authentication framework with built-in providers (Auth0, WorkOS, Supabase, Keycloak)
+- **New**: OAuth middleware and routes for server-side OAuth flow handling
+- **New**: OAuth callback component in inspector for authentication flows
+- **New**: Context storage with async local storage for request-scoped context
+- **New**: Response helpers for standardized HTTP responses and error handling
+- **New**: Runtime detection utilities for Node.js, Bun, and Deno environments
+
+### Inspector Enhancements
+
+- **Enhancement**: Enhanced useMcp hook with improved connection management and OAuth support
+- **Enhancement**: Enhanced inspector dashboard with OAuth configuration UI
+- **Enhancement**: Better authentication flow handling with OAuth integration
+- **Enhancement**: Improved auto-connect with enhanced connection recovery
+- **Enhancement**: Enhanced HTTP connectors with OAuth token handling
+
+### UI Improvements
+
+- **Fix**: Fixed scrolls in tools, resources, and prompts tab
+- **Fix**: Fixed models and API keys box in inspector chat
+- **Fix**: Fixed rendering of table, inline-code, code and images in inspector chat
+- **Fix**: Fixed padding of RPC panels
+- **New**: Added enum input display for tools
+- **Enhancement**: Bundle minification (9.7mb → 4.2 mb)
+
+### Bug Fixes
+
+- **Fix**: Switched to fork SDK to fix Zod errors on Deno runtime
+- **Fix**: Optimized dependencies
+</Update>
+
+<Update label="v0.8.3" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.8.2" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.8.1" description="October 2025">
+  ## Bug Fixes - **Fix**: Fixed auto-connect proxy fallback behavior - **Fix**:
+  Fixed connection config updates not applying when connection already exists -
+  **Enhancement**: Auto-switch (proxy fallback) now automatically enabled during
+  auto-connect flow - **Enhancement**: Improved error messages for connection
+  failures
+</Update>
+
+<Update label="v0.8.0" description="October 2025">
+  ## Notifications, Sampling & OpenAI Apps SDK Integration
+  Major release with bidirectional notifications, LLM sampling, and comprehensive OpenAI Apps SDK support.
+
+### New Features
+
+- **New**: Bidirectional notification support between clients and servers
+- **New**: LLM sampling capabilities allowing MCP tools to request completions from connected clients
+- **New**: Widget build ID support for cache busting in widget UI resources
+- **New**: Inspector notifications tab with real-time display
+- **New**: Server capabilities modal showing supported MCP features
+- **New**: RPC message logging support in inspector
+
+### OpenAI Apps SDK Integration
+
+- **New**: McpUseProvider component combining React setup (StrictMode, ThemeProvider, BrowserRouter, ErrorBoundary)
+- **New**: WidgetControls component with debug overlay and view controls (fullscreen, PIP)
+- **New**: useWidget hook for type-safe React adapter to OpenAI Apps SDK API
+- **New**: ErrorBoundary component for graceful error handling
+- **New**: Image component handling data URLs and public file paths
+- **New**: ThemeProvider for consistent theme management
+- **New**: WidgetInspectorControls for inspector-specific debugging
+- **New**: Console proxy toggle for iframe console logs
+- **New**: Product search result widget template with carousel and accordion components
+- **New**: Folder-based widget support with automatic detection
+- **New**: Public folder support for static assets
+
+### Inspector Enhancements
+
+- **Enhancement**: Enhanced OpenAIComponentRenderer with better height calculation and theme support
+- **Enhancement**: Enhanced ToolResultDisplay with multiple content types (text, image, audio, resource links)
+- **Enhancement**: Resizable panels with collapse support
+- **Enhancement**: Better widget security headers and CSP configuration
+- **Enhancement**: Enhanced widget data handling and state management
+
+### Improvements
+
+- **Enhancement**: Refactored HTTP transport to reuse sessions across requests
+- **Enhancement**: Session management with tracking and automatic cleanup
+- **Enhancement**: Roots support in connectors and session API
+- **Enhancement**: Enhanced search_tools with metadata
+- **Enhancement**: Improved SSR configuration with proper Vite settings
+
+### Bug Fixes
+
+- **Fix**: Fixed iframe height calculation issues
+- **Fix**: Fixed theme flashing on widget load
+- **Fix**: Fixed CSP header generation for dev mode
+- **Fix**: Fixed asset loading in dev widget proxy
+- **Fix**: Fixed console logging in iframe
+- **Fix**: Fixed widget state inspection
+- **Fix**: Fixed resizable panel collapse behavior
+</Update>
+
+<Update label="v0.7.1" description="October 2025">
+  ## Bug Fixes & Improvements - **Fix**: Fixed auto-connect proxy fallback
+  behavior - **Fix**: Fixed connection config updates not applying when
+  connection already exists - **Enhancement**: Auto-switch (proxy fallback) now
+  automatically enabled during auto-connect flow - **Enhancement**: Improved
+  error messages for connection failures
+</Update>
+
+<Update label="v0.7.0" description="October 2025">
+  ## Code Mode Support - **New**: Code Mode feature allowing agents to execute
+  code using MCP tools - **Enhancement**: Enhanced MCPClient with code execution
+  configuration - **Enhancement**: Comprehensive tests for code execution
+  functionality
+</Update>
+
+<Update label="v0.6.1" description="October 2025">
+  ## Bug Fixes - **Fix**: Various bug fixes and improvements
+</Update>
+
+<Update label="v0.6.0" description="October 2025">
+  ## Edge Runtime Support - **Major**: Migrated to Hono framework for edge
+  runtime support - **New**: Runtime detection for Deno and Node.js environments
+  - **New**: Enhanced inspector dashboard with improved connection handling -
+  **Enhancement**: Better auto-connection logic with error handling and retry
+  mechanisms
+</Update>
+
+<Update label="v0.5.3" description="October 2025">
+  ## Bug Fixes & Improvements - **Fix**: Various bug fixes and stability
+  improvements - **Enhancement**: Dependency updates
+</Update>
+
+<Update label="v0.5.2" description="October 2025">
+  ## Bug Fixes & Improvements - **Fix**: Various bug fixes and stability
+  improvements - **Enhancement**: Dependency updates
+</Update>
+
+<Update label="v0.5.1" description="October 2025">
+  ## Bug Fixes - **Fix**: Various bug fixes and improvements
+</Update>
+
+<Update label="v0.5.0" description="October 2025">
+  ## LangChain 1.0.0 Support - **Major**: Support for LangChain 1.0.0 - **Fix**:
+  Model type compatibility for LangChain 1.0.0 - **Enhancement**: Set CLI and
+  inspector as dependencies
+</Update>
+
+<Update label="v0.4.13" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.12" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.11" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.10" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.9" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.8" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.7" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.6" description="October 2025">
+  ## Dependency Updates - **Enhancement**: Updated dependencies
+</Update>
+
+<Update label="v0.4.5" description="October 2025">
+  ## Bug Fixes - **Fix**: Fixed inspector chat formatting
+</Update>
+
+<Update label="v0.4.4" description="October 2025">
+  ## Bug Fixes - **Fix**: Fixed inspector chat - **Fix**: Fixed inspector shadow
+</Update>
+
+<Update label="v0.4.3" description="October 2025">
+  ## Major Refactoring & Apps SDK Support
+  Major refactoring with improved architecture and enhanced Apps SDK support.
+
+### Major Refactoring
+
+- **Refactor**: Server architecture refactored with major improvements to routing and middleware
+- **Refactor**: Removed legacy `mcp-inspector.ts` file in favor of modular architecture
+- **Refactor**: Added new `cli.ts` for improved command-line interface handling
+- **Refactor**: Added `utils.ts` and `shared-utils-browser.ts` for better code organization
+- **Refactor**: Enhanced `shared-routes.ts` with improved route handling and error management
+
+### Apps SDK Support
+
+- **Enhancement**: Enhanced widget data handling and state management
+- **New**: Added `readResource` method in MCPInspector for fetching resources based on server ID
+- **Enhancement**: Enhanced OpenAI component renderer to utilize serverId and readResource
+- **Enhancement**: Improved safe data serialization for widget state management
+
+### UI/UX Improvements
+
+- **Enhancement**: Enhanced ConnectionSettingsForm with copy configuration feature
+- **Enhancement**: Updated OpenAIComponentRenderer to dynamically adjust iframe height
+- **Enhancement**: Improved resource display with duration metrics and enhanced badge styling
+- **Enhancement**: Enhanced LayoutHeader with dynamic badge styling
+- **Fix**: Fixed scrollable tool parameters for better user experience
+- **Enhancement**: Added mobile-responsive hiding features
+
+### Bug Fixes
+
+- **Fix**: Fixed inspector mounting logic by simplifying server URL handling
+- **Fix**: Fixed linting issues across multiple components
+- **Fix**: Fixed server configuration for improved stability
+</Update>
+
+<Update label="v0.4.2" description="October 2025">
+  ## Auto-Connection & Multi-Server Support - **New**: Auto-connection
+  functionality - inspector now automatically connects to MCP servers on startup
+  - **New**: Multi-server support - enhanced support for connecting to multiple
+  MCP servers simultaneously - **New**: Client-side chat functionality with
+  improved message handling - **New**: Resource handling with enhanced chat
+  components - **Enhancement**: Streamlined routing with refactored server and
+  client routing - **Enhancement**: Enhanced connection handling with improved
+  auto-connection logic - **Enhancement**: Better UI components with updated
+  Layout, ChatTab, and ToolsTab components - **Fix**: Fixed connection handling
+  in InspectorDashboard - **Fix**: Improved error messages in useMcp hook
+</Update>
+
+<Update label="v0.4.1" description="October 2025">
+  ## Bug Fixes - **Fix**: Minor fixes and improvements
+</Update>
+
+<Update label="v0.4.0" description="October 2025">
+  ## Major Refactor & Apps SDK Initial Integration
+  Major refactor aligning inspector with mcp-use TypeScript package and initial Apps SDK integration.
+
+### Major Refactoring
+
+- **Refactor**: Migrated from CommonJS to ESM format
+- **Refactor**: Added input validation for port and URL
+- **Refactor**: Improved error handling and logging
+- **Refactor**: Added `open` package for cross-platform browser launching
+- **Refactor**: Reorganized component structure (moved to `src/client/components/`)
+- **Refactor**: Refactored ChatTab to use streaming API and custom hooks
+- **Refactor**: Enhanced InspectorDashboard with auto-connect functionality
+- **Refactor**: Improved CommandPalette with better item selection
+- **Refactor**: Updated routing to use query parameters
+
+### New Components
+
+- **New**: Chat components: `AssistantMessage`, `UserMessage`, `ToolCallDisplay`, `MCPUIResource`, `MessageList`
+- **New**: UI components: `aurora-background`, `text-shimmer`, `sheet`, `switch`, `kbd`, `shimmer-button`, `status-dot`
+- **New**: Form components: `ConnectionSettingsForm`, `ServerDropdown`
+- **New**: Tool components: `ToolExecutionPanel`, `ToolResultDisplay`, `SaveRequestDialog`
+- **New**: Resource components: `ResourceResultDisplay`, `ResourcesList`
+
+### Apps SDK Integration
+
+- **New**: OpenAI Apps SDK integration with UI resource type
+- **New**: Enhanced MCP-UI adapter for Apps SDK metadata
+- **New**: Resource URI format supporting `ui://widget/` scheme
+
+### Bug Fixes
+
+- **Fix**: Fixed CLI binary format and package configuration
+- **Fix**: Changed CLI build format from CommonJS to ESM
+- **Fix**: Added input validation for port and URL arguments
+- **Fix**: Improved error logging in API routes
+- **Fix**: Fixed async/await bugs in static file serving
+</Update>

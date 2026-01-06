@@ -1,7 +1,7 @@
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 export interface PendingSamplingRequest {
   id: string;

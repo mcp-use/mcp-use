@@ -15,11 +15,11 @@
  * - High-throughput scenarios (frequent disk I/O may impact performance)
  */
 
-import { mkdir, writeFile, rename, unlink } from "node:fs/promises";
-import { join, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
-import type { SessionStore } from "./index.js";
+import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { SessionMetadata } from "../session-manager.js";
+import type { SessionStore } from "./index.js";
 
 /**
  * Configuration for FileSystem session store
@@ -99,26 +99,16 @@ export class FileSystemSessionStore implements SessionStore {
       const now = Date.now();
 
       // Clean up expired sessions during load
-      let loadedCount = 0;
-      let expiredCount = 0;
-
       for (const [sessionId, metadata] of Object.entries(parsed)) {
         const sessionMetadata = metadata as SessionMetadata;
         const age = now - sessionMetadata.lastAccessedAt;
 
         if (age > this.maxAgeMs) {
-          expiredCount++;
           continue; // Skip expired sessions
         }
 
         this.sessions.set(sessionId, sessionMetadata);
-        loadedCount++;
       }
-
-      console.log(
-        `[FileSystemSessionStore] Loaded ${loadedCount} session(s) from ${this.filePath}` +
-          (expiredCount > 0 ? ` (cleaned up ${expiredCount} expired)` : "")
-      );
     } catch (error: any) {
       if (error.code === "ENOENT") {
         // File doesn't exist - this is fine for first run
@@ -263,10 +253,6 @@ export class FileSystemSessionStore implements SessionStore {
       const tempPath = `${this.filePath}.tmp`;
       await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
       await rename(tempPath, this.filePath);
-
-      console.debug(
-        `[FileSystemSessionStore] Saved ${this.sessions.size} session(s) to ${this.filePath}`
-      );
     } catch (error: any) {
       console.error(
         `[FileSystemSessionStore] Error saving sessions:`,

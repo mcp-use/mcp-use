@@ -13,7 +13,7 @@ import {
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
 import { LangChainAdapter } from "../adapters/langchain_adapter.js";
-import { MCPClient } from "../client.js";
+import type { MCPClient } from "../client.js";
 import type { BaseConnector } from "../connectors/base.js";
 import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
@@ -340,6 +340,8 @@ export class MCPAgent {
         logger.info(
           `Creating MCPClient with ${Object.keys(this.mcpServersConfig).length} server(s)...`
         );
+        // Dynamically import MCPClient (Node.js version)
+        const { MCPClient } = await import("../client.js");
         this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
         logger.info("✅ MCPClient created successfully");
       }
