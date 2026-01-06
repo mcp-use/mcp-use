@@ -1,7 +1,7 @@
 import type {
   ReadResourceResult,
   CallToolResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
@@ -344,9 +344,9 @@ interface BaseUIResourceDefinition {
     | ((
         params: Record<string, any>
       ) =>
-        | import("@mcp-use/modelcontextprotocol-sdk/types.js").CallToolResult
+        | import("@modelcontextprotocol/sdk/types.js").CallToolResult
         | import("../utils/response-helpers.js").TypedCallToolResult<any>)
-    | import("@mcp-use/modelcontextprotocol-sdk/types.js").CallToolResult
+    | import("@modelcontextprotocol/sdk/types.js").CallToolResult
     | import("../utils/response-helpers.js").TypedCallToolResult<any>;
 
   _meta?: Record<string, unknown>;

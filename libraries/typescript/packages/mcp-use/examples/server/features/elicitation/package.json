@@ -5,9 +5,9 @@
   "private": true,
   "description": "MCP server demonstrating elicitation (form and URL modes)",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
-    "build": "tsc"
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "build": "mcp-use build"
   },
   "dependencies": {
     "mcp-use": "workspace:*",

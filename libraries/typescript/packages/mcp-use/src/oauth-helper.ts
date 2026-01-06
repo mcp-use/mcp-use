@@ -269,6 +269,7 @@ export class OAuthHelper {
         response_types: ["code"],
         token_endpoint_auth_method: "none", // Use public client (no secret)
         scope: this.config.scope || "read write",
+        logo_uri: "https://mcp-use.com/logo.png",
       };
 
       console.log("🔐 [OAuthHelper] Registering OAuth client dynamically:", {
@@ -517,32 +518,4 @@ export class OAuthHelper {
       Math.random().toString(36).substring(2, 15)
     );
   }
-}
-
-/**
- * Linear-specific OAuth configuration
- */
-export const LINEAR_OAUTH_CONFIG: OAuthConfig = {
-  // No clientId needed - will use dynamic client registration
-  redirectUri:
-    typeof window !== "undefined"
-      ? window.location.origin + window.location.pathname
-      : "http://localhost:5173",
-  scope: "read write",
-  clientName: "MCP Use Example",
-};
-
-/**
- * Helper function to create OAuth-enabled MCP configuration
- */
-export function createOAuthMCPConfig(serverUrl: string, accessToken: string) {
-  return {
-    mcpServers: {
-      linear: {
-        url: serverUrl,
-        authToken: accessToken,
-        transport: "sse",
-      },
-    },
-  };
 }

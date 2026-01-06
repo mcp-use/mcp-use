@@ -75,7 +75,8 @@
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",
-                  "inspector/development"
+                  "inspector/development",
+                  "inspector/changelog"
                 ]
               },
               "tunneling/index"

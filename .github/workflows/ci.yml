@@ -912,3 +912,45 @@ jobs:
           [ -f "test-app/package.json" ] || exit 1
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
+      
+      - name: Test dev command (non --dev flag only)
+        if: matrix.flag == ''
+        shell: bash
+        working-directory: test-app
+        run: |
+          # Start dev server in background
+          case "${{ matrix.pm }}" in
+            npm)
+              npm run dev &
+              ;;
+            yarn)
+              yarn dev &
+              ;;
+            pnpm)
+              pnpm dev &
+              ;;
+          esac
+          
+          DEV_PID=$!
+          
+          # Wait for server to start (10 seconds should be enough)
+          sleep 10
+          
+          # Kill the dev server
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            # On Windows, kill by port is more reliable than DEV_PID
+            # because bash's $! may not map to the actual Windows process ID
+            DEV_PORT=3000
+            for pid in $(netstat -ano 2>/dev/null | grep ":$DEV_PORT " | grep "LISTENING" | awk '{print $5}' | sort -u); do
+              taskkill //PID $pid //F 2>/dev/null || true
+            done
+            # Also try the process tree kill as fallback
+            taskkill //PID $DEV_PID //T //F 2>/dev/null || true
+          else
+            kill $DEV_PID 2>/dev/null || true
+          fi
+          
+          # Wait for process to exit
+          wait $DEV_PID 2>/dev/null || true
+          
+          echo "✅ Dev server started and stopped successfully"

@@ -33,6 +33,8 @@ export function createConnectorFromConfig(
       preferSse: serverConfig.preferSse || transport === "sse",
       // Disable SSE fallback if explicitly disabled in config
       disableSseFallback: serverConfig.disableSseFallback,
+      // Pass clientInfo if provided in server config
+      clientInfo: serverConfig.clientInfo,
       ...connectorOptions,
     });
   }

@@ -3,8 +3,8 @@ import type {
   OAuthClientInformation,
   OAuthTokens,
   OAuthClientMetadata,
-} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
-import type { OAuthClientProvider } from "@mcp-use/modelcontextprotocol-sdk/client/auth.js";
+} from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary
@@ -18,6 +18,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly serverUrlHash: string;
   readonly clientName: string;
   readonly clientUri: string;
+  readonly logoUri: string;
   readonly callbackUrl: string;
   private preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
@@ -35,6 +36,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       storageKeyPrefix?: string;
       clientName?: string;
       clientUri?: string;
+      logoUri?: string;
       callbackUrl?: string;
       preventAutoAuth?: boolean;
       useRedirectFlow?: boolean;
@@ -52,6 +54,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.clientUri =
       options.clientUri ||
       (typeof window !== "undefined" ? window.location.origin : "");
+    this.logoUri = options.logoUri || "https://mcp-use.com/logo.png";
     this.callbackUrl = sanitizeUrl(
       options.callbackUrl ||
         (typeof window !== "undefined"
@@ -77,6 +80,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       response_types: ["code"],
       client_name: this.clientName,
       client_uri: this.clientUri,
+      logo_uri: this.logoUri,
       // scope: 'openid profile email mcp', // Example scopes, adjust as needed
     };
   }

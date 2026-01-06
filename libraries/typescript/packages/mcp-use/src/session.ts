@@ -3,8 +3,8 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
+} from "@modelcontextprotocol/sdk/types.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { BaseConnector, NotificationHandler } from "./connectors/base.js";
 
 export class MCPSession {

@@ -1,14 +1,14 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
-import * as React from "react";
-import { cn } from "@/client/lib/utils";
 import {
   Tooltip,
-  TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import { cn } from "@/client/lib/utils";
+import type { LucideIcon } from "lucide-react";
+import * as React from "react";
 
 interface TabsContextType {
   activeValue: string;
@@ -276,6 +276,7 @@ interface TabsTriggerProps {
   disabled?: boolean;
   icon?: LucideIcon;
   title?: string;
+  showDot?: boolean;
 }
 
 // conditional tooltip wrapper if collapsed
@@ -323,6 +324,7 @@ const TabsTrigger = React.forwardRef<
       disabled,
       icon: Icon,
       title: titleProp,
+      showDot = false,
       ...props
     },
     ref
@@ -367,6 +369,9 @@ const TabsTrigger = React.forwardRef<
                 collapsed && "mr-0!"
               )}
             />
+          )}
+          {showDot && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 dark:bg-orange-400 border-2 border-white dark:border-zinc-900 rounded-full transition-opacity duration-300 z-10 animate-status-pulse-orange" />
           )}
           <span
             className={cn(

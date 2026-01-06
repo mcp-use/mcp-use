@@ -27,10 +27,10 @@
 
 // Suppress TypeScript warning - SSEClientTransport is deprecated in SDK but we maintain it for backward compat
 // @ts-ignore - We're aware of the deprecation and handle it with our own @deprecated tag above
-import type { SSEClientTransportOptions } from "@mcp-use/modelcontextprotocol-sdk/client/sse.js";
+import type { SSEClientTransportOptions } from "@modelcontextprotocol/sdk/client/sse.js";
 // @ts-ignore
-import { SSEClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/sse.js";
-import type { JSONRPCMessage } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../logging.js";
 import { ConnectionManager } from "./base.js";
 
