@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.9.4
+
+### Patch Changes
+
+- 53fb670: fix: include node types in dev deps
+
 ## 0.9.4-canary.0
 
 ### Patch Changes
