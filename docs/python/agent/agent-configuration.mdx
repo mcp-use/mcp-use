@@ -100,9 +100,9 @@ agent = MCPAgent(
     memory_enabled=True,
     system_prompt="Custom instructions for the agent",
     additional_instructions="Additional guidelines for specific tasks",
-    disallowed_tools=["file_system", "network", "shell"]  # Restrict potentially dangerous tools
-    metadata={"emp_id": value, "email":"a.b@c.com"} # use this to send sensitive data into tools without passing to the LLM
-    message_id="choosen message id in chat usually like a UUID"
+    disallowed_tools=["file_system", "network", "shell"]  # Restrict potentially dangerous tools,
+    metadata={"emp_id": value, "email":"a.b@c.com"} # use this to send sensitive data into tools without passing to the LLM,
+    message_id="chosen message id in chat usually like a UUID"
 )
 ```
 </CodeGroup>
@@ -122,7 +122,7 @@ agent = MCPAgent(
 - `disallowed_tools`: List of tool names that should not be available to the agent (optional)
 - `use_server_manager`: Enable dynamic server selection (default: False)
 - `metadata`: Dictionary of sensitive information to the tools which is not to be passed to LLM
-- `message_id`: User specific message id for a chat message usually like a UUID
+- `message_id`: User-specific message id for a chat message usually like a UUID
 
 ## Sending Files with HumanMessage
 
