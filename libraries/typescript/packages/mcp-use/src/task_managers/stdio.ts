@@ -1,6 +1,6 @@
-import type { StdioServerParameters } from "@mcp-use/modelcontextprotocol-sdk/client/stdio.js";
+import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { Writable } from "node:stream";
-import { StdioClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/stdio.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { logger } from "../logging.js";
 import { ConnectionManager } from "./base.js";
 

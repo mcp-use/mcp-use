@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.9.3",
+  "version": "0.9.4-canary.0",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",

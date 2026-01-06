@@ -1,4 +1,7 @@
-import type { MCPNotification } from "@/client/context/McpContext";
+import type { McpNotification } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPNotification = McpNotification;
 import { ListItem } from "@/client/components/shared/ListItem";
 import { NotFound } from "@/client/components/ui/not-found";
 

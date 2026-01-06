@@ -1,0 +1,29 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.7.0",
+    "create-mcp-use-app": "0.9.3",
+    "@mcp-use/inspector": "0.13.2",
+    "mcp-use": "1.11.2"
+  },
+  "changesets": [
+    "clean-ears-greet",
+    "dry-grapes-check",
+    "gold-toes-deny",
+    "honest-bushes-guess",
+    "jolly-llamas-wash",
+    "lemon-pumas-travel",
+    "neat-shirts-grin",
+    "ninety-jokes-enjoy",
+    "pink-clubs-rule",
+    "plenty-gifts-smell",
+    "silver-adults-sink",
+    "sour-melons-sit",
+    "sparkly-numbers-sit",
+    "tangy-foxes-sin",
+    "tasty-jokes-play",
+    "thin-glasses-accept",
+    "twelve-icons-invent"
+  ]
+}

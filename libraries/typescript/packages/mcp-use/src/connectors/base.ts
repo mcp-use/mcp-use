@@ -1,13 +1,13 @@
 import type {
   Client,
   ClientOptions,
-} from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
-import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
+} from "@modelcontextprotocol/sdk/client/index.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   ListRootsRequestSchema,
   CreateMessageRequestSchema,
   ElicitRequestSchema,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type {
   CallToolResult,
   CreateMessageRequest,
@@ -18,7 +18,7 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import { logger } from "../logging.js";
 import { Telemetry } from "../telemetry/index.js";

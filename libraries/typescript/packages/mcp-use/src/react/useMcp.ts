@@ -4,13 +4,16 @@ import type {
   Resource,
   ResourceTemplate,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { sanitizeUrl } from "../utils/url-sanitize.js";
-import { BrowserMCPClient } from "../client/browser.js";
+} from "@modelcontextprotocol/sdk/types.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
-import { Tel } from "../telemetry/index.js";
+import { BrowserMCPClient } from "../client/browser.js";
+import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
+import { detectFavicon } from "../utils/favicon-detector.js";
+import { applyProxyConfig } from "../utils/proxy-config.js";
+import { sanitizeUrl } from "../utils/url-sanitize.js";
+import { getPackageVersion } from "../version.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
@@ -54,8 +57,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const {
     url,
     enabled = true,
-    clientName,
-    clientUri,
     callbackUrl = typeof window !== "undefined"
       ? sanitizeUrl(
           new URL("/oauth/callback", window.location.origin).toString()
@@ -64,6 +65,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     storageKeyPrefix = "mcp:auth",
     clientConfig = {},
     customHeaders = {},
+    proxyConfig,
     debug: _debug = false,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
@@ -79,6 +81,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     onElicitation,
   } = options;
 
+  // Apply proxy configuration if provided
+  const { url: finalUrl, headers: proxyHeaders } = useMemo(
+    () => applyProxyConfig(url || "", proxyConfig),
+    [url, proxyConfig]
+  );
+
+  // Merge proxy headers with custom headers (custom headers take precedence)
+  const allHeaders = useMemo(
+    () => ({ ...proxyHeaders, ...customHeaders }),
+    [proxyHeaders, customHeaders]
+  );
+
   const [state, setState] = useState<UseMcpResult["state"]>("discovering");
   const [tools, setTools] = useState<Tool[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
@@ -86,26 +100,32 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [serverInfo, setServerInfo] = useState<{
-    name: string;
-    version?: string;
-  }>();
+  const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>();
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
+  const [authTokens, setAuthTokens] =
+    useState<UseMcpResult["authTokens"]>(undefined);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
   const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null);
+  const iconLoadingPromiseRef = useRef<Promise<string | null> | null>(null);
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
   const authTimeoutRef = useRef<number | null>(null);
+  const retryScheduledRef = useRef<boolean>(false);
 
   // --- Refs for values used in callbacks ---
   const stateRef = useRef(state);
   const autoReconnectRef = useRef(autoReconnect);
   const successfulTransportRef = useRef<TransportType | null>(null);
+  // Forward refs for functions (declared later) to avoid circular dependencies
+  const connectRef = useRef<(() => Promise<void>) | null>(null);
+  const failConnectionRef = useRef<
+    ((message: string, error?: Error) => void) | null
+  >(null);
 
   /**
    * Effect: Keep refs in sync with state values
@@ -264,8 +284,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (!authProviderRef.current) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
-        clientName,
-        clientUri,
+        clientName: clientConfig.name,
+        clientUri: clientConfig.uri,
+        logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
@@ -292,18 +313,22 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Build server config
         const serverConfig: any = {
-          url: url,
+          url: finalUrl,
           transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
           // Disable SSE fallback when using explicit HTTP transport (not SSE)
           // This prevents automatic HTTP → SSE fallback at the connector level
           disableSseFallback: transportTypeParam === "http",
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
+          clientInfo: {
+            name: "mcp-use Inspector",
+            version: getPackageVersion(),
+          },
         };
 
-        // Add custom headers if provided
-        if (customHeaders && Object.keys(customHeaders).length > 0) {
-          serverConfig.headers = customHeaders;
+        // Add custom headers if provided (includes proxy headers)
+        if (allHeaders && Object.keys(allHeaders).length > 0) {
+          serverConfig.headers = allHeaders;
         }
 
         // Add OAuth token if available
@@ -503,11 +528,88 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         if (serverInfo) {
           console.log("[useMcp] Server info:", serverInfo);
           setServerInfo(serverInfo);
+
+          // Start icon loading in background and store the promise
+          const loadIconPromise = (async () => {
+            try {
+              // Check if server provided icons in the serverInfo
+              const serverIcons = (serverInfo as any).icons;
+              if (
+                serverIcons &&
+                Array.isArray(serverIcons) &&
+                serverIcons.length > 0
+              ) {
+                // Server provided icons - use the first one
+                const iconUrl = serverIcons[0].src || serverIcons[0].url;
+                if (iconUrl) {
+                  addLog("info", "Server provided icon:", iconUrl);
+                  // Fetch and convert to base64 for storage
+                  const res = await fetch(iconUrl);
+                  const blob = await res.blob();
+                  const base64 = await new Promise<string>(
+                    (resolve, reject) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => resolve(reader.result as string);
+                      reader.onerror = reject;
+                      reader.readAsDataURL(blob);
+                    }
+                  );
+
+                  if (isMountedRef.current) {
+                    setServerInfo((prev) =>
+                      prev ? { ...prev, icon: base64 } : undefined
+                    );
+                    addLog("debug", "Server icon converted to base64");
+                  }
+                  return base64;
+                }
+              }
+
+              // No server-provided icons - try auto-detection
+              if (url) {
+                const faviconBase64 = await detectFavicon(url);
+                if (faviconBase64 && isMountedRef.current) {
+                  setServerInfo((prev) =>
+                    prev ? { ...prev, icon: faviconBase64 } : undefined
+                  );
+                  addLog("debug", "Favicon detected and added to serverInfo");
+                  return faviconBase64;
+                }
+              }
+
+              return null;
+            } catch (err) {
+              addLog("debug", "Icon loading failed (non-critical):", err);
+              return null;
+            }
+          })();
+
+          // Store the promise so ensureIconLoaded() can await it
+          iconLoadingPromiseRef.current = loadIconPromise;
         }
 
         if (capabilities) {
           console.log("[useMcp] Server capabilities:", capabilities);
           setCapabilities(capabilities);
+        }
+
+        // Get OAuth tokens if authentication was used
+        if (authProviderRef.current) {
+          const tokens = await authProviderRef.current.tokens();
+          if (tokens?.access_token) {
+            // Calculate expires_at from expires_in if available
+            const expiresAt = tokens.expires_in
+              ? Date.now() + tokens.expires_in * 1000
+              : undefined;
+
+            setAuthTokens({
+              access_token: tokens.access_token,
+              token_type: tokens.token_type || "Bearer",
+              expires_at: expiresAt,
+              refresh_token: tokens.refresh_token,
+              scope: tokens.scope,
+            });
+          }
         }
 
         return "success";
@@ -533,7 +635,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             // This happens because 401 occurs before OAuth flow starts
             try {
               const { auth } =
-                await import("@mcp-use/modelcontextprotocol-sdk/client/auth.js");
+                await import("@modelcontextprotocol/sdk/client/auth.js");
               const baseUrl = new URL(url).origin;
 
               // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
@@ -642,11 +744,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     disconnect,
     url,
     storageKeyPrefix,
-    clientName,
-    clientUri,
     callbackUrl,
     clientConfig.name,
     clientConfig.version,
+    clientConfig.uri,
+    clientConfig.logo_uri,
     customHeaders,
     transportType,
     preventAutoAuth,
@@ -656,6 +758,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout,
     sseReadTimeout,
   ]);
+
+  /**
+   * Effect: Update function refs to prevent stale closures
+   * Used by retry and OAuth callback handlers
+   */
+  useEffect(() => {
+    connectRef.current = connect;
+    failConnectionRef.current = failConnection;
+  }, [connect, failConnection]);
 
   /**
    * Call a tool on the connected MCP server
@@ -745,18 +856,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   /**
    * Retry connection after failure
    * Only works if current state is 'failed'
+   * Note: Uses connectRef to avoid circular dependency with connect
    */
   const retry = useCallback(() => {
     if (stateRef.current === "failed") {
       addLog("info", "Retry requested...");
-      connect();
+      // Use connectRef to avoid circular dependency
+      // connectRef is kept updated via useEffect
+      connectRef.current?.();
     } else {
       addLog(
         "warn",
         `Retry called but state is not 'failed' (state: ${stateRef.current}). Ignoring.`
       );
     }
-  }, [addLog, connect]);
+  }, [addLog]);
 
   /**
    * Trigger manual OAuth authentication flow
@@ -812,8 +926,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Recreate the auth provider WITHOUT preventAutoAuth
         const freshAuthProvider = new BrowserOAuthClientProvider(url, {
           storageKeyPrefix,
-          clientName,
-          clientUri,
+          clientName: clientConfig.name,
+          clientUri: clientConfig.uri,
+          logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
           callbackUrl,
           preventAutoAuth: false, // ← Allow OAuth to proceed
           useRedirectFlow,
@@ -828,7 +943,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Generate a fresh authorization URL and redirect immediately
         // We need to manually trigger what the SDK would do
         const { auth } =
-          await import("@mcp-use/modelcontextprotocol-sdk/client/auth.js");
+          await import("@modelcontextprotocol/sdk/client/auth.js");
 
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
@@ -875,8 +990,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useRedirectFlow,
     onPopupWindow,
     storageKeyPrefix,
-    clientName,
-    clientUri,
+    clientConfig.name,
+    clientConfig.uri,
+    clientConfig.logo_uri,
     callbackUrl,
   ]);
 
@@ -1160,18 +1276,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   // ===== Effects =====
 
   /**
-   * Effect: Keep callback refs up to date
-   * Prevents stale closures in event listeners
-   */
-  const connectRef = useRef(connect);
-  const failConnectionRef = useRef(failConnection);
-
-  useEffect(() => {
-    connectRef.current = connect;
-    failConnectionRef.current = failConnection;
-  });
-
-  /**
    * Effect: Listen for OAuth callback messages from popup window
    * Handles successful authentication and reconnection
    */
@@ -1207,11 +1311,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                 "debug",
                 "Initiating reconnection after successful auth callback."
               );
-              connectRef.current();
+              connectRef.current?.();
             }
           }, 100);
         } else {
-          failConnectionRef.current(
+          failConnectionRef.current?.(
             `Authentication failed in callback: ${event.data.error || "Unknown reason."}`
           );
         }
@@ -1256,8 +1360,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (!authProviderRef.current || authProviderRef.current.serverUrl !== url) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
-        clientName,
-        clientUri,
+        clientName: clientConfig.name,
+        clientUri: clientConfig.uri,
+        logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
@@ -1279,10 +1384,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled,
     storageKeyPrefix,
     callbackUrl,
-    clientName,
-    clientUri,
     clientConfig.name,
     clientConfig.version,
+    clientConfig.uri,
+    clientConfig.logo_uri,
     useRedirectFlow,
   ]);
 
@@ -1291,26 +1396,81 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    *
    * If autoRetry is enabled and connection fails, automatically retries
    * after the specified delay.
+   * Uses a ref to prevent duplicate scheduling which can cause render loops.
    */
+  const retryRef = useRef(retry);
+  const addLogRef = useRef(addLog);
+
+  useEffect(() => {
+    retryRef.current = retry;
+    addLogRef.current = addLog;
+  }, [retry, addLog]);
+
   useEffect(() => {
     let retryTimeoutId: number | null = null;
+
     if (state === "failed" && autoRetry && connectAttemptRef.current > 0) {
-      const delay =
-        typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
-      addLog("info", `Connection failed, auto-retrying in ${delay}ms...`);
-      retryTimeoutId = setTimeout(() => {
-        if (isMountedRef.current && stateRef.current === "failed") {
-          retry();
-        }
-      }, delay) as any;
+      // Prevent duplicate scheduling - only schedule if not already scheduled
+      if (!retryScheduledRef.current) {
+        retryScheduledRef.current = true;
+        const delay =
+          typeof autoRetry === "number" ? autoRetry : DEFAULT_RETRY_DELAY;
+        addLogRef.current(
+          "info",
+          `Connection failed, auto-retrying in ${delay}ms...`
+        );
+        retryTimeoutId = setTimeout(() => {
+          retryScheduledRef.current = false;
+          if (isMountedRef.current && stateRef.current === "failed") {
+            retryRef.current();
+          }
+        }, delay) as any;
+      }
+    } else if (state !== "failed") {
+      // Reset the ref when not in failed state
+      retryScheduledRef.current = false;
     }
+
     return () => {
-      if (retryTimeoutId) clearTimeout(retryTimeoutId);
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        retryScheduledRef.current = false;
+      }
     };
-  }, [state, autoRetry, retry, addLog]);
+  }, [state, autoRetry]);
+
+  /**
+   * Ensure the server icon is loaded and available
+   * Waits for the background icon loading to complete
+   *
+   * @returns Promise that resolves with the base64 icon or null
+   */
+  const ensureIconLoaded = useCallback(async (): Promise<string | null> => {
+    if (stateRef.current !== "ready") {
+      addLog("warn", "Cannot ensure icon loaded - not connected");
+      return null;
+    }
+
+    // If icon is already available, return it immediately
+    if (serverInfo?.icon) {
+      return serverInfo.icon;
+    }
+
+    // If icon loading is in progress, wait for it
+    if (iconLoadingPromiseRef.current) {
+      addLog("debug", "Waiting for icon to finish loading...");
+      const icon = await iconLoadingPromiseRef.current;
+      return icon;
+    }
+
+    // No icon loading in progress and no icon available
+    addLog("debug", "No icon available and no loading in progress");
+    return null;
+  }, [serverInfo, addLog]);
 
   return {
     state,
+    name: serverInfo?.name || url || "",
     tools,
     resources,
     resourceTemplates,
@@ -1320,6 +1480,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     error,
     log,
     authUrl,
+    authTokens,
     client: clientRef.current,
     callTool,
     readResource,
@@ -1334,5 +1495,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     disconnect,
     authenticate,
     clearStorage,
+    ensureIconLoaded,
   };
 }

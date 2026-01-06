@@ -14,7 +14,7 @@
 import type {
   CreateMessageRequest,
   TextContent,
-} from "@mcp-use/modelcontextprotocol-sdk/types";
+} from "@modelcontextprotocol/sdk/types";
 import { MCPClient } from "../../../dist/src/client";
 
 // Mock LLM function - replace this with your actual LLM integration
@@ -58,9 +58,7 @@ async function mockLLM(prompt: string): Promise<string> {
 // Create sampling callback
 async function samplingCallback(
   params: CreateMessageRequest["params"]
-): Promise<
-  import("@mcp-use/modelcontextprotocol-sdk/types.js").CreateMessageResult
-> {
+): Promise<import("@modelcontextprotocol/sdk/types.js").CreateMessageResult> {
   console.log("📥 Received sampling request:");
   console.log("   Messages:", params.messages.length);
   console.log("   Model preferences:", params.modelPreferences);
@@ -92,11 +90,14 @@ async function main() {
   console.log("🚀 Starting Sampling Client Example\n");
 
   // Create client with sampling callback
+  // Configure clientInfo to identify this client to the server
+  // This is sent in the MCP initialize request and helps with server-side logging/observability
   const client = new MCPClient(
     {
       mcpServers: {
         sampling: {
           url: "http://localhost:3000/mcp",
+          clientInfo: { name: "sampling-client", version: "1.0.0" },
         },
       },
     },

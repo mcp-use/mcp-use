@@ -14,9 +14,22 @@
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { logger } from "../logging.js";
 
+/**
+ * Retrieve the value of an environment variable when `process.env` is available.
+ *
+ * @param key - The environment variable name to look up
+ * @returns The variable's value if present, `undefined` otherwise
+ */
+function getEnvVar(key: string): string | undefined {
+  if (typeof process !== "undefined" && process.env) {
+    return process.env[key];
+  }
+  return undefined;
+}
+
 // Check if Langfuse is disabled via environment variable
 const langfuseDisabled =
-  process.env.MCP_USE_LANGFUSE?.toLowerCase() === "false";
+  getEnvVar("MCP_USE_LANGFUSE")?.toLowerCase() === "false";
 
 // Initialize variables - using const with object to avoid linter issues with mutable exports
 const langfuseState = {
@@ -25,6 +38,16 @@ const langfuseState = {
   initPromise: null as Promise<void> | null,
 };
 
+/**
+ * Initializes Langfuse observability for the application and installs a callback handler that augments traces with optional agent metadata and tags.
+ *
+ * This will attempt to dynamically load the Langfuse LangChain integration and, if available, create and store a wrapped callback handler (and optionally a Langfuse client) on the module state so tracing can be used elsewhere in the application.
+ *
+ * @param agentId - Optional identifier for the agent to include in traces
+ * @param metadata - Optional static metadata to attach to traces; merged with dynamic metadata if a provider is supplied
+ * @param metadataProvider - Optional function that returns dynamic metadata to attach to traces at runtime
+ * @param tagsProvider - Optional function that returns an array of tags to attach to traces at runtime
+ */
 async function initializeLangfuse(
   agentId?: string,
   metadata?: Record<string, any>,
@@ -166,7 +189,7 @@ async function initializeLangfuse(
 
       // Determine environment tag based on MCP_USE_AGENT_ENV
       private getEnvironmentTag(): string | null {
-        const agentEnv = process.env.MCP_USE_AGENT_ENV;
+        const agentEnv = getEnvVar("MCP_USE_AGENT_ENV");
         if (!agentEnv) {
           // Default to 'unknown' if environment is not explicitly set
           return "unknown";
@@ -237,25 +260,25 @@ async function initializeLangfuse(
     const initialTags = tagsProvider ? tagsProvider() : [];
 
     const config = {
-      publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-      secretKey: process.env.LANGFUSE_SECRET_KEY,
+      publicKey: getEnvVar("LANGFUSE_PUBLIC_KEY"),
+      secretKey: getEnvVar("LANGFUSE_SECRET_KEY"),
       baseUrl:
-        process.env.LANGFUSE_HOST ||
-        process.env.LANGFUSE_BASEURL ||
+        getEnvVar("LANGFUSE_HOST") ||
+        getEnvVar("LANGFUSE_BASEURL") ||
         "https://cloud.langfuse.com",
-      flushAt: Number.parseInt(process.env.LANGFUSE_FLUSH_AT || "15"),
+      flushAt: Number.parseInt(getEnvVar("LANGFUSE_FLUSH_AT") || "15"),
       flushInterval: Number.parseInt(
-        process.env.LANGFUSE_FLUSH_INTERVAL || "10000"
+        getEnvVar("LANGFUSE_FLUSH_INTERVAL") || "10000"
       ),
-      release: process.env.LANGFUSE_RELEASE,
+      release: getEnvVar("LANGFUSE_RELEASE"),
       requestTimeout: Number.parseInt(
-        process.env.LANGFUSE_REQUEST_TIMEOUT || "10000"
+        getEnvVar("LANGFUSE_REQUEST_TIMEOUT") || "10000"
       ),
-      enabled: process.env.LANGFUSE_ENABLED !== "false",
+      enabled: getEnvVar("LANGFUSE_ENABLED") !== "false",
       // Set trace name - can be customized via metadata.trace_name or defaults to 'mcp-use-agent'
       traceName:
         initialMetadata.trace_name ||
-        process.env.LANGFUSE_TRACE_NAME ||
+        getEnvVar("LANGFUSE_TRACE_NAME") ||
         "mcp-use-agent",
       // Pass sessionId, userId, and tags to the handler
       sessionId: initialMetadata.session_id || undefined,
@@ -295,9 +318,9 @@ async function initializeLangfuse(
       if (langfuseCore) {
         const { Langfuse } = langfuseCore as any;
         langfuseState.client = new Langfuse({
-          publicKey: process.env.LANGFUSE_PUBLIC_KEY,
-          secretKey: process.env.LANGFUSE_SECRET_KEY,
-          baseUrl: process.env.LANGFUSE_HOST || "https://cloud.langfuse.com",
+          publicKey: getEnvVar("LANGFUSE_PUBLIC_KEY"),
+          secretKey: getEnvVar("LANGFUSE_SECRET_KEY"),
+          baseUrl: getEnvVar("LANGFUSE_HOST") || "https://cloud.langfuse.com",
         });
         logger.debug("Langfuse client initialized");
       }
@@ -315,8 +338,8 @@ if (langfuseDisabled) {
     "Langfuse tracing disabled via MCP_USE_LANGFUSE environment variable"
   );
 } else if (
-  !process.env.LANGFUSE_PUBLIC_KEY ||
-  !process.env.LANGFUSE_SECRET_KEY
+  !getEnvVar("LANGFUSE_PUBLIC_KEY") ||
+  !getEnvVar("LANGFUSE_SECRET_KEY")
 ) {
   logger.debug(
     "Langfuse API keys not found - tracing disabled. Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY to enable"
