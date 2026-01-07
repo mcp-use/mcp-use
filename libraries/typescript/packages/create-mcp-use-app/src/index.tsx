@@ -645,8 +645,8 @@ program
           }
         }
 
-        // Initialize git repository if requested
-        if (options.git) {
+        // Initialize git repository if requested (skip for GitHub repo templates)
+        if (options.git && !isGitHubRepoUrl(validatedTemplate)) {
           tryGitInit(projectPath);
         }
 
