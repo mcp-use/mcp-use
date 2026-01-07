@@ -5,11 +5,12 @@ import { Command } from "commander";
 import { render } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
-import { execSync, spawn } from "node:child_process";
+import { execSync, spawn, spawnSync } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -785,7 +786,7 @@ function validateGitHubRepoInfo(info: GitHubRepoInfo): boolean {
   // GitHub usernames and repo names can contain alphanumeric characters and hyphens
   // Branch names can contain alphanumeric, hyphens, underscores, slashes, and dots
   const validIdentifier = /^[a-zA-Z0-9_-]+$/;
-  const validBranch = /^[a-zA-Z0-9_.\/-]+$/;
+  const validBranch = /^[a-zA-Z0-9_./-]+$/;
   
   if (!validIdentifier.test(info.owner) || !validIdentifier.test(info.repo)) {
     return false;
@@ -807,10 +808,12 @@ async function cloneGitHubRepo(
   repoInfo: GitHubRepoInfo,
   tempDir: string
 ): Promise<string> {
-  // Check if git is available
-  try {
-    execSync("git --version", { stdio: "ignore" });
-  } catch {
+  // Check if git is available using spawnSync with array arguments
+  const versionCheck = spawnSync("git", ["--version"], {
+    stdio: "ignore",
+    shell: false,
+  });
+  if (versionCheck.status !== 0 || versionCheck.error) {
     console.error(
       chalk.red("❌ Git is not installed or not available in PATH")
     );
@@ -825,68 +828,73 @@ async function cloneGitHubRepo(
 
   const spinner = ora(`Cloning repository from GitHub...`).start();
 
-  try {
-    // Try cloning with the specified branch
-    try {
-      execSync(
-        `git clone --depth 1 --branch ${branch} ${repoUrl} "${tempDir}"`,
-        { stdio: "pipe" }
-      );
-      spinner.succeed("Repository cloned successfully");
-      return tempDir;
-    } catch (branchError) {
-      // If branch doesn't exist and no branch was specified, try main/master
-      if (!repoInfo.branch) {
-        spinner.text = `Branch "${branch}" not found, trying "main"...`;
-        try {
-          execSync(
-            `git clone --depth 1 --branch main ${repoUrl} "${tempDir}"`,
-            { stdio: "pipe" }
-          );
-          spinner.succeed("Repository cloned successfully (using main branch)");
-          return tempDir;
-        } catch {
-          spinner.text = `Branch "main" not found, trying "master"...`;
-          try {
-            execSync(
-              `git clone --depth 1 --branch master ${repoUrl} "${tempDir}"`,
-              { stdio: "pipe" }
-            );
-            spinner.succeed(
-              "Repository cloned successfully (using master branch)"
-            );
-            return tempDir;
-          } catch {
-            // If all branches fail, throw the original error
-            throw branchError;
-          }
-        }
-      } else {
-        // If a specific branch was requested and it doesn't exist, throw error
-        throw branchError;
+  // Helper function to clone with a specific branch
+  const cloneWithBranch = (branchName: string): { success: boolean; error?: Error } => {
+    const result = spawnSync(
+      "git",
+      ["clone", "--depth", "1", "--branch", branchName, repoUrl, tempDir],
+      {
+        stdio: "pipe",
+        shell: false,
       }
+    );
+
+    if (result.status !== 0) {
+      const errorMessage =
+        result.stderr?.toString() || result.stdout?.toString() || "Unknown error";
+      return {
+        success: false,
+        error: new Error(errorMessage),
+      };
     }
-  } catch (error) {
-    spinner.fail("Failed to clone repository");
-    console.error(chalk.red(`❌ Error cloning repository: ${repoUrl}`));
-    if (repoInfo.branch) {
-      console.error(
-        chalk.yellow(`   Branch "${repoInfo.branch}" may not exist`)
-      );
-    }
-    if (error instanceof Error) {
-      const errorMessage = error.message || String(error);
-      // Try to extract useful error message from git output
-      if (errorMessage.includes("not found")) {
-        console.error(
-          chalk.yellow(`   Repository may not exist or is private`)
-        );
-      } else {
-        console.error(chalk.yellow(`   ${errorMessage}`));
-      }
-    }
-    throw error;
+
+    return { success: true };
+  };
+
+  // Try cloning with the specified branch
+  const cloneResult = cloneWithBranch(branch);
+  if (cloneResult.success) {
+    spinner.succeed("Repository cloned successfully");
+    return tempDir;
   }
+
+  // If branch doesn't exist and no branch was specified, try main/master
+  if (!repoInfo.branch) {
+    spinner.text = `Branch "${branch}" not found, trying "main"...`;
+    const mainResult = cloneWithBranch("main");
+    if (mainResult.success) {
+      spinner.succeed("Repository cloned successfully (using main branch)");
+      return tempDir;
+    }
+
+    spinner.text = `Branch "main" not found, trying "master"...`;
+    const masterResult = cloneWithBranch("master");
+    if (masterResult.success) {
+      spinner.succeed("Repository cloned successfully (using master branch)");
+      return tempDir;
+    }
+  }
+
+  // All attempts failed
+  spinner.fail("Failed to clone repository");
+  console.error(chalk.red(`❌ Error cloning repository: ${repoUrl}`));
+  if (repoInfo.branch) {
+    console.error(
+      chalk.yellow(`   Branch "${repoInfo.branch}" may not exist`)
+    );
+  }
+
+  const errorMessage =
+    cloneResult.error?.message || "Unknown error";
+  if (errorMessage.includes("not found")) {
+    console.error(
+      chalk.yellow(`   Repository may not exist or is private`)
+    );
+  } else {
+    console.error(chalk.yellow(`   ${errorMessage}`));
+  }
+
+  throw cloneResult.error || new Error("Failed to clone repository");
 }
 
 // Validate and sanitize template name to prevent path traversal
@@ -935,7 +943,7 @@ async function copyTemplate(
   // Check if template is a GitHub repo URL
   const repoInfo = parseGitHubRepoUrl(template);
   if (repoInfo) {
-    const tempDir = join(tmpdir(), `create-mcp-use-app-${Date.now()}`);
+    const tempDir = mkdtempSync(join(tmpdir(), "create-mcp-use-app-"));
 
     try {
       // Clone the repository
