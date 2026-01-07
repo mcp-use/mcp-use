@@ -17,6 +17,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 import ora from "ora";
 import React, { useState } from "react";
 import { Box, Text } from "ink";
@@ -364,7 +365,7 @@ program
   .argument("[project-name]", "Name of the MCP server project")
   .option(
     "-t, --template <template>",
-    "Template to use (starter, mcp-ui, apps-sdk)",
+    "Template to use (starter, mcp-ui, apps-sdk) or GitHub repo URL (owner/repo or https://github.com/owner/repo)",
     "starter"
   )
   .option("--list-templates", "List all available templates")
@@ -721,9 +722,155 @@ program
     }
   );
 
+// Parse GitHub repo URL to extract owner, repo, and branch
+interface GitHubRepoInfo {
+  owner: string;
+  repo: string;
+  branch?: string;
+}
+
+function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
+  const trimmed = url.trim();
+
+  // Match patterns:
+  // - https://github.com/owner/repo
+  // - https://github.com/owner/repo.git
+  // - https://github.com/owner/repo#branch
+  // - https://github.com/owner/repo/tree/branch
+  // - github.com/owner/repo
+  // - owner/repo
+  // - owner/repo#branch
+
+  // Full URL with https://
+  let match = trimmed.match(
+    /^https?:\/\/(?:www\.)?github\.com\/([^\/]+)\/([^\/#]+?)(?:\.git)?(?:\/tree\/([^\/]+))?(?:#(.+))?$/
+  );
+  if (match) {
+    return {
+      owner: match[1],
+      repo: match[2],
+      branch: match[3] || match[4] || undefined,
+    };
+  }
+
+  // github.com/owner/repo format
+  match = trimmed.match(/^(?:www\.)?github\.com\/([^\/]+)\/([^\/#]+?)(?:\.git)?(?:#(.+))?$/);
+  if (match) {
+    return {
+      owner: match[1],
+      repo: match[2],
+      branch: match[3] || undefined,
+    };
+  }
+
+  // owner/repo format
+  match = trimmed.match(/^([^\/#]+)\/([^\/#]+?)(?:#(.+))?$/);
+  if (match) {
+    return {
+      owner: match[1],
+      repo: match[2],
+      branch: match[3] || undefined,
+    };
+  }
+
+  return null;
+}
+
+function isGitHubRepoUrl(template: string): boolean {
+  return parseGitHubRepoUrl(template) !== null;
+}
+
+// Clone GitHub repo to a temporary directory
+async function cloneGitHubRepo(
+  repoInfo: GitHubRepoInfo,
+  tempDir: string
+): Promise<string> {
+  // Check if git is available
+  try {
+    execSync("git --version", { stdio: "ignore" });
+  } catch {
+    console.error(chalk.red("❌ Git is not installed or not available in PATH"));
+    console.error(
+      chalk.yellow("   Please install Git to use GitHub repository templates")
+    );
+    process.exit(1);
+  }
+
+  const repoUrl = `https://github.com/${repoInfo.owner}/${repoInfo.repo}.git`;
+  const branch = repoInfo.branch || "main";
+
+  const spinner = ora(`Cloning repository from GitHub...`).start();
+
+  try {
+    // Try cloning with the specified branch
+    try {
+      execSync(
+        `git clone --depth 1 --branch ${branch} ${repoUrl} "${tempDir}"`,
+        { stdio: "pipe" }
+      );
+      spinner.succeed("Repository cloned successfully");
+      return tempDir;
+    } catch (branchError) {
+      // If branch doesn't exist and no branch was specified, try main/master
+      if (!repoInfo.branch) {
+        spinner.text = `Branch "${branch}" not found, trying "main"...`;
+        try {
+          execSync(
+            `git clone --depth 1 --branch main ${repoUrl} "${tempDir}"`,
+            { stdio: "pipe" }
+          );
+          spinner.succeed("Repository cloned successfully (using main branch)");
+          return tempDir;
+        } catch {
+          spinner.text = `Branch "main" not found, trying "master"...`;
+          try {
+            execSync(
+              `git clone --depth 1 --branch master ${repoUrl} "${tempDir}"`,
+              { stdio: "pipe" }
+            );
+            spinner.succeed("Repository cloned successfully (using master branch)");
+            return tempDir;
+          } catch {
+            // If all branches fail, throw the original error
+            throw branchError;
+          }
+        }
+      } else {
+        // If a specific branch was requested and it doesn't exist, throw error
+        throw branchError;
+      }
+    }
+  } catch (error) {
+    spinner.fail("Failed to clone repository");
+    console.error(chalk.red(`❌ Error cloning repository: ${repoUrl}`));
+    if (repoInfo.branch) {
+      console.error(
+        chalk.yellow(`   Branch "${repoInfo.branch}" may not exist`)
+      );
+    }
+    if (error instanceof Error) {
+      const errorMessage = error.message || String(error);
+      // Try to extract useful error message from git output
+      if (errorMessage.includes("not found")) {
+        console.error(
+          chalk.yellow(`   Repository may not exist or is private`)
+        );
+      } else {
+        console.error(chalk.yellow(`   ${errorMessage}`));
+      }
+    }
+    throw error;
+  }
+}
+
 // Validate and sanitize template name to prevent path traversal
 function validateTemplateName(template: string): string {
   const sanitized = template.trim();
+
+  // If it's a GitHub repo URL, skip validation (it will be handled separately)
+  if (isGitHubRepoUrl(sanitized)) {
+    return sanitized;
+  }
 
   // Security: Prevent path traversal attacks
   if (
@@ -759,6 +906,38 @@ async function copyTemplate(
   isDevelopment: boolean = false,
   useCanary: boolean = false
 ) {
+  // Check if template is a GitHub repo URL
+  const repoInfo = parseGitHubRepoUrl(template);
+  if (repoInfo) {
+    const tempDir = join(tmpdir(), `create-mcp-use-app-${Date.now()}`);
+    
+    try {
+      // Clone the repository
+      await cloneGitHubRepo(repoInfo, tempDir);
+      
+      // Copy the cloned repository contents to the project path
+      copyDirectoryWithProcessing(
+        tempDir,
+        projectPath,
+        versions,
+        isDevelopment,
+        useCanary
+      );
+    } finally {
+      // Clean up temporary directory
+      try {
+        rmSync(tempDir, { recursive: true, force: true });
+      } catch (error) {
+        // Ignore cleanup errors
+        if (process.env.NODE_ENV === "development") {
+          console.warn(`Warning: Failed to clean up temp directory: ${tempDir}`);
+        }
+      }
+    }
+    return;
+  }
+
+  // Handle local templates
   const templatePath = join(__dirname, "templates", template);
 
   if (!existsSync(templatePath)) {
@@ -788,6 +967,9 @@ async function copyTemplate(
     console.log(
       '💡 Tip: Use "apps-sdk" template for a MCP server with OpenAI Apps SDK integration'
     );
+    console.log(
+      '💡 Tip: Use a GitHub repo URL like "owner/repo" or "https://github.com/owner/repo" to use a custom template'
+    );
     process.exit(1);
   }
 
@@ -810,6 +992,11 @@ function copyDirectoryWithProcessing(
   const entries = readdirSync(src, { withFileTypes: true });
 
   for (const entry of entries) {
+    // Skip .git directories (user's project will have its own git repo initialized)
+    if (entry.name === ".git") {
+      continue;
+    }
+
     const srcPath = join(src, entry.name);
     const destPath = join(dest, entry.name);
 
