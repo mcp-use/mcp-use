@@ -746,11 +746,12 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
     /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:\/tree\/([^/]+))?(?:#(.+))?$/
   );
   if (match) {
-    return {
+    const result = {
       owner: match[1],
       repo: match[2],
       branch: match[3] || match[4] || undefined,
     };
+    return validateGitHubRepoInfo(result) ? result : null;
   }
 
   // github.com/owner/repo format
@@ -758,24 +759,43 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
     /^(?:www\.)?github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/
   );
   if (match) {
-    return {
+    const result = {
       owner: match[1],
       repo: match[2],
       branch: match[3] || undefined,
     };
+    return validateGitHubRepoInfo(result) ? result : null;
   }
 
   // owner/repo format
   match = trimmed.match(/^([^/#]+)\/([^/#]+?)(?:#(.+))?$/);
   if (match) {
-    return {
+    const result = {
       owner: match[1],
       repo: match[2],
       branch: match[3] || undefined,
     };
+    return validateGitHubRepoInfo(result) ? result : null;
   }
 
   return null;
+}
+
+function validateGitHubRepoInfo(info: GitHubRepoInfo): boolean {
+  // GitHub usernames and repo names can contain alphanumeric characters and hyphens
+  // Branch names can contain alphanumeric, hyphens, underscores, slashes, and dots
+  const validIdentifier = /^[a-zA-Z0-9_-]+$/;
+  const validBranch = /^[a-zA-Z0-9_.\/-]+$/;
+  
+  if (!validIdentifier.test(info.owner) || !validIdentifier.test(info.repo)) {
+    return false;
+  }
+  
+  if (info.branch && !validBranch.test(info.branch)) {
+    return false;
+  }
+  
+  return true;
 }
 
 function isGitHubRepoUrl(template: string): boolean {
