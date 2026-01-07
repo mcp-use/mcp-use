@@ -787,15 +787,15 @@ function validateGitHubRepoInfo(info: GitHubRepoInfo): boolean {
   // Branch names can contain alphanumeric, hyphens, underscores, slashes, and dots
   const validIdentifier = /^[a-zA-Z0-9_-]+$/;
   const validBranch = /^[a-zA-Z0-9_./-]+$/;
-  
+
   if (!validIdentifier.test(info.owner) || !validIdentifier.test(info.repo)) {
     return false;
   }
-  
+
   if (info.branch && !validBranch.test(info.branch)) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -829,7 +829,9 @@ async function cloneGitHubRepo(
   const spinner = ora(`Cloning repository from GitHub...`).start();
 
   // Helper function to clone with a specific branch
-  const cloneWithBranch = (branchName: string): { success: boolean; error?: Error } => {
+  const cloneWithBranch = (
+    branchName: string
+  ): { success: boolean; error?: Error } => {
     const result = spawnSync(
       "git",
       ["clone", "--depth", "1", "--branch", branchName, repoUrl, tempDir],
@@ -841,7 +843,9 @@ async function cloneGitHubRepo(
 
     if (result.status !== 0) {
       const errorMessage =
-        result.stderr?.toString() || result.stdout?.toString() || "Unknown error";
+        result.stderr?.toString() ||
+        result.stdout?.toString() ||
+        "Unknown error";
       return {
         success: false,
         error: new Error(errorMessage),
@@ -879,17 +883,12 @@ async function cloneGitHubRepo(
   spinner.fail("Failed to clone repository");
   console.error(chalk.red(`❌ Error cloning repository: ${repoUrl}`));
   if (repoInfo.branch) {
-    console.error(
-      chalk.yellow(`   Branch "${repoInfo.branch}" may not exist`)
-    );
+    console.error(chalk.yellow(`   Branch "${repoInfo.branch}" may not exist`));
   }
 
-  const errorMessage =
-    cloneResult.error?.message || "Unknown error";
+  const errorMessage = cloneResult.error?.message || "Unknown error";
   if (errorMessage.includes("not found")) {
-    console.error(
-      chalk.yellow(`   Repository may not exist or is private`)
-    );
+    console.error(chalk.yellow(`   Repository may not exist or is private`));
   } else {
     console.error(chalk.yellow(`   ${errorMessage}`));
   }
