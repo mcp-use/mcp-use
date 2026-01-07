@@ -8,6 +8,8 @@
     "mcp-use": "1.12.0"
   },
   "changesets": [
-    "github-repo-template-support"
+    "dependabot-6febc87",
+    "github-repo-template-support",
+    "update-mcp-sdk-1.25.2"
   ]
 }
