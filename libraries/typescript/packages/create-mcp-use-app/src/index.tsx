@@ -743,7 +743,7 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
 
   // Full URL with https://
   let match = trimmed.match(
-    /^https?:\/\/(?:www\.)?github\.com\/([^\/]+)\/([^\/#]+?)(?:\.git)?(?:\/tree\/([^\/]+))?(?:#(.+))?$/
+    /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:\/tree\/([^/]+))?(?:#(.+))?$/
   );
   if (match) {
     return {
@@ -754,7 +754,9 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
   }
 
   // github.com/owner/repo format
-  match = trimmed.match(/^(?:www\.)?github\.com\/([^\/]+)\/([^\/#]+?)(?:\.git)?(?:#(.+))?$/);
+  match = trimmed.match(
+    /^(?:www\.)?github\.com\/([^/]+)\/([^/#]+?)(?:\.git)?(?:#(.+))?$/
+  );
   if (match) {
     return {
       owner: match[1],
@@ -764,7 +766,7 @@ function parseGitHubRepoUrl(url: string): GitHubRepoInfo | null {
   }
 
   // owner/repo format
-  match = trimmed.match(/^([^\/#]+)\/([^\/#]+?)(?:#(.+))?$/);
+  match = trimmed.match(/^([^/#]+)\/([^/#]+?)(?:#(.+))?$/);
   if (match) {
     return {
       owner: match[1],
@@ -789,7 +791,9 @@ async function cloneGitHubRepo(
   try {
     execSync("git --version", { stdio: "ignore" });
   } catch {
-    console.error(chalk.red("❌ Git is not installed or not available in PATH"));
+    console.error(
+      chalk.red("❌ Git is not installed or not available in PATH")
+    );
     console.error(
       chalk.yellow("   Please install Git to use GitHub repository templates")
     );
@@ -828,7 +832,9 @@ async function cloneGitHubRepo(
               `git clone --depth 1 --branch master ${repoUrl} "${tempDir}"`,
               { stdio: "pipe" }
             );
-            spinner.succeed("Repository cloned successfully (using master branch)");
+            spinner.succeed(
+              "Repository cloned successfully (using master branch)"
+            );
             return tempDir;
           } catch {
             // If all branches fail, throw the original error
@@ -910,11 +916,11 @@ async function copyTemplate(
   const repoInfo = parseGitHubRepoUrl(template);
   if (repoInfo) {
     const tempDir = join(tmpdir(), `create-mcp-use-app-${Date.now()}`);
-    
+
     try {
       // Clone the repository
       await cloneGitHubRepo(repoInfo, tempDir);
-      
+
       // Copy the cloned repository contents to the project path
       copyDirectoryWithProcessing(
         tempDir,
@@ -930,7 +936,9 @@ async function copyTemplate(
       } catch (error) {
         // Ignore cleanup errors
         if (process.env.NODE_ENV === "development") {
-          console.warn(`Warning: Failed to clean up temp directory: ${tempDir}`);
+          console.warn(
+            `Warning: Failed to clean up temp directory: ${tempDir}`
+          );
         }
       }
     }
