@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.1-canary.2
+
+### Patch Changes
+
+- 74ff401: fix: updated building script to correctly export types for inspector/client components
+  - mcp-use@1.12.1-canary.2
+
 ## 0.14.1-canary.1
 
 ### Patch Changes
