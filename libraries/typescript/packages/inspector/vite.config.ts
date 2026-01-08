@@ -126,13 +126,14 @@ export default defineConfig({
   },
   build: {
     minify: true,
-    outDir: "dist/client",
+    outDir: "dist/web",
     rollupOptions: {
       external: [
         "langfuse-langchain",
         "langfuse",
         "@e2b/code-interpreter",
         "os",
+        /^@mcp-use\/modelcontextprotocol-sdk/,
       ],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
