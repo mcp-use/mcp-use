@@ -1029,7 +1029,7 @@ class MCPAgent:
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
-    ) -> AsyncIterator[dict]:
+    ) -> AsyncIterator[StreamEvent]:
         """Asynchronous streaming interface.
 
         Example::
