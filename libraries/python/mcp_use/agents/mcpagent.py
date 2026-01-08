@@ -1040,7 +1040,6 @@ class MCPAgent:
         start_time = time.time()
         success = False
         chunk_count = 0
-        total_response_length = 0
         human_query = self._ensure_human_message(query)
 
         try:
@@ -1052,8 +1051,6 @@ class MCPAgent:
             ):
                 log_agent_stream(chunk, pretty_print=self.pretty_print)
                 chunk_count += 1
-                if isinstance(chunk, str):
-                    total_response_length += len(chunk)
                 yield chunk
             success = True
         finally:
@@ -1068,7 +1065,7 @@ class MCPAgent:
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
-                response=f"[STREAMED RESPONSE - {total_response_length} chars]",
+                response="[STREAMED RESPONSE]",
                 error_type=None if success else "streaming_error",
             )
 
