@@ -128,7 +128,12 @@ function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
   if (env === "browser") {
     // Check if localStorage is actually available (might be disabled)
     try {
-      if (typeof localStorage !== "undefined") {
+      if (
+        typeof localStorage !== "undefined" &&
+        typeof localStorage.getItem === "function" &&
+        typeof localStorage.setItem === "function" &&
+        typeof localStorage.removeItem === "function"
+      ) {
         localStorage.setItem("__mcp_use_test__", "1");
         localStorage.removeItem("__mcp_use_test__");
         return "localStorage";
@@ -241,9 +246,24 @@ export class Telemetry {
   }
 
   private _checkTelemetryDisabled(): boolean {
+    // Check environment variable (Node.js/Test)
+    try {
+      if (
+        typeof process !== "undefined" &&
+        process.env &&
+        process.env.MCP_USE_DISABLE_TELEMETRY === "true"
+      ) {
+        return true;
+      }
+    } catch {
+      // process not available
+    }
+
     // Check localStorage (Browser)
     if (
       typeof localStorage !== "undefined" &&
+      typeof localStorage.getItem === "function" &&
+      typeof localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "string" && // paranoia check
       localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false"
     ) {
       return true;

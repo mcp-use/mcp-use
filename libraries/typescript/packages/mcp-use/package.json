@@ -29,7 +29,10 @@
     "mcp-inspector",
     "ai",
     "utility",
-    "typescript"
+    "typescript",
+    "multi-agent",
+    "orchestration",
+    "workflow"
   ],
   "exports": {
     ".": {
@@ -76,6 +79,11 @@
       "types": "./dist/src/utils/index.d.ts",
       "import": "./dist/src/utils/index.js",
       "require": "./dist/src/utils/index.cjs"
+    },
+    "./orchestrator": {
+      "types": "./dist/src/orchestrator/index.d.ts",
+      "import": "./dist/src/orchestrator/index.js",
+      "require": "./dist/src/orchestrator/index.cjs"
     }
   },
   "main": "./dist/index.js",
@@ -155,7 +163,9 @@
     "example:server:oauth:supabase": "tsx examples/typescript/server/oauth/supabase/src/server.ts",
     "example:client:oauth:auth0": "tsx examples/typescript/server/oauth/auth0/src/server.ts",
     "example:client:oauth:workos": "tsx examples/typescript/server/oauth/workos/src/server.ts",
-    "example:client:oauth:keycloak": "tsx examples/typescript/server/oauth/keycloak/src/server.ts"
+    "example:client:oauth:keycloak": "tsx examples/typescript/server/oauth/keycloak/src/server.ts",
+    "example:orchestrator:customer": "tsx examples/agent/orchestration/customer-support.ts",
+    "example:orchestrator:research": "tsx examples/agent/orchestration/research-parallel.ts"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",

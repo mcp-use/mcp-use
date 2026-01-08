@@ -1,0 +1,12 @@
+{
+    "extends": "../tsconfig.json",
+    "include": [
+        "."
+    ],
+    "compilerOptions": {
+        "composite": false,
+        "noEmit": true,
+        "module": "Node16",
+        "moduleResolution": "Node16"
+    }
+}

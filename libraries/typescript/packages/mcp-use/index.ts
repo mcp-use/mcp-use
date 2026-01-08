@@ -132,6 +132,20 @@ export type {
   CreateMessageResult,
 } from "@modelcontextprotocol/sdk/types.js";
 
+// Export orchestrator functionality
+export { MCPOrchestrator } from "./src/orchestrator/orchestrator.js";
+export { WorkflowContext } from "./src/orchestrator/context.js";
+export { WorkflowExecutor } from "./src/orchestrator/executor.js";
+export { validateWorkflow } from "./src/orchestrator/validation.js";
+
+export type {
+  WorkflowStep,
+  WorkflowDefinition,
+  OrchestratorOptions,
+  StepResult,
+  WorkflowResult,
+} from "./src/orchestrator/types.js";
+
 /**
  * Type alias for the params property of CreateMessageRequest.
  * Convenience type for sampling callback functions.
