@@ -327,7 +327,7 @@ async function buildWidgets(
 
   for (const entry of entries) {
     const widgetName = entry.name;
-    const entryPath = entry.path;
+    const entryPath = entry.path.replace(/\\/g, "/");
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 

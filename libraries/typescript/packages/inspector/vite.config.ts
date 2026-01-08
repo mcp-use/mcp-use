@@ -126,7 +126,7 @@ export default defineConfig({
   },
   build: {
     minify: true,
-    outDir: "dist/client",
+    outDir: "dist/web",
     rollupOptions: {
       external: [
         "langfuse-langchain",

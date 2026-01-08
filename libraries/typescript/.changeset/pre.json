@@ -1,0 +1,18 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.8.0",
+    "create-mcp-use-app": "0.9.4",
+    "@mcp-use/inspector": "0.14.0",
+    "mcp-use": "1.12.0"
+  },
+  "changesets": [
+    "dependabot-6febc87",
+    "fix-windows-path-separator",
+    "github-repo-template-support",
+    "respect-template-flag-interactive-mode",
+    "shiny-deserts-decide",
+    "update-mcp-sdk-1.25.2"
+  ]
+}
