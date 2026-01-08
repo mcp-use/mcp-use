@@ -11,6 +11,7 @@
     "dependabot-6febc87",
     "fix-windows-path-separator",
     "github-repo-template-support",
+    "respect-template-flag-interactive-mode",
     "shiny-deserts-decide",
     "update-mcp-sdk-1.25.2"
   ]
