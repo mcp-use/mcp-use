@@ -88,12 +88,29 @@ class ConnectionManager(Generic[T], ABC):
     async def stop(self, timeout: float = 30.0) -> None:
         """Stop the connection manager and close the connection.
 
+        This method ensures graceful shutdown by waiting for the connection task
+        to complete and cleanup to finish. If operations exceed the timeout,
+        forced cleanup is performed to prevent resource leaks.
+
         Args:
             timeout: Maximum time to wait for cleanup in seconds (default: 30.0).
+                    This is the total timeout for the entire stop operation.
 
-        Raises:
-            None: Guarantees graceful shutdown even if cleanup times out.
+        Note:
+            This method does not raise exceptions and guarantees graceful shutdown
+            even if cleanup times out.
         """
+        import time
+        start_time = time.monotonic()
+        
+        # If stop() is called when the manager was never started, there's nothing to wait for.
+        # Ensure state is consistent and return quickly to avoid long sleeps in callers/tests.
+        if self._task is None:
+            logger.debug(f"{self.__class__.__name__} stop() called without start(): nothing to do")
+            self._connection = None
+            self._done_event.set()
+            return
+
         if self._task and not self._task.done():
             logger.debug(f"Signaling stop to {self.__class__.__name__} task")
             self._stop_event.set()
@@ -101,31 +118,40 @@ class ConnectionManager(Generic[T], ABC):
             try:
                 await asyncio.wait_for(self._task, timeout=timeout)
             except TimeoutError:
+                elapsed = time.monotonic() - start_time
+                remaining_timeout = max(0.1, timeout - elapsed)
+                
                 logger.warning(f"{self.__class__.__name__} task did not stop within {timeout}s, cancelling")
                 self._task.cancel()
                 try:
-                    await self._task
+                    await asyncio.wait_for(self._task, timeout=remaining_timeout)
                 except asyncio.CancelledError:
                     logger.debug(f"{self.__class__.__name__} task cancelled successfully")
+                except TimeoutError:
+                    logger.error(
+                        f"{self.__class__.__name__} task did not finish cancellation within {remaining_timeout}s; "
+                        f"proceeding with forced shutdown"
+                    )
             except asyncio.CancelledError:
                 logger.debug(f"{self.__class__.__name__} task cancelled during stop")
             except Exception as e:
                 logger.warning(f"Error waiting for {self.__class__.__name__} task to stop: {e}")
 
+        # Calculate remaining time for done event wait
+        elapsed = time.monotonic() - start_time
+        remaining_timeout = max(0.1, timeout - elapsed)
+        
         try:
-            await asyncio.wait_for(self._done_event.wait(), timeout=timeout)
+            await asyncio.wait_for(self._done_event.wait(), timeout=remaining_timeout)
             logger.debug(f"{self.__class__.__name__} task completed")
         except TimeoutError:
             logger.error(
-                f"Cleanup did not complete within {timeout}s - resources may leak! "
-                f"Forcing cleanup for {self.__class__.__name__}"
+                f"Cleanup did not complete within {timeout}s total (remaining: {remaining_timeout}s). "
+                f"Resources may not have been properly released for {self.__class__.__name__}. "
+                f"Forcing cleanup to prevent resource leaks."
             )
             self._connection = None
             self._done_event.set()
-            logger.warning(
-                f"Connection cleanup timed out. Some resources may not have been "
-                f"properly released for {self.__class__.__name__}"
-            )
 
     def get_streams(self) -> T | None:
         """Get the current connection streams.
