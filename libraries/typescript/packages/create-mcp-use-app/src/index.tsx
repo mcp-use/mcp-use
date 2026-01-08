@@ -2,7 +2,7 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
-import { render } from "ink";
+import { Box, render, Text } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
 import { execSync, spawn, spawnSync } from "node:child_process";
@@ -16,12 +16,11 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { tmpdir } from "node:os";
 import ora from "ora";
 import React, { useState } from "react";
-import { Box, Text } from "ink";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -366,8 +365,7 @@ program
   .argument("[project-name]", "Name of the MCP server project")
   .option(
     "-t, --template <template>",
-    "Template to use (starter, mcp-ui, apps-sdk) or GitHub repo URL (owner/repo or https://github.com/owner/repo)",
-    "starter"
+    "Template to use (starter, mcp-ui, apps-sdk) or GitHub repo URL (owner/repo or https://github.com/owner/repo)"
   )
   .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
@@ -381,7 +379,7 @@ program
     async (
       projectName: string | undefined,
       options: {
-        template: string;
+        template?: string;
         listTemplates?: boolean;
         install?: boolean;
         git: boolean;
@@ -421,8 +419,15 @@ program
           projectName = await promptForProjectName();
           console.log("");
 
-          // Prompt for template selection in interactive mode
-          selectedTemplate = await promptForTemplate();
+          // Only prompt for template if one wasn't provided via --template flag
+          if (!options.template) {
+            selectedTemplate = await promptForTemplate();
+          }
+        }
+
+        // Set default template if still not selected
+        if (!selectedTemplate) {
+          selectedTemplate = "starter";
         }
 
         // Validate project name
