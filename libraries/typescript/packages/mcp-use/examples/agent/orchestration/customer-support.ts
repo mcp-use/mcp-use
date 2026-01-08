@@ -1,6 +1,5 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "mcp-use";
-import { MCPOrchestrator } from "@mcp-use/orchestrator";
+import { MCPAgent, MCPClient, MCPOrchestrator } from "../../../index.js";
 
 /**
  * Customer Support Workflow Example
