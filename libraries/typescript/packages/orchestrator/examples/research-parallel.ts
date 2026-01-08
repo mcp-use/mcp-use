@@ -48,7 +48,7 @@ async function main() {
     const webSearcher = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a web search specialist.
+        systemMessage: `You are a web search specialist.
     Find relevant blog posts, tutorials, and documentation from the web.
     Return summaries with URLs.`,
     });
