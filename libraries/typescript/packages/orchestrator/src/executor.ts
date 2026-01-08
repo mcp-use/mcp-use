@@ -190,7 +190,7 @@ export class WorkflowExecutor {
         }
 
         // Failed after all retries
-        const durationMs = Date.now() - Date.now();
+        const durationMs = 0;  // Duration not tracked for failed attempts
         return {
             stepId: step.id,
             agent: step.agent,

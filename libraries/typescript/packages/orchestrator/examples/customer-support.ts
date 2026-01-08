@@ -34,7 +34,7 @@ async function main() {
     const classifierAgent = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a ticket classifier. Analyze support tickets and classify them as:
+        systemMessage: `You are a ticket classifier. Analyze support tickets and classify them as:
     - "bug" - Software defects
     - "question" - How-to questions
     - "billing" - Payment/subscription issues
@@ -46,7 +46,7 @@ async function main() {
     const bugAgent = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a technical support specialist for software bugs.
+        systemMessage: `You are a technical support specialist for software bugs.
     Search the knowledge base for solutions, provide debugging steps, and escalate if needed.`,
     });
 
@@ -54,7 +54,7 @@ async function main() {
     const questionAgent = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a helpful support agent for product questions.
+        systemMessage: `You are a helpful support agent for product questions.
     Search documentation and provide clear, step-by-step answers.`,
     });
 
@@ -62,7 +62,7 @@ async function main() {
     const billingAgent = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a billing support specialist.
+        systemMessage: `You are a billing support specialist.
     Handle payment issues, subscription questions, and refund requests professionally.`,
     });
 

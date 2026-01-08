@@ -30,7 +30,7 @@ async function main() {
     const githubSearcher = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a GitHub documentation search specialist.
+        systemMessage: `You are a GitHub documentation search specialist.
     Search repositories, issues, and documentation for relevant information.
     Return concise, factual summaries with links.`,
     });
@@ -39,7 +39,7 @@ async function main() {
     const academicSearcher = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are an academic research specialist.
+        systemMessage: `You are an academic research specialist.
     Find relevant research papers, arxiv preprints, and academic sources.
     Return summaries with citations.`,
     });
@@ -57,7 +57,7 @@ async function main() {
     const synthesisAgent = new MCPAgent({
         llm,
         client,
-        systemPrompt: `You are a research synthesis specialist.
+        systemMessage: `You are a research synthesis specialist.
     Combine findings from multiple sources into a coherent report.
     Identify common themes, contradictions, and key insights.`,
     });
