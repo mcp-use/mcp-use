@@ -132,7 +132,7 @@ export default defineConfig({
         "langfuse-langchain",
         "langfuse",
         "@e2b/code-interpreter",
-        "os"
+        "os",
       ],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
