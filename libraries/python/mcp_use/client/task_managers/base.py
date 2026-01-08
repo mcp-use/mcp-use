@@ -101,8 +101,9 @@ class ConnectionManager(Generic[T], ABC):
             even if cleanup times out.
         """
         import time
+
         start_time = time.monotonic()
-        
+
         # If stop() is called when the manager was never started, there's nothing to wait for.
         # Ensure state is consistent and return quickly to avoid long sleeps in callers/tests.
         if self._task is None:
@@ -120,7 +121,7 @@ class ConnectionManager(Generic[T], ABC):
             except TimeoutError:
                 elapsed = time.monotonic() - start_time
                 remaining_timeout = max(0.1, timeout - elapsed)
-                
+
                 logger.warning(f"{self.__class__.__name__} task did not stop within {timeout}s, cancelling")
                 self._task.cancel()
                 try:
@@ -140,7 +141,7 @@ class ConnectionManager(Generic[T], ABC):
         # Calculate remaining time for done event wait
         elapsed = time.monotonic() - start_time
         remaining_timeout = max(0.1, timeout - elapsed)
-        
+
         try:
             await asyncio.wait_for(self._done_event.wait(), timeout=remaining_timeout)
             logger.debug(f"{self.__class__.__name__} task completed")

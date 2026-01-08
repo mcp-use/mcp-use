@@ -7,7 +7,13 @@ from mcp_use.client.task_managers.base import ConnectionManager
 
 
 class MockConnectionManager(ConnectionManager[str]):
-    def __init__(self, establish_delay: float = 0, close_delay: float = 0, fail_on_establish: bool = False, fail_on_close: bool = False):
+    def __init__(
+        self,
+        establish_delay: float = 0,
+        close_delay: float = 0,
+        fail_on_establish: bool = False,
+        fail_on_close: bool = False,
+    ):
         super().__init__()
         self.establish_delay = establish_delay
         self.close_delay = close_delay
@@ -88,7 +94,7 @@ class TestConnectionManagerTimeout:
         assert manager._connection is None
         assert manager._done_event.is_set()
         first_task = manager._task
-        
+
         # Second stop should be idempotent
         await manager.stop()
         # Verify no additional cleanup operations occurred
@@ -143,7 +149,7 @@ class TestConnectionManagerTimeout:
 
         # Stop with short timeout - should timeout AND handle the exception
         await manager.stop(timeout=0.2)
-        
+
         # Verify forced cleanup occurred
         assert manager._connection is None
         assert manager._done_event.is_set()
@@ -158,7 +164,7 @@ class TestConnectionManagerTimeout:
 
         # Stop with sufficient timeout - exception should be caught and logged
         await manager.stop(timeout=5.0)
-        
+
         # Verify cleanup completed despite exception
         assert manager.close_called
         assert manager._connection is None
