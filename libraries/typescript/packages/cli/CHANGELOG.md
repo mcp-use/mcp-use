@@ -1,5 +1,30 @@
 # @mcp-use/cli
 
+## 2.8.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [74ff401]
+  - @mcp-use/inspector@0.14.1-canary.2
+  - mcp-use@1.12.1-canary.2
+
+## 2.8.1-canary.1
+
+### Patch Changes
+
+- 4ff190a: fix: directory separator on Windows platform causing widgets build fail. Normalize Windows backslash path separators to forward slashes when building widget entry paths to ensure cross-platform compatibility.
+  - mcp-use@1.12.1-canary.1
+  - @mcp-use/inspector@0.14.1-canary.1
+
+## 2.8.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1674a02]
+- Updated dependencies [1674a02]
+  - @mcp-use/inspector@0.14.1-canary.0
+  - mcp-use@1.12.1-canary.0
+
 ## 2.8.0
 
 ### Minor Changes

@@ -112,6 +112,11 @@ npx create-mcp-use-app my-project
 npx create-mcp-use-app my-project --template apps-sdk
 npx create-mcp-use-app my-project --template mcp-ui
 
+# Use a GitHub repository as a template
+npx create-mcp-use-app my-project --template owner/repo
+npx create-mcp-use-app my-project --template https://github.com/owner/repo
+npx create-mcp-use-app my-project --template owner/repo#branch-name
+
 # Use a specific package manager
 npx create-mcp-use-app my-project --npm
 npx create-mcp-use-app my-project --yarn
@@ -158,6 +163,29 @@ The mcp-ui template includes:
 - Clean, focused setup for UI-first applications
 
 Best for building MCP servers with rich interactive UI components.
+
+### GitHub Repository Templates
+
+You can use any GitHub repository as a template by providing the repository URL:
+
+```bash
+# Short format (owner/repo)
+npx create-mcp-use-app my-project --template owner/repo
+
+# Full URL format
+npx create-mcp-use-app my-project --template https://github.com/owner/repo
+
+# With specific branch
+npx create-mcp-use-app my-project --template owner/repo#branch-name
+npx create-mcp-use-app my-project --template https://github.com/owner/repo#branch-name
+```
+
+The repository will be cloned and its contents will be used to initialize your project. This is useful for:
+- Using community templates
+- Sharing custom templates within your organization
+- Creating projects from existing repositories
+
+**Note:** Git must be installed and available in your PATH to use GitHub repository templates.
 
 ---
 

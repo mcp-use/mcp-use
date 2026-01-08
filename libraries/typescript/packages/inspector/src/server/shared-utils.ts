@@ -413,15 +413,15 @@ export function getClientDistPath(): string {
   const __dirname = dirname(__filename);
 
   // Check if we're running from dist/cli.js or dist/server/*.js
-  // CLI: dist/cli.js -> path is './client'
-  // Server: dist/server/*.js -> path is '../client'
+  // CLI: dist/cli.js -> path is './web'
+  // Server: dist/server/*.js -> path is '../web'
   if (__dirname.endsWith("dist") || __dirname.endsWith("dist/")) {
     // Running from CLI (dist/cli.js)
-    return join(__dirname, "client");
+    return join(__dirname, "web");
   }
 
   // Running from server (dist/server/*.js)
-  return join(__dirname, "../client");
+  return join(__dirname, "../web");
 }
 
 /**
