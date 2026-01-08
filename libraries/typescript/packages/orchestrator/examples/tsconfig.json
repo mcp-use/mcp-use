@@ -14,6 +14,8 @@
         "esModuleInterop": true,
         "resolveJsonModule": true,
         "baseUrl": ".",
+        "rootDir": ".",
+        "outDir": "./dist",
         "paths": {
             "mcp-use": [
                 "../../mcp-use/dist/index.d.ts"

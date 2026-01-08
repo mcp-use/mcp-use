@@ -1,6 +1,6 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { MCPAgent, MCPClient } from "mcp-use";
-import { MCPOrchestrator } from "../src/index.js";
+import { MCPOrchestrator } from "@mcp-use/orchestrator";
 
 /**
  * Research Workflow Example
@@ -30,7 +30,7 @@ async function main() {
     const githubSearcher = new MCPAgent({
         llm,
         client,
-        systemMessage: `You are a GitHub documentation search specialist.
+        systemPrompt: `You are a GitHub documentation search specialist.
     Search repositories, issues, and documentation for relevant information.
     Return concise, factual summaries with links.`,
     });
@@ -39,7 +39,7 @@ async function main() {
     const academicSearcher = new MCPAgent({
         llm,
         client,
-        systemMessage: `You are an academic research specialist.
+        systemPrompt: `You are an academic research specialist.
     Find relevant research papers, arxiv preprints, and academic sources.
     Return summaries with citations.`,
     });
@@ -48,7 +48,7 @@ async function main() {
     const webSearcher = new MCPAgent({
         llm,
         client,
-        systemMessage: `You are a web search specialist.
+        systemPrompt: `You are a web search specialist.
     Find relevant blog posts, tutorials, and documentation from the web.
     Return summaries with URLs.`,
     });
@@ -57,7 +57,7 @@ async function main() {
     const synthesisAgent = new MCPAgent({
         llm,
         client,
-        systemMessage: `You are a research synthesis specialist.
+        systemPrompt: `You are a research synthesis specialist.
     Combine findings from multiple sources into a coherent report.
     Identify common themes, contradictions, and key insights.`,
     });
