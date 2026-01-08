@@ -20,7 +20,6 @@
 
 ### Patch Changes
 
-- 1674a02: Updated dependency `@modelcontextprotocol/sdk` to `^1.25.2`.
 - 1674a02: Updated dependency `@modelcontextprotocol/sdk` from `1.25.1` to `1.25.2`. This update includes a fix for ReDoS vulnerability in UriTemplate regex patterns.
 - Updated dependencies [1674a02]
 - Updated dependencies [1674a02]
