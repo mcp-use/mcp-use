@@ -15,26 +15,36 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { useMcpContext } from "@/client/context/McpContext";
 import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
 import {
   CircleMinus,
   Copy,
+  Info,
   Loader2,
   MoreVertical,
   RotateCcw,
   Settings,
 } from "lucide-react";
-import { useMcp } from "mcp-use/react";
+import { useMcp, useMcpClient } from "mcp-use/react";
+import { applyProxyConfig } from "mcp-use/utils";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
+import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
 
-// Temporary connection tester component
+/**
+ * Validates the provided connection configuration and performs a short-lived connection attempt to confirm connectivity and authentication.
+ *
+ * If the URL is invalid or the connection fails (and no authentication URL is present), `onFailure` is invoked with an error message and any persisted connection state is cleared. If the connection reaches a ready state, `onSuccess` is invoked once. If an authentication URL is available, the tester waits for authentication instead of failing.
+ *
+ * @param config - Connection parameters: `url` (include protocol), optional `proxyConfig` ({ proxyAddress, proxyToken, customHeaders }), and optional `transportType` (`"http"` or `"sse"`, defaults to `"http"`).
+ * @param onSuccess - Called once when a successful connection is established.
+ * @param onFailure - Called once with a human-readable error message when validation or connection fails.
+ */
 function ConnectionTester({
   config,
   onSuccess,
@@ -64,22 +74,14 @@ function ConnectionTester({
   let urlError: string | null = null;
 
   try {
-    if (config.proxyConfig?.proxyAddress) {
-      const proxyUrl = new URL(config.proxyConfig.proxyAddress);
-      const originalUrl = new URL(config.url);
-      finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`;
-
-      customHeaders["X-Target-URL"] = config.url;
-    } else {
-      // Validate the URL even if not using proxy
-      new URL(config.url);
-    }
+    // Validate URL format
+    new URL(config.url);
+    // Apply proxy configuration if provided
+    const proxyResult = applyProxyConfig(config.url, config.proxyConfig);
+    finalUrl = proxyResult.url;
+    customHeaders = proxyResult.headers;
   } catch (err) {
     urlError = `Invalid URL format. Please include the protocol (http:// or https://).\nExample: https://${config.url}`;
-  }
-
-  if (config.proxyConfig?.customHeaders) {
-    customHeaders = { ...customHeaders, ...config.proxyConfig.customHeaders };
   }
 
   // Show error immediately if URL is invalid
@@ -137,18 +139,144 @@ function ConnectionTester({
   return null;
 }
 
+/**
+ * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
+ *
+ * This component displays a list of saved connections, a connection settings form, and controls
+ * for adding, editing, removing, resyncing, and inspecting servers. It coordinates connection
+ * testing (via a temporary ConnectionTester), adapts older add/update/remove semantics to the
+ * newer client API, persists UI state (auto-switch, timeouts, headers, OAuth fields), tracks
+ * transient connection and navigation state, and opens modals for connection editing and server
+ * capabilities. Telemetry for inspector opens and server additions is emitted.
+ *
+ * @returns A JSX element representing the Inspector dashboard UI.
+ */
 export function InspectorDashboard() {
-  const mcpContext = useMcpContext();
   const {
-    connections,
-    addConnection,
-    removeConnection,
-    updateConnectionConfig,
-    autoConnect,
-    setAutoConnect,
-    connectServer,
-    disconnectServer: _disconnectServer,
-  } = mcpContext;
+    servers: connections,
+    addServer,
+    removeServer: removeConnection,
+    updateServer,
+  } = useMcpClient();
+
+  // Track concurrent updates to prevent race conditions
+  const [updatingConnections, setUpdatingConnections] = useState<Set<string>>(
+    new Set()
+  );
+  const updatingConnectionsRef = useRef<Set<string>>(new Set());
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    updatingConnectionsRef.current = updatingConnections;
+  }, [updatingConnections]);
+
+  // Adapter functions for backward compatibility
+  const addConnection = useCallback(
+    (
+      url: string,
+      name?: string,
+      proxyConfig?: any,
+      transportType?: "http" | "sse"
+    ) => {
+      addServer(url, {
+        url,
+        name,
+        proxyConfig,
+        transportType,
+      });
+    },
+    [addServer]
+  );
+
+  const updateConnectionConfig = useCallback(
+    async (
+      id: string,
+      config: {
+        name?: string;
+        proxyConfig?: {
+          proxyAddress?: string;
+          customHeaders?: Record<string, string>;
+        };
+        transportType?: "http" | "sse";
+      }
+    ) => {
+      // Check if already updating this connection
+      if (updatingConnectionsRef.current.has(id)) {
+        console.warn(
+          `[InspectorDashboard] Connection ${id} is already being updated, skipping`
+        );
+        return;
+      }
+
+      // Mark as updating
+      setUpdatingConnections((prev) => new Set(prev).add(id));
+
+      try {
+        // Use the new updateServer method for atomic updates
+        await updateServer(id, config);
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to update connection ${id}:`,
+          error
+        );
+      } finally {
+        // Clear the updating flag
+        setUpdatingConnections((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [updateServer]
+  );
+
+  const connectServer = useCallback(
+    async (id: string) => {
+      // Check if already updating this connection
+      if (updatingConnectionsRef.current.has(id)) {
+        console.warn(
+          `[InspectorDashboard] Connection ${id} is already being reconnected, skipping`
+        );
+        return;
+      }
+
+      const server = connections.find((s) => s.id === id);
+      if (!server) return;
+
+      // Mark as updating
+      setUpdatingConnections((prev) => new Set(prev).add(id));
+
+      try {
+        // Trigger reconnection by updating with the same config (forces disconnect/reconnect)
+        await updateServer(id, {
+          url: server.url,
+          name: server.name,
+        });
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to reconnect server ${id}:`,
+          error
+        );
+      } finally {
+        // Clear the updating flag
+        setUpdatingConnections((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [connections, updateServer]
+  );
+
+  // Auto-connect state management (simplified - always true now)
+  const autoConnect = true;
+  const setAutoConnect = useCallback((_enabled: boolean) => {
+    console.log(
+      "[InspectorDashboard] autoConnect is always enabled in new provider"
+    );
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
   const [connectingServers, setConnectingServers] = useState<Set<string>>(
@@ -158,6 +286,10 @@ export function InspectorDashboard() {
     null
   );
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
+    null
+  );
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalConnection, setInfoModalConnection] = useState<any | null>(
     null
   );
 
@@ -174,7 +306,6 @@ export function InspectorDashboard() {
   }, []); // Only run once on mount
 
   // Form state
-  const [transportType, setTransportType] = useState("SSE");
   const [url, setUrl] = useState("");
   const [connectionType, setConnectionType] = useState("Direct");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
@@ -279,9 +410,8 @@ export function InspectorDashboard() {
               ),
             };
 
-      // Map UI transport type to actual transport type
-      // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
-      const actualTransportType = transportType === "SSE" ? "http" : "sse";
+      // Always use HTTP transport (SSE is deprecated)
+      const actualTransportType = "http";
 
       // Store pending connection config - don't add to saved connections yet
       setPendingConnectionConfig({
@@ -291,7 +421,7 @@ export function InspectorDashboard() {
         transportType: actualTransportType,
       });
     },
-    [url, connectionType, proxyAddress, customHeaders, transportType]
+    [url, connectionType, proxyAddress, customHeaders]
   );
 
   // Handle successful connection
@@ -474,8 +604,8 @@ export function InspectorDashboard() {
   );
 
   const handleServerClick = (connection: any) => {
-    // If disconnected, connect the server
-    if (connection.state === "disconnected") {
+    // If failed, try to reconnect the server
+    if (connection.state === "failed") {
       console.warn(
         "[InspectorDashboard] Connecting server and setting pending navigation:",
         connection.id
@@ -490,13 +620,15 @@ export function InspectorDashboard() {
       toast.error("Server is not connected and cannot be inspected");
       return;
     }
-    // Preserve tunnelUrl parameter if present
+    // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
-    const newUrl = tunnelUrl
-      ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-      : `/?server=${encodeURIComponent(connection.id)}`;
-    navigate(newUrl);
+    const tab = urlParams.get("tab");
+    const params = new URLSearchParams();
+    params.set("server", connection.id);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    if (tab) params.set("tab", tab);
+    navigate(`/?${params.toString()}`);
   };
 
   // Monitor connecting servers and remove them from the set when they connect or fail
@@ -530,16 +662,18 @@ export function InspectorDashboard() {
     if (
       connection &&
       (connection.state === "ready" ||
-        (hasData && connection.state !== "connecting"))
+        (hasData && connection.state !== "discovering"))
     ) {
       setPendingNavigation(null);
-      // Preserve tunnelUrl parameter if present
+      // Preserve tunnelUrl and tab parameters if present
       const urlParams = new URLSearchParams(location.search);
       const tunnelUrl = urlParams.get("tunnelUrl");
-      const newUrl = tunnelUrl
-        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(connection.id)}`;
-      navigate(newUrl);
+      const tab = urlParams.get("tab");
+      const params = new URLSearchParams();
+      params.set("server", connection.id);
+      if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+      if (tab) params.set("tab", tab);
+      navigate(`/?${params.toString()}`);
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (
@@ -633,13 +767,11 @@ export function InspectorDashboard() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
-                        <ServerIcon
-                          serverUrl={connection.url}
-                          serverName={connection.name}
-                          size="md"
-                        />
+                        <ServerIcon server={connection} size="md" />
                         <h4 className="font-semibold text-sm">
-                          {connection.name}
+                          {connection.serverInfo?.title ||
+                            connection.serverInfo?.name ||
+                            connection.name}
                         </h4>
                         <div className="flex items-center gap-2">
                           {connectingServers.has(connection.id) ? (
@@ -666,13 +798,11 @@ export function InspectorDashboard() {
                           ) : (
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                connection.state === "disconnected"
-                                  ? "bg-gray-400 dark:bg-gray-600"
-                                  : connection.state === "ready"
-                                    ? "bg-emerald-600 animate-status-pulse"
-                                    : connection.state === "failed"
-                                      ? "bg-rose-600 animate-status-pulse-red"
-                                      : "bg-yellow-500 animate-status-pulse-yellow"
+                                connection.state === "ready"
+                                  ? "bg-emerald-600 animate-status-pulse"
+                                  : connection.state === "failed"
+                                    ? "bg-rose-600 animate-status-pulse-red"
+                                    : "bg-yellow-500 animate-status-pulse-yellow"
                               }`}
                             />
                           )}
@@ -730,6 +860,26 @@ export function InspectorDashboard() {
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
+                              handleActionClick(e, () => {
+                                setInfoModalConnection(connection);
+                                setInfoModalOpen(true);
+                              })
+                            }
+                            className="h-8 w-8 p-0"
+                          >
+                            <Info className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View server info</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) =>
                               handleActionClick(e, () =>
                                 setEditingConnectionId(connection.id)
                               )
@@ -762,7 +912,7 @@ export function InspectorDashboard() {
                           <p>Remove connection</p>
                         </TooltipContent>
                       </Tooltip>
-                      {connection.state !== "disconnected" && (
+                      {connection.state === "ready" && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -808,13 +958,23 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
+                              setInfoModalConnection(connection);
+                              setInfoModalOpen(true);
+                            }}
+                          >
+                            <Info className="h-4 w-4 mr-2" />
+                            View server info
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingConnectionId(connection.id);
                             }}
                           >
                             <Settings className="h-4 w-4 mr-2" />
                             Edit connection settings
                           </DropdownMenuItem>
-                          {connection.state !== "disconnected" && (
+                          {connection.state === "ready" && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -888,8 +1048,8 @@ export function InspectorDashboard() {
       <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <ConnectionSettingsForm
-            transportType={transportType}
-            setTransportType={setTransportType}
+            transportType="SSE"
+            setTransportType={() => {}}
             url={url}
             setUrl={setUrl}
             connectionType={connectionType}
@@ -946,6 +1106,13 @@ export function InspectorDashboard() {
           }
         }}
         onConnect={handleUpdateConnection}
+      />
+
+      {/* Server Info Modal */}
+      <ServerCapabilitiesModal
+        open={infoModalOpen}
+        onOpenChange={setInfoModalOpen}
+        connection={infoModalConnection}
       />
     </div>
   );

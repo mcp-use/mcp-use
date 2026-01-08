@@ -1,13 +1,10 @@
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
-import { isPortAvailable } from "./utils.js";
-
-const execAsync = promisify(exec);
+import { isPortAvailable, parsePortFromArgs } from "./utils.js";
 
 const app = new Hono();
 
@@ -20,7 +17,17 @@ registerInspectorRoutes(app);
 // Register static file serving with dev proxy support (must be last as it includes catch-all route)
 registerStaticRoutesWithDevProxy(app);
 
-// Start the server
+/**
+ * Start the MCP Inspector HTTP server and return its listening port and fetch handler.
+ *
+ * Starts the Hono app on an available port (prefers a CLI-specified port, otherwise 3001;
+ * in standalone/production mode it will fall back to 3002 if 3001 is unavailable),
+ * logs server status, and attempts to open the browser when not running in production.
+ * On unrecoverable startup failures (for example, requested ports unavailable), the process
+ * will exit with code 1.
+ *
+ * @returns An object containing the resolved `port` number and the application's `fetch` handler.
+ */
 async function startServer() {
   try {
     // In development mode, use port 3001 for API server
@@ -28,10 +35,20 @@ async function startServer() {
     const isDev =
       process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
-    let port = 3001;
+    // Check for port from command line arguments first
+    const cliPort = parsePortFromArgs();
+    let port = cliPort ?? 3001;
     const available = await isPortAvailable(port);
 
     if (!available) {
+      // If port was explicitly specified via CLI, fail immediately
+      if (cliPort !== null) {
+        console.error(
+          `❌ Port ${port} is not available. Please stop the process using this port and try again.`
+        );
+        process.exit(1);
+      }
+
       if (isDev) {
         console.error(
           `❌❌❌ Port ${port} is not available (probably used by Vite dev server as fallback so you should stop port 3000). Please stop the process using this port and try again.`
@@ -75,16 +92,10 @@ async function startServer() {
     // Auto-open browser in development
     if (process.env.NODE_ENV !== "production") {
       try {
-        const command =
-          process.platform === "win32"
-            ? "start"
-            : process.platform === "darwin"
-              ? "open"
-              : "xdg-open";
         const url = isDev
           ? "http://localhost:3000"
           : `http://localhost:${port}`;
-        await execAsync(`${command} ${url}`);
+        await open(url);
         console.warn(`🌐 Browser opened automatically`);
       } catch {
         const url = isDev

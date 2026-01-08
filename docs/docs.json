@@ -75,7 +75,8 @@
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",
-                  "inspector/development"
+                  "inspector/development",
+                  "inspector/changelog"
                 ]
               },
               "tunneling/index"
@@ -657,6 +658,10 @@
     {
       "source": "/typescript/getting-started",
       "destination": "/typescript/getting-started/quickstart"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/python/changelog/changelog"
     }
   ],
   "logo": {

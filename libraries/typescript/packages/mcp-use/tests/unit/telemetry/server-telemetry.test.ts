@@ -211,7 +211,8 @@ describe("MCPServer Telemetry Integration", () => {
   describe("trackServerToolCall", () => {
     it("should wrap tool handlers with telemetry tracking in getServerForSession", async () => {
       const { MCPServer } = await import("../../../src/server/mcp-server.js");
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
 
       const server = new MCPServer({
         name: "tool-server",

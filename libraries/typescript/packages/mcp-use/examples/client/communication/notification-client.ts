@@ -40,6 +40,8 @@ async function main() {
   ];
 
   console.log("[Setup] Creating HTTP connector...");
+  // Configure clientInfo to identify this client to the server
+  // This is sent in the MCP initialize request and helps with server-side logging/observability
   const connector = new HttpConnector(SERVER_URL, {
     clientInfo: { name: "notification-client", version: "1.0.0" },
     roots: initialRoots,

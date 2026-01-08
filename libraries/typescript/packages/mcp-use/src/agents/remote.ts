@@ -61,7 +61,9 @@ export class RemoteAgent {
     this.baseUrl = options.baseUrl ?? "https://cloud.mcp-use.com";
 
     // Handle API key validation
-    const apiKey = options.apiKey ?? process.env.MCP_USE_API_KEY;
+    const apiKey =
+      options.apiKey ??
+      (typeof process !== "undefined" && process.env?.MCP_USE_API_KEY);
     if (!apiKey) {
       throw new Error(
         "API key is required for remote execution. " +

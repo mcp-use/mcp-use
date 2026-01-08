@@ -1,5 +1,8 @@
 import type { ReactNode, RefObject } from "react";
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { ChatTab } from "./ChatTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { PromptsTab } from "./PromptsTab";

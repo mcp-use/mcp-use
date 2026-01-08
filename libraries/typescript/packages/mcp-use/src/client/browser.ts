@@ -1,7 +1,7 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { logger } from "../logging.js";
-import { Tel } from "../telemetry/index.js";
+import { Tel } from "../telemetry/telemetry-browser.js";
 import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 
@@ -68,6 +68,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       elicitationCallback,
       disableSseFallback,
       preferSse,
+      clientInfo,
     } = serverConfig;
 
     if (!url) {
@@ -85,6 +86,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       elicitationCallback, // ← Pass elicitation callback to connector
       disableSseFallback, // ← Disable automatic SSE fallback
       preferSse, // ← Use SSE transport directly
+      clientInfo, // ← Pass client info (name, version) to connector
     };
 
     // Debug: Log if clientOptions are being passed

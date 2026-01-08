@@ -14,8 +14,8 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   ElicitRequest,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import { toJsonSchemaCompat } from "@mcp-use/modelcontextprotocol-sdk/server/zod-json-schema-compat.js";
+} from "@modelcontextprotocol/sdk/types.js";
+import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import { ElicitationValidationError } from "../../errors.js";
 import { generateUUID } from "../utils/runtime.js";
 import type {
