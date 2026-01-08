@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.14.1
+
+### Patch Changes
+
+- e36d1ab: Updated dependency `@modelcontextprotocol/sdk` to `^1.25.2`.
+- e36d1ab: fix: updated building script to correctly export types for inspector/client components
+- e36d1ab: Updated dependency `@modelcontextprotocol/sdk` from `1.25.1` to `1.25.2`. This update includes a fix for ReDoS vulnerability in UriTemplate regex patterns.
+- Updated dependencies [e36d1ab]
+- Updated dependencies [e36d1ab]
+  - mcp-use@1.12.1
+
 ## 0.14.1-canary.2
 
 ### Patch Changes
