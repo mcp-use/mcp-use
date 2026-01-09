@@ -23,6 +23,35 @@ const DEFAULT_RETRY_DELAY = 5000;
 type TransportType = "http" | "sse";
 
 /**
+ * Derives clientConfig from clientInfo for OAuth registration.
+ * This allows clientInfo to be the single source of truth.
+ */
+function deriveClientConfigFromClientInfo(clientInfo: {
+  name: string;
+  title?: string;
+  version: string;
+  description?: string;
+  icons?: Array<{
+    src: string;
+    mimeType?: string;
+    sizes?: string[];
+  }>;
+  websiteUrl?: string;
+}): {
+  name?: string;
+  version?: string;
+  uri?: string;
+  logo_uri?: string;
+} {
+  return {
+    name: clientInfo.name,
+    version: clientInfo.version,
+    uri: clientInfo.websiteUrl,
+    logo_uri: clientInfo.icons?.[0]?.src,
+  };
+}
+
+/**
  * React hook for connecting to and interacting with MCP servers
  *
  * Provides a complete interface for MCP server connections including:
@@ -80,6 +109,51 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     samplingCallback,
     onElicitation,
   } = options;
+
+  // Build clientInfo with defaults, merging with provided clientInfo
+  const defaultClientInfo = useMemo(
+    () => ({
+      name: "mcp-use",
+      title: "mcp-use",
+      version: getPackageVersion(),
+      description:
+        "mcp-use is a complete TypeScript framework for building and using MCP",
+      icons: [
+        {
+          src: "https://mcp-use.com/logo.png",
+        },
+      ],
+      websiteUrl: "https://mcp-use.com",
+    }),
+    []
+  );
+
+  const mergedClientInfo = useMemo(
+    () =>
+      options.clientInfo
+        ? { ...defaultClientInfo, ...options.clientInfo }
+        : defaultClientInfo,
+    [options.clientInfo, defaultClientInfo]
+  );
+
+  // Derive clientConfig from clientInfo (deprecate explicit clientConfig)
+  const derivedClientConfig = useMemo(
+    () => deriveClientConfigFromClientInfo(mergedClientInfo),
+    [mergedClientInfo]
+  );
+
+  // Use explicit clientConfig if provided (with deprecation warning), otherwise use derived
+  const finalClientConfig = useMemo(() => {
+    if (clientConfig && Object.keys(clientConfig).length > 0) {
+      console.warn(
+        "[useMcp] The 'clientConfig' option is deprecated and will be removed in a future version. " +
+          "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
+      );
+      // Merge derived config with explicit config (explicit takes precedence for backward compatibility)
+      return { ...derivedClientConfig, ...clientConfig };
+    }
+    return derivedClientConfig;
+  }, [clientConfig, derivedClientConfig]);
 
   // Apply proxy configuration if provided
   const { url: finalUrl, headers: proxyHeaders } = useMemo(
@@ -284,9 +358,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (!authProviderRef.current) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
-        clientName: clientConfig.name,
-        clientUri: clientConfig.uri,
-        logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
+        clientName: finalClientConfig.name,
+        clientUri: finalClientConfig.uri,
+        logoUri: finalClientConfig.logo_uri || "https://mcp-use.com/logo.png",
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
@@ -320,10 +394,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           disableSseFallback: transportTypeParam === "http",
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
-          clientInfo: {
-            name: "mcp-use Inspector",
-            version: getPackageVersion(),
-          },
+          clientInfo: mergedClientInfo,
         };
 
         // Add custom headers if provided (includes proxy headers)
@@ -344,11 +415,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Add server to client with OAuth provider
         // Include wrapTransport if provided
-        // Pass clientConfig as clientOptions so connector can set up capabilities
+        // Pass derived clientConfig as clientOptions so connector can set up capabilities
         clientRef.current!.addServer(serverName, {
           ...serverConfig,
           authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
-          clientOptions: clientConfig, // ← Pass client config to connector
+          clientOptions: finalClientConfig, // ← Pass client config (derived from clientInfo) to connector
           samplingCallback: samplingCallback, // ← Pass sampling callback to connector
           elicitationCallback: onElicitation, // ← Pass elicitation callback to connector
           wrapTransport: wrapTransport
@@ -745,10 +816,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     url,
     storageKeyPrefix,
     callbackUrl,
-    clientConfig.name,
-    clientConfig.version,
-    clientConfig.uri,
-    clientConfig.logo_uri,
+    finalClientConfig.name,
+    finalClientConfig.version,
+    finalClientConfig.uri,
+    finalClientConfig.logo_uri,
     customHeaders,
     transportType,
     preventAutoAuth,
@@ -757,6 +828,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled,
     timeout,
     sseReadTimeout,
+    mergedClientInfo,
   ]);
 
   /**
@@ -926,9 +998,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Recreate the auth provider WITHOUT preventAutoAuth
         const freshAuthProvider = new BrowserOAuthClientProvider(url, {
           storageKeyPrefix,
-          clientName: clientConfig.name,
-          clientUri: clientConfig.uri,
-          logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
+          clientName: finalClientConfig.name,
+          clientUri: finalClientConfig.uri,
+          logoUri: finalClientConfig.logo_uri || "https://mcp-use.com/logo.png",
           callbackUrl,
           preventAutoAuth: false, // ← Allow OAuth to proceed
           useRedirectFlow,
@@ -990,10 +1062,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useRedirectFlow,
     onPopupWindow,
     storageKeyPrefix,
-    clientConfig.name,
-    clientConfig.uri,
-    clientConfig.logo_uri,
+    finalClientConfig.name,
+    finalClientConfig.uri,
+    finalClientConfig.logo_uri,
     callbackUrl,
+    mergedClientInfo,
   ]);
 
   /**
@@ -1360,9 +1433,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (!authProviderRef.current || authProviderRef.current.serverUrl !== url) {
       authProviderRef.current = new BrowserOAuthClientProvider(url, {
         storageKeyPrefix,
-        clientName: clientConfig.name,
-        clientUri: clientConfig.uri,
-        logoUri: clientConfig.logo_uri || "https://mcp-use.com/logo.png",
+        clientName: finalClientConfig.name,
+        clientUri: finalClientConfig.uri,
+        logoUri: finalClientConfig.logo_uri || "https://mcp-use.com/logo.png",
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
@@ -1384,11 +1457,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled,
     storageKeyPrefix,
     callbackUrl,
-    clientConfig.name,
-    clientConfig.version,
-    clientConfig.uri,
-    clientConfig.logo_uri,
+    finalClientConfig.name,
+    finalClientConfig.version,
+    finalClientConfig.uri,
+    finalClientConfig.logo_uri,
     useRedirectFlow,
+    mergedClientInfo,
   ]);
 
   /**

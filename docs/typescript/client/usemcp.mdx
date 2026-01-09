@@ -18,25 +18,27 @@ The hook provides:
 - **Type safety**: Full TypeScript support with automatic type inference
 
 <Tip>
-**Perfect for React Apps**: The hook handles all the complexity of MCP connections, letting you focus on building your UI. Just call `useMcp()` and you're ready to go.
+  **Perfect for React Apps**: The hook handles all the complexity of MCP
+  connections, letting you focus on building your UI. Just call `useMcp()` and
+  you're ready to go.
 </Tip>
 
 ## Basic Usage
 
 ```typescript
-import { useMcp } from 'mcp-use/react'
+import { useMcp } from "mcp-use/react";
 
 function MyComponent() {
   const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
+    url: "http://localhost:3000/mcp",
     customHeaders: {
-      Authorization: 'Bearer YOUR_API_KEY'
-    }
-  })
+      Authorization: "Bearer YOUR_API_KEY",
+    },
+  });
 
   // Wait for connection
-  if (mcp.state !== 'ready') {
-    return <div>Connecting...</div>
+  if (mcp.state !== "ready") {
+    return <div>Connecting...</div>;
   }
 
   // Show available tools
@@ -44,12 +46,14 @@ function MyComponent() {
     <div>
       <h2>Available Tools</h2>
       <ul>
-        {mcp.tools.map(tool => (
-          <li key={tool.name}>{tool.name}: {tool.description}</li>
+        {mcp.tools.map((tool) => (
+          <li key={tool.name}>
+            {tool.name}: {tool.description}
+          </li>
         ))}
       </ul>
     </div>
-  )
+  );
 }
 ```
 
@@ -58,7 +62,7 @@ function MyComponent() {
 The hook manages connection state automatically:
 
 ```typescript
-const mcp = useMcp({ url })
+const mcp = useMcp({ url });
 
 // State progression:
 // 'discovering' → Initial state, attempting connection
@@ -72,32 +76,28 @@ Handling Connection States
 
 ```typescript
 function ConnectionStatus() {
-  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+  const mcp = useMcp({ url: "http://localhost:3000/mcp" });
 
   switch (mcp.state) {
-    case 'discovering':
-      return <Spinner>Connecting...</Spinner>
+    case "discovering":
+      return <Spinner>Connecting...</Spinner>;
 
-    case 'authenticating':
-      return <div>Authenticating... Check for popup window</div>
+    case "authenticating":
+      return <div>Authenticating... Check for popup window</div>;
 
-    case 'pending_auth':
-      return (
-        <button onClick={mcp.authenticate}>
-          Click to Authenticate
-        </button>
-      )
+    case "pending_auth":
+      return <button onClick={mcp.authenticate}>Click to Authenticate</button>;
 
-    case 'ready':
-      return <div>✅ Connected ({mcp.tools.length} tools available)</div>
+    case "ready":
+      return <div>✅ Connected ({mcp.tools.length} tools available)</div>;
 
-    case 'failed':
+    case "failed":
       return (
         <div>
           ❌ Connection failed: {mcp.error}
           <button onClick={mcp.retry}>Retry</button>
         </div>
-      )
+      );
   }
 }
 ```
@@ -107,43 +107,124 @@ function ConnectionStatus() {
 ```typescript
 interface UseMcpOptions {
   // Connection
-  url?: string                             // MCP server URL (optional)
-  enabled?: boolean                        // Enable/disable connection (default: true)
-  customHeaders?: Record<string, string>   // Custom headers (auth, etc.)
-  transportType?: 'auto' | 'http' | 'sse'  // Transport preference (default: 'auto')
-  timeout?: number                         // Connection timeout (ms, default: 30000)
-  sseReadTimeout?: number                  // SSE read timeout (ms, default: 300000)
+  url?: string; // MCP server URL (optional)
+  enabled?: boolean; // Enable/disable connection (default: true)
+  customHeaders?: Record<string, string>; // Custom headers (auth, etc.)
+  transportType?: "auto" | "http" | "sse"; // Transport preference (default: 'auto')
+  timeout?: number; // Connection timeout (ms, default: 30000)
+  sseReadTimeout?: number; // SSE read timeout (ms, default: 300000)
 
   // OAuth
-  clientName?: string                      // OAuth client name
-  clientUri?: string                       // OAuth client URI
-  callbackUrl?: string                     // OAuth callback URL (default: /oauth/callback)
-  preventAutoAuth?: boolean                // Prevent automatic OAuth (show auth button, default: false)
-  useRedirectFlow?: boolean                // Use redirect instead of popup (default: false)
-  onPopupWindow?: (url: string, features: string, window: Window | null) => void    // OAuth popup handler
-  storageKeyPrefix?: string                // localStorage key prefix (default: 'mcp:auth')
+  clientName?: string; // OAuth client name
+  clientUri?: string; // OAuth client URI
+  callbackUrl?: string; // OAuth callback URL (default: /oauth/callback)
+  preventAutoAuth?: boolean; // Prevent automatic OAuth (show auth button, default: false)
+  useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
+  onPopupWindow?: (
+    url: string,
+    features: string,
+    window: Window | null
+  ) => void; // OAuth popup handler
+  storageKeyPrefix?: string; // localStorage key prefix (default: 'mcp:auth')
 
   // Reconnection
-  autoRetry?: boolean | number             // Auto-retry on failure (boolean or delay in ms)
-  autoReconnect?: boolean | number         // Auto-reconnect on drop (boolean or delay in ms, default: 3000)
+  autoRetry?: boolean | number; // Auto-retry on failure (boolean or delay in ms)
+  autoReconnect?: boolean | number; // Auto-reconnect on drop (boolean or delay in ms, default: 3000)
 
   // Client info
+  /**
+   * @deprecated Use `clientInfo` instead. This option will be removed in a future version.
+   * The `clientConfig` is automatically derived from `clientInfo` for OAuth registration.
+   */
   clientConfig?: {
-    name?: string                          // Client name
-    version?: string                       // Client version
-  }
+    name?: string; // Client name (for OAuth registration)
+    version?: string; // Client version (for OAuth registration)
+    uri?: string; // Client URI/homepage (for OAuth registration)
+    logo_uri?: string; // Client logo URI (for OAuth registration)
+  };
+  clientInfo?: {
+    name: string; // Client name (sent to MCP server and used for OAuth)
+    title?: string; // Client display name
+    version: string; // Client version (used for OAuth)
+    description?: string; // Client description
+    icons?: Array<{
+      // Client icons (first icon used for OAuth logo_uri)
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    websiteUrl?: string; // Client website URL (used for OAuth uri)
+  };
 
   // Advanced
-  debug?: boolean                          // Enable verbose debug logging
-  popupFeatures?: string                   // OAuth popup window features string
-  wrapTransport?: (transport: any, serverId: string) => any  // Transport wrapper for interceptors
+  debug?: boolean; // Enable verbose debug logging
+  popupFeatures?: string; // OAuth popup window features string
+  wrapTransport?: (transport: any, serverId: string) => any; // Transport wrapper for interceptors
 
   // Callbacks
-  onNotification?: (notification: Notification) => void  // Handle server notifications
-  samplingCallback?: (params: CreateMessageRequest["params"]) => Promise<CreateMessageResult>  // Handle sampling requests
-  onElicitation?: (params: ElicitRequestFormParams | ElicitRequestURLParams) => Promise<ElicitResult>  // Handle elicitation requests
+  onNotification?: (notification: Notification) => void; // Handle server notifications
+  samplingCallback?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>; // Handle sampling requests
+  onElicitation?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>; // Handle elicitation requests
 }
 ```
+
+### Client Information
+
+The `useMcp` hook uses `clientInfo` to identify your client to both MCP servers and OAuth providers. The `clientConfig` option is deprecated and will be automatically derived from `clientInfo`.
+
+**How clientInfo maps to OAuth registration:**
+
+- `clientInfo.name` → OAuth `client_name`
+- `clientInfo.websiteUrl` → OAuth `client_uri`
+- `clientInfo.icons?.[0]?.src` → OAuth `logo_uri` (first icon)
+- `clientInfo.version` → OAuth client metadata
+
+**Default Behavior:**
+
+If `clientInfo` is not provided, the hook automatically uses mcp-use defaults:
+
+- `name`: "mcp-use"
+- `title`: "mcp-use"
+- `version`: Current mcp-use package version
+- `description`: "mcp-use is a complete TypeScript framework for building and using MCP"
+- `icons`: [{"src": "https://mcp-use.com/logo.png"}]
+- `websiteUrl`: "https://mcp-use.com"
+
+**Custom Client Info Example:**
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  clientInfo: {
+    name: "MyApp",
+    title: "My Application",
+    version: "1.0.0",
+    description: "A custom MCP client application",
+    icons: [
+      {
+        src: "https://example.com/icon.png",
+        mimeType: "image/png",
+        sizes: ["48x48", "96x96"],
+      },
+    ],
+    websiteUrl: "https://example.com",
+  },
+});
+// OAuth registration will automatically use:
+// - client_name: "MyApp"
+// - client_uri: "https://example.com"
+// - logo_uri: "https://example.com/icon.png"
+```
+
+**Note:** The `clientInfo` you provide will be merged with the defaults, so you only need to specify the fields you want to override.
+
+**Deprecated: clientConfig**
+
+The `clientConfig` option is deprecated. If you still use it, you'll see a deprecation warning. The OAuth registration values will be automatically derived from `clientInfo` instead.
 
 ## Authentication
 
@@ -151,11 +232,11 @@ interface UseMcpOptions {
 
 ```typescript
 const mcp = useMcp({
-  url: 'http://localhost:3000/mcp',
+  url: "http://localhost:3000/mcp",
   customHeaders: {
-    Authorization: 'Bearer YOUR_API_KEY'
-  }
-})
+    Authorization: "Bearer YOUR_API_KEY",
+  },
+});
 ```
 
 ### OAuth
@@ -168,15 +249,15 @@ Opens OAuth in a popup window. Best for web applications.
 
 ```typescript
 const mcp = useMcp({
-  url: 'https://mcp.linear.app/mcp',
-  clientName: 'My App',
-  callbackUrl: window.location.origin + '/oauth/callback',
+  url: "https://mcp.linear.app/mcp",
+  clientName: "My App",
+  callbackUrl: window.location.origin + "/oauth/callback",
   // Popup flow is default
   onPopupWindow: (popup) => {
     // Track popup for UX
-    console.log('OAuth popup opened:', popup)
-  }
-})
+    console.log("OAuth popup opened:", popup);
+  },
+});
 
 // OAuth handled automatically:
 // 1. Server returns 401 with WWW-Authenticate
@@ -192,11 +273,11 @@ Redirects the main window. Best for mobile or when popups are blocked.
 
 ```typescript
 const mcp = useMcp({
-  url: 'https://mcp.linear.app/mcp',
-  clientName: 'My App',
-  callbackUrl: window.location.origin + '/oauth/callback',
-  useRedirectFlow: true // Enable redirect flow
-})
+  url: "https://mcp.linear.app/mcp",
+  clientName: "My App",
+  callbackUrl: window.location.origin + "/oauth/callback",
+  useRedirectFlow: true, // Enable redirect flow
+});
 ```
 
 **Manual Authentication Trigger**
@@ -206,20 +287,16 @@ Prevent automatic OAuth and show a manual login button:
 ```typescript
 function MyComponent() {
   const mcp = useMcp({
-    url: 'https://mcp.linear.app/mcp',
-    preventAutoAuth: true // Don't auto-trigger OAuth
-  })
+    url: "https://mcp.linear.app/mcp",
+    preventAutoAuth: true, // Don't auto-trigger OAuth
+  });
 
-  if (mcp.state === 'pending_auth') {
-    return (
-      <button onClick={mcp.authenticate}>
-        Sign in to Linear
-      </button>
-    )
+  if (mcp.state === "pending_auth") {
+    return <button onClick={mcp.authenticate}>Sign in to Linear</button>;
   }
 
-  if (mcp.state === 'authenticating') {
-    return <div>Authenticating...</div>
+  if (mcp.state === "authenticating") {
+    return <div>Authenticating...</div>;
   }
 
   // ... rest of component
@@ -233,9 +310,9 @@ Create an OAuth callback route to handle OAuth redirects:
 ```typescript
 // app/oauth/callback/page.tsx (Next.js App Router)
 // or pages/oauth/callback.tsx (Next.js Pages Router)
-import { onMcpAuthorization } from 'mcp-use/auth'
+import { onMcpAuthorization } from "mcp-use/auth";
 // Also available from: import { onMcpAuthorization } from 'mcp-use/react'
-import { useEffect } from 'react'
+import { useEffect } from "react";
 
 export default function OAuthCallback() {
   useEffect(() => {
@@ -244,46 +321,49 @@ export default function OAuthCallback() {
     // - Posts message to opener window for popup flow
     // - Automatically redirects for redirect flow
     // - No need for error handling - it's handled internally
-    onMcpAuthorization()
-  }, [])
+    onMcpAuthorization();
+  }, []);
 
   // Simple loading state while processing
-  return <div>Processing authentication...</div>
+  return <div>Processing authentication...</div>;
 }
 ```
 
 <Note>
-The `onMcpAuthorization()` function handles all success and error cases internally. For popup flow, it posts a message to the opener window (which `useMcp` listens for automatically). For redirect flow, it handles the navigation. You don't need custom error handling in your callback component.
+  The `onMcpAuthorization()` function handles all success and error cases
+  internally. For popup flow, it posts a message to the opener window (which
+  `useMcp` listens for automatically). For redirect flow, it handles the
+  navigation. You don't need custom error handling in your callback component.
 </Note>
 
 ## Calling Tools
 
 ```typescript
 function ToolExecutor() {
-  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
-  const [result, setResult] = useState(null)
+  const mcp = useMcp({ url: "http://localhost:3000/mcp" });
+  const [result, setResult] = useState(null);
 
   const handleSendEmail = async () => {
     try {
-      const result = await mcp.callTool('send-email', {
-        to: 'user@example.com',
-        subject: 'Hello',
-        body: 'Test message'
-      })
-      setResult(result)
+      const result = await mcp.callTool("send-email", {
+        to: "user@example.com",
+        subject: "Hello",
+        body: "Test message",
+      });
+      setResult(result);
     } catch (error) {
-      console.error('Tool call failed:', error)
+      console.error("Tool call failed:", error);
     }
-  }
+  };
 
   return (
     <div>
-      <button onClick={handleSendEmail} disabled={mcp.state !== 'ready'}>
+      <button onClick={handleSendEmail} disabled={mcp.state !== "ready"}>
         Send Email
       </button>
       {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
     </div>
-  )
+  );
 }
 ```
 
@@ -291,23 +371,23 @@ function ToolExecutor() {
 
 ```typescript
 function ResourceViewer({ uri }: { uri: string }) {
-  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
-  const [content, setContent] = useState('')
+  const mcp = useMcp({ url: "http://localhost:3000/mcp" });
+  const [content, setContent] = useState("");
 
   useEffect(() => {
-    if (mcp.state === 'ready') {
-      mcp.readResource(uri).then(resource => {
-        setContent(resource.contents[0].text)
-      })
+    if (mcp.state === "ready") {
+      mcp.readResource(uri).then((resource) => {
+        setContent(resource.contents[0].text);
+      });
     }
-  }, [mcp.state, uri])
+  }, [mcp.state, uri]);
 
   return (
     <div>
       <h3>Resource: {uri}</h3>
       <pre>{content}</pre>
     </div>
-  )
+  );
 }
 ```
 
@@ -315,17 +395,17 @@ function ResourceViewer({ uri }: { uri: string }) {
 
 ```typescript
 function ServerExplorer() {
-  const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+  const mcp = useMcp({ url: "http://localhost:3000/mcp" });
 
   const handleListResources = async () => {
-    await mcp.listResources()
+    await mcp.listResources();
     // Updates mcp.resources state
-  }
+  };
 
   const handleListPrompts = async () => {
-    await mcp.listPrompts()
+    await mcp.listPrompts();
     // Updates mcp.prompts state
-  }
+  };
 
   return (
     <div>
@@ -334,19 +414,21 @@ function ServerExplorer() {
 
       <h3>Resources ({mcp.resources.length})</h3>
       <ul>
-        {mcp.resources.map(r => (
+        {mcp.resources.map((r) => (
           <li key={r.uri}>{r.name || r.uri}</li>
         ))}
       </ul>
 
       <h3>Prompts ({mcp.prompts.length})</h3>
       <ul>
-        {mcp.prompts.map(p => (
-          <li key={p.name}>{p.name}: {p.description}</li>
+        {mcp.prompts.map((p) => (
+          <li key={p.name}>
+            {p.name}: {p.description}
+          </li>
         ))}
       </ul>
     </div>
-  )
+  );
 }
 ```
 
@@ -355,101 +437,111 @@ function ServerExplorer() {
 The `useMcp` hook exposes the underlying `client` which you can use to create an AI agent with access to all MCP tools.
 
 <Note>
-**For browser apps**: Use dynamic import of `mcp-use/browser` (shown below) to avoid bundling server-side code.
-**For Node.js apps**: You can import directly from `mcp-use`.
+  **For browser apps**: Use dynamic import of `mcp-use/browser` (shown below) to
+  avoid bundling server-side code. **For Node.js apps**: You can import directly
+  from `mcp-use`.
 </Note>
 
 ```typescript
-import { useMcp } from 'mcp-use/react'
-import { ChatOpenAI } from '@langchain/openai'
-import { useState, useMemo, useEffect } from 'react'
+import { useMcp } from "mcp-use/react";
+import { ChatOpenAI } from "@langchain/openai";
+import { useState, useMemo, useEffect } from "react";
 
 function ChatInterface() {
   const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    customHeaders: { Authorization: 'Bearer YOUR_API_KEY' }
-  })
+    url: "http://localhost:3000/mcp",
+    customHeaders: { Authorization: "Bearer YOUR_API_KEY" },
+  });
 
-  const [agent, setAgent] = useState(null)
-  const [messages, setMessages] = useState<Array<{role: string, content: string}>>([])
-  const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [agent, setAgent] = useState(null);
+  const [messages, setMessages] = useState<
+    Array<{ role: string; content: string }>
+  >([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   // Create LLM instance
-  const llm = useMemo(() => new ChatOpenAI({
-    model: 'gpt-4',
-    apiKey: process.env.OPENAI_API_KEY,
-    temperature: 0.7
-  }), [])
+  const llm = useMemo(
+    () =>
+      new ChatOpenAI({
+        model: "gpt-4",
+        apiKey: process.env.OPENAI_API_KEY,
+        temperature: 0.7,
+      }),
+    []
+  );
 
   // Create agent when connection is ready
   useEffect(() => {
-    if (mcp.state === 'ready' && mcp.client && !agent) {
+    if (mcp.state === "ready" && mcp.client && !agent) {
       // Use dynamic import for browser environments to avoid bundling server-side code
-      import('mcp-use/browser').then(({ MCPAgent }) => {
+      import("mcp-use/browser").then(({ MCPAgent }) => {
         const newAgent = new MCPAgent({
           llm,
           client: mcp.client,
           memoryEnabled: true,
-          systemPrompt: 'You are a helpful assistant.'
-        })
-        newAgent.initialize().then(() => setAgent(newAgent))
-      })
+          systemPrompt: "You are a helpful assistant.",
+        });
+        newAgent.initialize().then(() => setAgent(newAgent));
+      });
     }
-  }, [mcp.state, mcp.client, llm])
+  }, [mcp.state, mcp.client, llm]);
 
   const handleSend = async () => {
-    if (!input.trim() || !agent) return
+    if (!input.trim() || !agent) return;
 
-    const userMessage = { role: 'user', content: input }
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
-    setIsLoading(true)
+    const userMessage = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
 
     try {
-      let assistantContent = ''
+      let assistantContent = "";
 
       // Stream response from AI agent
       for await (const event of agent.streamEvents(input)) {
         // Handle streaming text
-        if (event.event === 'on_chat_model_stream' && event.data?.chunk?.text) {
-          assistantContent += event.data.chunk.text
+        if (event.event === "on_chat_model_stream" && event.data?.chunk?.text) {
+          assistantContent += event.data.chunk.text;
 
           // Update UI with streaming text
-          setMessages(prev => {
-            const last = prev[prev.length - 1]
-            if (last?.role === 'assistant') {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
               return [
                 ...prev.slice(0, -1),
-                { role: 'assistant', content: assistantContent }
-              ]
+                { role: "assistant", content: assistantContent },
+              ];
             }
-            return [...prev, { role: 'assistant', content: assistantContent }]
-          })
+            return [...prev, { role: "assistant", content: assistantContent }];
+          });
         }
 
         // Handle tool calls
-        if (event.event === 'on_tool_start') {
-          console.log('Using tool:', event.name)
+        if (event.event === "on_tool_start") {
+          console.log("Using tool:", event.name);
         }
       }
     } catch (error) {
-      console.error('Chat error:', error)
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `Error: ${error.message}`
-      }])
+      console.error("Chat error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Error: ${error.message}`,
+        },
+      ]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleClearHistory = () => {
     if (agent) {
-      agent.clearConversationHistory()
-      setMessages([])
+      agent.clearConversationHistory();
+      setMessages([]);
     }
-  }
+  };
 
   return (
     <div>
@@ -463,24 +555,25 @@ function ChatInterface() {
 
       <input
         value={input}
-        onChange={e => setInput(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && handleSend()}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleSend()}
         disabled={isLoading || !agent}
       />
 
       <button onClick={handleSend} disabled={isLoading || !agent}>
-        {isLoading ? 'Sending...' : 'Send'}
+        {isLoading ? "Sending..." : "Send"}
       </button>
 
       <button onClick={handleClearHistory} disabled={!agent}>
         Clear History
       </button>
     </div>
-  )
+  );
 }
 ```
 
 **Key features:**
+
 - 🧠 **Conversation memory**: The agent remembers previous messages (set `memoryEnabled: true`)
 - 🛠️ **Automatic tool access**: Agent can call any MCP tool from the connected server
 - ⚡ **Streaming responses**: Real-time token streaming for better UX
@@ -490,29 +583,29 @@ MCPAgent works with any LangChain chat model:
 
 ```typescript
 // OpenAI
-import { ChatOpenAI } from '@langchain/openai'
+import { ChatOpenAI } from "@langchain/openai";
 const llm = new ChatOpenAI({
-  model: 'gpt-4',
-  apiKey: process.env.OPENAI_API_KEY
-})
+  model: "gpt-4",
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Anthropic
-import { ChatAnthropic } from '@langchain/anthropic'
+import { ChatAnthropic } from "@langchain/anthropic";
 const llm = new ChatAnthropic({
-  model: 'claude-3-5-sonnet-20241022',
-  apiKey: process.env.ANTHROPIC_API_KEY
-})
+  model: "claude-3-5-sonnet-20241022",
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 // Google
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai'
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 const llm = new ChatGoogleGenerativeAI({
-  model: 'gemini-pro',
-  apiKey: process.env.GOOGLE_API_KEY
-})
+  model: "gemini-pro",
+  apiKey: process.env.GOOGLE_API_KEY,
+});
 
 // Or any other LangChain-compatible model
-import { ChatOllama } from '@langchain/community/chat_models/ollama'
-const llm = new ChatOllama({ model: 'llama2' })
+import { ChatOllama } from "@langchain/community/chat_models/ollama";
+const llm = new ChatOllama({ model: "llama2" });
 ```
 
 ## Error Handling
@@ -520,55 +613,54 @@ const llm = new ChatOllama({ model: 'llama2' })
 ```typescript
 function RobustConnection() {
   const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    autoRetry: 5000,  // Auto-retry every 5 seconds on failure
-  })
+    url: "http://localhost:3000/mcp",
+    autoRetry: 5000, // Auto-retry every 5 seconds on failure
+  });
 
   // Monitor errors
   useEffect(() => {
-    if (mcp.state === 'failed') {
-      console.error('Connection failed:', mcp.error)
+    if (mcp.state === "failed") {
+      console.error("Connection failed:", mcp.error);
 
       // Common errors:
-      if (mcp.error?.includes('401')) {
-        alert('Add your Authorization header in settings')
-      } else if (mcp.error?.includes('ECONNREFUSED')) {
-        alert('Server is not running on ' + url)
+      if (mcp.error?.includes("401")) {
+        alert("Add your Authorization header in settings");
+      } else if (mcp.error?.includes("ECONNREFUSED")) {
+        alert("Server is not running on " + url);
       }
     }
-  }, [mcp.state, mcp.error])
+  }, [mcp.state, mcp.error]);
 
   return (
     <div>
-      {mcp.state === 'failed' && (
+      {mcp.state === "failed" && (
         <div className="error">
           {mcp.error}
           <button onClick={mcp.retry}>Retry Connection</button>
         </div>
       )}
     </div>
-  )
+  );
 }
 ```
-
 
 ## API Reference
 
 ### State Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `state` | `'discovering' \| 'authenticating' \| 'pending_auth' \| 'ready' \| 'failed'` | Current connection state |
-| `tools` | `Tool[]` | Available tools from the server |
-| `resources` | `Resource[]` | Available resources |
-| `resourceTemplates` | `ResourceTemplate[]` | Available resource templates |
-| `prompts` | `Prompt[]` | Available prompt templates |
-| `serverInfo` | `{ name: string; version?: string } \| undefined` | Server information from initialize response |
-| `capabilities` | `Record<string, any> \| undefined` | Server capabilities from initialize response |
-| `error` | `string \| undefined` | Error message if connection failed |
-| `log` | `Array<{level, message, timestamp}>` | Connection log entries |
-| `authUrl` | `string \| undefined` | OAuth authorization URL (if manual auth needed) |
-| `client` | `BrowserMCPClient \| null` | Underlying client instance for creating agents |
+| Property            | Type                                                                         | Description                                     |
+| ------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------- |
+| `state`             | `'discovering' \| 'authenticating' \| 'pending_auth' \| 'ready' \| 'failed'` | Current connection state                        |
+| `tools`             | `Tool[]`                                                                     | Available tools from the server                 |
+| `resources`         | `Resource[]`                                                                 | Available resources                             |
+| `resourceTemplates` | `ResourceTemplate[]`                                                         | Available resource templates                    |
+| `prompts`           | `Prompt[]`                                                                   | Available prompt templates                      |
+| `serverInfo`        | `{ name: string; version?: string } \| undefined`                            | Server information from initialize response     |
+| `capabilities`      | `Record<string, any> \| undefined`                                           | Server capabilities from initialize response    |
+| `error`             | `string \| undefined`                                                        | Error message if connection failed              |
+| `log`               | `Array<{level, message, timestamp}>`                                         | Connection log entries                          |
+| `authUrl`           | `string \| undefined`                                                        | OAuth authorization URL (if manual auth needed) |
+| `client`            | `BrowserMCPClient \| null`                                                   | Underlying client instance for creating agents  |
 
 ### Methods
 
@@ -577,6 +669,7 @@ function RobustConnection() {
 Execute a tool on the MCP server with optional timeout configuration.
 
 **Parameters:**
+
 - `name: string` - Tool name to execute
 - `args?: Record<string, unknown>` - Tool arguments
 - `options?` - Optional configuration:
@@ -587,22 +680,30 @@ Execute a tool on the MCP server with optional timeout configuration.
 
 ```typescript
 // Basic tool call
-const result = await mcp.callTool('tool-name', {
-  param1: 'value1',
-  param2: 'value2'
-})
+const result = await mcp.callTool("tool-name", {
+  param1: "value1",
+  param2: "value2",
+});
 
 // Tool call with extended timeout (useful for long-running tools or sampling)
-const result = await mcp.callTool('analyze-data', { dataset: 'large' }, {
-  timeout: 300000,              // 5 minutes
-  resetTimeoutOnProgress: true  // Reset timer on progress updates
-})
+const result = await mcp.callTool(
+  "analyze-data",
+  { dataset: "large" },
+  {
+    timeout: 300000, // 5 minutes
+    resetTimeoutOnProgress: true, // Reset timer on progress updates
+  }
+);
 
 // Tool call with abort signal
-const controller = new AbortController()
-const result = await mcp.callTool('query', { search: 'term' }, {
-  signal: controller.signal
-})
+const controller = new AbortController();
+const result = await mcp.callTool(
+  "query",
+  { search: "term" },
+  {
+    signal: controller.signal,
+  }
+);
 // Later: controller.abort()
 ```
 
@@ -611,8 +712,8 @@ const result = await mcp.callTool('query', { search: 'term' }, {
 Read a resource by URI.
 
 ```typescript
-const resource = await mcp.readResource('file:///path/to/file')
-console.log(resource.contents[0].text)
+const resource = await mcp.readResource("file:///path/to/file");
+console.log(resource.contents[0].text);
 ```
 
 #### `listResources()`
@@ -620,7 +721,7 @@ console.log(resource.contents[0].text)
 Refresh the list of available resources.
 
 ```typescript
-await mcp.listResources()
+await mcp.listResources();
 // mcp.resources is now updated
 ```
 
@@ -629,7 +730,7 @@ await mcp.listResources()
 Refresh the list of available prompts.
 
 ```typescript
-await mcp.listPrompts()
+await mcp.listPrompts();
 // mcp.prompts is now updated
 ```
 
@@ -638,11 +739,11 @@ await mcp.listPrompts()
 Get a prompt template with arguments.
 
 ```typescript
-const prompt = await mcp.getPrompt('code-review', {
-  language: 'typescript',
-  focus: 'security'
-})
-console.log(prompt.messages)
+const prompt = await mcp.getPrompt("code-review", {
+  language: "typescript",
+  focus: "security",
+});
+console.log(prompt.messages);
 ```
 
 #### `client`
@@ -650,29 +751,29 @@ console.log(prompt.messages)
 The underlying BrowserMCPClient instance. Use this to create an MCPAgent for AI chat functionality.
 
 ```typescript
-import { ChatOpenAI } from '@langchain/openai'
+import { ChatOpenAI } from "@langchain/openai";
 
-const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
+const mcp = useMcp({ url: "http://localhost:3000/mcp" });
 
 // For browser environments, use dynamic import
-const { MCPAgent } = await import('mcp-use/browser')
+const { MCPAgent } = await import("mcp-use/browser");
 
 // Create agent with the exposed client
 const agent = new MCPAgent({
-  llm: new ChatOpenAI({ model: 'gpt-4' }),
+  llm: new ChatOpenAI({ model: "gpt-4" }),
   client: mcp.client,
-  memoryEnabled: true
-})
+  memoryEnabled: true,
+});
 
-await agent.initialize()
+await agent.initialize();
 
 // Use agent for chat
-for await (const event of agent.streamEvents('Send an email')) {
-  console.log(event)
+for await (const event of agent.streamEvents("Send an email")) {
+  console.log(event);
 }
 
 // Clear conversation history
-agent.clearConversationHistory()
+agent.clearConversationHistory();
 ```
 
 **Note**: Use `import('mcp-use/browser')` for browser apps to avoid bundling server-side connectors (stdio, etc.).
@@ -682,8 +783,8 @@ agent.clearConversationHistory()
 Manually retry connection after failure.
 
 ```typescript
-if (mcp.state === 'failed') {
-  mcp.retry()
+if (mcp.state === "failed") {
+  mcp.retry();
 }
 ```
 
@@ -692,7 +793,7 @@ if (mcp.state === 'failed') {
 Disconnect from the server.
 
 ```typescript
-await mcp.disconnect()
+await mcp.disconnect();
 ```
 
 #### `authenticate()`
@@ -700,8 +801,8 @@ await mcp.disconnect()
 Trigger manual OAuth authentication flow.
 
 ```typescript
-if (mcp.state === 'pending_auth') {
-  mcp.authenticate()  // Opens OAuth popup
+if (mcp.state === "pending_auth") {
+  mcp.authenticate(); // Opens OAuth popup
 }
 ```
 
@@ -710,9 +811,8 @@ if (mcp.state === 'pending_auth') {
 Clear OAuth tokens and disconnect.
 
 ```typescript
-mcp.clearStorage()  // Removes tokens from localStorage
+mcp.clearStorage(); // Removes tokens from localStorage
 ```
-
 
 ## Next Steps
 

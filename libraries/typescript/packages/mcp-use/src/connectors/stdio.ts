@@ -1,16 +1,17 @@
 import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { Writable } from "node:stream";
 
-import type { ConnectorInitOptions } from "./base.js";
-import process from "node:process";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import process from "node:process";
+import type { ConnectorInitOptions } from "./base.js";
 
 import { logger } from "../logging.js";
 import { StdioConnectionManager } from "../task_managers/stdio.js";
 import { BaseConnector } from "./base.js";
+import type { ClientInfo } from "./http.js";
 
 export interface StdioConnectorOptions extends ConnectorInitOptions {
-  clientInfo?: { name: string; version: string };
+  clientInfo?: ClientInfo;
 }
 
 export class StdioConnector extends BaseConnector {
@@ -18,7 +19,7 @@ export class StdioConnector extends BaseConnector {
   private readonly args: string[];
   private readonly env?: Record<string, string>;
   private readonly errlog: Writable;
-  private readonly clientInfo: { name: string; version: string };
+  private readonly clientInfo: ClientInfo;
 
   constructor({
     command = "npx",

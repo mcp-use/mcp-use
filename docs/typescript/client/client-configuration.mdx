@@ -209,6 +209,7 @@ For servers that run as local child processes:
 - `command`: Executable command to start the server (e.g., `"npx"`, `"python"`)
 - `args`: Array of command-line arguments
 - `env`: Environment variables for the server process
+- `clientInfo`: (Optional) Client information sent to the server in the initialize request. If not provided, defaults to mcp-use client info.
 
 **Example:**
 ```json
@@ -217,7 +218,12 @@ For servers that run as local child processes:
     "stdio_server": {
       "command": "npx",
       "args": ["@my-mcp/server"],
-      "env": {}
+      "env": {},
+      "clientInfo": {
+        "name": "My Custom Client",
+        "title": "My Custom Client Display Name",
+        "version": "1.0.0"
+      }
     }
   }
 }
@@ -229,6 +235,7 @@ For servers accessible via HTTP endpoints:
 
 - `url`: Full URL to the MCP server endpoint
 - `headers`: Custom HTTP headers (useful for authentication)
+- `clientInfo`: (Optional) Client information sent to the server in the initialize request. If not provided, defaults to mcp-use client info.
 
 **Example:**
 ```json
@@ -238,11 +245,46 @@ For servers accessible via HTTP endpoints:
       "url": "http://localhost:3000",
       "headers": {
         "Authorization": "Bearer ${AUTH_TOKEN}"
+      },
+      "clientInfo": {
+        "name": "My Custom Client",
+        "title": "My Custom Client Display Name",
+        "version": "1.0.0",
+        "description": "A custom MCP client application",
+        "icons": [
+          {
+            "src": "https://example.com/icon.png",
+            "mimeType": "image/png",
+            "sizes": ["48x48"]
+          }
+        ],
+        "websiteUrl": "https://example.com"
       }
     }
   }
 }
 ```
+
+**Client Info Structure:**
+
+The `clientInfo` parameter allows you to customize how your client identifies itself to MCP servers:
+
+- `name` (required): Client identifier name
+- `title` (optional): Display name for the client
+- `version` (required): Client version string
+- `description` (optional): Human-readable description of the client
+- `icons` (optional): Array of icon objects with `src`, `mimeType`, and `sizes` properties
+- `websiteUrl` (optional): URL to the client's website
+
+**Default Client Info:**
+
+If `clientInfo` is not specified, mcp-use automatically uses:
+- `name`: "mcp-use"
+- `title`: "mcp-use"
+- `version`: Current mcp-use package version
+- `description`: "mcp-use is a complete TypeScript framework for building and using MCP"
+- `icons`: [{"src": "https://mcp-use.com/logo.png"}]
+- `websiteUrl`: "https://mcp-use.com"
 
 ### Example Configuration
 

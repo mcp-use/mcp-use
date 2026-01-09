@@ -8,12 +8,25 @@ import { SseConnectionManager } from "../task_managers/sse.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
+export type ClientInfo = {
+  name: string;
+  title?: string;
+  version: string;
+  description?: string;
+  icons?: Array<{
+    src: string;
+    mimeType?: string;
+    sizes?: string[];
+  }>;
+  websiteUrl?: string;
+};
+
 export interface HttpConnectorOptions extends ConnectorInitOptions {
   authToken?: string;
   headers?: Record<string, string>;
   timeout?: number; // HTTP request timeout (ms)
   sseReadTimeout?: number; // SSE read timeout (ms)
-  clientInfo?: { name: string; version: string };
+  clientInfo?: ClientInfo;
   preferSse?: boolean; // Force SSE transport instead of trying streamable HTTP first
   disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
   gatewayUrl?: string; // Optional gateway URL to route requests through
@@ -25,7 +38,7 @@ export class HttpConnector extends BaseConnector {
   private readonly headers: Record<string, string>;
   private readonly timeout: number;
   private readonly sseReadTimeout: number;
-  private readonly clientInfo: { name: string; version: string };
+  private readonly clientInfo: ClientInfo;
   private readonly preferSse: boolean;
   private readonly disableSseFallback: boolean;
   private readonly gatewayUrl?: string;

@@ -26,11 +26,16 @@ export type UseMcpOptions = {
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /** Client configuration for both OAuth registration and MCP protocol identification */
+  /**
+   * @deprecated Use `clientInfo` instead. This option will be removed in a future version.
+   * The `clientConfig` will be automatically derived from `clientInfo` for OAuth registration.
+   *
+   * Client configuration for OAuth registration (deprecated - derived from clientInfo).
+   */
   clientConfig?: {
-    /** Client name (used for OAuth registration and MCP initialize) */
+    /** Client name (used for OAuth registration) */
     name?: string;
-    /** Client version (sent in MCP initialize request) */
+    /** Client version (used for OAuth registration) */
     version?: string;
     /** Client URI/homepage (used for OAuth registration) */
     uri?: string;
@@ -117,6 +122,22 @@ export type UseMcpOptions = {
   onElicitation?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+  /**
+   * Client information sent to the MCP server in the initialize request.
+   * If not provided, defaults to mcp-use client info.
+   */
+  clientInfo?: {
+    name: string;
+    title?: string;
+    version: string;
+    description?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    websiteUrl?: string;
+  };
 };
 
 export type UseMcpResult = {
