@@ -5,10 +5,39 @@ import { HttpConnector } from "./connectors/http.js";
 import { StdioConnector } from "./connectors/stdio.js";
 import { getPackageVersion } from "./version.js";
 
-export function loadConfigFile(filepath: string): Record<string, any> {
-  const raw = readFileSync(filepath, "utf-8");
-  return JSON.parse(raw);
+/**
+ * Base server configuration with common optional fields
+ */
+interface BaseServerConfig {
+  clientInfo?: ClientInfo;
 }
+
+/**
+ * Server configuration for STDIO connectors
+ */
+export interface StdioServerConfig extends BaseServerConfig {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+/**
+ * Server configuration for HTTP connectors
+ */
+export interface HttpServerConfig extends BaseServerConfig {
+  url: string;
+  headers?: Record<string, string>;
+  authToken?: string;
+  auth_token?: string; // Alternative naming for backward compatibility
+  transport?: "http" | "sse";
+  preferSse?: boolean;
+  disableSseFallback?: boolean;
+}
+
+/**
+ * Discriminated union of all supported server configuration types
+ */
+export type ServerConfig = StdioServerConfig | HttpServerConfig;
 
 /**
  * Default clientInfo for mcp-use
@@ -29,13 +58,30 @@ function getDefaultClientInfo(): ClientInfo {
   };
 }
 
+/**
+ * Normalizes and validates clientInfo from config.
+ * Ensures required fields (name, version) are present and merges with defaults.
+ */
+function normalizeClientInfo(input: unknown): ClientInfo {
+  const fallback = getDefaultClientInfo();
+  if (!input || typeof input !== "object") return fallback;
+  const ci = input as Partial<ClientInfo>;
+  // Require name + version (SDK/client contract)
+  if (!ci.name || !ci.version) return fallback;
+  return { ...fallback, ...ci };
+}
+
+export function loadConfigFile(filepath: string): Record<string, any> {
+  const raw = readFileSync(filepath, "utf-8");
+  return JSON.parse(raw);
+}
+
 export function createConnectorFromConfig(
-  serverConfig: Record<string, any>,
+  serverConfig: ServerConfig,
   connectorOptions?: Partial<ConnectorInitOptions>
 ): BaseConnector {
-  // Use provided clientInfo or default to mcp-use clientInfo
-  const clientInfo: ClientInfo =
-    serverConfig.clientInfo ?? getDefaultClientInfo();
+  // Normalize clientInfo to ensure required fields are present
+  const clientInfo = normalizeClientInfo(serverConfig.clientInfo);
 
   if ("command" in serverConfig && "args" in serverConfig) {
     return new StdioConnector({
