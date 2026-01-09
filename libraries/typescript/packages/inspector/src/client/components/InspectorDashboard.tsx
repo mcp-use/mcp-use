@@ -931,6 +931,32 @@ export function InspectorDashboard() {
                           </TooltipContent>
                         </Tooltip>
                       )}
+                      {connection.state === "failed" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  connectServer(connection.id)
+                                )
+                              }
+                              disabled={connectingServers.has(connection.id)}
+                              className="h-8 w-8 p-0"
+                            >
+                              {connectingServers.has(connection.id) ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Reconnect connection</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     {/* Mobile: Show 3-dots overflow menu */}
                     <div className="lg:hidden flex-shrink-0">
@@ -983,6 +1009,22 @@ export function InspectorDashboard() {
                             >
                               <RotateCcw className="h-4 w-4 mr-2" />
                               Resync connection
+                            </DropdownMenuItem>
+                          )}
+                          {connection.state === "failed" && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                connectServer(connection.id);
+                              }}
+                              disabled={connectingServers.has(connection.id)}
+                            >
+                              {connectingServers.has(connection.id) ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-4 w-4 mr-2" />
+                              )}
+                              Reconnect connection
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
