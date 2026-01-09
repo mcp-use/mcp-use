@@ -15,13 +15,13 @@ The custom provider gives you complete control over:
 ## Basic Configuration
 
 ```typescript
-import { McpServer, custom } from 'mcp-use/server'
+import { MCPServer, oauthCustomProvider } from 'mcp-use/server'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 
-const server = new McpServer({
+const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  oauth: custom({
+  oauth: oauthCustomProvider({
     issuer: 'https://auth.example.com',
     authEndpoint: 'https://auth.example.com/oauth/authorize',
     tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -59,8 +59,8 @@ await server.listen(3000)
 ## Full Configuration Options
 
 ```typescript
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     // OAuth Endpoints
     issuer: 'https://auth.example.com',
     authEndpoint: 'https://auth.example.com/oauth/authorize',
@@ -111,7 +111,7 @@ Verify tokens using the provider's public keys:
 ```typescript
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 
-oauth: custom({
+oauth: oauthCustomProvider({
   issuer: 'https://auth.example.com',
   authEndpoint: 'https://auth.example.com/oauth/authorize',
   tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -141,7 +141,7 @@ For symmetric key signing:
 ```typescript
 import { jwtVerify } from 'jose'
 
-oauth: custom({
+oauth: oauthCustomProvider({
   issuer: 'https://auth.example.com',
   authEndpoint: 'https://auth.example.com/oauth/authorize',
   tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -165,7 +165,7 @@ oauth: custom({
 ### Skip Verification (Development Only)
 
 ```typescript
-oauth: custom({
+oauth: oauthCustomProvider({
   issuer: 'https://auth.example.com',
   authEndpoint: 'https://auth.example.com/oauth/authorize',
   tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -256,8 +256,8 @@ getUserInfo(payload: any) {
 Server proxies OAuth requests (default):
 
 ```typescript
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     issuer: 'https://auth.example.com',
     authEndpoint: 'https://auth.example.com/oauth/authorize',
     tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -281,8 +281,8 @@ const client = new McpClient({
 Clients authenticate directly with provider:
 
 ```typescript
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     issuer: 'https://auth.example.com',
     authEndpoint: 'https://auth.example.com/oauth/authorize',
     tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -306,10 +306,10 @@ const client = new McpClient({
 ### GitHub OAuth
 
 ```typescript
-import { McpServer, custom } from 'mcp-use/server'
+import { MCPServer, oauthCustomProvider } from 'mcp-use/server'
 
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     issuer: 'https://github.com',
     authEndpoint: 'https://github.com/login/oauth/authorize',
     tokenEndpoint: 'https://github.com/login/oauth/access_token',
@@ -352,8 +352,8 @@ const server = new McpServer({
 ```typescript
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     issuer: process.env.OKTA_DOMAIN!,
     authEndpoint: `${process.env.OKTA_DOMAIN!}/oauth2/v1/authorize`,
     tokenEndpoint: `${process.env.OKTA_DOMAIN!}/oauth2/v1/token`,
@@ -394,8 +394,8 @@ import { jwtVerify, createRemoteJWKSet } from 'jose'
 
 const tenantId = process.env.AZURE_TENANT_ID!
 
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     issuer: `https://login.microsoftonline.com/${tenantId}/v2.0`,
     authEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
     tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
@@ -436,8 +436,8 @@ const server = new McpServer({
 ```typescript
 import { jwtVerify, createRemoteJWKSet } from 'jose'
 
-const server = new McpServer({
-  oauth: custom({
+const server = new MCPServer({
+  oauth: oauthCustomProvider({
     issuer: 'https://accounts.google.com',
     authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenEndpoint: 'https://oauth2.googleapis.com/token',
@@ -483,7 +483,7 @@ const server = new McpServer({
 For opaque tokens (non-JWT):
 
 ```typescript
-oauth: custom({
+oauth: oauthCustomProvider({
   issuer: 'https://auth.example.com',
   authEndpoint: 'https://auth.example.com/oauth/authorize',
   tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -520,7 +520,7 @@ oauth: custom({
 Add custom validation rules:
 
 ```typescript
-oauth: custom({
+oauth: oauthCustomProvider({
   issuer: 'https://auth.example.com',
   authEndpoint: 'https://auth.example.com/oauth/authorize',
   tokenEndpoint: 'https://auth.example.com/oauth/token',
@@ -567,7 +567,7 @@ const JWKS = createRemoteJWKSet(
   }
 )
 
-oauth: custom({
+oauth: oauthCustomProvider({
   issuer: 'https://auth.example.com',
   authEndpoint: 'https://auth.example.com/oauth/authorize',
   tokenEndpoint: 'https://auth.example.com/oauth/token',

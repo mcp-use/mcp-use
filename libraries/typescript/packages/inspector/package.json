@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.14.1-canary.1",
+  "version": "0.14.1",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -39,14 +39,13 @@
     "dist"
   ],
   "scripts": {
-    "generate:version": "node scripts/generate-version.mjs",
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "rm -rf node_modules/.vite && vite --port 3000",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
-    "build": "npm run generate:version && npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli",
+    "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli",
     "build:client": "vite build",
-    "build:client-exports": "npm run generate:version && tsup src/client/index.ts --format esm --out-dir dist/client --tsconfig tsconfig.client.json --external react --external react-dom --external lucide-react --no-splitting && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
+    "build:client-exports": "tsup src/client/index.ts --format esm --out-dir dist/client --tsconfig tsconfig.client.json --external react --external react-dom --external lucide-react --no-splitting && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
     "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm --filter mcp-use build && pnpm build",
