@@ -104,7 +104,9 @@ dmypy.json
 
 # AI
 .cursor
-.claude
+.claude/*
+!.claude/CLAUDE.md
+!.claude/README.md
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
@@ -179,5 +181,4 @@ conf.yaml
 # Agents
 .cursor
 .cursorrules
-.claude
 .mcp-use/
