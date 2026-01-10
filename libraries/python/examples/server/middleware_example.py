@@ -19,6 +19,7 @@ from typing import Any
 from mcp_use.server import MCPServer
 from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 
+
 class ConnectionGuard(Middleware):
     async def on_initialize(self, context, call_next):
         client_name = context.message.clientInfo.name
