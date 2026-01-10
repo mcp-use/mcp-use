@@ -1,6 +1,10 @@
+import logging
+
 import httpx
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
+
+logger = logging.getLogger(__name__)
 
 CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector@latest/dist/web"
 INDEX_URL = f"{CDN_BASE_URL}/index.html"
@@ -26,8 +30,12 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
             response = await client.get(INDEX_URL, follow_redirects=True)
             if response.status_code == 200:
                 return HTMLResponse(response.text)
-    except Exception:
-        pass
+            else:
+                logger.warning(
+                    f"Failed to fetch inspector from CDN: {INDEX_URL} returned status {response.status_code}"
+                )
+    except Exception as e:
+        logger.exception(f"Failed to fetch inspector from CDN: {INDEX_URL} - {e}")
 
     # CDN failed - return error page (no redirect to avoid loop)
     return HTMLResponse(
@@ -42,7 +50,7 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
         </body>
         </html>
         """,
-        status_code=503
+        status_code=503,
     )
 
 
@@ -54,8 +62,14 @@ async def _inspector_static(request: Request):
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(cdn_url, follow_redirects=True)
             if response.status_code == 200:
-                return HTMLResponse(content=response.content, media_type=response.headers.get("Content-Type", "text/plain"))
-    except Exception:
-        pass
+                return HTMLResponse(
+                    content=response.content, media_type=response.headers.get("Content-Type", "text/plain")
+                )
+            else:
+                logger.warning(
+                    f"Failed to fetch static file from CDN: {cdn_url} returned status {response.status_code}"
+                )
+    except Exception as e:
+        logger.exception(f"Failed to fetch static file from CDN: {cdn_url} - {e}")
 
     return HTMLResponse("File not found", status_code=404)
