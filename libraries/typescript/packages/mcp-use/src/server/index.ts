@@ -1,7 +1,7 @@
 export {
   createMCPServer,
   MCPServer,
-  type McpServerInstance,
+  type McpServerInstance
 } from "./mcp-server.js";
 
 // Export version information (global)
@@ -13,7 +13,7 @@ export type {
   ElicitOptions,
   ElicitUrlParams,
   SampleOptions,
-  ToolContext,
+  ToolContext
 } from "./types/tool-context.js";
 
 export * from "./types/index.js";
@@ -22,7 +22,7 @@ export * from "./types/index.js";
 export {
   getRequestContext,
   hasRequestContext,
-  runWithContext,
+  runWithContext
 } from "./context-storage.js";
 
 // Response helper utilities for tools and resources
@@ -44,7 +44,7 @@ export {
   widget,
   xml,
   type TypedCallToolResult,
-  type WidgetResponseConfig,
+  type WidgetResponseConfig
 } from "./utils/response-helpers.js";
 
 // OAuth utilities for authentication and authorization
@@ -66,7 +66,7 @@ export {
   type OAuthProvider,
   type SupabaseProviderConfig,
   type UserInfo,
-  type WorkOSProviderConfig,
+  type WorkOSProviderConfig
 } from "./oauth/index.js";
 
 // Session storage utilities for pluggable persistence
@@ -79,7 +79,7 @@ export {
   type RedisSessionStoreConfig,
   type SessionData,
   type SessionMetadata,
-  type SessionStore,
+  type SessionStore
 } from "./sessions/index.js";
 
 // Stream management utilities for active SSE connections
@@ -87,7 +87,7 @@ export {
   InMemoryStreamManager,
   RedisStreamManager,
   type RedisStreamManagerConfig,
-  type StreamManager,
+  type StreamManager
 } from "./sessions/index.js";
 
 // MCP-UI adapter utility functions
@@ -97,14 +97,14 @@ export {
   createRawHtmlResource,
   createRemoteDomResource,
   createUIResourceFromDefinition,
-  type UrlConfig,
+  type UrlConfig
 } from "./widgets/mcp-ui-adapter.js";
 
 // Middleware adapter utility functions
 export {
   adaptConnectMiddleware,
   adaptMiddleware,
-  isExpressMiddleware,
+  isExpressMiddleware
 } from "./connect-adapter.js";
 
 // MCP Proxy middleware for CORS proxying
@@ -136,5 +136,6 @@ export type {
   UIResourceDefinition,
   WidgetConfig,
   WidgetManifest,
-  WidgetProps,
+  WidgetProps
 } from "./types/index.js";
+

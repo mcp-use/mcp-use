@@ -1,16 +1,16 @@
 import type { Hono } from "hono";
+import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
-  generateWidgetContainerHtml,
-  generateWidgetContentHtml,
-  getWidgetData,
-  getWidgetSecurityHeaders,
-  handleChatRequest,
-  handleChatRequestStream,
-  storeWidgetData,
+    generateWidgetContainerHtml,
+    generateWidgetContentHtml,
+    getWidgetData,
+    getWidgetSecurityHeaders,
+    handleChatRequest,
+    handleChatRequestStream,
+    storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
-import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
-import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added

@@ -12,12 +12,12 @@ const ServerManager: React.FC = () => {
 
   useEffect(() => {
     // Add multiple servers on mount
-    // addServer("linear", {
-    //   url: "https://mcp.linear.app/mcp",
-    //   name: "Linear (OAuth)",
-    //   timeout: 30000,
-    //   preventAutoAuth: true,
-    // });
+    addServer("linear", {
+      url: "https://mcp.linear.app/mcp",
+      name: "Linear (OAuth)",
+      timeout: 30000,
+      preventAutoAuth: true,
+    });
 
     addServer("vercel", {
       url: "https://mcp.vercel.com",
@@ -26,24 +26,9 @@ const ServerManager: React.FC = () => {
       preventAutoAuth: false, // Allow OAuth flow to proceed
     });
 
-    // addServer("example-invalid-api-key", {
-    //   url: "https://tight-meadow-4074.deploy.mcp-use.com/mcp",
-    //   name: "Invalid API Key (MCP Use)",
-    //   headers: {
-    //     Authorization: `Bearer invalid-key`,
-    //   },
-    // });
-
-    // // Example: Valid API key - demonstrates automatic proxy fallback
-    // // When direct connection fails (FastMCP), automatically retries with proxy
-    addServer("example-valid-api-key", {
-      url: "https://tight-meadow-4074.deploy.mcp-use.com/mcp",
-      name: "Valid API Key (MCP Use)",
-      headers: {
-        Authorization: `Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18zMDlHYzJ1TEVqS2dhM0FVSzUzclVqRjJKbFgiLCJ0eXAiOiJKV1QifQ.eyJhaWQiOiIxYTFkMmFlOS1mZDNjLTRlYzAtODlhMi0yMTA1YTc1YmQxZDIiLCJhenAiOiJodHRwczovL2RlbW8uYXJnaWxlLmFpIiwiZXhwIjoxNzcxNjQ4NDE2LCJpYXQiOjE3NjgwNDg0MTYsImlzcyI6Imh0dHBzOi8vY2xlcmsuYXJnaWxlLmFpIiwianRpIjoiOTZkN2Q2OTQzN2I1NjJiMDc4MTMiLCJuYmYiOjE3NjgwNDg0MTEsInJvbCI6Im9yZzptZW1iZXIiLCJzdWIiOiJ1c2VyXzMwdjRIbXh1OUV1MEV6aDVOdzJYeGlrdG5URyJ9.mHwwXDD4rOso4z8T8gFAqzyE-HLFqkFcvCuvSAeaBJ5I4NGX-Dm4cH4xlG-MEJzbW8olQ-LbjgvAzyJTEXBFLo_f125uvFSXD4Eo316PN8TkWF2SYjo50cht_R-ZyHyPQOOrc_DSO6bm7y6f2zoRAbr3UpMhbshET21_j6JnRnx8pfsdnBsky6tGFBXl9lPPRiVadr5_IIgoaKiqKyW_WbTk8ATPIwru4UqPruIG6zn23mPFYFCGc0XXjCELrkoeFBrygaJmwvfkzIGqUYP4U5ljnjXg_sU2VJacKNcGw1bi6NXnAEHUb_pdun9SQkEMmBTt0J7NjajR_F8ioiuTbA`,
-      },
-      // autoProxyFallback is inherited from McpClientProvider (enabled by default)
-      // Will automatically retry with proxy if FastMCP error occurs
+    addServer("no api key needed", {
+      url: "https://apps-sdk-starter.mcp-use.run",
+      name: "Invalid API Key (MCP Use)",
     });
   }, [addServer]);
 
