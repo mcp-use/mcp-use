@@ -1,8 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import ReactExample from "./react_example";
 import MultiServerExample from "./multi-server-example";
 import OAuthCallback from "./oauth-callback";
+import ReactExample from "./react_example";
 
 // Navigation component
 function Navigation() {
