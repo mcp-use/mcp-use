@@ -206,12 +206,14 @@ export class HttpConnector extends BaseConnector {
           requestInit: {
             headers: this.headers,
           },
-          // Pass through reconnection options
+          // Disable automatic reconnection at transport level
+          // Reconnection should be handled at a higher level (useMcp hook) if needed
+          // This prevents constant polling when the SSE stream closes
           reconnectionOptions: {
             maxReconnectionDelay: 30000,
             initialReconnectionDelay: 1000,
             reconnectionDelayGrowFactor: 1.5,
-            maxRetries: 2,
+            maxRetries: 2, // Disable automatic reconnection - let higher-level logic handle it
           },
           // Don't pass sessionId - let the SDK generate it automatically during connect()
         }
