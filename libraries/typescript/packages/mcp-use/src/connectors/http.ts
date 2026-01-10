@@ -213,7 +213,7 @@ export class HttpConnector extends BaseConnector {
             maxReconnectionDelay: 30000,
             initialReconnectionDelay: 1000,
             reconnectionDelayGrowFactor: 1.5,
-            maxRetries: 0, // Disable automatic reconnection - let higher-level logic handle it
+            maxRetries: 2, // Disable automatic reconnection - let higher-level logic handle it
           },
           // Don't pass sessionId - let the SDK generate it automatically during connect()
         }
