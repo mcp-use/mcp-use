@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
+import { getInspectorVersion } from "@/client/utils/version";
 import {
   CircleMinus,
   Copy,
@@ -99,6 +100,19 @@ function ConnectionTester({
       Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
     transportType: config.transportType || "http", // Respect user's transport choice, default to HTTP (no auto-fallback to SSE)
     enabled: !urlError, // Disable connection if URL is invalid
+    clientInfo: {
+      name: "mcp-use Inspector",
+      title: "mcp-use Inspector",
+      version: getInspectorVersion(),
+      description:
+        "mcp-use Inspector - A tool for inspecting and debugging MCP servers",
+      icons: [
+        {
+          src: "https://mcp-use.com/logo.png",
+        },
+      ],
+      websiteUrl: "https://mcp-use.com",
+    },
   });
 
   const hasCalledRef = useRef(false);
@@ -535,13 +549,47 @@ export function InspectorDashboard() {
 
   const handleCopyConnectionConfig = async (connection: any) => {
     try {
+      // Try to get the original stored config from localStorage
+      // This contains the proxyConfig and customHeaders that were originally saved
+      let storedConfig: any = null;
+      try {
+        const stored = localStorage.getItem("mcp-inspector-connections");
+        if (stored) {
+          const allServers = JSON.parse(stored);
+          storedConfig = allServers[connection.id];
+        }
+      } catch (e) {
+        // If we can't read from localStorage, fall back to connection object
+        console.warn(
+          "[InspectorDashboard] Could not read from localStorage:",
+          e
+        );
+      }
+
+      // Extract customHeaders from stored config (which has the original proxyConfig)
+      const customHeaders =
+        storedConfig?.proxyConfig?.customHeaders ||
+        storedConfig?.customHeaders ||
+        connection.proxyConfig?.customHeaders ||
+        connection.customHeaders ||
+        {};
+
+      // Determine connection type and proxyConfig
+      const hasProxyAddress =
+        storedConfig?.proxyConfig?.proxyAddress ||
+        connection.proxyConfig?.proxyAddress;
+      const connectionType = hasProxyAddress ? "Via Proxy" : "Direct";
+      const proxyConfig = hasProxyAddress
+        ? storedConfig?.proxyConfig || connection.proxyConfig
+        : undefined;
+
       const config = {
         url: connection.url,
         name: connection.name,
         transportType: connection.transportType || "http",
-        connectionType: connection.proxyConfig ? "Via Proxy" : "Direct",
-        proxyConfig: connection.proxyConfig,
-        customHeaders: connection.customHeaders || {},
+        connectionType,
+        proxyConfig,
+        customHeaders,
         requestTimeout: connection.requestTimeout || 10000,
         resetTimeoutOnProgress: connection.resetTimeoutOnProgress !== false,
         maxTotalTimeout: connection.maxTotalTimeout || 60000,
@@ -931,32 +979,6 @@ export function InspectorDashboard() {
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      {connection.state === "failed" && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) =>
-                                handleActionClick(e, () =>
-                                  connectServer(connection.id)
-                                )
-                              }
-                              disabled={connectingServers.has(connection.id)}
-                              className="h-8 w-8 p-0"
-                            >
-                              {connectingServers.has(connection.id) ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <RotateCcw className="w-4 h-4" />
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Reconnect connection</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
                     </div>
                     {/* Mobile: Show 3-dots overflow menu */}
                     <div className="lg:hidden flex-shrink-0">
@@ -1009,22 +1031,6 @@ export function InspectorDashboard() {
                             >
                               <RotateCcw className="h-4 w-4 mr-2" />
                               Resync connection
-                            </DropdownMenuItem>
-                          )}
-                          {connection.state === "failed" && (
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                connectServer(connection.id);
-                              }}
-                              disabled={connectingServers.has(connection.id)}
-                            >
-                              {connectingServers.has(connection.id) ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              ) : (
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                              )}
-                              Reconnect connection
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem

@@ -1,4 +1,6 @@
 import type { Hono } from "hono";
+import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
   generateWidgetContentHtml,
@@ -9,8 +11,6 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
-import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
-import { mountMcpProxy } from "mcp-use/server";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -29,6 +29,11 @@ export function registerInspectorRoutes(
   // Mount MCP proxy middleware at the inspector's proxy path
   mountMcpProxy(app, {
     path: "/inspector/api/proxy",
+  });
+
+  // Mount OAuth proxy middleware at the inspector's OAuth path
+  mountOAuthProxy(app, {
+    basePath: "/inspector/api/oauth",
   });
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)

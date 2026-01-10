@@ -1,4 +1,4 @@
-import { McpClientProvider, useMcpClient, useMcpServer } from "mcp-use/react";
+import { McpClientProvider, useMcpClient } from "mcp-use/react";
 import React, { useEffect } from "react";
 
 /**
@@ -13,19 +13,43 @@ const ServerManager: React.FC = () => {
   useEffect(() => {
     // Add multiple servers on mount
     addServer("linear", {
-      url: "https://mcp.linear.app/sse",
-      name: "Linear",
+      url: "https://mcp.linear.app/mcp",
+      name: "Linear (OAuth)",
+      timeout: 30000,
+      preventAutoAuth: true,
     });
 
-    addServer("example", {
-      url: "http://localhost:3000/mcp",
-      name: "Local Example Server",
+    addServer("vercel", {
+      url: "https://mcp.vercel.com",
+      name: "Vercel (OAuth)",
+      timeout: 30000,
+      preventAutoAuth: false, // Allow OAuth flow to proceed
+    });
+
+    addServer("no api key needed", {
+      url: "https://apps-sdk-starter.mcp-use.run",
+      name: "No API Key (MCP Use)",
     });
   }, [addServer]);
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
       <h1>Multi-Server MCP Manager</h1>
+
+      <p>
+        This example demonstrates the new <code>McpClientProvider</code> that
+        allows you to manage multiple MCP server connections in a single React
+        application without re-initializing the protocol for each server.
+      </p>
+      <h4>Features:</h4>
+      <ul>
+        <li>✅ Manage multiple servers dynamically</li>
+        <li>✅ Add/remove servers at runtime</li>
+        <li>✅ Notification management per server</li>
+        <li>✅ Sampling/elicitation request handling</li>
+        <li>✅ Access servers via hooks: useMcpClient(), useMcpServer(id)</li>
+        <li>✅ Backward compatible with standalone useMcp()</li>
+      </ul>
 
       <div style={{ marginBottom: "20px" }}>
         <h2>Connected Servers ({servers.length})</h2>
@@ -137,80 +161,16 @@ const ServerManager: React.FC = () => {
   );
 };
 
-// Component that uses a specific server
-const ServerDetails: React.FC<{ serverId: string }> = ({ serverId }) => {
-  const server = useMcpServer(serverId);
-
-  if (!server) {
-    return (
-      <div style={{ padding: "20px" }}>
-        <p>Server "{serverId}" not found</p>
-      </div>
-    );
-  }
-
-  if (server.state !== "ready") {
-    return (
-      <div style={{ padding: "20px" }}>
-        <p>
-          Server is {server.state}
-          ...
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: "20px" }}>
-      <h2>Tools for {server.id}</h2>
-      <ul>
-        {server.tools.map((tool) => (
-          <li key={tool.name}>
-            <strong>{tool.name}</strong>
-            {tool.description && `: ${tool.description}`}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
-
 // Main example component
 const MultiServerExample: React.FC = () => {
   return (
-    <McpClientProvider>
-      <div>
-        <ServerManager />
-
-        <div
-          style={{
-            marginTop: "40px",
-            padding: "20px",
-            backgroundColor: "#e7f3ff",
-            border: "1px solid #b3d9ff",
-            borderRadius: "4px",
-          }}
-        >
-          <h3>🚀 Multi-Server MCP Client Provider</h3>
-          <p>
-            This example demonstrates the new <code>McpClientProvider</code>{" "}
-            that allows you to manage multiple MCP server connections in a
-            single React application without re-initializing the protocol for
-            each server.
-          </p>
-          <h4>Features:</h4>
-          <ul>
-            <li>✅ Manage multiple servers dynamically</li>
-            <li>✅ Add/remove servers at runtime</li>
-            <li>✅ Notification management per server</li>
-            <li>✅ Sampling/elicitation request handling</li>
-            <li>
-              ✅ Access servers via hooks: useMcpClient(), useMcpServer(id)
-            </li>
-            <li>✅ Backward compatible with standalone useMcp()</li>
-          </ul>
-        </div>
-      </div>
+    <McpClientProvider
+      defaultAutoProxyFallback={{
+        enabled: true,
+        proxyAddress: "http://localhost:3005/inspector/api/proxy",
+      }}
+    >
+      <ServerManager />
     </McpClientProvider>
   );
 };

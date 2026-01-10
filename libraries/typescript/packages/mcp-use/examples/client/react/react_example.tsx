@@ -16,7 +16,8 @@ const MCPTools: React.FC = () => {
     authenticate,
     clearStorage,
   } = useMcp({
-    url: "https://mcp.linear.app/sse",
+    url: "https://mcp.linear.app/mcp",
+    preventAutoAuth: true,
   });
 
   const [toolResult, setToolResult] = React.useState<any>(null);
@@ -179,8 +180,8 @@ const MCPTools: React.FC = () => {
 
       {/* Loading State */}
       {(state === "discovering" ||
-        state === "connecting" ||
-        state === "loading") && (
+        state === "authenticating" ||
+        state === "pending_auth") && (
         <div
           style={{
             marginBottom: "20px",
@@ -194,7 +195,7 @@ const MCPTools: React.FC = () => {
             ⏳{" "}
             {state === "discovering"
               ? "Discovering server..."
-              : state === "connecting"
+              : state === "authenticating"
                 ? "Connecting..."
                 : "Loading tools..."}
           </strong>

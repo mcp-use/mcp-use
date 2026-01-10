@@ -9,6 +9,9 @@
  * To run this example:
  * 1. Start the sampling server: cd examples/server/sampling && npm run dev
  * 2. Run this client: tsx examples/client/sampling-client.ts
+ *
+ * Note: This example uses `onSampling`. The deprecated `samplingCallback` name
+ * is still supported for backward compatibility but will be removed in a future version.
  */
 
 import type {
@@ -56,7 +59,8 @@ async function mockLLM(prompt: string): Promise<string> {
 }
 
 // Create sampling callback
-async function samplingCallback(
+// Note: The function name can be anything, but we use `onSampling` to match the option name
+async function onSampling(
   params: CreateMessageRequest["params"]
 ): Promise<import("@modelcontextprotocol/sdk/types.js").CreateMessageResult> {
   console.log("📥 Received sampling request:");
@@ -102,7 +106,8 @@ async function main() {
       },
     },
     {
-      samplingCallback,
+      onSampling,
+      // Note: The deprecated `samplingCallback` name is still supported for backward compatibility
     }
   );
 

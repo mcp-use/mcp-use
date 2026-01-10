@@ -18,32 +18,28 @@ The mcp-use client supports multiple authentication methods for secure connectio
 OAuth provides secure, token-based authentication with automatic token refresh and user consent flows.
 
 ```typescript
-import { useMcp } from 'mcp-use/react'
+import { useMcp } from "mcp-use/react";
 
 function MyComponent() {
   const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    callbackUrl: 'http://localhost:3000/callback',
-  })
+    url: "http://localhost:3000/mcp",
+    callbackUrl: "http://localhost:3000/callback",
+  });
 
   // Handle authentication states
-  if (mcp.state === 'pending_auth') {
-    return (
-      <button onClick={mcp.authenticate}>
-        Authenticate with OAuth
-      </button>
-    )
+  if (mcp.state === "pending_auth") {
+    return <button onClick={mcp.authenticate}>Authenticate with OAuth</button>;
   }
 
-  if (mcp.state === 'authenticating') {
-    return <div>Authenticating...</div>
+  if (mcp.state === "authenticating") {
+    return <div>Authenticating...</div>;
   }
 
-  if (mcp.state === 'ready') {
-    return <div>Connected! {mcp.tools.length} tools available</div>
+  if (mcp.state === "ready") {
+    return <div>Connected! {mcp.tools.length} tools available</div>;
   }
 
-  return <div>Connecting...</div>
+  return <div>Connecting...</div>;
 }
 ```
 
@@ -56,16 +52,17 @@ For servers requiring API keys or bearer tokens:
 import { useMcp } from 'mcp-use/react'
 
 function MyComponent() {
-  const mcp = useMcp({
-    url: 'http://localhost:3000/mcp',
-    customHeaders: {
-      Authorization: 'Bearer sk-your-api-key-here'
-    }
-  })
-
-  // Use mcp.tools, mcp.callTool, etc.
+const mcp = useMcp({
+url: 'http://localhost:3000/mcp',
+headers: {
+Authorization: 'Bearer sk-your-api-key-here'
 }
-```
+})
+
+// Use mcp.tools, mcp.callTool, etc.
+}
+
+````
 
 ```typescript HttpConnector
 import { HttpConnector } from 'mcp-use'
@@ -73,7 +70,8 @@ import { HttpConnector } from 'mcp-use'
 const connector = new HttpConnector('http://localhost:3000/mcp', {
   authToken: 'sk-your-api-key-here'
 })
-```
+````
+
 </CodeGroup>
 
 ## Node.js Client Authentication
@@ -89,16 +87,17 @@ The simplest way to authenticate with API-based MCP servers:
 import { MCPClient } from 'mcp-use'
 
 const config = {
-  mcpServers: {
-    "my-server": {
-      url: "https://api.example.com/mcp",
-      authToken: "sk-your-api-key-here"
-    }
-  }
+mcpServers: {
+"my-server": {
+url: "https://api.example.com/mcp",
+authToken: "sk-your-api-key-here"
+}
+}
 }
 
 const client = MCPClient.fromDict(config)
-```
+
+````
 
 ```typescript With Environment Variables
 import { MCPClient } from 'mcp-use'
@@ -113,7 +112,8 @@ const config = {
 }
 
 const client = MCPClient.fromDict(config)
-```
+````
+
 </CodeGroup>
 
 ### Custom Headers
@@ -121,22 +121,22 @@ const client = MCPClient.fromDict(config)
 For servers requiring custom authentication headers or additional metadata:
 
 ```typescript
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "mcp-use";
 
 const config = {
   mcpServers: {
     "my-server": {
       url: "https://api.example.com/mcp",
       headers: {
-        "Authorization": "Bearer sk-your-api-key",
+        Authorization: "Bearer sk-your-api-key",
         "X-API-Version": "2024-01-01",
-        "X-Custom-Header": "value"
-      }
-    }
-  }
-}
+        "X-Custom-Header": "value",
+      },
+    },
+  },
+};
 
-const client = MCPClient.fromDict(config)
+const client = MCPClient.fromDict(config);
 ```
 
 ### Configuration File
@@ -153,7 +153,8 @@ const client = new MCPClient('./mcp-config.json')
 // Or use fromDict with imported config
 import config from './mcp-config.json'
 const client = MCPClient.fromDict(config)
-```
+
+````
 
 ```json mcp-config.json
 {
@@ -177,11 +178,13 @@ const client = MCPClient.fromDict(config)
     }
   }
 }
-```
+````
+
 </CodeGroup>
 
 <Tip>
-**Best Practice**: Store sensitive tokens in environment variables and reference them in your configuration instead of hardcoding them in files.
+  **Best Practice**: Store sensitive tokens in environment variables and
+  reference them in your configuration instead of hardcoding them in files.
 </Tip>
 
 ## CLI Authentication
@@ -207,7 +210,9 @@ npx mcp-use client disconnect my-server
 The CLI automatically saves authentication tokens in `~/.mcp-use/cli-sessions.json` for future sessions.
 
 <Note>
-For complete CLI documentation including stdio connections, session management, and interactive mode, see the [CLI Client Guide](/typescript/client/cli).
+  For complete CLI documentation including stdio connections, session
+  management, and interactive mode, see the [CLI Client
+  Guide](/typescript/client/cli).
 </Note>
 
 ## OAuth Flow Modes
@@ -219,17 +224,19 @@ mcp-use supports two OAuth flow modes for client applications:
 Opens OAuth authorization in a popup window. Best for desktop and web applications.
 
 **Advantages:**
+
 - User stays on the same page
 - Better UX for web applications
 - No navigation interruption
 
 **Usage:**
+
 ```typescript
 const mcp = useMcp({
-  url: 'http://localhost:3000/mcp',
-  callbackUrl: 'http://localhost:3000/callback',
+  url: "http://localhost:3000/mcp",
+  callbackUrl: "http://localhost:3000/callback",
   // Popup flow is the default
-})
+});
 ```
 
 ### Redirect Flow
@@ -237,60 +244,66 @@ const mcp = useMcp({
 Redirects the current window to the OAuth provider, then back to your app.
 
 **Advantages:**
+
 - Works in all browsers (popup blockers won't interfere)
 - Better for mobile browsers
 - More reliable across different environments
 
 **Usage:**
+
 ```typescript
 const mcp = useMcp({
-  url: 'http://localhost:3000/mcp',
-  callbackUrl: 'http://localhost:3000/callback',
-  useRedirectFlow: true // Enable redirect flow
-})
+  url: "http://localhost:3000/mcp",
+  callbackUrl: "http://localhost:3000/callback",
+  useRedirectFlow: true, // Enable redirect flow
+});
 ```
 
 **Setup for Redirect Flow:**
 
 1. Create a callback page in your app:
+
 ```typescript
 // pages/callback.tsx or app/callback/page.tsx
-import { onMcpAuthorization } from 'mcp-use/auth'
-import { useEffect, useState } from 'react'
+import { onMcpAuthorization } from "mcp-use/auth";
+import { useEffect, useState } from "react";
 
 export default function OAuthCallback() {
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing')
+  const [status, setStatus] = useState<"processing" | "success" | "error">(
+    "processing"
+  );
 
   useEffect(() => {
     onMcpAuthorization()
       .then(() => {
-        setStatus('success')
+        setStatus("success");
         // Redirect back to main app
-        setTimeout(() => window.location.href = '/', 1000)
+        setTimeout(() => (window.location.href = "/"), 1000);
       })
       .catch((err) => {
-        setStatus('error')
-        console.error('Auth failed:', err)
-      })
-  }, [])
+        setStatus("error");
+        console.error("Auth failed:", err);
+      });
+  }, []);
 
-  if (status === 'processing') {
-    return <div>Completing authentication...</div>
+  if (status === "processing") {
+    return <div>Completing authentication...</div>;
   }
-  if (status === 'success') {
-    return <div>Success! Redirecting...</div>
+  if (status === "success") {
+    return <div>Success! Redirecting...</div>;
   }
-  return <div>Authentication failed</div>
+  return <div>Authentication failed</div>;
 }
 ```
 
 2. Configure your callback URL to match this route:
+
 ```typescript
 const mcp = useMcp({
-  url: 'http://localhost:3000/mcp',
-  callbackUrl: 'http://localhost:3000/callback', // Your callback page
-  useRedirectFlow: true
-})
+  url: "http://localhost:3000/mcp",
+  callbackUrl: "http://localhost:3000/callback", // Your callback page
+  useRedirectFlow: true,
+});
 ```
 
 ### Preventing Auto-Authentication
@@ -299,17 +312,13 @@ By default, mcp-use automatically triggers OAuth flow when a server requires aut
 
 ```typescript
 const mcp = useMcp({
-  url: 'http://localhost:3000/mcp',
-  preventAutoAuth: true // Show auth button instead of auto-triggering
-})
+  url: "http://localhost:3000/mcp",
+  preventAutoAuth: true, // Show auth button instead of auto-triggering
+});
 
 // Manually trigger authentication
-if (mcp.state === 'pending_auth') {
-  return (
-    <button onClick={mcp.authenticate}>
-      Sign in to continue
-    </button>
-  )
+if (mcp.state === "pending_auth") {
+  return <button onClick={mcp.authenticate}>Sign in to continue</button>;
 }
 ```
 
@@ -335,33 +344,35 @@ sequenceDiagram
     OAuthServer->>Client: MCP requests authorized
 ```
 
-
 ## Configuration Options
 
 ### Node.js Client Configuration Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `url` | string | Yes | MCP server endpoint URL |
-| `authToken` | string | No | Bearer token for authentication (added to Authorization header) |
-| `auth_token` | string | No | Alternative snake_case form of `authToken` (for Python config compatibility) |
-| `headers` | object | No | Custom HTTP headers including authentication headers |
+| Parameter    | Type   | Required | Description                                                                  |
+| ------------ | ------ | -------- | ---------------------------------------------------------------------------- |
+| `url`        | string | Yes      | MCP server endpoint URL                                                      |
+| `authToken`  | string | No       | Bearer token for authentication (added to Authorization header)              |
+| `auth_token` | string | No       | Alternative snake_case form of `authToken` (for Python config compatibility) |
+| `headers`    | object | No       | Custom HTTP headers including authentication headers                         |
 
 <Note>
-**Configuration Compatibility**: Both `authToken` (camelCase) and `auth_token` (snake_case) are accepted for token-based authentication. Use `authToken` for TypeScript conventions; `auth_token` is supported for compatibility with Python-style configurations.
+  **Configuration Compatibility**: Both `authToken` (camelCase) and `auth_token`
+  (snake_case) are accepted for token-based authentication. Use `authToken` for
+  TypeScript conventions; `auth_token` is supported for compatibility with
+  Python-style configurations.
 </Note>
 
 ### OAuth Configuration Parameters (Browser Only)
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `client_id` | string | No* | OAuth client ID (required if not using DCR) |
-| `client_secret` | string | No | OAuth client secret (required if not using DCR) |
-| `scope` | string | No | OAuth scopes to request |
-| `callback_port` | integer | No | Port for OAuth callback (default: 8080) |
-| `oauth_provider` | object | No | OAuth provider metadata |
+| Parameter        | Type    | Required | Description                                     |
+| ---------------- | ------- | -------- | ----------------------------------------------- |
+| `client_id`      | string  | No\*     | OAuth client ID (required if not using DCR)     |
+| `client_secret`  | string  | No       | OAuth client secret (required if not using DCR) |
+| `scope`          | string  | No       | OAuth scopes to request                         |
+| `callback_port`  | integer | No       | Port for OAuth callback (default: 8080)         |
+| `oauth_provider` | object  | No       | OAuth provider metadata                         |
 
-*Required unless using Dynamic Client Registration
+\*Required unless using Dynamic Client Registration
 
 ### Port Configuration
 
@@ -372,12 +383,15 @@ sequenceDiagram
 ## Example Servers that support OAuth
 
 ### OAuth with DCR Support
+
 - **Linear**: `https://mcp.linear.app/mcp`
 
 ### OAuth with Manual Registration
+
 - **GitHub**: `https://api.githubcopilot.com/mcp/`
 
 ### Bearer Token
+
 - Most API-based MCP servers
 
 Check your server's documentation for specific authentication requirements and supported methods.
