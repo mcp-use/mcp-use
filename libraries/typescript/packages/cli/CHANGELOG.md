@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.8.2-canary.2
+
+### Patch Changes
+
+- f9b1001: chore: updated docs
+- Updated dependencies [f9b1001]
+  - @mcp-use/inspector@0.14.2-canary.2
+  - mcp-use@1.12.2-canary.2
+
 ## 2.8.2-canary.1
 
 ### Patch Changes
