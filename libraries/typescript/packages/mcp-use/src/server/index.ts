@@ -110,6 +110,9 @@ export {
 // MCP Proxy middleware for CORS proxying
 export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 
+// OAuth Proxy middleware for CORS-free OAuth flows
+export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
+
 export type {
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
