@@ -20,24 +20,71 @@ export type UseMcpOptions = {
   /** Proxy configuration for routing through a proxy server */
   proxyConfig?: {
     proxyAddress?: string;
+    headers?: Record<string, string>;
+    /**
+     * @deprecated Use `headers` instead. This option will be removed in a future version.
+     */
     customHeaders?: Record<string, string>;
   };
+  /**
+   * Enable automatic proxy fallback when direct connection fails
+   * When enabled, if a direct connection fails with FastMCP or CORS errors,
+   * automatically retries using the proxy configuration
+   *
+   * Can be:
+   * - `true`: Enable with default proxy (https://inspector.mcp-use.com/inspector/api/proxy)
+   * - `false`: Disable automatic fallback (default)
+   * - `{ enabled: boolean, proxyAddress?: string }`: Custom configuration
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * // Use default proxy
+   * useMcp({ url: '...', autoProxyFallback: true })
+   *
+   * // Use custom proxy
+   * useMcp({
+   *   url: '...',
+   *   autoProxyFallback: {
+   *     enabled: true,
+   *     proxyAddress: 'https://my-proxy.com/api/proxy'
+   *   }
+   * })
+   * ```
+   */
+  autoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
   /** Custom callback URL for OAuth redirect (defaults to /oauth/callback on the current origin) */
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /** Client configuration for both OAuth registration and MCP protocol identification */
+  /**
+   * @deprecated Use `clientInfo` instead. This option will be removed in a future version.
+   * The `clientConfig` will be automatically derived from `clientInfo` for OAuth registration.
+   *
+   * Client configuration for OAuth registration (deprecated - derived from clientInfo).
+   */
   clientConfig?: {
-    /** Client name (used for OAuth registration and MCP initialize) */
+    /** Client name (used for OAuth registration) */
     name?: string;
-    /** Client version (sent in MCP initialize request) */
+    /** Client version (used for OAuth registration) */
     version?: string;
     /** Client URI/homepage (used for OAuth registration) */
     uri?: string;
     /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
     logo_uri?: string;
   };
-  /** Custom headers that can be used to bypass auth */
+  /** Headers that can be used to bypass auth */
+  headers?: Record<string, string>;
+  /**
+   * @deprecated Use `headers` instead. This option will be removed in a future version.
+   * Custom headers that can be used to bypass auth
+   */
   customHeaders?: Record<string, string>;
   /** Whether to enable verbose debug logging to the console and the log state */
   debug?: boolean;
@@ -102,6 +149,15 @@ export type UseMcpOptions = {
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
    */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
@@ -117,6 +173,22 @@ export type UseMcpOptions = {
   onElicitation?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+  /**
+   * Client information sent to the MCP server in the initialize request.
+   * If not provided, defaults to mcp-use client info.
+   */
+  clientInfo?: {
+    name: string;
+    title?: string;
+    version: string;
+    description?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    websiteUrl?: string;
+  };
 };
 
 export type UseMcpResult = {

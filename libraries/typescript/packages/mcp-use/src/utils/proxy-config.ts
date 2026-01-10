@@ -12,6 +12,11 @@ export interface ProxyConfig {
    */
   proxyAddress?: string;
   /**
+   * Additional headers to include in requests
+   */
+  headers?: Record<string, string>;
+  /**
+   * @deprecated Use `headers` instead. This option will be removed in a future version.
    * Additional custom headers to include in requests
    */
   customHeaders?: Record<string, string>;
@@ -53,16 +58,16 @@ export interface ProxyResult {
  *
  * // With proxy
  * const result = applyProxyConfig(
- *   "https://api.example.com/sse",
+ *   "https://api.example.com/mcp",
  *   {
  *     proxyAddress: "http://localhost:3001/proxy",
- *     customHeaders: { "Authorization": "Bearer token" }
+ *     headers: { "Authorization": "Bearer token" }
  *   }
  * );
  * // {
- * //   url: "http://localhost:3001/proxy/sse",
+ * //   url: "http://localhost:3001/proxy/mcp",
  * //   headers: {
- * //     "X-Target-URL": "https://api.example.com/sse",
+ * //     "X-Target-URL": "https://api.example.com/mcp",
  * //     "Authorization": "Bearer token"
  * //   }
  * // }
@@ -72,11 +77,19 @@ export function applyProxyConfig(
   originalUrl: string,
   proxyConfig?: ProxyConfig
 ): ProxyResult {
+  // Support both new and deprecated names with deprecation warning
+  const proxyHeaders = proxyConfig?.headers ?? proxyConfig?.customHeaders ?? {};
+  if (proxyConfig?.customHeaders && !proxyConfig?.headers) {
+    console.warn(
+      '[applyProxyConfig] The "customHeaders" option in proxyConfig is deprecated. Use "headers" instead.'
+    );
+  }
+
   // No proxy configured - return original URL with any custom headers
   if (!proxyConfig?.proxyAddress) {
     return {
       url: originalUrl,
-      headers: proxyConfig?.customHeaders || {},
+      headers: proxyHeaders,
     };
   }
 
@@ -85,14 +98,14 @@ export function applyProxyConfig(
   const targetUrl = new URL(originalUrl);
 
   // Combine proxy base with original path and query parameters
-  // Example: proxy="http://localhost:3001/proxy" + target="/sse?foo=bar"
-  // Result: "http://localhost:3001/proxy/sse?foo=bar"
+  // Example: proxy="http://localhost:3001/proxy" + target="/mcp?foo=bar"
+  // Result: "http://localhost:3001/proxy/mcp?foo=bar"
   const finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${targetUrl.pathname}${targetUrl.search}`;
 
   // Build headers with X-Target-URL for the proxy to know where to forward
   const headers: Record<string, string> = {
     "X-Target-URL": originalUrl,
-    ...proxyConfig.customHeaders,
+    ...proxyHeaders,
   };
 
   return { url: finalUrl, headers };

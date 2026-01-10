@@ -129,6 +129,16 @@ interface ServerConfig {
 interface McpServerWrapperProps {
   id: string;
   options: McpServerOptions;
+  defaultProxyConfig?: {
+    proxyAddress?: string;
+    headers?: Record<string, string>;
+  };
+  defaultAutoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
   onUpdate: (server: McpServer) => void;
   rpcWrapTransport?: (transport: any, serverId: string) => any;
   onGlobalSamplingRequest?: (
@@ -166,6 +176,8 @@ interface McpServerWrapperProps {
 function McpServerWrapper({
   id,
   options,
+  defaultProxyConfig,
+  defaultAutoProxyFallback,
   onUpdate,
   rpcWrapTransport,
   onGlobalSamplingRequest,
@@ -193,8 +205,20 @@ function McpServerWrapper({
       wrapTransport: _wrapTransport,
       ...rest
     } = options;
-    return rest;
-  }, [options]);
+
+    // Merge defaults from provider with server-specific options
+    // Server-specific options take precedence over defaults
+    return {
+      ...rest,
+      // Use server-specific proxyConfig if provided, otherwise use default
+      proxyConfig: rest.proxyConfig || defaultProxyConfig,
+      // Use server-specific autoProxyFallback if provided, otherwise use default
+      autoProxyFallback:
+        rest.autoProxyFallback !== undefined
+          ? rest.autoProxyFallback
+          : defaultAutoProxyFallback,
+    };
+  }, [options, defaultProxyConfig, defaultAutoProxyFallback]);
 
   // Merge user's wrapTransport with RPC logging wrapper
   const combinedWrapTransport = useMemo(() => {
@@ -426,7 +450,7 @@ function McpServerWrapper({
   const mcp = useMcp({
     ...mcpOptions,
     onNotification: handleNotification,
-    samplingCallback,
+    onSampling: samplingCallback,
     onElicitation: elicitationCallback,
     wrapTransport: combinedWrapTransport,
   });
@@ -559,6 +583,28 @@ export interface McpClientProviderProps {
   mcpServers?: Record<string, McpServerOptions>;
 
   /**
+   * Default proxy configuration for all servers
+   * Can be overridden per-server in addServer() options
+   */
+  defaultProxyConfig?: {
+    proxyAddress?: string;
+    headers?: Record<string, string>;
+  };
+
+  /**
+   * Enable automatic proxy fallback for all servers by default
+   * When enabled, if a direct connection fails with FastMCP or CORS errors,
+   * automatically retries using proxy configuration
+   * @default true
+   */
+  defaultAutoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
+
+  /**
    * Storage provider for persisting server configurations
    * When provided, automatically loads servers on mount and saves on changes
    */
@@ -655,6 +701,8 @@ export interface McpClientProviderProps {
 export function McpClientProvider({
   children,
   mcpServers,
+  defaultProxyConfig,
+  defaultAutoProxyFallback = true,
   storageProvider,
   enableRpcLogging = false,
   onServerAdded,
@@ -956,6 +1004,8 @@ export function McpClientProvider({
           key={config.id}
           id={config.id}
           options={config.options}
+          defaultProxyConfig={defaultProxyConfig}
+          defaultAutoProxyFallback={defaultAutoProxyFallback}
           onUpdate={handleServerUpdate}
           rpcWrapTransport={rpcWrapTransport}
           onGlobalSamplingRequest={onSamplingRequest}
