@@ -7,6 +7,8 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
+import mcp.server.lowlevel.server as lowlevel
+import mcp.server.session as mcp_session
 from mcp.server.fastmcp import FastMCP
 from mcp.types import (
     AnyFunction,
@@ -27,6 +29,7 @@ from mcp_use.server.middleware import (
     ServerMiddlewareContext,
     TelemetryMiddleware,
 )
+from mcp_use.server.middleware.server_session import MiddlewareServerSession
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
@@ -34,6 +37,10 @@ from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.server.utils.signals import setup_signal_handlers
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
 from mcp_use.telemetry.utils import track_server_run_from_server
+
+# Monkey patching for init request of middleware
+mcp_session.ServerSession = MiddlewareServerSession
+lowlevel.ServerSession = MiddlewareServerSession
 
 if TYPE_CHECKING:
     from mcp.server.session import ServerSession
@@ -101,6 +108,10 @@ class MCPServer(FastMCP):
 
         # Set up signal handlers for immediate shutdown
         setup_signal_handlers()
+
+        # Inject middleware in the ServerSession
+        MiddlewareServerSession._middleware_manager = self.middleware_manager
+        MiddlewareServerSession._transport_type = self._transport_type
 
     @property
     def debug(self) -> bool:
@@ -232,15 +243,6 @@ class MCPServer(FastMCP):
         return app
 
     def _wrap_handlers_with_middleware(self) -> None:
-        """Wrap MCP request handlers with middleware chain.
-
-        Note: InitializeRequest is NOT included here because it's handled at the session
-        protocol layer (ServerSession._received_request) before reaching request_handlers.
-        This is by design in the MCP protocol - initialize is a bootstrap/handshake operation
-        that establishes the session, similar to TCP handshake or TLS negotiation.
-
-        If you need to track initialize events, do so directly in telemetry without middleware.
-        """
         handlers = self._mcp_server.request_handlers
 
         if self.debug_level >= 1:
