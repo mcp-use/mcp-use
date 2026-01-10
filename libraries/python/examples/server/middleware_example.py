@@ -19,6 +19,13 @@ from typing import Any
 from mcp_use.server import MCPServer
 from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 
+class ConnectionGuard(Middleware):
+    async def on_initialize(self, context, call_next):
+        client_name = context.message.clientInfo.name
+        print(f"Incoming connection from: {client_name}")
+
+        return await call_next(context)
+
 
 class LoggingMiddleware(Middleware):
     """Minimal logging."""
@@ -90,6 +97,7 @@ server = MCPServer(
         AuthenticationMiddleware(),
         RateLimitingMiddleware(max_requests_per_minute=10),
         ValidationMiddleware(),
+        ConnectionGuard(),
     ],
     debug=True,
     pretty_print_jsonrpc=True,
