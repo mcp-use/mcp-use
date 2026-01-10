@@ -28,7 +28,7 @@ const ServerManager: React.FC = () => {
 
     addServer("no api key needed", {
       url: "https://apps-sdk-starter.mcp-use.run",
-      name: "Invalid API Key (MCP Use)",
+      name: "No API Key (MCP Use)",
     });
   }, [addServer]);
 
