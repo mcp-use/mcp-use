@@ -2,13 +2,13 @@ import type { Hono } from "hono";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
-    generateWidgetContainerHtml,
-    generateWidgetContentHtml,
-    getWidgetData,
-    getWidgetSecurityHeaders,
-    handleChatRequest,
-    handleChatRequestStream,
-    storeWidgetData,
+  generateWidgetContainerHtml,
+  generateWidgetContentHtml,
+  getWidgetData,
+  getWidgetSecurityHeaders,
+  handleChatRequest,
+  handleChatRequestStream,
+  storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
 
