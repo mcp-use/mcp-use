@@ -8,6 +8,9 @@
     "mcp-use": "1.12.1"
   },
   "changesets": [
-    "cold-moles-like"
+    "add-inspector-client-info",
+    "cold-moles-like",
+    "fix-copy-config-custom-headers",
+    "loose-jobs-grow"
   ]
 }
