@@ -15,7 +15,11 @@ import {
   VMCodeExecutor,
 } from "./client/codeExecutor.js";
 import { CodeModeConnector } from "./client/connectors/codeMode.js";
-import { createConnectorFromConfig, loadConfigFile } from "./config.js";
+import {
+  createConnectorFromConfig,
+  loadConfigFile,
+  type ServerConfig,
+} from "./config.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
@@ -51,6 +55,15 @@ export interface CodeModeConfig {
 export interface MCPClientOptions {
   codeMode?: boolean | CodeModeConfig;
   /**
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
    * Optional callback function to handle sampling requests from servers.
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
@@ -152,7 +165,13 @@ export class MCPClient extends BaseMCPClient {
     this.codeMode = codeModeEnabled;
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
-    this._samplingCallback = options?.samplingCallback;
+    // Support both new and deprecated names
+    this._samplingCallback = options?.onSampling ?? options?.samplingCallback;
+    if (options?.samplingCallback && !options?.onSampling) {
+      console.warn(
+        '[MCPClient] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+      );
+    }
     this._elicitationCallback = options?.elicitationCallback;
 
     if (this.codeMode) {
@@ -212,7 +231,7 @@ export class MCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    return createConnectorFromConfig(serverConfig, {
+    return createConnectorFromConfig(serverConfig as ServerConfig, {
       samplingCallback: this._samplingCallback,
       elicitationCallback: this._elicitationCallback,
     });

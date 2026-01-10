@@ -484,7 +484,7 @@ const clientRef = useRef<Client | null>(null)
 
 const connect = async () => {
   const transport = new StreamableHTTPClientTransport(url, {
-    headers: customHeaders,
+    headers: headers,
     authProvider: oauthProvider
   })
 
@@ -521,7 +521,7 @@ const connect = async () => {
 
   client.current.addServer('inspector-server', {
     url: url,
-    headers: customHeaders,
+    headers: headers,
     authProvider: oauthProvider
   })
 

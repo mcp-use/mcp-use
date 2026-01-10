@@ -8,8 +8,14 @@ import { isPortAvailable, parsePortFromArgs } from "./utils.js";
 
 const app = new Hono();
 
-// Middleware
-app.use("*", cors());
+// Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    exposeHeaders: ["*"], // Expose all headers since this is a proxy
+  })
+);
 
 // Register all API routes
 registerInspectorRoutes(app);

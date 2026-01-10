@@ -7,7 +7,8 @@
  * @module mcp-proxy
  */
 
-import type { Hono, Context } from "hono";
+import type { Context, Hono } from "hono";
+import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 /**
@@ -106,6 +107,16 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
   const basePath = options.path || "/mcp/proxy";
   const enableLogging = options.enableLogging !== false;
 
+  // CRITICAL: Enable CORS and expose all headers for FastMCP session management
+  // The Mcp-Session-Id header MUST be exposed for the browser to read it
+  app.use(
+    `${basePath}/*`,
+    cors({
+      origin: "*",
+      exposeHeaders: ["*"], // Expose all headers including Mcp-Session-Id for FastMCP
+    })
+  );
+
   // Apply logger middleware to proxy routes
   if (enableLogging) {
     app.use(`${basePath}/*`, logger());
@@ -122,8 +133,24 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       }
 
-      // Get target URL from header
-      const targetUrl = c.req.header("X-Target-URL");
+      // Get target URL from query parameter or header
+      // IMPORTANT: Query parameter takes precedence because it's used for OAuth discovery
+      // where we encode the full target path. The SDK might still include X-Target-URL
+      // header from the transport config, but we need to use the query param for OAuth.
+      const url = new URL(c.req.url);
+      const targetFromQuery = url.searchParams.get("__mcp_target");
+      let targetUrl: string | undefined;
+
+      if (targetFromQuery) {
+        // OAuth discovery mode: construct full URL from target origin + request path
+        // e.g., __mcp_target=https://mcp.vercel.com + /.well-known/oauth-protected-resource
+        const requestPath = url.pathname.replace(basePath, "");
+        targetUrl = targetFromQuery + requestPath;
+      } else {
+        // Regular MCP proxy mode: use X-Target-URL header
+        targetUrl = c.req.header("X-Target-URL");
+      }
+
       if (!targetUrl) {
         return c.json(
           {
@@ -221,7 +248,50 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       });
 
-      // Return the proxied response
+      // Check if this is an OAuth discovery response that needs resource field rewriting
+      // The SDK validates that the resource field matches the connection URL for security
+      // We need to rewrite the resource to match the proxy URL, but keep authorization_servers
+      // pointing to the original OAuth server (the fetch interceptor will route those)
+      const contentType = response.headers.get("content-type") || "";
+      const isOAuthDiscovery =
+        url.pathname.includes("/.well-known/oauth") &&
+        contentType.includes("application/json");
+
+      if (isOAuthDiscovery && response.body) {
+        // Read and parse the response body
+        const bodyText = await response.text();
+        try {
+          const bodyJson = JSON.parse(bodyText);
+          const proxyOrigin = new URL(c.req.url).origin;
+
+          // Rewrite the resource field to match the proxy URL
+          // The SDK validates that the resource matches the URL it connected to
+          // Without this, the SDK will reject the OAuth response as a security measure
+          if (bodyJson.resource) {
+            bodyJson.resource = `${proxyOrigin}${basePath}`;
+          }
+
+          // DO NOT rewrite authorization_servers - keep them pointing to original OAuth server
+          // The browser's fetch interceptor will route requests to those URLs through the OAuth proxy
+          // DO NOT rewrite token_endpoint or registration_endpoint - same reason
+          // DO NOT rewrite authorization_endpoint - browser needs to redirect there directly
+
+          return new Response(JSON.stringify(bodyJson), {
+            status: response.status,
+            statusText: response.statusText,
+            headers: responseHeaders,
+          });
+        } catch {
+          // If parsing fails, return original body
+          return new Response(bodyText, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: responseHeaders,
+          });
+        }
+      }
+
+      // Return the proxied response unchanged for non-OAuth discovery responses
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

@@ -20,8 +20,45 @@ export type UseMcpOptions = {
   /** Proxy configuration for routing through a proxy server */
   proxyConfig?: {
     proxyAddress?: string;
+    headers?: Record<string, string>;
+    /**
+     * @deprecated Use `headers` instead. This option will be removed in a future version.
+     */
     customHeaders?: Record<string, string>;
   };
+  /**
+   * Enable automatic proxy fallback when direct connection fails
+   * When enabled, if a direct connection fails with FastMCP or CORS errors,
+   * automatically retries using the proxy configuration
+   *
+   * Can be:
+   * - `true`: Enable with default proxy (https://inspector.mcp-use.com/inspector/api/proxy)
+   * - `false`: Disable automatic fallback (default)
+   * - `{ enabled: boolean, proxyAddress?: string }`: Custom configuration
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * // Use default proxy
+   * useMcp({ url: '...', autoProxyFallback: true })
+   *
+   * // Use custom proxy
+   * useMcp({
+   *   url: '...',
+   *   autoProxyFallback: {
+   *     enabled: true,
+   *     proxyAddress: 'https://my-proxy.com/api/proxy'
+   *   }
+   * })
+   * ```
+   */
+  autoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
   /** Custom callback URL for OAuth redirect (defaults to /oauth/callback on the current origin) */
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
@@ -42,7 +79,12 @@ export type UseMcpOptions = {
     /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
     logo_uri?: string;
   };
-  /** Custom headers that can be used to bypass auth */
+  /** Headers that can be used to bypass auth */
+  headers?: Record<string, string>;
+  /**
+   * @deprecated Use `headers` instead. This option will be removed in a future version.
+   * Custom headers that can be used to bypass auth
+   */
   customHeaders?: Record<string, string>;
   /** Whether to enable verbose debug logging to the console and the log state */
   debug?: boolean;
@@ -103,6 +145,15 @@ export type UseMcpOptions = {
   /** Callback function that is invoked when a notification is received from the MCP server */
   onNotification?: (notification: Notification) => void;
   /**
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
    * Optional callback function to handle sampling requests from servers.
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.

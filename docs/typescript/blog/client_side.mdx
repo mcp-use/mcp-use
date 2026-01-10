@@ -167,16 +167,16 @@ The inspector stores and sends auth headers directly from the browser:
 
 ```typescript
 // react/useMcp.ts
-export function useMcp({ url, customHeaders }) {
+export function useMcp({ url, headers }) {
   const clientRef = useRef<BrowserMCPClient | null>(null)
 
   const connect = async () => {
     clientRef.current = new BrowserMCPClient()
 
-    // Add server with custom headers
+    // Add server with headers
     clientRef.current.addServer('server', {
       url: url,
-      headers: customHeaders  // ← Set once, used forever
+      headers: headers  // ← Set once, used forever
     })
 
     // All subsequent requests include these headers
@@ -191,18 +191,18 @@ export function useMcp({ url, customHeaders }) {
 
 ```typescript
 // Inspector connection form
-const [customHeaders, setCustomHeaders] = useState([
+const [headers, setHeaders] = useState([
   { name: 'Authorization', value: '' }
 ])
 
 const handleConnect = () => {
-  const headers = {}
-  customHeaders.forEach(h => {
-    if (h.name && h.value) headers[h.name] = h.value
+  const headerObj = {}
+  headers.forEach(h => {
+    if (h.name && h.value) headerObj[h.name] = h.value
   })
 
   // Headers stored in browser memory only
-  addConnection(url, name, { customHeaders: headers })
+  addConnection(url, name, { headers: headerObj })
 }
 ```
 
@@ -326,7 +326,7 @@ The `useMcp` hook provides one connection for all features:
 
 ```typescript
 // react/useMcp.ts
-export function useMcp(options: { url: string, customHeaders?: Record<string, string> }) {
+export function useMcp(options: { url: string, headers?: Record<string, string> }) {
   const clientRef = useRef<BrowserMCPClient | null>(null)
   const agentRef = useRef<MCPAgent | null>(null)
 
@@ -335,7 +335,7 @@ export function useMcp(options: { url: string, customHeaders?: Record<string, st
     clientRef.current = new BrowserMCPClient()
     clientRef.current.addServer('inspector', {
       url: options.url,
-      headers: options.customHeaders
+      headers: options.headers
     })
 
     // Create session once
@@ -837,7 +837,7 @@ import { useState } from 'react'
 function ChatWidget() {
   const { sendChatMessage, state } = useMcp({
     url: 'https://api.example.com/mcp',
-    customHeaders: { Authorization: `Bearer ${apiKey}` }
+    headers: { Authorization: `Bearer ${apiKey}` }
   })
 
   const [messages, setMessages] = useState([])

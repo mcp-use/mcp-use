@@ -60,6 +60,15 @@ export interface ConnectorInitOptions {
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
    */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
@@ -92,10 +101,20 @@ export abstract class BaseConnector {
   protected rootsCache: Root[] = [];
 
   constructor(opts: ConnectorInitOptions = {}) {
-    this.opts = opts;
+    // Support both new and deprecated name
+    const finalOpts = {
+      ...opts,
+      onSampling: opts.onSampling ?? opts.samplingCallback,
+    };
+    if (opts.samplingCallback && !opts.onSampling) {
+      console.warn(
+        '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+      );
+    }
+    this.opts = finalOpts;
     // Initialize roots from options
-    if (opts.roots) {
-      this.rootsCache = [...opts.roots];
+    if (finalOpts.roots) {
+      this.rootsCache = [...finalOpts.roots];
     }
   }
 
@@ -272,7 +291,8 @@ export abstract class BaseConnector {
       logger.debug("setupSamplingHandler: No client available");
       return;
     }
-    if (!this.opts.samplingCallback) {
+    const samplingCallback = this.opts.onSampling ?? this.opts.samplingCallback;
+    if (!samplingCallback) {
       logger.debug("setupSamplingHandler: No sampling callback provided");
       return;
     }
@@ -283,7 +303,7 @@ export abstract class BaseConnector {
       CreateMessageRequestSchema,
       async (request: CreateMessageRequest, _extra: unknown) => {
         logger.debug("Server requested sampling, forwarding to callback");
-        return await this.opts.samplingCallback!(request.params);
+        return await samplingCallback(request.params);
       }
     );
     logger.debug(
