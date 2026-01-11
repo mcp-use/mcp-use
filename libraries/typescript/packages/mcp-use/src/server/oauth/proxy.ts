@@ -170,7 +170,11 @@ export function mountOAuthProxy(
                 Accept: "application/json",
               },
               // Send minimal MCP request to trigger 401 with WWW-Authenticate
-              body: JSON.stringify({ jsonrpc: "2.0", method: "initialize" }),
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "initialize",
+                id: 1,
+              }),
             });
 
             // Extract WWW-Authenticate header
