@@ -298,10 +298,16 @@ test: add widget rendering tests
 - State preserved when possible
 - Fast refresh for React components
 
-**Server (tsx watch):**
+**MCP Server (HMR):**
+- Tools, prompts, and resources update without restart
+- Connected clients stay connected
+- Inspector auto-refreshes when `list_changed` notifications are received
+- No need to reconnect after code changes
+
+**Server (tsx watch fallback):**
 - TypeScript files auto-recompile
 - Server restarts on changes
-- Watch mode for all server files
+- Use `--no-hmr` flag if HMR causes issues
 
 ### Debugging Techniques
 
