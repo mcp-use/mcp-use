@@ -28,7 +28,7 @@ const ServerManager: React.FC = () => {
     });
 
     addServer("supabase", {
-      url: "https://mcp.supabase.com/mcp?project_ref=jscgzgjudifdoqxdwyno&features=database%2Cdebugging",
+      url: "https://mcp.supabase.com/mcp?project_ref={PROJECT_REF}&features=database%2Cdebugging",
       name: "Supabase (OAuth proxy, requires special proxying)",
       timeout: 30000,
       preventAutoAuth: true, // is the default
