@@ -145,14 +145,104 @@ export function mountOAuthProxy(
         console.log(`[OAuth Proxy] Fetching metadata: ${url}`);
       }
 
-      // Fetch OAuth metadata from the server
-      const response = await fetch(metadataUrl.toString(), {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "mcp-use/1.0",
-        },
-      });
+      let response: Response | null = null;
+      let discoveredFromWWWAuth = false;
+
+      // FIRST: Try to discover metadata URL from WWW-Authenticate header
+      // This is the authoritative source per OAuth spec and handles non-standard paths
+      // ONLY apply this for oauth-protected-resource requests (not oauth-authorization-server)
+      if (url.includes("/.well-known/oauth-protected-resource")) {
+        const mcpServerUrl = c.req.query("mcp_url");
+
+        if (mcpServerUrl) {
+          try {
+            if (enableLogging) {
+              console.log(
+                `[OAuth Proxy] Attempting metadata discovery from WWW-Authenticate header for: ${mcpServerUrl}`
+              );
+            }
+
+            // Make a request to the MCP endpoint to get WWW-Authenticate header
+            const mcpResponse = await fetch(mcpServerUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              // Send minimal MCP request to trigger 401 with WWW-Authenticate
+              body: JSON.stringify({ jsonrpc: "2.0", method: "initialize" }),
+            });
+
+            // Extract WWW-Authenticate header
+            const wwwAuth = mcpResponse.headers.get("WWW-Authenticate");
+            if (wwwAuth) {
+              if (enableLogging) {
+                console.log(
+                  `[OAuth Proxy] WWW-Authenticate header: ${wwwAuth}`
+                );
+              }
+
+              // Parse resource_metadata from header
+              // Format: Bearer error="...", resource_metadata="https://..."
+              const resourceMetadataMatch = wwwAuth.match(
+                /resource_metadata="([^"]+)"/
+              );
+
+              if (resourceMetadataMatch && resourceMetadataMatch[1]) {
+                const discoveredMetadataUrl = resourceMetadataMatch[1];
+                if (enableLogging) {
+                  console.log(
+                    `[OAuth Proxy] Discovered metadata URL from WWW-Authenticate: ${discoveredMetadataUrl}`
+                  );
+                }
+
+                // Fetch from the discovered URL
+                response = await fetch(discoveredMetadataUrl, {
+                  method: "GET",
+                  headers: {
+                    Accept: "application/json",
+                    "User-Agent": "mcp-use/1.0",
+                  },
+                });
+
+                if (response.ok) {
+                  discoveredFromWWWAuth = true;
+                  if (enableLogging) {
+                    console.log(
+                      `[OAuth Proxy] Successfully fetched metadata from discovered URL`
+                    );
+                  }
+                }
+              }
+            }
+          } catch (discoveryError) {
+            if (enableLogging) {
+              console.log(
+                `[OAuth Proxy] WWW-Authenticate discovery failed, falling back to standard path:`,
+                discoveryError instanceof Error
+                  ? discoveryError.message
+                  : discoveryError
+              );
+            }
+            // Continue to fallback
+          }
+        }
+      }
+
+      // FALLBACK: Try the standard .well-known path if discovery failed
+      if (!response || !response.ok) {
+        if (enableLogging && !discoveredFromWWWAuth) {
+          console.log(`[OAuth Proxy] Trying standard metadata path: ${url}`);
+        }
+
+        response = await fetch(metadataUrl.toString(), {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "mcp-use/1.0",
+          },
+        });
+      }
 
       if (!response.ok) {
         if (enableLogging) {
@@ -171,9 +261,9 @@ export function mountOAuthProxy(
       let metadata = await response.json();
 
       // If this is an oauth-protected-resource response and we're using MCP proxy,
-      // rewrite the resource field to match the connection URL (MCP proxy)
-      // The connection URL can be inferred from the OAuth proxy base path
-      // e.g., /inspector/api/oauth -> /inspector/api/proxy
+      // we need to temporarily rewrite the resource field to pass SDK validation.
+      // The browser fetch interceptor will rewrite it back to the actual resource
+      // when making the authorization request to the OAuth server.
       if (metadata.resource && metadata.authorization_servers) {
         // Check if request includes X-Connection-URL header (set by client when using MCP proxy)
         let connectionUrl = c.req.header("X-Connection-URL");
@@ -183,35 +273,18 @@ export function mountOAuthProxy(
         if (!connectionUrl) {
           const requestUrl = new URL(c.req.url);
 
-          // Detect the actual protocol the client is using (may be different from internal request)
-          // Check forwarded headers in order of preference
+          // Detect the actual protocol the client is using
           let clientProtocol = requestUrl.protocol.replace(":", "");
-
-          // 1. Check X-Forwarded-Proto (most common, set by most proxies)
           const xForwardedProto = c.req.header("X-Forwarded-Proto");
           if (xForwardedProto) {
             clientProtocol = xForwardedProto.split(",")[0].trim();
           }
 
-          // 2. Check X-Forwarded-Scheme (alternative header)
-          const xForwardedScheme = c.req.header("X-Forwarded-Scheme");
-          if (!xForwardedProto && xForwardedScheme) {
-            clientProtocol = xForwardedScheme.trim();
-          }
-
-          // 3. Check Forwarded header (RFC 7239)
-          const forwarded = c.req.header("Forwarded");
-          if (!xForwardedProto && !xForwardedScheme && forwarded) {
-            const protoMatch = forwarded.match(/proto=([^;,\s]+)/i);
-            if (protoMatch) {
-              clientProtocol = protoMatch[1];
-            }
-          }
-
-          if (enableLogging) {
-            console.log(
-              `[OAuth Proxy] Detected protocol: ${clientProtocol} (original: ${requestUrl.protocol})`
-            );
+          // Detect the actual host the client is using
+          let clientHost = requestUrl.host;
+          const xForwardedHost = c.req.header("X-Forwarded-Host");
+          if (xForwardedHost) {
+            clientHost = xForwardedHost.split(",")[0].trim();
           }
 
           // Extract base path before /oauth
@@ -219,22 +292,20 @@ export function mountOAuthProxy(
           const oauthIndex = pathParts.findIndex((part) => part === "oauth");
           if (oauthIndex > 0) {
             const basePath = pathParts.slice(0, oauthIndex).join("/");
-            // Construct connection URL with the correct protocol
-            const host = requestUrl.host;
-            connectionUrl = `${clientProtocol}://${host}${basePath}/proxy`;
+            connectionUrl = `${clientProtocol}://${clientHost}${basePath}/proxy`;
           }
         }
 
         if (connectionUrl) {
-          // Rewrite resource to match the connection URL (MCP proxy URL)
-          // This allows SDK validation to pass when connecting through proxy
+          // Store the original resource URL in a custom field
           metadata = {
             ...metadata,
-            resource: connectionUrl,
+            resource: connectionUrl, // SDK validation requires this to match connection URL
+            _original_resource: metadata.resource, // Store original for client to use in OAuth request
           };
           if (enableLogging) {
             console.log(
-              `[OAuth Proxy] Rewrote resource field to match connection URL: ${connectionUrl}`
+              `[OAuth Proxy] Rewrote resource field to ${connectionUrl} for SDK validation (original: ${metadata._original_resource})`
             );
           }
         }

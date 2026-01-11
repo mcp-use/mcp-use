@@ -541,6 +541,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preventAutoAuth,
           useRedirectFlow,
           oauthProxyUrl,
+          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
           onPopupWindow,
         }
       );
@@ -1321,6 +1322,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false, // ← Allow OAuth to proceed
             useRedirectFlow,
             oauthProxyUrl,
+            connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
             onPopupWindow,
           }
         );
@@ -1808,6 +1810,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preventAutoAuth,
           useRedirectFlow,
           oauthProxyUrl,
+          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
           onPopupWindow,
         }
       );
