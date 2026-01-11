@@ -547,7 +547,9 @@ function McpServerWrapper({
     mcp.resources.length,
     mcp.resourceTemplates.length,
     mcp.prompts.length,
-    // Objects excluded - manual comparison handles serverInfo/capabilities changes
+    // serverInfo and capabilities - include for reference comparison
+    mcp.serverInfo,
+    mcp.capabilities,
     // Functions excluded - they're stable via useCallback in useMcp
     // mcp.log excluded - log changes shouldn't trigger provider updates
     // mcp.client excluded - client reference stability handled by manual check

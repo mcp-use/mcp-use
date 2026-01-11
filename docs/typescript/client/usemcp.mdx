@@ -238,7 +238,7 @@ interface McpServerOptions {
   autoProxyFallback?: boolean | { enabled?: boolean; proxyAddress?: string };
 
   // OAuth
-  preventAutoAuth?: boolean; // Prevent automatic OAuth popup (default: false)
+  preventAutoAuth?: boolean; // Prevent automatic OAuth popup (default: true)
   useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
   callbackUrl?: string; // OAuth callback URL
   clientInfo?: {
@@ -285,25 +285,9 @@ function MyApp() {
 
 ### OAuth Authentication
 
-**Automatic OAuth (Popup Flow)**
+**Manual OAuth Trigger (Default)**
 
-```typescript
-function MyApp() {
-  const { addServer } = useMcpClient();
-
-  useEffect(() => {
-    addServer("linear", {
-      url: "https://mcp.linear.app/mcp",
-      name: "Linear",
-      // OAuth handled automatically when server requires it
-    });
-  }, [addServer]);
-
-  return <ServerList />;
-}
-```
-
-**Manual OAuth Trigger**
+By default, you need to explicitly trigger OAuth when a server requires authentication:
 
 ```typescript
 function ServerCard({ serverId }) {
@@ -323,6 +307,26 @@ function ServerCard({ serverId }) {
 }
 ```
 
+**Automatic OAuth (Legacy)**
+
+To enable automatic OAuth popup when authentication is required, set `preventAutoAuth: false`:
+
+```typescript
+function MyApp() {
+  const { addServer } = useMcpClient();
+
+  useEffect(() => {
+    addServer("linear", {
+      url: "https://mcp.linear.app/mcp",
+      name: "Linear",
+      preventAutoAuth: false, // Auto-trigger OAuth popup
+    });
+  }, [addServer]);
+
+  return <ServerList />;
+}
+```
+
 **Redirect Flow** (for mobile or popup-blocked environments)
 
 ```typescript
@@ -330,7 +334,7 @@ addServer("linear", {
   url: "https://mcp.linear.app/mcp",
   name: "Linear",
   useRedirectFlow: true, // Use redirect instead of popup
-  preventAutoAuth: true, // Show button first
+  // preventAutoAuth: true is the default
 });
 ```
 

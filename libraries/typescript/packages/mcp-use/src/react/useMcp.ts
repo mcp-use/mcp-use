@@ -123,7 +123,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
     transportType = "auto",
-    preventAutoAuth = false, // Default to false for backward compatibility (auto-trigger OAuth)
+    preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
@@ -1032,44 +1032,25 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               "Authentication required. OAuth provider available."
             );
 
-            // Generate auth URL manually since SDK didn't trigger it
-            // This happens because 401 occurs before OAuth flow starts
-            try {
-              const { auth } =
-                await import("@modelcontextprotocol/sdk/client/auth.js");
-              const baseUrl = new URL(url).origin;
-
-              // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
-              // This ensures the URL gets prepared and stored
-              auth(authProviderRef.current, { serverUrl: baseUrl }).catch(
-                () => {
-                  // Expected to fail/stop - we just want the URL prepared
-                }
-              );
-
-              // Give it a moment to prepare the URL
-              setTimeout(() => {
-                if (isMountedRef.current) {
-                  const manualUrl =
-                    authProviderRef.current?.getLastAttemptedAuthUrl();
-                  if (manualUrl) {
-                    setAuthUrl(manualUrl);
-                    addLog(
-                      "info",
-                      "Manual authentication URL available:",
-                      manualUrl
-                    );
-                  } else {
-                    addLog("warn", "Could not generate authentication URL");
-                  }
-                }
-              }, 100);
-            } catch (authGenError) {
-              addLog("warn", "Error generating auth URL:", authGenError);
-            }
+            // Don't trigger auth flow automatically - let the user click "Authenticate"
+            // This prevents unnecessary metadata discovery requests that may fail with CORS/404
+            addLog(
+              "info",
+              "Waiting for user to initiate authentication flow..."
+            );
 
             if (isMountedRef.current) {
               setState("pending_auth");
+              // Retrieve the stored auth URL if it was prepared during OAuth discovery
+              const storedAuthUrl =
+                authProviderRef.current?.getLastAttemptedAuthUrl();
+              if (storedAuthUrl) {
+                setAuthUrl(storedAuthUrl);
+                addLog(
+                  "info",
+                  "Retrieved stored auth URL for manual authentication"
+                );
+              }
             }
             connectingRef.current = false;
             return "auth_redirect";
@@ -1310,23 +1291,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
         assert(url, "Server URL is required for authentication");
 
-        // Clear ALL stale OAuth state from previous attempts
-        addLog("info", "Clearing all OAuth state and initiating fresh flow...");
-
-        // Clear all OAuth-related keys for this server
-        const hashPrefix = `${storageKeyPrefix}:${authProviderRef.current.serverUrlHash}`;
-        Object.keys(localStorage).forEach((key) => {
-          // Remove all keys for this server's hash
-          if (key.startsWith(hashPrefix)) {
-            addLog("debug", `Removing stale OAuth key: ${key}`);
-            localStorage.removeItem(key);
-          }
-          // Also remove any orphaned state parameters
-          if (key.startsWith(`${storageKeyPrefix}:state_`)) {
-            addLog("debug", `Removing orphaned state: ${key}`);
-            localStorage.removeItem(key);
-          }
-        });
+        // NOTE: We no longer clear state here. The existing state from the initial
+        // discovery is valid and should be preserved. If auth() creates new state,
+        // that's fine - old state will be cleaned up on successful auth or clearStorage().
+        // Clearing state prematurely caused issues when auth() failed to create new state.
+        addLog("info", "Initiating OAuth flow (preserving existing state)...");
 
         // Update state to authenticating before redirect
         setState("authenticating");
@@ -1380,16 +1349,27 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const baseUrl = new URL(url).origin;
-        auth(freshAuthProvider, {
-          serverUrl: baseUrl,
-        }).catch((err: unknown) => {
-          // This is expected to "fail" with redirect - the auth flow continues in the popup/redirect
+        try {
+          await auth(freshAuthProvider, {
+            serverUrl: baseUrl,
+          });
+          addLog("info", "OAuth flow completed (tokens obtained)");
+        } catch (err: unknown) {
+          // This is expected when auth opens popup/redirect - the flow continues there
           addLog(
             "info",
-            "OAuth flow initiated:",
+            "OAuth flow initiated (popup/redirect):",
             err instanceof Error ? err.message : "Redirecting..."
           );
-        });
+        }
+
+        // Update authUrl with the new URL from the fresh provider
+        // This is critical for the fallback link when popup is blocked
+        const newAuthUrl = freshAuthProvider.getLastAttemptedAuthUrl();
+        if (newAuthUrl) {
+          setAuthUrl(newAuthUrl);
+          addLog("info", "Updated auth URL for fallback:", newAuthUrl);
+        }
       } catch (authError) {
         if (!isMountedRef.current) return;
         setState("pending_auth"); // Go back to pending state on error

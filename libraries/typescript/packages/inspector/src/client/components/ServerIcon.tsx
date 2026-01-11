@@ -3,7 +3,7 @@ import { RandomGradientBackground } from "@/client/components/ui/random-gradient
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
 import type { UseMcpResult } from "mcp-use/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface ServerIconProps {
   server: UseMcpResult;
@@ -49,6 +49,12 @@ export function ServerIcon({
     // 3. No icon available - will show gradient
     return null;
   })();
+
+  // Reset loading and error states when iconUrl changes
+  useEffect(() => {
+    setImageLoading(iconUrl !== null);
+    setImageError(false);
+  }, [iconUrl]);
 
   // Get server display name
   const displayName = server.serverInfo?.name || server.name || "MCP";

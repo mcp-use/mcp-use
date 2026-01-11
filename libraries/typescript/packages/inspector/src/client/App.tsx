@@ -1,6 +1,8 @@
+import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
 import { InspectorDashboard } from "@/client/components/InspectorDashboard";
 import { Layout } from "@/client/components/Layout";
 import { OAuthCallback } from "@/client/components/OAuthCallback";
+import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
 import { Toaster } from "@/client/components/ui/sonner";
 import {
   LocalStorageProvider,
@@ -10,8 +12,6 @@ import {
 import { useMemo } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
-import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
-import { ElicitationRequestToast } from "@/client/components/elicitation/ElicitationRequestToast";
 import { InspectorProvider } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
@@ -41,6 +41,10 @@ function App() {
       <McpClientProvider
         storageProvider={storageProvider}
         enableRpcLogging={true}
+        defaultAutoProxyFallback={{
+          enabled: true,
+          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+        }}
         onServerAdded={(id: string, server: McpServer) => {
           console.log("[Inspector] Server added:", id, server.state);
         }}

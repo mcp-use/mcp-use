@@ -335,13 +335,18 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       },
       // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",
-      // Store current URL for redirect flow so we can return to it
+      // Always store current URL so we can return to it after auth
+      // This is critical for popup flow when popup is blocked and user clicks link manually
       returnUrl:
-        this.useRedirectFlow && typeof window !== "undefined"
-          ? window.location.href
-          : undefined,
+        typeof window !== "undefined" ? window.location.href : undefined,
     };
+
+    console.log(`[OAuth] Storing state key: ${stateKey}`);
     localStorage.setItem(stateKey, JSON.stringify(stateData));
+
+    // Verify it was stored
+    const verified = localStorage.getItem(stateKey);
+    console.log(`[OAuth] State stored successfully: ${!!verified}`);
 
     // Add the state parameter to the URL
     authorizationUrl.searchParams.set("state", state);
