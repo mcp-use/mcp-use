@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
@@ -16,6 +17,9 @@ app.use(
     exposeHeaders: ["*"], // Expose all headers since this is a proxy
   })
 );
+
+// Apply logger middleware to API routes for request/response logging
+app.use("/inspector/api/*", logger());
 
 // Register all API routes
 registerInspectorRoutes(app);

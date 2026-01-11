@@ -34,6 +34,7 @@ export function registerInspectorRoutes(
   // Mount OAuth proxy middleware at the inspector's OAuth path
   mountOAuthProxy(app, {
     basePath: "/inspector/api/oauth",
+    enableLogging: true,
   });
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)
