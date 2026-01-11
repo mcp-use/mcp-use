@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.4-canary.0
+
+### Patch Changes
+
+- a308b3f: fix: autoconnect is not parsing config object as well in addition to string urls
+  - mcp-use@1.12.4-canary.0
+
 ## 0.14.3
 
 ### Patch Changes

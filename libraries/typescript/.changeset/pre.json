@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.14.3",
     "mcp-use": "1.12.3"
   },
-  "changesets": []
+  "changesets": [
+    "bumpy-needles-mate"
+  ]
 }
