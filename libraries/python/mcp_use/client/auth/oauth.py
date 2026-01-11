@@ -559,7 +559,7 @@ class OAuth:
             # Try OAuth 2.0 Authorization Server Metadata endpoints first
             for well_known_url in oauth_candidates:
                 try:
-                    logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
+                    logger.debug(f"Trying OAuth metadata discovery for issuer: {parsed_issuer.netloc}")
                     response = await client.get(well_known_url)
                     response.raise_for_status()
                     metadata = response.json()
@@ -569,11 +569,11 @@ class OAuth:
                     logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
                     return
                 except (httpx.HTTPError, ValueError) as e:
-                    logger.debug(f"Failed to discover OAuth metadata at {well_known_url}: {e}")
+                    logger.debug(f"Failed to discover OAuth metadata: {e}")
 
             # Then try OpenID Connect Discovery endpoints
             for oidc_url in oidc_candidates:
-                logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
+                logger.debug(f"Trying OpenID Connect discovery for issuer: {parsed_issuer.netloc}")
                 try:
                     response = await client.get(oidc_url)
                     response.raise_for_status()
@@ -584,23 +584,23 @@ class OAuth:
                     logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
                     return
                 except (httpx.HTTPError, ValueError) as e:
-                    logger.debug(f"Failed to discover OIDC metadata at {oidc_url}: {e}")
+                    logger.debug(f"Failed to discover OIDC metadata: {e}")
 
-        # 4) If PRM path didn’t yield anything, fall back to old host-level discovery
+        # 4) If PRM path didn't yield anything, fall back to old host-level discovery
         if not self._metadata:
             well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
             try:
-                logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
+                logger.debug(f"Trying OAuth metadata discovery for host: {parsed.netloc}")
                 resp = await client.get(well_known_url)
                 resp.raise_for_status()
                 self._metadata = ServerOAuthMetadata(**resp.json())
                 logger.debug("Successfully discovered OAuth metadata (host-level fallback)")
                 return
             except (httpx.HTTPError, ValueError) as e:
-                logger.debug(f"Failed to discover OAuth metadata at {well_known_url}: {e}")
+                logger.debug(f"Failed to discover OAuth metadata: {e}")
 
             oidc_url = f"{base_url}/.well-known/openid-configuration"
-            logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
+            logger.debug(f"Trying OpenID Connect discovery for host: {parsed.netloc}")
             try:
                 resp = await client.get(oidc_url)
                 resp.raise_for_status()
@@ -608,7 +608,7 @@ class OAuth:
                 logger.debug("Successfully discovered OIDC metadata (host-level fallback)")
                 return
             except (httpx.HTTPError, ValueError) as e:
-                logger.debug(f"Failed to discover OIDC metadata at {oidc_url}: {e}")
+                logger.debug(f"Failed to discover OIDC metadata: {e}")
 
         logger.error(f"Failed to discover OAuth/OIDC metadata for {self.server_url}")
         raise OAuthDiscoveryError(
