@@ -411,21 +411,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     // IMPORTANT: Rewrite the resource parameter from the gateway URL back to the actual server URL
     // The metadata was modified to pass SDK validation (resource = connectionUrl),
     // but Supabase needs the actual MCP server URL
-    console.log(
-      `[OAuth prepareAuthorizationUrl] connectionUrl: ${this.connectionUrl}, serverUrl: ${this.serverUrl}`
-    );
-
     if (this.connectionUrl && this.serverUrl) {
       const resourceParam = authorizationUrl.searchParams.get("resource");
-      console.log(
-        `[OAuth prepareAuthorizationUrl] resourceParam: ${resourceParam}`
-      );
       if (resourceParam) {
         try {
           const connectionUrlObj = new URL(this.connectionUrl);
-          console.log(
-            `[OAuth prepareAuthorizationUrl] connectionUrlObj.origin: ${connectionUrlObj.origin}`
-          );
           // Check if resource is using the gateway URL (which SDK required for validation)
           if (
             resourceParam.startsWith(connectionUrlObj.origin) ||
@@ -436,19 +426,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             console.log(
               `[OAuth] Rewrote authorize resource parameter from ${resourceParam} to ${this.serverUrl}`
             );
-          } else {
-            console.log(
-              `[OAuth prepareAuthorizationUrl] resource doesn't match gateway, not rewriting`
-            );
           }
         } catch (e) {
           console.error(`[OAuth] Error rewriting resource parameter:`, e);
         }
       }
-    } else {
-      console.log(
-        `[OAuth prepareAuthorizationUrl] Missing connectionUrl or serverUrl, skipping rewrite`
-      );
     }
 
     // Generate a unique state parameter for this authorization request
@@ -466,6 +448,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         clientName: this.clientName,
         clientUri: this.clientUri,
         callbackUrl: this.callbackUrl,
+        // Include OAuth proxy settings so callback can bypass CORS for token exchange
+        oauthProxyUrl: this.oauthProxyUrl,
+        connectionUrl: this.connectionUrl,
       },
       // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",

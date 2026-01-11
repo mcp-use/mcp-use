@@ -139,6 +139,18 @@ interface McpServerWrapperProps {
         enabled?: boolean;
         proxyAddress?: string;
       };
+  clientInfo?: {
+    name: string;
+    title?: string;
+    version: string;
+    description?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    websiteUrl?: string;
+  };
   onUpdate: (server: McpServer) => void;
   rpcWrapTransport?: (transport: any, serverId: string) => any;
   onGlobalSamplingRequest?: (
@@ -178,6 +190,7 @@ function McpServerWrapper({
   options,
   defaultProxyConfig,
   defaultAutoProxyFallback,
+  clientInfo: providerClientInfo,
   onUpdate,
   rpcWrapTransport,
   onGlobalSamplingRequest,
@@ -217,8 +230,20 @@ function McpServerWrapper({
         rest.autoProxyFallback !== undefined
           ? rest.autoProxyFallback
           : defaultAutoProxyFallback,
+      // Merge provider clientInfo with server-specific clientInfo
+      // Server-specific takes precedence
+      clientInfo: rest.clientInfo
+        ? providerClientInfo
+          ? { ...providerClientInfo, ...rest.clientInfo }
+          : rest.clientInfo
+        : providerClientInfo,
     };
-  }, [options, defaultProxyConfig, defaultAutoProxyFallback]);
+  }, [
+    options,
+    defaultProxyConfig,
+    defaultAutoProxyFallback,
+    providerClientInfo,
+  ]);
 
   // Merge user's wrapTransport with RPC logging wrapper
   const combinedWrapTransport = useMemo(() => {
@@ -607,6 +632,29 @@ export interface McpClientProviderProps {
       };
 
   /**
+   * Client info for all servers (used for OAuth registration and server capabilities)
+   * Can be overridden per-server in addServer() options
+   */
+  clientInfo?: {
+    /** Client name displayed on OAuth consent pages (required) */
+    name: string;
+    /** Client title/display name */
+    title?: string;
+    /** Client version (required) */
+    version: string;
+    /** Client description */
+    description?: string;
+    /** Client icons (first icon used as logo_uri for OAuth) */
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    /** Client website URL (used as client_uri for OAuth) */
+    websiteUrl?: string;
+  };
+
+  /**
    * Storage provider for persisting server configurations
    * When provided, automatically loads servers on mount and saves on changes
    */
@@ -705,6 +753,7 @@ export function McpClientProvider({
   mcpServers,
   defaultProxyConfig,
   defaultAutoProxyFallback = true,
+  clientInfo,
   storageProvider,
   enableRpcLogging = false,
   onServerAdded,
@@ -1008,6 +1057,7 @@ export function McpClientProvider({
           options={config.options}
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
+          clientInfo={clientInfo}
           onUpdate={handleServerUpdate}
           rpcWrapTransport={rpcWrapTransport}
           onGlobalSamplingRequest={onSamplingRequest}
