@@ -178,7 +178,16 @@
                       "python/client/logging"
                     ]
                   },
-                  "python/client/authentication",
+                  {
+                    "group": "Authentication",
+                    "icon": "key",
+                    "pages": [
+                      "python/client/authentication/index",
+                      "python/client/authentication/oauth",
+                      "python/client/authentication/bearer",
+                      "python/client/authentication/custom"
+                    ]
+                  },
                   "python/client/code-mode"
                 ]
               },
