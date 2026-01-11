@@ -5,9 +5,10 @@ This module provides utilities to convert MCP tools to LangChain tools.
 """
 
 import re
-from typing import Any, NoReturn
+from typing import Annotated, Any, NoReturn, Union, get_args, get_origin
 
 from jsonschema_pydantic import jsonschema_to_pydantic
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from mcp.types import (
     CallToolResult,
@@ -24,6 +25,69 @@ from mcp_use.agents.adapters.base import BaseAdapter
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
+
+# ---------------------------------------------------------------------------
+# RunnableConfig field helpers (inlined from former pydantic_check.py)
+# ---------------------------------------------------------------------------
+
+
+def _field_annotation(schema_cls: type, name: str) -> Any:
+    """Return the typing annotation for a field, Pydantic v2 or v1."""
+    # Pydantic v2
+    fields_v2 = getattr(schema_cls, "model_fields", None)
+    if fields_v2 and name in fields_v2:
+        return fields_v2[name].annotation
+
+    # Pydantic v1
+    fields_v1 = getattr(schema_cls, "__fields__", None)
+    if fields_v1 and name in fields_v1:
+        # outer_type_ includes Optional[...] etc; good for our use
+        return fields_v1[name].outer_type_
+
+    raise AttributeError(f"Field '{name}' not found on {schema_cls!r}")
+
+
+def _is_runnable_config_type(tp: Any) -> bool:
+    """Recursively test whether a typing annotation is RunnableConfig."""
+    if tp is None:
+        return False
+
+    origin = get_origin(tp)
+
+    # Annotated[X, ...] -> check X
+    if origin is Annotated:
+        return _is_runnable_config_type(get_args(tp)[0])
+
+    # Optional[X] / Union[X, Y, ...]
+    if origin is Union:
+        return any(_is_runnable_config_type(arg) for arg in get_args(tp))
+
+    # Some schemas may wrap RunnableConfig in a dynamically generated type name
+    if hasattr(tp, "__name__") and tp.__name__ in ["RunnableConfig", "DynamicModel"]:
+        return True
+
+    # Direct match
+    return tp is RunnableConfig
+
+
+def _field_is_runnable_config(args_schema: type, field_name: str) -> bool:
+    """Return True if args_schema.<field_name> is annotated as RunnableConfig (or Optional/Annotated of it)."""
+    ann = _field_annotation(args_schema, field_name)
+    return _is_runnable_config_type(ann)
+
+
+def schema_has_runnable_config(args_schema: type) -> tuple[bool, str | None]:
+    """Scan all fields; return (found?, field_name)."""
+    # Pydantic v2
+    fields = getattr(args_schema, "model_fields", None)
+    if fields is None:
+        # Fall back to Pydantic v1
+        fields = getattr(args_schema, "__fields__", None) or {}
+
+    for name in fields:
+        if _field_is_runnable_config(args_schema, name):
+            return True, name
+    return False, None
 
 
 class LangChainAdapter(BaseAdapter[BaseTool]):
@@ -85,10 +149,15 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 """
                 raise NotImplementedError("MCP tools only support async operations")
 
-            async def _arun(self, **kwargs: Any) -> str | dict:
+            async def _arun(
+                self,
+                config: RunnableConfig = None,
+                **kwargs: Any,
+            ) -> str | dict:
                 """Asynchronously execute the tool with given arguments.
 
                 Args:
+                    config: Optional LangChain RunnableConfig (used to propagate metadata).
                     kwargs: The arguments to pass to the tool.
 
                 Returns:
@@ -100,6 +169,24 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 logger.debug(f'MCP tool: "{self.name}" received input: {kwargs}')
 
                 try:
+                    found, cfg_name = schema_has_runnable_config(self.args_schema)
+                    if found and config is not None:
+                        metadata = None
+
+                        # RunnableConfig can behave like an object with .metadata
+                        try:
+                            metadata = getattr(config, "metadata", None)
+                        except Exception:
+                            metadata = None
+
+                        # Or like a mapping
+                        if metadata is None and isinstance(config, dict):
+                            metadata = config.get("metadata")
+
+                        # Only set the kwarg if we actually have metadata
+                        if metadata is not None:
+                            kwargs[cfg_name] = {"metadata": metadata}
+
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     try:
                         # Use the helper function to parse the result
