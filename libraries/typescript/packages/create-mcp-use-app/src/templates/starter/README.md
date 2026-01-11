@@ -4,7 +4,7 @@
 
 A comprehensive MCP server template with examples of tools, resources, prompts, and all UIResource types.
 
-> 📚 **[View Full Documentation](https://docs.mcp-use.com/typescript/getting-started/quickstart)** - Complete guides, API references, and tutorials
+> 📚 **[View Full Documentation](https://mcp-use.com/docs/typescript/getting-started/quickstart)** - Complete guides, API references, and tutorials
 
 ## Features
 
@@ -556,6 +556,6 @@ MIT
 
 ---
 
-> 📚 **[View Full Documentation](https://docs.mcp-use.com/typescript/getting-started/quickstart)** - For more guides and advanced features
+> 📚 **[View Full Documentation](https://mcp-use.com/docs/typescript/getting-started/quickstart)** - For more guides and advanced features
 
 Happy building! 🚀

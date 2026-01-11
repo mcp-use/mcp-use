@@ -431,7 +431,7 @@ server.use("*", cors());
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [RFC 9068: JWT Profile for OAuth 2.0 Access Tokens](https://datatracker.ietf.org/doc/html/rfc9068)
 - [MCP Authentication Specification](https://modelcontextprotocol.io/docs/specification/authentication)
-- [mcp-use Documentation](https://docs.mcp-use.com)
+- [mcp-use Documentation](https://mcp-use.com/docs)
 - [PKCE Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce)
 
 ### Sample Applications

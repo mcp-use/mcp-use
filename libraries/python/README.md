@@ -17,7 +17,7 @@
         <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
     <a href="https://github.com/pietrozullo/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/pietrozullo/mcp-use" /></a>
-    <a href="https://docs.mcp-use.com" alt="Documentation">
+    <a href="https://mcp-use.com/docs" alt="Documentation">
         <img src="https://img.shields.io/badge/docs-mcp--use.com-blue" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
@@ -44,7 +44,7 @@ mcp-use for Python provides three main capabilities:
 
 - **[Main Repository](../../README.md)** - Overview of the entire mcp-use ecosystem
 - **[TypeScript Version](../typescript/README.md)** - TypeScript implementation with server framework
-- **[Documentation](https://docs.mcp-use.com)** - Complete online documentation
+- **[Documentation](https://mcp-use.com/docs)** - Complete online documentation
 - **[Examples](./examples/)** - Python code examples
 
 | Supports       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
