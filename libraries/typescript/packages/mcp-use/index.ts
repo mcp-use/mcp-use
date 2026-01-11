@@ -47,14 +47,6 @@ export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./src/version.js";
 
-export type {
-  ClientRegistration,
-  OAuthConfig,
-  OAuthDiscovery,
-  OAuthResult,
-  OAuthState,
-} from "./src/oauth-helper.js";
-
 // Export new SDK-integrated auth utilities (recommended for new projects)
 export {
   BrowserOAuthClientProvider,

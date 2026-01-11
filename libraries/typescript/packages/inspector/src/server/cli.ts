@@ -62,8 +62,14 @@ Examples:
 
 const app = new Hono();
 
-// Middleware
-app.use("*", cors());
+// Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    exposeHeaders: ["*"], // Expose all headers since this is a proxy
+  })
+);
 // Apply logger middleware only to proxy routes
 app.use("/inspector/api/proxy/*", logger());
 

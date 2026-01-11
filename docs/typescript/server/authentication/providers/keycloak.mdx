@@ -56,12 +56,12 @@ docker run -p 8080:8080 \
 ### Basic Configuration
 
 ```typescript
-import { McpServer, keycloak } from 'mcp-use/server'
+import { MCPServer, oauthKeycloakProvider } from 'mcp-use/server'
 
-const server = new McpServer({
+const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  oauth: keycloak({
+  oauth: oauthKeycloakProvider({
     serverUrl: process.env.MCP_USE_OAUTH_KEYCLOAK_SERVER_URL!, // 'https://keycloak.example.com'
     realm: process.env.MCP_USE_OAUTH_KEYCLOAK_REALM!,          // 'my-realm'
     clientId: process.env.MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID!,   // 'my-mcp-server'
@@ -83,8 +83,8 @@ MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID=my-mcp-server
 ### Full Configuration Options
 
 ```typescript
-const server = new McpServer({
-  oauth: keycloak({
+const server = new MCPServer({
+  oauth: oauthKeycloakProvider({
     // Required
     serverUrl: 'https://keycloak.example.com',
     realm: 'my-realm',

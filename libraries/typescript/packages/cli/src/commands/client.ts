@@ -1,16 +1,9 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { createInterface } from "node:readline";
-import { MCPClient } from "mcp-use/client";
+import { getPackageVersion } from "mcp-use";
 import type { MCPSession } from "mcp-use/client";
-import {
-  getActiveSession,
-  getSession,
-  listAllSessions,
-  saveSession,
-  setActiveSession,
-  updateSessionInfo,
-} from "../utils/session-storage.js";
+import { MCPClient } from "mcp-use/client";
+import { createInterface } from "node:readline";
 import {
   formatError,
   formatHeader,
@@ -25,6 +18,14 @@ import {
   formatToolCall,
   formatWarning,
 } from "../utils/format.js";
+import {
+  getActiveSession,
+  getSession,
+  listAllSessions,
+  saveSession,
+  setActiveSession,
+  updateSessionInfo,
+} from "../utils/session-storage.js";
 
 // In-memory session map
 const activeSessions = new Map<
@@ -69,6 +70,7 @@ async function getOrRestoreSession(
   // Reconnect
   try {
     const client = new MCPClient();
+    const cliClientInfo = getCliClientInfo();
 
     if (config.type === "http") {
       client.addServer(sessionName, {
@@ -76,12 +78,14 @@ async function getOrRestoreSession(
         headers: config.authToken
           ? { Authorization: `Bearer ${config.authToken}` }
           : undefined,
+        clientInfo: cliClientInfo,
       });
     } else if (config.type === "stdio") {
       client.addServer(sessionName, {
         command: config.command!,
         args: config.args || [],
         env: config.env,
+        clientInfo: cliClientInfo,
       });
     } else {
       console.error(formatError(`Unknown session type: ${config.type}`));
@@ -102,6 +106,24 @@ async function getOrRestoreSession(
 /**
  * Connect command
  */
+/**
+ * Default clientInfo for mcp-use CLI
+ */
+function getCliClientInfo() {
+  return {
+    name: "mcp-use CLI",
+    title: "mcp-use CLI",
+    version: getPackageVersion(),
+    description: "mcp-use CLI - Command-line interface for MCP servers",
+    icons: [
+      {
+        src: "https://mcp-use.com/logo.png",
+      },
+    ],
+    websiteUrl: "https://mcp-use.com",
+  };
+}
+
 export async function connectCommand(
   urlOrCommand: string,
   options: {
@@ -115,6 +137,7 @@ export async function connectCommand(
 
     const client = new MCPClient();
     let session: MCPSession;
+    const cliClientInfo = getCliClientInfo();
 
     if (options.stdio) {
       // Parse stdio command
@@ -129,6 +152,7 @@ export async function connectCommand(
       client.addServer(sessionName, {
         command,
         args,
+        clientInfo: cliClientInfo,
       });
 
       session = await client.createSession(sessionName);
@@ -149,6 +173,7 @@ export async function connectCommand(
         headers: options.auth
           ? { Authorization: `Bearer ${options.auth}` }
           : undefined,
+        clientInfo: cliClientInfo,
       });
 
       session = await client.createSession(sessionName);

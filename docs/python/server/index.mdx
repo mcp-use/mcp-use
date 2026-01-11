@@ -110,7 +110,7 @@ Build your first MCP server in minutes with this step-by-step guide:
 
     ```python
     if __name__ == "__main__":
-        server.run(transport="streamable-http", debug=True)
+        server.run(transport="streamable-http", run_debug=True)
     ```
 
     Then run it:
@@ -159,7 +159,7 @@ def get_time() -> str:
     return datetime.now().isoformat()
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", debug=True)
+    server.run(transport="streamable-http", run_debug=True)
 ```
 
 ### Transport Options

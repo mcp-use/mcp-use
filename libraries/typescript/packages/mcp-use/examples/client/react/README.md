@@ -1,11 +1,32 @@
-# MCP Use React Example
+# MCP Use React Examples
 
-This is a React example that demonstrates how to use the `mcp-use` library in a React/browser application. The example shows how to:
+This directory contains React examples that demonstrate how to use the `mcp-use` library in a React/browser application.
 
+## Examples
+
+### 1. Single Server Example (`/`)
+Demonstrates the `useMcp` hook for connecting to a single MCP server with OAuth authentication:
+- OAuth authentication flow with Linear's MCP server
+- Tool, resource, and prompt listing
+- Connection state management
+- Error handling and retry logic
+
+### 2. Multi-Server Example (`/multi-server`)
+Demonstrates the `McpClientProvider` for managing multiple MCP servers:
+- Connect to multiple servers simultaneously
+- Add/remove servers dynamically
+- Per-server notification management
+- Sampling and elicitation request handling
+- Access servers via `useMcpClient()` and `useMcpServer(id)` hooks
+
+## Features
+
+The examples showcase:
 - Import and initialize the MCPClient from `mcp-use/browser`
-- Connect to MCP servers via WebSocket or HTTP/SSE
+- Connect to MCP servers via HTTP/SSE
 - Display available tools from connected servers
 - Handle loading states and errors
+- OAuth authentication with automatic token management
 
 ## Browser Compatibility
 
@@ -77,6 +98,12 @@ pnpm dev
 
 This will start a development server with hot reloading.
 
+### Available Routes
+
+- **`/`** - Single server example with OAuth (Linear MCP)
+- **`/multi-server`** - Multi-server management example
+- **`/oauth/callback`** - OAuth callback handler (automatically handled)
+
 ## Features
 
 The React example includes:
@@ -93,9 +120,11 @@ The example uses a default configuration with a filesystem server. You can modif
 
 ## File Structure
 
-- `index.tsx` - Entry point for the React application
-- `react_example.tsx` - Main React component with MCP integration
-- `react_example.html` - HTML template
+- `index.html` - HTML template for all examples
+- `index.tsx` - Entry point with routing and navigation
+- `react_example.tsx` - Single server example with OAuth
+- `multi-server-example.tsx` - Multi-server management example
+- `oauth-callback.tsx` - OAuth callback handler
 - `vite.config.ts` - Vite bundler configuration (includes browser polyfills)
 - `package.json` - Dependencies and scripts
 - `tsconfig.json` - TypeScript configuration

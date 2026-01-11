@@ -329,8 +329,8 @@ Asynchronous streaming interface.
 
         Example::
 
-            async for chunk in agent.stream("hello"):
-                print(chunk, end="|", flush=True)
+            async for chunk in agent.stream_events("hello"):
+                print(chunk)
 
 
 **Parameters**

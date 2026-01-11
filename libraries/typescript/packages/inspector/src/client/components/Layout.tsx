@@ -53,6 +53,7 @@ export function Layout({ children }: LayoutProps) {
         name,
         proxyConfig,
         transportType,
+        preventAutoAuth: true,
       });
     },
     [addServer]
