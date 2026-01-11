@@ -59,8 +59,6 @@ class Middleware:
     ) -> CallNext[Any, Any]:
         handler: CallNext[Any, Any] = call_next
 
-        # Note: "initialize" is not handled here - it occurs at the protocol layer
-        # before middleware is invoked. See ServerSession._received_request in the MCP SDK.
         match context.method:
             case "initialize":
                 handler = partial(self.on_initialize, call_next=handler)

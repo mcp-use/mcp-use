@@ -14,16 +14,13 @@ Use middleware to run cross-cutting logic (logging, auth, rate limiting, validat
 ## Hooks (typed)
 
 - `on_request` (all requests)
+- `on_initialize`
 - `on_call_tool`
 - `on_read_resource`
 - `on_get_prompt`
 - `on_list_tools/resources/prompts`
 
 All hooks receive `ServerMiddlewareContext[...]` with typed `message`, `method`, `timestamp`, `transport`, `session_id`, `headers`, `client_ip`, `metadata`. Use `context.copy(...)` to enrich metadata.
-
-<Info>
-**`on_initialize` coming soon**: Support for the `initialize` hook is being added in an upcoming release. Currently, `initialize` requests are handled at the protocol/session layer. Track progress at [#issue-link](https://github.com/mcp-use/mcp-use/issues).
-</Info>
 
 ## Minimal middleware
 
