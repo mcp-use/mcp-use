@@ -8,6 +8,8 @@
     "mcp-use": "1.12.2"
   },
   "changesets": [
-    "dependabot-e4e1d3b6"
+    "dependabot-e4e1d3b6",
+    "lemon-buttons-repeat",
+    "ninety-turkeys-worry"
   ]
 }
