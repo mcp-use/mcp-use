@@ -274,7 +274,36 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           }
         }
 
-        const body = init?.body ? await serializeBody(init.body) : undefined;
+        let body = init?.body ? await serializeBody(init.body) : undefined;
+
+        // IMPORTANT: For token requests, rewrite the resource parameter in the body
+        // The body is URL-encoded form data, and resource needs to be the actual server URL
+        if (url.includes("/token") && serverUrl && connectionUrl && body) {
+          try {
+            // Body is URL-encoded form data string
+            const params = new URLSearchParams(body);
+            const resourceParam = params.get("resource");
+
+            if (resourceParam) {
+              const connectionUrlObj = new URL(connectionUrl);
+
+              // Check if resource is using the gateway URL
+              if (
+                resourceParam.startsWith(connectionUrlObj.origin) ||
+                resourceParam === connectionUrl
+              ) {
+                // Replace with the actual server URL for Supabase OAuth validation
+                params.set("resource", serverUrl);
+                body = params.toString();
+                console.log(
+                  `[OAuth Proxy] Rewrote token resource parameter from ${resourceParam} to ${serverUrl}`
+                );
+              }
+            }
+          } catch (e) {
+            console.error(`[OAuth Proxy] Error rewriting token body:`, e);
+          }
+        }
         const response = await originalFetch(proxyEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
