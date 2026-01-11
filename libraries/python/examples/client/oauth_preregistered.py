@@ -36,7 +36,7 @@ if not client_id or not client_secret:
 config = {
     "mcpServers": {
         "github": {
-            "url": "https://api.githubcopilot.com/mcp/sse",
+            "url": "https://api.githubcopilot.com/mcp",
             "auth": {
                 "client_id": client_id,
                 "client_secret": client_secret,
