@@ -12,25 +12,25 @@ const ServerManager: React.FC = () => {
 
   useEffect(() => {
     // Add multiple servers on mount
-    // addServer("linear", {
-    //   url: "https://mcp.linear.app/mcp",
-    //   name: "Linear (OAuth)",
-    //   timeout: 30000,
-    //   // preventAutoAuth: true is the default - requires explicit user action to auth
-    // });
+    addServer("linear", {
+      url: "https://mcp.linear.app/mcp",
+      name: "Linear (OAuth, Direct)",
+      timeout: 30000,
+      // preventAutoAuth: true is the default - requires explicit user action to auth
+    });
 
     addServer("vercel", {
       url: "https://mcp.vercel.com",
-      name: "Vercel (OAuth)",
+      name: "Vercel (OAuth proxy due to CORS)",
       timeout: 30000,
-      // preventAutoAuth: true is the default
+      preventAutoAuth: true, // is the default
       // User must click "Authenticate" button when server requires OAuth
     });
 
-    // addServer("no api key needed", {
-    //   url: "https://apps-sdk-starter.mcp-use.run",
-    //   name: "No API Key (MCP Use)",
-    // });
+    addServer("no api key needed", {
+      url: "https://apps-sdk-starter.mcp-use.run",
+      name: "No API Key (MCP Use)",
+    });
   }, [addServer]);
 
   return (
@@ -155,8 +155,7 @@ const ServerManager: React.FC = () => {
                 )}
 
                 {/* Authentication Actions */}
-                {(server.state === "failed" ||
-                  server.state === "pending_auth") && (
+                {server.state === "pending_auth" && (
                   <div style={{ marginTop: "10px" }}>
                     <button
                       onClick={() => server.authenticate()}
@@ -170,9 +169,7 @@ const ServerManager: React.FC = () => {
                         cursor: "pointer",
                       }}
                     >
-                      {server.state === "pending_auth"
-                        ? "Start Authentication"
-                        : "Retry Connection"}
+                      Start Authentication
                     </button>
 
                     {server.authUrl && (
@@ -197,23 +194,24 @@ const ServerManager: React.FC = () => {
                         </a>
                       </div>
                     )}
+                  </div>
+                )}
 
-                    {server.state === "failed" && (
-                      <button
-                        onClick={() => server.retry()}
-                        style={{
-                          padding: "10px 20px",
-                          marginLeft: "10px",
-                          backgroundColor: "#007bff",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        Retry Connection
-                      </button>
-                    )}
+                {server.state === "failed" && (
+                  <div style={{ marginTop: "10px" }}>
+                    <button
+                      onClick={() => server.retry()}
+                      style={{
+                        padding: "10px 20px",
+                        backgroundColor: "#007bff",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Retry Connection
+                    </button>
                   </div>
                 )}
 

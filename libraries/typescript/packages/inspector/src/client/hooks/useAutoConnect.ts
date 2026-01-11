@@ -320,7 +320,7 @@ export function useAutoConnect({
 
     // Handle failed connection - show error and navigate home
     // Note: useMcp's autoProxyFallback will have already tried proxy fallback internally
-    if (connection?.state === "failed" && connection.error) {
+    if (connection?.state === "failed") {
       console.warn("[useAutoConnect] Connection failed after all retries");
 
       toast.error(
