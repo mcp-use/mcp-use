@@ -1,5 +1,5 @@
 import type { McpServer } from "mcp-use/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
@@ -86,8 +86,10 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
 
 /**
  * Manage automatic connection attempts to a server URL, including initiating connections,
- * preserving auth headers, storing OAuth tokens (when appropriate), and retrying with a
- * proxy fallback if a direct connection fails.
+ * preserving auth headers, storing OAuth tokens (when appropriate), and navigating to
+ * the server on successful connection.
+ *
+ * Note: Proxy fallback is handled automatically by useMcp's built-in autoProxyFallback.
  *
  * @param options - Configuration for auto-connect behavior. Includes the current `connections`
  *   list, `addConnection`/`removeConnection` callbacks, `configLoaded` from context, and
@@ -107,25 +109,7 @@ export function useAutoConnect({
   const [isAutoConnecting, setIsAutoConnecting] = useState(false);
   const [autoConnectConfig, setAutoConnectConfig] =
     useState<ConnectionConfig | null>(null);
-  const [hasTriedBothModes, setHasTriedBothModes] = useState(false);
-  const [autoSwitch, setAutoSwitch] = useState(true);
   const [configLoaded, setConfigLoaded] = useState(false);
-  const retryScheduledRef = useRef(false);
-
-  // Load auto-switch setting from localStorage, but override to true if autoConnect is active
-  useEffect(() => {
-    if (autoConnectConfig) {
-      // When using autoConnect, always enable auto-switch (proxy fallback)
-      setAutoSwitch(true);
-    } else {
-      const autoSwitchSetting = localStorage.getItem(
-        "mcp-inspector-auto-switch"
-      );
-      if (autoSwitchSetting !== null) {
-        setAutoSwitch(autoSwitchSetting === "true");
-      }
-    }
-  }, [autoConnectConfig]);
 
   // Unified connection attempt function
   const attemptConnection = useCallback(
@@ -232,7 +216,6 @@ export function useAutoConnect({
       } else {
         // No existing connection - create new one
         setAutoConnectConfig(config);
-        setHasTriedBothModes(false);
         setIsAutoConnecting(true);
         attemptConnection(config);
       }
@@ -284,15 +267,16 @@ export function useAutoConnect({
       .catch(() => setConfigLoaded(true));
   }, [configLoaded, contextConfigLoaded, handleAutoConnectConfig]);
 
-  // Auto-connect retry logic
+  // Handle connection state changes (success and auth states)
+  // Proxy fallback is now handled by useMcp's built-in autoProxyFallback
   useEffect(() => {
-    if (!autoConnectConfig || !autoSwitch || retryScheduledRef.current) {
+    if (!autoConnectConfig) {
       return;
     }
 
     const connection = connections.find((c) => c.url === autoConnectConfig.url);
 
-    // Handle successful connection first (don't block by hasTriedBothModes)
+    // Handle successful connection
     if (connection?.state === "ready") {
       console.warn(
         "[useAutoConnect] Connection succeeded, navigating to server"
@@ -311,9 +295,7 @@ export function useAutoConnect({
 
       setTimeout(() => {
         setAutoConnectConfig(null);
-        setHasTriedBothModes(false);
         setIsAutoConnecting(false);
-        retryScheduledRef.current = false;
       }, 100);
       return;
     }
@@ -336,73 +318,30 @@ export function useAutoConnect({
       return;
     }
 
-    // Only check hasTriedBothModes for failure retry logic
-    if (hasTriedBothModes) {
-      return;
-    }
-
-    // Handle failed connection - retry with alternate mode
+    // Handle failed connection - show error and navigate home
+    // Note: useMcp's autoProxyFallback will have already tried proxy fallback internally
     if (connection?.state === "failed" && connection.error) {
       console.warn(
-        "[useAutoConnect] Connection failed, trying alternate mode..."
+        "[useAutoConnect] Connection failed after all retries"
       );
 
-      // Determine alternate connection type
-      const alternateConnectionType =
-        autoConnectConfig.connectionType === "Direct" ? "Via Proxy" : "Direct";
+      toast.error(
+        "Cannot connect to server. Please check the URL and try again."
+      );
 
-      // Only retry if we haven't tried both modes yet
-      if (autoConnectConfig.connectionType === "Direct") {
-        // Failed with direct, try proxy
-        toast.error("Direct connection failed, trying with proxy...");
-        retryScheduledRef.current = true;
+      // Defer state updates to avoid updating during render
+      queueMicrotask(() => {
+        removeConnection(connection.id);
+        setIsAutoConnecting(false);
+        setAutoConnectConfig(null);
 
-        // Defer state updates to avoid updating during render
-        queueMicrotask(() => {
-          removeConnection(connection.id);
-
-          setTimeout(() => {
-            console.warn("[useAutoConnect] Retrying with proxy");
-
-            // Create new config with proxy
-            const retryConfig: ConnectionConfig = {
-              ...autoConnectConfig,
-              connectionType: alternateConnectionType,
-            };
-
-            // Update the config to track the retry attempt
-            setAutoConnectConfig(retryConfig);
-            setIsAutoConnecting(true);
-            retryScheduledRef.current = false;
-
-            attemptConnection(retryConfig);
-          }, 1000);
-        });
-      } else {
-        // Both modes failed - clear loading, reset state, and navigate home
-        toast.error(
-          "Cannot connect to server. Please check the URL and try again."
-        );
-
-        // Defer state updates to avoid updating during render
-        queueMicrotask(() => {
-          removeConnection(connection.id);
-          setIsAutoConnecting(false);
-          setAutoConnectConfig(null);
-          setHasTriedBothModes(true);
-          retryScheduledRef.current = false;
-
-          // Navigate to home page after connection failure
-          navigate("/");
-        });
-      }
+        // Navigate to home page after connection failure
+        navigate("/");
+      });
     }
   }, [
     connections,
     autoConnectConfig,
-    hasTriedBothModes,
-    autoSwitch,
-    attemptConnection,
     removeConnection,
     navigate,
   ]);

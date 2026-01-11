@@ -24,7 +24,7 @@ export async function onMcpAuthorization() {
 
   let provider: BrowserOAuthClientProvider | null = null;
   let storedStateData: StoredState | null = null;
-  const stateKey = state ? `mcp:auth:state_${state}` : null; // Reconstruct state key prefix assumption
+  let stateKey: string | null = null;
 
   try {
     // --- Basic Error Handling ---
@@ -38,9 +38,42 @@ export async function onMcpAuthorization() {
         "Authorization code not found in callback query parameters."
       );
     }
-    if (!state || !stateKey) {
+    if (!state) {
       throw new Error(
         "State parameter not found or invalid in callback query parameters."
+      );
+    }
+
+    // --- Find State Key ---
+    // Debug: Log all localStorage keys to help diagnose state issues
+    console.log(`[mcp-callback] Looking for state: ${state}`);
+    console.log(`[mcp-callback] All localStorage keys:`, Object.keys(localStorage));
+    
+    // Try default prefix first, then search dynamically for other prefixes
+    // This handles different storageKeyPrefix values used by different servers
+    const defaultStateKey = `mcp:auth:state_${state}`;
+    if (localStorage.getItem(defaultStateKey)) {
+      stateKey = defaultStateKey;
+      console.log(`[mcp-callback] Found state with default key: ${defaultStateKey}`);
+    } else {
+      // Search through localStorage for keys matching the pattern *:state_${state}
+      const stateKeySuffix = `:state_${state}`;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith(stateKeySuffix)) {
+          stateKey = key;
+          console.log(`[mcp-callback] Found state with dynamic key: ${key}`);
+          break;
+        }
+      }
+    }
+
+    if (!stateKey) {
+      // Log all state-related keys for debugging
+      const stateKeys = Object.keys(localStorage).filter(k => k.includes('state'));
+      console.log(`[mcp-callback] State keys in storage:`, stateKeys);
+      throw new Error(
+        `Invalid or expired state parameter "${state}". No matching state found in storage.`
       );
     }
 
@@ -113,8 +146,16 @@ export async function onMcpAuthorization() {
         );
         localStorage.removeItem(stateKey);
         window.close();
+      } else if (storedStateData.returnUrl) {
+        // Fallback for popup flow when popup was blocked and user clicked link manually
+        // Use the stored returnUrl to navigate back to the original page
+        console.log(
+          `${logPrefix} Popup flow without opener. Returning to: ${storedStateData.returnUrl}`
+        );
+        localStorage.removeItem(stateKey);
+        window.location.href = storedStateData.returnUrl;
       } else {
-        // Fallback: no opener and no return URL, redirect to root
+        // Last resort fallback: no opener and no return URL, redirect to root
         console.warn(
           `${logPrefix} No opener window or return URL detected. Redirecting to root.`
         );

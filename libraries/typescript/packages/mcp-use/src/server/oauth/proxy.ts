@@ -182,12 +182,46 @@ export function mountOAuthProxy(
         // OAuth proxy at /inspector/api/oauth -> MCP proxy at /inspector/api/proxy
         if (!connectionUrl) {
           const requestUrl = new URL(c.req.url);
+          
+          // Detect the actual protocol the client is using (may be different from internal request)
+          // Check forwarded headers in order of preference
+          let clientProtocol = requestUrl.protocol.replace(":", "");
+
+          // 1. Check X-Forwarded-Proto (most common, set by most proxies)
+          const xForwardedProto = c.req.header("X-Forwarded-Proto");
+          if (xForwardedProto) {
+            clientProtocol = xForwardedProto.split(",")[0].trim();
+          }
+
+          // 2. Check X-Forwarded-Scheme (alternative header)
+          const xForwardedScheme = c.req.header("X-Forwarded-Scheme");
+          if (!xForwardedProto && xForwardedScheme) {
+            clientProtocol = xForwardedScheme.trim();
+          }
+
+          // 3. Check Forwarded header (RFC 7239)
+          const forwarded = c.req.header("Forwarded");
+          if (!xForwardedProto && !xForwardedScheme && forwarded) {
+            const protoMatch = forwarded.match(/proto=([^;,\s]+)/i);
+            if (protoMatch) {
+              clientProtocol = protoMatch[1];
+            }
+          }
+
+          if (enableLogging) {
+            console.log(
+              `[OAuth Proxy] Detected protocol: ${clientProtocol} (original: ${requestUrl.protocol})`
+            );
+          }
+
           // Extract base path before /oauth
           const pathParts = requestUrl.pathname.split("/");
           const oauthIndex = pathParts.findIndex((part) => part === "oauth");
           if (oauthIndex > 0) {
             const basePath = pathParts.slice(0, oauthIndex).join("/");
-            connectionUrl = `${requestUrl.origin}${basePath}/proxy`;
+            // Construct connection URL with the correct protocol
+            const host = requestUrl.host;
+            connectionUrl = `${clientProtocol}://${host}${basePath}/proxy`;
           }
         }
 

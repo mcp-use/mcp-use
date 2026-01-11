@@ -12,24 +12,24 @@ const ServerManager: React.FC = () => {
 
   useEffect(() => {
     // Add multiple servers on mount
-    addServer("linear", {
-      url: "https://mcp.linear.app/mcp",
-      name: "Linear (OAuth)",
-      timeout: 30000,
-      preventAutoAuth: true,
-    });
+    // addServer("linear", {
+    //   url: "https://mcp.linear.app/mcp",
+    //   name: "Linear (OAuth)",
+    //   timeout: 30000,
+    //   preventAutoAuth: true,
+    // });
 
     addServer("vercel", {
       url: "https://mcp.vercel.com",
       name: "Vercel (OAuth)",
       timeout: 30000,
-      preventAutoAuth: false, // Allow OAuth flow to proceed
+      preventAutoAuth: true,
     });
 
-    addServer("no api key needed", {
-      url: "https://apps-sdk-starter.mcp-use.run",
-      name: "No API Key (MCP Use)",
-    });
+    // addServer("no api key needed", {
+    //   url: "https://apps-sdk-starter.mcp-use.run",
+    //   name: "No API Key (MCP Use)",
+    // });
   }, [addServer]);
 
   return (
@@ -150,6 +150,102 @@ const ServerManager: React.FC = () => {
                     }}
                   >
                     ❌ {server.error}
+                  </div>
+                )}
+
+                {/* Authentication Actions */}
+                {(server.state === "failed" || server.state === "pending_auth") && (
+                  <div style={{ marginTop: "10px" }}>
+                    <button
+                      onClick={() => server.authenticate()}
+                      style={{
+                        padding: "10px 20px",
+                        marginRight: "10px",
+                        backgroundColor: "#28a745",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {server.state === "pending_auth"
+                        ? "Start Authentication"
+                        : "Retry Connection"}
+                    </button>
+
+                    {server.authUrl && (
+                      <div
+                        style={{
+                          marginTop: "10px",
+                          padding: "10px",
+                          backgroundColor: "#fff3cd",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        <p style={{ margin: "0 0 10px 0" }}>
+                          <strong>Popup blocked?</strong> Click the link below to
+                          authenticate manually:
+                        </p>
+                        <a
+                          href={server.authUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open Authentication Page
+                        </a>
+                      </div>
+                    )}
+
+                    {server.state === "failed" && (
+                      <button
+                        onClick={() => server.retry()}
+                        style={{
+                          padding: "10px 20px",
+                          marginLeft: "10px",
+                          backgroundColor: "#007bff",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Retry Connection
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Authenticating State */}
+                {server.state === "authenticating" && (
+                  <div
+                    style={{
+                      marginTop: "10px",
+                      padding: "10px",
+                      backgroundColor: "#fff3cd",
+                      border: "1px solid #ffc107",
+                      borderRadius: "4px",
+                    }}
+                  >
+                    <strong>⏳ Authenticating...</strong>
+                    <p style={{ margin: "10px 0 0 0" }}>
+                      Please complete the authentication in the popup window. If
+                      you don't see a popup, check if your browser blocked it.
+                    </p>
+                    {server.authUrl && (
+                      <div style={{ marginTop: "10px" }}>
+                        <p style={{ margin: "0 0 10px 0" }}>
+                          <strong>Popup blocked?</strong> Click the link below to
+                          authenticate manually:
+                        </p>
+                        <a
+                          href={server.authUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open Authentication Page
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

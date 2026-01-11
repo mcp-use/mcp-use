@@ -41,6 +41,10 @@ function App() {
       <McpClientProvider
         storageProvider={storageProvider}
         enableRpcLogging={true}
+        defaultAutoProxyFallback={{
+          enabled: true,
+          proxyAddress: `${window.location.origin}/inspector/api/proxy/mcp`,
+        }}
         onServerAdded={(id: string, server: McpServer) => {
           console.log("[Inspector] Server added:", id, server.state);
         }}
