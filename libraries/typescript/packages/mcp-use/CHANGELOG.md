@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.12.3-canary.0
+
+### Patch Changes
+
+- 708f6e5: Updated dependency `react-router` to `^7.12.0`.
+- Updated dependencies [708f6e5]
+  - @mcp-use/inspector@0.14.3-canary.0
+  - @mcp-use/cli@2.8.3-canary.0
+
 ## 1.12.2
 
 ### Patch Changes

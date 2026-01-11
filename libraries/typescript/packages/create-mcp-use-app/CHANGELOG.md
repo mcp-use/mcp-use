@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.10.1-canary.0
+
+### Patch Changes
+
+- 708f6e5: Updated dependency `react-router` to `^7.12.0`.
+
 ## 0.10.0
 
 ### Minor Changes
