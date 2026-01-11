@@ -168,7 +168,7 @@ export function useAutoConnect({
       const proxyConfig =
         connectionType === "Via Proxy"
           ? {
-              proxyAddress: `${window.location.origin}/inspector/api/proxy/mcp`,
+              proxyAddress: `${window.location.origin}/inspector/api/proxy`,
               customHeaders: finalCustomHeaders,
             }
           : Object.keys(finalCustomHeaders).length > 0

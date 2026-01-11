@@ -123,7 +123,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
     transportType = "auto",
-    preventAutoAuth = false, // Default to false for backward compatibility (auto-trigger OAuth)
+    preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
@@ -1032,44 +1032,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               "Authentication required. OAuth provider available."
             );
 
-            // Generate auth URL manually since SDK didn't trigger it
-            // This happens because 401 occurs before OAuth flow starts
-            try {
-              const { auth } =
-                await import("@modelcontextprotocol/sdk/client/auth.js");
-              const baseUrl = new URL(url).origin;
-
-              // Trigger auth to generate the URL, but it will be blocked by preventAutoAuth
-              // This ensures the URL gets prepared and stored
-              auth(authProviderRef.current, { serverUrl: baseUrl }).catch(
-                () => {
-                  // Expected to fail/stop - we just want the URL prepared
-                }
-              );
-
-              // Give it a moment to prepare the URL
-              setTimeout(() => {
-                if (isMountedRef.current) {
-                  const manualUrl =
-                    authProviderRef.current?.getLastAttemptedAuthUrl();
-                  if (manualUrl) {
-                    setAuthUrl(manualUrl);
-                    addLog(
-                      "info",
-                      "Manual authentication URL available:",
-                      manualUrl
-                    );
-                  } else {
-                    addLog("warn", "Could not generate authentication URL");
-                  }
-                }
-              }, 100);
-            } catch (authGenError) {
-              addLog("warn", "Error generating auth URL:", authGenError);
-            }
+            // Don't trigger auth flow automatically - let the user click "Authenticate"
+            // This prevents unnecessary metadata discovery requests that may fail with CORS/404
+            addLog(
+              "info",
+              "Waiting for user to initiate authentication flow..."
+            );
 
             if (isMountedRef.current) {
               setState("pending_auth");
+              // Retrieve the stored auth URL if it was prepared during OAuth discovery
+              const storedAuthUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
+              if (storedAuthUrl) {
+                setAuthUrl(storedAuthUrl);
+                addLog("info", "Retrieved stored auth URL for manual authentication");
+              }
             }
             connectingRef.current = false;
             return "auth_redirect";

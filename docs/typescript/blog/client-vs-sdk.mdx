@@ -229,19 +229,19 @@ client.addServer("server", {
   authProvider, // ← Client passes to transport automatically
 });
 
-// OAuth handled automatically:
+// OAuth infrastructure built-in:
 // - Token refresh
 // - Dynamic Client Registration (DCR)
-// - Popup flow
+// - Popup flow (user-initiated)
 // - localStorage persistence
 await client.createSession("server");
 ```
 
 Our `BrowserOAuthClientProvider` implements:
 
-- ✅ Automatic popup-based auth flow
+- ✅ User-initiated popup auth flow with fallback
 - ✅ Token storage in `localStorage`
-- ✅ Token refresh before expiration
+- ✅ Automatic token refresh before expiration
 - ✅ Dynamic Client Registration (DCR)
 - ✅ Callback handling via `window.postMessage`
 
@@ -415,7 +415,7 @@ Nearly identical APIs reduce cognitive load when switching languages.
 
 - ✅ Building **AI agents** that use multiple MCP servers
 - ✅ Need **config file** driven setup
-- ✅ Want **automatic OAuth** with DCR
+- ✅ Want **built-in OAuth** with DCR and token management
 - ✅ Prefer **session management** over manual transport lifecycle
 - ✅ Building apps that match the **Python mcp-use API**
 - ✅ Need **automatic capability checking**
@@ -646,7 +646,7 @@ const provider = new BrowserOAuthClientProvider(url, {
   storageKeyPrefix: "mcp:auth",
 });
 
-// Pass to client - OAuth handled automatically
+// Pass to client - OAuth infrastructure built-in
 client.addServer("server", {
   url: url,
   authProvider: provider,
@@ -656,10 +656,10 @@ client.addServer("server", {
 **What it handles:**
 
 - ✅ Dynamic Client Registration (DCR)
-- ✅ Popup-based authorization flow
+- ✅ User-initiated popup authorization flow
 - ✅ Callback via `window.postMessage`
 - ✅ Token storage in `localStorage`
-- ✅ Token refresh before expiration
+- ✅ Automatic token refresh before expiration
 - ✅ Multiple servers (different tokens per server)
 
 The official SDK provides the **interface**. We provide the **implementation**.
@@ -713,7 +713,7 @@ mcp-use (base): ~180KB
 Includes: Multi-server, sessions, all transports, OAuth provider
 ```
 
-**Extra 30KB** gets you multi-server support, automatic OAuth, and simplified API.
+**Extra 30KB** gets you multi-server support, built-in OAuth infrastructure, and simplified API.
 
 **For browser apps:** Use `mcp-use/browser` (no Node.js deps) at ~50KB total.
 

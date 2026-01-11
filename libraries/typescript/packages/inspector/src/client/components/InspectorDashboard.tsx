@@ -260,6 +260,7 @@ export function InspectorDashboard() {
       url: url.trim(),
       name: url.trim(),
       transportType: "http",
+      preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       ...(proxyConfig
         ? {
             proxyConfig,

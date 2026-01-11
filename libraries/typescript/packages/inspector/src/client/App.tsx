@@ -43,7 +43,7 @@ function App() {
         enableRpcLogging={true}
         defaultAutoProxyFallback={{
           enabled: true,
-          proxyAddress: `${window.location.origin}/inspector/api/proxy/mcp`,
+          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
         }}
         onServerAdded={(id: string, server: McpServer) => {
           console.log("[Inspector] Server added:", id, server.state);

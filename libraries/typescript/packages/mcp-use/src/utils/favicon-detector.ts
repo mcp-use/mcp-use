@@ -60,6 +60,7 @@ function blobToBase64(blob: Blob): Promise<string> {
  * @returns The base64-encoded favicon data URL if detected, `null` otherwise
  */
 export async function detectFavicon(serverUrl: string): Promise<string | null> {
+  console.debug("[favicon-detector] Starting favicon detection for:", serverUrl);
   try {
     // Extract domain from serverUrl
     let domain: string;
@@ -70,9 +71,11 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
     } else {
       domain = serverUrl.split("/")[0];
     }
+    console.debug("[favicon-detector] Extracted domain:", domain);
 
     // Skip local servers - they typically don't have public favicons
     if (isLocalServer(domain)) {
+      console.debug("[favicon-detector] Skipping local server:", domain);
       return null;
     }
 
@@ -80,12 +83,14 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
     const baseDomain = getBaseDomain(domain);
     const domainsToTry =
       domain !== baseDomain ? [domain, baseDomain] : [domain];
+    console.debug("[favicon-detector] Domains to try:", domainsToTry);
 
     for (const currentDomain of domainsToTry) {
       try {
         // Use favicon.tools.mcp-use.com API to get the favicon as base64
         // Request the image directly (not JSON) so we get the actual image bytes
         const faviconApiUrl = `https://favicon.tools.mcp-use.com/${currentDomain}`;
+        console.debug("[favicon-detector] Attempting to fetch favicon for:", currentDomain, "from:", faviconApiUrl);
 
         // Create abort controller for timeout
         const controller = new AbortController();
@@ -98,26 +103,31 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
           clearTimeout(timeoutId);
 
           if (!response.ok) {
+            console.debug("[favicon-detector] Fetch failed for", currentDomain, "with status:", response.status);
             continue;
           }
 
           // Convert the response to base64 directly (no CORS issues since we're fetching from favicon.tools)
           const blob = await response.blob();
           const base64Image = await blobToBase64(blob);
+          console.debug("[favicon-detector] Successfully retrieved favicon for:", currentDomain, "size:", blob.size, "bytes");
 
           return base64Image;
         } catch (err) {
           clearTimeout(timeoutId);
           // Timeout or fetch error - try next domain
+          console.debug("[favicon-detector] Fetch error for", currentDomain, ":", err instanceof Error ? err.message : String(err));
           continue;
         }
       } catch (error) {
         // Error with this domain - try next one
+        console.debug("[favicon-detector] Error processing domain", currentDomain, ":", error instanceof Error ? error.message : String(error));
         continue;
       }
     }
 
     // All attempts failed
+    console.debug("[favicon-detector] All attempts failed for:", serverUrl);
     return null;
   } catch (error) {
     console.warn("[favicon-detector] Error detecting favicon:", error);

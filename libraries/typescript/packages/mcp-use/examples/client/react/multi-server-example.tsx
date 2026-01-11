@@ -16,14 +16,15 @@ const ServerManager: React.FC = () => {
     //   url: "https://mcp.linear.app/mcp",
     //   name: "Linear (OAuth)",
     //   timeout: 30000,
-    //   preventAutoAuth: true,
+    //   // preventAutoAuth: true is the default - requires explicit user action to auth
     // });
 
     addServer("vercel", {
       url: "https://mcp.vercel.com",
       name: "Vercel (OAuth)",
       timeout: 30000,
-      preventAutoAuth: true,
+      // preventAutoAuth: true is the default
+      // User must click "Authenticate" button when server requires OAuth
     });
 
     // addServer("no api key needed", {

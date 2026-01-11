@@ -98,14 +98,16 @@ The inspector shows different states during OAuth:
 - **Ready**: Successfully authenticated and connected
 - **Failed**: Authentication or connection failed
 
-### Manual Authentication
+### OAuth Authentication
 
-If automatic OAuth redirect doesn't work:
+When a server requires OAuth authentication:
 
-1. Look for the **Authenticate** button in the server card
-2. Click to open the OAuth page in a new tab
-3. Complete the authorization
-4. Return to the inspector - it will detect the completed auth
+1. The connection will enter **pending_auth** state
+2. Click the **Authenticate** button in the server card
+3. Complete the authorization in the popup or new tab
+4. Return to the inspector - it will automatically detect the completed auth
+
+If the popup is blocked, use the **"open auth page"** link as a fallback.
 
 ## Custom Headers
 

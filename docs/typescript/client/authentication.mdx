@@ -306,20 +306,29 @@ const mcp = useMcp({
 });
 ```
 
-### Preventing Auto-Authentication
+### Manual Authentication Control
 
-By default, mcp-use automatically triggers OAuth flow when a server requires authentication. You can disable this to show a manual authentication button:
+By default, mcp-use requires explicit user action to trigger OAuth authentication. When a server requires authentication, the connection enters `pending_auth` state and you must call the `authenticate()` method:
 
 ```typescript
 const mcp = useMcp({
   url: "http://localhost:3000/mcp",
-  preventAutoAuth: true, // Show auth button instead of auto-triggering
+  // preventAutoAuth: true is the default
 });
 
-// Manually trigger authentication
+// Manually trigger authentication when ready
 if (mcp.state === "pending_auth") {
   return <button onClick={mcp.authenticate}>Sign in to continue</button>;
 }
+```
+
+To enable automatic OAuth flow (legacy behavior), set `preventAutoAuth: false`:
+
+```typescript
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  preventAutoAuth: false, // Auto-trigger OAuth popup
+});
 ```
 
 ## OAuth Flow Process
