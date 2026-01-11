@@ -151,6 +151,7 @@ interface McpServerWrapperProps {
     }>;
     websiteUrl?: string;
   };
+  cachedMetadata?: import("./storage/StorageProvider.js").CachedServerMetadata;
   onUpdate: (server: McpServer) => void;
   rpcWrapTransport?: (transport: any, serverId: string) => any;
   onGlobalSamplingRequest?: (
@@ -191,6 +192,7 @@ function McpServerWrapper({
   defaultProxyConfig,
   defaultAutoProxyFallback,
   clientInfo: providerClientInfo,
+  cachedMetadata,
   onUpdate,
   rpcWrapTransport,
   onGlobalSamplingRequest,
@@ -237,12 +239,15 @@ function McpServerWrapper({
           ? { ...providerClientInfo, ...rest.clientInfo }
           : rest.clientInfo
         : providerClientInfo,
+      // Pass cached metadata as initial server info if available
+      _initialServerInfo: cachedMetadata,
     };
   }, [
     options,
     defaultProxyConfig,
     defaultAutoProxyFallback,
     providerClientInfo,
+    cachedMetadata,
   ]);
 
   // Merge user's wrapTransport with RPC logging wrapper
@@ -766,6 +771,11 @@ export function McpClientProvider({
   const [servers, setServers] = useState<McpServer[]>([]);
   const [storageLoaded, setStorageLoaded] = useState(false);
 
+  // Store cached server metadata
+  const cachedMetadataRef = useRef<
+    Record<string, import("./storage/StorageProvider.js").CachedServerMetadata>
+  >({});
+
   // Load RPC transport wrapper if enabled
   const [rpcWrapTransport, setRpcWrapTransport] = useState<
     ((transport: any, serverId: string) => any) | undefined
@@ -838,6 +848,40 @@ export function McpClientProvider({
           "[McpClientProvider] Loaded from storage:",
           Object.keys(storedServers).length
         );
+
+        // Load cached metadata if supported by storage provider
+        if (storageProvider.getServerMetadata) {
+          try {
+            const serverIds = Object.keys(storedServers);
+            const metadataPromises = serverIds.map(async (id) => {
+              const metadata = await Promise.resolve(
+                storageProvider.getServerMetadata!(id)
+              );
+              return [id, metadata] as const;
+            });
+            const metadataEntries = await Promise.all(metadataPromises);
+            cachedMetadataRef.current = Object.fromEntries(
+              metadataEntries.filter(
+                (
+                  entry
+                ): entry is [
+                  string,
+                  import("./storage/StorageProvider.js").CachedServerMetadata,
+                ] => entry[1] !== undefined
+              )
+            );
+            console.log(
+              "[McpClientProvider] Loaded cached metadata for",
+              Object.keys(cachedMetadataRef.current).length,
+              "servers"
+            );
+          } catch (metadataError) {
+            console.warn(
+              "[McpClientProvider] Failed to load cached metadata:",
+              metadataError
+            );
+          }
+        }
 
         // Merge with initial mcpServers (mcpServers takes precedence)
         const mergedServers = { ...storedServers, ...mcpServers };
@@ -912,6 +956,8 @@ export function McpClientProvider({
         // Check if actually changed to avoid loops
         const current = prev[index];
         const stateChanged = current.state !== updatedServer.state;
+        const serverInfoChanged =
+          current.serverInfo !== updatedServer.serverInfo;
 
         if (
           current.state === updatedServer.state &&
@@ -937,12 +983,42 @@ export function McpClientProvider({
           onServerStateChange?.(updatedServer.id, updatedServer.state);
         }
 
+        // Server info changed - update cached metadata
+        if (
+          serverInfoChanged &&
+          updatedServer.serverInfo &&
+          storageProvider?.setServerMetadata
+        ) {
+          const metadata: import("./storage/StorageProvider.js").CachedServerMetadata =
+            {
+              name: updatedServer.serverInfo.name,
+              version: updatedServer.serverInfo.version,
+              title: updatedServer.serverInfo.title,
+              websiteUrl: updatedServer.serverInfo.websiteUrl,
+              icons: updatedServer.serverInfo.icons,
+              icon: updatedServer.serverInfo.icon,
+            };
+
+          // Update cached metadata ref
+          cachedMetadataRef.current[updatedServer.id] = metadata;
+
+          // Save to storage asynchronously
+          Promise.resolve(
+            storageProvider.setServerMetadata(updatedServer.id, metadata)
+          ).catch((err) => {
+            console.error(
+              "[McpClientProvider] Failed to save server metadata:",
+              err
+            );
+          });
+        }
+
         const newServers = [...prev];
         newServers[index] = updatedServer;
         return newServers;
       });
     },
-    [onServerAdded, onServerStateChange]
+    [onServerAdded, onServerStateChange, storageProvider]
   );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
@@ -1058,6 +1134,7 @@ export function McpClientProvider({
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
           clientInfo={clientInfo}
+          cachedMetadata={cachedMetadataRef.current[config.id]}
           onUpdate={handleServerUpdate}
           rpcWrapTransport={rpcWrapTransport}
           onGlobalSamplingRequest={onSamplingRequest}
