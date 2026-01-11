@@ -91,12 +91,23 @@ The PRM document tells the client which authorization servers to use:
 
 ### Authorization Server Metadata
 
-For each authorization server in PRM, `mcp-use` discovers OAuth endpoints:
+For each authorization server in PRM, `mcp-use` discovers OAuth endpoints using two standards:
+
+| Standard | URL Construction |
+|----------|------------------|
+| OAuth 2.0 ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html#section-3)) | Insert `.well-known` between host and path |
+| OpenID Connect | Append `.well-known` to issuer |
+
+For an issuer like `https://github.com/login/oauth`:
 
 ```
-/.well-known/oauth-authorization-server          (OAuth 2.0)
-/.well-known/openid-configuration                (OpenID Connect)
+OAuth 2.0:  https://github.com/.well-known/oauth-authorization-server/login/oauth
+OIDC:       https://github.com/login/oauth/.well-known/openid-configuration
 ```
+
+<Note>
+When the issuer has no path, both methods produce the same URL. `mcp-use` tries OAuth 2.0 style first, then falls back to OpenID Connect.
+</Note>
 
 ## Client Registration
 
