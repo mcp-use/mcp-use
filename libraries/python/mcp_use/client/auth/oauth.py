@@ -473,17 +473,6 @@ class OAuth:
         # Try well-known endpoint first
         parsed = urlparse(self.server_url)
 
-        # Edge case for GH that doesn't have metadata discovery
-        if parsed.netloc == "api.githubcopilot.com":
-            logger.debug("Detected GitHub MCP server, using its metadata")
-            issuer = "https://github.com/login/oauth"
-            authorization_endpoint = "https://github.com/login/oauth/authorize"
-            token_endpoint = "https://github.com/login/oauth/access_token"
-            self._metadata = ServerOAuthMetadata(
-                issuer=issuer, authorization_endpoint=authorization_endpoint, token_endpoint=token_endpoint
-            )
-            return
-
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         prm_url: str | None = None
 
@@ -537,24 +526,34 @@ class OAuth:
                 pass
 
         # 3) For each authorization server, try AS metadata and stop on first success
+        #
+        # Well-known URL construction differs between OAuth 2.0 and OpenID Connect:
+        #   - OAuth 2.0 (RFC 8414): Insert .well-known between host and path
+        #   - OpenID Connect: Append .well-known to issuer
+        #
+        # Example for issuer https://github.com/login/oauth:
+        #   - OAuth 2.0:  https://github.com/.well-known/oauth-authorization-server/login/oauth
+        #   - OIDC:       https://github.com/login/oauth/.well-known/openid-configuration
+        #
+        # See: https://www.rfc-editor.org/rfc/rfc8414.html#section-3.1
         auth_servers = self._resource_metadata.authorization_servers if self._resource_metadata else []
         for auth_server in auth_servers:
             parsed_issuer = urlparse(auth_server)
             issuer_base = f"{parsed_issuer.scheme}://{parsed_issuer.netloc}"
             issuer_path = (parsed_issuer.path or "").rstrip("/")
 
+            # OAuth 2.0 (RFC 8414): Insert .well-known between host and path
             oauth_candidates: list[str] = []
-            oidc_candidates: list[str] = []
-
             if issuer_path:
+                # e.g., https://github.com/.well-known/oauth-authorization-server/login/oauth
                 oauth_candidates.append(f"{issuer_base}/.well-known/oauth-authorization-server{issuer_path}")
-                oauth_candidates.append(f"{auth_server.rstrip('/')}/.well-known/oauth-authorization-server")
-                oidc_candidates.append(f"{issuer_base}/.well-known/openid-configuration{issuer_path}")
-                oidc_candidates.append(f"{auth_server.rstrip('/')}/.well-known/openid-configuration")
             else:
-                # Simple issuer (no path)
                 oauth_candidates.append(f"{issuer_base}/.well-known/oauth-authorization-server")
-                oidc_candidates.append(f"{issuer_base}/.well-known/openid-configuration")
+
+            # OpenID Connect: Append .well-known to issuer
+            oidc_candidates: list[str] = []
+            # e.g., https://github.com/login/oauth/.well-known/openid-configuration
+            oidc_candidates.append(f"{auth_server.rstrip('/')}/.well-known/openid-configuration")
 
             # Try OAuth 2.0 Authorization Server Metadata endpoints first
             for well_known_url in oauth_candidates:
