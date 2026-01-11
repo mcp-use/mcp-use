@@ -155,7 +155,8 @@ const ServerManager: React.FC = () => {
                 )}
 
                 {/* Authentication Actions */}
-                {(server.state === "failed" || server.state === "pending_auth") && (
+                {(server.state === "failed" ||
+                  server.state === "pending_auth") && (
                   <div style={{ marginTop: "10px" }}>
                     <button
                       onClick={() => server.authenticate()}
@@ -184,8 +185,8 @@ const ServerManager: React.FC = () => {
                         }}
                       >
                         <p style={{ margin: "0 0 10px 0" }}>
-                          <strong>Popup blocked?</strong> Click the link below to
-                          authenticate manually:
+                          <strong>Popup blocked?</strong> Click the link below
+                          to authenticate manually:
                         </p>
                         <a
                           href={server.authUrl}
@@ -235,8 +236,8 @@ const ServerManager: React.FC = () => {
                     {server.authUrl && (
                       <div style={{ marginTop: "10px" }}>
                         <p style={{ margin: "0 0 10px 0" }}>
-                          <strong>Popup blocked?</strong> Click the link below to
-                          authenticate manually:
+                          <strong>Popup blocked?</strong> Click the link below
+                          to authenticate manually:
                         </p>
                         <a
                           href={server.authUrl}

@@ -1042,10 +1042,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             if (isMountedRef.current) {
               setState("pending_auth");
               // Retrieve the stored auth URL if it was prepared during OAuth discovery
-              const storedAuthUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
+              const storedAuthUrl =
+                authProviderRef.current?.getLastAttemptedAuthUrl();
               if (storedAuthUrl) {
                 setAuthUrl(storedAuthUrl);
-                addLog("info", "Retrieved stored auth URL for manual authentication");
+                addLog(
+                  "info",
+                  "Retrieved stored auth URL for manual authentication"
+                );
               }
             }
             connectingRef.current = false;

@@ -340,10 +340,10 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       returnUrl:
         typeof window !== "undefined" ? window.location.href : undefined,
     };
-    
+
     console.log(`[OAuth] Storing state key: ${stateKey}`);
     localStorage.setItem(stateKey, JSON.stringify(stateData));
-    
+
     // Verify it was stored
     const verified = localStorage.getItem(stateKey);
     console.log(`[OAuth] State stored successfully: ${!!verified}`);

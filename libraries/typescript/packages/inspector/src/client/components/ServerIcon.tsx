@@ -3,7 +3,7 @@ import { RandomGradientBackground } from "@/client/components/ui/random-gradient
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
 import type { UseMcpResult } from "mcp-use/react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface ServerIconProps {
   server: UseMcpResult;

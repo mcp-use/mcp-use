@@ -182,7 +182,7 @@ export function mountOAuthProxy(
         // OAuth proxy at /inspector/api/oauth -> MCP proxy at /inspector/api/proxy
         if (!connectionUrl) {
           const requestUrl = new URL(c.req.url);
-          
+
           // Detect the actual protocol the client is using (may be different from internal request)
           // Check forwarded headers in order of preference
           let clientProtocol = requestUrl.protocol.replace(":", "");

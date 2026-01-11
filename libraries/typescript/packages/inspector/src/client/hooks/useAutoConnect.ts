@@ -321,9 +321,7 @@ export function useAutoConnect({
     // Handle failed connection - show error and navigate home
     // Note: useMcp's autoProxyFallback will have already tried proxy fallback internally
     if (connection?.state === "failed" && connection.error) {
-      console.warn(
-        "[useAutoConnect] Connection failed after all retries"
-      );
+      console.warn("[useAutoConnect] Connection failed after all retries");
 
       toast.error(
         "Cannot connect to server. Please check the URL and try again."
@@ -339,12 +337,7 @@ export function useAutoConnect({
         navigate("/");
       });
     }
-  }, [
-    connections,
-    autoConnectConfig,
-    removeConnection,
-    navigate,
-  ]);
+  }, [connections, autoConnectConfig, removeConnection, navigate]);
 
   // Clear loading state for connections that complete without retry
   useEffect(() => {
