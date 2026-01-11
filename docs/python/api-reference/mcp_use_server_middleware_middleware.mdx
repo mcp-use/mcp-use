@@ -132,6 +132,28 @@ context: ServerMiddlewareContext[GetPromptRequestParams],
 </Card>
 
 <Card type="info">
+### `method` on_initialize
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[InitializeRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[InitializeRequestParams, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_initialize(
+context: ServerMiddlewareContext[InitializeRequestParams],
+    call_next: CallNext[InitializeRequestParams,
+    Any]
+):
+```
+
+</Card>
+
+<Card type="info">
 ### `method` on_list_prompts
 
 
