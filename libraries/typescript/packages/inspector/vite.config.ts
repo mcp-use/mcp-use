@@ -46,6 +46,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Use require.resolve to get the actual module path from node_modules
+      // This works in both dev (with workspace links) and production
       "mcp-use/react": path.resolve(
         __dirname,
         "../mcp-use/dist/src/react/index.js"
@@ -53,6 +55,10 @@ export default defineConfig({
       "mcp-use/browser": path.resolve(
         __dirname,
         "../mcp-use/dist/src/browser.js"
+      ),
+      "mcp-use/utils": path.resolve(
+        __dirname,
+        "../mcp-use/dist/src/utils/index.js"
       ),
       "posthog-node": path.resolve(
         __dirname,
@@ -66,9 +72,30 @@ export default defineConfig({
       util: path.resolve(__dirname, "./src/client/stubs/util.js"),
       path: path.resolve(__dirname, "./src/client/stubs/path.js"),
       process: path.resolve(__dirname, "./src/client/stubs/process.js"),
+      // More specific aliases must come first
+      "node:fs/promises": path.resolve(
+        __dirname,
+        "./src/client/stubs/fs-promises.js"
+      ),
+      "fs/promises": path.resolve(
+        __dirname,
+        "./src/client/stubs/fs-promises.js"
+      ),
+      "node:fs": path.resolve(__dirname, "./src/client/stubs/fs.js"),
+      fs: path.resolve(__dirname, "./src/client/stubs/fs.js"),
       "node:async_hooks": path.resolve(
         __dirname,
         "./src/client/stubs/async_hooks.js"
+      ),
+      "node:stream": path.resolve(__dirname, "./src/client/stubs/stream.js"),
+      "node:process": path.resolve(__dirname, "./src/client/stubs/process.js"),
+      "node:child_process": path.resolve(
+        __dirname,
+        "./src/client/stubs/child_process.js"
+      ),
+      child_process: path.resolve(
+        __dirname,
+        "./src/client/stubs/child_process.js"
       ),
     },
   },
@@ -84,19 +111,29 @@ export default defineConfig({
   optimizeDeps: {
     include: [
       "mcp-use/react",
+      "mcp-use/browser",
+      "mcp-use/utils",
       "react-syntax-highlighter",
-      "refractor/lib/core",
     ],
-    exclude: ["posthog-node"], // Exclude Node.js-only packages
+    exclude: [
+      "posthog-node",
+      "tar", // Node.js file system package
+      "path-scurry", // Node.js path utilities
+    ], // Exclude Node.js-only packages
   },
   ssr: {
     noExternal: ["react-syntax-highlighter", "refractor"],
   },
   build: {
-    minify: false, // Disable minification for debugging
-    outDir: "dist/client",
+    minify: true,
+    outDir: "dist/web",
     rollupOptions: {
-      external: ["langfuse-langchain", "langfuse", "@e2b/code-interpreter"],
+      external: [
+        "langfuse-langchain",
+        "langfuse",
+        "@e2b/code-interpreter",
+        "os",
+      ],
       onwarn(warning, warn) {
         // Suppress warnings about externalized modules for refractor
         if (

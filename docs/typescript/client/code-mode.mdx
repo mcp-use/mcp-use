@@ -1,24 +1,53 @@
 ---
 title: "Code Mode"
-description: "Using MCP tools via JavaScript/TypeScript code execution"
+description: "Enable AI agents to write code for tool interactions"
 icon: "code"
 tag: "New"
 ---
 
-Code Execution Mode allows agents to interact with MCP tools by writing and executing JavaScript/TypeScript code instead of calling tools individually. This approach can significantly improve efficiency for complex tasks, data processing, and multi-step workflows.
+Code Mode enables AI agents to interact with MCP tools by writing and executing JavaScript/TypeScript code instead of making individual tool calls. This dramatically improves efficiency for complex tasks, data processing, and multi-step workflows.
 
-Based on [Anthropic's research on code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp), this feature enables agents to process data more efficiently and reduce context usage.
+<video alt="Code Mode Example" style={{maxWidth: '600px', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} muted autoPlay loop>
+  <source src="/images/code_mode.mp4" type="video/mp4" />
+</video>
 
-<Note>
-  Code Execution Mode runs code in sandboxed environments. The default VM
-  executor provides basic isolation, while the E2B executor provides strong
-  cloud-based isolation. Choose the appropriate executor based on your security
-  requirements.
-</Note>
+## Why Code Mode?
 
-## Quick Start
+Based on [Anthropic's research on code execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp), code mode provides:
 
-### Basic Setup (VM Executor)
+- **Better efficiency**: Batch multiple operations in a single code execution
+- **Reduced context**: Less back-and-forth between agent and tools
+- **Complex logic**: Enable sophisticated data processing and transformations
+- **Natural workflow**: Agents write code the way developers do
+
+<Warning>
+**Security Considerations**: Code Mode executes user-generated code. Always use appropriate sandboxing:
+- **VM Executor**: Basic local sandboxing for trusted environments
+- **E2B Executor**: Strong cloud-based isolation for production use
+</Warning>
+
+## Executor Types
+
+Code Mode supports three executor types:
+
+### VM Executor (Default)
+
+Local execution using Node.js `vm` module. Fast and simple, suitable for trusted environments.
+
+**Advantages:**
+
+- Zero latency - direct function calls
+- No external dependencies
+- Immediate execution
+- No cost
+
+**Limitations:**
+
+- Basic isolation (not suitable for untrusted code)
+- Limited to Node.js built-ins
+- Shares host resources
+
+**Basic Setup:**
 
 The simplest way to enable Code Mode with local execution:
 
@@ -49,29 +78,7 @@ const agent = new MCPAgent({
 const result = await agent.run("List all files and count them");
 ```
 
-### E2B Setup (Cloud Sandbox)
-
-For production or untrusted code, use E2B for stronger isolation:
-
-```typescript
-const client = new MCPClient(
-  {
-    /* server config */
-  },
-  {
-    codeMode: {
-      enabled: true,
-      executor: "e2b",
-      executorOptions: {
-        apiKey: process.env.E2B_API_KEY!,
-        timeoutMs: 300000, // 5 minutes (default)
-      },
-    },
-  }
-);
-```
-
-### VM with Custom Timeout
+**Custom Timeout:**
 
 Customize the VM executor timeout:
 
@@ -91,73 +98,6 @@ const client = new MCPClient(
     },
   }
 );
-```
-
-## Architecture
-
-Code Mode uses a layered architecture to provide flexible code execution with MCP tool access:
-
-```
-┌────────────────────────────────────────────────────────────┐
-│                       AI Agent                             │
-│  (Writes JavaScript code to accomplish tasks)              │
-└────────────────────────────┬───────────────────────────────┘
-                             │
-                             ▼
-┌────────────────────────────────────────────────────────────┐
-│                    CodeModeConnector                       │
-│  Provides two special tools:                               │
-│  • execute_code: Run JavaScript with tool access           │
-│  • search_tools: Discover available tools                  │
-└────────────────────────────┬───────────────────────────────┘
-                             │
-                    ┌────────┴────────┐
-                    ▼                 ▼
-        ┌───────────────────┐  ┌──────────────────┐
-        │   Code Executor   │  │   MCP Servers    │
-        │  (VM or E2B)      │  │  (github, etc.)  │
-        │                   │  │                  │
-        │  Runs code with   │  │  Provide tools   │
-        │  tools exposed    │  │  for execution   │
-        └───────────────────┘  └──────────────────┘
-```
-
-### Flow
-
-1. **Agent discovers tools** using `search_tools`
-2. **Agent writes code** that calls tools as async functions
-3. **Code executes** in VM or E2B sandbox
-4. **Tools are called** either directly (VM) or via bridge (E2B)
-5. **Results are returned** to the agent
-
-## Executor Types
-
-Code Mode supports three executor types:
-
-### VM Executor (Default)
-
-Local execution using Node.js `vm` module. Fast and simple, suitable for trusted environments.
-
-**Advantages:**
-
-- Zero latency - direct function calls
-- No external dependencies
-- Immediate execution
-- No cost
-
-**Limitations:**
-
-- Basic isolation (not suitable for untrusted code)
-- Limited to Node.js built-ins
-- Shares host resources
-
-**Configuration:**
-
-```typescript
-const client = new MCPClient(config, {
-  codeMode: true,
-  // VM is the default, no need to specify codeExecutor
-});
 ```
 
 ### E2B Executor
@@ -191,13 +131,24 @@ yarn add @e2b/code-interpreter
 
 3. **Configure client:**
 
+For production or untrusted code, use E2B for stronger isolation:
+
 ```typescript
-const client = new MCPClient(config, {
-  codeMode: true,
-  codeExecutor: "e2b",
-  e2bApiKey: process.env.E2B_API_KEY,
-  e2bTimeoutMs: 300000, // Optional: sandbox timeout (default 5 min)
-});
+const client = new MCPClient(
+  {
+    /* server config */
+  },
+  {
+    codeMode: {
+      enabled: true,
+      executor: "e2b",
+      executorOptions: {
+        apiKey: process.env.E2B_API_KEY!,
+        timeoutMs: 300000, // 5 minutes (default)
+      },
+    },
+  }
+);
 ```
 
 4. **Set environment variable:**
@@ -260,6 +211,16 @@ const client = new MCPClient(config, {
 
 ## How Agent Code Works
 
+
+Code Mode uses a layered architecture to provide flexible code execution with MCP tool access:
+
+```mermaid
+flowchart TD
+    A[AI Agent<br/>Writes JavaScript code to accomplish tasks] --> B[CodeModeConnector<br/>Provides two special tools:<br/>• execute_code: Run JavaScript with tool access<br/>• search_tools: Discover available tools]
+    B --> C[Code Executor<br/>VM or E2B<br/>Runs code with tools exposed]
+    B --> D[MCP Servers<br/>github, etc.<br/>Provide tools for execution]
+```
+
 When Code Mode is active, the agent writes JavaScript code that has access to:
 
 ### 1. Tool Namespaces
@@ -320,51 +281,6 @@ const summary = {
 return summary;
 ```
 
-### Complete Example
-
-Here's how an agent might write code to analyze GitHub issues:
-
-```javascript
-// 1. Discover what tools are available
-const searchResult = await search_tools("github issue");
-const tools = searchResult.results;
-console.log(`Found ${searchResult.meta.result_count} GitHub issue tools out of ${searchResult.meta.total_tools} total`);
-
-// 2. Fetch issues from repository
-const issues = await github.list_issues({
-  owner: "modelcontextprotocol",
-  repo: "servers",
-  state: "open",
-});
-
-// 3. Process data efficiently in code
-const criticalIssues = issues.filter((issue) =>
-  issue.labels.some((label) => label.name === "critical")
-);
-
-const bugIssues = issues.filter((issue) =>
-  issue.labels.some((label) => label.name === "bug")
-);
-
-// 4. Post notification if needed
-if (criticalIssues.length > 0) {
-  await slack.post_message({
-    channel: "#alerts",
-    text: `⚠️ Found ${criticalIssues.length} critical issues!`,
-  });
-}
-
-// 5. Return structured summary
-return {
-  total_issues: issues.length,
-  critical_count: criticalIssues.length,
-  bug_count: bugIssues.length,
-  critical_titles: criticalIssues.map((i) => i.title),
-  oldest_issue: issues.sort(
-    (a, b) => new Date(a.created_at) - new Date(b.created_at)
-  )[0],
-};
-```
 
 ## Advanced Topics
 
@@ -477,51 +393,6 @@ try {
   await client.close();
 }
 ```
-
-## Security Considerations
-
-### VM Executor Security
-
-The VM executor uses Node.js `vm` module for isolation:
-
-**Allowed:**
-
-- Standard built-ins: `Array`, `Object`, `String`, `Number`, `Boolean`, `Date`, `Math`, `JSON`, `RegExp`, `Map`, `Set`, `Promise`
-- Standard functions: `parseInt`, `parseFloat`, `isNaN`, `isFinite`, `encodeURI`, `decodeURI`, `setTimeout`, `clearTimeout`
-- Console methods: `console.log`, `console.error`, `console.warn`, `console.info`
-- MCP tools via namespaced functions
-
-**Blocked:**
-
-- `require` and `import` statements
-- `process`, `fs`, `child_process`, and other Node.js modules
-- `eval` and `Function` constructor
-- Access to host filesystem (except via MCP tools)
-
-**Best Practices:**
-
-- Use VM executor only in trusted environments
-- Validate and sanitize any user input used in code
-- Set reasonable timeout limits
-- Monitor execution logs for suspicious activity
-
-### E2B Executor Security
-
-The E2B executor provides stronger isolation:
-
-- Code runs in isolated cloud sandbox
-- Full Linux environment with network access
-- Sandboxes are ephemeral and destroyed after use
-- Tool calls are proxied back to host via secure channel
-- No direct access to host system
-
-**Best Practices:**
-
-- Use E2B for production and multi-tenant systems
-- Keep API keys secure and rotate regularly
-- Monitor E2B usage and costs
-- Set appropriate timeout limits
-- Review execution logs for debugging
 
 ## API Reference
 
@@ -641,98 +512,12 @@ abstract class BaseCodeExecutor {
 
 ## Complete Examples
 
-### VM Executor Example
 
-See [`examples/client/code_mode_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client/code_mode_example.ts) for a complete working example using the default VM executor with the filesystem MCP server.
+**VM Executor Example:** See [`examples/client/code_mode_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client/code_mode_example.ts) for a complete working example using the default VM executor with the filesystem MCP server.
 
-Key points:
 
-- Simple configuration with `codeMode: true`
-- Uses `PROMPTS.CODE_MODE` for agent instructions
-- Demonstrates tool discovery and usage
-- Shows cleanup with `agent.close()`
+**E2B Executor Example:** See [`examples/client/code_mode_e2b_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client/code_mode_e2b_example.ts) for a complete working example using E2B cloud sandboxes.
 
-### E2B Executor Example
-
-See [`examples/client/code_mode_e2b_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client/code_mode_e2b_example.ts) for a complete working example using E2B cloud sandboxes.
-
-Key points:
-
-- E2B API key from environment variable
-- Error handling for missing API key
-- E2B-specific configuration
-- Resource cleanup for cloud sandboxes
-
-## Troubleshooting
-
-### "Code execution mode is not enabled"
-
-Make sure you initialized the client with `codeMode: true`:
-
-```typescript
-const client = new MCPClient(config, { codeMode: true });
-```
-
-### "@e2b/code-interpreter is not installed"
-
-Install the E2B dependency:
-
-```bash
-yarn add @e2b/code-interpreter
-```
-
-### "Script execution timed out"
-
-Increase the timeout:
-
-```typescript
-// For VM executor - set default timeout
-const client = new MCPClient(config, {
-  codeMode: {
-    enabled: true,
-    executor: "vm",
-    executorOptions: {
-      timeoutMs: 60000, // 1 minute default
-    },
-  },
-});
-
-// Or override per execution
-const result = await client.executeCode(code, 30000); // 30 seconds
-
-// For E2B executor
-const client = new MCPClient(config, {
-  codeMode: {
-    enabled: true,
-    executor: "e2b",
-    executorOptions: {
-      apiKey: process.env.E2B_API_KEY!,
-      timeoutMs: 600000, // 10 minutes
-    },
-  },
-});
-```
-
-### Tools not available in code
-
-Make sure MCP servers are configured and connected:
-
-```javascript
-// Check available namespaces
-console.log("Available servers:", __tool_namespaces);
-
-// Search for tools
-const result = await search_tools();
-console.log(`Found ${result.meta.result_count} tools out of ${result.meta.total_tools} total`);
-console.log("Available tools:", result.results);
-```
-
-### E2B sandbox issues
-
-- Verify API key is correct and valid
-- Check E2B account has sufficient credits
-- Review E2B dashboard for sandbox logs
-- Ensure network connectivity to E2B API
 
 ## Further Reading
 

@@ -3,20 +3,26 @@ import type {
   ClientOptions,
 } from "@modelcontextprotocol/sdk/client/index.js";
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import {
-  ListRootsRequestSchema,
-  CreateMessageRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
 import type {
   CallToolResult,
   CreateMessageRequest,
   CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
   Notification,
   Root,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { ConnectionManager } from "../task_managers/base.js";
+import {
+  CreateMessageRequestSchema,
+  ElicitRequestSchema,
+  ListRootsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../logging.js";
+import type { ConnectionManager } from "../task_managers/base.js";
+import type { ConnectorInitEventData } from "../telemetry/events.js";
+import { Telemetry } from "../telemetry/index.js";
 
 /**
  * Handler function for server notifications
@@ -54,9 +60,30 @@ export interface ConnectorInitOptions {
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
    */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  /**
+   * Optional callback function to handle elicitation requests from servers.
+   * When provided, the client will declare elicitation capability and handle
+   * `elicitation/create` requests by calling this callback.
+   *
+   * Elicitation allows servers to request additional information from users:
+   * - Form mode: Collect structured data with JSON schema validation
+   * - URL mode: Direct users to external URLs for sensitive interactions
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 }
 
 /**
@@ -66,7 +93,7 @@ export abstract class BaseConnector {
   protected client: Client | null = null;
   protected connectionManager: ConnectionManager<any> | null = null;
   protected toolsCache: Tool[] | null = null;
-  protected capabilitiesCache: any = null;
+  protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: { name: string; version?: string } | null = null;
   protected connected = false;
   protected readonly opts: ConnectorInitOptions;
@@ -74,11 +101,37 @@ export abstract class BaseConnector {
   protected rootsCache: Root[] = [];
 
   constructor(opts: ConnectorInitOptions = {}) {
-    this.opts = opts;
-    // Initialize roots from options
-    if (opts.roots) {
-      this.rootsCache = [...opts.roots];
+    // Support both new and deprecated name
+    const finalOpts = {
+      ...opts,
+      onSampling: opts.onSampling ?? opts.samplingCallback,
+    };
+    if (opts.samplingCallback && !opts.onSampling) {
+      console.warn(
+        '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+      );
     }
+    this.opts = finalOpts;
+    // Initialize roots from options
+    if (finalOpts.roots) {
+      this.rootsCache = [...finalOpts.roots];
+    }
+  }
+
+  /**
+   * Track connector initialization event
+   * Should be called by subclasses after successful connection
+   */
+  protected trackConnectorInit(
+    data: Omit<ConnectorInitEventData, "connectorType">
+  ): void {
+    const connectorType = this.constructor.name;
+    Telemetry.getInstance()
+      .trackConnectorInit({
+        connectorType,
+        ...data,
+      })
+      .catch((e) => logger.debug(`Failed to track connector init: ${e}`));
   }
 
   /**
@@ -220,7 +273,7 @@ export abstract class BaseConnector {
     // Handle roots/list requests from the server
     this.client.setRequestHandler(
       ListRootsRequestSchema,
-      async (_request, _extra) => {
+      async (_request: unknown, _extra: unknown) => {
         logger.debug(
           `Server requested roots list, returning ${this.rootsCache.length} root(s)`
         );
@@ -234,16 +287,60 @@ export abstract class BaseConnector {
    * This is called after the client connects to register the handler for sampling requests.
    */
   protected setupSamplingHandler(): void {
-    if (!this.client) return;
-    if (!this.opts.samplingCallback) return;
+    if (!this.client) {
+      logger.debug("setupSamplingHandler: No client available");
+      return;
+    }
+    const samplingCallback = this.opts.onSampling ?? this.opts.samplingCallback;
+    if (!samplingCallback) {
+      logger.debug("setupSamplingHandler: No sampling callback provided");
+      return;
+    }
 
+    logger.debug("setupSamplingHandler: Setting up sampling request handler");
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
       CreateMessageRequestSchema,
-      async (request, _extra) => {
+      async (request: CreateMessageRequest, _extra: unknown) => {
         logger.debug("Server requested sampling, forwarding to callback");
-        return await this.opts.samplingCallback!(request.params);
+        return await samplingCallback(request.params);
       }
+    );
+    logger.debug(
+      "setupSamplingHandler: Sampling handler registered successfully"
+    );
+  }
+
+  /**
+   * Internal: set up elicitation/create request handler.
+   * This is called after the client connects to register the handler for elicitation requests.
+   */
+  protected setupElicitationHandler(): void {
+    if (!this.client) {
+      logger.debug("setupElicitationHandler: No client available");
+      return;
+    }
+    if (!this.opts.elicitationCallback) {
+      logger.debug("setupElicitationHandler: No elicitation callback provided");
+      return;
+    }
+
+    logger.debug(
+      "setupElicitationHandler: Setting up elicitation request handler"
+    );
+    // Handle elicitation/create requests from the server
+    this.client.setRequestHandler(
+      ElicitRequestSchema,
+      async (
+        request: { params: ElicitRequestFormParams | ElicitRequestURLParams },
+        _extra: unknown
+      ) => {
+        logger.debug("Server requested elicitation, forwarding to callback");
+        return await this.opts.elicitationCallback!(request.params);
+      }
+    );
+    logger.debug(
+      "setupElicitationHandler: Elicitation handler registered successfully"
     );
   }
 
@@ -290,7 +387,7 @@ export abstract class BaseConnector {
 
     // Cache server capabilities for callers who need them.
     const capabilities = this.client.getServerCapabilities();
-    this.capabilitiesCache = capabilities;
+    this.capabilitiesCache = (capabilities as Record<string, unknown>) || null;
 
     // Cache server info from the initialize response
     const serverInfo = this.client.getServerVersion();
@@ -318,8 +415,8 @@ export abstract class BaseConnector {
   }
 
   /** Expose cached server capabilities. */
-  get serverCapabilities(): any {
-    return this.capabilitiesCache;
+  get serverCapabilities(): Record<string, unknown> {
+    return this.capabilitiesCache || {};
   }
 
   /** Expose cached server info. */
@@ -337,14 +434,47 @@ export abstract class BaseConnector {
       throw new Error("MCP client is not connected");
     }
 
+    // If resetTimeoutOnProgress is enabled but no onprogress callback is provided,
+    // add a no-op callback to trigger the SDK to add progressToken to the request.
+    // The SDK only adds progressToken when onprogress is present, which is required
+    // for the server to send progress notifications that reset the timeout.
+    const enhancedOptions = options ? { ...options } : undefined;
+    if (
+      enhancedOptions?.resetTimeoutOnProgress &&
+      !enhancedOptions.onprogress
+    ) {
+      // Add no-op progress callback to trigger progressToken addition
+      enhancedOptions.onprogress = () => {
+        // No-op: progress notifications are handled by the SDK's timeout reset logic
+      };
+      logger.debug(
+        `[BaseConnector] Added onprogress callback for tool '${name}' to enable progressToken`
+      );
+    }
+
     logger.debug(`Calling tool '${name}' with args`, args);
     const res = await this.client.callTool(
       { name, arguments: args },
       undefined,
-      options
+      enhancedOptions
     );
     logger.debug(`Tool '${name}' returned`, res);
     return res as CallToolResult;
+  }
+
+  /**
+   * List all available tools from the MCP server.
+   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   *
+   * @param options - Optional request options
+   * @returns Array of available tools
+   */
+  async listTools(options?: RequestOptions): Promise<Tool[]> {
+    if (!this.client) {
+      throw new Error("MCP client is not connected");
+    }
+    const result = await this.client.listTools(undefined, options);
+    return (result.tools ?? []) as Tool[];
   }
 
   /**
@@ -386,15 +516,17 @@ export abstract class BaseConnector {
       let cursor: string | undefined = undefined;
 
       do {
-        const result = await this.client.listResources({ cursor }, options);
+        const result: { resources?: any[]; nextCursor?: string } =
+          await this.client.listResources({ cursor }, options);
         allResources.push(...(result.resources || []));
         cursor = result.nextCursor;
       } while (cursor);
 
       return { resources: allResources };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
-      if (err.code === -32601) {
+      if (error.code === -32601) {
         logger.debug("Server advertised resources but method not found");
         return { resources: [] };
       }
@@ -472,9 +604,10 @@ export abstract class BaseConnector {
     try {
       logger.debug("Listing prompts");
       return await this.client.listPrompts();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
       // Gracefully handle if server advertises but doesn't actually support it
-      if (err.code === -32601) {
+      if (error.code === -32601) {
         logger.debug("Server advertised prompts but method not found");
         return { prompts: [] };
       }

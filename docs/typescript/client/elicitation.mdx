@@ -1,152 +1,355 @@
 ---
 title: "Elicitation"
-description: "Enable user input requests for MCP tools"
+description: "Interactive user input during tool execution"
 icon: "check"
 ---
 
-# Elicitation
+Elicitation enables MCP tools to request additional information from users during execution. This creates interactive workflows where tools can dynamically gather data, credentials, or approvals as needed.
+
+## Understanding Elicitation
+
+When a tool needs user input, it sends an elicitation request to the client. The client handles presenting this request to the user and returning their response. This enables:
+
+- **Interactive workflows**: Tools can ask for input mid-execution
+- **Secure credentials**: Request sensitive data without storing it
+- **Dynamic decisions**: Get user approval for actions
+- **OAuth flows**: Redirect users for authentication
 
 <Info>
-Elicitation allows MCP tools to request additional information from users during their execution.
+  **Two Modes Available**: Form mode for structured data collection, and URL
+  mode for directing users to external authentication or approval pages.
 </Info>
+
+## Elicitation Modes
+
+### Form Mode
+
+Collect structured data with JSON schema validation. Best for:
+
+- Non-sensitive information
+- Structured input requirements
+- Client-side form rendering
+
+### URL Mode
+
+Direct users to external URLs. Required for:
+
+- Sensitive credentials (passwords, API keys)
+- OAuth authentication flows
+- External approval processes
+- Third-party integrations
+
+<Note>
+**Server API**: Servers use a simplified API like `ctx.elicit(message, zodSchema)` or `ctx.elicit(message, url)`. The mode is automatically detected and the request is sent to the client with the appropriate JSON schema or URL.
+
+**Server-Side Validation with mcp-use**: When using the mcp-use server library with Zod schemas (simplified API), returned data is automatically validated server-side before reaching your tool logic. This is a convenience feature provided by mcp-use, ensuring type safety and data integrity.
+
+</Note>
 
 ## Configuration
 
-To enable elicitation, provide an `elicitation_callback` function when initializing the MCPClient:
+### With MCPClient
 
-<CodeGroup>
-```typescript TypeScript
-// ⚠️ Elicitation callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
+Provide an `elicitationCallback` function when initializing the MCPClient:
 
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
+```typescript
+import { MCPClient } from "mcp-use";
+import type {
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+} from "@modelcontextprotocol/sdk/types.js";
 
-async function elicitationCallback(context, params) {
-    // Display the message to the user and collect their input
-    console.log(`Server requests: ${params.message}`)
+async function elicitationCallback(
+  params: ElicitRequestFormParams | ElicitRequestURLParams
+): Promise<ElicitResult> {
+  if (params.mode === "url") {
+    // URL mode: Direct user to external URL
+    console.log(`Please visit: ${params.url}`);
+    console.log(`Reason: ${params.message}`);
 
-    let userInput
-    if (params.requestedSchema) {
-        // Handle structured input based on the schema
-        userInput = await collectStructuredInput(params.requestedSchema)
-    } else {
-        // Handle simple text input
-        userInput = await getUserInput('Please provide your response: ')
-    }
+    // Show URL to user (open in browser, display in UI, etc.)
+    // In a real app, you might open a popup or new tab
 
-    // Return the result
+    // Wait for user confirmation
+    const userConsent = await promptUser("Did you complete the authorization?");
+
     return {
-        action: 'accept',  // or 'decline' or 'cancel'
-        content: userInput
+      action: userConsent ? "accept" : "decline",
+    };
+  } else {
+    // Form mode: Collect structured data
+    console.log(`Server requests: ${params.message}`);
+
+    const schema = params.requestedSchema;
+    const userData: Record<string, any> = {};
+
+    // Collect data based on schema properties
+    if (schema.type === "object" && schema.properties) {
+      for (const [fieldName, fieldSchema] of Object.entries(
+        schema.properties
+      )) {
+        const value = await promptUser(
+          `Enter ${fieldSchema.title || fieldName}:`,
+          fieldSchema.default
+        );
+        userData[fieldName] = value;
+      }
     }
+
+    return {
+      action: "accept",
+      data: userData,
+    };
+  }
 }
 
-const client = new MCPClient(
-    config,
-    { elicitationCallback }
-)
-*/
+const client = new MCPClient(config, { elicitationCallback });
 ```
 
-```typescript TypeScript
-// ⚠️ Elicitation callbacks are not yet supported in the TypeScript library.
-// Support is coming soon! If you need this feature now, please open an issue:
-// https://github.com/mcp-use/mcp-use
+### With React Hook
 
-// When supported, the API will look similar to:
-/*
-import { MCPClient } from 'mcp-use'
+Use the `onElicitation` prop in the `useMcp` hook:
 
-async function elicitationCallback(context, params) {
-    // Display the message to the user and collect their input
-    console.log(`Server requests: ${params.message}`)
+```typescript
+import { useMcp } from "mcp-use/react";
+import type {
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+} from "@modelcontextprotocol/sdk/types.js";
 
-    let userInput
-    if (params.requestedSchema) {
-        // Handle structured input based on the schema
-        userInput = await collectStructuredInput(params.requestedSchema)
-    } else {
-        // Handle simple text input
-        userInput = await getUserInput('Please provide your response: ')
-    }
+function MyComponent() {
+  const { tools, callTool, state } = useMcp({
+    url: "http://localhost:3000/mcp",
+    onElicitation: async (params) => {
+      if (params.mode === "url") {
+        // URL mode: Open external URL
+        const confirmed = window.confirm(
+          `${params.message}\n\nOpen ${params.url}?`
+        );
 
-    // Return the result
-    return {
-        action: 'accept',  // or 'decline' or 'cancel'
-        content: userInput
-    }
+        if (confirmed) {
+          window.open(params.url, "_blank");
+
+          // Wait for user to complete external action
+          const completed = window.confirm("Did you complete the action?");
+          return {
+            action: completed ? "accept" : "decline",
+          };
+        }
+
+        return { action: "decline" };
+      } else {
+        // Form mode: Show form to collect data
+        const formData = await showElicitationForm(
+          params.message,
+          params.requestedSchema
+        );
+
+        return {
+          action: formData ? "accept" : "cancel",
+          data: formData,
+        };
+      }
+    },
+  });
+
+  // ... rest of component
 }
-
-const client = new MCPClient(
-    config,
-    { elicitationCallback }
-)
-*/
 ```
-</CodeGroup>
 
-## Handler Parameters
+## Form Mode Elicitation
 
-The elicitation handler receives two parameters:
+Form mode collects structured data from users with JSON schema validation.
 
-### Elicitation Handler Parameters
+<Info>
+  **Validation Flow**: The client receives a JSON Schema to guide user input.
+  When data is returned, the server validates it against the original Zod schema
+  (if using simplified API) or JSON Schema (if using verbose API). This provides
+  defense-in-depth validation.
+</Info>
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| **context** | `RequestContext` | Request context containing metadata about the elicitation request |
-| **params** | `ElicitRequestParams` | The MCP elicitation request parameters containing the message and optional schema |
+### Request Parameters
 
-#### ElicitRequestParams Structure
+| Field               | Type                | Description                                                      |
+| ------------------- | ------------------- | ---------------------------------------------------------------- |
+| **mode**            | `"form"` (optional) | Specifies form mode (can be omitted for backwards compatibility) |
+| **message**         | `string`            | Human-readable prompt explaining what information is needed      |
+| **requestedSchema** | `object`            | JSON Schema defining the expected response structure             |
 
-| Field | Type | Description |
-|-------|------|-------------|
-| **message** | `str` | The prompt message to display to the user |
-| **requestedSchema** | `dict \| None` | Optional JSON schema defining the expected response structure |
+### Client-Side vs Server-Side Validation
 
-### Response Structure
+**Client-Side (Optional)**:
 
-The handler must return an `ElicitResult` object that specifies how the user responded:
+- You can validate data before sending to improve UX
+- Shows errors immediately without round-trip
+- Not required - server validates anyway
 
-#### ElicitResult Structure
+**Server-Side (Automatic)**:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| **action** | `Literal['accept', 'decline', 'cancel']` | How the user responded to the elicitation request |
-| **content** | `dict \| str \| None` | The user's input data (required for "accept", omitted for "decline"/"cancel") |
+- Server always validates returned data
+- Ensures data integrity regardless of client behavior
+- Protects against malicious or buggy clients
+- Returns clear validation error messages
 
-#### Action Types:
+### Client-Side Validation (Optional but Recommended)
 
-- **accept**: User provided valid input - include their data in the `content` field
-- **decline**: User chose not to provide the requested information - omit `content`
-- **cancel**: User cancelled the entire operation - omit `content`
+While the server always validates data, implementing client-side validation improves UX by catching errors before the round-trip:
 
-### Example Parameter Usage
+```typescript
+async function handleFormElicitation(
+  params: ElicitRequestFormParams
+): Promise<ElicitResult> {
+  const schema = params.requestedSchema;
 
-## Response Actions
+  if (schema.type === "object" && schema.properties) {
+    const formData: Record<string, any> = {};
 
-Elicitation responses use a three-action model to clearly distinguish between different user intentions:
+    // Build form based on schema
+    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
+      const value = await showInputField({
+        name: fieldName,
+        title: fieldDef.title || fieldName,
+        description: fieldDef.description,
+        type: fieldDef.type, // 'string', 'number', 'boolean', etc.
+        default: fieldDef.default,
+        required: schema.required?.includes(fieldName),
+        // Optional: Add client-side validation
+        min: fieldDef.minimum || fieldDef.minLength,
+        max: fieldDef.maximum || fieldDef.maxLength,
+        pattern: fieldDef.pattern,
+        format: fieldDef.format,
+      });
 
-### Accept
-User explicitly approved and submitted data:
-### Decline
-User explicitly declined the request:
-### Cancel
-User dismissed without making an explicit choice:
-## Structured Data Requests
+      formData[fieldName] = value;
+    }
 
-MCP tools can request structured data using JSON schemas. The schema defines the expected format and validation rules:
+    // Optional: Validate before sending
+    // This improves UX but server will validate anyway
+    const validationErrors = validateAgainstSchema(formData, schema);
+    if (validationErrors.length > 0) {
+      // Show errors to user, let them fix
+      await showValidationErrors(validationErrors);
+      // Retry or cancel
+    }
 
-## Creating Elicitation-Enabled Tools
+    return {
+      action: "accept",
+      data: formData,
+    };
+  }
 
-When building MCP servers, tools can request user input using the context parameter:
+  return { action: "cancel" };
+}
+```
 
-## Integration with MCPAgent
+<Note>
+  **Best Practice**: Implement client-side validation for better UX, but
+  remember that the server always validates as the final authority. Never rely
+  solely on client-side validation.
+</Note>
 
-When using elicitation with MCPAgent, the elicitation callback is automatically used during tool execution:
+## URL Mode Elicitation
+
+URL mode directs users to external URLs for sensitive operations. **This mode MUST be used for:**
+
+- Authentication credentials
+- API keys and tokens
+- OAuth authorization flows
+- Payment information
+- Any sensitive personal data
+
+<Warning>
+  **Security Requirement**: Never use form mode for sensitive data. URL mode
+  ensures credentials and sensitive information do not pass through the MCP
+  client, maintaining proper security boundaries.
+</Warning>
+
+### Request Parameters
+
+| Field             | Type     | Description                                                                |
+| ----------------- | -------- | -------------------------------------------------------------------------- |
+| **mode**          | `"url"`  | Specifies URL mode (required)                                              |
+| **message**       | `string` | Human-readable explanation of why the user needs to visit the URL          |
+| **url**           | `string` | The URL to direct the user to                                              |
+| **elicitationId** | `string` | Unique identifier for tracking this elicitation (auto-generated by server) |
+
+### Example: OAuth Authorization
+
+```typescript
+async function handleUrlElicitation(
+  params: ElicitRequestURLParams
+): Promise<ElicitResult> {
+  // Display the URL to the user
+  const userMessage = `
+    ${params.message}
+    
+    Please visit this URL to continue:
+    ${params.url}
+  `;
+
+  console.log(userMessage);
+
+  // In a browser environment, open in new tab
+  if (typeof window !== "undefined") {
+    window.open(params.url, "_blank", "noopener,noreferrer");
+  }
+
+  // Wait for user confirmation
+  const completed = await confirmWithUser(
+    "Have you completed the authorization?"
+  );
+
+  if (completed) {
+    return { action: "accept" };
+  } else {
+    return { action: "decline" };
+  }
+}
+```
+
+## Response Structure
+
+The elicitation callback must return an `ElicitResult` object:
+
+```typescript
+interface ElicitResult {
+  action: "accept" | "decline" | "cancel";
+  data?: any; // Only for 'accept' action in form mode
+}
+```
+
+### Response Actions
+
+| Action      | When to Use                                        | Data Field                                    |
+| ----------- | -------------------------------------------------- | --------------------------------------------- |
+| **accept**  | User provided valid input                          | Required for form mode, optional for URL mode |
+| **decline** | User explicitly declined to provide information    | Omit                                          |
+| **cancel**  | User dismissed the request without making a choice | Omit                                          |
 
 ## Error Handling
 
-If no elicitation callback is provided but a tool requests user input:
+If no elicitation callback is provided but a tool requests user input, the tool call will fail:
+
+```typescript
+// Without elicitation callback
+const client = new MCPClient(config);
+// No elicitationCallback provided
+
+// Tool that requires elicitation will fail
+const session = await client.createSession("server-name");
+try {
+  await session.callTool("collect-user-info", {});
+} catch (error) {
+  console.error("Elicitation not supported:", error);
+  // MCP error: Client does not support elicitation
+}
+```
+
+## Next Steps
+
+- Learn how to [create tools with elicitation](/typescript/server/elicitation) on the server side
+- See the [example server](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/elicitation) for working implementations
+- Explore [sampling](/typescript/client/sampling) for LLM completions
+- Check out [notifications](/typescript/client/notifications) for server-to-client messages

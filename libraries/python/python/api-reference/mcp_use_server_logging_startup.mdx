@@ -1,0 +1,43 @@
+---
+title: "Startup"
+description: "Startup API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/startup.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/startup.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/startup.py</a>
+</Callout>
+
+
+## display_startup_info
+<Card type="info">
+### `function` display_startup_info
+
+Display Next.js-style startup information for the MCP server.
+
+```python
+from mcp_use.server.logging.startup import display_startup_info
+```
+
+**Parameters**
+><ParamField body="server" type="MCPServer" required="True" >   Server name or configuration </ParamField>
+><ParamField body="host" type="str" required="True" >   String value </ParamField>
+><ParamField body="port" type="int" required="True" >   Integer value </ParamField>
+><ParamField body="transport" type="Literal | None" default="None" >   Parameter value </ParamField>
+><ParamField body="start_time" type="float" default="0.0" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def display_startup_info(
+server: MCPServer,
+    host: str,
+    port: int,
+    transport: Literal | None = None,
+    start_time: float = 0.0
+):
+```
+
+</Card>

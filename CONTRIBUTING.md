@@ -1,176 +1,166 @@
-# Contributing to MCP-Use
+<p align="center">
+  <img src="https://cdn.mcp-use.com/github/Contributing.jpg" alt="Contributing to mcp-use" width="100%" />
+</p>
 
-Thank you for your interest in contributing to MCP-Use! This document provides guidelines and instructions for contributing to both the Python and TypeScript implementations of MCP-Use.
+# Contributing to mcp-use
 
-## 📋 Table of Contents
+Thank you for your interest in contributing to mcp-use! This document provides guidelines for contributing to both the Python and TypeScript libraries.
+
+## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Setup](#development-setup)
-- [How to Contribute](#how-to-contribute)
-- [Coding Standards](#coding-standards)
-- [Testing](#testing)
-- [Documentation](#documentation)
+- [Ways to Contribute](#ways-to-contribute)
+- [Repository Structure](#repository-structure)
+- [Python Development](#python-development)
+- [TypeScript Development](#typescript-development)
 - [Pull Request Process](#pull-request-process)
-- [Release Process](#release-process)
+- [Getting Help](#getting-help)
 
 ## Code of Conduct
 
 Please read and follow our [Code of Conduct](./CODE_OF_CONDUCT.md) to ensure a welcoming and inclusive environment for all contributors.
 
-## Getting Started
+## Ways to Contribute
 
-### Prerequisites
+We welcome all kinds of contributions! Here are some ways you can help:
 
-- **Git**: Version control
-- **Python**: 3.11 or higher (for Python library)
-- **Node.js**: 20 or higher (for TypeScript library)
-- **pnpm**: 9 or higher (for TypeScript library)
+- **Help with issues**: Answer questions, help debug problems, or provide guidance on [GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
+- **Fix bugs**: Pick an issue from our [issue tracker](https://github.com/mcp-use/mcp-use/issues) and submit a fix. Issues labeled [`good first issue`](https://github.com/mcp-use/mcp-use/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) are great starting points, but don't let that stop you from tackling other issues, many are very approachable!
+- **Add new features**: Have an idea? Open an issue to discuss it first, then submit a PR
+- **Improve documentation**: Fix typos, clarify explanations, or add examples
 
-### Repository Structure
+If you have any questions or need guidance, join our [Discord](https://discord.gg/XkNkSkMz3V), we're super happy to help!
+
+## Repository Structure
 
 This is a monorepo containing both Python and TypeScript implementations:
 
 ```
 mcp-use/
 ├── libraries/
-│   ├── python/        # Python implementation
-│   └── typescript/    # TypeScript implementation
-├── .github/           # GitHub Actions workflows
-└── docs/              # Unified documentation
+│   ├── python/        # Python library (mcp-use on PyPI)
+│   └── typescript/    # TypeScript monorepo (multiple npm packages)
+├── docs/              # Documentation
+└── .github/           # CI/CD workflows
 ```
 
-## Development Setup
+The Python and TypeScript libraries have independent development workflows and release processes.
 
-### 1. Fork and Clone
+---
 
-```bash
-# Fork the repository on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/mcp-use.git
-cd mcp-use
-```
+## Python Development
 
-### 2. Install Dependencies
+### Prerequisites
 
-#### Option A: Using Make (Recommended)
+- [Python](https://www.python.org/downloads/) 3.11 or higher
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) - Fast Python package manager
 
-```bash
-make install
-```
-
-#### Option B: Manual Installation
+### Setup
 
 ```bash
-# Install Python dependencies
+# Navigate to the Python library
 cd libraries/python
-pip install -e ".[dev,search,e2b]"  # Include optional dependencies
 
-# Install TypeScript dependencies
-cd ../typescript
-pnpm install
+# Create and activate a virtual environment
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies with development extras
+uv pip install -e ".[dev,anthropic,openai,search,e2b]"
 ```
 
-### 3. Set Up Pre-commit Hooks (Python)
+### Code Quality
 
-Pre-commit hooks ensure code quality before committing. The hooks will:
-
-- Format code using Ruff
-- Run linting checks
-- Check for trailing whitespace and fix it
-- Ensure files end with a newline
-- Validate YAML files
-- Check for large files
-- Remove debug statements
+We use **Ruff** for linting and formatting:
 
 ```bash
 cd libraries/python
-pip install pre-commit
-pre-commit install
-```
 
-### 4. Verify Setup
-
-```bash
-# Run tests for both libraries
-make test
-
-# Or individually:
-make test-python
-make test-ts
-```
-
-## How to Contribute
-
-### Types of Contributions
-
-We welcome various types of contributions:
-
-- **Bug Fixes**: Help us squash bugs
-- **Features**: Implement new features or enhance existing ones
-- **Documentation**: Improve or expand our documentation
-- **Tests**: Add test coverage
-- **Examples**: Create example applications
-- **Performance**: Optimize performance
-- **Refactoring**: Improve code quality
-
-### Finding Issues
-
-1. Check our [GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
-2. Look for issues labeled:
-   - `good first issue` - Perfect for newcomers
-   - `help wanted` - We need your expertise
-   - `python` - Python-specific issues
-   - `typescript` - TypeScript-specific issues
-
-### Creating Issues
-
-Before creating an issue:
-
-1. Search existing issues to avoid duplicates
-2. Use our issue templates
-3. Provide clear reproduction steps for bugs
-4. Include relevant system information
-
-## Coding Standards
-
-### Python Guidelines
-
-#### Style Guide
-
-- Follow [PEP 8](https://pep8.org/)
-- Use `ruff` for linting and formatting
-- Maximum line length: 100 characters
-
-#### Code Quality Tools
-
-```bash
-# Format code
-cd libraries/python
-ruff format .
-
-# Lint code
+# Check linting
 ruff check .
 
-# Type checking
-mypy mcp_use
+# Fix linting issues
+ruff check . --fix
+
+# Check formatting
+ruff format --check .
+
+# Format code
+ruff format .
 ```
 
-#### Python Best Practices
+### Pre-commit Hooks (Python)
 
+The Python library has its own pre-commit config at `libraries/python/.pre-commit-config.yaml`:
+
+```bash
+cd libraries/python
+
+# Install pre-commit (if not already in your venv)
+uv pip install pre-commit
+
+# Install hooks
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+```
+
+This runs:
+- Ruff linting and formatting
+- Type checking with ty (excluding tests)
+- Trailing whitespace and end-of-file fixes
+
+### Running Tests
+
+```bash
+cd libraries/python
+
+# Run all unit tests
+pytest tests/unit
+
+# Run with verbose output
+pytest -vv tests/unit
+
+# Run with coverage
+pytest --cov=mcp_use tests/unit
+```
+
+#### Test Categories
+
+Tests are organized into:
+
+- **Unit tests** (`tests/unit/`): Fast, isolated tests
+- **Integration tests** (`tests/integration/`):
+  - `client/transports/`: Tests for stdio, sse, streamable_http transports
+  - `client/primitives/`: Tests for MCP primitives (tools, resources, prompts, etc.)
+  - `client/others/`: Other integration tests
+  - `agent/`: Agent tests (require API keys)
+
+To run specific integration tests:
+
+```bash
+# Transport tests
+pytest -vv tests/integration/client/transports/test_stdio.py
+
+# Primitive tests
+pytest -vv tests/integration/client/primitives/test_tools.py
+
+# Agent tests (requires OPENAI_API_KEY)
+pytest -vv tests/integration/agent/test_agent_run.py
+```
+
+### Python Coding Standards
+
+- Follow [PEP 8](https://pep8.org/)
+- Maximum line length: 120 characters (configured in `pyproject.toml`)
 - Use type hints for all public functions
-- Write docstrings for all public modules, classes, and functions (use Google-style)
-- Prefer f-strings for string formatting
+- Write docstrings using Google-style format
 - Use async/await for asynchronous code
-- Follow PEP 8 naming conventions
-- Add type hints to function signatures
-
-#### Python Docstring Example
 
 ```python
-def function_name(param1: type, param2: type) -> return_type:
-    """Short description.
-
-    Longer description if needed.
+def function_name(param1: str, param2: int) -> bool:
+    """Short description of what the function does.
 
     Args:
         param1: Description of param1
@@ -180,173 +170,171 @@ def function_name(param1: type, param2: type) -> return_type:
         Description of return value
 
     Raises:
-        ExceptionType: When and why this exception is raised
+        ValueError: When and why this exception is raised
     """
 ```
 
-### TypeScript Guidelines
+---
 
-#### Style Guide
+## TypeScript Development
 
-- Follow the project's ESLint configuration
-- Use Prettier for formatting
-- Use TypeScript strict mode
+### Prerequisites
 
-#### Code Quality Tools
+- [Node.js](https://nodejs.org/) 20 or higher (22 recommended)
+- [pnpm](https://pnpm.io/installation) 10 or higher
+
+### Monorepo Structure
+
+The TypeScript library is a **pnpm workspace monorepo** containing multiple packages in `libraries/typescript/packages/`:
+
+```
+libraries/typescript/
+├── package.json          # Root workspace config
+├── pnpm-workspace.yaml   # Workspace definition
+├── packages/
+│   ├── mcp-use/          # Core library (npm: mcp-use)
+│   ├── cli/              # CLI tools (npm: @mcp-use/cli)
+│   ├── inspector/        # MCP Inspector (npm: @mcp-use/inspector)
+│   └── create-mcp-use-app/  # Project scaffolding CLI
+```
+
+**How the monorepo works:**
+
+- All packages share the same `node_modules` at the workspace root (efficient disk usage)
+- Packages can depend on each other using `workspace:*` protocol
+- Running `pnpm install` at the root installs dependencies for all packages
+- Running `pnpm build` builds packages in the correct dependency order (`mcp-use` first, then others)
+
+### Setup
 
 ```bash
-# Format code
+# Navigate to the TypeScript library
 cd libraries/typescript
+
+# Install dependencies for all packages
+pnpm install
+
+# Build all packages (mcp-use first, then others in parallel)
+pnpm build
+```
+
+### Working with Packages
+
+Use `pnpm --filter` to run commands in specific packages:
+
+```bash
+# Build only the core library
+pnpm --filter mcp-use build
+
+# Run tests in inspector package
+pnpm --filter @mcp-use/inspector test
+
+# Run a command in all packages
+pnpm run -r test
+```
+
+### Code Quality
+
+We use **ESLint** for linting and **Prettier** for formatting:
+
+```bash
+cd libraries/typescript
+
+# Check formatting
+pnpm format:check
+
+# Format code
 pnpm format
 
-# Lint code
+# Run linter
 pnpm lint
 
-# Type checking
-pnpm type-check
+# Fix lint issues
+pnpm lint:fix
 ```
 
-#### TypeScript Best Practices
+### Pre-commit Hooks (TypeScript)
 
-- Always define explicit types (avoid `any`)
-- Use interfaces for object shapes
-- Prefer `const` over `let` when possible
-- Use async/await over promises when appropriate
+The TypeScript library uses **Husky** + **lint-staged** for pre-commit hooks. When you run `pnpm install`, Husky is automatically set up via the `prepare` script.
 
-## Testing
-
-### Writing Tests
-
-#### Python Tests
-
-```python
-# Test file: tests/test_feature.py
-import pytest
-from mcp_use import Feature
-
-def test_feature_functionality():
-    """Test that feature works as expected."""
-    feature = Feature()
-    result = feature.do_something()
-    assert result == expected_value
-
-@pytest.mark.asyncio
-async def test_async_feature():
-    """Test async functionality."""
-    result = await async_feature()
-    assert result is not None
-
-@pytest.mark.slow
-def test_slow_operation():
-    """Test marked as slow for optional execution."""
-    # Long-running test code
-    pass
-
-@pytest.mark.integration
-async def test_integration_feature():
-    """Test marked as integration for network-dependent tests."""
-    # Integration test code
-    pass
-```
-
-**Test Organization:**
-
-- Add unit tests in `tests/unit/`
-- Add integration tests in `tests/integration/`
-- Mark slow or network-dependent tests with `@pytest.mark.slow` or `@pytest.mark.integration`
-- Aim for high test coverage of new code
-
-#### TypeScript Tests
-
-```typescript
-// Test file: __tests__/feature.test.ts
-import { describe, it, expect } from "vitest";
-import { Feature } from "../src/feature";
-
-describe("Feature", () => {
-  it("should work as expected", () => {
-    const feature = new Feature();
-    const result = feature.doSomething();
-    expect(result).toBe(expectedValue);
-  });
-
-  it("should handle async operations", async () => {
-    const result = await asyncFeature();
-    expect(result).toBeDefined();
-  });
-});
-```
+The hooks automatically run Prettier and ESLint on staged `.js`, `.jsx`, `.ts`, and `.tsx` files.
 
 ### Running Tests
 
 ```bash
-# Run all tests
-make test
-
-# Run Python tests with coverage
-cd libraries/python
-pytest --cov=mcp_use --cov-report=html
-
-# Run TypeScript tests with coverage
 cd libraries/typescript
-pnpm test --coverage
 
-# Run tests in watch mode
-make dev
+# Run all tests across all packages
+pnpm test
+
+# Run tests for specific package
+pnpm --filter mcp-use test
+pnpm --filter @mcp-use/inspector test
+pnpm --filter @mcp-use/cli test
+
+# Run unit tests only (mcp-use package)
+pnpm --filter mcp-use test:unit
+
+# Run agent integration tests (requires OPENAI_API_KEY)
+pnpm --filter mcp-use test:integration:agent
 ```
 
-## Documentation
+### Changesets
 
-### Documentation Standards
-
-- Write clear, concise documentation
-- Include code examples
-- Update relevant documentation when changing functionality
-- Add docstrings/JSDoc comments for all public APIs
-
-### Types of Documentation
-
-1. **API Documentation**: In-code documentation
-2. **User Guides**: How-to guides and tutorials
-3. **Examples**: Working example applications
-4. **README files**: Package and project overviews
-
-### Building Documentation
+**All TypeScript changes require a changeset** describing what changed. This is enforced in CI for PRs to `main`.
 
 ```bash
-# Python documentation (if using Sphinx)
-cd libraries/python/docs
-make html
-
-# TypeScript documentation (if using TypeDoc)
 cd libraries/typescript
-pnpm docs
+
+# Create a changeset
+pnpm changeset
 ```
+
+You'll be prompted to:
+1. Select which packages changed
+2. Choose the semver bump type (patch/minor/major)
+3. Write a summary of changes
+
+Commit the generated `.changeset/*.md` file with your changes.
+
+### TypeScript Coding Standards
+
+- Use TypeScript strict mode
+- Always define explicit types (avoid `any`)
+- Use interfaces for object shapes
+- Prefer `const` over `let`
+- Use async/await over raw promises
+
+---
 
 ## Pull Request Process
 
 ### 1. Create a Branch
 
-The `main` branch contains the latest stable code. Create feature or fix branches from `main`:
-
 ```bash
-# Create a feature branch
-git checkout -b feature/your-feature-name
+# Create a feature branch from main
+git checkout main
+git pull origin main
+git checkout -b feat/python/your-feature-name
+# or
+git checkout -b feat/typescript/your-feature-name
 
 # Or a fix branch
-git checkout -b fix/bug-description
+git checkout -b fix/python/bug-description
+# or
+git checkout -b fix/typescript/bug-description
 ```
 
 ### 2. Make Your Changes
 
 - Write clean, well-documented code
-- Follow the coding standards
-- Add or update tests
+- Follow the coding standards for the language
+- Add tests for new functionality
 - Update documentation if needed
 
 ### 3. Commit Your Changes
 
-Follow conventional commit format (recommended but not strictly enforced):
+We recommend (but don't strictly enforce) conventional commit format:
 
 ```bash
 # Format: <type>(<scope>): <subject>
@@ -355,126 +343,63 @@ git commit -m "fix(typescript): resolve memory leak in agent"
 git commit -m "docs: update installation instructions"
 ```
 
-Types:
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `test`: Test changes
-- `chore`: Build process or auxiliary tool changes
+### 4. Before Pushing
 
-**Note:** Try to keep your commit messages informational and descriptive of the changes made.
+**For Python changes:**
+```bash
+cd libraries/python
+ruff check .
+ruff format --check .
+pytest tests/unit
+```
 
-### 4. Push and Create PR
+**For TypeScript changes:**
+```bash
+cd libraries/typescript
+pnpm format:check
+pnpm lint
+pnpm build
+pnpm changeset  # Create a changeset if not done yet
+```
 
-Before pushing, ensure:
-
-- Your code passes all tests
-- Pre-commit hooks pass (for Python)
-- No linting errors remain
+### 5. Push and Create PR
 
 ```bash
 git push origin your-branch-name
 ```
 
-Then create a Pull Request on GitHub with:
-
+Create a Pull Request on GitHub with:
 - Clear title and description
-- Link to related issues
+- Link to related issues (use "Closes #123")
 - Screenshots/recordings for UI changes
-- Test results
 
-### 5. PR Review Process
+### CI Checks
 
-- PRs require at least one approval
-- Address all review comments
-- Keep PRs focused and atomic
-- Update your branch with main if needed
+PRs trigger automated checks:
 
-## Release Process
+**Python (runs if `libraries/python/**` changed):**
+- Linting (ruff check + format check)
+- Unit tests (Python 3.11 & 3.12, latest & minimum deps)
+- Transport tests (stdio, sse, streamable_http)
+- Primitive tests (tools, resources, prompts, etc.)
+- Agent tests (requires API keys)
 
-### Version Numbering
+**TypeScript (runs if `libraries/typescript/**` changed):**
+- Linting (ESLint)
+- Formatting (Prettier)
+- Build verification
+- Package tests
+- Changeset verification (PRs to main only)
 
-We follow [Semantic Versioning](https://semver.org/):
-
-- MAJOR.MINOR.PATCH (e.g., 2.1.3)
-- MAJOR: Breaking changes
-- MINOR: New features (backward compatible)
-- PATCH: Bug fixes (backward compatible)
-
-### Python Releases
-
-```bash
-# Update version in pyproject.toml
-# Update CHANGELOG.md
-# Create tag
-git tag python-v1.2.3
-git push origin python-v1.2.3
-```
-
-### TypeScript Releases
-
-TypeScript releases use [Changesets](https://github.com/changesets/changesets) for version management:
-
-#### For Main Branch (Stable Releases)
-
-```bash
-# 1. Create a changeset describing your changes
-cd libraries/typescript
-pnpm changeset
-
-# 2. Commit and push your changes with the changeset
-git add .
-git commit -m "feat: add new feature"
-git push
-
-# 3. When merged to main:
-#    - CI automatically creates/updates a "Version Packages" PR
-#    - Review and merge the Version PR to publish stable versions
-```
-
-#### For Canary Branch (Prereleases)
-
-```bash
-# 1. Create a changeset for your changes
-cd libraries/typescript
-pnpm changeset
-
-# 2. Push to canary branch
-git add .
-git commit -m "feat: experimental feature"
-git push origin canary
-
-# 3. CI automatically publishes as canary prerelease
-#    - Versions: x.y.z-canary.0, x.y.z-canary.1, etc.
-#    - Published with "canary" dist tag on npm
-```
-
-#### Installing Canary Versions
-
-Users can test canary releases by installing with the canary tag:
-
-```bash
-npm install mcp-use@canary
-npm install @mcp-use/cli@canary
-```
+---
 
 ## Getting Help
 
 - 💬 [GitHub Discussions](https://github.com/mcp-use/mcp-use/discussions) - Ask questions and share ideas
 - 🐛 [GitHub Issues](https://github.com/mcp-use/mcp-use/issues) - Report bugs and request features
-- 📧 Email: maintainers@mcp-use.com
-- 💼 [Discord](https://discord.gg/mcp-use) - Join our community
-
-## Recognition
-
-Contributors will be recognized in:
-
-- The project README
-- Release notes
-- Our website's contributors page
+- 💼 [Discord](https://discord.gg/XkNkSkMz3V) - Join our community
 
 ## License
 
@@ -482,4 +407,4 @@ By contributing, you agree that your contributions will be licensed under the sa
 
 ---
 
-Thank you for contributing to MCP-Use! Your efforts help make this project better for everyone. 🎉
+Thank you for contributing to mcp-use! 🎉

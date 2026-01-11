@@ -1,4 +1,7 @@
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import { useCallback, useRef, useState } from "react";
 import type { LLMConfig, Message } from "./types";
@@ -93,9 +96,8 @@ export function useChatMessagesClientSide({
               apiKey: llmConfig.apiKey,
             });
           } else if (llmConfig.provider === "google") {
-            const { ChatGoogleGenerativeAI } = await import(
-              "@langchain/google-genai"
-            );
+            const { ChatGoogleGenerativeAI } =
+              await import("@langchain/google-genai");
             llm = new ChatGoogleGenerativeAI({
               model: llmConfig.model,
               apiKey: llmConfig.apiKey,

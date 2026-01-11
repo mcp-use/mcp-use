@@ -1,11 +1,56 @@
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
-import chalk from "chalk";
-import { highlight } from "cli-highlight";
-import stripAnsiLib from "strip-ansi";
 
 /**
  * Helper functions for pretty-printing code mode tool executions
  */
+
+// Dynamically import optional display dependencies and Node.js built-ins
+let chalk: any = null;
+let highlight: any = null;
+let stripVTControlCharacters: ((str: string) => string) | null = null;
+let displayPackagesWarned = false;
+
+// Check if we're in a Node.js environment
+const isNode = typeof process !== "undefined" && process.versions?.node;
+
+(async () => {
+  // Load Node.js util for stripVTControlCharacters (Node.js only)
+  if (isNode) {
+    try {
+      const utilModule = await import("node:util");
+      stripVTControlCharacters = utilModule.stripVTControlCharacters;
+    } catch {
+      // node:util not available, will use plain text fallback
+    }
+  }
+
+  try {
+    const chalkModule = await import("chalk");
+    chalk = chalkModule.default;
+  } catch {
+    // chalk not available, will use plain text
+  }
+
+  try {
+    const cliHighlightModule = await import("cli-highlight");
+    highlight = cliHighlightModule.highlight;
+  } catch {
+    // cli-highlight not available, will use plain text
+  }
+
+  // Show warning if packages are missing (only once, and only in Node.js)
+  if (isNode && (!chalk || !highlight)) {
+    if (!displayPackagesWarned) {
+      displayPackagesWarned = true;
+      console.warn(
+        "\n✨ For enhanced console output with colors and syntax highlighting, install:\n\n" +
+          "  npm install chalk cli-highlight\n" +
+          "  # or\n" +
+          "  pnpm add chalk cli-highlight\n"
+      );
+    }
+  }
+})();
 
 const TERMINAL_WIDTH = process.stdout.columns || 120;
 
@@ -16,9 +61,42 @@ interface ExecuteCodeResult {
   execution_time: number;
 }
 
-// Remove ANSI color codes for length calculation using the strip-ansi library
+// Helper functions for optional chalk styling
+const chalkHelper = {
+  gray: (str: string) => chalk?.gray(str) ?? str,
+  bold: {
+    white: (str: string) => chalk?.bold?.white(str) ?? str,
+  },
+  bgGray: (str: string) => chalk?.bgGray(str) ?? str,
+  cyan: (str: string) => chalk?.cyan(str) ?? str,
+  dim: (str: string) => chalk?.dim(str) ?? str,
+  red: (str: string) => chalk?.red(str) ?? str,
+  green: (str: string) => chalk?.green(str) ?? str,
+};
+
+// Helper for optional syntax highlighting
+function highlightCode(content: string, language?: string): string {
+  if (!highlight) {
+    return content; // Plain text fallback
+  }
+  try {
+    return highlight(content, {
+      language: language ?? "javascript",
+      ignoreIllegals: true,
+    });
+  } catch {
+    return content; // Fallback on error
+  }
+}
+
+// Remove ANSI color codes for length calculation
 function stripAnsi(str: string): string {
-  return stripAnsiLib(str);
+  if (stripVTControlCharacters) {
+    return stripVTControlCharacters(str);
+  }
+  // Fallback: Simple regex to strip ANSI codes (for non-Node.js environments)
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
 // wrap lines correctly, preserving ANSI codes
@@ -75,7 +153,7 @@ export function printBox(
   let displayContent = content;
   if (language) {
     try {
-      displayContent = highlight(content, { language, ignoreIllegals: true });
+      displayContent = highlightCode(content, language);
     } catch {
       // Highlighting failed, use plain content
     }
@@ -85,32 +163,32 @@ export function printBox(
     .split("\n")
     .flatMap((line) => wrapAnsiLine(line, width - 4));
 
-  console.log(chalk.gray("┌" + "─".repeat(width - 2) + "┐"));
+  console.log(chalkHelper.gray("┌" + "─".repeat(width - 2) + "┐"));
 
   if (title) {
     const stripped = stripAnsi(title);
     const lineText = `${title} `;
     const padding = Math.max(0, width - 4 - stripped.length - 2);
     console.log(
-      chalk.gray("│ ") +
-        chalk.bold.white(lineText) +
+      chalkHelper.gray("│ ") +
+        chalkHelper.bold.white(lineText) +
         " ".repeat(padding) +
-        chalk.gray(" │")
+        chalkHelper.gray(" │")
     );
-    console.log(chalk.gray("├" + "─".repeat(width - 2) + "┤"));
+    console.log(chalkHelper.gray("├" + "─".repeat(width - 2) + "┤"));
   }
 
   lines.forEach((line) => {
     const stripped = stripAnsi(line);
     const padding = Math.max(0, width - 4 - stripped.length);
     const finalLine = bgColor
-      ? chalk.bgGray(line + " ".repeat(padding))
+      ? chalkHelper.bgGray(line + " ".repeat(padding))
       : line + " ".repeat(padding);
 
-    console.log(chalk.gray("│ ") + finalLine + chalk.gray(" │"));
+    console.log(chalkHelper.gray("│ ") + finalLine + chalkHelper.gray(" │"));
   });
 
-  console.log(chalk.gray("└" + "─".repeat(width - 2) + "┘"));
+  console.log(chalkHelper.gray("└" + "─".repeat(width - 2) + "┘"));
 }
 
 /**
@@ -344,7 +422,7 @@ export function formatSearchToolsAsTree(
     const serverPrefix = isLastServer ? "└─" : "├─";
 
     lines.push(
-      `${serverPrefix} ${chalk.cyan(server)} (${serverTools.length} tools)`
+      `${serverPrefix} ${chalkHelper.cyan(server)} (${serverTools.length} tools)`
     );
 
     // Add tools under this server
@@ -393,7 +471,7 @@ export function formatSearchToolsAsTree(
 
         // Add indent and dim styling to each line
         for (const descLine of wrappedLines) {
-          lines.push(`${descriptionIndent}${chalk.dim(descLine)}`);
+          lines.push(`${descriptionIndent}${chalkHelper.dim(descLine)}`);
         }
       }
     }
@@ -445,8 +523,8 @@ export function handleToolEnd(event: StreamEvent) {
           execResult.error !== undefined &&
           execResult.error !== "";
         const statusText = isError
-          ? chalk.red("error")
-          : chalk.green("success");
+          ? chalkHelper.red("error")
+          : chalkHelper.green("success");
         const title = `${toolName} - ${statusText} - ${timeStr}`;
 
         // Only show the result, not the full object
@@ -464,7 +542,12 @@ export function handleToolEnd(event: StreamEvent) {
         }
 
         if (execResult.error) {
-          printBox(execResult.error, chalk.red("Error"), undefined, false);
+          printBox(
+            execResult.error,
+            chalkHelper.red("Error"),
+            undefined,
+            false
+          );
         }
         return;
       }
@@ -572,9 +655,9 @@ export function handleToolEnd(event: StreamEvent) {
     // Create title with tool name
     const statusLabel =
       status === "success"
-        ? chalk.green("Success")
+        ? chalkHelper.green("Success")
         : isError
-          ? chalk.red("Error")
+          ? chalkHelper.red("Error")
           : "Result";
     const title = `${statusLabel}: ${toolName} - Result`;
 
@@ -602,7 +685,7 @@ export function handleToolEnd(event: StreamEvent) {
     }
 
     if (execResult.error) {
-      printBox(execResult.error, chalk.red("Error"), undefined, false);
+      printBox(execResult.error, chalkHelper.red("Error"), undefined, false);
     }
     return;
   }

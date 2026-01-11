@@ -1,11 +1,11 @@
 "use client";
 
-import { Eye, EyeOff, FileText, Plus, Trash2 } from "lucide-react";
-import React, { useCallback, useRef, useState } from "react";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { cn } from "@/client/lib/utils";
+import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import React, { useCallback, useState } from "react";
 
 export interface EnvVariable {
   key: string;
@@ -35,7 +35,6 @@ export function EnvVariablesEditor({
   maxVariables = 100,
 }: EnvVariablesEditorProps) {
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Generate unique ID for new variables
   const generateId = () => Math.random().toString(36).slice(2, 11);
@@ -139,29 +138,6 @@ export function EnvVariablesEditor({
         }
       }
     }
-  };
-
-  // Handle file import
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      const parsed = parseEnvContent(content);
-
-      if (parsed.length > 0) {
-        // Merge with existing variables, avoiding duplicates
-        const existingKeys = new Set(variables.map((v) => v.key));
-        const newVariables = parsed.filter((v) => !existingKeys.has(v.key));
-
-        if (newVariables.length > 0) {
-          onChange([...variables, ...newVariables]);
-        }
-      }
-    };
-    reader.readAsText(file);
   };
 
   return (
@@ -302,27 +278,8 @@ export function EnvVariablesEditor({
           </Button>
           {showImportSection && (
             <div className="flex items-center gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2"
-              >
-                <FileText className="h-4 w-4" />
-                Import .env
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".env,.env.local,.env.production,.env.development"
-                onChange={handleFileImport}
-                className="hidden"
-                aria-label="Import .env file"
-                title="Import .env file"
-              />
               <span className="text-sm text-muted-foreground">
-                or paste the .env contents above
+                Paste the .env contents above to autofill
               </span>
             </div>
           )}

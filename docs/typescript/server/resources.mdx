@@ -4,9 +4,11 @@ description: "Managing static and dynamic resources in MCP servers"
 icon: "folder-open"
 ---
 
-# Resources
-
 Resources in MCP provide a way to expose data, files, and content that clients can discover and read. Unlike tools which execute functions, resources represent accessible content with URIs.
+
+<Tip>
+**Response Helpers**: This guide uses response helpers like `text()`, `object()`, and `markdown()` for cleaner resource implementations. See [Response Helpers](./response-helpers) for the complete reference.
+</Tip>
 
 ## Understanding Resources
 
@@ -16,13 +18,31 @@ Resources are:
 - **Typed**: Each resource has a MIME type
 - **Annotated**: Metadata helps clients understand resource purpose
 
-## Resource Types
+## Resources
 
-### Static Resources
+Fixed content that doesn't change based on parameters. Use response helpers for cleaner code:
 
-Fixed content that doesn't change based on parameters:
+<CodeGroup>
 
-```typescript
+```typescript Helper
+import { object } from 'mcp-use/server';
+
+server.resource(
+  {
+    name: 'app_config',
+    uri: 'config://application',
+    title: 'Application Configuration',
+    description: 'Current application settings'
+  },
+  async () => object({
+    version: '1.0.0',
+    environment: 'production',
+    features: ['auth', 'api', 'ui']
+  })
+)
+```
+
+```typescript Expanded
 server.resource({
   name: 'app_config',
   uri: 'config://application',
@@ -43,65 +63,34 @@ server.resource({
 })
 ```
 
-### Dynamic Resource Templates
+</CodeGroup>
+
+You can use any mime type you want.
+To help you defining resources, you can use the response helpers to create the resource content.
+Here are some of the helpers you can use:
+
+```typescript
+import { 
+  text, markdown, html, xml, css, javascript, object, array,
+  image, audio, binary, mix, 
+} from 'mcp-use/server';
+```
+
+## Resource Templates
 
 Resources with parameterized URIs for dynamic content:
 
 ```typescript
 server.resourceTemplate({
   name: 'user_data',
-  resourceTemplate: {
-    uriTemplate: 'user://{userId}/data',
-    name: 'User Data',
-    description: 'Data for a specific user',
-    mimeType: 'application/json'
-  },
-  readCallback: async (uri, params) => {
-    const userData = await fetchUserData(params.userId)
-    return {
-      contents: [{
-        uri: uri.toString(),
-        mimeType: 'application/json',
-        text: JSON.stringify(userData, null, 2)
-      }]
-    }
-  }
+  uriTemplate: 'user://{userId}/name',
+}, async (uri, { userId }) => {
+  
+  // userId is automatically extracted from the URI and typed
+  const userData = await fetchUserData(userId)
+  return text(`User name: ${userData.name}`)
+
 })
-```
-
-## URI Schemes
-
-Choose meaningful URI schemes for your resources:
-
-```typescript
-// Configuration resources
-'config://database'
-'config://api-keys'
-
-// File resources
-'file:///path/to/document.pdf'
-'file://relative/path.txt'
-
-// Custom schemes
-'weather://current/new-york'
-'inventory://products/12345'
-'docs://api/authentication'
-```
-
-## MIME Types
-
-Specify appropriate MIME types for content:
-
-```typescript
-// Common MIME types
-'text/plain'           // Plain text
-'text/html'           // HTML content
-'text/markdown'       // Markdown documents
-'application/json'    // JSON data
-'application/xml'     // XML data
-'image/png'          // PNG images
-'image/jpeg'         // JPEG images
-'application/pdf'    // PDF documents
 ```
 
 ## Resource Annotations
@@ -110,9 +99,7 @@ Provide metadata to help clients use resources effectively:
 
 ```typescript
 server.resource({
-  name: 'user_manual',
-  uri: 'docs://manual',
-  mimeType: 'text/markdown',
+  ...
   annotations: {
     // Target audience
     audience: ['user'],  // 'user' or 'assistant'
@@ -122,107 +109,52 @@ server.resource({
 
     // Last modified timestamp
     lastModified: new Date().toISOString()
-  },
-  readCallback: async () => ({
-    contents: [{
-      uri: 'docs://manual',
-      mimeType: 'text/markdown',
-      text: '# User Manual\n\n...'
-    }]
-  })
-})
-```
-
-## Implementing Resources
-
-### Text Resources
-
-Simple text-based content:
-
-```typescript
-server.resource({
-  name: 'readme',
-  uri: 'docs://readme',
-  title: 'README',
-  mimeType: 'text/markdown',
-  readCallback: async () => {
-    const readme = await fs.readFile('README.md', 'utf-8')
-    return {
-      contents: [{
-        uri: 'docs://readme',
-        mimeType: 'text/markdown',
-        text: readme
-      }]
-    }
   }
-})
+},
+  async () => { ... }
+)
 ```
 
-### JSON Resources
+<Tip>
+Learn more about resource annotations in the [MCP resources specification](https://modelcontextprotocol.io/specification/2025-06-18/server/resources#annotations).
+</Tip>
 
-Structured data resources:
 
-```typescript
-server.resource({
-  name: 'api_stats',
-  uri: 'stats://api',
-  title: 'API Statistics',
-  mimeType: 'application/json',
-  readCallback: async () => {
-    const stats = {
-      requests: await getRequestCount(),
-      errors: await getErrorCount(),
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString()
-    }
-
-    return {
-      contents: [{
-        uri: 'stats://api',
-        mimeType: 'application/json',
-        text: JSON.stringify(stats, null, 2)
-      }]
-    }
-  }
-})
-```
-
-### Binary Resources
-
-Resources with binary content:
-
-```typescript
-server.resource({
-  name: 'logo',
-  uri: 'assets://logo.png',
-  title: 'Company Logo',
-  mimeType: 'image/png',
-  readCallback: async () => {
-    const imageBuffer = await fs.readFile('assets/logo.png')
-    const base64 = imageBuffer.toString('base64')
-
-    return {
-      contents: [{
-        uri: 'assets://logo.png',
-        mimeType: 'image/png',
-        blob: base64  // Use blob for binary data
-      }]
-    }
-  }
-})
-```
-
-### Multiple Content Items
+## Multiple Content Items
 
 Resources can return multiple content items:
 
-```typescript
+<CodeGroup>
+```typescript Helper
+server.resource(
+  {
+    name: 'report_bundle',
+    uri: 'reports://latest',
+    title: 'Latest Reports Bundle'
+  },
+  async () => {
+    const reportData = await getReportData();
+    const chartImage = await generateChart(reportData);
+
+    return mix(
+      text('Executive Summary...'),
+      object(reportData),
+      image(chartImage, 'image/png')
+    );
+  }
+)
+```
+
+```typescript Expanded
 server.resource({
   name: 'report_bundle',
   uri: 'reports://latest',
   title: 'Latest Reports Bundle',
   mimeType: 'multipart/mixed',
   readCallback: async () => {
+    const reportData = await getReportData();
+    const chartImage = await generateChart(reportData);
+
     return {
       contents: [
         {
@@ -233,12 +165,12 @@ server.resource({
         {
           uri: 'reports://latest/data',
           mimeType: 'application/json',
-          text: JSON.stringify({ /* data */ })
+          text: JSON.stringify(reportData, null, 2)
         },
         {
           uri: 'reports://latest/chart',
           mimeType: 'image/png',
-          blob: chartImageBase64
+          blob: chartImage
         }
       ]
     }
@@ -246,291 +178,77 @@ server.resource({
 })
 ```
 
-## Dynamic Resource Templates
+</CodeGroup>
 
-### Basic Template
 
-Templates with single parameter:
+## Callback Signature Variations
 
-```typescript
-server.resourceTemplate({
-  name: 'document',
-  resourceTemplate: {
-    uriTemplate: 'docs://{docId}',
-    name: 'Document',
-    mimeType: 'text/markdown'
-  },
-  readCallback: async (uri, params) => {
-    const doc = await getDocument(params.docId)
-    return {
-      contents: [{
-        uri: uri.toString(),
-        mimeType: 'text/markdown',
-        text: doc.content
-      }]
-    }
-  }
-})
-```
-
-### Multiple Parameters
-
-Templates with multiple parameters:
+Resource templates support multiple callback signatures. Use the simplest one that meets your needs:
 
 ```typescript
-server.resourceTemplate({
-  name: 'project_file',
-  resourceTemplate: {
-    uriTemplate: 'project://{projectId}/files/{filename}',
-    name: 'Project File',
-    mimeType: 'text/plain'
-  },
-  readCallback: async (uri, params) => {
-    // params will contain: { projectId: "...", filename: "..." }
-    const file = await getProjectFile(params.projectId, params.filename)
-    return {
-      contents: [{
-        uri: uri.toString(),
-        mimeType: getMimeType(params.filename),
-        text: file.content
-      }]
-    }
-  }
-})
-```
+import { text, object } from 'mcp-use/server';
 
-### Dynamic MIME Types
-
-Determine MIME type based on content:
-
-```typescript
-server.resourceTemplate({
-  name: 'file',
-  resourceTemplate: {
-    uriTemplate: 'file://{path}',
-    name: 'File',
-    // Don't specify mimeType here
-  },
-  readCallback: async (uri, params) => {
-    const filePath = params.path
-    const content = await fs.readFile(filePath)
-    const mimeType = getMimeTypeFromPath(filePath)
-
-    return {
-      contents: [{
-        uri: uri.toString(),
-        mimeType,
-        text: content.toString('utf-8')
-      }]
-    }
-  }
-})
-```
-
-## Advanced Patterns
-
-### Caching Resources
-
-Implement caching for expensive operations:
-
-```typescript
-const resourceCache = new Map()
-
+// No parameters - for static templates
 server.resource({
-  name: 'expensive_data',
-  uri: 'data://expensive',
-  mimeType: 'application/json',
-  readCallback: async () => {
-    const cacheKey = 'expensive_data'
-    const cached = resourceCache.get(cacheKey)
+    name: 'welcome',
+    uri: 'app://welcome'
+  }, async () => text('Welcome to our API!')
+)
 
-    // Return cached if fresh (5 minutes)
-    if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) {
-      return cached.data
-    }
-
-    // Generate new data
-    const data = await generateExpensiveData()
-    const result = {
-      contents: [{
-        uri: 'data://expensive',
-        mimeType: 'application/json',
-        text: JSON.stringify(data)
-      }]
-    }
-
-    // Cache the result
-    resourceCache.set(cacheKey, {
-      timestamp: Date.now(),
-      data: result
-    })
-
-    return result
-  }
-})
-```
-
-### Streaming Large Resources
-
-For large resources, consider chunking:
-
-```typescript
-server.resourceTemplate({
-  name: 'large_file',
-  resourceTemplate: {
-    uriTemplate: 'file://{path}?chunk={chunk}',
-    name: 'Large File Chunk'
-  },
-  readCallback: async (uri, params) => {
-    const CHUNK_SIZE = 1024 * 1024 // 1MB chunks
-    const chunkNum = parseInt(params.chunk || '0')
-    const offset = chunkNum * CHUNK_SIZE
-
-    const fileHandle = await fs.open(params.path, 'r')
-    const buffer = Buffer.alloc(CHUNK_SIZE)
-    const { bytesRead } = await fileHandle.read(buffer, 0, CHUNK_SIZE, offset)
-    await fileHandle.close()
-
-    return {
-      contents: [{
-        uri: uri.toString(),
-        mimeType: 'application/octet-stream',
-        blob: buffer.slice(0, bytesRead).toString('base64')
-      }]
-    }
-  }
-})
-```
-
-### Computed Resources
-
-Resources that aggregate or compute data:
-
-```typescript
+// Just URI - when you need the full URI
 server.resource({
-  name: 'system_health',
-  uri: 'health://system',
-  title: 'System Health Report',
-  mimeType: 'application/json',
-  readCallback: async () => {
-    // Gather data from multiple sources
-    const [cpu, memory, disk, services] = await Promise.all([
-      getCPUUsage(),
-      getMemoryUsage(),
-      getDiskUsage(),
-      getServiceStatuses()
-    ])
+    name: 'echo',
+    uri: 'echo://{path}'
+  }, async (uri) => text(`You requested: ${uri.toString()}`)
+)
 
-    const health = {
-      timestamp: new Date().toISOString(),
-      status: determineOverallStatus(cpu, memory, disk, services),
-      metrics: { cpu, memory, disk },
-      services
-    }
-
-    return {
-      contents: [{
-        uri: 'health://system',
-        mimeType: 'application/json',
-        text: JSON.stringify(health, null, 2)
-      }]
-    }
-  }
-})
-```
-
-### Resource Versioning
-
-Support multiple versions of resources:
-
-```typescript
+// URI and params - most common pattern
 server.resourceTemplate({
-  name: 'api_spec',
-  resourceTemplate: {
-    uriTemplate: 'api://spec/v{version}',
-    name: 'API Specification',
-    mimeType: 'application/json'
+    name: 'user',
+    uriTemplate: 'user://{userId}'
   },
-  readCallback: async (uri, params) => {
-    const version = params.version
-    const specFile = `specs/api-v${version}.json`
-
-    try {
-      const spec = await fs.readFile(specFile, 'utf-8')
-      return {
-        contents: [{
-          uri: uri.toString(),
-          mimeType: 'application/json',
-          text: spec
-        }]
-      }
-    } catch (error) {
-      return {
-        contents: [{
-          uri: uri.toString(),
-          mimeType: 'text/plain',
-          text: `API specification version ${version} not found`
-        }]
-      }
-    }
+  async (uri, { userId }) => {
+    const user = await fetchUser(userId);
+    return object(user);
   }
-})
+)
+
+// With context - for auth or request access
+server.resourceTemplate(
+  {
+    name: 'private',
+    resourceTemplate: { uriTemplate: 'private://{id}' }
+  },
+  async (uri, { id }, ctx) => {
+    // Access authenticated user
+    const user = ctx.auth;
+    const data = await getPrivateData(id, user);
+    return object(data);
+  }
+)
 ```
 
-## Error Handling
 
-Handle errors gracefully in resource callbacks:
+## Notifying Clients of Resource Changes
+
+When dynamically adding or removing resources, notify clients to refresh their resources cache:
 
 ```typescript
+// Register a new resource dynamically
 server.resource({
-  name: 'database_schema',
-  uri: 'db://schema',
-  mimeType: 'application/json',
-  readCallback: async () => {
-    try {
-      const schema = await fetchDatabaseSchema()
-      return {
-        contents: [{
-          uri: 'db://schema',
-          mimeType: 'application/json',
-          text: JSON.stringify(schema, null, 2)
-        }]
-      }
-    } catch (error) {
-      // Return error as plain text
-      return {
-        contents: [{
-          uri: 'db://schema',
-          mimeType: 'text/plain',
-          text: `Error fetching database schema: ${error.message}`
-        }]
-      }
-    }
-  }
-})
+  name: 'new_resource',
+  uri: 'app://new',
+  description: 'A dynamically added resource'
+}, async () => text('New resource content'));
+
+// Notify all connected clients
+await server.sendResourcesListChanged();
 ```
 
-## Testing Resources
+See [Notifications](./notifications) for more details.
 
-### Unit Testing
 
-```typescript
-import { describe, it, expect } from 'vitest'
-
-describe('Config Resource', () => {
-  it('should return valid JSON configuration', async () => {
-    const result = await configResource.readCallback()
-
-    expect(result.contents).toHaveLength(1)
-    expect(result.contents[0].mimeType).toBe('application/json')
-
-    const config = JSON.parse(result.contents[0].text)
-    expect(config).toHaveProperty('version')
-  })
-})
-```
-
-### Testing with Inspector
+### Testing 
 
 1. Start server with inspector
 2. Navigate to Resources tab
@@ -538,94 +256,18 @@ describe('Config Resource', () => {
 4. Click to read resource content
 5. Verify content and MIME type
 
-## Best Practices
+---
 
-1. **Clear URI Schemes**: Use intuitive, consistent URI patterns
-2. **Appropriate MIME Types**: Always specify correct MIME types
-3. **Useful Annotations**: Provide audience and priority metadata
-4. **Error Handling**: Return errors as content, not exceptions
-5. **Caching**: Cache expensive resources appropriately
-6. **Documentation**: Document resource URIs and expected content
-7. **Versioning**: Support versioning for evolving resources
-8. **Validation**: Validate parameters in template callbacks
 
-## Common Patterns
+<Tip>
+You can read more about resources in the [MCP resources specification](https://modelcontextprotocol.io/specification/2025-06-18/server/resources).
+</Tip>
 
-### Configuration Resources
 
-```typescript
-// Environment-specific config
-server.resource({
-  name: 'env_config',
-  uri: `config://${process.env.NODE_ENV}`,
-  mimeType: 'application/json',
-  readCallback: async () => {
-    const config = await loadConfigForEnv(process.env.NODE_ENV)
-    return {
-      contents: [{
-        uri: `config://${process.env.NODE_ENV}`,
-        mimeType: 'application/json',
-        text: JSON.stringify(config, null, 2)
-      }]
-    }
-  }
-})
-```
-
-### Documentation Resources
-
-```typescript
-// API documentation
-server.resource({
-  name: 'api_docs',
-  uri: 'docs://api',
-  title: 'API Documentation',
-  mimeType: 'text/html',
-  annotations: {
-    audience: ['user', 'assistant'],
-    priority: 1.0
-  },
-  readCallback: async () => {
-    const html = await generateAPIDocsHTML()
-    return {
-      contents: [{
-        uri: 'docs://api',
-        mimeType: 'text/html',
-        text: html
-      }]
-    }
-  }
-})
-```
-
-### Status Resources
-
-```typescript
-// Service status
-server.resource({
-  name: 'service_status',
-  uri: 'status://services',
-  mimeType: 'application/json',
-  annotations: {
-    priority: 0.8,
-    lastModified: new Date().toISOString()
-  },
-  readCallback: async () => {
-    const statuses = await checkAllServices()
-    return {
-      contents: [{
-        uri: 'status://services',
-        mimeType: 'application/json',
-        text: JSON.stringify(statuses, null, 2)
-      }]
-    }
-  }
-})
-```
 
 ## Next Steps
 
-- [UI Widgets](./ui-widgets) - Creating interactive UI components
+- [Response Helpers](./response-helpers) - Utility functions for creating responses
 - [Tools Guide](./tools) - Building executable tools
-- [API Reference](./api-reference) - Complete API documentation
-- [Examples](./examples) - Real-world resource implementations
+- [UI Widgets](./ui-widgets) - Creating interactive UI components
+- [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) - Real-world resource implementations

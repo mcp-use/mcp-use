@@ -1,4 +1,15 @@
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/client/components/ui/resizable";
+import { useInspector } from "@/client/context/InspectorContext";
+import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -7,25 +18,14 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
-import type { ResourceResult } from "./resources";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/client/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { useInspector } from "@/client/context/InspectorContext";
-import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
+import type { ResourceResult } from "./resources";
 import {
   ResourceResultDisplay,
   ResourcesList,
   ResourcesTabHeader,
 } from "./resources";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -39,6 +39,16 @@ interface ResourcesTabProps {
   isConnected: boolean;
 }
 
+/**
+ * Render the Resources tab UI and manage its interactions (resource list, selection, result display, search, keyboard navigation, mobile/desktop layouts, copy/download/fullscreen actions, and RPC logger).
+ *
+ * @param ref - Optional ref exposing `focusSearch()` and `blurSearch()` methods for programmatic search focus control.
+ * @param resources - Array of resources to show and filter.
+ * @param readResource - Function to read a resource by its URI; used when a resource is selected.
+ * @param serverId - Identifier for the server; used for telemetry and RPC logger scope.
+ * @param isConnected - When `true`, selecting a resource triggers `readResource`; when `false`, reads are skipped.
+ * @returns The ResourcesTab React element.
+ */
 export function ResourcesTab({
   ref,
   resources,
@@ -182,7 +192,10 @@ export function ResourcesTab({
 
           setCurrentResult({
             uri: resource.uri,
-            result: null,
+            result: {
+              contents: [],
+              _meta: {},
+            },
             error: error instanceof Error ? error.message : "Unknown error",
             timestamp,
             resourceAnnotations: resource.annotations as Record<string, any>,
@@ -438,21 +451,21 @@ export function ResourcesTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <ResourcesTabHeader
-              activeTab={activeTab}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredResourcesCount={filteredResources.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onTabSwitch={() => {}}
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <ResourcesTabHeader
+                activeTab={activeTab}
+                isSearchExpanded={isSearchExpanded}
+                searchQuery={searchQuery}
+                filteredResourcesCount={filteredResources.length}
+                onSearchExpand={() => setIsSearchExpanded(true)}
+                onSearchChange={setSearchQuery}
+                onSearchBlur={handleSearchBlur}
+                onTabSwitch={() => {}}
+                searchInputRef={
+                  searchInputRef as React.RefObject<HTMLInputElement>
+                }
+              />
 
-            <div className="flex flex-col h-full">
               <ResourcesList
                 resources={filteredResources}
                 selectedResource={selectedResource}
@@ -469,7 +482,10 @@ export function ResourcesTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={6}
+            collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => setRpcPanelCollapsed(true)}
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"
@@ -520,15 +536,15 @@ export function ResourcesTab({
                 }`}
               />
             </div>
-            {!rpcPanelCollapsed && (
-              <div className="flex-1 overflow-hidden min-h-0">
-                <JsonRpcLoggerView
-                  serverIds={[serverId]}
-                  onCountChange={setRpcMessageCount}
-                  onClearRef={clearRpcMessagesRef}
-                />
-              </div>
-            )}
+            <div
+              className={`flex-1 overflow-hidden min-h-0 ${rpcPanelCollapsed ? "hidden" : ""}`}
+            >
+              <JsonRpcLoggerView
+                serverIds={[serverId]}
+                onCountChange={setRpcMessageCount}
+                onClearRef={clearRpcMessagesRef}
+              />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>

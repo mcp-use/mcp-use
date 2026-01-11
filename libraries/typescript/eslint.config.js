@@ -14,7 +14,6 @@ export default [
       "**/coverage/**",
       "**/*.min.js",
       "**/.turbo/**",
-      "**/.vercel/**",
       "**/.tsup/**",
       "packages/*/dist/**",
       "packages/*/build/**",
@@ -88,6 +87,14 @@ export default [
         HTMLTextAreaElement: "readonly",
         HTMLIFrameElement: "readonly",
         HTMLElement: "readonly",
+        HTMLParagraphElement: "readonly",
+        HTMLHeadingElement: "readonly",
+        HTMLTableElement: "readonly",
+        HTMLTableSectionElement: "readonly",
+        HTMLTableRowElement: "readonly",
+        HTMLTableCellElement: "readonly",
+        HTMLTableCaptionElement: "readonly",
+        SVGSVGElement: "readonly",
         // Browser APIs
         MessageEvent: "readonly",
         MutationObserver: "readonly",
@@ -221,6 +228,7 @@ export default [
     rules: {
       ...eslint.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
+      "no-undef": "off", // TypeScript handles undefined checks
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",

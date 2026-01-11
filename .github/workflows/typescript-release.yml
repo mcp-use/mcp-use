@@ -110,6 +110,154 @@ jobs:
           pnpm changeset publish
           echo "✅ Published canary packages to npm using trusted publishing"
 
+      - name: Tag + push tags (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          
+          # Ensure we're on the latest commit (commits were pushed in previous step)
+          git fetch --tags --force
+          git pull origin canary
+          
+          cd libraries/typescript
+          pnpm changeset tag
+          cd ../..
+
+          NEW_TAGS=$(git tag --points-at HEAD)
+          if [ -z "$NEW_TAGS" ]; then
+            echo "ℹ️  No tags were created by changeset tag"
+            exit 0
+          fi
+
+          echo "📦 Tags created: $NEW_TAGS"
+          echo "$NEW_TAGS" > .release-tags
+
+          # Push tags (commits were already pushed in the "Version packages" step)
+          git push --tags
+          echo "✅ Pushed tags"
+
+      - name: Create GitHub Releases (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        uses: actions/github-script@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+
+            const tagsFile = path.join(process.env.GITHUB_WORKSPACE, '.release-tags')
+            if (!fs.existsSync(tagsFile)) {
+              core.info(`No tags file found at ${tagsFile}`)
+              return
+            }
+
+            const tags = fs.readFileSync(tagsFile, 'utf8').trim().split(/\s+/).filter(Boolean)
+            if (!tags.length) {
+              core.info('Tags file is empty')
+              return
+            }
+
+            const isPrerelease = context.ref === 'refs/heads/canary'
+            core.info(`Creating GitHub releases for tags: ${tags.join(', ')} (prerelease=${isPrerelease})`)
+
+            function parseTag(tag) {
+              // Tag formats:
+              // - @scope/package@version
+              // - package@version
+              const atIndex = tag.lastIndexOf('@')
+              if (atIndex <= 0) return null
+              const pkg = tag.slice(0, atIndex)
+              const version = tag.slice(atIndex + 1)
+              const pkgDir = pkg.startsWith('@') ? pkg.split('/').slice(1).join('/') : pkg
+              return { pkg, version, pkgDir }
+            }
+
+            function extractChangelogSection(changelog, version) {
+              // Mimics the old awk: get content after "## <version...>" until next "## "
+              const lines = changelog.split(/\r?\n/)
+              let found = false
+              const out = []
+              for (const line of lines) {
+                if (line.startsWith('## ')) {
+                  if (found) break
+                  if (line.includes(version)) {
+                    found = true
+                    continue
+                  }
+                }
+                if (found) out.push(line)
+              }
+              const body = out.join('\n').trim()
+              return body.length ? body : null
+            }
+
+            for (const tag of tags) {
+              core.info(`\nProcessing tag: ${tag}`)
+              const parsed = parseTag(tag)
+              if (!parsed) {
+                core.warning(`Could not parse tag: ${tag}`)
+                continue
+              }
+
+              // Skip if release exists
+              try {
+                await github.rest.repos.getReleaseByTag({ owner, repo, tag })
+                core.info(`Release already exists for ${tag}, skipping`)
+                continue
+              } catch (e) {
+                if (e.status !== 404) throw e
+              }
+
+              const changelogFile = path.join(process.env.GITHUB_WORKSPACE, 'libraries', 'typescript', 'packages', parsed.pkgDir, 'CHANGELOG.md')
+              let notes = `Release ${parsed.version} of ${parsed.pkg}`
+
+              if (fs.existsSync(changelogFile)) {
+                const changelog = fs.readFileSync(changelogFile, 'utf8')
+                const section = extractChangelogSection(changelog, parsed.version)
+                if (section) {
+                  notes = section
+                } else {
+                  core.info(`No changelog entry found for version ${parsed.version} in ${changelogFile}`)
+                }
+              } else {
+                core.info(`No CHANGELOG.md found at ${changelogFile}`)
+              }
+
+              const name = `${parsed.pkg} ${parsed.version}`
+              const make_latest = (!isPrerelease && parsed.pkg === 'mcp-use') ? 'true' : 'false'
+
+              await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                name,
+                body: notes,
+                prerelease: isPrerelease,
+                make_latest,
+              })
+
+              core.info(`Created release for ${tag}`)
+            }
+
+      - name: Create deployment marker (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        run: |
+          echo "packages_published=true" > .railway-deploy-marker
+          echo "branch=canary" >> .railway-deploy-marker
+
+      - name: Upload deployment marker (Canary)
+        if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: railway-deploy-marker
+          path: .railway-deploy-marker
+          retention-days: 1
+
       # ============================================================================
       # MAIN BRANCH: Stable release workflow
       # ============================================================================
@@ -198,21 +346,64 @@ jobs:
 
       - name: Publish packages (Main)
         if: github.ref == 'refs/heads/main' &&
-            github.event_name == 'push' &&
             steps.check-prerelease.outputs.in_prerelease == 'false' &&
             steps.check-release.outputs.should_publish == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e  # Exit immediately if any command fails
+          
+          # Ensure we're on the latest commit and have all remote refs
+          git fetch --tags --force
+          git checkout main
+          git pull origin main
+          
           # Publish to npm using trusted publishing (OIDC) - no token needed
           cd libraries/typescript
           pnpm changeset publish
+          pnpm changeset tag
 
-          # Push git tags from repo root
+          # Capture new tags created by changeset before pushing
           cd ../..
-          git push --follow-tags
+          NEW_TAGS=$(git tag --points-at HEAD)
+          
+          if [ -z "$NEW_TAGS" ]; then
+            echo "⚠️  No tags were created by changeset tag"
+            exit 0
+          fi
+          
+          echo "📦 Tags created: $NEW_TAGS"
+
+          # Save tags to a file for the next step
+          echo "$NEW_TAGS" > .release-tags
+
+          # Push git tags - fail immediately if this doesn't work
+          # Note: Commits should already be pushed from the prerelease exit step
+          if ! git push --tags; then
+            echo "❌ Failed to push tags to remote (git push --tags)"
+            rm -f .release-tags  # Clean up tags file since push failed
+            exit 1
+          fi
 
           echo "✅ Published packages to npm using trusted publishing and pushed tags"
+
+      - name: Create deployment marker (Main)
+        if: github.ref == 'refs/heads/main' &&
+            steps.check-prerelease.outputs.in_prerelease == 'false' &&
+            steps.check-release.outputs.should_publish == 'true'
+        run: |
+          echo "packages_published=true" > .railway-deploy-marker
+          echo "branch=main" >> .railway-deploy-marker
+
+      - name: Upload deployment marker (Main)
+        if: github.ref == 'refs/heads/main' &&
+            steps.check-prerelease.outputs.in_prerelease == 'false' &&
+            steps.check-release.outputs.should_publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: railway-deploy-marker
+          path: .railway-deploy-marker
+          retention-days: 1
 
       - name: Reset canary to main
         if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
@@ -237,77 +428,101 @@ jobs:
 
       - name: Create GitHub Release (Main)
         if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
+        uses: actions/github-script@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Fetch all tags
-          git fetch --tags
+        with:
+          script: |
+            const fs = require('fs')
+            const path = require('path')
+            const owner = context.repo.owner
+            const repo = context.repo.repo
 
-          # Get tags from the last commit (the publish commit creates tags)
-          TAGS=$(git tag --points-at HEAD)
+            const tagsFile = path.join(process.env.GITHUB_WORKSPACE, '.release-tags')
+            if (!fs.existsSync(tagsFile)) {
+              core.info(`No tags file found at ${tagsFile}`)
+              return
+            }
 
-          if [ -z "$TAGS" ]; then
-            echo "ℹ️  No tags found on current commit"
-            exit 0
-          fi
+            const tags = fs.readFileSync(tagsFile, 'utf8').trim().split(/\s+/).filter(Boolean)
+            if (!tags.length) {
+              core.info('Tags file is empty')
+              return
+            }
 
-          # Get the date for the release title
-          RELEASE_DATE=$(date +"%Y-%m-%d")
-          
-          # Generate release notes combining all packages
-          RELEASE_NOTES="# TypeScript Packages Release - $RELEASE_DATE"$'\n\n'
-          RELEASE_NOTES+="## 📦 Published Packages"$'\n\n'
-          
-          # Track the first/main tag for the release name
-          MAIN_TAG=""
-          
-          # Loop through all tags to build combined release notes
-          for TAG in $TAGS; do
-            if [ -z "$MAIN_TAG" ]; then
-              MAIN_TAG="$TAG"
-            fi
-            
-            echo "Processing $TAG..."
-            
-            # Extract package name and version
-            PACKAGE_NAME=$(echo "$TAG" | sed 's/@[0-9].*//')
-            VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*')
-            
-            # Add package header
-            RELEASE_NOTES+="### \`$TAG\`"$'\n\n'
-            
-            # Try to extract changelog for this version
-            CHANGELOG_FILE="libraries/typescript/packages/${PACKAGE_NAME##*\/}/CHANGELOG.md"
-            
-            if [ -f "$CHANGELOG_FILE" ]; then
-              # Extract the changelog for this specific version
-              PACKAGE_CHANGELOG=$(awk -v ver="$VERSION" '
-                /^## / {
-                  if (found) exit;
-                  if ($0 ~ ver) found=1;
-                  next;
+            const isPrerelease = false
+            core.info(`Creating GitHub releases for tags: ${tags.join(', ')}`)
+
+            function parseTag(tag) {
+              const atIndex = tag.lastIndexOf('@')
+              if (atIndex <= 0) return null
+              const pkg = tag.slice(0, atIndex)
+              const version = tag.slice(atIndex + 1)
+              const pkgDir = pkg.startsWith('@') ? pkg.split('/').slice(1).join('/') : pkg
+              return { pkg, version, pkgDir }
+            }
+
+            function extractChangelogSection(changelog, version) {
+              const lines = changelog.split(/\r?\n/)
+              let found = false
+              const out = []
+              for (const line of lines) {
+                if (line.startsWith('## ')) {
+                  if (found) break
+                  if (line.includes(version)) {
+                    found = true
+                    continue
+                  }
                 }
-                found {print}
-              ' "$CHANGELOG_FILE")
-              
-              if [ -n "$PACKAGE_CHANGELOG" ]; then
-                RELEASE_NOTES+="$PACKAGE_CHANGELOG"$'\n\n'
-              else
-                RELEASE_NOTES+="_No changelog entry found for this version._"$'\n\n'
-              fi
-            else
-              RELEASE_NOTES+="_No CHANGELOG.md found._"$'\n\n'
-            fi
-            
-            RELEASE_NOTES+="---"$'\n\n'
-          done
+                if (found) out.push(line)
+              }
+              const body = out.join('\n').trim()
+              return body.length ? body : null
+            }
 
-          # Create a single consolidated release using the first tag
-          RELEASE_TITLE="TypeScript Release - $RELEASE_DATE"
-          
-          gh release create "$MAIN_TAG" \
-            --title "$RELEASE_TITLE" \
-            --notes "$RELEASE_NOTES" \
-            --latest || echo "⚠️  Failed to create release (may already exist)"
-          
-          echo "✅ Created consolidated GitHub release: $RELEASE_TITLE"
+            for (const tag of tags) {
+              core.info(`\nProcessing tag: ${tag}`)
+              const parsed = parseTag(tag)
+              if (!parsed) {
+                core.warning(`Could not parse tag: ${tag}`)
+                continue
+              }
+
+              try {
+                await github.rest.repos.getReleaseByTag({ owner, repo, tag })
+                core.info(`Release already exists for ${tag}, skipping`)
+                continue
+              } catch (e) {
+                if (e.status !== 404) throw e
+              }
+
+              const changelogFile = path.join(process.env.GITHUB_WORKSPACE, 'libraries', 'typescript', 'packages', parsed.pkgDir, 'CHANGELOG.md')
+              let notes = `Release ${parsed.version} of ${parsed.pkg}`
+
+              if (fs.existsSync(changelogFile)) {
+                const changelog = fs.readFileSync(changelogFile, 'utf8')
+                const section = extractChangelogSection(changelog, parsed.version)
+                if (section) {
+                  notes = section
+                } else {
+                  core.info(`No changelog entry found for version ${parsed.version} in ${changelogFile}`)
+                }
+              } else {
+                core.info(`No CHANGELOG.md found at ${changelogFile}`)
+              }
+
+              const name = `${parsed.pkg} ${parsed.version}`
+              const make_latest = (parsed.pkg === 'mcp-use') ? 'true' : 'false'
+
+              await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                name,
+                body: notes,
+                prerelease: isPrerelease,
+                make_latest,
+              })
+
+              core.info(`Created release for ${tag}`)
+            }

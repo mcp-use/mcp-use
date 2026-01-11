@@ -1,9 +1,208 @@
 ---
 title: "Prompts"
 description: "Define and expose prompts from your MCP server"
-icon: "volume-2"
+icon: "message-square"
 ---
 
-<Danger>
-Python Server is a work in progress.
-</Danger>
+Prompts are reusable message templates that help AI agents interact with your server effectively. They provide structured ways to guide conversations and standardize common interactions.
+
+## Basic Prompt Definition
+
+Use the `@server.prompt()` decorator to define a prompt:
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="My Server")
+
+@server.prompt(name="greeting")
+def greeting_prompt() -> str:
+    """A friendly greeting prompt."""
+    return "Hello! How can I help you today?"
+```
+
+## Prompt Options
+
+The `@server.prompt()` decorator accepts several options:
+
+```python
+@server.prompt(
+    name="help",              # Unique prompt identifier
+    title="Help Menu",        # Human-readable title
+    description="Shows help", # Prompt description
+)
+def help_prompt() -> str:
+    return "Here are the available commands..."
+```
+
+## Dynamic Prompts
+
+Prompts can accept arguments to generate dynamic content:
+
+```python
+@server.prompt(name="summarize")
+def summarize_prompt(topic: str, length: str = "short") -> str:
+    """Generate a summarization prompt."""
+    if length == "short":
+        return f"Briefly summarize the key points about {topic} in 2-3 sentences."
+    else:
+        return f"Provide a comprehensive summary of {topic} covering all major aspects."
+```
+
+## Using Context
+
+Access the MCP context for advanced features:
+
+```python
+from mcp.server.fastmcp import Context
+
+@server.prompt(name="contextual")
+async def contextual_prompt(context: Context) -> str:
+    """A prompt that uses context information."""
+    # Access request context if needed
+    return "Based on the current context, please..."
+```
+
+## Multi-Message Prompts
+
+Return structured messages for complex prompts:
+
+```python
+from mcp.types import PromptMessage, TextContent
+
+@server.prompt(name="interview")
+def interview_prompt(role: str) -> list[PromptMessage]:
+    """Generate an interview prompt sequence."""
+    return [
+        PromptMessage(
+            role="user",
+            content=TextContent(
+                type="text",
+                text=f"I'm interviewing for a {role} position."
+            )
+        ),
+        PromptMessage(
+            role="assistant",
+            content=TextContent(
+                type="text",
+                text=f"I'll help you prepare for your {role} interview. Let's start with common questions."
+            )
+        )
+    ]
+```
+
+## Async Prompts
+
+Prompts can be async for dynamic content generation:
+
+```python
+@server.prompt(name="daily_brief")
+async def daily_brief() -> str:
+    """Generate a daily briefing prompt."""
+    # Could fetch from database, API, etc.
+    from datetime import datetime
+    today = datetime.now().strftime("%A, %B %d")
+    return f"Good morning! Today is {today}. What would you like to accomplish?"
+```
+
+## Template-Based Prompts
+
+Create prompts with template patterns:
+
+```python
+@server.prompt(name="code_review")
+def code_review_prompt(language: str, focus: str = "general") -> str:
+    """Generate a code review prompt."""
+    base = f"Please review the following {language} code"
+
+    focus_instructions = {
+        "general": "for overall quality, readability, and best practices.",
+        "security": "focusing on security vulnerabilities and potential exploits.",
+        "performance": "focusing on performance optimizations and efficiency.",
+        "testing": "and suggest appropriate test cases."
+    }
+
+    instruction = focus_instructions.get(focus, focus_instructions["general"])
+    return f"{base} {instruction}"
+```
+
+## Complete Example
+
+```python
+from datetime import datetime
+from mcp.server.fastmcp import Context
+from mcp.types import PromptMessage, TextContent
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="Prompt Server", version="1.0.0")
+
+@server.prompt(
+    name="help",
+    title="Help",
+    description="Display available commands and usage"
+)
+def help_prompt() -> str:
+    """Show help information."""
+    return """Available commands:
+- /help - Show this message
+- /status - Check server status
+- /search <query> - Search for information
+
+How can I assist you today?"""
+
+@server.prompt(name="task")
+def task_prompt(task_type: str, priority: str = "normal") -> str:
+    """Generate a task-focused prompt."""
+    priority_prefix = {
+        "high": "URGENT: ",
+        "normal": "",
+        "low": "When you have time: "
+    }
+    prefix = priority_prefix.get(priority, "")
+    return f"{prefix}Please help me with the following {task_type} task:"
+
+@server.prompt(name="conversation")
+def conversation_starter(topic: str) -> list[PromptMessage]:
+    """Start a conversation about a topic."""
+    return [
+        PromptMessage(
+            role="user",
+            content=TextContent(
+                type="text",
+                text=f"I'd like to learn about {topic}."
+            )
+        ),
+        PromptMessage(
+            role="assistant",
+            content=TextContent(
+                type="text",
+                text=f"Great choice! {topic} is a fascinating subject. What aspect interests you most?"
+            )
+        )
+    ]
+
+@server.prompt(name="daily")
+async def daily_prompt(context: Context) -> str:
+    """Generate a daily prompt based on current time."""
+    hour = datetime.now().hour
+    if hour < 12:
+        greeting = "Good morning"
+    elif hour < 17:
+        greeting = "Good afternoon"
+    else:
+        greeting = "Good evening"
+
+    return f"{greeting}! What would you like to work on?"
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", run_debug=True)
+```
+
+## Prompts vs Tools vs Resources
+
+| Aspect | Prompts | Tools | Resources |
+|--------|---------|-------|-----------|
+| Purpose | Guide interactions | Perform actions | Expose data |
+| Returns | Message templates | Action results | Content/data |
+| Use case | Conversation starters, templates | Operations | Files, configs |
+| Invocation | User selects prompt | Agent calls tool | Agent reads resource |

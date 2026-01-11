@@ -126,8 +126,13 @@ class ConnectionManager(Generic[T], ABC):
             # Signal that the connection is ready
             self._ready_event.set()
 
-            # Wait until stop is requested
-            await self._stop_event.wait()
+            try:
+                # Wait until stop is requested
+                await self._stop_event.wait()
+            except asyncio.CancelledError:
+                # just treat this as normal shutdown and fall through to finally
+                logger.debug(f"{self.__class__.__name__} task cancelled during stop")
+                return
 
         except Exception as e:
             # Store the exception

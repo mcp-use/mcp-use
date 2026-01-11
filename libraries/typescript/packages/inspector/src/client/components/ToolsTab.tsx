@@ -1,4 +1,7 @@
+import { Button } from "@/client/components/ui/button";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -7,23 +10,22 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
 import type { SavedRequest, ToolResult } from "./tools";
 
+import { Badge } from "@/client/components/ui/badge";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
-import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useInspector } from "@/client/context/InspectorContext";
 import {
   MCPToolExecutionEvent,
   MCPToolSavedEvent,
   Telemetry,
 } from "@/client/telemetry";
+import type { ImperativePanelHandle } from "react-resizable-panels";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import {
   SavedRequestsList,
   SaveRequestDialog,
@@ -32,8 +34,6 @@ import {
   ToolsList,
   ToolsTabHeader,
 } from "./tools";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -59,6 +59,19 @@ interface ToolsTabProps {
 
 const SAVED_REQUESTS_KEY = "mcp-inspector-saved-requests";
 
+/**
+ * Render the Tools tab UI for browsing, executing, and managing tools and saved requests.
+ *
+ * Renders a responsive interface with a searchable tools list and saved-requests list, a tool execution panel, a results history (with copying, deleting, fullscreen, preview and Apps SDK resource integration), and an RPC message logger. Supports mobile-specific navigation, resizable panels for desktop, saved request persistence, keyboard navigation, execution abort/timeout handling, and telemetry for executions and saved requests.
+ *
+ * @param ref - Optional imperative ref exposing `focusSearch` and `blurSearch` methods.
+ * @param tools - Array of available tools to list and execute.
+ * @param callTool - Function to invoke a tool by name with arguments and options (timeout, reset behavior, abort signal).
+ * @param readResource - Function to fetch a resource by URI (used for Apps SDK output templates).
+ * @param serverId - Identifier for the current server (used for telemetry and RPC filtering).
+ * @param isConnected - Whether the inspector is connected to the server (affects execution UI).
+ * @returns The React element for the Tools tab.
+ */
 export function ToolsTab({
   ref,
   tools,
@@ -76,6 +89,8 @@ export function ToolsTab({
   const [results, setResults] = useState<ToolResult[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"tools" | "saved">("tools");
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
@@ -379,6 +394,9 @@ export function ToolsTab({
   const executeTool = useCallback(async () => {
     if (!selectedTool || isExecuting) return;
 
+    // Create abort controller for this execution
+    const controller = new AbortController();
+    setAbortController(controller);
     setIsExecuting(true);
     const startTime = Date.now();
 
@@ -408,11 +426,12 @@ export function ToolsTab({
         );
       }
 
-      // Use a 10 minute timeout for tool calls, as tools may trigger sampling
+      // Use a 10 minute timeout for tool calls, as tools may trigger sampling/elicitation
       // which can take a long time (waiting for LLM responses or human input)
       const result = await callTool(selectedTool.name, parsedArgs, {
         timeout: 600000, // 10 minutes
         resetTimeoutOnProgress: true, // Reset timeout when progress is received
+        signal: controller.signal, // Pass abort signal
       });
       const duration = Date.now() - startTime;
 
@@ -582,9 +601,15 @@ export function ToolsTab({
     setResults((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Filter results to only show executions of the currently selected tool
+  const filteredResults = useMemo(() => {
+    if (!selectedTool) return [];
+    return results.filter((r) => r.toolName === selectedTool.name);
+  }, [results, selectedTool]);
+
   const handleFullscreen = useCallback(
     (index: number) => {
-      const result = results[index];
+      const result = filteredResults[index];
       if (result) {
         const newWindow = window.open("", "_blank", "width=800,height=600");
         if (newWindow) {
@@ -827,7 +852,7 @@ export function ToolsTab({
                 className="absolute inset-0 bg-background z-20"
               >
                 <ToolResultDisplay
-                  results={results}
+                  results={filteredResults}
                   copiedResult={copiedResult}
                   previewMode={previewMode}
                   serverId={serverId}
@@ -867,39 +892,41 @@ export function ToolsTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <ToolsTabHeader
-              activeTab={activeTab}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredToolsCount={filteredTools.length}
-              savedRequestsCount={savedRequests.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onTabSwitch={() =>
-                setActiveTab(activeTab === "tools" ? "saved" : "tools")
-              }
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+            <div className="flex flex-col h-full overflow-hidden">
+              <ToolsTabHeader
+                activeTab={activeTab}
+                isSearchExpanded={isSearchExpanded}
+                searchQuery={searchQuery}
+                filteredToolsCount={filteredTools.length}
+                savedRequestsCount={savedRequests.length}
+                onSearchExpand={() => setIsSearchExpanded(true)}
+                onSearchChange={setSearchQuery}
+                onSearchBlur={handleSearchBlur}
+                onTabSwitch={() =>
+                  setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                }
+                searchInputRef={
+                  searchInputRef as React.RefObject<HTMLInputElement>
+                }
+              />
 
-            {activeTab === "tools" ? (
-              <ToolsList
-                tools={filteredTools}
-                selectedTool={selectedTool}
-                onToolSelect={handleToolSelect}
-                focusedIndex={focusedIndex}
-              />
-            ) : (
-              <SavedRequestsList
-                savedRequests={savedRequests}
-                selectedRequest={selectedSavedRequest}
-                onLoadRequest={loadSavedRequest}
-                onDeleteRequest={deleteSavedRequest}
-                focusedIndex={focusedIndex}
-              />
-            )}
+              {activeTab === "tools" ? (
+                <ToolsList
+                  tools={filteredTools}
+                  selectedTool={selectedTool}
+                  onToolSelect={handleToolSelect}
+                  focusedIndex={focusedIndex}
+                />
+              ) : (
+                <SavedRequestsList
+                  savedRequests={savedRequests}
+                  selectedRequest={selectedSavedRequest}
+                  onLoadRequest={loadSavedRequest}
+                  onDeleteRequest={deleteSavedRequest}
+                  focusedIndex={focusedIndex}
+                />
+              )}
+            </div>
           </ResizablePanel>
 
           <ResizableHandle withHandle />
@@ -909,7 +936,10 @@ export function ToolsTab({
             defaultSize={0}
             collapsible
             minSize={5}
-            collapsedSize={6}
+            collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}
@@ -966,15 +996,15 @@ export function ToolsTab({
                 }`}
               />
             </div>
-            {!rpcPanelCollapsed && (
-              <div className="flex-1 overflow-hidden min-h-0">
-                <JsonRpcLoggerView
-                  serverIds={[serverId]}
-                  onCountChange={setRpcMessageCount}
-                  onClearRef={clearRpcMessagesRef}
-                />
-              </div>
-            )}
+            <div
+              className={`flex-1 overflow-hidden min-h-0 ${rpcPanelCollapsed ? "hidden" : ""}`}
+            >
+              <JsonRpcLoggerView
+                serverIds={[serverId]}
+                onCountChange={setRpcMessageCount}
+                onClearRef={clearRpcMessagesRef}
+              />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>
@@ -992,6 +1022,11 @@ export function ToolsTab({
               onArgChange={handleArgChange}
               onExecute={executeTool}
               onSave={openSaveDialog}
+              onCancel={() => {
+                if (abortController) {
+                  abortController.abort();
+                }
+              }}
             />
           </ResizablePanel>
 
@@ -1000,7 +1035,7 @@ export function ToolsTab({
           <ResizablePanel ref={bottomPanelRef} defaultSize={60}>
             <div className="flex flex-col h-full">
               <ToolResultDisplay
-                results={results}
+                results={filteredResults}
                 copiedResult={copiedResult}
                 previewMode={previewMode}
                 serverId={serverId}

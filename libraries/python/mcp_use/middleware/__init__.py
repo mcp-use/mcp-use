@@ -38,7 +38,7 @@ from mcp_use.client.middleware import (
 )
 
 warnings.warn(
-    "mcp_use.middleware is deprecated. Use mcp_use.client.middleware. This import will be removed in version 1.4.0",
+    "mcp_use.middleware is deprecated. Use mcp_use.client.middleware. This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

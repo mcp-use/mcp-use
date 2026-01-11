@@ -7,8 +7,11 @@ import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import open from "open";
+import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
+import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
+import { createDeploymentsCommand } from "./commands/deployments.js";
 
 const program = new Command();
 
@@ -89,7 +92,7 @@ function runCommand(
   const proc = spawn(command, args, {
     cwd,
     stdio: filterStderr ? (["inherit", "inherit", "pipe"] as const) : "inherit",
-    shell: false,
+    shell: process.platform === "win32",
     env: env ? { ...process.env, ...env } : process.env,
   });
 
@@ -139,7 +142,7 @@ async function startTunnel(
 
     const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+      shell: process.platform === "win32",
     });
 
     let resolved = false;
@@ -309,11 +312,22 @@ async function buildWidgets(
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
 
+  // Read favicon config from package.json
+  const packageJsonPath = path.join(projectPath, "package.json");
+  let favicon = "";
+  try {
+    const pkgContent = await fs.readFile(packageJsonPath, "utf-8");
+    const pkg = JSON.parse(pkgContent);
+    favicon = pkg.mcpUse?.favicon || "";
+  } catch {
+    // No package.json or no mcpUse config, that's fine
+  }
+
   const builtWidgets: Array<{ name: string; metadata: any }> = [];
 
   for (const entry of entries) {
     const widgetName = entry.name;
-    const entryPath = entry.path;
+    const entryPath = entry.path.replace(/\\/g, "/");
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
@@ -325,7 +339,14 @@ async function buildWidgets(
     const relativeResourcesPath = path
       .relative(tempDir, resourcesDir)
       .replace(/\\/g, "/");
-    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory */\n@source "${relativeResourcesPath}";\n`;
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+    const relativeMcpUsePath = path
+      .relative(tempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
+    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory and mcp-use package */\n@source "${relativeResourcesPath}";\n@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";\n`;
     await fs.writeFile(path.join(tempDir, "styles.css"), cssContent, "utf8");
 
     // Create entry file
@@ -347,7 +368,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widgetName} Widget</title>
+    <title>${widgetName} Widget</title>${
+      favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>
@@ -384,10 +410,39 @@ if (container && Component) {
       await fs.mkdir(metadataTempDir, { recursive: true });
 
       const { createServer } = await import("vite");
+
+      // Plugin to provide browser stubs for Node.js-only packages
+      const nodeStubsPlugin = {
+        name: "node-stubs",
+        enforce: "pre" as const,
+        resolveId(id: string) {
+          if (id === "posthog-node" || id.startsWith("posthog-node/")) {
+            return "\0virtual:posthog-node-stub";
+          }
+          return null;
+        },
+        load(id: string) {
+          if (id === "\0virtual:posthog-node-stub") {
+            return `
+export class PostHog {
+  constructor() {}
+  capture() {}
+  identify() {}
+  alias() {}
+  flush() { return Promise.resolve(); }
+  shutdown() { return Promise.resolve(); }
+}
+export default PostHog;
+`;
+          }
+          return null;
+        },
+      };
+
       const metadataServer = await createServer({
         root: metadataTempDir,
         cacheDir: path.join(metadataTempDir, ".vite-cache"),
-        plugins: [tailwindcss(), react()],
+        plugins: [nodeStubsPlugin, tailwindcss(), react()],
         resolve: {
           alias: {
             "@": resourcesDir,
@@ -396,9 +451,15 @@ if (container && Component) {
         server: {
           middlewareMode: true,
         },
+        optimizeDeps: {
+          // Exclude Node.js-only packages from browser bundling
+          exclude: ["posthog-node"],
+        },
         ssr: {
           // Force Vite to transform these packages in SSR instead of using external requires
           noExternal: ["@openai/apps-sdk-ui", "react-router"],
+          // Mark Node.js-only packages as external in SSR mode
+          external: ["posthog-node"],
         },
         define: {
           // Define process.env for SSR context
@@ -426,11 +487,44 @@ if (container && Component) {
       try {
         const mod = await metadataServer.ssrLoadModule(entryPath);
         if (mod.widgetMetadata) {
+          // Handle props (preferred) or inputs (deprecated) field
+          const schemaField =
+            mod.widgetMetadata.props || mod.widgetMetadata.inputs;
+
+          // Check if schemaField is a Zod v4 schema (has ~standard property from Standard Schema)
+          // and convert to JSON Schema for serialization using Zod v4's built-in toJsonSchema
+          let inputsValue = schemaField || {};
+          if (
+            schemaField &&
+            typeof schemaField === "object" &&
+            "~standard" in schemaField
+          ) {
+            // Convert Zod schema to JSON Schema for manifest serialization
+            try {
+              inputsValue = toJSONSchema(schemaField);
+            } catch (conversionError) {
+              console.warn(
+                chalk.yellow(
+                  `    ⚠ Could not convert schema for ${widgetName}, using raw schema`
+                )
+              );
+            }
+          }
+
+          // Destructure to exclude props (raw Zod schema) from being serialized
+          const {
+            props: _rawProps,
+            inputs: _rawInputs,
+            ...restMetadata
+          } = mod.widgetMetadata;
+
           widgetMetadata = {
-            ...mod.widgetMetadata,
+            ...restMetadata,
             title: mod.widgetMetadata.title || widgetName,
             description: mod.widgetMetadata.description,
-            inputs: mod.widgetMetadata.inputs?.shape || {},
+            // Store the converted JSON Schema (props field is used by production mount)
+            props: inputsValue,
+            inputs: inputsValue,
           };
         }
         // Give a moment for any background esbuild operations to complete
@@ -453,10 +547,102 @@ if (container && Component) {
     }
 
     try {
+      // Enhanced plugin to stub Node.js-only packages and built-ins
+      const buildNodeStubsPlugin = {
+        name: "node-stubs-build",
+        enforce: "pre" as const,
+        resolveId(id: string) {
+          // Stub posthog-node
+          if (id === "posthog-node" || id.startsWith("posthog-node/")) {
+            return "\0virtual:posthog-node-stub";
+          }
+          // Stub path module for browser builds
+          if (id === "path" || id === "node:path") {
+            return "\0virtual:path-stub";
+          }
+          return null;
+        },
+        load(id: string) {
+          if (id === "\0virtual:posthog-node-stub") {
+            return `
+export class PostHog {
+  constructor() {}
+  capture() {}
+  identify() {}
+  alias() {}
+  flush() { return Promise.resolve(); }
+  shutdown() { return Promise.resolve(); }
+}
+export default PostHog;
+`;
+          }
+          if (id === "\0virtual:path-stub") {
+            return `
+export function join(...paths) {
+  return paths.filter(Boolean).join("/").replace(/\\/\\//g, "/").replace(/\\/$/, "");
+}
+export function resolve(...paths) {
+  return join(...paths);
+}
+export function dirname(filepath) {
+  const parts = filepath.split("/");
+  parts.pop();
+  return parts.join("/") || "/";
+}
+export function basename(filepath, ext) {
+  const parts = filepath.split("/");
+  let name = parts[parts.length - 1] || "";
+  if (ext && name.endsWith(ext)) {
+    name = name.slice(0, -ext.length);
+  }
+  return name;
+}
+export function extname(filepath) {
+  const name = basename(filepath);
+  const index = name.lastIndexOf(".");
+  return index > 0 ? name.slice(index) : "";
+}
+export function normalize(filepath) {
+  return filepath.replace(/\\/\\//g, "/");
+}
+export function isAbsolute(filepath) {
+  return filepath.startsWith("/");
+}
+export const sep = "/";
+export const delimiter = ":";
+export const posix = {
+  join,
+  resolve,
+  dirname,
+  basename,
+  extname,
+  normalize,
+  isAbsolute,
+  sep,
+  delimiter,
+};
+export default {
+  join,
+  resolve,
+  dirname,
+  basename,
+  extname,
+  normalize,
+  isAbsolute,
+  sep,
+  delimiter,
+  posix,
+};
+`;
+          }
+          return null;
+        },
+      };
+
       await build({
         root: tempDir,
         base: baseUrl,
-        plugins: [tailwindcss(), react()],
+        plugins: [buildNodeStubsPlugin, tailwindcss(), react()],
         experimental: {
           renderBuiltUrl: (filename: string, { hostType }) => {
             if (["js", "css"].includes(hostType)) {
@@ -473,11 +659,19 @@ if (container && Component) {
             "@": resourcesDir,
           },
         },
+        optimizeDeps: {
+          // Exclude Node.js-only packages from browser bundling
+          exclude: ["posthog-node"],
+        },
         build: {
           outDir,
           emptyOutDir: true,
           rollupOptions: {
             input: path.join(tempDir, "index.html"),
+            external: (id) => {
+              // Don't externalize posthog-node or path - we're stubbing them
+              return false;
+            },
           },
         },
       });
@@ -759,7 +953,17 @@ program
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
-      const port = parseInt(options.port, 10);
+      // Priority: --port flag > process.env.PORT > default
+      // Check if --port or -p was explicitly provided in command line
+      const portFlagProvided =
+        process.argv.includes("--port") ||
+        process.argv.includes("-p") ||
+        process.argv.some((arg) => arg.startsWith("--port=")) ||
+        process.argv.some((arg) => arg.startsWith("-p="));
+
+      const port = portFlagProvided
+        ? parseInt(options.port, 10) // Flag explicitly provided, use it
+        : parseInt(process.env.PORT || options.port || "3000", 10); // Check env, then default
 
       console.log(
         `\x1b[36m\x1b[1mmcp-use\x1b[0m \x1b[90mVersion: ${packageJson.version}\x1b[0m\n`
@@ -976,6 +1180,15 @@ program
     "--from-source",
     "Deploy from local source code (even for GitHub repos)"
   )
+  .option(
+    "--new",
+    "Force creation of new deployment instead of reusing linked deployment"
+  )
+  .option(
+    "--env <key=value...>",
+    "Environment variables (can be used multiple times)"
+  )
+  .option("--env-file <path>", "Path to .env file with environment variables")
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -983,7 +1196,16 @@ program
       port: options.port ? parseInt(options.port, 10) : undefined,
       runtime: options.runtime,
       fromSource: options.fromSource,
+      new: options.new,
+      env: options.env,
+      envFile: options.envFile,
     });
   });
+
+// Client command
+program.addCommand(createClientCommand());
+
+// Deployments command
+program.addCommand(createDeploymentsCommand());
 
 program.parse();

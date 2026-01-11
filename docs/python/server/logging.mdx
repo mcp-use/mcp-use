@@ -4,17 +4,13 @@ description: "Clean, configurable logging system designed specifically for MCP s
 icon: "activity"
 ---
 
-<Danger>
-Python Server is a work in progress.
-</Danger>
-
-<Card title="" img="./images/Logging.jpg" horizontal="true"/>
+<Card title="" img="https://cdn.mcp-use.com/docs/python/Logging.jpg" horizontal="true"/>
 
 <Info>
 mcp-use provides clean, informative logging about MCP operations, making it easy to understand server activity and debug issues in both production and development.
 </Info>
 
-MCP-specific logging provides detailed information about which MCP methods are being called, including the specific method name, session IDs, and execution details.
+MCP-specific logging provides detailed information about which MCP methods are being called, including the specific method name, session IDs, and execution details. MCP requests use a distinct `MCP:` prefix to differentiate them from regular HTTP logs.
 
 ## Why Use MCP-Specific Logging?
 
@@ -31,20 +27,19 @@ This type of logging is essential because:
 mcp-use provides three logging modes controlled by the `debug` parameter and `DEBUG` environment variable:
 
 ### Production Logs (Default: `debug=False`)
-Clean, readable logs showing MCP method calls:
+Clean, readable logs showing MCP method calls with the `MCP:` prefix:
 
 ```
-INFO: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
-INFO: 127.0.0.1:58478 - "POST /mcp [resources/list] HTTP/1.1" 200 OK
-ERROR: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
+MCP:  127.0.0.1:58478 - "POST /mcp [resources/list] HTTP/1.1" 200
+MCP:  127.0.0.1:58478 - "POST /mcp [initialize] HTTP/1.1" 200
 ```
 
 ### Debug Logs (`debug=True`)
-Same logs as production + development routes (inspector, docs):
+Same logs as production + development routes (inspector, docs). By default, inspector logs are hidden:
 
 ```
-INFO: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
-INFO: 127.0.0.1:58478 - "GET  /inspector HTTP/1.1" 302
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
 INFO: 127.0.0.1:58478 - "GET  /docs HTTP/1.1" 200
 ```
 
@@ -52,25 +47,53 @@ INFO: 127.0.0.1:58478 - "GET  /docs HTTP/1.1" 200
 Same logs as debug mode + JSON-RPC request/response logging:
 
 ```
-INFO: 127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200 OK
-DEBUG: JSON-RPC Request: {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "test"}}}
-DEBUG: JSON-RPC Response: {"jsonrpc": "2.0", "id": 1, "result": {"content": [...]}}
-DEBUG: Duration: 45.2ms
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
+MCP:  [tools/call:search] Request (45.2ms): {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "test"}}}
+MCP:  [tools/call:search] Response: {"jsonrpc": "2.0", "id": 1, "result": {"content": [...]}}
+```
+
+#### Pretty Print Mode (`pretty_print_jsonrpc=True`)
+For easier debugging, enable pretty-printed JSON-RPC logs with Rich panels:
+
+```python
+server = MCPServer("my-server", pretty_print_jsonrpc=True)
+```
+
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
+╭─ tools/call:search Request ─────────────────────── 45.2ms ──╮
+│ {                                                           │
+│   "jsonrpc": "2.0",                                         │
+│   "id": 1,                                                  │
+│   "method": "tools/call",                                   │
+│   "params": {                                               │
+│     "name": "search",                                       │
+│     "arguments": {"query": "test"}                          │
+│   }                                                         │
+│ }                                                           │
+╰─────────────────────────────────────────────────────────────╯
+╭─ tools/call:search Response ────────────────────────────────╮
+│ {                                                           │
+│   "jsonrpc": "2.0",                                         │
+│   "id": 1,                                                  │
+│   "result": {"content": [...]}                              │
+│ }                                                           │
+╰─────────────────────────────────────────────────────────────╯
 ```
 
 ## Understanding the Log Format
 
-Each log line contains detailed information about the request:
+Each MCP log line contains detailed information about the request:
 
 ```
-INFO: 127.0.0.1:58478 - "POST /mcp [b98ed3729a6443e4875d3f0db151881e] [tools/call:search] HTTP/1.1" 200 OK
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
 ```
 
 Breaking down each component:
 
 <Steps>
-  <Step title="Log Level">
-    <code style={{color: '#10b981'}}>INFO:</code> - The severity level of the log message
+  <Step title="Log Prefix">
+    <code style={{color: '#10b981'}}>MCP:</code> - Identifies this as an MCP-specific log (distinct from regular HTTP `INFO:` logs)
   </Step>
 
   <Step title="Client Address">
@@ -85,10 +108,6 @@ Breaking down each component:
     <code style={{color: '#8b5cf6'}}>/mcp</code> - The MCP server endpoint path
   </Step>
 
-  <Step title="Session ID">
-    <code style={{color: '#ec4899'}}>[b98ed3729a6443e4875d3f0db151881e]</code> - Unique session identifier for tracking related requests
-  </Step>
-
   <Step title="MCP Method">
     <code style={{color: '#06b6d4'}}>[tools/call:search]</code> - The specific MCP method being called (e.g., tools/call, resources/list, etc.)
   </Step>
@@ -98,7 +117,7 @@ Breaking down each component:
   </Step>
 
   <Step title="Status Code">
-    <code style={{color: '#10b981'}}>200 OK</code> - The HTTP response status code
+    <code style={{color: '#10b981'}}>200</code> - The HTTP response status code
   </Step>
 </Steps>
 
@@ -149,17 +168,76 @@ server = MCPServer(
 server.run(transport="streamable-http")
 ```
 
-## Customization
+## Logging Options
 
-You can customize the logging behavior by modifying the logging configuration:
+### Inspector Logs (`show_inspector_logs`)
+
+By default, inspector-related logs (requests to `/inspector/*`) are hidden to keep the output clean. Enable them if needed:
 
 ```python
-from mcp_use.server.logging import get_logging_config
+# Hide inspector logs (default)
+server = MCPServer("my-server", show_inspector_logs=False)
 
-# Get custom logging config
-config = get_logging_config(debug=True)
-# Modify config as needed
-server.run(transport="streamable-http", log_config=config)
+# Show inspector logs
+server = MCPServer("my-server", show_inspector_logs=True)
+```
+
+**With `show_inspector_logs=False` (default):**
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [initialize] HTTP/1.1" 200
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/list] HTTP/1.1" 200
+```
+
+**With `show_inspector_logs=True`:**
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [initialize] HTTP/1.1" 200
+INFO: 127.0.0.1:58478 - "GET /inspector HTTP/1.1" 200
+INFO: 127.0.0.1:58478 - "GET /inspector/config.json HTTP/1.1" 200
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/list] HTTP/1.1" 200
+```
+
+### Pretty Print JSON-RPC (`pretty_print_jsonrpc`)
+
+When using `DEBUG=2`, JSON-RPC requests and responses are logged. By default, they appear as single-line text. Enable pretty printing for formatted Rich panels:
+
+```python
+# Plain text JSON-RPC logs (default)
+server = MCPServer("my-server", pretty_print_jsonrpc=False)
+
+# Pretty-printed JSON-RPC logs with Rich panels
+server = MCPServer("my-server", pretty_print_jsonrpc=True)
+```
+
+**With `pretty_print_jsonrpc=False` (default):**
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
+MCP:  [tools/call:search] Request (45.2ms): {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search"}}
+MCP:  [tools/call:search] Response: {"jsonrpc":"2.0","id":1,"result":{...}}
+```
+
+**With `pretty_print_jsonrpc=True`:**
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/call:search] HTTP/1.1" 200
+╭─ tools/call:search Request ─────────────────────── 45.2ms ──╮
+│ {                                                           │
+│   "jsonrpc": "2.0",                                         │
+│   "id": 1,                                                  │
+│   "method": "tools/call",                                   │
+│   "params": {"name": "search"}                              │
+│ }                                                           │
+╰─────────────────────────────────────────────────────────────╯
+```
+
+### Combined Example
+
+```python
+server = MCPServer(
+    name="my-server",
+    debug=True,
+    show_inspector_logs=False,    # Hide inspector noise
+    pretty_print_jsonrpc=True,    # Pretty JSON-RPC in DEBUG=2
+)
+server.run(transport="streamable-http")
 ```
 
 This makes it much easier to understand what's happening with your MCP server and debug any issues in both production and development environments.

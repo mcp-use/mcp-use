@@ -10,45 +10,47 @@ This document provides a complete reference for the `mcp-use/server` API, includ
 
 ## Server Creation
 
-### `createMCPServer()`
+### `MCPServer` Class
 
 Creates a new MCP server instance with Express integration.
 
 ```typescript
-function createMCPServer(
-  name: string,
-  config?: Partial<ServerConfig>
-): McpServerInstance
+class MCPServer {
+  constructor(config: ServerConfig): McpServerInstance
+}
 ```
 
 **Parameters:**
-- `name` (string) - Unique identifier for your server
-- `config` (Partial&lt;ServerConfig&gt;) - Optional configuration object
+- `config` (ServerConfig) - Server configuration object (name is required in config)
 
 **Returns:** `McpServerInstance` - Server instance with both MCP and Express methods
 
 **Example:**
 ```typescript
 // Basic usage
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   description: 'My MCP server'
 })
 
 // With custom host (e.g., for Docker or remote access)
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   host: '0.0.0.0' // or 'myserver.com'
 })
 
 // With full base URL (e.g., behind a proxy or custom domain)
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
 })
 
 // Production with explicit allowed origins
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   allowedOrigins: [
     'https://myapp.com',
@@ -56,6 +58,8 @@ const server = createMCPServer('my-server', {
   ]
 })
 ```
+
+**Note:** The `createMCPServer()` factory function is still available for backward compatibility, but the class constructor is recommended for new code.
 
 ## Server Configuration
 
@@ -92,12 +96,14 @@ The `allowedOrigins` option controls DNS rebinding protection behavior:
 **Example:**
 ```typescript
 // Development: No need to set (allows all origins)
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0'
 })
 
 // Production: Explicitly set allowed origins
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   allowedOrigins: [
     'https://myapp.com',
@@ -125,13 +131,15 @@ The `autoCreateSessionOnInvalidId` option controls behavior when a client sends 
 **Example:**
 ```typescript
 // Default behavior (compatible with ChatGPT)
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   autoCreateSessionOnInvalidId: true  // Default: true
 })
 
 // Strict MCP spec compliance (requires compliant clients)
-const server = createMCPServer('my-server', {
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   autoCreateSessionOnInvalidId: false  // Strict spec compliance
 })
@@ -157,18 +165,10 @@ tool(definition: ToolDefinition): this
 server.tool({
   name: 'calculate',
   description: 'Perform calculations',
-  inputs: [
-    { name: 'expression', type: 'string', required: true }
-  ],
-  cb: async ({ expression }) => {
-    const result = eval(expression) // Note: Use safe evaluation in production
-    return {
-      content: [{
-        type: 'text',
-        text: `Result: ${result}`
-      }]
-    }
-  }
+  schema: z.object({ expression: z.string().describe('The expression to evaluate') }),
+}, async ({ expression }) => {
+  const result = eval(expression) // Note: Use safe evaluation in production
+  return text(`Result: ${result}`);
 })
 ```
 
@@ -301,14 +301,9 @@ server.uiResource({
   widget: 'analytics-dashboard',
   title: 'Analytics Dashboard',
   description: 'Interactive analytics visualization',
-  props: {
-    timeRange: {
-      type: 'string',
-      description: 'Time range for data',
-      required: false,
-      default: '7d'
-    }
-  },
+  props: z.object({
+    timeRange: z.string().describe('Time range for data').optional().default('7d')
+  }),
   size: ['800px', '600px']
 })
 ```

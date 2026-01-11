@@ -191,41 +191,52 @@ const result = await agent.run(
 Build your own MCP servers with automatic inspector and UI capabilities:
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer, text } from 'mcp-use/server'
 import { z } from 'zod'
 
 // Create your MCP server
-const server = createMCPServer('weather-server', {
+const server = new MCPServer({
+  name: 'weather-server',
   version: '1.0.0',
   description: 'Weather information MCP server',
 })
 
 // Define tools with Zod schemas
-server.tool('get_weather', {
-  description: 'Get current weather for a city',
-  parameters: z.object({
-    city: z.string().describe('City name'),
-    units: z.enum(['celsius', 'fahrenheit']).optional(),
-  }),
-  execute: async ({ city, units = 'celsius' }) => {
-    const weather = await fetchWeather(city, units)
-    return {
-      temperature: weather.temp,
-      condition: weather.condition,
-      humidity: weather.humidity,
-    }
+server.tool(
+  {
+    name: 'get_weather',
+    description: 'Get current weather for a city',
+    schema: z.object({
+      city: z.string().describe('City name'),
+      units: z.enum(['celsius', 'fahrenheit']).optional(),
+    }),
   },
-})
+  async ({ city, units = 'celsius' }) => {
+    const weather = await fetchWeather(city, units)
+    return text(`Temperature: ${weather.temp}, Condition: ${weather.condition}, Humidity: ${weather.humidity}`)
+  }
+)
 
 // Define resources
-server.resource('weather_map', {
-  description: 'Interactive weather map',
-  uri: 'weather://map',
-  mimeType: 'text/html',
-  fetch: async () => {
-    return generateWeatherMapHTML()
+server.resource(
+  {
+    name: 'weather_map',
+    description: 'Interactive weather map',
+    uri: 'weather://map',
+    mimeType: 'text/html',
   },
-})
+  async () => {
+    return {
+      contents: [
+        {
+          uri: 'weather://map',
+          mimeType: 'text/html',
+          text: generateWeatherMapHTML(),
+        },
+      ],
+    }
+  }
+)
 
 // Start the server
 server.listen(3000)
@@ -248,7 +259,7 @@ server.listen(3000)
 
 ```typescript
 import { streamEventsToAISDKWithTools } from 'mcp-use'
-import { LangChainAdapter } from 'ai'
+import { createTextStreamResponse } from 'ai'
 
 // In your Next.js API route
 export async function POST(req: Request) {
@@ -258,7 +269,7 @@ export async function POST(req: Request) {
   const enhancedStream = streamEventsToAISDKWithTools(streamEvents)
   const readableStream = createReadableStreamFromGenerator(enhancedStream)
 
-  return LangChainAdapter.toDataStreamResponse(readableStream)
+  return createTextStreamResponse({ textStream: readableStream })
 }
 ```
 
@@ -449,22 +460,26 @@ const report = await researcher.run(`
 ### Example 3: Database Admin Assistant
 
 ```typescript
-const server = createMCPServer('db-admin', {
+const server = new MCPServer({
+  name: 'db-admin',
   version: '1.0.0',
 })
 
-server.tool('execute_query', {
-  description: 'Execute SQL query safely',
-  parameters: z.object({
-    query: z.string(),
-    database: z.string(),
-  }),
-  execute: async ({ query, database }) => {
+server.tool(
+  {
+    name: 'execute_query',
+    description: 'Execute SQL query safely',
+    schema: z.object({
+      query: z.string(),
+      database: z.string(),
+    }),
+  },
+  async ({ query, database }) => {
     // Validate and execute query
     const results = await db.query(query, { database })
-    return { rows: results, count: results.length }
-  },
-})
+    return text(`Query executed: ${results.length} rows returned`)
+  }
+)
 
 // Create an AI-powered DBA
 const dba = new MCPAgent({

@@ -1,0 +1,149 @@
+---
+title: "Server Logging"
+description: "Debug and monitor your MCP server with built-in logging"
+icon: "scroll-text"
+---
+
+mcp-use provides comprehensive logging for MCP servers, making it easy to understand server activity, debug issues, and monitor production deployments.
+
+
+## Log Levels
+
+The server provides different logging levels through environment variables:
+
+### Production Mode (Default)
+
+Clean, informative logs showing MCP operations:
+
+```bash
+node server.js
+```
+
+**Output:**
+```
+[MCP] Server mounted at /mcp (Streamable HTTP Transport)
+[MCP] Session initialized: abc123
+[MCP] tools/call:analyze-sentiment completed in 234ms
+[MCP] Session closed: abc123
+```
+
+### Debug Mode
+
+Enable debug mode for development and troubleshooting:
+
+```bash
+DEBUG=1 node server.js
+```
+
+**Output:**
+```
+[MCP] Server initialized: my-server v1.0.0
+[MCP] Registered tool: analyze-sentiment
+[MCP] Registered resource: config://app-settings
+[MCP] Session initialized: abc123
+[MCP] tools/call:analyze-sentiment started
+[MCP] tools/call:analyze-sentiment completed in 234ms
+```
+
+### Verbose Debug Mode
+
+Full request/response logging with JSON-RPC details:
+
+```bash
+DEBUG=2 node server.js
+```
+
+**Output:**
+```
+[MCP] Session initialized: abc123
+[MCP] → Request: {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "analyze-sentiment",
+    "arguments": { "text": "I love this!" }
+  }
+}
+[MCP] tools/call:analyze-sentiment completed in 234ms
+[MCP] ← Response: {
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [{ "type": "text", "text": "Sentiment: positive" }]
+  }
+}
+```
+
+## Tool Logging with ctx.log
+
+Tools can send log messages directly to clients during execution using `ctx.log()`. This allows real-time visibility into what your tool is doing, which is especially useful for long-running operations or debugging tool behavior.
+
+
+```typescript
+server.tool({
+  name: 'process_data',
+  description: 'Process data with progress logging',
+  schema: z.object({
+    items: z.array(z.string())
+  })
+}, async ({ items }, ctx) => {
+  // Log the start of processing
+  await ctx.log('info', 'Starting data processing');
+  
+  // Debug-level logging for detailed information
+  await ctx.log('debug', `Processing ${items.length} items`, 'my-tool');
+  
+  for (const item of items) {
+    // Log warnings when needed
+    if (!item.trim()) {
+      await ctx.log('warning', 'Empty item found, skipping');
+      continue;
+    }
+    
+    try {
+      await processItem(item);
+    } catch (err) {
+      // Log errors without throwing
+      await ctx.log('error', `Failed to process item: ${err.message}`);
+    }
+  }
+  
+  await ctx.log('info', 'Processing completed');
+  return text('All items processed');
+})
+```
+
+### Log Levels
+
+The `ctx.log()` function supports eight log levels, from least to most severe:
+
+| Level | Use Case |
+|-------|----------|
+| `debug` | Detailed debugging information, verbose output |
+| `info` | General informational messages about progress |
+| `notice` | Normal but significant events |
+| `warning` | Warning messages for recoverable issues |
+| `error` | Error messages for failures that don't stop execution |
+| `critical` | Critical conditions requiring immediate attention |
+| `alert` | Action must be taken immediately |
+| `emergency` | System is unusable |
+
+### Parameters
+
+```typescript
+ctx.log(level, message, logger?)
+```
+
+- **`level`** (required): One of the eight log levels listed above
+- **`message`** (required): The log message content as a string
+- **`logger`** (optional): Logger name for categorization (defaults to `'tool'`)
+
+
+## Related
+
+- [Client Logging](/typescript/client/logging) - Logging for MCP clients
+- [Notifications](./notifications) - Send status updates to clients
+- [Configuration](./configuration) - Configure server options
+- [Tools Guide](./tools) - Building tools with proper error handling
+

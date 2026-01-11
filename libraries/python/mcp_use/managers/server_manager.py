@@ -8,7 +8,7 @@ from mcp_use.agents.managers.server_manager import ServerManager as _ServerManag
 warnings.warn(
     "mcp_use.managers.server_manager is deprecated. "
     "Use mcp_use.agents.managers.server_manager. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

@@ -13,17 +13,22 @@ import { MCPAgent } from "./src/agents/mcp_agent.js";
 import { RemoteAgent } from "./src/agents/remote.js";
 import { MCPClient } from "./src/client.js";
 import { loadConfigFile } from "./src/config.js";
-import { BaseConnector } from "./src/connectors/base.js";
 import type { NotificationHandler } from "./src/connectors/base.js";
+import { BaseConnector } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
 import { StdioConnector } from "./src/connectors/stdio.js";
-import { WebSocketConnector } from "./src/connectors/websocket.js";
 
-import { Logger, logger } from "./src/logging.js";
-import { MCPSession, Notification, Root } from "./src/session.js";
 import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
+import { Logger, logger } from "./src/logging.js";
+import {
+  MCPSession,
+  type CallToolResult,
+  type Notification,
+  type Root,
+  type Tool,
+} from "./src/session.js";
 
-export { BaseAdapter, LangChainAdapter } from "./src/adapters/index.js";
+export { BaseAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
 export * from "./src/agents/utils/index.js";
 export { ServerManager } from "./src/managers/server_manager.js";
@@ -39,19 +44,8 @@ export {
 // Export telemetry utilities
 export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
 
-// Export OAuth helper (legacy - for backward compatibility)
-export {
-  createOAuthMCPConfig,
-  LINEAR_OAUTH_CONFIG,
-  OAuthHelper,
-} from "./src/oauth-helper.js";
-export type {
-  ClientRegistration,
-  OAuthConfig,
-  OAuthDiscovery,
-  OAuthResult,
-  OAuthState,
-} from "./src/oauth-helper.js";
+// Export version information (global)
+export { getPackageVersion, VERSION } from "./src/version.js";
 
 // Export new SDK-integrated auth utilities (recommended for new projects)
 export {
@@ -62,6 +56,9 @@ export type { StoredState } from "./src/auth/types.js";
 
 // Export React hooks
 export * from "./src/react/index.js";
+
+// Export utility functions
+export * from "./src/utils/index.js";
 
 // Export client prompts
 export { PROMPTS } from "./src/agents/index.js";
@@ -81,12 +78,12 @@ export {
   MCPAgent,
   MCPClient,
   MCPSession,
-  Notification,
   RemoteAgent,
-  Root,
   StdioConnector,
-  WebSocketConnector,
 };
+
+// Export session-related types
+export type { CallToolResult, Notification, Root, Tool };
 
 // Export notification types for handling server notifications
 export type { NotificationHandler };
@@ -103,8 +100,8 @@ export type {
 export {
   BaseCodeExecutor,
   E2BCodeExecutor,
-  VMCodeExecutor,
   isVMAvailable,
+  VMCodeExecutor,
 } from "./src/client.js";
 
 export type {
@@ -113,6 +110,13 @@ export type {
   ToolNamespaceInfo,
   ToolSearchResult,
 } from "./src/client/codeExecutor.js";
+
+// Export custom error types
+export {
+  ElicitationDeclinedError,
+  ElicitationTimeoutError,
+  ElicitationValidationError,
+} from "./src/errors.js";
 
 // Export sampling types for LLM sampling capabilities
 export type {

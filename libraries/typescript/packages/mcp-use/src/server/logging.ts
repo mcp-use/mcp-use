@@ -1,19 +1,6 @@
 import type { Context, Next } from "hono";
 
-// Runtime detection
-const isDeno = typeof (globalThis as any).Deno !== "undefined";
-
-/**
- * Helper to get environment variable (works in both Node.js and Deno)
- */
-function getEnv(key: string): string | undefined {
-  if (isDeno) {
-    return (globalThis as any).Deno.env.get(key);
-  }
-  return typeof process !== "undefined" && process.env
-    ? process.env[key]
-    : undefined;
-}
+import { getEnv } from "./utils/runtime.js";
 
 /**
  * Check if DEBUG mode is enabled via environment variable
@@ -32,36 +19,57 @@ function isDebugMode(): boolean {
  * Format an object for logging (pretty-print JSON)
  */
 function formatForLogging(obj: any): string {
+  function truncate(val: any): any {
+    if (typeof val === "string" && val.length > 100) {
+      return val.slice(0, 100) + "...";
+    } else if (Array.isArray(val)) {
+      return val.map(truncate);
+    } else if (val && typeof val === "object") {
+      const result: Record<string, any> = {};
+      for (const key in val) {
+        if (Object.prototype.hasOwnProperty.call(val, key)) {
+          result[key] = truncate(val[key]);
+        }
+      }
+      return result;
+    }
+    return val;
+  }
   try {
-    return JSON.stringify(obj, null, 2);
+    return JSON.stringify(truncate(obj), null, 2);
   } catch {
     return String(obj);
   }
 }
 
 /**
- * Request logging middleware with timestamp, colored status codes, and MCP method info
+ * Middleware that logs incoming HTTP requests with a timestamp, color-coded status code, and optional debug details.
  *
- * Logs all HTTP requests with:
- * - Timestamp in HH:MM:SS.mmm format
- * - HTTP method and endpoint in bold
- * - MCP method name in brackets for POST requests to /mcp
- * - Color-coded status codes (green 2xx, yellow 3xx, red 4xx, magenta 5xx)
+ * Skips logging for inspector telemetry and RPC endpoints under /inspector/api/tel/, /inspector/api/rpc/stream, and /inspector/api/rpc/log.
+ * For POST requests to /mcp, includes the MCP method name when present. When DEBUG is enabled, logs request headers/body and response headers/body.
  *
- * When DEBUG environment variable is set, also logs:
- * - Request headers
- * - Full request payload/body
- * - Response headers
- * - Response body
- *
- * @param c - Hono context object
- * @param next - Hono next function
+ * @param c - Hono context for the current request/response
+ * @param next - Next middleware function to invoke
  */
 export async function requestLogger(c: Context, next: Next): Promise<void> {
   const timestamp = new Date().toISOString().substring(11, 23);
   const method = c.req.method;
   const url = c.req.url;
   const debugMode = isDebugMode();
+
+  // Filter out noisy endpoints that create log spam
+  const pathname = new URL(url).pathname;
+  const noisyPaths = [
+    "/inspector/api/tel/", // Telemetry endpoints (posthog, scarf)
+    "/inspector/api/rpc/stream", // RPC stream (SSE)
+    "/inspector/api/rpc/log", // RPC log endpoint
+  ];
+
+  // Skip logging for noisy paths but still process the request
+  if (noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath))) {
+    await next();
+    return;
+  }
 
   // Get request body for logging
   let requestBody: any = null;

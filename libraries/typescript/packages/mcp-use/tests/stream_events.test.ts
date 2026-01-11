@@ -15,31 +15,38 @@ import type { StreamEvent } from "../index.js";
 import { MCPAgent, MCPClient } from "../index.js";
 
 // Mock the MCP client for testing
-vi.mock("../src/client.js", () => ({
-  MCPClient: vi.fn().mockImplementation(() => ({
-    getAllActiveSessions: vi.fn().mockResolvedValue({}),
-    createAllSessions: vi.fn().mockResolvedValue({}),
-    closeAllSessions: vi.fn().mockResolvedValue(undefined),
-    close: vi.fn().mockResolvedValue(undefined),
-  })),
-}));
+vi.mock("../src/client.js", () => {
+  class MockMCPClient {
+    getAllActiveSessions = vi.fn().mockResolvedValue({});
+    createAllSessions = vi.fn().mockResolvedValue({});
+    closeAllSessions = vi.fn().mockResolvedValue(undefined);
+    close = vi.fn().mockResolvedValue(undefined);
+  }
+  return {
+    MCPClient: MockMCPClient,
+  };
+});
 
 // Mock the LangChain adapter
-vi.mock("../src/adapters/langchain_adapter.js", () => ({
-  LangChainAdapter: vi.fn().mockImplementation(() => ({
-    createToolsFromConnectors: vi.fn().mockResolvedValue([
+vi.mock("../src/adapters/langchain_adapter.js", () => {
+  class MockLangChainAdapter {
+    createToolsFromConnectors = vi.fn().mockResolvedValue([
       {
         name: "test_tool",
         description: "A test tool",
         schema: {},
         func: vi.fn().mockResolvedValue("Test tool result"),
       },
-    ]),
-  })),
-}));
+    ]);
+  }
+  return {
+    LangChainAdapter: MockLangChainAdapter,
+  };
+});
 
 describe("mCPAgent streamEvents()", () => {
   let agent: MCPAgent;
+  // Using any for test mocks is acceptable for flexibility
   let mockClient: any;
   let mockLLM: any;
 
@@ -206,8 +213,10 @@ describe("mCPAgent streamEvents()", () => {
       events.push(event);
     }
 
-    // Should add user message and AI response to history
-    expect(addToHistorySpy).toHaveBeenCalledTimes(2);
+    // Should add all messages from execution (user message, tool calls, tool outputs, and AI response)
+    // With the new memory behavior, we store all messages, not just user query and final response
+    expect(addToHistorySpy).toHaveBeenCalled();
+    expect(addToHistorySpy.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it("should track telemetry", async () => {

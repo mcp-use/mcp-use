@@ -1,0 +1,68 @@
+---
+title: "Sampling"
+description: "Request LLM completions from the client"
+icon: "pipette"
+---
+
+Sampling allows your MCP server tools to request LLM completions from the client during execution. This enables tools to leverage the client's LLM capabilities for tasks like sentiment analysis, text generation, or decision-making.
+
+## How It Works
+
+When a tool needs an LLM response, it can use the `Context` to send a sampling request to the client. The client's configured LLM processes the request and returns the result to the tool.
+
+## Basic Usage
+
+Use the `sample()` method on the context object to request LLM completions:
+
+```python
+from mcp.types import SamplingMessage, TextContent
+from mcp_use.server import Context, MCPServer
+
+server = MCPServer(name="My Server")
+
+@server.tool()
+async def analyze_sentiment(text: str, ctx: Context) -> str:
+    """Analyze the sentiment of text using the client's LLM."""
+    prompt = f"""Analyze the sentiment of the following text as positive, negative, or neutral.
+    Just output a single word - 'positive', 'negative', or 'neutral'.
+
+    Text to analyze: {text}"""
+
+    message = SamplingMessage(role="user", content=TextContent(type="text", text=prompt))
+
+    # Request LLM analysis
+    response = await ctx.sample(messages=[message])
+
+    if isinstance(response.content, TextContent):
+        return response.content.text.strip()
+    return ""
+```
+
+## Use Case Example
+
+A content moderation server that uses the client's LLM to analyze user-generated content:
+
+```python
+@server.tool()
+async def moderate_content(content: str, ctx: Context) -> dict:
+    """Moderate user content for policy violations."""
+    prompt = f"Does this content violate community guidelines? Answer yes or no: {content}"
+    message = SamplingMessage(role="user", content=TextContent(type="text", text=prompt))
+    response = await ctx.sample(messages=[message])
+    decision = response.content.text.strip().lower()
+    return {"allowed": decision == "no", "reason": "AI review"}
+```
+
+This allows the tool to leverage sophisticated LLM reasoning without having to integrate an LLM provider directly.
+
+## Important Notes
+
+- The client must provide a `sampling_callback` to support sampling requests
+- If no callback is configured, sampling requests will fail with an error
+- Sampling requests are processed by the client's configured LLM, not the server
+
+## Next Steps
+
+- See [Context API](/python/api-reference/mcp_use_server_context) for more context methods
+- Learn about [Elicitation](/python/server/elicitation) for requesting user input
+

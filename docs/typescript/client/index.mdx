@@ -1,0 +1,98 @@
+---
+title: "Introduction"
+description: "Connect to MCP servers with the mcp-use client"
+icon: "list-start"
+---
+
+# MCP Client
+
+**mcp-use** provides a complete MCP client implementation for TypeScript that enables your applications to connect to and interact with any MCP server. Whether you're building AI agents, automation tools, or integrations, the MCPClient gives you full access to MCP protocol features with a clean, type-safe API.
+
+## Key Features
+
+- **Multi-server support**: Connect to multiple MCP servers simultaneously
+- **Multiple connection types**: STDIO, HTTP, and SSE transports
+- **Full MCP protocol**: Complete support for tools, resources, prompts, and notifications
+- **Type-safe**: Full TypeScript support with automatic type inference
+- **Middleware support**: Add logging, metrics, and custom middleware
+- **Sandbox mode**: Secure execution environment for untrusted code
+
+## Installation
+
+Install the mcp-use package:
+
+<CodeGroup>
+```bash npm
+npm install mcp-use
+```
+```bash pnpm
+pnpm add mcp-use
+```
+```bash yarn
+yarn add mcp-use
+```
+</CodeGroup>
+
+## Quick Start
+
+Here's a basic example of connecting to an MCP server and calling a tool:
+
+
+<a href="https://codesandbox.io/p/devbox/nice-ptolemy-9j887v?embed=1&file=%2Fsrc%2Findex.ts">
+<img noZoom src="https://codesandbox.io/static/img/play-codesandbox.svg" alt="Edit mcp-client-getting-started" />
+</a>
+
+```typescript
+import { MCPClient } from 'mcp-use'
+
+// Create client and connect
+const client = new MCPClient({
+  mcpServers: {
+    'my-server': {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-everything']
+    }
+  }
+})
+await client.createAllSessions()
+
+// Get a session for a specific server
+const session = client.getSession('my-server')
+
+// List available tools
+const tools = await session.listTools()
+console.log('Available tools:', tools)
+
+// Call a tool
+const result = await session.callTool('tool_name', { 
+  param: 'value' 
+})
+console.log('Result:', result)
+
+// Cleanup
+await client.closeAllSessions()
+```
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Environments" icon="layer-group" href="/typescript/client/environments">
+    Use the client in Node.js, browser, and React applications
+  </Card>
+  <Card title="Configuration" icon="cog" href="/typescript/client/client-configuration">
+    Configure your client and understand connection types (STDIO, HTTP, SSE)
+  </Card>
+  <Card title="Tools" icon="wrench" href="/typescript/client/tools">
+    Invoke server functions and handle results
+  </Card>
+  <Card title="Resources" icon="folder-open" href="/typescript/client/resources">
+    Read content from server resources
+  </Card>
+  <Card title="Server Manager" icon="server" href="/typescript/client/server-manager">
+    Manage multiple MCP servers simultaneously
+  </Card>
+  <Card title="OAuth" icon="shield" href="/typescript/client/authentication">
+    Secure your connections with OAuth
+  </Card>
+</CardGroup>
+

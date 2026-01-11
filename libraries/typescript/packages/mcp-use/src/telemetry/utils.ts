@@ -1,21 +1,6 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-export function getPackageVersion(): string {
-  try {
-    // Check if we're in a Node.js environment with file system access
-    if (typeof __dirname === "undefined" || typeof fs === "undefined") {
-      return "unknown";
-    }
-
-    const packagePath = path.join(__dirname, "../../package.json");
-    const packageJson = JSON.parse(fs.readFileSync(packagePath, "utf-8"));
-    return packageJson.version || "unknown";
-  } catch {
-    return "unknown";
-  }
-}
+// Re-export from global version module for backward compatibility
+export { VERSION, getPackageVersion } from "../version.js";
 
 export function getModelProvider(llm: BaseLanguageModel): string {
   // Use LangChain's standard _llm_type property for identification

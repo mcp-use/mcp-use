@@ -8,7 +8,7 @@ from mcp_use.client.middleware.logging import default_logging_middleware as _def
 warnings.warn(
     "mcp_use.middleware.logging is deprecated. "
     "Use mcp_use.client.middleware.logging. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

@@ -4,135 +4,124 @@ description: "Building and configuring MCP tools"
 icon: "wrench"
 ---
 
-# Tools
-
 Tools are the primary way MCP clients interact with your server. They represent functions that can be invoked with parameters and return results. This guide covers everything you need to know about creating powerful and reliable tools.
+
+<Tip>
+**Response Helpers**: Throughout this guide, you'll see code examples using response helpers like `text()`, `object()`, and `mix()`. These utilities simplify creating tool responses with proper typing and metadata. See [Response Helpers](./response-helpers) for a complete reference.
+</Tip>
 
 ## Understanding Tools
 
 Tools in MCP are:
 - **Invocable Functions**: Clients can call them with parameters
 - **Typed**: Parameters and returns have defined types
-- **Async**: All tool handlers are asynchronous
-- **Stateless**: Each invocation is independent
+- **Async**: All tool handlers can be asynchronous
 
 ## Basic Tool Structure
 
 Every tool has three main components:
 
 ```typescript
+import { z } from 'zod';
+
 server.tool({
   name: 'tool_name',           // Unique identifier
   description: 'What it does',  // Clear description for clients
-  inputs: [...],                // Parameter definitions
-  cb: async (params) => {...}  // Handler function
-})
+  schema: z.object({...}),      // Zod schema for input validation
+}, async (params) => {...})    // Handler function
 ```
 
-## Defining Tool Inputs
+## Input Validation with Zod
 
-### Input Types
+Tools use [Zod](https://zod.dev/) schemas for input validation. The server automatically validates inputs before calling your handler, so you can trust that the parameters match your schema.
 
-Tools support five parameter types:
-
-```typescript
-// String input
-{
-  name: 'message',
-  type: 'string',
-  description: 'The message to process',
-  required: true
-}
-
-// Number input
-{
-  name: 'count',
-  type: 'number',
-  description: 'Number of items',
-  required: false,
-  default: 10
-}
-
-// Boolean input
-{
-  name: 'verbose',
-  type: 'boolean',
-  description: 'Enable verbose output',
-  required: false,
-  default: false
-}
-
-// Object input
-{
-  name: 'config',
-  type: 'object',
-  description: 'Configuration object',
-  required: false
-}
-
-// Array input
-{
-  name: 'items',
-  type: 'array',
-  description: 'List of items to process',
-  required: true
-}
-```
-
-### Optional Parameters and Defaults
+### Basic Input Types
 
 ```typescript
+import { z } from 'zod';
+
 server.tool({
-  name: 'search',
-  description: 'Search for items',
-  inputs: [
-    {
-      name: 'query',
-      type: 'string',
-      required: true  // Required parameter
-    },
-    {
-      name: 'limit',
-      type: 'number',
-      required: false,  // Optional
-      default: 10       // Default value if not provided
-    },
-    {
-      name: 'sort',
-      type: 'string',
-      required: false   // Optional with no default
-    }
-  ],
-  cb: async ({ query, limit = 10, sort }) => {
-    // limit will be 10 if not provided
-    // sort will be undefined if not provided
-    return { content: [{ type: 'text', text: 'Results...' }] }
-  }
+  name: 'process_message',
+  description: 'Process a message with various options',
+  schema: z.object({
+    // Required string
+    message: z.string().describe('The message to process'),
+    
+    // Optional number with default
+    count: z.number().default(10).describe('Number of items'),
+    
+    // Optional boolean with default
+    verbose: z.boolean().default(false).describe('Enable verbose output'),
+    
+    // Optional object
+    config: z.object({
+      setting1: z.string(),
+      setting2: z.number()
+    }).optional().describe('Configuration object'),
+    
+    // Array of strings
+    items: z.array(z.string()).describe('List of items to process')
+  })
+}, async ({ message, count, verbose, config, items }) => {
+  // message, count, verbose, config, items are fully typed and validated
+  // count will be 10 if not provided
+  // verbose will be false if not provided
+  return text('Results...')
 })
 ```
+
 
 ## Tool Callbacks
 
 ### Basic Response
 
-The simplest tool response is text:
+The simplest tool response is text. Use the `text()` helper for clean, readable code:
 
-```typescript
-cb: async (params) => {
+<CodeGroup>
+
+```typescript Helper
+import { text } from 'mcp-use/server';
+
+async (params) => {
+  return text('Response text here');
+}
+```
+
+```typescript Expanded
+async (params) => {
   return {
     content: [{
       type: 'text',
       text: 'Response text here'
-    }]
+    }],
+    _meta: {
+      mimeType: 'text/plain'
+    }
   }
 }
 ```
 
+</CodeGroup>
+
 ### Multiple Content Items
 
-Tools can return multiple content items:
+Tools can return multiple content items using the `mix()` helper:
 
-```typescript
+<CodeGroup>
+
+```typescript Helper (Recommended)
+import { mix, text, resource, object } from 'mcp-use/server';
+
+cb: async ({ data }) => {
+  return mix(
+    text('Analysis complete:'),
+    text(`Found ${data.length} items`),
+    resource('results://latest', object({ items: data }))
+  );
+}
+```
+
+```typescript Expanded
 cb: async ({ data }) => {
   return {
     content: [
@@ -146,293 +135,20 @@ cb: async ({ data }) => {
       },
       {
         type: 'resource',
-        uri: 'results://latest',
-        mimeType: 'application/json'
-      }
-    ]
-  }
-}
-```
-
-### Including Resources
-
-Tools can reference resources:
-
-```typescript
-cb: async ({ filename }) => {
-  // Process file and create resource
-  const resourceUri = `file://${filename}`
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `Processed ${filename}`
-      },
-      {
-        type: 'resource',
-        uri: resourceUri,
-        mimeType: 'text/plain'
-      }
-    ]
-  }
-}
-```
-
-## Advanced Tool Patterns
-
-### Input Validation
-
-Always validate inputs in your tool handlers:
-
-```typescript
-server.tool({
-  name: 'divide',
-  description: 'Divide two numbers',
-  inputs: [
-    { name: 'dividend', type: 'number', required: true },
-    { name: 'divisor', type: 'number', required: true }
-  ],
-  cb: async ({ dividend, divisor }) => {
-    // Validation
-    if (divisor === 0) {
-      return {
-        content: [{
-          type: 'text',
-          text: 'Error: Division by zero is not allowed'
-        }]
-      }
-    }
-
-    const result = dividend / divisor
-    return {
-      content: [{
-        type: 'text',
-        text: `Result: ${result}`
-      }]
-    }
-  }
-})
-```
-
-### Async Operations
-
-Tools naturally support async operations:
-
-```typescript
-server.tool({
-  name: 'fetch_data',
-  description: 'Fetch data from external API',
-  inputs: [
-    { name: 'endpoint', type: 'string', required: true }
-  ],
-  cb: async ({ endpoint }) => {
-    try {
-      const response = await fetch(endpoint)
-      const data = await response.json()
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(data, null, 2)
-        }]
-      }
-    } catch (error) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Error fetching data: ${error.message}`
-        }]
-      }
-    }
-  }
-})
-```
-
-### Progress Reporting
-
-For long-running operations, provide status updates:
-
-```typescript
-server.tool({
-  name: 'process_batch',
-  description: 'Process a batch of items',
-  inputs: [
-    { name: 'items', type: 'array', required: true }
-  ],
-  cb: async ({ items }) => {
-    const results = []
-    const messages = []
-
-    for (let i = 0; i < items.length; i++) {
-      // Process each item
-      const result = await processItem(items[i])
-      results.push(result)
-
-      // Create progress message
-      messages.push(`Processed ${i + 1}/${items.length}: ${items[i]}`)
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: messages.join('\n')
-        },
-        {
-          type: 'text',
-          text: `\nCompleted processing ${items.length} items`
+        resource: {
+          uri: 'results://latest',
+          mimeType: 'application/json',
+          text: JSON.stringify({ items: data }, null, 2)
         }
-      ]
-    }
-  }
-})
-```
-
-### Automatic Progress in Sampling
-
-When using `ctx.sample()` for LLM sampling, progress notifications are automatically sent to prevent client-side timeouts. This is especially important for long-running operations that may exceed the default 60-second timeout.
-
-```typescript
-server.tool({
-  name: 'analyze-sentiment',
-  description: 'Analyze sentiment using client LLM',
-  inputs: [
-    { name: 'text', type: 'string', required: true }
-  ],
-  cb: async (params, ctx?: ToolContext) => {
-    if (!ctx) {
-      return {
-        content: [{ type: 'text', text: 'Sampling not available' }],
-        isError: true
       }
-    }
-
-    // ctx.sample() automatically sends progress notifications every 5 seconds
-    // This prevents client timeouts when resetTimeoutOnProgress is enabled
-    const result = await ctx.sample({
-      messages: [{
-        role: 'user',
-        content: { type: 'text', text: `Analyze sentiment: ${params.text}` }
-      }],
-      modelPreferences: {
-        intelligencePriority: 0.8,
-        speedPriority: 0.5
-      }
-    })
-
-    return {
-      content: [{
-        type: 'text',
-        text: result.content.text || 'Unable to analyze'
-      }]
-    }
+    ]
   }
-})
+}
 ```
 
-#### Configuring Progress and Timeout
+</CodeGroup>
 
-You can customize the progress interval and timeout:
 
-```typescript
-const result = await ctx.sample(
-  {
-    messages: [{ role: 'user', content: { type: 'text', text: prompt } }]
-  },
-  {
-    // Optional: Set a timeout (default: Infinity - waits indefinitely)
-    timeout: 120000, // 2 minutes
-    
-    // Optional: Progress notification interval (default: 5000ms)
-    progressIntervalMs: 3000, // Every 3 seconds
-    
-    // Optional: Custom progress callback
-    onProgress: ({ progress, message }) => {
-      console.log(`[Progress] ${message}`)
-    }
-  }
-)
-```
-
-#### Manual Progress Reporting
-
-For non-sampling operations, you can manually send progress notifications:
-
-```typescript
-server.tool({
-  name: 'long_operation',
-  description: 'Long-running operation with manual progress',
-  inputs: [{ name: 'data', type: 'string', required: true }],
-  cb: async (params, ctx?: ToolContext) => {
-    if (ctx?.reportProgress) {
-      // Send progress updates manually
-      await ctx.reportProgress(0, 100, 'Starting processing...')
-      
-      // Do work...
-      await processData(params.data)
-      
-      await ctx.reportProgress(50, 100, 'Halfway done...')
-      
-      // More work...
-      await finalizeProcessing()
-      
-      await ctx.reportProgress(100, 100, 'Complete!')
-    }
-    
-    return {
-      content: [{ type: 'text', text: 'Operation complete' }]
-    }
-  }
-})
-```
-
-**Note**: Progress notifications only work if the client requested them by including a `progressToken` in the tool call request. The client must also have `resetTimeoutOnProgress: true` enabled to reset timeouts on progress notifications.
-
-### Tool Composition
-
-Tools can work together:
-
-```typescript
-// Data fetching tool
-server.tool({
-  name: 'fetch_user',
-  description: 'Fetch user data',
-  inputs: [
-    { name: 'userId', type: 'string', required: true }
-  ],
-  cb: async ({ userId }) => {
-    const user = await getUserFromDatabase(userId)
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify(user)
-      }]
-    }
-  }
-})
-
-// Analysis tool that uses fetched data
-server.tool({
-  name: 'analyze_user',
-  description: 'Analyze user activity',
-  inputs: [
-    { name: 'userId', type: 'string', required: true }
-  ],
-  cb: async ({ userId }) => {
-    // Could call fetch_user first or expect client to provide data
-    const userData = await getUserFromDatabase(userId)
-    const analysis = analyzeUserActivity(userData)
-
-    return {
-      content: [{
-        type: 'text',
-        text: `User ${userId} analysis:\n${analysis}`
-      }]
-    }
-  }
-})
-```
 
 ## Tool Annotations
 
@@ -442,156 +158,223 @@ Add metadata to tools for better client integration:
 server.tool({
   name: 'important_operation',
   description: 'Performs an important operation',
-  inputs: [...],
+  schema: z.object({ ... }),
   annotations: {
     requiresAuth: true,
     rateLimit: '10/minute',
     deprecated: false
-  },
-  cb: async (params) => {
-    // Tool implementation
   }
+}, async (params) => {
+  // Tool implementation
 })
 ```
+
+## Returning Widgets from Tools
+
+Tools can return interactive UI widgets using the `widget()` helper with the `widget` config option. This automatically configures the tool to render widgets in the Inspector and ChatGPT.
+
+<Note>
+You must include the `widget: { name, ... }` config in your tool definition when returning widgets. This sets up all the registration-time metadata needed for proper widget rendering.
+</Note>
+
+```typescript
+import { widget, text } from 'mcp-use/server';
+import { z } from 'zod';
+
+server.tool({
+  name: 'get-weather',
+  description: 'Get current weather for a city',
+  schema: z.object({
+    city: z.string().describe('City name')
+  }),
+  // Widget config sets all registration-time metadata
+  widget: {
+    name: 'weather-display',  // Must match a widget in resources/
+    invoking: 'Fetching weather...',
+    invoked: 'Weather loaded'
+  }
+}, async ({ city }) => {
+  // Fetch weather data
+  const weatherData = await fetchWeather(city);
+  
+  // Return widget with runtime data only
+  return widget({
+    props: weatherData,
+    output: text(`Weather in ${city}: ${weatherData.temp}°C`),
+    message: `Current weather in ${city}`
+  });
+});
+```
+
+**How it works:**
+- `widget: { name, invoking, invoked, ... }` on tool definition - Configures all widget metadata at registration time
+- `widget({ props, output, message })` helper - Returns runtime data only:
+  - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
+  - `output` - Optional response helper (text(), object(), etc.) that the model sees
+  - `message` - Optional text message override
+- The widget must exist in your `resources/` folder as a `.tsx` file or folder
+
+See [UI Widgets](./ui-widgets) for complete widget creation and registration documentation.
 
 ## OpenAI Apps SDK Integration
 
 For ChatGPT and OpenAI compatible clients:
 
+<Tip>
+**Recommended Approach**: The recommended way to create OpenAI Apps SDK widgets is to use the [widget helper with returnsWidget option](./ui-widgets#custom-tools-with-widgets) or [automatic widget mounting](./ui-widgets#automatic-widget-registration), which automatically registers widgets from the `resources/` folder as tools. The manual approach below is shown for reference.
+</Tip>
+
 ```typescript
 server.tool({
   name: 'show_chart',
   description: 'Display a chart',
-  inputs: [
-    { name: 'data', type: 'array', required: true }
-  ],
+  schema: z.object({
+    data: z.array(z.any()).describe('The chart data')
+  }),
   _meta: {
     'openai/outputTemplate': 'ui://widgets/chart',
     'openai/toolInvocation/invoking': 'Generating chart...',
     'openai/toolInvocation/invoked': 'Chart generated',
     'openai/widgetAccessible': true
-  },
-  cb: async ({ data }) => {
-    return {
-      _meta: {
-        'openai/outputTemplate': 'ui://widgets/chart'
-      },
-      content: [{
-        type: 'text',
-        text: 'Chart displayed'
-      }],
-      structuredContent: { data }
-    }
+  }
+}, async ({ data }) => {
+  return {
+    _meta: {
+      'openai/outputTemplate': 'ui://widgets/chart'
+    },
+    content: [{
+      type: 'text',
+      text: 'Chart displayed'
+    }],
+    structuredContent: { data }
   }
 })
 ```
 
-## Error Handling Best Practices
+## Error Handling with error()
 
-### Graceful Degradation
+The `error()` helper provides a standardized way to return error responses from tools. It sets the `isError` flag to `true`, allowing clients to distinguish between successful results and error conditions. This ensures consistent error handling across your MCP server.
 
-```typescript
+The `error()` helper creates a properly formatted error response with:
+- `isError: true` flag to indicate failure
+- Text content with your error message
+- Proper MIME type metadata
+
+
+<CodeGroup>
+
+```typescript Helper (Recommended)
+import { object, error } from 'mcp-use/server';
+
 server.tool({
   name: 'external_api',
   description: 'Call external API',
-  inputs: [
-    { name: 'endpoint', type: 'string', required: true }
-  ],
-  cb: async ({ endpoint }) => {
-    try {
-      const data = await callExternalAPI(endpoint)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(data)
-        }]
-      }
-    } catch (error) {
-      // Provide useful error information
-      return {
-        content: [{
-          type: 'text',
-          text: `Unable to fetch data from ${endpoint}.\n` +
-                `Error: ${error.message}\n` +
-                `Please check the endpoint and try again.`
-        }]
-      }
-    }
+  schema: z.object({
+    endpoint: z.string().url().describe('The API endpoint URL')
+  })
+}, async ({ endpoint }) => {
+  try {
+    const data = await callExternalAPI(endpoint);
+    return object(data);
+  } catch (err) {
+    // Use error() helper to signal failure to the client
+    return error(
+      `Unable to fetch data from ${endpoint}.\n` +
+      `Error: ${err.message}\n` +
+      `Please check the endpoint and try again.`
+    );
   }
 })
 ```
 
-### Input Sanitization
-
-```typescript
+```typescript Expanded
 server.tool({
-  name: 'execute_command',
-  description: 'Execute a safe command',
-  inputs: [
-    { name: 'command', type: 'string', required: true }
-  ],
-  cb: async ({ command }) => {
-    // Sanitize input
-    const allowedCommands = ['list', 'status', 'info']
-    const sanitizedCommand = command.toLowerCase().trim()
-
-    if (!allowedCommands.includes(sanitizedCommand)) {
-      return {
-        content: [{
-          type: 'text',
-          text: `Invalid command. Allowed commands: ${allowedCommands.join(', ')}`
-        }]
-      }
-    }
-
-    // Execute safe command
-    const result = await executeSafeCommand(sanitizedCommand)
+  name: 'external_api',
+  description: 'Call external API',
+  schema: z.object({
+    endpoint: z.string().url().describe('The API endpoint URL')
+  })
+}, async ({ endpoint }) => {
+  try {
+    const data = await callExternalAPI(endpoint);
     return {
       content: [{
         type: 'text',
-        text: result
-      }]
+        text: JSON.stringify(data, null, 2)
+      }],
+      structuredContent: data,
+      _meta: {
+        mimeType: 'application/json'
+      }
+    }
+  } catch (err) {
+    // Return error response with isError flag set
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Unable to fetch data from ${endpoint}.\n` +
+              `Error: ${err.message}\n` +
+              `Please check the endpoint and try again.`
+      }],
+      _meta: {
+        mimeType: 'text/plain'
+      }
     }
   }
 })
 ```
 
-## Testing Tools
+</CodeGroup>
 
-### Unit Testing Example
+## Logging from Tools
+
+Tools can send log messages to clients during execution using `ctx.log()`. This is useful for reporting progress, debugging tool behavior, and providing real-time feedback during long-running operations.
 
 ```typescript
-import { describe, it, expect } from 'vitest'
-import { createMCPServer } from 'mcp-use/server'
-
-describe('Calculator Tool', () => {
-  const server = createMCPServer('test-server')
-
-  server.tool({
-    name: 'add',
-    description: 'Add two numbers',
-    inputs: [
-      { name: 'a', type: 'number', required: true },
-      { name: 'b', type: 'number', required: true }
-    ],
-    cb: async ({ a, b }) => ({
-      content: [{
-        type: 'text',
-        text: `${a + b}`
-      }]
-    })
+server.tool({
+  name: 'process_files',
+  description: 'Process multiple files',
+  schema: z.object({
+    files: z.array(z.string())
   })
-
-  it('should add two numbers correctly', async () => {
-    const tool = server.getTool('add') // Note: This is pseudocode
-    const result = await tool.cb({ a: 5, b: 3 })
-
-    expect(result.content[0].text).toBe('8')
-  })
+}, async ({ files }, ctx) => {
+  await ctx.log('info', 'Starting file processing');
+  
+  for (const file of files) {
+    await ctx.log('debug', `Processing ${file}`);
+    // ... process file ...
+  }
+  
+  await ctx.log('info', 'Processing completed');
+  return text(`Processed ${files.length} files`);
 })
 ```
 
-### Manual Testing with Inspector
+The `ctx.log()` function accepts a log level (`'debug'`, `'info'`, `'notice'`, `'warning'`, `'error'`, `'critical'`, `'alert'`, `'emergency'`), a message string, and an optional logger name. See [Server Logging](./logging#tool-logging-with-ctxlog) for complete documentation on log levels and best practices.
+
+
+## Notifying Clients of Tool Changes
+
+When dynamically adding or removing tools, notify clients to refresh their tools cache:
+
+```typescript
+// Register a new tool dynamically
+server.tool({
+  name: 'new_tool',
+  description: 'A dynamically added tool',
+  schema: z.object({ input: z.string() })
+}, async ({ input }) => text(`Processed: ${input}`));
+
+// Notify all connected clients
+await server.sendToolsListChanged();
+```
+
+See [Notifications](./notifications) for more details.
+
+
+## Testing
+
 
 Use the built-in inspector for interactive testing:
 
@@ -601,90 +384,9 @@ Use the built-in inspector for interactive testing:
 4. Enter parameter values
 5. Execute and view results
 
-## Performance Optimization
-
-### Caching Results
-
-```typescript
-const cache = new Map()
-
-server.tool({
-  name: 'expensive_operation',
-  description: 'Performs expensive computation',
-  inputs: [
-    { name: 'input', type: 'string', required: true }
-  ],
-  cb: async ({ input }) => {
-    // Check cache
-    const cacheKey = `expensive:${input}`
-    if (cache.has(cacheKey)) {
-      return {
-        content: [{
-          type: 'text',
-          text: cache.get(cacheKey)
-        }]
-      }
-    }
-
-    // Perform expensive operation
-    const result = await performExpensiveOperation(input)
-
-    // Cache result
-    cache.set(cacheKey, result)
-
-    return {
-      content: [{
-        type: 'text',
-        text: result
-      }]
-    }
-  }
-})
-```
-
-### Streaming Large Results
-
-For large datasets, consider pagination:
-
-```typescript
-server.tool({
-  name: 'list_items',
-  description: 'List items with pagination',
-  inputs: [
-    { name: 'page', type: 'number', required: false, default: 1 },
-    { name: 'pageSize', type: 'number', required: false, default: 20 }
-  ],
-  cb: async ({ page = 1, pageSize = 20 }) => {
-    const offset = (page - 1) * pageSize
-    const items = await getItems(offset, pageSize)
-    const total = await getTotalCount()
-    const totalPages = Math.ceil(total / pageSize)
-
-    return {
-      content: [{
-        type: 'text',
-        text: `Page ${page} of ${totalPages} (${total} total items):\n` +
-              items.map(item => `- ${item.name}`).join('\n')
-      }]
-    }
-  }
-})
-```
-
-## Best Practices
-
-1. **Clear Naming**: Use descriptive, action-oriented names
-2. **Comprehensive Descriptions**: Explain what the tool does and how to use it
-3. **Input Validation**: Always validate and sanitize inputs
-4. **Error Handling**: Provide helpful error messages
-5. **Idempotency**: Make tools idempotent when possible
-6. **Documentation**: Document complex tools with examples
-7. **Testing**: Write tests for critical tools
-8. **Performance**: Consider caching and pagination for expensive operations
-
 ## Next Steps
 
+- [Response Helpers](./response-helpers) - Utility functions for creating responses
 - [Resources Guide](./resources) - Managing static and dynamic content
 - [UI Widgets](./ui-widgets) - Creating interactive UI components
-- [API Reference](./api-reference) - Complete API documentation
-- [Examples](./examples) - Real-world tool implementations
+- [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) - Real-world tool implementations

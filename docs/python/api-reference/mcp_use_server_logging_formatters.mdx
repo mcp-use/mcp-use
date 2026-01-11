@@ -1,0 +1,205 @@
+---
+title: "Formatters"
+description: "Log formatters for MCP servers API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/formatters.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/formatters.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/logging/formatters.py</a>
+</Callout>
+
+Log formatters for MCP servers.
+
+## ColoredFormatter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ColoredFormatter</div>
+
+Custom formatter with ANSI color codes.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.formatters import ColoredFormatter
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="fmt" default="None" >   Parameter value </ParamField>
+><ParamField body="datefmt" default="None" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(fmt = None, datefmt = None):
+```
+
+</Card>
+</div>
+
+## MCPAccessFormatter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPAccessFormatter</div>
+
+Enhanced Uvicorn access formatter that shows MCP method information.
+
+    For MCP requests, enhances the log with JSON-RPC method info from thread-local storage.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.formatters import MCPAccessFormatter
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="kwargs" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(kwargs):
+```
+
+</Card>
+</div>
+
+## MCPErrorFormatter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPErrorFormatter</div>
+
+Custom error formatter with helpful messages.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.formatters import MCPErrorFormatter
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize the formatter with specified format strings.
+
+        Initialize the formatter either with the specified format string, or a
+        default as described above. Allow for specialized date formatting with
+        the optional datefmt argument. If datefmt is omitted, you get an
+        ISO8601-like (or RFC 3339-like) format.
+
+        Use a style parameter of '%', '\{' or '$' to specify that you want to
+        use one of %-formatting, :meth:`str.format` (``\{\}``) formatting or
+        :class:`string.Template` formatting in your format string.
+
+        .. versionchanged:: 3.2
+           Added the ``style`` parameter.
+
+**Parameters**
+><ParamField body="fmt" default="None" >   Parameter value </ParamField>
+><ParamField body="datefmt" default="None" >   Parameter value </ParamField>
+><ParamField body="style" default='%' >   Parameter value </ParamField>
+><ParamField body="validate" default="True" >   Parameter value </ParamField>
+><ParamField body="defaults" default="None" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(fmt = None, datefmt = None, style = "%", validate = True, defaults = None):
+```
+
+</Card>
+</div>
+
+## UvicornAccessArgs
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> UvicornAccessArgs</div>
+
+Uvicorn access logs use a tuple format: (client_addr, method, path, ...).
+
+    This class provides named access to make the code more readable.
+    See: https://github.com/encode/uvicorn/blob/master/uvicorn/logging.py
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.formatters import UvicornAccessArgs
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="client_addr" type="str" required="True" >   MCP client instance </ParamField>
+<ParamField body="method" type="str" required="True" >   String value </ParamField>
+<ParamField body="path" type="str" required="True" >   File path </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="client_addr" type="str" required="True" >   MCP client instance </ParamField>
+><ParamField body="method" type="str" required="True" >   String value </ParamField>
+><ParamField body="path" type="str" required="True" >   File path </ParamField>
+><ParamField body="extra" type="tuple" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(client_addr: str, method: str, path: str, extra: tuple):
+```
+
+</Card>
+<Card type="info">
+### `method` is_mcp_request
+
+Check if this is a POST request to the MCP endpoint.
+
+
+**Parameters**
+><ParamField body="mcp_path" type="str" default='/mcp' >   File path </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def is_mcp_request(mcp_path: str = "/mcp"):
+```
+
+</Card>
+
+<Card type="info">
+### `method` to_tuple
+
+Convert back to tuple format for Uvicorn's formatter.
+
+
+**Parameters**
+><ParamField body="path_override" type="str | None" default="None" >   File path </ParamField>
+><ParamField body="method_override" type="str | None" default="None" >   String value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="tuple" />
+
+**Signature**
+```python wrap
+def to_tuple(path_override: str | None = None, method_override: str | None = None):
+```
+
+</Card>
+
+</div>

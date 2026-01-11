@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
-import { logger } from "hono/logger";
+import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
   generateWidgetContentHtml,
@@ -10,7 +11,6 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
-import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -22,91 +22,18 @@ export function registerInspectorRoutes(
   app: Hono,
   config?: { autoConnectUrl?: string | null }
 ) {
-  // MCP Proxy endpoint - proxies MCP requests to target servers
-  // WARNING: This proxy endpoint does not implement authentication.
-  // For production use, consider adding authentication or restricting access to localhost only.
-
   app.get("/inspector/health", (c) => {
     return c.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Apply logger middleware only to proxy routes
-  app.use("/inspector/api/proxy/*", logger());
+  // Mount MCP proxy middleware at the inspector's proxy path
+  mountMcpProxy(app, {
+    path: "/inspector/api/proxy",
+  });
 
-  app.all("/inspector/api/proxy/*", async (c) => {
-    try {
-      const targetUrl = c.req.header("X-Target-URL");
-
-      if (!targetUrl) {
-        return c.json({ error: "X-Target-URL header is required" }, 400);
-      }
-
-      // Forward the request to the target MCP server
-      const method = c.req.method;
-      const headers: Record<string, string> = {};
-
-      // Copy relevant headers, excluding proxy-specific ones and encoding preferences
-      const requestHeaders = c.req.header();
-      for (const [key, value] of Object.entries(requestHeaders)) {
-        const lowerKey = key.toLowerCase();
-        if (
-          !lowerKey.startsWith("x-proxy-") &&
-          !lowerKey.startsWith("x-target-") &&
-          lowerKey !== "host" &&
-          lowerKey !== "accept-encoding"
-        ) {
-          // Don't forward accept-encoding to prevent compression
-          headers[key] = value;
-        }
-      }
-
-      // Explicitly request uncompressed response
-      headers["Accept-Encoding"] = "identity";
-
-      // Set the target URL as the host
-      try {
-        const targetUrlObj = new URL(targetUrl);
-        headers.Host = targetUrlObj.host;
-      } catch {
-        return c.json({ error: "Invalid target URL" }, 400);
-      }
-
-      const body =
-        method !== "GET" && method !== "HEAD"
-          ? await c.req.arrayBuffer()
-          : undefined;
-
-      const response = await fetch(targetUrl, {
-        method,
-        headers,
-        body: body ? new Uint8Array(body) : undefined,
-      });
-
-      // Forward response headers, excluding problematic encoding headers
-      // Node.js fetch() auto-decompresses the body but preserves these headers
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        const lowerKey = key.toLowerCase();
-        // Skip compression-related headers that don't match the actual body state
-        if (
-          lowerKey !== "content-encoding" &&
-          lowerKey !== "transfer-encoding" &&
-          lowerKey !== "content-length"
-        ) {
-          responseHeaders[key] = value;
-        }
-      });
-
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: responseHeaders,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("Proxy request failed:", message, error);
-      return c.json({ error: "Proxy request failed", details: message }, 500);
-    }
+  // Mount OAuth proxy middleware at the inspector's OAuth path
+  mountOAuthProxy(app, {
+    basePath: "/inspector/api/oauth",
   });
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)

@@ -43,8 +43,8 @@ export function ChatHeader({
   onClearConfig,
 }: ChatHeaderProps) {
   return (
-    <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 bg-background/40 backdrop-blur-sm gap-2">
-      <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4">
+    <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
+      <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4 bg-background/40 backdrop-blur-sm">
         <h3 className="text-xl sm:text-3xl font-base">Chat</h3>
         {llmConfig && (
           <>

@@ -1,12 +1,10 @@
 ---
-title: "McpUseProvider"
-description: "Unified provider component that combines all common React setup for mcp-use widgets"
+title: "<McpUseProvider />"
+description: "Utility component to simplify the setup of your widget"
 icon: "layers"
 ---
 
-# McpUseProvider
-
-The `McpUseProvider` is a unified provider component that combines all common React setup for mcp-use widgets. It automatically includes StrictMode, ThemeProvider, BrowserRouter, optional WidgetControls, and ErrorBoundary, eliminating the need to manually set up these providers.
+The `<McpUseProvider />` is a utility component that simplifies the setup of your widget. It automatically includes StrictMode, ThemeProvider, BrowserRouter, optional WidgetControls, and ErrorBoundary, eliminating the need to manually set up these providers.
 
 ## Import
 
@@ -39,7 +37,7 @@ The `McpUseProvider` automatically wraps your widget with:
 ```tsx
 import { McpUseProvider } from 'mcp-use/react';
 import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 function MyWidget() {
   return (
@@ -93,7 +91,7 @@ Enable automatic height notifications for dynamic content:
 ```tsx
 import { McpUseProvider } from 'mcp-use/react';
 import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useWidget } from 'mcp-use/react';
 
 function ProductWidget() {
@@ -117,31 +115,6 @@ export default function App() {
   );
 }
 ```
-
-## Auto-sizing Feature
-
-When `autoSize={true}`, the provider:
-
-- Uses `ResizeObserver` to monitor the container height
-- Automatically calls `window.openai.notifyIntrinsicHeight()` when height changes
-- Debounces notifications (150ms) to prevent excessive calls
-- Uses `scrollHeight` as fallback for more accurate measurements
-- Prevents feedback loops by tracking notification state
-
-This is especially useful for widgets with dynamic content that changes height based on user interactions or data loading.
-
-## Automatic Basename Calculation
-
-The `BrowserRouter` automatically calculates the correct `basename` for routing:
-
-- In **production**: Uses `/` as basename
-- In **inspector dev proxy**: Detects `/inspector/api/dev-widget/:toolId` pattern and sets basename accordingly
-
-This ensures React Router works correctly in both development and production environments.
-
-## Dev Mode Detection
-
-When running in the inspector's dev widget proxy, `WidgetControls` are automatically hidden since the inspector provides its own debugging interface. This prevents duplicate controls from appearing.
 
 ## Related Components
 

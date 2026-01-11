@@ -7,7 +7,7 @@ from mcp_use.agents.adapters.base import BaseAdapter as _BaseAdapter
 
 warnings.warn(
     "mcp_use.adapters.base is deprecated. Use mcp_use.agents.adapters.base. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

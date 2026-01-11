@@ -67,12 +67,11 @@ Initialize a new MCPAgent instance.
 ><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for remote API calls. </ParamField>
 ><ParamField body="callbacks" type="list | None" default="None" >   List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler. </ParamField>
 ><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
-><ParamField body="retry_on_error" type="bool" default="True" >   Whether to retry tool calls that fail due to validation errors. </ParamField>
-><ParamField body="max_retries_per_step" type="int" default="2" >   Maximum number of retries for validation errors per step. </ParamField>
+><ParamField body="retry_on_error" type="bool" default="True" >   Whether to enable automatic error handling for tool calls. When True, tool errors </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.client.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.agents.managers.base.BaseServerManager | None = None, verbose: bool = False, pretty_print: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, max_retries_per_step: int = 2):
+def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.client.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.agents.managers.base.BaseServerManager | None = None, verbose: bool = False, pretty_print: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True):
 ```
 
 </Card>
@@ -208,7 +207,7 @@ Run a query using LangChain 1.0.0's agent and return the final result.
 
 
 **Parameters**
-><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
+><ParamField body="query" type="str | langchain_core.messages.human.HumanMessage" required="True" >   The query to run. Accepts a plain string or a ``HumanMessage`` when </ParamField>
 ><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
@@ -220,7 +219,7 @@ Run a query using LangChain 1.0.0's agent and return the final result.
 **Signature**
 ```python wrap
 def run(
-query: str,
+query: str | langchain_core.messages.human.HumanMessage,
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
@@ -294,7 +293,7 @@ Async generator using LangChain 1.0.0's create_agent and astream.
 
 
 **Parameters**
-><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
+><ParamField body="query" type="str | langchain_core.messages.human.HumanMessage" required="True" >   The query to run. Accepts a plain string or a ``HumanMessage`` when </ParamField>
 ><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
@@ -307,7 +306,7 @@ Async generator using LangChain 1.0.0's create_agent and astream.
 **Signature**
 ```python wrap
 def stream(
-query: str,
+query: str | langchain_core.messages.human.HumanMessage,
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
@@ -330,7 +329,7 @@ Asynchronous streaming interface.
 
 
 **Parameters**
-><ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+><ParamField body="query" type="str | langchain_core.messages.human.HumanMessage" required="True" >   Query string or input </ParamField>
 ><ParamField body="max_steps" type="int | None" default="None" >   Integer value </ParamField>
 ><ParamField body="manage_connector" type="bool" default="True" >   Connector instance </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   List of items </ParamField>
@@ -341,7 +340,7 @@ Asynchronous streaming interface.
 **Signature**
 ```python wrap
 def stream_events(
-query: str,
+query: str | langchain_core.messages.human.HumanMessage,
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None

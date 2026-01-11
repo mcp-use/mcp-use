@@ -14,14 +14,15 @@ import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
 import { JSONDisplay } from "../shared/JSONDisplay";
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 
 export interface ResourceResult {
   uri: string;
-  result: any;
+  result: ReadResourceResult | { error?: string; isError?: boolean };
   error?: string;
   timestamp: number;
   // Resource metadata from definition (includes openai/outputTemplate in annotations)
-  resourceAnnotations?: Record<string, any>;
+  resourceAnnotations?: Record<string, unknown>;
 }
 
 interface ResourceResultDisplayProps {
@@ -29,13 +30,44 @@ interface ResourceResultDisplayProps {
   isLoading: boolean;
   previewMode: boolean;
   serverId?: string;
-  readResource?: (uri: string) => Promise<any>;
+  readResource?: (uri: string) => Promise<ReadResourceResult>;
   onTogglePreview: () => void;
   onCopy: () => void;
   onDownload: () => void;
   onFullscreen: () => void;
-  onUIAction?: (action: any) => void;
+  onUIAction?: (action: unknown) => void;
   isCopied?: boolean;
+}
+
+// Helper function to extract error message from result with isError: true
+function extractErrorMessage(
+  result: ReadResourceResult | { error?: string; isError?: boolean }
+): string | null {
+  // Handle direct error property
+  if ("error" in result && result.error) {
+    return result.error;
+  }
+
+  // Only extract text content as error if isError is explicitly true
+  if (!("isError" in result && result.isError)) {
+    return null;
+  }
+
+  // isError is true - extract error message from contents
+  if ("contents" in result && Array.isArray(result.contents)) {
+    const textContents = result.contents
+      .filter(
+        (item): item is Extract<typeof item, { text: string }> => "text" in item
+      )
+      .map((item) => item.text)
+      .filter(Boolean);
+
+    if (textContents.length > 0) {
+      return textContents.join("\n");
+    }
+  }
+
+  return "An error occurred";
 }
 
 export function ResourceResultDisplay({
@@ -119,13 +151,16 @@ export function ResourceResultDisplay({
     );
   }
 
-  if (result.error) {
+  // Check for error in result.error or result.result.isError
+  const errorMessage = result.error || extractErrorMessage(result.result);
+
+  if (errorMessage) {
     return (
       <div className="p-4">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
           <p className="text-red-800 dark:text-red-300 font-medium">Error:</p>
           <p className="text-red-700 dark:text-red-400 text-sm">
-            {result.error}
+            {errorMessage}
           </p>
         </div>
       </div>

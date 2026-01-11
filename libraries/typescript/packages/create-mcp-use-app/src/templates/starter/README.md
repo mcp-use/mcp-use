@@ -1,10 +1,10 @@
 # MCP Starter Server
 
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fcreate-mcp-use-app%2Fsrc%2Ftemplates%2Fstarter&branch=main&project-name=starter-template&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A18)
+[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fcreate-mcp-use-app%2Fsrc%2Ftemplates%2Fstarter&branch=main&project-name=starter-template&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A20)
 
 A comprehensive MCP server template with examples of tools, resources, prompts, and all UIResource types.
 
-> 📚 **[View Full Documentation](https://docs.mcp-use.com/typescript/getting-started/quickstart)** - Complete guides, API references, and tutorials
+> 📚 **[View Full Documentation](https://mcp-use.com/docs/typescript/getting-started/quickstart)** - Complete guides, API references, and tutorials
 
 ## Features
 
@@ -26,40 +26,44 @@ This starter template demonstrates all major MCP features:
 ### 1. Traditional Tools
 
 ```typescript
-server.tool({
-  name: 'greet',
-  description: 'Greet someone by name',
-  inputs: [{ name: 'name', type: 'string', required: true }],
-  cb: async ({ name }) => {
-    return { content: [{ type: 'text', text: `Hello, ${name}!` }] }
+import { text } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "greet",
+    description: "Greet someone by name",
+    schema: z.object({ name: z.string() }),
   },
-})
+  async ({ name }) => {
+    return text(`Hello, ${name}!`);
+  }
+);
 ```
 
 ### 2. Resources
 
 ```typescript
 server.resource({
-  name: 'config',
-  uri: 'config://settings',
-  mimeType: 'application/json',
+  name: "config",
+  uri: "config://settings",
+  mimeType: "application/json",
   readCallback: async () => ({
     /* ... */
   }),
-})
+});
 ```
 
 ### 3. Prompts
 
 ```typescript
 server.prompt({
-  name: 'review-code',
-  description: 'Review code for best practices',
-  args: [{ name: 'code', type: 'string', required: true }],
+  name: "review-code",
+  description: "Review code for best practices",
+  args: [{ name: "code", type: "string", required: true }],
   cb: async ({ code }) => {
     /* ... */
   },
-})
+});
 ```
 
 ### 4. UIResources (3 Types)
@@ -70,14 +74,14 @@ React components served from your filesystem:
 
 ```typescript
 server.uiResource({
-  type: 'externalUrl',
-  name: 'kanban-board',
-  widget: 'kanban-board',
-  title: 'Kanban Board',
+  type: "externalUrl",
+  name: "kanban-board",
+  widget: "kanban-board",
+  title: "Kanban Board",
   props: {
     /* ... */
   },
-})
+});
 ```
 
 #### B. Remote DOM (MCP-UI Components)
@@ -86,14 +90,14 @@ Lightweight widgets using MCP-UI React components:
 
 ```typescript
 server.uiResource({
-  type: 'remoteDom',
-  name: 'quick-poll',
+  type: "remoteDom",
+  name: "quick-poll",
   script: `/* Remote DOM script */`,
-  framework: 'react',
+  framework: "react",
   props: {
     /* ... */
   },
-})
+});
 ```
 
 #### C. Apps SDK (ChatGPT Compatible)
@@ -102,13 +106,13 @@ OpenAI Apps SDK widgets for ChatGPT integration:
 
 ```typescript
 server.uiResource({
-  type: 'appsSdk',
-  name: 'pizzaz-map-apps-sdk',
+  type: "appsSdk",
+  name: "pizzaz-map-apps-sdk",
   htmlTemplate: `<div id="pizzaz-root"></div>`,
   appsSdkMetadata: {
     /* OpenAI metadata */
   },
-})
+});
 ```
 
 ## Getting Started
@@ -166,7 +170,7 @@ starter/
 Simple greeting tool demonstrating basic tool structure.
 
 ```typescript
-await client.callTool('greet', { name: 'Alice' })
+await client.callTool("greet", { name: "Alice" });
 // Returns: "Hello, Alice! Welcome to MCP."
 ```
 
@@ -175,7 +179,7 @@ await client.callTool('greet', { name: 'Alice' })
 Demonstrates async operations and external API calls.
 
 ```typescript
-await client.callTool('fetch-weather', { city: 'London' })
+await client.callTool("fetch-weather", { city: "London" });
 // Returns: Weather information from wttr.in
 ```
 
@@ -184,10 +188,10 @@ await client.callTool('fetch-weather', { city: 'London' })
 Interactive Kanban board widget (External URL).
 
 ```typescript
-await client.callTool('ui_kanban-board', {
-  initialTasks: [{ id: '1', title: 'Task 1' /* ... */ }],
-  theme: 'dark',
-})
+await client.callTool("ui_kanban-board", {
+  initialTasks: [{ id: "1", title: "Task 1" /* ... */ }],
+  theme: "dark",
+});
 ```
 
 ### `ui_quick-poll`
@@ -195,10 +199,10 @@ await client.callTool('ui_kanban-board', {
 Quick polling widget (Remote DOM).
 
 ```typescript
-await client.callTool('ui_quick-poll', {
-  question: 'Favorite framework?',
-  options: ['React', 'Vue', 'Svelte'],
-})
+await client.callTool("ui_quick-poll", {
+  question: "Favorite framework?",
+  options: ["React", "Vue", "Svelte"],
+});
 ```
 
 ### `ui_pizzaz-map-apps-sdk`
@@ -206,9 +210,9 @@ await client.callTool('ui_quick-poll', {
 Pizza location map (Apps SDK).
 
 ```typescript
-await client.callTool('ui_pizzaz-map-apps-sdk', {
-  pizzaTopping: 'pepperoni',
-})
+await client.callTool("ui_pizzaz-map-apps-sdk", {
+  pizzaTopping: "pepperoni",
+});
 ```
 
 ## Available Resources
@@ -218,7 +222,7 @@ await client.callTool('ui_pizzaz-map-apps-sdk', {
 Server configuration resource.
 
 ```typescript
-await client.readResource('config://settings')
+await client.readResource("config://settings");
 ```
 
 ### `ui://widget/kanban-board`
@@ -226,7 +230,7 @@ await client.readResource('config://settings')
 Static Kanban board widget with defaults.
 
 ```typescript
-await client.readResource('ui://widget/kanban-board')
+await client.readResource("ui://widget/kanban-board");
 ```
 
 ### `ui://widget/quick-poll`
@@ -234,7 +238,7 @@ await client.readResource('ui://widget/kanban-board')
 Static quick poll widget with defaults.
 
 ```typescript
-await client.readResource('ui://widget/quick-poll')
+await client.readResource("ui://widget/quick-poll");
 ```
 
 ### `ui://widget/pizzaz-map-apps-sdk`
@@ -242,7 +246,7 @@ await client.readResource('ui://widget/quick-poll')
 Static pizza map widget.
 
 ```typescript
-await client.readResource('ui://widget/pizzaz-map-apps-sdk')
+await client.readResource("ui://widget/pizzaz-map-apps-sdk");
 ```
 
 ## Available Prompts
@@ -252,7 +256,7 @@ await client.readResource('ui://widget/pizzaz-map-apps-sdk')
 Code review prompt template.
 
 ```typescript
-await client.getPrompt('review-code', { code: 'const x = 1;' })
+await client.getPrompt("review-code", { code: "const x = 1;" });
 ```
 
 ## Customization Guide
@@ -262,17 +266,19 @@ await client.getPrompt('review-code', { code: 'const x = 1;' })
 1. Add to `src/server.ts`:
 
 ```typescript
-server.tool({
-  name: 'my-tool',
-  description: 'My custom tool',
-  inputs: [{ name: 'param', type: 'string', required: true }],
-  cb: async ({ param }) => {
-    // Your logic here
-    return {
-      content: [{ type: 'text', text: `Result: ${param}` }],
-    }
+server.tool(
+  {
+    name: "my-tool",
+    description: "My custom tool",
+    schema: z.object({
+      param: z.string(),
+    }),
   },
-})
+  async ({ param }) => {
+    // Your logic here
+    return text(param);
+  }
+);
 ```
 
 ### Adding New React Widgets
@@ -280,16 +286,16 @@ server.tool({
 1. Create widget in `resources/my-widget.tsx` (at root level):
 
 ```tsx
-import React from 'react'
-import { createRoot } from 'react-dom/client'
+import React from "react";
+import { createRoot } from "react-dom/client";
 
 const MyWidget: React.FC = () => {
-  return <div>My Widget</div>
-}
+  return <div>My Widget</div>;
+};
 
-const container = document.getElementById('widget-root')
+const container = document.getElementById("widget-root");
 if (container) {
-  createRoot(container).render(<MyWidget />)
+  createRoot(container).render(<MyWidget />);
 }
 ```
 
@@ -297,12 +303,12 @@ if (container) {
 
 ```typescript
 server.uiResource({
-  type: 'externalUrl',
-  name: 'my-widget',
-  widget: 'my-widget',
-  title: 'My Widget',
-  description: 'My custom widget',
-})
+  type: "externalUrl",
+  name: "my-widget",
+  widget: "my-widget",
+  title: "My Widget",
+  description: "My custom widget",
+});
 ```
 
 ### Adding Remote DOM Widgets
@@ -319,59 +325,59 @@ export const myScript = `
   container.appendChild(text);
 
   root.appendChild(container);
-`
+`;
 ```
 
 2. Register in `src/server.ts`:
 
 ```typescript
-import { myScript } from './remoteDom/my-script'
+import { myScript } from "./remoteDom/my-script";
 
 server.uiResource({
-  type: 'remoteDom',
-  name: 'my-remote-widget',
+  type: "remoteDom",
+  name: "my-remote-widget",
   script: myScript,
-  framework: 'react',
-  encoding: 'text',
-})
+  framework: "react",
+  encoding: "text",
+});
 ```
 
 ### Adding Resources
 
 ```typescript
 server.resource({
-  name: 'my-resource',
-  uri: 'custom://my-data',
-  mimeType: 'application/json',
-  description: 'My custom resource',
+  name: "my-resource",
+  uri: "custom://my-data",
+  mimeType: "application/json",
+  description: "My custom resource",
   readCallback: async () => ({
     contents: [
       {
-        uri: 'custom://my-data',
-        mimeType: 'application/json',
-        text: JSON.stringify({ data: 'value' }),
+        uri: "custom://my-data",
+        mimeType: "application/json",
+        text: JSON.stringify({ data: "value" }),
       },
     ],
   }),
-})
+});
 ```
 
 ### Adding Prompts
 
 ```typescript
 server.prompt({
-  name: 'my-prompt',
-  description: 'My custom prompt',
-  args: [{ name: 'input', type: 'string', required: true }],
+  name: "my-prompt",
+  description: "My custom prompt",
+  args: [{ name: "input", type: "string", required: true }],
   cb: async ({ input }) => ({
     content: [
       {
-        type: 'text',
+        type: "text",
         text: `Process this input: ${input}`,
       },
     ],
   }),
-})
+});
 ```
 
 ## Testing Your Server
@@ -393,22 +399,22 @@ http://localhost:3000/mcp-use/widgets/kanban-board
 ### Via MCP Client
 
 ```typescript
-import { createMCPClient } from 'mcp-use/client'
+import { createMCPClient } from "mcp-use/client";
 
 const client = createMCPClient({
-  serverUrl: 'http://localhost:3000/mcp',
-})
+  serverUrl: "http://localhost:3000/mcp",
+});
 
-await client.connect()
+await client.connect();
 
 // Test tools
-const result = await client.callTool('greet', { name: 'World' })
+const result = await client.callTool("greet", { name: "World" });
 
 // Test resources
-const config = await client.readResource('config://settings')
+const config = await client.readResource("config://settings");
 
 // Test prompts
-const prompt = await client.getPrompt('review-code', { code: '...' })
+const prompt = await client.getPrompt("review-code", { code: "..." });
 ```
 
 ## UIResource Types Comparison
@@ -487,64 +493,64 @@ PORT=3001 npm run dev
 1. **Create widget** (`resources/weather.tsx`):
 
 ```tsx
-import React, { useEffect, useState } from 'react'
-import { createRoot } from 'react-dom/client'
+import React, { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
 
 const Weather: React.FC = () => {
-  const [city, setCity] = useState('London')
-  const [weather, setWeather] = useState(null)
+  const [city, setCity] = useState("London");
+  const [weather, setWeather] = useState(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const cityParam = params.get('city')
-    if (cityParam) setCity(cityParam)
-  }, [])
+    const params = new URLSearchParams(window.location.search);
+    const cityParam = params.get("city");
+    if (cityParam) setCity(cityParam);
+  }, []);
 
   useEffect(() => {
     fetch(`https://wttr.in/${city}?format=j1`)
       .then((r) => r.json())
-      .then(setWeather)
-  }, [city])
+      .then(setWeather);
+  }, [city]);
 
-  if (!weather) return <div>Loading...</div>
+  if (!weather) return <div>Loading...</div>;
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Weather in {city}</h1>
       <p>{weather.current_condition[0].temp_C}°C</p>
     </div>
-  )
-}
+  );
+};
 
-const container = document.getElementById('widget-root')
-if (container) createRoot(container).render(<Weather />)
+const container = document.getElementById("widget-root");
+if (container) createRoot(container).render(<Weather />);
 ```
 
 2. **Register** (`src/server.ts`):
 
 ```typescript
 server.uiResource({
-  type: 'externalUrl',
-  name: 'weather-widget',
-  widget: 'weather',
-  title: 'Weather Widget',
+  type: "externalUrl",
+  name: "weather-widget",
+  widget: "weather",
+  title: "Weather Widget",
   props: {
-    city: { type: 'string', default: 'London' },
+    city: { type: "string", default: "London" },
   },
-})
+});
 ```
 
 3. **Use**:
 
 ```typescript
-await client.callTool('ui_weather-widget', { city: 'Paris' })
+await client.callTool("ui_weather-widget", { city: "Paris" });
 ```
 
 ## Learn More
 
 - [MCP Documentation](https://modelcontextprotocol.io)
 - [MCP-UI Documentation](https://github.com/idosal/mcp-ui)
-- [mcp-use Documentation](https://github.com/pyroprompt/mcp-use)
+- [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
 - [React Documentation](https://react.dev/)
 - [OpenAI Apps SDK](https://platform.openai.com/docs/apps)
 
@@ -554,6 +560,6 @@ MIT
 
 ---
 
-> 📚 **[View Full Documentation](https://docs.mcp-use.com/typescript/getting-started/quickstart)** - For more guides and advanced features
+> 📚 **[View Full Documentation](https://mcp-use.com/docs/typescript/getting-started/quickstart)** - For more guides and advanced features
 
 Happy building! 🚀

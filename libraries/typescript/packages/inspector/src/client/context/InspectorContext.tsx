@@ -6,7 +6,14 @@ export type TabType =
   | "prompts"
   | "resources"
   | "chat"
+  | "sampling"
+  | "elicitation"
   | "notifications";
+
+interface EmbeddedConfig {
+  backgroundColor?: string;
+  padding?: string;
+}
 
 interface InspectorState {
   selectedServerId: string | null;
@@ -14,7 +21,11 @@ interface InspectorState {
   selectedToolName: string | null;
   selectedPromptName: string | null;
   selectedResourceUri: string | null;
+  selectedSamplingRequestId: string | null;
+  selectedElicitationRequestId: string | null;
   tunnelUrl: string | null;
+  isEmbedded: boolean;
+  embeddedConfig: EmbeddedConfig;
 }
 
 interface InspectorContextType extends InspectorState {
@@ -23,7 +34,10 @@ interface InspectorContextType extends InspectorState {
   setSelectedToolName: (toolName: string | null) => void;
   setSelectedPromptName: (promptName: string | null) => void;
   setSelectedResourceUri: (resourceUri: string | null) => void;
+  setSelectedSamplingRequestId: (requestId: string | null) => void;
+  setSelectedElicitationRequestId: (requestId: string | null) => void;
   setTunnelUrl: (tunnelUrl: string | null) => void;
+  setEmbeddedMode: (isEmbedded: boolean, config?: EmbeddedConfig) => void;
   navigateToItem: (
     serverId: string,
     tab: TabType,
@@ -36,6 +50,16 @@ const InspectorContext = createContext<InspectorContextType | undefined>(
   undefined
 );
 
+/**
+ * Provides Inspector context and state to descendant components.
+ *
+ * Initializes and supplies the inspector UI state (selected server, active tab,
+ * per-tab selections, tunnel URL, and embedded mode/config) along with updater
+ * callbacks and navigation/clearing helpers through React context.
+ *
+ * @param children - Elements that will receive the Inspector context
+ * @returns A context provider element that supplies inspector state and mutator functions to its children
+ */
 export function InspectorProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<InspectorState>({
     selectedServerId: null,
@@ -43,7 +67,11 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     selectedToolName: null,
     selectedPromptName: null,
     selectedResourceUri: null,
+    selectedSamplingRequestId: null,
+    selectedElicitationRequestId: null,
     tunnelUrl: null,
+    isEmbedded: false,
+    embeddedConfig: {},
   });
 
   const setSelectedServerId = useCallback((serverId: string | null) => {
@@ -66,9 +94,33 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, selectedResourceUri: resourceUri }));
   }, []);
 
+  const setSelectedSamplingRequestId = useCallback(
+    (requestId: string | null) => {
+      setState((prev) => ({ ...prev, selectedSamplingRequestId: requestId }));
+    },
+    []
+  );
+
+  const setSelectedElicitationRequestId = useCallback(
+    (requestId: string | null) => {
+      setState((prev) => ({
+        ...prev,
+        selectedElicitationRequestId: requestId,
+      }));
+    },
+    []
+  );
+
   const setTunnelUrl = useCallback((tunnelUrl: string | null) => {
     setState((prev) => ({ ...prev, tunnelUrl }));
   }, []);
+
+  const setEmbeddedMode = useCallback(
+    (isEmbedded: boolean, config: EmbeddedConfig = {}) => {
+      setState((prev) => ({ ...prev, isEmbedded, embeddedConfig: config }));
+    },
+    []
+  );
 
   const navigateToItem = useCallback(
     (serverId: string, tab: TabType, itemIdentifier?: string) => {
@@ -78,19 +130,20 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
         itemIdentifier,
       });
 
-      const newState = {
+      setState((prev) => ({
+        ...prev,
         selectedServerId: serverId,
         activeTab: tab,
         selectedToolName: tab === "tools" ? itemIdentifier || null : null,
         selectedPromptName: tab === "prompts" ? itemIdentifier || null : null,
         selectedResourceUri:
           tab === "resources" ? itemIdentifier || null : null,
-      };
-
-      console.warn("[InspectorContext] Setting new state:", newState);
-
-      // Update all state atomically in a single setState call
-      setState(newState);
+        selectedSamplingRequestId:
+          tab === "sampling" ? itemIdentifier || null : null,
+        selectedElicitationRequestId:
+          tab === "elicitation" ? itemIdentifier || null : null,
+        tunnelUrl: null,
+      }));
     },
     []
   );
@@ -101,6 +154,8 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
       selectedToolName: null,
       selectedPromptName: null,
       selectedResourceUri: null,
+      selectedSamplingRequestId: null,
+      selectedElicitationRequestId: null,
     }));
   }, []);
 
@@ -111,7 +166,10 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setSelectedToolName,
     setSelectedPromptName,
     setSelectedResourceUri,
+    setSelectedSamplingRequestId,
+    setSelectedElicitationRequestId,
     setTunnelUrl,
+    setEmbeddedMode,
     navigateToItem,
     clearSelection,
   };

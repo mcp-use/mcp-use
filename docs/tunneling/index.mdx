@@ -52,9 +52,10 @@ npx create-mcp-use-app my-mcp-server
 ```
 
 ```typescript manual
-import { createMCPServer } from 'mcp-use/server'
-
-const server = createMCPServer('my-server', {
+import { MCPServer, text } from 'mcp-use/server'
+import { z } from 'zod'
+const server = new MCPServer({
+  name: 'my-server',
   version: '1.0.0',
   description: 'My MCP server'
 })
@@ -62,23 +63,15 @@ const server = createMCPServer('my-server', {
 server.tool({
   name: 'echo',
   description: 'Echo back the provided message',
-  inputs: [
-    { name: 'message', type: 'string', required: true }
-  ],
-  cb: async ({ message }) => {
-    return {
-      content: [{ type: 'text', text: `Echo: ${message}` }]
-    }
-  }
+  schema: z.object({
+    message: z.string().describe('The message to echo back'),
+  }),
+}, async ({ message }) => {
+  return text(`Echo: ${message}`);
 })
-
-server.listen(3000)
 ```
 </CodeGroup>
-
-For more details, see the [TypeScript Server documentation](/typescript/server/index).
 </Step>
-
 <Step title="Start Your Local MCP Server">
 Start your MCP server on a local port (e.g., port 3000):
 

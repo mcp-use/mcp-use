@@ -1,5 +1,427 @@
 # create-mcp-use-app
 
+## 0.10.1
+
+### Patch Changes
+
+- 2f89a3b: Updated dependency `react-router` to `^7.12.0`.
+
+## 0.10.1-canary.0
+
+### Patch Changes
+
+- 708f6e5: Updated dependency `react-router` to `^7.12.0`.
+
+## 0.10.0
+
+### Minor Changes
+
+- e36d1ab: Add support for GitHub repository URLs in the `--template` option. Users can now initialize projects using any public GitHub repository as a template by providing the repository URL in formats like `owner/repo`, `https://github.com/owner/repo`, or `owner/repo#branch-name`.
+
+### Patch Changes
+
+- e36d1ab: fix: respect --template flag in interactive mode. Previously, when no project name was provided as a positional argument, the CLI would always prompt for template selection even if --template was explicitly provided via the command line flag. The tool now correctly uses the --template value when provided, only prompting for template selection when the flag is not specified.
+
+## 0.10.0-canary.1
+
+### Patch Changes
+
+- 4531798: fix: respect --template flag in interactive mode. Previously, when no project name was provided as a positional argument, the CLI would always prompt for template selection even if --template was explicitly provided via the command line flag. The tool now correctly uses the --template value when provided, only prompting for template selection when the flag is not specified.
+
+## 0.10.0-canary.0
+
+### Minor Changes
+
+- f6117d6: Add support for GitHub repository URLs in the `--template` option. Users can now initialize projects using any public GitHub repository as a template by providing the repository URL in formats like `owner/repo`, `https://github.com/owner/repo`, or `owner/repo#branch-name`.
+
+## 0.9.4
+
+### Patch Changes
+
+- 53fb670: fix: include node types in dev deps
+
+## 0.9.4-canary.0
+
+### Patch Changes
+
+- 33274d2: fix: include node types in dev deps
+
+## 0.9.3
+
+### Patch Changes
+
+- 9a8cb3a: chore(docs): updated examples and docs to use preferred methods
+
+## 0.9.3-canary.0
+
+### Patch Changes
+
+- 681c929: chore(docs): updated examples and docs to use preferred methods
+
+## 0.9.2
+
+### Patch Changes
+
+- ae4ac11: chore: updated templates to use MCPServer instead of createMcpServer
+
+## 0.9.1
+
+### Patch Changes
+
+- c225250: fix: add typescript to dev deps
+
+## 0.9.1-canary.0
+
+### Patch Changes
+
+- bbf7159: fix: add typescript to dev deps
+
+## 0.9.0
+
+### Minor Changes
+
+- 8a2e84e: ## Breaking Changes
+
+  ### LangChain Adapter Export Path Changed
+
+  The LangChain adapter is no longer exported from the main entry point. Import from `mcp-use/adapters` instead:
+
+  ```typescript
+  // Before
+  import { LangChainAdapter } from "mcp-use";
+
+  // After
+  import { LangChainAdapter } from "mcp-use/adapters";
+  ```
+
+  **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
+
+  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+
+  ### WebSocket Transport Removed
+
+  WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
+
+  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+
+  ## Features
+
+  ### Session Management Architecture with Redis Support
+
+  Implements a pluggable session management architecture enabling distributed deployments with cross-server notifications, sampling, and resource subscriptions.
+
+  **New Interfaces:**
+  - `SessionStore` - Pluggable interface for storing session metadata
+    - `InMemorySessionStore` (production default)
+    - `FileSystemSessionStore` (dev mode default)
+    - `RedisSessionStore` (distributed deployments)
+  - `StreamManager` - Manages active SSE connections
+    - `InMemoryStreamManager` (default)
+    - `RedisStreamManager` (distributed via Redis Pub/Sub)
+
+  **Server Configuration:**
+
+  ```typescript
+  // Development (default - FileSystemSessionStore for hot reload)
+  const server = new MCPServer({
+    name: "dev-server",
+    version: "1.0.0",
+  });
+
+  // Production distributed (cross-server notifications)
+  import { RedisSessionStore, RedisStreamManager } from "mcp-use/server";
+  const server = new MCPServer({
+    name: "prod-server",
+    version: "1.0.0",
+    sessionStore: new RedisSessionStore({ client: redis }),
+    streamManager: new RedisStreamManager({
+      client: redis,
+      pubSubClient: pubSubRedis,
+    }),
+  });
+  ```
+
+  **Client Improvements:**
+  - Auto-refresh tools/resources/prompts when receiving list change notifications
+  - Manual refresh methods: `refreshTools()`, `refreshResources()`, `refreshPrompts()`, `refreshAll()`
+  - Automatic 404 handling and re-initialization per MCP spec
+
+  **Convenience Methods:**
+  - `sendToolsListChanged()` - Notify clients when tools list changes
+  - `sendResourcesListChanged()` - Notify clients when resources list changes
+  - `sendPromptsListChanged()` - Notify clients when prompts list changes
+
+  **Development Experience:**
+  - FileSystemSessionStore persists sessions to `.mcp-use/sessions.json` in dev mode
+  - Sessions survive server hot reloads
+  - Auto-cleanup of expired sessions (>24 hours)
+
+  **Deprecated:**
+  - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
+
+  **Learn more:** [Session Management](/typescript/server/session-management)
+
+  ### Favicon Support for Widgets
+
+  Added favicon configuration for widget pages:
+
+  ```typescript
+  const server = createMCPServer({
+    name: "my-server",
+    version: "1.0.0",
+    favicon: "favicon.ico", // Path relative to public/ directory
+  });
+  ```
+
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process includes favicon in widget HTML pages
+  - Long-term caching (1 year) for favicon assets
+
+  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+
+  ### CLI Client Support
+
+  Added dedicated CLI client support for better command-line integration and testing.
+
+  **Learn more:** [CLI Client](/typescript/client/cli)
+
+  ### Enhanced Session Methods
+  - `callTool()` method now defaults args to an empty object
+  - New `requireSession()` method for reliable session retrieval
+
+  ## Improvements
+
+  ### Widget Build System
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode watches for widget file/directory deletions and cleans up build artifacts
+
+  ### Dependency Management
+  - Added support for Node >= 18
+  - Added CommonJS module support
+
+  ### Documentation & Metadata
+  - Updated agent documentation and method signatures
+  - Added repository metadata to package.json
+
+  ## Fixes
+
+  ### Widget Fixes
+  - Fixed widget styling isolation - widgets no longer pick up mcp-use styles
+  - Fixed favicon URL generator for proper asset resolution
+
+  ### React Router Migration
+
+  Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
+
+  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+
+  ### Session & Transport Fixes
+  - Fixed transport cleanup when session becomes idle
+  - Fixed agent access to resources and prompts
+
+  ### Code Quality
+  - Formatting and linting improvements across packages
+
+### Patch Changes
+
+- 8a2e84e: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- 8a2e84e: chore: fixed codeql vulnerabilities
+
+## 0.8.1-canary.5
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+
+## 0.8.1-canary.4
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+
+## 0.8.1-canary.3
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+
+## 0.8.1-canary.2
+
+### Patch Changes
+
+- 3945a10: **Breaking Changes:**
+  - LangChain adapter no longer exported from main entry point. Import from `mcp-use/adapters` instead:
+
+    ```ts
+    // Before
+    import { LangChainAdapter } from "mcp-use";
+
+    // After
+    import { LangChainAdapter } from "mcp-use/adapters";
+    ```
+
+  - Moved `@langchain/core` and `langchain` from dependencies to optional peer dependencies
+
+  **Features:**
+  - Added favicon support for widget pages. Configure via `favicon` option in `ServerConfig`:
+    ```ts
+    const server = createMCPServer({
+      name: "my-server",
+      version: "1.0.0",
+      favicon: "favicon.ico", // Path relative to public/ directory
+    });
+    ```
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process now includes favicon in widget HTML pages
+
+  **Improvements:**
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode now watches for widget file/directory deletions and cleans up build artifacts
+  - Added long-term caching (1 year) for favicon assets
+
+- 3945a10: fix: widgets
+
+## 0.8.1-canary.1
+
+### Patch Changes
+
+- 9acf03b: fix: drop react-router-dom in favor of react-router
+
+## 0.8.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+
+## 0.8.0
+
+### Minor Changes
+
+- 6ec11cd: ## Breaking Changes
+  - **Server API**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. The factory function is still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+  - **Session API**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+  - **OAuth Environment Variables**: Standardized OAuth env vars to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+
+  ## New Features
+  - **Client Capabilities API**: Added `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks.
+  - **Session Notifications**: Added `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks.
+  - **Session Info**: Added `ctx.session.sessionId` to access current session ID in tool callbacks.
+  - **Resource Template Flat Structure**: Resource templates now support flat structure with `uriTemplate` directly on definition (in addition to nested structure).
+  - **Resource Template Callback Signatures**: Resource template callbacks now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`.
+  - **Type Exports**: Added exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types.
+
+  ## Improvements
+  - **Type Inference**: Enhanced type inference for resource template callbacks with better overload support.
+  - **Client Capabilities Tracking**: Server now captures and stores client capabilities during initialization.
+  - **Session Methods**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.).
+  - **Documentation**: Major documentation refactoring and restructuring for better organization.
+
+### Patch Changes
+
+- 6ec11cd: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+- 6ec11cd: Updated dependencies.
+- 6ec11cd: fix: fix transport bug
+- 6ec11cd: chore: fix types
+
+## 0.8.0-canary.2
+
+### Patch Changes
+
+- 1379b00: chore: fix types
+
+## 0.8.0-canary.1
+
+### Minor Changes
+
+- 96e4097: ## Breaking Changes
+  - **Server API**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. The factory function is still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+  - **Session API**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+  - **OAuth Environment Variables**: Standardized OAuth env vars to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+
+  ## New Features
+  - **Client Capabilities API**: Added `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks.
+  - **Session Notifications**: Added `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks.
+  - **Session Info**: Added `ctx.session.sessionId` to access current session ID in tool callbacks.
+  - **Resource Template Flat Structure**: Resource templates now support flat structure with `uriTemplate` directly on definition (in addition to nested structure).
+  - **Resource Template Callback Signatures**: Resource template callbacks now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`.
+  - **Type Exports**: Added exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types.
+
+  ## Improvements
+  - **Type Inference**: Enhanced type inference for resource template callbacks with better overload support.
+  - **Client Capabilities Tracking**: Server now captures and stores client capabilities during initialization.
+  - **Session Methods**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.).
+  - **Documentation**: Major documentation refactoring and restructuring for better organization.
+
+## 0.7.5-canary.0
+
+### Patch Changes
+
+- 4d1aa19: fix: refactor to use https://github.com/modelcontextprotocol/typescript-sdk/pull/1209
+
+## 0.7.4
+
+### Patch Changes
+
+- 4fc04a9: Updated dependencies.
+- 4fc04a9: fix: fix transport bug
+
+## 0.7.4-canary.1
+
+### Patch Changes
+
+- b0d1ffe: fix: fix transport bug
+
+## 0.7.4-canary.0
+
+### Patch Changes
+
+- d726bfa: Updated dependencies.
+
+## 0.7.3
+
+### Patch Changes
+
+- 4bf21f3: Updated dependencies.
+
+## 0.7.3-canary.0
+
+### Patch Changes
+
+- 33a1a69: Updated dependencies.
+
+## 0.7.2
+
+### Patch Changes
+
+- a4341d5: chore: update deps
+
+## 0.7.2-canary.0
+
+### Patch Changes
+
+- c1d7378: chore: update deps
+
+## 0.7.1
+
+### Patch Changes
+
+- 2730902: fix: parse port to number
+- 2730902: Optimized dependencies
+- 2730902: Moved ai sdk dep to optional since it's only used in test and example
+
+## 0.7.1-canary.1
+
+### Patch Changes
+
+- caf8c7c: fix: parse port to number
+- caf8c7c: Moved ai sdk dep to optional since it's only used in test and example
+
+## 0.7.1-canary.0
+
+### Patch Changes
+
+- 1ca9801: Optimized dependencies
+
 ## 0.7.0
 
 ### Minor Changes
@@ -183,7 +605,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -378,7 +800,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -562,7 +984,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy

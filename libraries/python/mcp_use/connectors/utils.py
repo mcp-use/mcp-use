@@ -9,7 +9,7 @@ from mcp_use.client.connectors.utils import is_stdio_server as _is_stdio_server
 warnings.warn(
     "mcp_use.connectors.utils is deprecated. "
     "Use mcp_use.client.connectors.utils. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

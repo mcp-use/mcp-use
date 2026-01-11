@@ -1,6 +1,8 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
-import { WebSocketConnector } from "../connectors/websocket.js";
+import { logger } from "../logging.js";
+import { Tel } from "../telemetry/telemetry-browser.js";
+import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 
 /**
@@ -9,12 +11,39 @@ import { BaseMCPClient } from "./base.js";
  * This client works in both browser and Node.js environments by avoiding
  * Node.js-specific APIs (like fs, path). It supports:
  * - Multiple servers via addServer()
- * - HTTP and WebSocket connectors
+ * - HTTP connector
  * - All base client functionality
  */
 export class BrowserMCPClient extends BaseMCPClient {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
   constructor(config?: Record<string, any>) {
     super(config);
+    this._trackClientInit();
+  }
+
+  private _trackClientInit(): void {
+    const servers = Object.keys(this.config.mcpServers ?? {});
+
+    Tel.getInstance()
+      .trackMCPClientInit({
+        codeMode: false, // Browser client doesn't support code mode
+        sandbox: false, // Sandbox not supported in browser
+        allCallbacks: false, // Will be set per-server
+        verify: false,
+        servers,
+        numServers: servers.length,
+        isBrowser: true, // Browser MCPClient
+      })
+      .catch((e) =>
+        logger.debug(`Failed to track BrowserMCPClient init: ${e}`)
+      );
   }
 
   public static fromDict(cfg: Record<string, any>): BrowserMCPClient {
@@ -23,25 +52,34 @@ export class BrowserMCPClient extends BaseMCPClient {
 
   /**
    * Create a connector from server configuration (Browser version)
-   * Supports HTTP and WebSocket connectors only
+   * Supports HTTP connector only
    */
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
     const {
       url,
-      transport,
       headers,
       authToken,
       authProvider,
       wrapTransport,
       clientOptions,
+      onSampling,
       samplingCallback,
+      elicitationCallback,
+      disableSseFallback,
+      preferSse,
+      clientInfo,
+      gatewayUrl,
+      serverId,
     } = serverConfig;
 
     if (!url) {
       throw new Error("Server URL is required");
     }
+
+    // Support both new and deprecated name
+    const finalOnSampling = onSampling ?? samplingCallback;
 
     // Prepare connector options
     const connectorOptions = {
@@ -50,7 +88,14 @@ export class BrowserMCPClient extends BaseMCPClient {
       authProvider, // ← Pass OAuth provider to connector
       wrapTransport, // ← Pass transport wrapper if provided
       clientOptions, // ← Pass client options (capabilities, etc.) to connector
-      samplingCallback, // ← Pass sampling callback to connector
+      onSampling: finalOnSampling, // ← Pass sampling callback to connector (new name)
+      samplingCallback: finalOnSampling, // ← Backward compatibility: also pass as old name
+      elicitationCallback, // ← Pass elicitation callback to connector
+      disableSseFallback, // ← Disable automatic SSE fallback
+      preferSse, // ← Use SSE transport directly
+      clientInfo, // ← Pass client info (name, version) to connector
+      gatewayUrl, // ← Pass gateway/proxy URL to connector
+      serverId, // ← Pass server ID for gateway observability
     };
 
     // Debug: Log if clientOptions are being passed
@@ -65,22 +110,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       );
     }
 
-    // Determine transport type
-    if (
-      transport === "websocket" ||
-      url.startsWith("ws://") ||
-      url.startsWith("wss://")
-    ) {
-      return new WebSocketConnector(url, connectorOptions);
-    } else if (
-      transport === "http" ||
-      url.startsWith("http://") ||
-      url.startsWith("https://")
-    ) {
-      return new HttpConnector(url, connectorOptions);
-    } else {
-      // Default to HTTP for browser
-      return new HttpConnector(url, connectorOptions);
-    }
+    // Use HTTP connector for browser
+    return new HttpConnector(url, connectorOptions);
   }
 }

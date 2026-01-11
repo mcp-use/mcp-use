@@ -14,7 +14,7 @@ LangChain 1.0.0 Migration:
 import logging
 import time
 from collections.abc import AsyncGenerator, AsyncIterator
-from typing import TypeVar
+from typing import Any, TypeVar, cast
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware
@@ -26,6 +26,7 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
+    ToolMessage,
 )
 from langchain_core.runnables.schema import StreamEvent
 from langchain_core.tools import BaseTool
@@ -48,13 +49,14 @@ from mcp_use.agents.remote import RemoteAgent
 from mcp_use.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.logging import logger
-from mcp_use.telemetry.telemetry import Telemetry, telemetry
-from mcp_use.telemetry.utils import extract_model_info
+from mcp_use.telemetry.telemetry import Telemetry
+from mcp_use.telemetry.utils import extract_model_info, track_agent_execution_from_agent
 
 set_debug(logger.level == logging.DEBUG)
 
 # Type variable for structured output
 T = TypeVar("T", bound=BaseModel)
+QueryInput = str | HumanMessage
 
 
 class MCPAgent:
@@ -157,6 +159,7 @@ class MCPAgent:
 
         # Create the adapter for tool conversion
         self.adapter = LangChainAdapter(disallowed_tools=self.disallowed_tools)
+        self.adapter._record_telemetry = False
 
         # Initialize telemetry
         self.telemetry = Telemetry()
@@ -190,6 +193,8 @@ class MCPAgent:
         else:
             # Standard initialization - if using client, get or create sessions
             if self.client:
+                # Disable telemetry for the client
+                self.client._record_telemetry = False
                 # First try to get existing sessions
                 self._sessions = self.client.get_all_active_sessions()
                 logger.info(f"🔌 Found {len(self._sessions)} existing sessions")
@@ -204,13 +209,19 @@ class MCPAgent:
                 # Create LangChain tools directly from the client using the adapter
                 await self.adapter.create_all(self.client)
                 self._tools = self.adapter.tools + self.adapter.resources + self.adapter.prompts
-                logger.info(f"🛠️ Created {len(self._tools)} LangChain tools from client")
+                logger.info(
+                    f"🛠️ Created {len(self._tools)} LangChain tools from client: "
+                    f"{len(self.adapter.tools)} tools, {len(self.adapter.resources)} resources, "
+                    f"{len(self.adapter.prompts)} prompts"
+                )
             else:
                 # Using direct connector - only establish connection
                 # LangChainAdapter will handle initialization
                 connectors_to_use = self.connectors
                 logger.info(f"🔗 Connecting to {len(connectors_to_use)} direct connectors...")
                 for connector in connectors_to_use:
+                    # Disable telemetry for the connector
+                    connector._record_telemetry = False
                     if not hasattr(connector, "client_session") or connector.client_session is None:
                         await connector.connect()
 
@@ -219,7 +230,11 @@ class MCPAgent:
                 await self.adapter._create_resources_from_connectors(connectors_to_use)
                 await self.adapter._create_prompts_from_connectors(connectors_to_use)
                 self._tools = self.adapter.tools + self.adapter.resources + self.adapter.prompts
-                logger.info(f"🛠️ Created {len(self._tools)} LangChain tools from connectors")
+                logger.info(
+                    f"🛠️ Created {len(self._tools)} LangChain tools from connectors: "
+                    f"{len(self.adapter.tools)} tools, {len(self.adapter.resources)} resources, "
+                    f"{len(self.adapter.prompts)} prompts"
+                )
 
             # Get all tools for system message generation
             all_tools = self._tools
@@ -232,6 +247,38 @@ class MCPAgent:
         self._agent_executor = self._create_agent()
         self._initialized = True
         logger.info("✨ Agent initialization complete")
+
+    def _ensure_human_message(self, query: QueryInput) -> HumanMessage:
+        """Return the provided query as a HumanMessage."""
+        if isinstance(query, HumanMessage):
+            return query
+        if isinstance(query, str):
+            return HumanMessage(content=query)
+        raise TypeError("query must be a string or HumanMessage")
+
+    def _message_text(self, message: HumanMessage) -> str:
+        """Extract readable text from a HumanMessage for logging/telemetry."""
+        content = message.content
+        if isinstance(content, str):
+            return content
+
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for part in content:
+                if isinstance(part, dict):
+                    if part.get("type") == "text" and "text" in part:
+                        text_parts.append(str(part.get("text") or ""))
+            if text_parts:
+                return " ".join(text_parts)
+            return "[non-text content]"
+
+        return str(content)
+
+    def _message_preview(self, message: HumanMessage, limit: int = 50) -> str:
+        """Create a short preview of the query for logs."""
+        text = self._message_text(message)
+        text = text.replace("\n", " ")
+        return text[:limit] + ("..." if len(text) > limit else "")
 
     def _normalize_output(self, value: object) -> str:
         """Normalize model outputs into a plain text string."""
@@ -248,10 +295,12 @@ class MCPAgent:
                 parts: list[str] = []
                 for item in value:
                     if isinstance(item, dict):
-                        if "text" in item and isinstance(item["text"], str):
-                            parts.append(item["text"])
-                        elif "content" in item:
-                            parts.append(self._normalize_output(item["content"]))
+                        # Cast to dict[str, Any] since isinstance doesn't narrow the key/value types
+                        item_dict = cast(dict[str, Any], item)
+                        if "text" in item_dict and isinstance(item_dict["text"], str):
+                            parts.append(item_dict["text"])
+                        elif "content" in item_dict:
+                            parts.append(self._normalize_output(item_dict["content"]))
                         else:
                             # Fallback to str for unknown shapes
                             parts.append(str(item))
@@ -303,9 +352,8 @@ class MCPAgent:
         """
         logger.debug(f"Creating new agent with {len(self._tools)} tools")
 
-        system_content = "You are a helpful assistant"
-        if self._system_message:
-            system_content = self._system_message.content
+        # Use SystemMessage directly or create a default one
+        system_prompt: SystemMessage | str = self._system_message or "You are a helpful assistant"
 
         tool_names = [tool.name for tool in self._tools]
         logger.info(f"🧠 Agent ready with tools: {', '.join(tool_names)}")
@@ -322,10 +370,17 @@ class MCPAgent:
         middleware.append(ModelCallLimitMiddleware(run_limit=self.max_steps))
 
         # Use the standard create_agent with middleware
+        # Type assertion: self.llm is guaranteed to be non-None for local execution
+        from langchain_core.language_models.chat_models import BaseChatModel
+
+        # Cast to BaseChatModel to satisfy type checker
+        llm_model = self.llm
+        assert isinstance(llm_model, BaseChatModel), "LLM must be a BaseChatModel instance"
+
         agent = create_agent(
-            model=self.llm,
+            model=llm_model,
             tools=self._tools,
-            system_prompt=system_content,
+            system_prompt=system_prompt,
             middleware=middleware,
             debug=self.verbose,
         ).with_config({"recursion_limit": self.recursion_limit})
@@ -428,10 +483,9 @@ class MCPAgent:
         steps_taken = len(self.tools_used_names)
         return final_result, steps_taken
 
-    @telemetry("agent_run")
     async def run(
         self,
-        query: str,
+        query: QueryInput,
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
@@ -440,7 +494,8 @@ class MCPAgent:
         """Run a query using LangChain 1.0.0's agent and return the final result.
 
         Args:
-            query: The query to run.
+            query: The query to run. Accepts a plain string or a ``HumanMessage`` when
+                you need to include richer content (e.g., multi-part messages or files).
             max_steps: Optional maximum number of steps to take.
             manage_connector: Whether to handle the connector lifecycle internally.
             external_history: Optional external history to use instead of the
@@ -471,14 +526,17 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            result = await self._remote_agent.run(query, max_steps, external_history, output_schema)
+            query_str: str = query if isinstance(query, str) else self._message_text(query)
+            result = await self._remote_agent.run(query_str, max_steps, external_history, output_schema)
             return result
 
         success = True
         start_time = time.time()
 
+        human_query = self._ensure_human_message(query)
+
         generator = self.stream(
-            query,
+            human_query,
             max_steps,
             manage_connector,
             external_history,
@@ -497,29 +555,18 @@ class MCPAgent:
             logger.error(f"❌ Error during agent execution: {e}")
             raise
         finally:
-            self.telemetry.track_agent_execution(
+            track_agent_execution_from_agent(
+                self,
                 execution_method="run",
-                query=query,
+                query=self._message_text(human_query),
                 success=success,
-                model_provider=self._model_provider,
-                model_name=self._model_name,
-                server_count=(len(self.client.get_all_active_sessions()) if self.client else len(self.connectors)),
-                server_identifiers=[connector.public_identifier for connector in self.connectors],
-                total_tools_available=len(self._tools) if self._tools else 0,
-                tools_available_names=[tool.name for tool in self._tools],
-                max_steps_configured=self.max_steps,
-                memory_enabled=self.memory_enabled,
-                use_server_manager=self.use_server_manager,
+                execution_time_ms=int((time.time() - start_time) * 1000),
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
                 steps_taken=steps_taken,
-                tools_used_count=len(self.tools_used_names),
-                tools_used_names=self.tools_used_names,
                 response=str(self._normalize_output(result)),
-                execution_time_ms=int((time.time() - start_time) * 1000),
                 error_type=error,
-                conversation_history_length=len(self._conversation_history),
             )
         return result
 
@@ -591,10 +638,9 @@ class MCPAgent:
 
         return enhanced_query
 
-    @telemetry("agent_stream")
     async def stream(
         self,
-        query: str,
+        query: QueryInput,
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
@@ -622,7 +668,8 @@ class MCPAgent:
         API constraints.
 
         Args:
-            query: The query to run.
+            query: The query to run. Accepts a plain string or a ``HumanMessage`` when
+                you need to include richer content (e.g., multi-part messages or files).
             manage_connector: Whether to handle the connector lifecycle internally.
             external_history: Optional external history to use instead of the
                 internal conversation history.
@@ -633,10 +680,12 @@ class MCPAgent:
         """
         # Delegate to remote agent if in remote mode
         if self._is_remote and self._remote_agent:
-            async for item in self._remote_agent.stream(query, max_steps, external_history, output_schema):
+            query_str: str = query if isinstance(query, str) else self._message_text(query)
+            async for item in self._remote_agent.stream(query_str, max_steps, external_history, output_schema):
                 yield item
             return
 
+        human_query = self._ensure_human_message(query)
         initialized_here = False
         start_time = time.time()
         success = False
@@ -677,12 +726,12 @@ class MCPAgent:
             # Convert messages to format expected by LangChain agent
             langchain_history = []
             for msg in history_to_use:
-                if isinstance(msg, HumanMessage | AIMessage):
+                if isinstance(msg, HumanMessage | AIMessage | ToolMessage):
                     langchain_history.append(msg)
 
-            inputs = {"messages": [*langchain_history, HumanMessage(content=query)]}
+            inputs = {"messages": [*langchain_history, human_query]}
 
-            display_query = query[:50].replace("\n", " ") + "..." if len(query) > 50 else query.replace("\n", " ")
+            display_query = self._message_preview(human_query)
             logger.info(f"💬 Received query: '{display_query}'")
             logger.info("🏁 Starting agent execution")
 
@@ -691,7 +740,7 @@ class MCPAgent:
             # With dynamic tool reload: if tools change mid-execution, we interrupt and restart
             max_restarts = 3  # Prevent infinite restart loops
             restart_count = 0
-            accumulated_messages = list(langchain_history) + [HumanMessage(content=query)]
+            accumulated_messages = list(langchain_history) + [human_query]
             pending_tool_calls = {}  # Map tool_call_id -> AgentAction
 
             while restart_count <= max_restarts:
@@ -762,9 +811,9 @@ class MCPAgent:
                                             tool_input_str = tool_input_str[:97] + "..."
 
                                 # Track tool results and yield AgentStep
-                                if hasattr(message, "type") and message.type == "tool":
+                                if isinstance(message, ToolMessage):
                                     observation = message.content
-                                    tool_call_id = getattr(message, "tool_call_id", None)
+                                    tool_call_id = message.tool_call_id
 
                                     if tool_call_id and tool_call_id in pending_tool_calls:
                                         action = pending_tool_calls.pop(tool_call_id)
@@ -804,7 +853,7 @@ class MCPAgent:
                                             break  # Break out of the message loop
 
                                 # Track final AI message (without tool calls = final response)
-                                if isinstance(message, AIMessage) and not getattr(message, "tool_calls", None):
+                                if isinstance(message, AIMessage) and not message.tool_calls:
                                     final_output = self._normalize_output(message.content)
                                     logger.info("✅ Agent finished with output")
 
@@ -826,11 +875,9 @@ class MCPAgent:
                     logger.warning(f"⚠️ Max restarts ({max_restarts}) reached. Continuing with current tools.")
                     break
 
-            # 4. Update conversation history
-            if self.memory_enabled:
-                self.add_to_history(HumanMessage(content=query))
-                if final_output:
-                    self.add_to_history(AIMessage(content=final_output))
+            # 4. Update conversation history (store full transcript including tool exchange)
+            if self.memory_enabled and external_history is None:
+                self._conversation_history = [msg for msg in accumulated_messages if not isinstance(msg, SystemMessage)]
 
             # 5. Handle structured output if requested
             if output_schema and final_output:
@@ -852,7 +899,7 @@ class MCPAgent:
                         final_output, structured_llm, output_schema, schema_description
                     )
 
-                    if self.memory_enabled:
+                    if self.memory_enabled and external_history is None:
                         self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
 
                     logger.info("✅ Structured output successful")
@@ -876,44 +923,21 @@ class MCPAgent:
             raise
 
         finally:
-            # Track comprehensive execution data
             execution_time_ms = int((time.time() - start_time) * 1000)
 
-            server_count = 0
-            if self.client:
-                server_count = len(self.client.get_all_active_sessions())
-            elif self.connectors:
-                server_count = len(self.connectors)
-
-            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
-
-            # Safely access _tools in case initialization failed
-            tools_available = getattr(self, "_tools", [])
-
             if track_execution:
-                self.telemetry.track_agent_execution(
+                track_agent_execution_from_agent(
+                    self,
                     execution_method="stream",
-                    query=query,
+                    query=self._message_text(human_query),
                     success=success,
-                    model_provider=self._model_provider,
-                    model_name=self._model_name,
-                    server_count=server_count,
-                    server_identifiers=[connector.public_identifier for connector in self.connectors],
-                    total_tools_available=len(tools_available),
-                    tools_available_names=[tool.name for tool in tools_available],
-                    max_steps_configured=self.max_steps,
-                    memory_enabled=self.memory_enabled,
-                    use_server_manager=self.use_server_manager,
+                    execution_time_ms=execution_time_ms,
                     max_steps_used=max_steps,
                     manage_connector=manage_connector,
                     external_history_used=external_history is not None,
                     steps_taken=steps_taken,
-                    tools_used_count=len(self.tools_used_names),
-                    tools_used_names=self.tools_used_names,
                     response=final_output,
-                    execution_time_ms=execution_time_ms,
                     error_type=None if success else "execution_error",
-                    conversation_history_length=conversation_history_length,
                 )
 
             # Clean up if necessary
@@ -923,7 +947,7 @@ class MCPAgent:
 
     async def _generate_response_chunks_async(
         self,
-        query: str,
+        query: QueryInput,
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
@@ -953,13 +977,15 @@ class MCPAgent:
         self.max_steps = max_steps or self.max_steps
 
         # 3. Build inputs --------------------------------------------------------
+        human_query = self._ensure_human_message(query)
         history_to_use = external_history if external_history is not None else self._conversation_history
-        inputs = {"messages": [*history_to_use, HumanMessage(content=query)]}
+        langchain_history: list[BaseMessage] = [msg for msg in history_to_use if not isinstance(msg, SystemMessage)]
+        inputs = {"messages": [*langchain_history, human_query]}
 
         # 4. Stream & collect response chunks ------------------------------------
         recursion_limit = self.max_steps * 2
         # Collect AI message content from streaming chunks
-        ai_message_chunks = []
+        turn_messages = []
 
         async for event in self._agent_executor.astream_events(
             inputs,
@@ -968,28 +994,26 @@ class MCPAgent:
                 "recursion_limit": recursion_limit,
             },
         ):
-            # Collect AI message chunks for history
-            if event.get("event") == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and getattr(chunk, "content", None):
-                    if isinstance(chunk.content, str):
-                        content = chunk.content
-                    elif hasattr(chunk.content, "__iter__"):
-                        content = "".join([item.get("text", "") for item in chunk.content])
-                    else:
-                        content = str(chunk.content)
-                    ai_message_chunks.append(content)
+            event_type = event.get("event")
+            if event_type == "on_chat_model_end":
+                # This contains the AIMessage
+                ai_message: AIMessage = event.get("data", {}).get("output")
+                turn_messages.append(ai_message)
+            if event_type == "on_tool_end":
+                # This contains the ToolMessage
+                tool_message: ToolMessage = event.get("data", {}).get("output")
+                turn_messages.append(tool_message)
 
             yield event
 
         # 5. Update conversation history with both messages ---------------------
-        if self.memory_enabled:
+        # If external_history is provided, treat it as per-call input (do not mutate internal memory).
+        persist_to_memory = self.memory_enabled and external_history is None
+        if persist_to_memory:
             # Add human message first
-            self.add_to_history(HumanMessage(content=query))
-            # Add AI message if we collected any chunks
-            if ai_message_chunks:
-                ai_content = "".join(ai_message_chunks)
-                self.add_to_history(AIMessage(content=ai_content))
+            self.add_to_history(self._ensure_human_message(query))
+            for message in turn_messages:
+                self.add_to_history(message)
 
         # 6. House-keeping -------------------------------------------------------
         # Restrict agent cleanup in _generate_response_chunks_async to only occur
@@ -999,71 +1023,50 @@ class MCPAgent:
             logger.info("🧹 Closing agent after generator completion")
             await self.close()
 
-    @telemetry("agent_stream_events")
     async def stream_events(
         self,
-        query: str,
+        query: QueryInput,
         max_steps: int | None = None,
         manage_connector: bool = True,
         external_history: list[BaseMessage] | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[StreamEvent]:
         """Asynchronous streaming interface.
 
         Example::
 
-            async for chunk in agent.stream("hello"):
-                print(chunk, end="|", flush=True)
+            async for chunk in agent.stream_events("hello"):
+                print(chunk)
         """
         start_time = time.time()
         success = False
         chunk_count = 0
-        total_response_length = 0
+        human_query = self._ensure_human_message(query)
 
         try:
             async for chunk in self._generate_response_chunks_async(
-                query=query,
+                query=human_query,
                 max_steps=max_steps,
                 manage_connector=manage_connector,
                 external_history=external_history,
             ):
                 log_agent_stream(chunk, pretty_print=self.pretty_print)
                 chunk_count += 1
-                if isinstance(chunk, str):
-                    total_response_length += len(chunk)
                 yield chunk
             success = True
         finally:
-            # Track comprehensive execution data for streaming
             execution_time_ms = int((time.time() - start_time) * 1000)
 
-            server_count = 0
-            if self.client:
-                server_count = len(self.client.get_all_active_sessions())
-            elif self.connectors:
-                server_count = len(self.connectors)
-
-            conversation_history_length = len(self._conversation_history) if self.memory_enabled else 0
-
-            self.telemetry.track_agent_execution(
+            track_agent_execution_from_agent(
+                self,
                 execution_method="stream_events",
-                query=query,
+                query=self._message_text(human_query),
                 success=success,
-                model_provider=self._model_provider,
-                model_name=self._model_name,
-                server_count=server_count,
-                server_identifiers=[connector.public_identifier for connector in self.connectors],
-                total_tools_available=len(self._tools) if self._tools else 0,
-                tools_available_names=[tool.name for tool in self._tools],
-                max_steps_configured=self.max_steps,
-                memory_enabled=self.memory_enabled,
-                use_server_manager=self.use_server_manager,
+                execution_time_ms=execution_time_ms,
                 max_steps_used=max_steps,
                 manage_connector=manage_connector,
                 external_history_used=external_history is not None,
-                response=f"[STREAMED RESPONSE - {total_response_length} chars]",
-                execution_time_ms=execution_time_ms,
+                response="[STREAMED RESPONSE]",
                 error_type=None if success else "streaming_error",
-                conversation_history_length=conversation_history_length,
             )
 
     async def close(self) -> None:

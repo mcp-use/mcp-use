@@ -1,9 +1,12 @@
-import fs from "node:fs";
-import path from "node:path";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import fs from "node:fs";
+import path from "node:path";
 import { BaseMCPClient } from "./client/base.js";
 import type { ExecutionResult } from "./client/codeExecutor.js";
 import {
@@ -12,10 +15,16 @@ import {
   VMCodeExecutor,
 } from "./client/codeExecutor.js";
 import { CodeModeConnector } from "./client/connectors/codeMode.js";
-import { createConnectorFromConfig, loadConfigFile } from "./config.js";
+import {
+  createConnectorFromConfig,
+  loadConfigFile,
+  type ServerConfig,
+} from "./config.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
+import { Tel } from "./telemetry/index.js";
+import { getPackageVersion } from "./version.js";
 
 export type CodeExecutorFunction = (
   code: string,
@@ -50,9 +59,30 @@ export interface MCPClientOptions {
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
    */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  /**
+   * Optional callback function to handle elicitation requests from servers.
+   * When provided, the client will declare elicitation capability and handle
+   * `elicitation/create` requests by calling this callback.
+   *
+   * Elicitation allows servers to request additional information from users:
+   * - Form mode: Collect structured data with JSON schema validation
+   * - URL mode: Direct users to external URLs for sensitive interactions
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 }
 
 // Export executor classes and utilities for external use
@@ -62,6 +92,10 @@ export {
   isVMAvailable,
   VMCodeExecutor,
 } from "./client/codeExecutor.js";
+
+// Export MCPSession and related types for CLI and other consumers
+export { MCPSession } from "./session.js";
+export type { CallToolResult, Notification, Root, Tool } from "./session.js";
 
 /**
  * Node.js-specific MCPClient implementation
@@ -73,6 +107,14 @@ export {
  * - Code execution mode
  */
 export class MCPClient extends BaseMCPClient {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
   public codeMode: boolean = false;
   private _codeExecutor: BaseCodeExecutor | null = null;
   private _customCodeExecutor: CodeExecutorFunction | null = null;
@@ -84,6 +126,9 @@ export class MCPClient extends BaseMCPClient {
   private _samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
+  private _elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
 
   constructor(
     config?: string | Record<string, any>,
@@ -120,11 +165,38 @@ export class MCPClient extends BaseMCPClient {
     this.codeMode = codeModeEnabled;
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
-    this._samplingCallback = options?.samplingCallback;
+    // Support both new and deprecated names
+    this._samplingCallback = options?.onSampling ?? options?.samplingCallback;
+    if (options?.samplingCallback && !options?.onSampling) {
+      console.warn(
+        '[MCPClient] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+      );
+    }
+    this._elicitationCallback = options?.elicitationCallback;
 
     if (this.codeMode) {
       this._setupCodeModeConnector();
     }
+
+    this._trackClientInit();
+  }
+
+  private _trackClientInit(): void {
+    const servers = Object.keys(this.config.mcpServers ?? {});
+    const hasSamplingCallback = !!this._samplingCallback;
+    const hasElicitationCallback = !!this._elicitationCallback;
+
+    Tel.getInstance()
+      .trackMCPClientInit({
+        codeMode: this.codeMode,
+        sandbox: false, // Sandbox not supported in TS yet
+        allCallbacks: hasSamplingCallback && hasElicitationCallback,
+        verify: false, // No verify option in TS client
+        servers,
+        numServers: servers.length,
+        isBrowser: false, // Node.js MCPClient
+      })
+      .catch((e) => logger.debug(`Failed to track MCPClient init: ${e}`));
   }
 
   public static fromDict(
@@ -159,8 +231,9 @@ export class MCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    return createConnectorFromConfig(serverConfig, {
+    return createConnectorFromConfig(serverConfig as ServerConfig, {
       samplingCallback: this._samplingCallback,
+      elicitationCallback: this._elicitationCallback,
     });
   }
 

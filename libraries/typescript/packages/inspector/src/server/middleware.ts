@@ -13,12 +13,12 @@ import { checkClientFiles, getClientDistPath } from "./shared-utils.js";
  *
  * @example
  * ```typescript
- * import { createMCPServer } from 'mcp-use/server'
+ * import { MCPServer } from 'mcp-use/server'
  * import { mountInspector } from '@mcp-use/inspector'
  *
- * const server = createMCPServer('my-server')
+ * const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
  * mountInspector(server) // Mounts at /inspector
- * mountInspector(server, { autoConnectUrl: 'http://localhost:3001/mcp' }) // With auto-connect
+ * mountInspector(server, { autoConnectUrl: 'http://localhost:3000/mcp' }) // With auto-connect
  * ```
  */
 export function mountInspector(

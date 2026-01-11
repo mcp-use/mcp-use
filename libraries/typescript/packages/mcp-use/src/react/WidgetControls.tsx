@@ -96,11 +96,11 @@ export function WidgetControls({
   const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const isPip = displayMode === "pip" && isAvailable;
 
-  // Detect if we're in dev mode (running in inspector dev widget proxy)
-  // In dev mode, hide the controls as they're shown in the inspector instead
-  const isDevMode =
+  // Detect if we're running in the inspector (dev or prod widget)
+  // When in inspector, hide the widget controls as the inspector shows its own controls
+  const isInInspector =
     typeof window !== "undefined" &&
-    window.location.pathname.includes("/inspector/api/dev-widget/");
+    window.location.pathname.includes("/inspector/api/");
 
   // Get window.openai keys
   useEffect(() => {
@@ -274,8 +274,9 @@ export function WidgetControls({
       const args = toolArgs.trim() ? JSON.parse(toolArgs) : {};
       const result = await callTool(toolName, args);
       setActionResult(`Success: ${JSON.stringify(result, null, 2)}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -284,8 +285,9 @@ export function WidgetControls({
       setActionResult("Sending follow-up message...");
       await sendFollowUpMessage(followUpMessage);
       setActionResult("Follow-up message sent successfully");
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -293,8 +295,9 @@ export function WidgetControls({
     try {
       openExternal(externalUrl);
       setActionResult(`Opened external link: ${externalUrl}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -305,8 +308,9 @@ export function WidgetControls({
       setActionResult(`Requesting display mode: ${mode}...`);
       const result = await requestDisplayMode(mode);
       setActionResult(`Display mode granted: ${result.mode}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -318,8 +322,9 @@ export function WidgetControls({
       setActionResult("Setting state...");
       await setState(newState);
       setActionResult(`State updated: ${JSON.stringify(newState, null, 2)}`);
-    } catch (error: any) {
-      setActionResult(`Error: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      setActionResult(`Error: ${err.message}`);
     }
   };
 
@@ -486,8 +491,8 @@ export function WidgetControls({
           className={getPositionClasses().join(" ")}
           style={getPositionOffsetStyles()}
         >
-          {/* In dev mode, hide all controls as they're shown in the inspector instead */}
-          {!isDevMode && (
+          {/* When in inspector, hide all controls as they're shown in the inspector instead */}
+          {!isInInspector && (
             <>
               {/* View controls (fullscreen/pip) - only show when not already in fullscreen/pip */}
               {!isFullscreen && !isPip && (

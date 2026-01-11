@@ -1,0 +1,120 @@
+---
+title: "File System Storage"
+description: "Using file system storage for development-friendly session persistence with hot reload support"
+icon: folder
+---
+
+
+`FileSystemSessionStore` persists session metadata to a JSON file on disk. This is the **default storage provider in development mode** (`NODE_ENV !== 'production'`), enabling sessions to survive server hot reloads.
+
+## Usage
+
+### Default (Development Mode)
+
+In development mode, `FileSystemSessionStore` is automatically selected:
+
+```typescript
+import { MCPServer } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'dev-server',
+  version: '1.0.0'
+  // Automatically uses FileSystemSessionStore in development
+  // Sessions persist to .mcp-use/sessions.json
+});
+```
+
+### Explicit Configuration
+
+You can also explicitly configure it:
+
+```typescript
+import { MCPServer, FileSystemSessionStore } from 'mcp-use/server';
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new FileSystemSessionStore({
+    path: '.mcp-use/sessions.json'  // Optional: custom path
+  })
+});
+```
+
+### Custom Configuration
+
+```typescript
+import { MCPServer, FileSystemSessionStore } from 'mcp-use/server';
+
+const sessionStore = new FileSystemSessionStore({
+  path: '.mcp-use/sessions.json',  // Optional: custom file path (default: .mcp-use/sessions.json)
+  debounceMs: 100,                  // Optional: write debounce delay in ms (default: 100)
+  maxAgeMs: 24 * 60 * 60 * 1000     // Optional: max session age in ms (default: 24 hours)
+});
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore
+});
+```
+
+## Configuration Options
+
+```typescript
+const sessionStore = new FileSystemSessionStore({
+  path: '.mcp-use/sessions.json',  // Optional: Path to session file (default: .mcp-use/sessions.json in project root)
+  debounceMs: 100,                  // Optional: Debounce delay for writes in milliseconds (default: 100)
+  maxAgeMs: 86400000                // Optional: Maximum session age in milliseconds (default: 24 hours)
+});
+```
+
+### Configuration Details
+
+- **`path`**: File path where sessions are stored. Defaults to `.mcp-use/sessions.json` in the project root. The directory is created automatically if it doesn't exist.
+
+- **`debounceMs`**: Debounce delay for write operations. Reduces disk I/O by batching rapid consecutive writes. Default: 100ms.
+
+- **`maxAgeMs`**: Maximum session age before automatic cleanup. Expired sessions are removed when the file is loaded. Default: 24 hours (86400000ms).
+
+## When to Upgrade
+
+Upgrade to [Redis Storage](/typescript/server/session-management/redis-storage) when you need:
+
+- Production deployments
+- Multiple server instances behind a load balancer
+- Distributed notifications/sampling across servers
+- High-throughput scenarios
+
+
+## How It Works
+
+The file system store:
+
+1. **Loads sessions on startup** - Reads existing sessions from the JSON file synchronously
+2. **Cleans up expired sessions** - Removes sessions older than `maxAgeMs` during load
+3. **Debounces writes** - Batches rapid consecutive writes to reduce disk I/O
+4. **Uses atomic writes** - Writes to a temporary file then renames for reliability
+
+## Session File Format
+
+Sessions are stored as a JSON object mapping session IDs to metadata:
+
+```json
+{
+  "session-id-1": {
+    "clientCapabilities": { ... },
+    "clientInfo": { ... },
+    "protocolVersion": "2024-11-05",
+    "logLevel": "info",
+    "lastAccessedAt": 1234567890
+  },
+  "session-id-2": { ... }
+}
+```
+
+## Related Documentation
+
+- [Session Management Overview](/typescript/server/session-management)
+- [In-Memory Storage](/typescript/server/session-management/memory-storage)
+- [Redis Storage](/typescript/server/session-management/redis-storage)
+

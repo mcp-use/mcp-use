@@ -8,7 +8,7 @@ from mcp_use.client.task_managers.stdio import StdioConnectionManager as _StdioC
 warnings.warn(
     "mcp_use.task_managers.stdio is deprecated. "
     "Use mcp_use.client.task_managers.stdio. "
-    "This import will be removed in version 1.4.0",
+    "This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )

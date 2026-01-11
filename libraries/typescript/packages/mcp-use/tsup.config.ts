@@ -3,10 +3,15 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: [
     "index.ts",
+    "src/adapters/index.ts",
     "src/agents/index.ts",
+    "src/auth/index.ts",
+    "src/bin.ts",
     "src/browser.ts",
+    "src/client.ts",
     "src/react/index.ts",
     "src/server/index.ts",
+    "src/utils/index.ts",
     "src/client/prompts.ts",
   ],
   format: ["cjs", "esm"],
@@ -14,6 +19,9 @@ export default defineConfig({
   keepNames: true,
   dts: false, // We run tsc separately for declarations
   external: [
+    // Keep MCP SDK external (peer dependency)
+    "@modelcontextprotocol/sdk",
+    "@modelcontextprotocol/sdk",
     // Keep Tailwind CSS and its dependencies external (native modules)
     "tailwindcss",
     "@tailwindcss/vite",
@@ -30,9 +38,17 @@ export default defineConfig({
     "@langchain/openai",
     "langchain",
     "@langfuse/langchain",
-    // Keep chalk and supports-color external (uses Node.js built-ins, incompatible with neutral platform)
+    // Keep optional display dependencies external (uses Node.js built-ins, incompatible with neutral platform)
     "chalk",
+    "cli-highlight",
     "supports-color",
+    // Keep react-router-dom external (optional, for widgets)
+    "react-router-dom",
+    // Keep Redis external (optional dependency, uses Node.js built-ins)
+    "redis",
+    "@redis/client",
+    // Keep posthog-node external for browser builds (browser uses posthog-js)
+    "posthog-node",
   ],
   esbuildOptions(options) {
     // Preserve node: prefix for Deno compatibility

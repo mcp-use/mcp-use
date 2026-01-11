@@ -67,6 +67,22 @@ interface ConnectionSettingsFormProps {
   isConnecting?: boolean;
 }
 
+/**
+ * Renders a connection settings form with controls for URL, connection type, OAuth, headers, and timeouts; supports copying the current configuration to the clipboard and pasting a JSON configuration to populate the form.
+ *
+ * The form manages sub-dialogs for Authentication, Custom Headers, and Configuration, handles Enter to trigger connection, and conditionally shows Connect/Save/Copy buttons based on props.
+ *
+ * @param onConnect - Callback invoked when the user triggers a connection (e.g., Connect button or Enter key)
+ * @param onSave - Callback invoked when the user saves connection options via the Save Connection Options button
+ * @param onCancel - Callback invoked when the user cancels editing (optional)
+ * @param variant - Visual variant of the form; "styled" applies a dark/styled appearance
+ * @param showConnectButton - When true, renders the Connect button
+ * @param showSaveButton - When true, renders Save and optional Cancel actions
+ * @param showExportButton - When true, renders the Copy Config button that copies a JSON config to the clipboard
+ * @param isConnecting - When true, disables the Connect button and shows a connecting state
+ *
+ * @returns The JSX element for the connection settings form
+ */
 export function ConnectionSettingsForm({
   transportType,
   setTransportType,
@@ -117,7 +133,7 @@ export function ConnectionSettingsForm({
     // Create a comprehensive config object with all current settings
     const config = {
       url,
-      transportType: transportType === "SSE" ? "http" : "sse",
+      transportType: "http", // HTTP only - SSE is deprecated
       connectionType,
       proxyConfig:
         connectionType === "Via Proxy" && proxyAddress.trim()
@@ -191,11 +207,8 @@ export function ConnectionSettingsForm({
         // Populate form fields with config data
         setUrl(config.url);
 
-        if (config.transportType) {
-          setTransportType(
-            config.transportType === "sse" ? "WebSocket" : "SSE"
-          );
-        }
+        // Transport type is always HTTP now (SSE is deprecated)
+        // No need to set transportType from config
 
         if (config.connectionType) {
           setConnectionType(config.connectionType);
@@ -205,8 +218,16 @@ export function ConnectionSettingsForm({
           setProxyAddress(config.proxyConfig.proxyAddress);
         }
 
-        if (config.customHeaders) {
-          const headers = Object.entries(config.customHeaders).map(
+        // Extract headers from proxyConfig (preferred) or top-level customHeaders/headers
+        const headersToExtract =
+          config.proxyConfig?.customHeaders ||
+          config.proxyConfig?.headers ||
+          config.customHeaders ||
+          config.headers ||
+          {};
+
+        if (Object.keys(headersToExtract).length > 0) {
+          const headers = Object.entries(headersToExtract).map(
             ([name, value], index) => ({
               id: `header-${index}`,
               name,
@@ -277,25 +298,11 @@ export function ConnectionSettingsForm({
         </Button>
       )}
 
-      {/* Transport Type */}
-      <div className="space-y-2">
-        <Label className={labelClassName}>Transport Type</Label>
-        <Select value={transportType} onValueChange={setTransportType}>
-          <SelectTrigger className={cn("w-full", selectTriggerClassName)}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="SSE">Streamable HTTP</SelectItem>
-            <SelectItem value="WebSocket">Server-Sent Events (SSE)</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* URL */}
       <div className="space-y-2">
         <Label className={labelClassName}>URL</Label>
         <Input
-          placeholder="http://localhost:3001/sse"
+          placeholder="http://localhost:3000"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onPaste={handlePaste}

@@ -6,132 +6,165 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
-import { Label } from "@/client/components/ui/label";
 import { NotFound } from "@/client/components/ui/not-found";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
-import { Switch } from "@/client/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { useMcpContext } from "@/client/context/McpContext";
 import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
 import {
   CircleMinus,
   Copy,
+  Info,
   Loader2,
   MoreVertical,
   RotateCcw,
   Settings,
 } from "lucide-react";
-import { useMcp } from "mcp-use/react";
+import { useMcpClient, type McpServerOptions } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
+import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
 
-// Temporary connection tester component
-function ConnectionTester({
-  config,
-  onSuccess,
-  onFailure,
-}: {
-  config: {
-    url: string;
-    name: string;
-    proxyConfig?: {
-      proxyAddress?: string;
-      proxyToken?: string;
-      customHeaders?: Record<string, string>;
-    };
-    transportType?: "http" | "sse";
-  };
-  onSuccess: () => void;
-  onFailure: (error: string) => void;
-}) {
-  const callbackUrl =
-    typeof window !== "undefined"
-      ? new URL("/inspector/oauth/callback", window.location.origin).toString()
-      : "/inspector/oauth/callback";
+/**
+ * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
+ *
+ * This component displays a list of saved connections, a connection settings form, and controls
+ * for adding, editing, removing, resyncing, and inspecting servers. It adapts older add/update/remove
+ * semantics to the newer client API, persists UI state (timeouts, headers, OAuth fields), tracks
+ * transient connection and navigation state, and opens modals for connection editing and server
+ * capabilities. Telemetry for inspector opens and server additions is emitted.
+ *
+ * Proxy fallback is handled automatically by useMcp's built-in autoProxyFallback feature.
+ *
+ * @returns A JSX element representing the Inspector dashboard UI.
+ */
+export function InspectorDashboard() {
+  const {
+    servers: connections,
+    addServer,
+    removeServer: removeConnection,
+    updateServer,
+  } = useMcpClient();
 
-  // Apply proxy configuration
-  let finalUrl = config.url;
-  let customHeaders: Record<string, string> = {};
+  // Track concurrent updates to prevent race conditions
+  const [updatingConnections, setUpdatingConnections] = useState<Set<string>>(
+    new Set()
+  );
+  const updatingConnectionsRef = useRef<Set<string>>(new Set());
 
-  if (config.proxyConfig?.proxyAddress) {
-    const proxyUrl = new URL(config.proxyConfig.proxyAddress);
-    const originalUrl = new URL(config.url);
-    finalUrl = `${proxyUrl.origin}${proxyUrl.pathname}${originalUrl.pathname}${originalUrl.search}`;
-
-    customHeaders["X-Target-URL"] = config.url;
-  }
-
-  if (config.proxyConfig?.customHeaders) {
-    customHeaders = { ...customHeaders, ...config.proxyConfig.customHeaders };
-  }
-
-  const mcpHook = useMcp({
-    url: finalUrl,
-    callbackUrl,
-    customHeaders:
-      Object.keys(customHeaders).length > 0 ? customHeaders : undefined,
-    transportType: config.transportType || "http",
-  });
-
-  const hasCalledRef = useRef(false);
-
+  // Keep ref in sync with state
   useEffect(() => {
-    if (hasCalledRef.current) return;
+    updatingConnectionsRef.current = updatingConnections;
+  }, [updatingConnections]);
 
-    if (mcpHook.state === "ready") {
-      hasCalledRef.current = true;
-      // Don't clear storage on success - we want to keep the connection alive
-      // The real McpConnectionWrapper will take over
-      onSuccess();
-    } else if (
-      mcpHook.state === "authenticating" ||
-      mcpHook.state === "pending_auth"
-    ) {
-      // Authentication is in progress - keep waiting for OAuth callback
-    } else if (mcpHook.state === "failed" && mcpHook.error) {
-      // If there's an authUrl available, authentication is in progress - don't fail yet
-      if (mcpHook.authUrl) {
+  // Adapter functions for backward compatibility
+  const addConnection = useCallback(
+    (
+      url: string,
+      name?: string,
+      proxyConfig?: any,
+      transportType?: "http" | "sse"
+    ) => {
+      addServer(url, {
+        url,
+        name,
+        proxyConfig,
+        transportType,
+      });
+    },
+    [addServer]
+  );
+
+  const updateConnectionConfig = useCallback(
+    async (
+      id: string,
+      config: {
+        name?: string;
+        proxyConfig?: {
+          proxyAddress?: string;
+          customHeaders?: Record<string, string>;
+        };
+        transportType?: "http" | "sse";
+      }
+    ) => {
+      // Check if already updating this connection
+      if (updatingConnectionsRef.current.has(id)) {
+        console.warn(
+          `[InspectorDashboard] Connection ${id} is already being updated, skipping`
+        );
         return;
       }
-      hasCalledRef.current = true;
-      const errorMessage = mcpHook.error;
-      // Clear storage on failure to clean up the failed connection attempt
-      mcpHook.clearStorage();
-      onFailure(errorMessage);
-    }
-  }, [
-    mcpHook.state,
-    mcpHook.error,
-    mcpHook.authUrl,
-    onSuccess,
-    onFailure,
-    mcpHook,
-  ]);
 
-  return null;
-}
+      // Mark as updating
+      setUpdatingConnections((prev) => new Set(prev).add(id));
 
-export function InspectorDashboard() {
-  const mcpContext = useMcpContext();
-  const {
-    connections,
-    addConnection,
-    removeConnection,
-    updateConnectionConfig,
-    autoConnect,
-    setAutoConnect,
-    connectServer,
-    disconnectServer: _disconnectServer,
-  } = mcpContext;
+      try {
+        // Use the new updateServer method for atomic updates
+        await updateServer(id, config);
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to update connection ${id}:`,
+          error
+        );
+      } finally {
+        // Clear the updating flag
+        setUpdatingConnections((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [updateServer]
+  );
+
+  const connectServer = useCallback(
+    async (id: string) => {
+      // Check if already updating this connection
+      if (updatingConnectionsRef.current.has(id)) {
+        console.warn(
+          `[InspectorDashboard] Connection ${id} is already being reconnected, skipping`
+        );
+        return;
+      }
+
+      const server = connections.find((s) => s.id === id);
+      if (!server) return;
+
+      // Mark as updating
+      setUpdatingConnections((prev) => new Set(prev).add(id));
+
+      try {
+        // Trigger reconnection by updating with the same config (forces disconnect/reconnect)
+        await updateServer(id, {
+          url: server.url,
+          name: server.name,
+        });
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to reconnect server ${id}:`,
+          error
+        );
+      } finally {
+        // Clear the updating flag
+        setUpdatingConnections((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [connections, updateServer]
+  );
+
   const navigate = useNavigate();
   const location = useLocation();
   const [connectingServers, setConnectingServers] = useState<Set<string>>(
@@ -143,11 +176,9 @@ export function InspectorDashboard() {
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null
   );
-
-  // Log connections on every render to debug
-  console.warn(
-    "[InspectorDashboard] Render - connections:",
-    connections.map((c) => ({ id: c.id, state: c.state }))
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalConnection, setInfoModalConnection] = useState<any | null>(
+    null
   );
 
   // Track inspector open on mount
@@ -163,7 +194,6 @@ export function InspectorDashboard() {
   }, []); // Only run once on mount
 
   // Form state
-  const [transportType, setTransportType] = useState("SSE");
   const [url, setUrl] = useState("");
   const [connectionType, setConnectionType] = useState("Direct");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
@@ -182,178 +212,89 @@ export function InspectorDashboard() {
   );
   const [scope, setScope] = useState("");
 
-  // UI state
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [autoSwitch, setAutoSwitch] = useState(true);
-  const hasShownToastRef = useRef(false);
-  const [hasTriedBothConnectionTypes, setHasTriedBothConnectionTypes] =
-    useState(false);
-  const [pendingConnectionConfig, setPendingConnectionConfig] = useState<{
-    url: string;
-    name: string;
-    proxyConfig?: {
-      proxyAddress?: string;
-      customHeaders?: Record<string, string>;
-    };
-    transportType?: "http" | "sse";
-  } | null>(null);
+  const handleAddConnection = useCallback(() => {
+    if (!url.trim()) return;
 
-  // Load auto-switch setting from localStorage on mount
-  useEffect(() => {
-    const autoSwitchSetting = localStorage.getItem("mcp-inspector-auto-switch");
-    if (autoSwitchSetting !== null) {
-      setAutoSwitch(autoSwitchSetting === "true");
-    }
-  }, []);
+    // Validate URL format
+    try {
+      const parsedUrl = new URL(url.trim());
+      const isValid =
+        parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
-  const handleAddConnection = useCallback(
-    (isRetry = false, overrideConnectionType?: string) => {
-      if (!url.trim()) return;
-
-      setIsConnecting(true);
-      hasShownToastRef.current = false;
-      if (!isRetry) {
-        setHasTriedBothConnectionTypes(false);
+      if (!isValid) {
+        toast.error("Invalid URL protocol. Please use http://, https://");
+        return;
       }
+    } catch (error) {
+      toast.error("Invalid URL format. Please enter a valid URL.");
+      return;
+    }
 
-      // Use overridden connection type if provided (for retry logic), otherwise use state
-      const effectiveConnectionType = overrideConnectionType || connectionType;
-
-      // Prepare proxy configuration if "Via Proxy" is selected
-      const proxyConfig =
-        effectiveConnectionType === "Via Proxy" && proxyAddress.trim()
-          ? {
-              proxyAddress: proxyAddress.trim(),
-              customHeaders: customHeaders.reduce(
-                (acc, header) => {
-                  if (header.name && header.value) {
-                    acc[header.name] = header.value;
-                  }
-                  return acc;
-                },
-                {} as Record<string, string>
-              ),
-            }
-          : {
-              customHeaders: customHeaders.reduce(
-                (acc, header) => {
-                  if (header.name && header.value) {
-                    acc[header.name] = header.value;
-                  }
-                  return acc;
-                },
-                {} as Record<string, string>
-              ),
-            };
-
-      // Map UI transport type to actual transport type
-      // "SSE" in UI means "Streamable HTTP" which uses 'http' transport
-      // "WebSocket" in UI means "WebSocket" which uses 'sse' transport
-      const actualTransportType = transportType === "SSE" ? "http" : "sse";
-
-      // Store pending connection config - don't add to saved connections yet
-      setPendingConnectionConfig({
-        url,
-        name: url,
-        proxyConfig,
-        transportType: actualTransportType,
-      });
-    },
-    [url, connectionType, proxyAddress, customHeaders, transportType]
-  );
-
-  // Handle successful connection
-  const handleConnectionSuccess = useCallback(() => {
-    if (!pendingConnectionConfig) return;
-
-    setIsConnecting(false);
-
-    // Add to saved connections now that it's successful
-    addConnection(
-      pendingConnectionConfig.url,
-      pendingConnectionConfig.name,
-      pendingConnectionConfig.proxyConfig,
-      pendingConnectionConfig.transportType
+    // Convert custom headers array to object
+    const headersObject = customHeaders.reduce(
+      (acc, header) => {
+        if (header.name && header.value) {
+          acc[header.name] = header.value;
+        }
+        return acc;
+      },
+      {} as Record<string, string>
     );
+
+    // Prepare proxy configuration if "Via Proxy" is selected
+    const proxyConfig =
+      connectionType === "Via Proxy" && proxyAddress.trim()
+        ? {
+            proxyAddress: proxyAddress.trim(),
+            headers: headersObject,
+          }
+        : undefined;
+
+    // Build server configuration with proper typing
+    const serverConfig: McpServerOptions = {
+      url: url.trim(),
+      name: url.trim(),
+      transportType: "http",
+      preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
+      ...(proxyConfig
+        ? {
+            proxyConfig,
+            // Disable autoProxyFallback when proxy is explicitly configured
+            // User has chosen "Via Proxy" - use proxy from the start
+            autoProxyFallback: false,
+          }
+        : {}),
+      ...(Object.keys(headersObject).length > 0 && !proxyConfig
+        ? { headers: headersObject }
+        : {}),
+    };
+
+    // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
+    addServer(url.trim(), serverConfig);
 
     // Track server added
     const telemetry = Telemetry.getInstance();
     telemetry
       .capture(
         new MCPServerAddedEvent({
-          serverId: pendingConnectionConfig.url,
-          serverUrl: pendingConnectionConfig.url,
-          connectionType: pendingConnectionConfig.transportType,
-          viaProxy: !!pendingConnectionConfig.proxyConfig?.proxyAddress,
+          serverId: url.trim(),
+          serverUrl: url.trim(),
+          connectionType: "http",
+          viaProxy: !!proxyConfig?.proxyAddress,
         })
       )
       .catch(() => {
         // Silently fail - telemetry should not break the application
       });
 
-    setPendingConnectionConfig(null);
-    toast.success("Connection established successfully");
-
     // Reset form
     setUrl("");
     setCustomHeaders([]);
     setClientId("");
     setScope("");
-  }, [pendingConnectionConfig, addConnection]);
 
-  // Handle failed connection
-  const handleConnectionFailure = useCallback(
-    (errorMessage: string) => {
-      // Skip auto-switch for auth errors (both transports will fail the same way)
-      const isAuthError =
-        errorMessage.includes("401") ||
-        errorMessage.includes("Unauthorized") ||
-        errorMessage.includes("Authentication required");
-
-      // Try auto-switch if enabled and we haven't tried both connection types yet
-      if (autoSwitch && !hasTriedBothConnectionTypes && !isAuthError) {
-        const shouldTryProxy = connectionType === "Direct";
-        const shouldTryDirect = connectionType === "Via Proxy";
-
-        if (shouldTryProxy) {
-          toast.error("Direct connection failed, trying with proxy...");
-          setHasTriedBothConnectionTypes(true);
-          // Clear pending config first to unmount the old ConnectionTester
-          setPendingConnectionConfig(null);
-          // Switch to proxy and retry after a brief delay
-          setConnectionType("Via Proxy");
-          setTimeout(() => {
-            setIsConnecting(true);
-            // Pass 'Via Proxy' explicitly to override the memoized callback's connectionType
-            handleAddConnection(true, "Via Proxy");
-          }, 1000); // Small delay to show the toast
-        } else if (shouldTryDirect) {
-          toast.error("Proxy connection failed, trying direct...");
-          setHasTriedBothConnectionTypes(true);
-          // Clear pending config first to unmount the old ConnectionTester
-          setPendingConnectionConfig(null);
-          // Switch to direct and retry after a brief delay
-          setConnectionType("Direct");
-          setTimeout(() => {
-            setIsConnecting(true);
-            // Pass 'Direct' explicitly to override the memoized callback's connectionType
-            handleAddConnection(true, "Direct");
-          }, 1000); // Small delay to show the toast
-        }
-      } else {
-        toast.error(errorMessage);
-        // Clear pending config on final failure
-        setPendingConnectionConfig(null);
-        setIsConnecting(false);
-      }
-    },
-    [
-      autoSwitch,
-      hasTriedBothConnectionTypes,
-      connectionType,
-      handleAddConnection,
-    ]
-  );
+    toast.success("Server added successfully");
+  }, [url, connectionType, proxyAddress, customHeaders, addServer]);
 
   const handleClearAllConnections = () => {
     // Remove all connections
@@ -373,13 +314,47 @@ export function InspectorDashboard() {
 
   const handleCopyConnectionConfig = async (connection: any) => {
     try {
+      // Try to get the original stored config from localStorage
+      // This contains the proxyConfig and customHeaders that were originally saved
+      let storedConfig: any = null;
+      try {
+        const stored = localStorage.getItem("mcp-inspector-connections");
+        if (stored) {
+          const allServers = JSON.parse(stored);
+          storedConfig = allServers[connection.id];
+        }
+      } catch (e) {
+        // If we can't read from localStorage, fall back to connection object
+        console.warn(
+          "[InspectorDashboard] Could not read from localStorage:",
+          e
+        );
+      }
+
+      // Extract customHeaders from stored config (which has the original proxyConfig)
+      const customHeaders =
+        storedConfig?.proxyConfig?.customHeaders ||
+        storedConfig?.customHeaders ||
+        connection.proxyConfig?.customHeaders ||
+        connection.customHeaders ||
+        {};
+
+      // Determine connection type and proxyConfig
+      const hasProxyAddress =
+        storedConfig?.proxyConfig?.proxyAddress ||
+        connection.proxyConfig?.proxyAddress;
+      const connectionType = hasProxyAddress ? "Via Proxy" : "Direct";
+      const proxyConfig = hasProxyAddress
+        ? storedConfig?.proxyConfig || connection.proxyConfig
+        : undefined;
+
       const config = {
         url: connection.url,
         name: connection.name,
         transportType: connection.transportType || "http",
-        connectionType: connection.proxyConfig ? "Via Proxy" : "Direct",
-        proxyConfig: connection.proxyConfig,
-        customHeaders: connection.customHeaders || {},
+        connectionType,
+        proxyConfig,
+        customHeaders,
         requestTimeout: connection.requestTimeout || 10000,
         resetTimeoutOnProgress: connection.resetTimeoutOnProgress !== false,
         maxTotalTimeout: connection.maxTotalTimeout || 60000,
@@ -442,8 +417,8 @@ export function InspectorDashboard() {
   );
 
   const handleServerClick = (connection: any) => {
-    // If disconnected, connect the server
-    if (connection.state === "disconnected") {
+    // If failed, try to reconnect the server
+    if (connection.state === "failed") {
       console.warn(
         "[InspectorDashboard] Connecting server and setting pending navigation:",
         connection.id
@@ -458,13 +433,15 @@ export function InspectorDashboard() {
       toast.error("Server is not connected and cannot be inspected");
       return;
     }
-    // Preserve tunnelUrl parameter if present
+    // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
-    const newUrl = tunnelUrl
-      ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-      : `/?server=${encodeURIComponent(connection.id)}`;
-    navigate(newUrl);
+    const tab = urlParams.get("tab");
+    const params = new URLSearchParams();
+    params.set("server", connection.id);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    if (tab) params.set("tab", tab);
+    navigate(`/?${params.toString()}`);
   };
 
   // Monitor connecting servers and remove them from the set when they connect or fail
@@ -498,16 +475,18 @@ export function InspectorDashboard() {
     if (
       connection &&
       (connection.state === "ready" ||
-        (hasData && connection.state !== "connecting"))
+        (hasData && connection.state !== "discovering"))
     ) {
       setPendingNavigation(null);
-      // Preserve tunnelUrl parameter if present
+      // Preserve tunnelUrl and tab parameters if present
       const urlParams = new URLSearchParams(location.search);
       const tunnelUrl = urlParams.get("tunnelUrl");
-      const newUrl = tunnelUrl
-        ? `/?server=${encodeURIComponent(connection.id)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(connection.id)}`;
-      navigate(newUrl);
+      const tab = urlParams.get("tab");
+      const params = new URLSearchParams();
+      params.set("server", connection.id);
+      if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+      if (tab) params.set("tab", tab);
+      navigate(`/?${params.toString()}`);
     }
     // Only cancel navigation if connection truly failed with no data loaded
     else if (
@@ -564,19 +543,6 @@ export function InspectorDashboard() {
               Connected Servers
             </h3>
             <div className="hidden sm:flex items-center gap-3 justify-center sm:justify-start">
-              <div className="flex items-center gap-2">
-                <Label
-                  htmlFor="auto-connect"
-                  className="text-sm cursor-pointer"
-                >
-                  Auto-connect
-                </Label>
-                <Switch
-                  id="auto-connect"
-                  checked={autoConnect}
-                  onCheckedChange={setAutoConnect}
-                />
-              </div>
               {connections.length > 0 && (
                 <Button
                   variant="ghost"
@@ -601,13 +567,11 @@ export function InspectorDashboard() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
-                        <ServerIcon
-                          serverUrl={connection.url}
-                          serverName={connection.name}
-                          size="md"
-                        />
+                        <ServerIcon server={connection} size="md" />
                         <h4 className="font-semibold text-sm">
-                          {connection.name}
+                          {connection.serverInfo?.title ||
+                            connection.serverInfo?.name ||
+                            connection.name}
                         </h4>
                         <div className="flex items-center gap-2">
                           {connectingServers.has(connection.id) ? (
@@ -634,13 +598,11 @@ export function InspectorDashboard() {
                           ) : (
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                connection.state === "disconnected"
-                                  ? "bg-gray-400 dark:bg-gray-600"
-                                  : connection.state === "ready"
-                                    ? "bg-emerald-600 animate-status-pulse"
-                                    : connection.state === "failed"
-                                      ? "bg-rose-600 animate-status-pulse-red"
-                                      : "bg-yellow-500 animate-status-pulse-yellow"
+                                connection.state === "ready"
+                                  ? "bg-emerald-600 animate-status-pulse"
+                                  : connection.state === "failed"
+                                    ? "bg-rose-600 animate-status-pulse-red"
+                                    : "bg-yellow-500 animate-status-pulse-yellow"
                               }`}
                             />
                           )}
@@ -698,6 +660,26 @@ export function InspectorDashboard() {
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
+                              handleActionClick(e, () => {
+                                setInfoModalConnection(connection);
+                                setInfoModalOpen(true);
+                              })
+                            }
+                            className="h-8 w-8 p-0"
+                          >
+                            <Info className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View server info</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) =>
                               handleActionClick(e, () =>
                                 setEditingConnectionId(connection.id)
                               )
@@ -730,7 +712,7 @@ export function InspectorDashboard() {
                           <p>Remove connection</p>
                         </TooltipContent>
                       </Tooltip>
-                      {connection.state !== "disconnected" && (
+                      {connection.state === "ready" && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -776,13 +758,23 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
+                              setInfoModalConnection(connection);
+                              setInfoModalOpen(true);
+                            }}
+                          >
+                            <Info className="h-4 w-4 mr-2" />
+                            View server info
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingConnectionId(connection.id);
                             }}
                           >
                             <Settings className="h-4 w-4 mr-2" />
                             Edit connection settings
                           </DropdownMenuItem>
-                          {connection.state !== "disconnected" && (
+                          {connection.state === "ready" && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -807,27 +799,45 @@ export function InspectorDashboard() {
                       </DropdownMenu>
                     </div>
                   </div>
-                  {connection.state === "pending_auth" &&
-                    connection.authUrl && (
-                      <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={connection.authenticate}
-                        >
-                          Authenticate
-                        </Button>{" "}
-                        or{" "}
-                        <a
-                          href={connection.authUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline"
-                        >
-                          open auth page
-                        </a>
-                      </div>
-                    )}
+                  {(connection.state === "pending_auth" ||
+                    connection.state === "authenticating") && (
+                    <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
+                      <Button
+                        size="sm"
+                        className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                        variant="outline"
+                        onClick={(e) =>
+                          handleActionClick(e, connection.authenticate)
+                        }
+                        disabled={connection.state === "authenticating"}
+                      >
+                        {connection.state === "authenticating" ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Authenticating...
+                          </>
+                        ) : (
+                          "Authenticate"
+                        )}
+                      </Button>
+                      {connection.authUrl &&
+                        connection.state === "pending_auth" && (
+                          <>
+                            {" "}
+                            or{" "}
+                            <a
+                              href={connection.authUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              open auth page
+                            </a>
+                          </>
+                        )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -838,8 +848,8 @@ export function InspectorDashboard() {
       <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <ConnectionSettingsForm
-            transportType={transportType}
-            setTransportType={setTransportType}
+            transportType="SSE"
+            setTransportType={() => {}}
             url={url}
             setUrl={setUrl}
             connectionType={connectionType}
@@ -860,27 +870,14 @@ export function InspectorDashboard() {
             setRedirectUrl={setRedirectUrl}
             scope={scope}
             setScope={setScope}
-            autoSwitch={autoSwitch}
-            setAutoSwitch={setAutoSwitch}
             onConnect={handleAddConnection}
             variant="styled"
             showConnectButton={true}
             showExportButton={true}
-            isConnecting={isConnecting}
           />
         </div>
         <RandomGradientBackground className="absolute inset-0" />
       </div>
-
-      {/* Temporary connection tester - only rendered when testing a new connection */}
-      {pendingConnectionConfig && (
-        <ConnectionTester
-          key={`${pendingConnectionConfig.url}-${pendingConnectionConfig.transportType}-${connectionType}`}
-          config={pendingConnectionConfig}
-          onSuccess={handleConnectionSuccess}
-          onFailure={handleConnectionFailure}
-        />
-      )}
 
       {/* Connection Options Dialog */}
       <ServerConnectionModal
@@ -896,6 +893,13 @@ export function InspectorDashboard() {
           }
         }}
         onConnect={handleUpdateConnection}
+      />
+
+      {/* Server Info Modal */}
+      <ServerCapabilitiesModal
+        open={infoModalOpen}
+        onOpenChange={setInfoModalOpen}
+        connection={infoModalConnection}
       />
     </div>
   );

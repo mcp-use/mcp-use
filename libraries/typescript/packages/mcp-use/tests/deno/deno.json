@@ -1,0 +1,20 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1.25.1",
+    "@mcp-ui/server": "npm:@mcp-ui/server@^5.15.0",
+    "mcp-use/server": "../../dist/src/server/index.js",
+    "zod": "npm:zod@^4.2.0",
+    "jose": "npm:jose@^6.1.2",
+    "hono": "npm:hono@^4.10.7",
+    "hono/cors": "npm:hono@^4.10.7/cors",
+    "path": "node:path",
+    "fs": "node:fs",
+    "fs/promises": "node:fs/promises",
+    "async_hooks": "node:async_hooks"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.unstable"]
+  }
+}
+

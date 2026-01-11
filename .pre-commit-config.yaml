@@ -1,0 +1,41 @@
+repos:
+  # Python hooks - only run on Python files
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.2
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^libraries/python/.*\.py$
+        types: [python]
+      - id: ruff-format
+        files: ^libraries/python/.*\.py$
+        types: [python]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^libraries/python/
+      - id: end-of-file-fixer
+        files: ^libraries/python/
+      - id: check-yaml
+        exclude: (pnpm-lock\.yaml|package-lock\.json)$
+      - id: check-added-large-files
+        exclude: \.mp4$
+      - id: debug-statements
+        files: ^libraries/python/.*\.py$
+
+  # TypeScript/JavaScript hooks - only run on TS/JS files
+  - repo: local
+    hooks:
+      - id: typescript-format-and-lint
+        name: TypeScript Format & Lint
+        entry: .git/hooks/typescript-pre-commit.sh
+        language: system
+        files: ^libraries/typescript/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+# Define configuration for the Python checks
+default_language_version:
+  python: python3.11
+

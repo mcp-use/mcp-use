@@ -1,10 +1,15 @@
 import type { ReactNode, RefObject } from "react";
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { ChatTab } from "./ChatTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { PromptsTab } from "./PromptsTab";
 import { ResourcesTab } from "./ResourcesTab";
 import { ToolsTab } from "./ToolsTab";
+import { SamplingTab } from "./SamplingTab";
+import { ElicitationTab } from "./ElicitationTab";
 
 interface LayoutContentProps {
   selectedServer: MCPConnection | undefined;
@@ -36,9 +41,13 @@ export function LayoutContent({
     return <>{children}</>;
   }
 
-  switch (activeTab) {
-    case "tools":
-      return (
+  // Render all tabs but hide inactive ones to preserve state
+  return (
+    <>
+      <div
+        style={{ display: activeTab === "tools" ? "block" : "none" }}
+        className="h-full"
+      >
         <ToolsTab
           ref={toolsSearchRef}
           tools={selectedServer.tools}
@@ -47,9 +56,11 @@ export function LayoutContent({
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
         />
-      );
-    case "prompts":
-      return (
+      </div>
+      <div
+        style={{ display: activeTab === "prompts" ? "block" : "none" }}
+        className="h-full"
+      >
         <PromptsTab
           ref={promptsSearchRef}
           prompts={selectedServer.prompts}
@@ -57,9 +68,11 @@ export function LayoutContent({
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
         />
-      );
-    case "resources":
-      return (
+      </div>
+      <div
+        style={{ display: activeTab === "resources" ? "block" : "none" }}
+        className="h-full"
+      >
         <ResourcesTab
           ref={resourcesSearchRef}
           resources={selectedServer.resources}
@@ -67,18 +80,47 @@ export function LayoutContent({
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
         />
-      );
-    case "chat":
-      return (
+      </div>
+      <div
+        style={{ display: activeTab === "chat" ? "block" : "none" }}
+        className="h-full"
+      >
         <ChatTab
           key={selectedServer.id}
           connection={selectedServer}
           isConnected={selectedServer.state === "ready"}
           readResource={selectedServer.readResource}
         />
-      );
-    case "notifications":
-      return (
+      </div>
+      <div
+        style={{ display: activeTab === "sampling" ? "block" : "none" }}
+        className="h-full"
+      >
+        <SamplingTab
+          pendingRequests={selectedServer.pendingSamplingRequests}
+          onApprove={selectedServer.approveSampling}
+          onReject={selectedServer.rejectSampling}
+          serverId={selectedServer.id}
+          isConnected={selectedServer.state === "ready"}
+          mcpServerUrl={selectedServer.url}
+        />
+      </div>
+      <div
+        style={{ display: activeTab === "elicitation" ? "block" : "none" }}
+        className="h-full"
+      >
+        <ElicitationTab
+          pendingRequests={selectedServer.pendingElicitationRequests}
+          onApprove={selectedServer.approveElicitation}
+          onReject={selectedServer.rejectElicitation}
+          serverId={selectedServer.id}
+          isConnected={selectedServer.state === "ready"}
+        />
+      </div>
+      <div
+        style={{ display: activeTab === "notifications" ? "block" : "none" }}
+        className="h-full"
+      >
         <NotificationsTab
           notifications={selectedServer.notifications}
           unreadCount={selectedServer.unreadNotificationCount}
@@ -88,8 +130,14 @@ export function LayoutContent({
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
         />
-      );
-    default:
-      return <>{children}</>;
-  }
+      </div>
+      {activeTab !== "tools" &&
+        activeTab !== "prompts" &&
+        activeTab !== "resources" &&
+        activeTab !== "chat" &&
+        activeTab !== "sampling" &&
+        activeTab !== "elicitation" &&
+        activeTab !== "notifications" && <>{children}</>}
+    </>
+  );
 }

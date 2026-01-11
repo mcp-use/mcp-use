@@ -1,10 +1,13 @@
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
+import { z } from "zod";
 
 // Create MCP server instance
-const server = createMCPServer("my-mcp-server", {
+const server = new MCPServer({
+  name: "my-mcp-server",
   version: "1.0.0",
   description: "My first MCP server with all features",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
+  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
 /**
@@ -28,12 +31,15 @@ const server = createMCPServer("my-mcp-server", {
  * Define MCP tools
  * Docs: https://docs.mcp-use.com/typescript/server/tools
  */
-server.tool({
-  name: "fetch-weather",
-  description: "Fetch the weather for a city",
-  inputs: [{ name: "city", type: "string", required: true }],
-  cb: async (params: Record<string, any>) => {
-    const city = params.city as string;
+server.tool(
+  {
+    name: "fetch-weather",
+    description: "Fetch the weather for a city",
+    schema: z.object({
+      city: z.string().describe("The city to fetch the weather for"),
+    }),
+  },
+  async ({ city }) => {
     const response = await fetch(`https://wttr.in/${city}?format=j1`);
     const data: any = await response.json();
     const current = data.current_condition[0];
@@ -45,8 +51,8 @@ server.tool({
         },
       ],
     };
-  },
-});
+  }
+);
 
 /*
  * Define MCP resources
@@ -75,11 +81,13 @@ server.resource({
  * Define MCP prompts
  * Docs: https://docs.mcp-use.com/typescript/server/prompts
  */
-server.prompt({
-  name: "review-code",
-  description: "Review code for best practices and potential issues",
-  args: [{ name: "code", type: "string", required: true }],
-  cb: async (params: Record<string, any>) => {
+server.prompt(
+  {
+    name: "review-code",
+    description: "Review code for best practices and potential issues",
+    args: [{ name: "code", type: "string", required: true }],
+  },
+  async (params: Record<string, any>) => {
     const { code } = params;
     return {
       messages: [
@@ -92,8 +100,8 @@ server.prompt({
         },
       ],
     };
-  },
-});
+  }
+);
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 console.log(`Server running on port ${PORT}`);

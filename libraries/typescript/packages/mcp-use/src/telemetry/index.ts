@@ -1,8 +1,36 @@
-import { Telemetry } from "./telemetry.js";
+export {
+  BaseTelemetryEvent,
+  MCPAgentExecutionEvent,
+  ServerRunEvent,
+  ServerInitializeEvent,
+  ServerToolCallEvent,
+  ServerResourceCallEvent,
+  ServerPromptCallEvent,
+  ServerContextEvent,
+  MCPClientInitEvent,
+  ConnectorInitEvent,
+  ClientAddServerEvent,
+  ClientRemoveServerEvent,
+} from "./events.js";
 
-export { BaseTelemetryEvent, MCPAgentExecutionEvent } from "./events.js";
-export type { MCPAgentExecutionEventData } from "./events.js";
-export { Telemetry } from "./telemetry.js";
+export type {
+  MCPAgentExecutionEventData,
+  ServerRunEventData,
+  ServerInitializeEventData,
+  ServerToolCallEventData,
+  ServerResourceCallEventData,
+  ServerPromptCallEventData,
+  ServerContextEventData,
+  MCPClientInitEventData,
+  ConnectorInitEventData,
+  ClientAddServerEventInput,
+  ClientRemoveServerEventInput,
+  Tool,
+  Resource,
+  Prompt,
+  Content,
+} from "./events.js";
+
 export {
   extractModelInfo,
   getModelName,
@@ -10,7 +38,14 @@ export {
   getPackageVersion,
 } from "./utils.js";
 
-// Convenience function to set telemetry source globally
-export function setTelemetrySource(source: string): void {
-  Telemetry.getInstance().setSource(source);
-}
+// Re-export from browser telemetry for shared/isomorphic modules
+// Browser telemetry is isomorphic - works in both browser and Node.js
+// (Node.js-specific telemetry with posthog-node is only used when directly imported)
+export {
+  Telemetry,
+  Tel,
+  setTelemetrySource,
+  isBrowserEnvironment,
+} from "./telemetry-browser.js";
+
+export type { RuntimeEnvironment } from "./telemetry-browser.js";

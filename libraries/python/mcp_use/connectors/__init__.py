@@ -20,7 +20,7 @@ from mcp_use.client.connectors import (
 )
 
 warnings.warn(
-    "mcp_use.connectors is deprecated. Use mcp_use.client.connectors. This import will be removed in version 1.4.0",
+    "mcp_use.connectors is deprecated. Use mcp_use.client.connectors. This import will be removed in version 2.0.0",
     DeprecationWarning,
     stacklevel=2,
 )
