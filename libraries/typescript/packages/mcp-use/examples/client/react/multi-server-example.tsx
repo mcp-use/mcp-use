@@ -27,9 +27,17 @@ const ServerManager: React.FC = () => {
       // User must click "Authenticate" button when server requires OAuth
     });
 
+    addServer("supabase", {
+      url: "https://mcp.supabase.com/mcp?project_ref={PROJECT_REF}&features=database%2Cdebugging",
+      name: "Supabase (OAuth proxy, requires special proxying)",
+      timeout: 30000,
+      preventAutoAuth: true, // is the default
+      // User must click "Authenticate" button when server requires OAuth
+    });
+
     addServer("no api key needed", {
       url: "https://apps-sdk-starter.mcp-use.run",
-      name: "No API Key (MCP Use)",
+      name: "No API Key Needed (MCP Use)",
     });
   }, [addServer]);
 

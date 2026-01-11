@@ -15,6 +15,9 @@ export interface StoredState {
     clientName: string;
     clientUri: string;
     callbackUrl: string;
+    // OAuth proxy settings for CORS bypass during token exchange
+    oauthProxyUrl?: string;
+    connectionUrl?: string;
   };
   // Track which flow was used (popup vs redirect)
   flowType?: "popup" | "redirect";
