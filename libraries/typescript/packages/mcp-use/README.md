@@ -13,7 +13,7 @@
         <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
     <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
         <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
-    <a href="https://docs.mcp-use.io" alt="Documentation">
+    <a href="https://mcp-use.com/docs" alt="Documentation">
         <img src="https://img.shields.io/badge/docs-mcp--use.io-blue" /></a>
     <a href="https://mcp-use.io" alt="Website">
         <img src="https://img.shields.io/badge/website-mcp--use.io-blue" /></a>
