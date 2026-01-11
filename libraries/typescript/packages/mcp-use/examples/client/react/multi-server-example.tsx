@@ -39,15 +39,6 @@ const ServerManager: React.FC = () => {
       url: "https://apps-sdk-starter.mcp-use.run",
       name: "No API Key Needed (MCP Use)",
     });
-
-    addServer("api key needed", {
-      url: "https://argile.mcp-use.run",
-      name: "API Key Needed (Argile)",
-      headers: {
-        Authorization:
-          "Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18zMDlHYzJ1TEVqS2dhM0FVSzUzclVqRjJKbFgiLCJ0eXAiOiJKV1QifQ.eyJhaWQiOiIxYTFkMmFlOS1mZDNjLTRlYzAtODlhMi0yMTA1YTc1YmQxZDIiLCJhenAiOiJodHRwczovL2RlbW8uYXJnaWxlLmFpIiwiZXhwIjoxNzcxNjQ4NDE2LCJpYXQiOjE3NjgwNDg0MTYsImlzcyI6Imh0dHBzOi8vY2xlcmsuYXJnaWxlLmFpIiwianRpIjoiOTZkN2Q2OTQzN2I1NjJiMDc4MTMiLCJuYmYiOjE3NjgwNDg0MTEsInJvbCI6Im9yZzptZW1iZXIiLCJzdWIiOiJ1c2VyXzMwdjRIbXh1OUV1MEV6aDVOdzJYeGlrdG5URyJ9.mHwwXDD4rOso4z8T8gFAqzyE-HLFqkFcvCuvSAeaBJ5I4NGX-Dm4cH4xlG-MEJzbW8olQ-LbjgvAzyJTEXBFLo_f125uvFSXD4Eo316PN8TkWF2SYjo50cht_R-ZyHyPQOOrc_DSO6bm7y6f2zoRAbr3UpMhbshET21_j6JnRnx8pfsdnBsky6tGFBXl9lPPRiVadr5_IIgoaKiqKyW_WbTk8ATPIwru4UqPruIG6zn23mPFYFCGc0XXjCELrkoeFBrygaJmwvfkzIGqUYP4U5ljnjXg_sU2VJacKNcGw1bi6NXnAEHUb_pdun9SQkEMmBTt0J7NjajR_F8ioiuTbA",
-      },
-    });
   }, [addServer]);
 
   return (
