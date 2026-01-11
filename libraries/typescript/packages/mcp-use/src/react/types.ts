@@ -189,6 +189,23 @@ export type UseMcpOptions = {
     }>;
     websiteUrl?: string;
   };
+  /**
+   * Initial server info to use from cache (internal use).
+   * This will be displayed immediately while the actual server info is being fetched.
+   * Once the real server info is available, it will replace this cached value.
+   * @internal
+   */
+  _initialServerInfo?: {
+    name?: string;
+    version?: string;
+    title?: string;
+    websiteUrl?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+    }>;
+    icon?: string;
+  };
 };
 
 export type UseMcpResult = {

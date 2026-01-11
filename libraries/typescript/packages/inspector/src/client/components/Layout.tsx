@@ -418,29 +418,25 @@ export function Layout({ children }: LayoutProps) {
   // Sync URL query params with selected server state
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    const decodedServerId = serverParam
-      ? decodeURIComponent(serverParam)
-      : null;
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverId = searchParams.get("server");
 
     // Update selected server if changed
-    if (decodedServerId !== selectedServerId) {
-      setSelectedServerId(decodedServerId);
+    if (serverId !== selectedServerId) {
+      setSelectedServerId(serverId);
     }
   }, [location.search, selectedServerId, setSelectedServerId]);
 
   // Handle failed server connections - redirect to home
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    if (!serverParam) {
+    const serverId = searchParams.get("server");
+    if (!serverId) {
       return;
     }
 
-    const decodedServerId = decodeURIComponent(serverParam);
-    const serverConnection = connections.find(
-      (conn) => conn.id === decodedServerId
-    );
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverConnection = connections.find((conn) => conn.id === serverId);
 
     // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {

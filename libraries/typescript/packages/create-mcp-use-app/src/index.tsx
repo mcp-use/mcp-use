@@ -714,7 +714,7 @@ program
           );
           console.log("");
         }
-        console.log(chalk.blue("📚 Learn more: https://docs.mcp-use.com"));
+        console.log(chalk.blue("📚 Learn more: https://mcp-use.com/docs"));
         console.log(chalk.gray("💬 For feedback and bug reporting visit:"));
         console.log(
           chalk.gray(

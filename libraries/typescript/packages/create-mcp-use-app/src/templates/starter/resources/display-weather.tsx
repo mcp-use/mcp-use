@@ -6,7 +6,7 @@ import "./styles.css";
 /*
  * Apps SDK widget
  * Just export widgetMetadata with description and Zod schema, and mcp-use handles the rest!
- * See docs: https://docs.mcp-use.com/typescript/server/ui-widgets
+ * See docs: https://mcp-use.com/docs/typescript/server/ui-widgets
  */
 
 const propSchema = z.object({

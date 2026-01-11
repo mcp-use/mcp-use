@@ -158,6 +158,13 @@ export default defineConfig({
       "^/inspector/api/.*": {
         target: "http://localhost:3001",
         changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on("proxyReq", (proxyReq, req) => {
+            // Preserve the original host for OAuth resource URL rewriting
+            const originalHost = req.headers.host || "localhost:3000";
+            proxyReq.setHeader("X-Forwarded-Host", originalHost);
+          });
+        },
       },
     },
   },

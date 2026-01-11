@@ -820,6 +820,59 @@ Configure MCP clients to connect to your server:
 }
 ```
 
+## Development Configuration
+
+### CLI Options
+
+The `mcp-use` CLI provides several options for development:
+
+```bash
+# Start development server (HMR enabled by default)
+mcp-use dev
+
+# Specify port
+mcp-use dev --port 3001
+
+# Disable Hot Module Reloading (uses tsx watch instead)
+mcp-use dev --no-hmr
+
+# Don't auto-open inspector in browser
+mcp-use dev --no-open
+
+# Specify project path
+mcp-use dev --path ./my-server
+```
+
+### Hot Module Reloading (HMR)
+
+HMR is enabled by default during development. It allows you to modify tools, prompts, and resources without restarting the server or dropping client connections.
+
+**How it works:**
+1. The CLI watches your `src/` directory for `.ts` and `.tsx` changes
+2. When a file changes, it re-imports your server module
+3. Changes are diffed and applied to the running server
+4. Connected clients receive `list_changed` notifications
+
+**What can be hot-reloaded:**
+- Adding new tools, prompts, resources, or resource templates
+- Updating existing registrations (descriptions, schemas, handlers)
+- Removing registrations
+
+**What requires a restart:**
+- Server configuration changes (name, version, port)
+- Adding new middleware
+- Changes to OAuth configuration
+
+**Disabling HMR:**
+
+If you encounter issues with HMR, you can disable it:
+
+```bash
+mcp-use dev --no-hmr
+```
+
+This falls back to `tsx watch`, which restarts the entire server on changes.
+
 ## Best Practices
 
 1. **Use Environment Variables**: Never hardcode secrets

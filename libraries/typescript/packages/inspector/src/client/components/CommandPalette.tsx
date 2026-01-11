@@ -262,7 +262,7 @@ export function CommandPalette({
       description: "Step-by-step guide to building MCP servers",
       type: "global",
       category: "Documentation",
-      action: () => window.open("https://docs.mcp-use.com", "_blank"),
+      action: () => window.open("https://mcp-use.com/docs", "_blank"),
     },
     {
       id: "mcp-docs",

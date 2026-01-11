@@ -45,6 +45,12 @@ function App() {
           enabled: true,
           proxyAddress: `${window.location.origin}/inspector/api/proxy`,
         }}
+        clientInfo={{
+          name: "mcp-use Inspector",
+          version: (window as any).__INSPECTOR_VERSION__,
+          websiteUrl: "https://mcp-use.com",
+          icons: [{ src: "https://mcp-use.com/logo.png" }],
+        }}
         onServerAdded={(id: string, server: McpServer) => {
           console.log("[Inspector] Server added:", id, server.state);
         }}

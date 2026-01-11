@@ -74,6 +74,7 @@ export type {
 export {
   LocalStorageProvider,
   MemoryStorageProvider,
+  type CachedServerMetadata,
   type StorageProvider,
 } from "./storage/index.js";
 

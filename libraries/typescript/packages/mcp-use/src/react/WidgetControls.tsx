@@ -91,7 +91,7 @@ export function WidgetControls({
     "Test follow-up message"
   );
   const [externalUrl, setExternalUrl] = useState<string>(
-    "https://docs.mcp-use.com"
+    "https://mcp-use.com/docs"
   );
   const isFullscreen = displayMode === "fullscreen" && isAvailable;
   const isPip = displayMode === "pip" && isAvailable;

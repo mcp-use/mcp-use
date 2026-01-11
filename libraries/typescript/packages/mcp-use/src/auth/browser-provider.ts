@@ -108,6 +108,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
     const oauthProxyUrl = this.oauthProxyUrl;
     const connectionUrl = this.connectionUrl; // Capture connectionUrl in closure
+    const serverUrl = this.serverUrl; // Capture serverUrl for WWW-Authenticate discovery
     const originalFetch = this.originalFetch;
 
     console.log(
@@ -156,8 +157,58 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       // The URL here should be the original OAuth server URL (e.g., https://mcp.vercel.com/.well-known/...)
       try {
         const isMetadata = url.includes("/.well-known/");
+
+        // IMPORTANT: When using a gateway/proxy, the SDK's OAuth client may construct
+        // metadata URLs using the gateway URL instead of the actual server URL.
+        // We need to detect and rewrite these to use the actual server URL.
+        let metadataUrl = url;
+        if (isMetadata && serverUrl) {
+          try {
+            const urlObj = new URL(url);
+            const serverUrlObj = new URL(serverUrl);
+
+            // Check if the URL is using a non-https scheme (like http://localhost)
+            // which indicates it's using the gateway URL instead of the actual server
+            if (
+              urlObj.protocol === "http:" &&
+              serverUrlObj.protocol === "https:"
+            ) {
+              // This is likely a gateway URL, replace with server URL
+              // Extract just the .well-known path (without any proxy path that may have been appended)
+              const pathMatch = urlObj.pathname.match(/(\/.well-known\/[^/]+)/);
+              const wellKnownPath = pathMatch ? pathMatch[1] : urlObj.pathname;
+              metadataUrl = `${serverUrlObj.origin}${wellKnownPath}`;
+              console.log(
+                `[OAuth Proxy] Rewrote gateway metadata URL ${url} to server URL ${metadataUrl}`
+              );
+            } else if (connectionUrl) {
+              // Also check if the URL origin matches the connection/gateway origin
+              const connectionUrlObj = new URL(connectionUrl);
+              if (
+                urlObj.origin === connectionUrlObj.origin &&
+                urlObj.origin !== serverUrlObj.origin
+              ) {
+                // Using gateway origin, rewrite to server origin
+                // Extract just the .well-known path
+                const pathMatch = urlObj.pathname.match(
+                  /(\/.well-known\/[^/]+)/
+                );
+                const wellKnownPath = pathMatch
+                  ? pathMatch[1]
+                  : urlObj.pathname;
+                metadataUrl = `${serverUrlObj.origin}${wellKnownPath}`;
+                console.log(
+                  `[OAuth Proxy] Rewrote gateway metadata URL ${url} to server URL ${metadataUrl}`
+                );
+              }
+            }
+          } catch (e) {
+            console.error(`[OAuth Proxy] Error rewriting metadata URL:`, e);
+          }
+        }
+
         const proxyEndpoint = isMetadata
-          ? `${oauthProxyUrl}/metadata?url=${encodeURIComponent(url)}`
+          ? `${oauthProxyUrl}/metadata?url=${encodeURIComponent(metadataUrl)}`
           : `${oauthProxyUrl}/proxy`;
 
         console.log(
@@ -167,6 +218,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         if (isMetadata) {
           // Metadata requests: simple GET through proxy
           // Include connection URL header so OAuth proxy can rewrite resource field
+          // Also include the MCP server URL for WWW-Authenticate header discovery
           const headers: Record<string, string> = {
             ...(init?.headers
               ? Object.fromEntries(new Headers(init.headers as HeadersInit))
@@ -175,7 +227,15 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           if (connectionUrl) {
             headers["X-Connection-URL"] = connectionUrl;
           }
-          return await originalFetch(proxyEndpoint, {
+
+          // Construct proxy URL with both the metadata URL and the original MCP URL
+          const proxyUrl = new URL(proxyEndpoint);
+          // Add the original MCP server URL so proxy can discover metadata from WWW-Authenticate
+          if (serverUrl) {
+            proxyUrl.searchParams.set("mcp_url", serverUrl);
+          }
+
+          return await originalFetch(proxyUrl.toString(), {
             ...init,
             method: "GET",
             headers,
@@ -183,12 +243,72 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         }
 
         // OAuth endpoint requests: serialize and proxy the full request
-        const body = init?.body ? await serializeBody(init.body) : undefined;
+        // IMPORTANT: For authorize requests, rewrite the resource parameter to use the actual server URL
+        // The metadata proxy stores the original resource in _original_resource for this purpose
+        let requestUrl = url;
+        if (url.includes("/authorize") && serverUrl) {
+          try {
+            const urlObj = new URL(url);
+            const resourceParam = urlObj.searchParams.get("resource");
+
+            // If resource parameter exists, rewrite it to the actual server URL
+            // (it was temporarily set to gateway URL to pass SDK validation)
+            if (resourceParam && connectionUrl) {
+              const connectionUrlObj = new URL(connectionUrl);
+
+              // Check if resource is using the gateway URL (which SDK required for validation)
+              if (
+                resourceParam.startsWith(connectionUrlObj.origin) ||
+                resourceParam === connectionUrl
+              ) {
+                // Replace with the actual server URL for Supabase OAuth validation
+                urlObj.searchParams.set("resource", serverUrl);
+                requestUrl = urlObj.toString();
+                console.log(
+                  `[OAuth Proxy] Rewrote authorize resource parameter from ${resourceParam} to ${serverUrl}`
+                );
+              }
+            }
+          } catch (e) {
+            console.error(`[OAuth Proxy] Error rewriting authorize URL:`, e);
+          }
+        }
+
+        let body = init?.body ? await serializeBody(init.body) : undefined;
+
+        // IMPORTANT: For token requests, rewrite the resource parameter in the body
+        // The body is URL-encoded form data, and resource needs to be the actual server URL
+        if (url.includes("/token") && serverUrl && connectionUrl && body) {
+          try {
+            // Body is URL-encoded form data string
+            const params = new URLSearchParams(body);
+            const resourceParam = params.get("resource");
+
+            if (resourceParam) {
+              const connectionUrlObj = new URL(connectionUrl);
+
+              // Check if resource is using the gateway URL
+              if (
+                resourceParam.startsWith(connectionUrlObj.origin) ||
+                resourceParam === connectionUrl
+              ) {
+                // Replace with the actual server URL for Supabase OAuth validation
+                params.set("resource", serverUrl);
+                body = params.toString();
+                console.log(
+                  `[OAuth Proxy] Rewrote token resource parameter from ${resourceParam} to ${serverUrl}`
+                );
+              }
+            }
+          } catch (e) {
+            console.error(`[OAuth Proxy] Error rewriting token body:`, e);
+          }
+        }
         const response = await originalFetch(proxyEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            url,
+            url: requestUrl,
             method: init?.method || "POST",
             headers: init?.headers
               ? Object.fromEntries(new Headers(init.headers as HeadersInit))
@@ -317,6 +437,31 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * @returns The full authorization URL with state parameter.
    */
   async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
+    // IMPORTANT: Rewrite the resource parameter from the gateway URL back to the actual server URL
+    // The metadata was modified to pass SDK validation (resource = connectionUrl),
+    // but Supabase needs the actual MCP server URL
+    if (this.connectionUrl && this.serverUrl) {
+      const resourceParam = authorizationUrl.searchParams.get("resource");
+      if (resourceParam) {
+        try {
+          const connectionUrlObj = new URL(this.connectionUrl);
+          // Check if resource is using the gateway URL (which SDK required for validation)
+          if (
+            resourceParam.startsWith(connectionUrlObj.origin) ||
+            resourceParam === this.connectionUrl
+          ) {
+            // Replace with the actual server URL for Supabase OAuth validation
+            authorizationUrl.searchParams.set("resource", this.serverUrl);
+            console.log(
+              `[OAuth] Rewrote authorize resource parameter from ${resourceParam} to ${this.serverUrl}`
+            );
+          }
+        } catch (e) {
+          console.error(`[OAuth] Error rewriting resource parameter:`, e);
+        }
+      }
+    }
+
     // Generate a unique state parameter for this authorization request
     const state = globalThis.crypto.randomUUID();
     const stateKey = `${this.storageKeyPrefix}:state_${state}`;
@@ -332,6 +477,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         clientName: this.clientName,
         clientUri: this.clientUri,
         callbackUrl: this.callbackUrl,
+        // Include OAuth proxy settings so callback can bypass CORS for token exchange
+        oauthProxyUrl: this.oauthProxyUrl,
+        connectionUrl: this.connectionUrl,
       },
       // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",

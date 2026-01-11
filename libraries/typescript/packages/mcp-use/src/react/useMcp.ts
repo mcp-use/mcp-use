@@ -246,7 +246,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>();
+  const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>(
+    // Only use cached metadata if it has at least a name
+    options._initialServerInfo?.name
+      ? (options._initialServerInfo as UseMcpResult["serverInfo"])
+      : undefined
+  );
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
@@ -541,6 +546,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preventAutoAuth,
           useRedirectFlow,
           oauthProxyUrl,
+          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
           onPopupWindow,
         }
       );
@@ -1321,6 +1327,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false, // ← Allow OAuth to proceed
             useRedirectFlow,
             oauthProxyUrl,
+            connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
             onPopupWindow,
           }
         );
@@ -1808,6 +1815,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preventAutoAuth,
           useRedirectFlow,
           oauthProxyUrl,
+          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
           onPopupWindow,
         }
       );

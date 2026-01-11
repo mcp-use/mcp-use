@@ -1,11 +1,14 @@
 import type { McpServerOptions } from "../McpClientProvider.js";
-import type { StorageProvider } from "./StorageProvider.js";
+import type {
+  CachedServerMetadata,
+  StorageProvider,
+} from "./StorageProvider.js";
 
 /**
  * In-memory storage provider for testing or non-persistent scenarios
  *
  * Stores server configurations in memory only. Data is lost when the
- * component unmounts or page reloads.
+ * component unmounts or page reloads. Also supports caching server metadata.
  *
  * @example
  * ```typescript
@@ -20,6 +23,7 @@ import type { StorageProvider } from "./StorageProvider.js";
  */
 export class MemoryStorageProvider implements StorageProvider {
   private storage: Record<string, McpServerOptions> = {};
+  private metadata: Record<string, CachedServerMetadata> = {};
 
   getServers(): Record<string, McpServerOptions> {
     return { ...this.storage };
@@ -35,9 +39,26 @@ export class MemoryStorageProvider implements StorageProvider {
 
   removeServer(id: string): void {
     delete this.storage[id];
+    this.removeServerMetadata(id);
   }
 
   clear(): void {
     this.storage = {};
+    this.metadata = {};
+  }
+
+  getServerMetadata(id: string): CachedServerMetadata | undefined {
+    return this.metadata[id];
+  }
+
+  setServerMetadata(id: string, metadata: CachedServerMetadata): void {
+    this.metadata[id] = {
+      ...metadata,
+      cachedAt: Date.now(),
+    };
+  }
+
+  removeServerMetadata(id: string): void {
+    delete this.metadata[id];
   }
 }
