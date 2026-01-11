@@ -55,7 +55,7 @@ class ServerOAuthMetadata(BaseModel):
 
 class ProtectedResourceMetadata(BaseModel):
     """
-    PRC (Protected Resource Metadata) can have metadata
+    PRM (Protected Resource Metadata) can have metadata
     describing their configuration. It could contain information
     about the OAuth metadata.
     """
@@ -300,7 +300,7 @@ class OAuth:
             not self._metadata.code_challenge_methods_supported
             or "S256" not in self._metadata.code_challenge_methods_supported
         ):
-            raise OAuthAuthenticationError("The auth must support code challenge S256. Can`t complete auth without it.")
+            raise OAuthAuthenticationError("The auth must support code challenge S256. Can't complete auth without it.")
 
         # Check if it supports CIMD
         supports_cimd = (
@@ -318,7 +318,7 @@ class OAuth:
             client_id = self.client_metadata_url
             client_secret = None  # public client
         else:
-            # 2) Legacy paths: pre-reggistered clients or DCR
+            # 2) Legacy paths: pre-registered clients or DCR
             registration = None  # Track if we used DCR
             if not client_id:
                 logger.debug("No client_id provided, attempting dynamic client registration")
