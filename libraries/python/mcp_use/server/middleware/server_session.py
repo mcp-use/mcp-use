@@ -15,7 +15,7 @@ class MiddlewareServerSession(ServerSession):
         if responder.request.root.method and responder.request.root.method == "initialize":
             if not self._middleware_manager:
                 # Fallback to normal behavior if middleware isn't injected yet
-                return await super()._received_request(responder)
+                return await ServerSession._received_request(self, responder)
 
             ctx = ServerMiddlewareContext(
                 message=responder.request.root.params,
@@ -26,8 +26,8 @@ class MiddlewareServerSession(ServerSession):
             )
 
             async def call_original(_):
-                return await super()._received_request(responder)
+                return await ServerSession._received_request(self, responder)
 
             return await self._middleware_manager.process_request(ctx, call_original)
 
-        return await super()._received_request(responder)
+        return await ServerSession._received_request(self, responder)
