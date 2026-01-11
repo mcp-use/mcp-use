@@ -214,7 +214,7 @@ class OAuth:
             oauth_provider: OAuth client provider to prevent metadata discovery
             client_metadata_url: Field used to authenticate with CIMD
         """
-        logger.debug(f"Initializing OAuth for server: {server_url}")
+        logger.debug(f"Initializing OAuth for server: {urlparse(server_url).netloc}")
         self.server_url = server_url
         self.token_storage = token_storage or FileTokenStorage()
         self.scope = scope
@@ -241,7 +241,7 @@ class OAuth:
 
         self._client: AsyncOAuth2Client | None = None
         self._bearer_auth: BearerAuth | None = None
-        logger.debug(f"OAuth initialized with scope='{self.scope}', client_id='{self.client_id}'")
+        logger.debug(f"OAuth initialized with scope='{self.scope}', has_client_id={self.client_id is not None}")
 
     @telemetry("oauth_initialize")
     async def initialize(self, client: httpx.AsyncClient) -> BearerAuth | None:
