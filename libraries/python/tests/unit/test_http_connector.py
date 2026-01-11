@@ -202,6 +202,7 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
             "write_stream",
             sampling_callback=None,
             elicitation_callback=None,
+            list_roots_callback=ANY,
             message_handler=ANY,
             logging_callback=None,
             client_info=ANY,

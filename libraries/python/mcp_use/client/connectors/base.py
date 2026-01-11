@@ -13,20 +13,25 @@ from typing import Any
 from mcp import ClientSession, Implementation
 from mcp.client.session import (
     ElicitationFnT,
+    ListRootsFnT,
     LoggingFnT,
     MessageHandlerFnT,
     SamplingFnT,
 )
+from mcp.shared.context import RequestContext
 from mcp.shared.exceptions import McpError
 from mcp.types import (
     CallToolResult,
+    ErrorData,
     GetPromptResult,
     InitializeResult,
+    ListRootsResult,
     Prompt,
     PromptListChangedNotification,
     ReadResourceResult,
     Resource,
     ResourceListChangedNotification,
+    Root,
     ServerCapabilities,
     ServerNotification,
     Tool,
@@ -54,8 +59,24 @@ class BaseConnector(ABC):
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
-        """Initialize base connector with common attributes."""
+        """Initialize base connector with common attributes.
+
+        Args:
+            sampling_callback: Optional callback to handle sampling requests from servers.
+            elicitation_callback: Optional callback to handle elicitation requests from servers.
+            message_handler: Optional callback to handle messages from servers.
+            logging_callback: Optional callback to handle log messages from servers.
+            middleware: Optional list of middleware to apply to requests.
+            roots: Optional initial list of roots to advertise to the server.
+                Roots represent directories or files that the client has access to.
+            list_roots_callback: Optional custom callback to handle roots/list requests.
+                If provided, this takes precedence over the default behavior.
+                If not provided, the connector will use an internal callback that returns
+                the roots set via the `roots` parameter or `set_roots()` method.
+        """
         self.client_session: ClientSession | None = None
         self._connection_manager: ConnectionManager | None = None
         self._tools: list[Tool] | None = None
@@ -70,6 +91,10 @@ class BaseConnector(ABC):
         self.logging_callback = logging_callback
         self.capabilities: ServerCapabilities | None = None
         self._record_telemetry = True
+
+        # Roots support - always advertise roots capability
+        self._roots: list[Root] = roots or []
+        self._user_list_roots_callback = list_roots_callback
 
         # Set up middleware manager
         self.middleware_manager = MiddlewareManager()
@@ -86,6 +111,58 @@ class BaseConnector(ABC):
             version=mcp_use.__version__,
             websiteUrl="https://github.com/mcp-use/mcp-use",
         )
+
+    async def _internal_list_roots_callback(
+        self,
+        context: RequestContext[ClientSession, Any, Any],
+    ) -> ListRootsResult | ErrorData:
+        """Internal callback to handle roots/list requests from the server.
+
+        If a user-provided callback exists, it will be used instead.
+        Otherwise, returns the cached roots list.
+        """
+        if self._user_list_roots_callback:
+            return await self._user_list_roots_callback(context)
+
+        logger.debug(f"Server requested roots list, returning {len(self._roots)} root(s)")
+        return ListRootsResult(roots=self._roots)
+
+    @property
+    def list_roots_callback(self) -> ListRootsFnT:
+        """Get the list_roots_callback to pass to ClientSession.
+
+        This always returns a callback to ensure the roots capability is advertised.
+        """
+        return self._internal_list_roots_callback
+
+    def get_roots(self) -> list[Root]:
+        """Get the current list of roots.
+
+        Returns:
+            A copy of the current roots list.
+        """
+        return list(self._roots)
+
+    async def set_roots(self, roots: list[Root]) -> None:
+        """Set the roots and notify the server if connected.
+
+        Roots represent directories or files that the client has access to.
+
+        Args:
+            roots: Array of Root objects with `uri` (must start with "file://") and optional `name`.
+
+        Example:
+            ```python
+            await connector.set_roots([
+                Root(uri="file:///home/user/project", name="My Project"),
+                Root(uri="file:///home/user/data"),
+            ])
+            ```
+        """
+        self._roots = list(roots)
+        if self.client_session and self._connected:
+            logger.debug(f"Sending roots/list_changed notification with {len(roots)} root(s)")
+            await self.client_session.send_roots_list_changed()
 
     async def _internal_message_handler(self, message: Any) -> None:
         """Wrap the user-provided message handler."""

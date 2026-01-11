@@ -48,14 +48,16 @@ Initialize a new HTTP connector.
 ><ParamField body="auth" type="str | dict[str, typing.Any] | httpx.Auth | None" default="None" >   Authentication method - can be: </ParamField>
 ><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Optional sampling callback. </ParamField>
 ><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Optional elicitation callback. </ParamField>
-><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
-><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
-><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
-><ParamField body="verify" type="bool | None" default="True" >   Boolean flag </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Optional callback to handle messages. </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Optional callback to handle log messages. </ParamField>
+><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Optional list of middleware. </ParamField>
+><ParamField body="verify" type="bool | None" default="True" >   Whether to verify SSL certificates. </ParamField>
+><ParamField body="roots" type="list[mcp.types.Root] | None" default="None" >   Optional initial list of roots to advertise to the server. </ParamField>
+><ParamField body="list_roots_callback" type="mcp.client.session.ListRootsFnT | None" default="None" >   Optional custom callback to handle roots/list requests. </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(base_url: str, headers: dict[str, str] | None = None, timeout: float = 5, sse_read_timeout: float = 300, auth: str | dict[str, typing.Any] | httpx.Auth | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, verify: bool | None = True):
+def __init__(base_url: str, headers: dict[str, str] | None = None, timeout: float = 5, sse_read_timeout: float = 300, auth: str | dict[str, typing.Any] | httpx.Auth | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, verify: bool | None = True, roots: list[mcp.types.Root] | None = None, list_roots_callback: mcp.client.session.ListRootsFnT | None = None):
 ```
 
 </Card>

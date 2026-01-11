@@ -9,8 +9,8 @@ import sys
 from typing import Any
 
 from mcp import ClientSession, ErrorData, McpError, StdioServerParameters
-from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
-from mcp.types import CONNECTION_CLOSED
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import CONNECTION_CLOSED, Root
 
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.client.middleware import CallbackClientSession, Middleware
@@ -37,6 +37,8 @@ class StdioConnector(BaseConnector):
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
         """Initialize a new stdio connector.
 
@@ -47,6 +49,11 @@ class StdioConnector(BaseConnector):
             errlog: Stream to write error output to.
             sampling_callback: Optional callback to sample the client.
             elicitation_callback: Optional callback to elicit the client.
+            message_handler: Optional callback to handle messages.
+            logging_callback: Optional callback to handle log messages.
+            middleware: Optional list of middleware.
+            roots: Optional initial list of roots to advertise to the server.
+            list_roots_callback: Optional custom callback to handle roots/list requests.
         """
         super().__init__(
             sampling_callback=sampling_callback,
@@ -54,6 +61,8 @@ class StdioConnector(BaseConnector):
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
         self.command = command
         self.args = args or []  # Ensure args is never None
@@ -81,6 +90,7 @@ class StdioConnector(BaseConnector):
                 write_stream,
                 sampling_callback=self.sampling_callback,
                 elicitation_callback=self.elicitation_callback,
+                list_roots_callback=self.list_roots_callback,
                 message_handler=self._internal_message_handler,
                 logging_callback=self.logging_callback,
                 client_info=self.client_info,
