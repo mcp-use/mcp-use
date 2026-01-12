@@ -1,13 +1,25 @@
 // browser-provider.ts
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformation,
-  OAuthTokens,
   OAuthClientMetadata,
-} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
-import type { OAuthClientProvider } from "@mcp-use/modelcontextprotocol-sdk/client/auth.js";
+  OAuthTokens,
+} from "@modelcontextprotocol/sdk/shared/auth.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary
+
+/**
+ * Serialize request body for proxying
+ */
+async function serializeBody(body: BodyInit): Promise<any> {
+  if (typeof body === "string") return body;
+  if (body instanceof URLSearchParams || body instanceof FormData) {
+    return Object.fromEntries(body.entries());
+  }
+  if (body instanceof Blob) return await body.text();
+  return body;
+}
 
 /**
  * Browser-compatible OAuth client provider for MCP using localStorage.
@@ -18,9 +30,13 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly serverUrlHash: string;
   readonly clientName: string;
   readonly clientUri: string;
+  readonly logoUri: string;
   readonly callbackUrl: string;
   private preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
+  private oauthProxyUrl?: string;
+  private connectionUrl?: string; // MCP proxy URL that client connected to
+  private originalFetch?: typeof fetch;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -35,9 +51,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       storageKeyPrefix?: string;
       clientName?: string;
       clientUri?: string;
+      logoUri?: string;
       callbackUrl?: string;
       preventAutoAuth?: boolean;
       useRedirectFlow?: boolean;
+      oauthProxyUrl?: string;
+      connectionUrl?: string; // MCP proxy URL that client connected to (for resource field rewriting)
       onPopupWindow?: (
         url: string,
         features: string,
@@ -52,6 +71,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.clientUri =
       options.clientUri ||
       (typeof window !== "undefined" ? window.location.origin : "");
+    this.logoUri = options.logoUri || "https://mcp-use.com/logo.png";
     this.callbackUrl = sanitizeUrl(
       options.callbackUrl ||
         (typeof window !== "undefined"
@@ -60,7 +80,148 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     );
     this.preventAutoAuth = options.preventAutoAuth;
     this.useRedirectFlow = options.useRedirectFlow;
+    this.oauthProxyUrl = options.oauthProxyUrl;
+    this.connectionUrl = options.connectionUrl;
     this.onPopupWindow = options.onPopupWindow;
+  }
+
+  /**
+   * Install fetch interceptor to proxy OAuth requests through the backend
+   */
+  installFetchInterceptor(): void {
+    if (!this.oauthProxyUrl) {
+      console.warn(
+        "[BrowserOAuthProvider] No OAuth proxy URL configured, skipping fetch interceptor installation"
+      );
+      return; // No proxy configured
+    }
+
+    // Store original fetch if not already stored
+    if (!this.originalFetch) {
+      this.originalFetch = window.fetch;
+    } else {
+      console.warn(
+        "[BrowserOAuthProvider] Fetch interceptor already installed"
+      );
+      return; // Already installed
+    }
+
+    const oauthProxyUrl = this.oauthProxyUrl;
+    const connectionUrl = this.connectionUrl; // Capture connectionUrl in closure
+    const originalFetch = this.originalFetch;
+
+    console.log(
+      `[BrowserOAuthProvider] Installing fetch interceptor with proxy: ${oauthProxyUrl}`
+    );
+
+    // Create interceptor
+    window.fetch = async function interceptedFetch(
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ): Promise<Response> {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+
+      // Check if this is an OAuth-related request that needs CORS bypass
+      const isOAuthRequest =
+        url.includes("/.well-known/") ||
+        url.match(/\/(register|token|authorize)$/);
+
+      if (!isOAuthRequest) {
+        return await originalFetch(input, init);
+      }
+
+      // Don't intercept requests already going to our OAuth proxy (avoid circular proxying)
+      // Check if the URL is pointing to our OAuth proxy endpoint
+      try {
+        const urlObj = new URL(url);
+        const proxyUrlObj = new URL(oauthProxyUrl);
+        // If the request is going to the same origin and path as our OAuth proxy, don't intercept
+        if (
+          urlObj.origin === proxyUrlObj.origin &&
+          (urlObj.pathname.startsWith(proxyUrlObj.pathname) ||
+            url.includes("/inspector/api/oauth"))
+        ) {
+          return await originalFetch(input, init);
+        }
+      } catch {
+        // If URL parsing fails, continue with interception (better safe than sorry)
+      }
+
+      // Proxy OAuth requests through our server
+      // The URL here should be the original OAuth server URL (e.g., https://mcp.vercel.com/.well-known/...)
+      try {
+        const isMetadata = url.includes("/.well-known/");
+        const proxyEndpoint = isMetadata
+          ? `${oauthProxyUrl}/metadata?url=${encodeURIComponent(url)}`
+          : `${oauthProxyUrl}/proxy`;
+
+        console.log(
+          `[OAuth Proxy] Routing ${isMetadata ? "metadata" : "request"} through: ${proxyEndpoint}`
+        );
+
+        if (isMetadata) {
+          // Metadata requests: simple GET through proxy
+          // Include connection URL header so OAuth proxy can rewrite resource field
+          const headers: Record<string, string> = {
+            ...(init?.headers
+              ? Object.fromEntries(new Headers(init.headers as HeadersInit))
+              : {}),
+          };
+          if (connectionUrl) {
+            headers["X-Connection-URL"] = connectionUrl;
+          }
+          return await originalFetch(proxyEndpoint, {
+            ...init,
+            method: "GET",
+            headers,
+          });
+        }
+
+        // OAuth endpoint requests: serialize and proxy the full request
+        const body = init?.body ? await serializeBody(init.body) : undefined;
+        const response = await originalFetch(proxyEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url,
+            method: init?.method || "POST",
+            headers: init?.headers
+              ? Object.fromEntries(new Headers(init.headers as HeadersInit))
+              : {},
+            body,
+          }),
+        });
+
+        const data = await response.json();
+        return new Response(JSON.stringify(data.body), {
+          status: data.status,
+          statusText: data.statusText,
+          headers: new Headers(data.headers),
+        });
+      } catch (error) {
+        console.error(
+          "[OAuth Proxy] Request failed, falling back to direct fetch:",
+          error
+        );
+        return await originalFetch(input, init);
+      }
+    };
+  }
+
+  /**
+   * Restore original fetch after OAuth flow completes
+   */
+  restoreFetch(): void {
+    if (this.originalFetch) {
+      console.log("[BrowserOAuthProvider] Restoring original fetch");
+      window.fetch = this.originalFetch;
+      this.originalFetch = undefined;
+    }
   }
 
   // --- SDK Interface Methods ---
@@ -77,6 +238,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       response_types: ["code"],
       client_name: this.clientName,
       client_uri: this.clientUri,
+      logo_uri: this.logoUri,
       // scope: 'openid profile email mcp', // Example scopes, adjust as needed
     };
   }
@@ -173,13 +335,18 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       },
       // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",
-      // Store current URL for redirect flow so we can return to it
+      // Always store current URL so we can return to it after auth
+      // This is critical for popup flow when popup is blocked and user clicks link manually
       returnUrl:
-        this.useRedirectFlow && typeof window !== "undefined"
-          ? window.location.href
-          : undefined,
+        typeof window !== "undefined" ? window.location.href : undefined,
     };
+
+    console.log(`[OAuth] Storing state key: ${stateKey}`);
     localStorage.setItem(stateKey, JSON.stringify(stateData));
+
+    // Verify it was stored
+    const verified = localStorage.getItem(stateKey);
+    console.log(`[OAuth] State stored successfully: ${!!verified}`);
 
     // Add the state parameter to the URL
     authorizationUrl.searchParams.set("state", state);

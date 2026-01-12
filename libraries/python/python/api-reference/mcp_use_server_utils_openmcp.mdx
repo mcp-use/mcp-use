@@ -1,0 +1,118 @@
+---
+title: "Openmcp"
+description: "Openmcp API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/openmcp.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/openmcp.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/openmcp.py</a>
+</Callout>
+
+## OpenMCPInfo
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OpenMCPInfo</div>
+
+OpenMCP server info structure.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.utils.openmcp import OpenMCPInfo
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="title" type="str" required="True" >   String value </ParamField>
+><ParamField body="version" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="description" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(title: str, version: str | None = None, description: str | None = None):
+```
+
+</Card>
+</div>
+
+## OpenMCPResponse
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> OpenMCPResponse</div>
+
+Strongly typed OpenMCP response structure.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.utils.openmcp import OpenMCPResponse
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="info" type="mcp_use.server.utils.openmcp.OpenMCPInfo" required="True" >   Parameter value </ParamField>
+><ParamField body="capabilities" type="mcp.types.ServerCapabilities" required="True" >   Parameter value </ParamField>
+><ParamField body="tools" type="list[mcp.types.Tool]" required="True" >   List of tools </ParamField>
+><ParamField body="resources" type="list[mcp.types.Resource]" required="True" >   List of items </ParamField>
+><ParamField body="resources_templates" type="list[mcp.types.ResourceTemplate]" required="True" >   List of items </ParamField>
+><ParamField body="prompts" type="list[mcp.types.Prompt]" required="True" >   List of items </ParamField>
+
+**Signature**
+```python wrap
+def __init__(info: mcp_use.server.utils.openmcp.OpenMCPInfo, capabilities: mcp.types.ServerCapabilities, tools: list[mcp.types.Tool], resources: list[mcp.types.Resource], resources_templates: list[mcp.types.ResourceTemplate], prompts: list[mcp.types.Prompt]):
+```
+
+</Card>
+<Card type="info">
+### `method` to_dict
+
+Convert to dictionary for JSON serialization.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def to_dict():
+```
+
+</Card>
+
+</div>
+
+
+## get_openmcp_json
+<Card type="info">
+### `function` get_openmcp_json
+
+Generate OpenMCP JSON response for a FastMCP server.
+
+
+```python
+from mcp_use.server.utils.openmcp import get_openmcp_json
+```
+
+**Parameters**
+><ParamField body="server" type="MCPServer" required="True" >   The FastMCP server instance </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="starlette.responses.JSONResponse" >JSONResponse containing the OpenMCP server description</ResponseField>
+
+**Signature**
+```python wrap
+def get_openmcp_json(server: MCPServer):
+```
+
+</Card>

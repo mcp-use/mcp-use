@@ -1,4 +1,4 @@
-import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";

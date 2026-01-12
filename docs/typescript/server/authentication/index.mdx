@@ -13,12 +13,12 @@ Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server with built-
 ### Basic OAuth Server
 
 ```typescript
-import { McpServer, auth0 } from 'mcp-use/server'
+import { MCPServer, oauthAuth0Provider } from 'mcp-use/server'
 
-const server = new McpServer({
+const server = new MCPServer({
   name: 'my-secure-server',
   version: '1.0.0',
-  oauth: auth0({
+  oauth: oauthAuth0Provider({
     domain: 'your-tenant.auth0.com',
     audience: 'https://your-api.example.com',
   })

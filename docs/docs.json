@@ -75,7 +75,8 @@
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",
-                  "inspector/development"
+                  "inspector/development",
+                  "inspector/changelog"
                 ]
               },
               "tunneling/index"
@@ -86,7 +87,8 @@
             "icon": "",
             "pages": [
               "home/mcp101",
-              "typescript/server/creating-apps-sdk-server"
+              "typescript/server/creating-apps-sdk-server",
+              "guides/chatgpt-apps-flow"
             ]
           }
         ]
@@ -131,6 +133,7 @@
                       "python/server/prompts",
                       "python/server/sampling",
                       "python/server/elicitation",
+                      "python/server/roots",
                       "python/server/notifications"
                     ]
                   },
@@ -172,11 +175,21 @@
                       "python/client/middleware",
                       "python/client/sampling",
                       "python/client/elicitation",
+                      "python/client/roots",
                       "python/client/notifications",
                       "python/client/logging"
                     ]
                   },
-                  "python/client/authentication",
+                  {
+                    "group": "Authentication",
+                    "icon": "key",
+                    "pages": [
+                      "python/client/authentication/index",
+                      "python/client/authentication/oauth",
+                      "python/client/authentication/bearer",
+                      "python/client/authentication/custom"
+                    ]
+                  },
                   "python/client/code-mode"
                 ]
               },
@@ -406,6 +419,7 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_5_2",
                   "python/changelog/1_5_0",
                   "python/changelog/1_4_1",
                   "python/changelog/1_4_0",
@@ -424,18 +438,6 @@
                 "group": "Community",
                 "pages": [
                   "python/community/showcase"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Blog",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Blog",
-                "pages": [
-                  "python/blog/middleware"
                 ]
               }
             ]
@@ -465,25 +467,18 @@
                 "icon": "brain",
                 "pages": [
                   "typescript/agent/index",
+                  "typescript/agent/agent-configuration",
                   {
                     "group": "Core Concepts",
                     "icon": "box",
                     "pages": [
-                      "typescript/agent/agent-configuration",
                       "typescript/agent/llm-integration",
-                      "typescript/agent/server-manager"
-                    ]
-                  },
-                  {
-                    "group": "Features",
-                    "icon": "sparkle",
-                    "pages": [
+                      "typescript/agent/memory-management",
+                      "typescript/agent/server-manager",
                       "typescript/agent/structured-output",
-                      "typescript/agent/streaming",
-                      "typescript/agent/interactive-chat-patterns"
+                      "typescript/agent/streaming"
                     ]
                   },
-                  "typescript/agent/building-custom-agents",
                   "typescript/agent/observability"
                 ]
               },
@@ -492,6 +487,8 @@
                 "icon": "router",
                 "pages": [
                   "typescript/client/index",
+                  "typescript/client/client-configuration",
+                  "typescript/client/environments",
                   {
                     "group": "Core Components",
                     "icon": "box",
@@ -502,24 +499,15 @@
                     ]
                   },
                   {
-                    "group": "Connection",
-                    "icon": "cable",
-                    "pages": [
-                      "typescript/client/client-configuration",
-                      "typescript/client/connection-types",
-                      "typescript/client/sandbox",
-                      "typescript/client/multi-server-setup"
-                    ]
-                  },
-                  {
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/client/cli",
+                      "typescript/client/server-manager",
                       "typescript/client/sampling",
                       "typescript/client/elicitation",
                       "typescript/client/notifications",
-                      "typescript/client/logging",
-                      "typescript/client/direct-tool-calls"
+                      "typescript/client/logging"
                     ]
                   },
                   "typescript/client/authentication",
@@ -533,6 +521,7 @@
                 "tag": "Beta",
                 "pages": [
                   "typescript/server/index",
+                  "typescript/server/configuration",
                   {
                     "group": "Core Components",
                     "icon": "box",
@@ -559,10 +548,19 @@
                     ]
                   },
                   {
+                    "group": "Session Management",
+                    "icon": "key-round",
+                    "pages": [
+                      "typescript/server/session-management",
+                      "typescript/server/session-management/memory-storage",
+                      "typescript/server/session-management/filesystem-storage",
+                      "typescript/server/session-management/redis-storage"
+                    ]
+                  },
+                  {
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
-                      "typescript/server/configuration",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
@@ -593,8 +591,9 @@
                     "group": "Deployment",
                     "icon": "rocket",
                     "pages": [
-                      "typescript/server/deployment-mcp-use",
-                      "typescript/server/deployment-supabase"
+                      "typescript/server/deployment/mcp-use",
+                      "typescript/server/deployment/supabase",
+                      "typescript/server/deployment/google"
                     ]
                   }
                 ]
@@ -659,17 +658,26 @@
     {
       "source": "/typescript/getting-started",
       "destination": "/typescript/getting-started/quickstart"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/python/changelog/changelog"
     }
   ],
   "logo": {
     "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "dark": "/logo/dark.svg",
+    "href": "https://mcp-use.com/docs"
   },
   "navbar": {
     "links": [
       {
         "label": "Examples",
         "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
+      },
+      {
+        "label": "Blog",
+        "href": "https://mcp-use.com/blog"
       },
       {
         "label": "Discord",
@@ -702,10 +710,6 @@
           {
             "label": "Website",
             "href": "https://mcp-use.com"
-          },
-          {
-            "label": "Cloud Chat",
-            "href": "https://chat.mcp-use.com"
           },
           {
             "label": "GitHub",

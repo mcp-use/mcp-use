@@ -1,0 +1,52 @@
+---
+title: "Version 1.5.2"
+description: "Roots support, OAuth 2.1 adaptation, and bug fixes"
+icon: "leaf"
+og:image: "https://mcp-use.com/api/og/release?v=1.5.2"
+---
+
+import { Contributors } from '/snippets/contributors.jsx'
+
+<Card img="https://mcp-use.com/api/og/release?v=1.5.2" title="Release 1.5.2" href="https://github.com/mcp-use/mcp-use/releases/tag/python-v1.5.2">
+  This patch release introduces **Roots support** in MCPClient and Server, adapts OAuth to the 2.1 specification from the new MCP spec, and includes several bug fixes.
+</Card>
+
+## New Features
+
+### Roots Support
+**[PR #751](https://github.com/mcp-use/mcp-use/pull/751) by @Pederzh**
+
+Introduced roots support in both MCPClient and MCPServer, enabling hierarchical resource organization and improved navigation capabilities within MCP servers.
+
+### OAuth 2.1 Adaptation
+**[PR #518](https://github.com/mcp-use/mcp-use/pull/518) by @renvins**
+
+Updated OAuth implementation to align with the OAuth 2.1 specification from the new MCP spec. This brings improved security practices and better compatibility with modern authentication flows.
+
+### Development Documentation
+**[PR #775](https://github.com/mcp-use/mcp-use/pull/775) by @Pederzh**
+
+Added CLAUDE.md files for Python and TypeScript libraries, providing AI-assisted development guidance and project context for contributors.
+
+## Bug Fixes
+
+### Inspector CDN Path Fix
+**[PR #773](https://github.com/mcp-use/mcp-use/pull/773) by @pietrozullo**
+
+Fixed the inspector CDN path and added error fallback handling for improved reliability when loading inspector resources.
+
+### Documentation Updates
+**[PR #774](https://github.com/mcp-use/mcp-use/pull/774) by @pietrozullo**
+
+Various documentation fixes and improvements for the Python SDK.
+
+## Other Changes
+
+### README Updates
+Updated the Python server README with improved documentation and examples.
+
+## Contributors
+
+Thank you to all contributors who made this release possible:
+
+<Contributors users="Pederzh,renvins,pietrozullo" />

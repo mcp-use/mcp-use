@@ -3,8 +3,8 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
+} from "@modelcontextprotocol/sdk/types.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { BaseConnector, NotificationHandler } from "./connectors/base.js";
 
 export class MCPSession {
@@ -99,6 +99,23 @@ export class MCPSession {
   }
 
   /**
+   * List all available tools from the MCP server.
+   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   *
+   * @param options - Optional request options
+   * @returns Array of available tools
+   *
+   * @example
+   * ```typescript
+   * const tools = await session.listTools();
+   * console.log(`Available tools: ${tools.map(t => t.name).join(", ")}`);
+   * ```
+   */
+  async listTools(options?: RequestOptions): Promise<Tool[]> {
+    return this.connector.listTools(options);
+  }
+
+  /**
    * Get the server capabilities advertised during initialization.
    *
    * @returns Server capabilities object
@@ -120,7 +137,7 @@ export class MCPSession {
    * Call a tool on the server.
    *
    * @param name - Name of the tool to call
-   * @param args - Arguments to pass to the tool
+   * @param args - Arguments to pass to the tool (defaults to empty object)
    * @param options - Optional request options (timeout, progress handlers, etc.)
    * @returns Result from the tool execution
    *
@@ -132,7 +149,7 @@ export class MCPSession {
    */
   async callTool(
     name: string,
-    args: Record<string, any>,
+    args: Record<string, any> = {},
     options?: RequestOptions
   ): Promise<CallToolResult> {
     return this.connector.callTool(name, args, options);

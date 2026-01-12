@@ -1,6 +1,6 @@
 # UIResource MCP Server
 
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fcreate-mcp-use-app%2Fsrc%2Ftemplates%2Fmcp-ui&branch=main&project-name=mcp-ui-template&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A18)
+[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fcreate-mcp-use-app%2Fsrc%2Ftemplates%2Fmcp-ui&branch=main&project-name=mcp-ui-template&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A20)
 
 An MCP server with the new UIResource integration for simplified widget management and MCP-UI compatibility.
 
@@ -21,21 +21,21 @@ The `uiResource` method is a powerful new addition that simplifies widget regist
 // Old way: Manual registration of tool and resource
 server.tool({
   /* tool config */
-})
+});
 server.resource({
   /* resource config */
-})
+});
 
 // New way: Single method does both!
 server.uiResource({
-  name: 'kanban-board',
-  widget: 'kanban-board',
-  title: 'Kanban Board',
+  name: "kanban-board",
+  widget: "kanban-board",
+  title: "Kanban Board",
   props: {
-    initialTasks: { type: 'array', required: false },
-    theme: { type: 'string', default: 'light' },
+    initialTasks: { type: "array", required: false },
+    theme: { type: "string", default: "light" },
   },
-})
+});
 ```
 
 This automatically creates:
@@ -76,55 +76,56 @@ npm start
 ### Simple Widget Registration
 
 ```typescript
-import { createMCPServer } from 'mcp-use/server'
+import { MCPServer } from "mcp-use/server";
 
-const server = createMCPServer('my-server', {
-  version: '1.0.0',
-  description: 'Server with UIResource widgets',
-})
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  description: "Server with UIResource widgets",
+});
 
 // Register a widget - creates both tool and resource
 server.uiResource({
-  name: 'my-widget',
-  widget: 'my-widget',
-  title: 'My Widget',
-  description: 'An interactive widget',
-})
+  name: "my-widget",
+  widget: "my-widget",
+  title: "My Widget",
+  description: "An interactive widget",
+});
 
-server.listen(3000)
+server.listen(3000);
 ```
 
 ### Widget with Props
 
 ```typescript
 server.uiResource({
-  name: 'data-chart',
-  widget: 'chart',
-  title: 'Data Chart',
-  description: 'Interactive data visualization',
+  name: "data-chart",
+  widget: "chart",
+  title: "Data Chart",
+  description: "Interactive data visualization",
   props: {
     data: {
-      type: 'array',
-      description: 'Data points to display',
+      type: "array",
+      description: "Data points to display",
       required: true,
     },
     chartType: {
-      type: 'string',
-      description: 'Type of chart (line/bar/pie)',
-      default: 'line',
+      type: "string",
+      description: "Type of chart (line/bar/pie)",
+      default: "line",
     },
     theme: {
-      type: 'string',
-      description: 'Visual theme',
-      default: 'light',
+      type: "string",
+      description: "Visual theme",
+      default: "light",
     },
   },
-  size: ['800px', '400px'], // Preferred iframe size
+  size: ["800px", "400px"], // Preferred iframe size
   annotations: {
-    audience: ['user', 'assistant'],
+    audience: ["user", "assistant"],
     priority: 0.8,
   },
-})
+});
 ```
 
 ## Widget Development
@@ -181,24 +182,24 @@ if (container) {
 ```typescript
 // src/server.ts
 server.uiResource({
-  name: 'my-widget',
-  widget: 'my-widget',
-  title: 'My Custom Widget',
-  description: 'A custom interactive widget',
+  name: "my-widget",
+  widget: "my-widget",
+  title: "My Custom Widget",
+  description: "A custom interactive widget",
   props: {
     initialData: {
-      type: 'array',
-      description: 'Initial data for the widget',
+      type: "array",
+      description: "Initial data for the widget",
       required: false,
     },
     theme: {
-      type: 'string',
-      description: 'Widget theme',
-      default: 'light',
+      type: "string",
+      description: "Widget theme",
+      default: "light",
     },
   },
-  size: ['600px', '400px'],
-})
+  size: ["600px", "400px"],
+});
 ```
 
 ## How It Works
@@ -234,25 +235,25 @@ Tool parameters are automatically:
 ```typescript
 const widgets = [
   {
-    name: 'todo-list',
-    widget: 'todo-list',
-    title: 'Todo List',
+    name: "todo-list",
+    widget: "todo-list",
+    title: "Todo List",
     props: {
-      items: { type: 'array', default: [] },
+      items: { type: "array", default: [] },
     },
   },
   {
-    name: 'calendar',
-    widget: 'calendar',
-    title: 'Calendar',
+    name: "calendar",
+    widget: "calendar",
+    title: "Calendar",
     props: {
-      date: { type: 'string', required: false },
+      date: { type: "string", required: false },
     },
   },
-]
+];
 
 // Register all widgets
-widgets.forEach((widget) => server.uiResource(widget))
+widgets.forEach((widget) => server.uiResource(widget));
 ```
 
 ### Mixed Registration
@@ -260,29 +261,29 @@ widgets.forEach((widget) => server.uiResource(widget))
 ```typescript
 // UIResource for widgets
 server.uiResource({
-  name: 'dashboard',
-  widget: 'dashboard',
-  title: 'Analytics Dashboard',
-})
+  name: "dashboard",
+  widget: "dashboard",
+  title: "Analytics Dashboard",
+});
 
 // Traditional tool for actions
 server.tool({
-  name: 'calculate',
-  description: 'Perform calculations',
+  name: "calculate",
+  description: "Perform calculations",
   cb: async (params) => {
     /* ... */
   },
-})
+});
 
 // Traditional resource for data
 server.resource({
-  name: 'config',
-  uri: 'config://app',
-  mimeType: 'application/json',
+  name: "config",
+  uri: "config://app",
+  mimeType: "application/json",
   readCallback: async () => {
     /* ... */
   },
-})
+});
 ```
 
 ## API Reference
@@ -368,15 +369,15 @@ If you have existing code using separate tool/resource:
 
 ```typescript
 // Old pattern
-server.tool({ name: 'show-widget' /* ... */ })
-server.resource({ uri: 'ui://widget' /* ... */ })
+server.tool({ name: "show-widget" /* ... */ });
+server.resource({ uri: "ui://widget" /* ... */ });
 
 // New pattern - replace both with:
 server.uiResource({
-  name: 'widget',
-  widget: 'widget',
+  name: "widget",
+  widget: "widget",
   // ... consolidated configuration
-})
+});
 ```
 
 ## Future Enhancements
@@ -392,7 +393,7 @@ Coming soon:
 
 - [MCP Documentation](https://modelcontextprotocol.io)
 - [MCP-UI Documentation](https://github.com/idosal/mcp-ui)
-- [mcp-use Documentation](https://github.com/pyroprompt/mcp-use)
+- [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
 - [React Documentation](https://react.dev/)
 
 Happy widget building! 🚀

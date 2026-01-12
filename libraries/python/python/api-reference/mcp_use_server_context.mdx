@@ -1,0 +1,135 @@
+---
+title: "Context"
+description: "Context API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/context.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/context.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/context.py</a>
+</Callout>
+
+## Context
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> Context</div>
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.context import Context
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="request_context" type="RequestContext[ServerSessionT, LifespanContextT, RequestT] | None" default="None" >   Parameter value </ParamField>
+><ParamField body="fastmcp" type="FastMCP | None" default="None" >   Parameter value </ParamField>
+><ParamField body="kwargs" type="Any" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(request_context: RequestContext[ServerSessionT, LifespanContextT, RequestT] | None = None, fastmcp: FastMCP | None = None, kwargs: Any):
+```
+
+</Card>
+<Card type="info">
+### `method` get_http_request
+
+Return the underlying Starlette Request when running over HTTP transports.
+
+
+**Returns**
+><ResponseField name="returns" type="Request | None" />
+
+**Signature**
+```python wrap
+def get_http_request():
+```
+
+</Card>
+
+<Card type="info">
+### `method` sample
+
+Request a client-side LLM sampling invocation.
+
+
+
+**Parameters**
+><ParamField body="messages" type="str | SamplingMessage | Sequence[SamplingMessage | str]" required="True" >   The sampling prompt(s). Accepts a simple string, a single </ParamField>
+><ParamField body="max_tokens" type="int" default="512" >   Maximum number of tokens to request from the client LLM. </ParamField>
+><ParamField body="system_prompt" type="str | None" default="None" >   Optional system instructions to prepend. </ParamField>
+><ParamField body="include_context" type="bool | None" default="None" >   Whether to ask the client to include MCP context. </ParamField>
+><ParamField body="temperature" type="float | None" default="None" >   Optional sampling temperature. </ParamField>
+><ParamField body="stop_sequences" type="Sequence[str] | None" default="None" >   Optional stop sequences to pass to the client LLM. </ParamField>
+><ParamField body="metadata" type="dict[str, Any] | None" default="None" >   Optional provider-specific metadata. </ParamField>
+><ParamField body="model_preferences" type="ModelPreferences | None" default="None" >   Optional hint about the desired model. </ParamField>
+><ParamField body="raw" type="bool" default="False" >   When ``True`` returns the full ``CreateMessageResult`` instead of </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CreateMessageResult" />
+
+**Signature**
+```python wrap
+def sample(
+messages: str | SamplingMessage | Sequence[SamplingMessage | str],
+    max_tokens: int = 512,
+    system_prompt: str | None = None,
+    include_context: bool | None = None,
+    temperature: float | None = None,
+    stop_sequences: Sequence[str] | None = None,
+    metadata: dict[str,
+    Any] | None = None,
+    model_preferences: ModelPreferences | None = None,
+    raw: bool = False
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` send_prompt_list_changed
+
+Notify the client that the prompt list changed.
+
+
+**Signature**
+```python wrap
+def send_prompt_list_changed():
+```
+
+</Card>
+
+<Card type="info">
+### `method` send_resource_list_changed
+
+Notify the client that the resource list changed.
+
+
+**Signature**
+```python wrap
+def send_resource_list_changed():
+```
+
+</Card>
+
+<Card type="info">
+### `method` send_tool_list_changed
+
+Notify the client that the tool list changed.
+
+
+**Signature**
+```python wrap
+def send_tool_list_changed():
+```
+
+</Card>
+
+</div>

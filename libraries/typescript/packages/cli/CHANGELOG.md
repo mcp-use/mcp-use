@@ -1,5 +1,919 @@
 # @mcp-use/cli
 
+## 2.8.4
+
+### Patch Changes
+
+- Updated dependencies [5161914]
+  - @mcp-use/inspector@0.14.4
+  - mcp-use@1.12.4
+
+## 2.8.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a308b3f]
+  - @mcp-use/inspector@0.14.4-canary.0
+  - mcp-use@1.12.4-canary.0
+
+## 2.8.3
+
+### Patch Changes
+
+- 2f89a3b: Security: Fixed 13 vulnerabilities (3 moderate, 10 high)
+  - Updated `langchain` to `^1.2.3` (fixes serialization injection vulnerability)
+  - Updated `@langchain/core` to `^1.1.8` (fixes serialization injection vulnerability)
+  - Updated `react-router` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Updated `react-router-dom` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Added override for `qs` to `>=6.14.1` (fixes DoS vulnerability)
+  - Added override for `preact` to `>=10.28.2` (fixes JSON VNode injection)
+
+- Updated dependencies [2f89a3b]
+- Updated dependencies [2f89a3b]
+- Updated dependencies [2f89a3b]
+  - @mcp-use/inspector@0.14.3
+  - mcp-use@1.12.3
+
+## 2.8.3-canary.1
+
+### Patch Changes
+
+- 9cdc757: Security: Fixed 13 vulnerabilities (3 moderate, 10 high)
+  - Updated `langchain` to `^1.2.3` (fixes serialization injection vulnerability)
+  - Updated `@langchain/core` to `^1.1.8` (fixes serialization injection vulnerability)
+  - Updated `react-router` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Updated `react-router-dom` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Added override for `qs` to `>=6.14.1` (fixes DoS vulnerability)
+  - Added override for `preact` to `>=10.28.2` (fixes JSON VNode injection)
+
+- Updated dependencies [9cdc757]
+- Updated dependencies [cbf2bb8]
+  - mcp-use@1.12.3-canary.1
+  - @mcp-use/inspector@0.14.3-canary.1
+
+## 2.8.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [708f6e5]
+  - @mcp-use/inspector@0.14.3-canary.0
+  - mcp-use@1.12.3-canary.0
+
+## 2.8.2
+
+### Patch Changes
+
+- 198fffd: Add configurable clientInfo support for MCP connection initialization. Clients can now customize how they identify themselves to MCP servers with full metadata including name, title, version, description, icons, and website URL. The clientConfig option is deprecated in favor of deriving it from clientInfo. Default clientInfo is set for mcp-use, inspector sets "mcp-use Inspector" with its own version, and CLI sets "mcp-use CLI".
+- 198fffd: chore: updated docs
+- 198fffd: ## Breaking Changes (with Deprecation Warnings)
+  - **Renamed `customHeaders` to `headers`**: The `customHeaders` option has been renamed to `headers` across all APIs for better consistency. The old name still works but shows deprecation warnings. Update your code to use `headers` instead.
+  - **Renamed `samplingCallback` to `onSampling`**: Callback naming is now more consistent with event handler patterns. The old name still works but shows deprecation warnings.
+
+  ## New Features
+  - **Automatic Proxy Fallback**: Added `autoProxyFallback` option to `useMcp` hook and `McpClientProvider`. When enabled (default: `true` in provider), automatically retries failed connections through a proxy when CORS errors or HTTP 4xx errors are detected. This makes connecting to MCP servers much more reliable in browser environments.
+  - **Provider-Level Proxy Defaults**: `McpClientProvider` now supports `defaultProxyConfig` and `defaultAutoProxyFallback` props to set proxy configuration for all servers. Individual servers can override these defaults.
+  - **OAuth Proxy Support**: Added OAuth request proxying through fetch interceptor in `BrowserOAuthClientProvider`. Configure with `oauthProxyUrl` to route OAuth discovery and token requests through your backend proxy.
+
+  ## Improvements
+  - **Enhanced Error Detection**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+  - **Smarter Connection Logic**: OAuth provider now always uses the original target URL for OAuth discovery, not the proxy URL
+  - **Better Session Management**: Improved session cleanup to avoid noisy warning logs
+  - **Type Safety**: Added deprecation notices in TypeScript types for deprecated options
+  - **Proxy Header Support**: `proxyConfig` now accepts a `headers` field for custom headers to the proxy
+
+  ## Refactoring
+  - **Removed `oauth-helper.ts`** (521 lines): OAuth helper utilities consolidated into `browser-provider.ts`
+  - **Removed `react_example.html`**: Outdated example file removed
+  - **Major `useMcp` Hook Refactor**: Complete rewrite of connection logic with automatic retry, better error handling, and proxy fallback support
+
+  ## Documentation
+  - Updated all client documentation to use new `headers` naming
+  - Added comprehensive examples for automatic proxy fallback
+  - Updated sampling documentation with new `onSampling` callback name
+  - Refreshed React integration guide with provider-based approach
+
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+  - @mcp-use/inspector@0.14.2
+  - mcp-use@1.12.2
+
+## 2.8.2-canary.2
+
+### Patch Changes
+
+- f9b1001: chore: updated docs
+- Updated dependencies [f9b1001]
+  - @mcp-use/inspector@0.14.2-canary.2
+  - mcp-use@1.12.2-canary.2
+
+## 2.8.2-canary.1
+
+### Patch Changes
+
+- 94e4e63: Add configurable clientInfo support for MCP connection initialization. Clients can now customize how they identify themselves to MCP servers with full metadata including name, title, version, description, icons, and website URL. The clientConfig option is deprecated in favor of deriving it from clientInfo. Default clientInfo is set for mcp-use, inspector sets "mcp-use Inspector" with its own version, and CLI sets "mcp-use CLI".
+- 94e4e63: ## Breaking Changes (with Deprecation Warnings)
+  - **Renamed `customHeaders` to `headers`**: The `customHeaders` option has been renamed to `headers` across all APIs for better consistency. The old name still works but shows deprecation warnings. Update your code to use `headers` instead.
+  - **Renamed `samplingCallback` to `onSampling`**: Callback naming is now more consistent with event handler patterns. The old name still works but shows deprecation warnings.
+
+  ## New Features
+  - **Automatic Proxy Fallback**: Added `autoProxyFallback` option to `useMcp` hook and `McpClientProvider`. When enabled (default: `true` in provider), automatically retries failed connections through a proxy when CORS errors or HTTP 4xx errors are detected. This makes connecting to MCP servers much more reliable in browser environments.
+  - **Provider-Level Proxy Defaults**: `McpClientProvider` now supports `defaultProxyConfig` and `defaultAutoProxyFallback` props to set proxy configuration for all servers. Individual servers can override these defaults.
+  - **OAuth Proxy Support**: Added OAuth request proxying through fetch interceptor in `BrowserOAuthClientProvider`. Configure with `oauthProxyUrl` to route OAuth discovery and token requests through your backend proxy.
+
+  ## Improvements
+  - **Enhanced Error Detection**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+  - **Smarter Connection Logic**: OAuth provider now always uses the original target URL for OAuth discovery, not the proxy URL
+  - **Better Session Management**: Improved session cleanup to avoid noisy warning logs
+  - **Type Safety**: Added deprecation notices in TypeScript types for deprecated options
+  - **Proxy Header Support**: `proxyConfig` now accepts a `headers` field for custom headers to the proxy
+
+  ## Refactoring
+  - **Removed `oauth-helper.ts`** (521 lines): OAuth helper utilities consolidated into `browser-provider.ts`
+  - **Removed `react_example.html`**: Outdated example file removed
+  - **Major `useMcp` Hook Refactor**: Complete rewrite of connection logic with automatic retry, better error handling, and proxy fallback support
+
+  ## Documentation
+  - Updated all client documentation to use new `headers` naming
+  - Added comprehensive examples for automatic proxy fallback
+  - Updated sampling documentation with new `onSampling` callback name
+  - Refreshed React integration guide with provider-based approach
+
+- Updated dependencies [94e4e63]
+- Updated dependencies [94e4e63]
+- Updated dependencies [94e4e63]
+  - @mcp-use/inspector@0.14.2-canary.1
+  - mcp-use@1.12.2-canary.1
+
+## 2.8.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a0aa464]
+  - @mcp-use/inspector@0.14.2-canary.0
+  - mcp-use@1.12.2-canary.0
+
+## 2.8.1
+
+### Patch Changes
+
+- e36d1ab: fix: directory separator on Windows platform causing widgets build fail. Normalize Windows backslash path separators to forward slashes when building widget entry paths to ensure cross-platform compatibility.
+- Updated dependencies [e36d1ab]
+- Updated dependencies [e36d1ab]
+- Updated dependencies [e36d1ab]
+  - @mcp-use/inspector@0.14.1
+  - mcp-use@1.12.1
+
+## 2.8.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [74ff401]
+  - @mcp-use/inspector@0.14.1-canary.2
+  - mcp-use@1.12.1-canary.2
+
+## 2.8.1-canary.1
+
+### Patch Changes
+
+- 4ff190a: fix: directory separator on Windows platform causing widgets build fail. Normalize Windows backslash path separators to forward slashes when building widget entry paths to ensure cross-platform compatibility.
+  - mcp-use@1.12.1-canary.1
+  - @mcp-use/inspector@0.14.1-canary.1
+
+## 2.8.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1674a02]
+- Updated dependencies [1674a02]
+  - @mcp-use/inspector@0.14.1-canary.0
+  - mcp-use@1.12.1-canary.0
+
+## 2.8.0
+
+### Minor Changes
+
+- 53fb670: ## Multi-Server Support and Architecture Improvements
+
+  ### Features
+  - **Multi-server management**: Introduced `McpClientProvider` to manage multiple MCP server connections, allowing dynamic addition and removal of servers in React applications
+  - **Storage providers**: Added pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+  - **Enhanced RPC logging**: New `rpc-logger` module with filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+  - **Browser support**: Exported `MCPAgent` for browser usage with `BrowserMCPClient` instance or through `RemoteAgent`
+
+  ### Inspector Enhancements
+  - **Improved UI responsiveness**: Enhanced mobile and tablet layouts with adaptive component visibility
+  - **Better server management**: Refactored server connection handling with improved icon display and status tracking
+  - **Enhanced debugging**: Added detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+  - **Simplified connection settings**: Removed deprecated transport types for cleaner configuration
+
+  ### Architecture Changes
+  - Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+  - Refactored `useMcp` hook for better multi-server support
+  - Updated components across inspector for cleaner architecture and imports
+  - Added multi-server React example demonstrating new capabilities
+
+  ### Bug Fixes
+  - Fixed server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+
+- 53fb670: chore: make broser bundle node js free
+- 53fb670: feat: remove Node.js dependencies and improve browser compatibility
+
+  This release removes Node.js-specific dependencies and significantly improves browser compatibility across the mcp-use ecosystem.
+
+  ## Breaking Changes
+  - **Logging**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+
+  ## New Features
+
+  ### Browser Runtime Support
+  - **Browser Telemetry**: Added `telemetry-browser.ts` that uses `posthog-js` for browser environments, separate from Node.js telemetry
+  - **Browser Entry Point**: Enhanced `browser.ts` entry point with improved browser-specific utilities
+  - **Browser Utilities**: Added new utilities:
+    - `utils/favicon-detector.ts` - Detect and extract favicons from URLs
+    - `utils/proxy-config.ts` - Proxy configuration utilities for browser environments
+    - `utils/mcpClientUtils.ts` - MCP client utilities moved from client package
+
+  ### React Components
+  - **AddToClientDropdown**: New React component (`src/react/AddToClientDropdown.tsx`) for adding MCP servers to clients with enhanced UI and functionality
+
+  ### Server Middleware
+  - **MCP Proxy Middleware**: Added `server/middleware/mcp-proxy.ts` - Hono middleware for proxying MCP server requests with optional authentication and request validation
+
+  ### Inspector Improvements
+  - Enhanced inspector components for better browser compatibility
+  - Improved server icon support and component interactions
+  - Added embedded mode support
+  - Better configuration handling and MCP proxy integration
+
+  ## Refactoring
+  - **Telemetry Split**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
+  - **Logging Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+  - **Build Configuration**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
+  - **Package Dependencies**: Removed `winston` and related Node.js-only dependencies from `package.json`
+
+  ## Testing
+  - Added comprehensive test (`browser-react-no-node-deps.test.ts`) to ensure `mcp-use/react` and `mcp-use/browser` do not import Node.js dependencies
+
+  This release makes mcp-use fully compatible with browser environments while maintaining backward compatibility with Node.js applications.
+
+### Patch Changes
+
+- 53fb670: ci: add dev command testing to CI workflow & fix issue [#742](https://github.com/mcp-use/mcp-use/issues/742)
+- 53fb670: chore: lint & format
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+  - @mcp-use/inspector@0.14.0
+  - mcp-use@1.12.0
+
+## 2.8.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [b16431b]
+  - @mcp-use/inspector@0.14.0-canary.14
+  - mcp-use@1.12.0-canary.14
+
+## 2.8.0-canary.13
+
+### Patch Changes
+
+- a95e8bb: ci: add dev command testing to CI workflow & fix issue [#742](https://github.com/mcp-use/mcp-use/issues/742)
+  - mcp-use@1.12.0-canary.13
+  - @mcp-use/inspector@0.14.0-canary.13
+
+## 2.8.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [d02b8df]
+  - mcp-use@1.12.0-canary.12
+  - @mcp-use/inspector@0.14.0-canary.12
+
+## 2.8.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [55db23e]
+  - @mcp-use/inspector@0.14.0-canary.11
+  - mcp-use@1.12.0-canary.11
+
+## 2.8.0-canary.10
+
+### Patch Changes
+
+- ce4647d: chore: lint & format
+- Updated dependencies [ce4647d]
+  - @mcp-use/inspector@0.14.0-canary.10
+  - mcp-use@1.12.0-canary.10
+
+## 2.8.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [4fb8223]
+  - mcp-use@1.12.0-canary.9
+  - @mcp-use/inspector@0.14.0-canary.9
+
+## 2.8.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [daf3c81]
+  - mcp-use@1.12.0-canary.8
+  - @mcp-use/inspector@0.14.0-canary.8
+
+## 2.8.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [4f93dc3]
+  - mcp-use@1.12.0-canary.7
+  - @mcp-use/inspector@0.14.0-canary.7
+
+## 2.8.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [2113c43]
+  - @mcp-use/inspector@0.14.0-canary.6
+  - mcp-use@1.12.0-canary.6
+
+## 2.8.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [7381ec3]
+  - @mcp-use/inspector@0.14.0-canary.5
+  - mcp-use@1.12.0-canary.5
+
+## 2.8.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [ef5a71d]
+  - @mcp-use/inspector@0.14.0-canary.4
+  - mcp-use@1.12.0-canary.4
+
+## 2.8.0-canary.3
+
+### Minor Changes
+
+- 8bc7f4d: ## Multi-Server Support and Architecture Improvements
+
+  ### Features
+  - **Multi-server management**: Introduced `McpClientProvider` to manage multiple MCP server connections, allowing dynamic addition and removal of servers in React applications
+  - **Storage providers**: Added pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+  - **Enhanced RPC logging**: New `rpc-logger` module with filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+  - **Browser support**: Exported `MCPAgent` for browser usage with `BrowserMCPClient` instance or through `RemoteAgent`
+
+  ### Inspector Enhancements
+  - **Improved UI responsiveness**: Enhanced mobile and tablet layouts with adaptive component visibility
+  - **Better server management**: Refactored server connection handling with improved icon display and status tracking
+  - **Enhanced debugging**: Added detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+  - **Simplified connection settings**: Removed deprecated transport types for cleaner configuration
+
+  ### Architecture Changes
+  - Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+  - Refactored `useMcp` hook for better multi-server support
+  - Updated components across inspector for cleaner architecture and imports
+  - Added multi-server React example demonstrating new capabilities
+
+  ### Bug Fixes
+  - Fixed server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+
+### Patch Changes
+
+- Updated dependencies [8bc7f4d]
+  - @mcp-use/inspector@0.14.0-canary.3
+  - mcp-use@1.12.0-canary.3
+
+## 2.8.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [93fd156]
+  - @mcp-use/inspector@0.14.0-canary.2
+  - mcp-use@1.12.0-canary.2
+
+## 2.8.0-canary.1
+
+### Minor Changes
+
+- 2156916: chore: make broser bundle node js free
+- 2156916: feat: remove Node.js dependencies and improve browser compatibility
+
+  This release removes Node.js-specific dependencies and significantly improves browser compatibility across the mcp-use ecosystem.
+
+  ## Breaking Changes
+  - **Logging**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+
+  ## New Features
+
+  ### Browser Runtime Support
+  - **Browser Telemetry**: Added `telemetry-browser.ts` that uses `posthog-js` for browser environments, separate from Node.js telemetry
+  - **Browser Entry Point**: Enhanced `browser.ts` entry point with improved browser-specific utilities
+  - **Browser Utilities**: Added new utilities:
+    - `utils/favicon-detector.ts` - Detect and extract favicons from URLs
+    - `utils/proxy-config.ts` - Proxy configuration utilities for browser environments
+    - `utils/mcpClientUtils.ts` - MCP client utilities moved from client package
+
+  ### React Components
+  - **AddToClientDropdown**: New React component (`src/react/AddToClientDropdown.tsx`) for adding MCP servers to clients with enhanced UI and functionality
+
+  ### Server Middleware
+  - **MCP Proxy Middleware**: Added `server/middleware/mcp-proxy.ts` - Hono middleware for proxying MCP server requests with optional authentication and request validation
+
+  ### Inspector Improvements
+  - Enhanced inspector components for better browser compatibility
+  - Improved server icon support and component interactions
+  - Added embedded mode support
+  - Better configuration handling and MCP proxy integration
+
+  ## Refactoring
+  - **Telemetry Split**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
+  - **Logging Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+  - **Build Configuration**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
+  - **Package Dependencies**: Removed `winston` and related Node.js-only dependencies from `package.json`
+
+  ## Testing
+  - Added comprehensive test (`browser-react-no-node-deps.test.ts`) to ensure `mcp-use/react` and `mcp-use/browser` do not import Node.js dependencies
+
+  This release makes mcp-use fully compatible with browser environments while maintaining backward compatibility with Node.js applications.
+
+### Patch Changes
+
+- Updated dependencies [2156916]
+- Updated dependencies [2156916]
+  - @mcp-use/inspector@0.14.0-canary.1
+  - mcp-use@1.12.0-canary.1
+
+## 2.7.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [841cccf]
+  - @mcp-use/inspector@0.14.0-canary.0
+  - mcp-use@1.11.3-canary.0
+
+## 2.7.0
+
+### Minor Changes
+
+- 9a8cb3a: feat: added deployments management to the cli
+- 9a8cb3a: feat: added support for project linking in cli
+- 9a8cb3a: feat(cli): allow setting env vars for the deployment while deploying
+
+### Patch Changes
+
+- 9a8cb3a: fix(cli): port detection
+- 9a8cb3a: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [9a8cb3a]
+  - @mcp-use/inspector@0.13.2
+  - mcp-use@1.11.2
+
+## 2.7.0-canary.1
+
+### Patch Changes
+
+- 681c929: fix(cli): port detection
+- 681c929: chore(docs): updated examples and docs to use preferred methods
+- Updated dependencies [681c929]
+  - @mcp-use/inspector@0.13.2-canary.1
+  - mcp-use@1.11.2-canary.1
+
+## 2.7.0-canary.0
+
+### Minor Changes
+
+- 0f3550c: feat: added deployments management to the cli
+- 0f3550c: feat: added support for project linking in cli
+- 0f3550c: feat(cli): allow setting env vars for the deployment while deploying
+
+### Patch Changes
+
+- mcp-use@1.11.2-canary.0
+- @mcp-use/inspector@0.13.2-canary.0
+
+## 2.6.1
+
+### Patch Changes
+
+- abf0e0f: fix: widget props not picked up if zod
+- Updated dependencies [abf0e0f]
+  - @mcp-use/inspector@0.13.1
+  - mcp-use@1.11.1
+
+## 2.6.1-canary.0
+
+### Patch Changes
+
+- 6fc856c: fix: widget props not picked up if zod
+- Updated dependencies [6fc856c]
+  - @mcp-use/inspector@0.13.1-canary.0
+  - mcp-use@1.11.1-canary.0
+
+## 2.6.0
+
+### Minor Changes
+
+- 8a2e84e: ## Breaking Changes
+
+  ### LangChain Adapter Export Path Changed
+
+  The LangChain adapter is no longer exported from the main entry point. Import from `mcp-use/adapters` instead:
+
+  ```typescript
+  // Before
+  import { LangChainAdapter } from "mcp-use";
+
+  // After
+  import { LangChainAdapter } from "mcp-use/adapters";
+  ```
+
+  **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
+
+  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+
+  ### WebSocket Transport Removed
+
+  WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
+
+  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+
+  ## Features
+
+  ### Session Management Architecture with Redis Support
+
+  Implements a pluggable session management architecture enabling distributed deployments with cross-server notifications, sampling, and resource subscriptions.
+
+  **New Interfaces:**
+  - `SessionStore` - Pluggable interface for storing session metadata
+    - `InMemorySessionStore` (production default)
+    - `FileSystemSessionStore` (dev mode default)
+    - `RedisSessionStore` (distributed deployments)
+  - `StreamManager` - Manages active SSE connections
+    - `InMemoryStreamManager` (default)
+    - `RedisStreamManager` (distributed via Redis Pub/Sub)
+
+  **Server Configuration:**
+
+  ```typescript
+  // Development (default - FileSystemSessionStore for hot reload)
+  const server = new MCPServer({
+    name: "dev-server",
+    version: "1.0.0",
+  });
+
+  // Production distributed (cross-server notifications)
+  import { RedisSessionStore, RedisStreamManager } from "mcp-use/server";
+  const server = new MCPServer({
+    name: "prod-server",
+    version: "1.0.0",
+    sessionStore: new RedisSessionStore({ client: redis }),
+    streamManager: new RedisStreamManager({
+      client: redis,
+      pubSubClient: pubSubRedis,
+    }),
+  });
+  ```
+
+  **Client Improvements:**
+  - Auto-refresh tools/resources/prompts when receiving list change notifications
+  - Manual refresh methods: `refreshTools()`, `refreshResources()`, `refreshPrompts()`, `refreshAll()`
+  - Automatic 404 handling and re-initialization per MCP spec
+
+  **Convenience Methods:**
+  - `sendToolsListChanged()` - Notify clients when tools list changes
+  - `sendResourcesListChanged()` - Notify clients when resources list changes
+  - `sendPromptsListChanged()` - Notify clients when prompts list changes
+
+  **Development Experience:**
+  - FileSystemSessionStore persists sessions to `.mcp-use/sessions.json` in dev mode
+  - Sessions survive server hot reloads
+  - Auto-cleanup of expired sessions (>24 hours)
+
+  **Deprecated:**
+  - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
+
+  **Learn more:** [Session Management](/typescript/server/session-management)
+
+  ### Favicon Support for Widgets
+
+  Added favicon configuration for widget pages:
+
+  ```typescript
+  const server = createMCPServer({
+    name: "my-server",
+    version: "1.0.0",
+    favicon: "favicon.ico", // Path relative to public/ directory
+  });
+  ```
+
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process includes favicon in widget HTML pages
+  - Long-term caching (1 year) for favicon assets
+
+  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+
+  ### CLI Client Support
+
+  Added dedicated CLI client support for better command-line integration and testing.
+
+  **Learn more:** [CLI Client](/typescript/client/cli)
+
+  ### Enhanced Session Methods
+  - `callTool()` method now defaults args to an empty object
+  - New `requireSession()` method for reliable session retrieval
+
+  ## Improvements
+
+  ### Widget Build System
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode watches for widget file/directory deletions and cleans up build artifacts
+
+  ### Dependency Management
+  - Added support for Node >= 18
+  - Added CommonJS module support
+
+  ### Documentation & Metadata
+  - Updated agent documentation and method signatures
+  - Added repository metadata to package.json
+
+  ## Fixes
+
+  ### Widget Fixes
+  - Fixed widget styling isolation - widgets no longer pick up mcp-use styles
+  - Fixed favicon URL generator for proper asset resolution
+
+  ### React Router Migration
+
+  Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
+
+  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+
+  ### Session & Transport Fixes
+  - Fixed transport cleanup when session becomes idle
+  - Fixed agent access to resources and prompts
+
+  ### Code Quality
+  - Formatting and linting improvements across packages
+
+### Patch Changes
+
+- 8a2e84e: fix: import from mcp-use/client instead of main entry to avoid mixing dependencies
+- 8a2e84e: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- 8a2e84e: chore: fixed codeql vulnerabilities
+- 8a2e84e: ## Inspector: Faster Direct-to-Proxy Fallback
+  - **Reduced connection timeout from 30s to 5s** for faster fallback when direct connections fail
+  - **Removed automatic HTTP → SSE transport fallback** since SSE is deprecated
+    - Added `disableSseFallback` option to `HttpConnector` to prevent automatic fallback to SSE transport
+    - Inspector now explicitly uses HTTP transport only, relying on Direct → Proxy fallback instead
+    - Users can still manually select SSE transport if needed
+  - **Total fallback time: ~6 seconds** (5s timeout + 1s delay) instead of ~31 seconds
+
+  ## Deployment: Fixed Supabase Health Check
+  - **Fixed deploy.sh MCP server health check** to use POST instead of GET
+    - SSE endpoints hang on GET requests, causing script to timeout
+    - POST requests return immediately (415 error), proving server is up
+    - Script now correctly detects when deployment is complete and shows success summary with URLs
+
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+- Updated dependencies [8a2e84e]
+  - @mcp-use/inspector@0.13.0
+  - mcp-use@1.11.0
+
+## 2.6.0-canary.20
+
+### Patch Changes
+
+- a90ac6f: chore: fixed codeql vulnerabilities
+- Updated dependencies [a90ac6f]
+  - @mcp-use/inspector@0.13.0-canary.20
+  - mcp-use@1.11.0-canary.20
+
+## 2.6.0-canary.19
+
+### Patch Changes
+
+- Updated dependencies [1adbb26]
+  - @mcp-use/inspector@0.13.0-canary.19
+  - mcp-use@1.11.0-canary.19
+
+## 2.6.0-canary.18
+
+### Patch Changes
+
+- Updated dependencies [2902a2e]
+- Updated dependencies [d7797b6]
+- Updated dependencies [168a2e1]
+  - @mcp-use/inspector@0.13.0-canary.18
+  - mcp-use@1.11.0-canary.18
+
+## 2.6.0-canary.17
+
+### Patch Changes
+
+- c24cafb: ## Inspector: Faster Direct-to-Proxy Fallback
+  - **Reduced connection timeout from 30s to 5s** for faster fallback when direct connections fail
+  - **Removed automatic HTTP → SSE transport fallback** since SSE is deprecated
+    - Added `disableSseFallback` option to `HttpConnector` to prevent automatic fallback to SSE transport
+    - Inspector now explicitly uses HTTP transport only, relying on Direct → Proxy fallback instead
+    - Users can still manually select SSE transport if needed
+  - **Total fallback time: ~6 seconds** (5s timeout + 1s delay) instead of ~31 seconds
+
+  ## Deployment: Fixed Supabase Health Check
+  - **Fixed deploy.sh MCP server health check** to use POST instead of GET
+    - SSE endpoints hang on GET requests, causing script to timeout
+    - POST requests return immediately (415 error), proving server is up
+    - Script now correctly detects when deployment is complete and shows success summary with URLs
+
+- Updated dependencies [c24cafb]
+  - mcp-use@1.11.0-canary.17
+  - @mcp-use/inspector@0.13.0-canary.17
+
+## 2.6.0-canary.16
+
+### Patch Changes
+
+- Updated dependencies [7eb280f]
+  - mcp-use@1.11.0-canary.16
+  - @mcp-use/inspector@0.13.0-canary.16
+
+## 2.6.0-canary.15
+
+### Patch Changes
+
+- Updated dependencies [0a7a19a]
+  - @mcp-use/inspector@0.13.0-canary.15
+  - mcp-use@1.11.0-canary.15
+
+## 2.6.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [f5dfa51]
+  - @mcp-use/inspector@0.13.0-canary.14
+  - mcp-use@1.11.0-canary.14
+
+## 2.6.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [f7623fc]
+  - @mcp-use/inspector@0.13.0-canary.13
+  - mcp-use@1.11.0-canary.13
+
+## 2.6.0-canary.12
+
+### Patch Changes
+
+- 68d1520: chore: moved dev deps from the workspace packages to the typescript root for consistency
+- Updated dependencies [68d1520]
+  - @mcp-use/inspector@0.13.0-canary.12
+  - mcp-use@1.11.0-canary.12
+
+## 2.6.0-canary.11
+
+### Patch Changes
+
+- cf72b53: fix: import from mcp-use/client instead of main entry to avoid mixing dependencies
+- Updated dependencies [cf72b53]
+  - mcp-use@1.11.0-canary.11
+  - @mcp-use/inspector@0.13.0-canary.11
+
+## 2.6.0-canary.10
+
+### Patch Changes
+
+- 14c015e: fix: trigger changeset
+- Updated dependencies [14c015e]
+  - @mcp-use/inspector@0.13.0-canary.10
+  - mcp-use@1.11.0-canary.10
+
+## 2.6.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [0262b5c]
+  - mcp-use@1.11.0-canary.9
+  - @mcp-use/inspector@0.13.0-canary.9
+
+## 2.6.0-canary.8
+
+### Minor Changes
+
+- 3945a10: **Breaking Changes:**
+  - LangChain adapter no longer exported from main entry point. Import from `mcp-use/adapters` instead:
+
+    ```ts
+    // Before
+    import { LangChainAdapter } from "mcp-use";
+
+    // After
+    import { LangChainAdapter } from "mcp-use/adapters";
+    ```
+
+  - Moved `@langchain/core` and `langchain` from dependencies to optional peer dependencies
+
+  **Features:**
+  - Added favicon support for widget pages. Configure via `favicon` option in `ServerConfig`:
+    ```ts
+    const server = createMCPServer({
+      name: "my-server",
+      version: "1.0.0",
+      favicon: "favicon.ico", // Path relative to public/ directory
+    });
+    ```
+  - Favicon automatically served at `/favicon.ico` for entire server domain
+  - CLI build process now includes favicon in widget HTML pages
+
+  **Improvements:**
+  - Automatic cleanup of stale widget directories in `.mcp-use` folder
+  - Dev mode now watches for widget file/directory deletions and cleans up build artifacts
+  - Added long-term caching (1 year) for favicon assets
+
+### Patch Changes
+
+- 3945a10: fix: widgets
+- Updated dependencies [3945a10]
+- Updated dependencies [3945a10]
+  - mcp-use@1.11.0-canary.8
+  - @mcp-use/inspector@0.13.0-canary.8
+
+## 2.6.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [9acf03b]
+  - @mcp-use/inspector@0.13.0-canary.7
+  - mcp-use@1.11.0-canary.7
+
+## 2.6.0-canary.6
+
+### Patch Changes
+
+- fdbd09e: fix: widgets do not pick up mcp-use styles
+- Updated dependencies [fdbd09e]
+  - mcp-use@1.11.0-canary.6
+  - @mcp-use/inspector@0.13.0-canary.6
+
+## 2.6.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [0b2292d]
+- Updated dependencies [861546b]
+  - mcp-use@1.11.0-canary.5
+  - @mcp-use/inspector@0.13.0-canary.5
+
+## 2.6.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f469d26]
+  - mcp-use@1.11.0-canary.4
+  - @mcp-use/inspector@0.13.0-canary.4
+
+## 2.6.0-canary.3
+
+### Minor Changes
+
+- e302f8d: feat: added support for cli client
+
+### Patch Changes
+
+- Updated dependencies [e302f8d]
+- Updated dependencies [e302f8d]
+  - mcp-use@1.11.0-canary.3
+  - @mcp-use/inspector@0.13.0-canary.3
+
 ## 2.5.6
 
 ### Patch Changes
@@ -48,6 +962,31 @@
 - Updated dependencies [b3d69ed]
   - @mcp-use/inspector@0.12.1
   - mcp-use@1.10.1
+
+## 2.5.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [1b6562a]
+  - mcp-use@1.10.1-canary.2
+  - @mcp-use/inspector@0.12.1-canary.2
+
+## 2.5.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2bb2278]
+  - mcp-use@1.10.1-canary.1
+  - @mcp-use/inspector@0.12.1-canary.1
+
+## 2.5.1-canary.0
+
+### Patch Changes
+
+- 122a36c: Added repository metadata in package.json
+- Updated dependencies [122a36c]
+  - @mcp-use/inspector@0.12.1-canary.0
+  - mcp-use@1.10.1-canary.0
 
 ## 2.5.0
 
@@ -667,7 +1606,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -932,7 +1871,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy
@@ -1139,7 +2078,7 @@
   ### Documentation
   - Fixed Supabase deployment script (`packages/mcp-use/examples/server/supabase/deploy.sh`) with updated project creation syntax
   - Updated deployment command in Supabase documentation to reflect new project creation syntax
-  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment-supabase.mdx`)
+  - Added server inspection URL to Supabase deployment documentation (`docs/typescript/server/deployment/supabase.mdx`)
 
   ### Other Fixes
   - Fixed history management to prevent unwanted redirects when running widgets in inspector dev-widget proxy

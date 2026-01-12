@@ -120,6 +120,56 @@ agent = MCPAgent(
 - `disallowed_tools`: List of tool names that should not be available to the agent (optional)
 - `use_server_manager`: Enable dynamic server selection (default: False)
 
+## Sending Files with HumanMessage
+
+Pass files directly inside a `HumanMessage` instead of using a separate parameter. The agent accepts either a plain string or a `HumanMessage`, so you can include both text and file content together:
+
+<CodeGroup>
+```python Python
+import asyncio
+import base64
+from pathlib import Path
+
+from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
+
+from mcp_use import MCPAgent, MCPClient
+
+
+async def main():
+    client = MCPClient(config = {})
+    agent = MCPAgent(
+        llm=ChatOpenAI(model="gpt-4o", temperature=0),
+        client=client,
+    )
+
+    image_bytes = base64.b64encode(
+        Path("static/logo-gh.jpg").read_bytes()
+    ).decode("utf-8")
+    human_message = HumanMessage(
+        content=[
+            {"type": "text", "text": "What is in this image?"},
+            {
+                "type": "image",
+                "base64": image_bytes,
+                "mime_type": "image/jpeg",
+            },
+        ]
+    )
+
+    async for step in agent.stream(human_message, max_steps=10):
+        print(step)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+</CodeGroup>
+
+<Note>
+Remote agents currently accept text-only `HumanMessage` content. Use a local agent when you need to pass files.
+</Note>
+
 ## Tool Access Control
 
 You can restrict which tools are available to the agent for security or to limit its capabilities. Here's a complete example showing how to set up an agent with restricted tool access:
@@ -203,7 +253,7 @@ If you want more control over how tools are created, you can work with the adapt
 import asyncio
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from mcp_use.client import MCPClient
 from mcp_use.adapters import LangChainAdapter
@@ -369,7 +419,7 @@ agent = MCPAgent(
 For more advanced customization, you can provide a custom system prompt template:
 
 ```python
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 
 custom_template = ChatPromptTemplate.from_messages([
     ("system", "You are an expert {domain} assistant. {instructions}"),

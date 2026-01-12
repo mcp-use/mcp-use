@@ -83,6 +83,8 @@ export async function* handleChatRequestStream(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
+  // Import from main entry (not browser) since this runs server-side.
+  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
   const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
@@ -113,11 +115,15 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
-  const serverConfig: ServerConfig = { url: mcpServerUrl };
+  const serverConfig: ServerConfig = {
+    url: mcpServerUrl,
+    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
+  };
 
   // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== "none") {
@@ -230,7 +236,15 @@ export async function* handleChatRequestStream(requestBody: {
 }
 
 /**
- * Handle chat API request with MCP agent (non-streaming, kept for backwards compatibility)
+ * Execute a non-streaming chat turn using an MCP agent and the specified LLM configuration.
+ *
+ * @param requestBody - Request parameters
+ * @param requestBody.mcpServerUrl - Base URL of the MCP server to connect to
+ * @param requestBody.llmConfig - LLM provider configuration (provider, model, apiKey, etc.)
+ * @param requestBody.authConfig - Optional authentication configuration for the MCP server
+ * @param requestBody.messages - Array of chat messages; only the last message with role "user" is used as the query
+ * @returns An object containing `content` with the agent's response text and `toolCalls` with recorded tool invocations (empty for this non-streaming implementation)
+ * @throws If required fields are missing, if the LLM provider is unsupported, or if no user message is found
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string;
@@ -248,6 +262,8 @@ export async function handleChatRequest(requestBody: {
 
   // Dynamically import mcp-use and LLM providers
   // Note: MCPClient supports multiple servers via client.addServer(name, config)
+  // Import from main entry (not browser) since this runs server-side.
+  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
   const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
@@ -278,11 +294,15 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
-  const serverConfig: ServerConfig = { url: mcpServerUrl };
+  const serverConfig: ServerConfig = {
+    url: mcpServerUrl,
+    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
+  };
 
   // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== "none") {
@@ -385,6 +405,7 @@ export interface WidgetData {
   uri: string;
   toolInput: Record<string, any>;
   toolOutput: any;
+  toolResponseMetadata?: Record<string, any>;
   resourceData: any;
   toolId: string;
   timestamp: number;
@@ -425,11 +446,13 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    theme,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -439,6 +462,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasResourceData: !!resourceData,
     hasToolInput: !!toolInput,
     hasToolOutput: !!toolOutput,
+    hasToolResponseMetadata: !!toolResponseMetadata,
+    toolResponseMetadata,
     hasWidgetCSP: !!widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
@@ -464,12 +489,14 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     timestamp: Date.now(),
     widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    theme,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);
@@ -536,6 +563,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     uri,
     toolInput,
     toolOutput,
+    toolResponseMetadata,
     resourceData,
     toolId,
     devServerBaseUrl,
@@ -586,6 +614,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   const safeToolOutput = JSON.stringify(toolOutput ?? null)
     .replace(/</g, "\\u003c")
     .replace(/>/g, "\\u003e");
+  const safeToolResponseMetadata = JSON.stringify(toolResponseMetadata ?? null)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e");
   const safeToolId = JSON.stringify(toolId);
   const safeWidgetStateKey = JSON.stringify(widgetStateKey);
   // Safely serialize theme, defaulting to 'light' if not provided
@@ -612,7 +643,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         const openaiAPI = {
           toolInput: ${safeToolInput},
           toolOutput: ${safeToolOutput},
-          toolResponseMetadata: null,
+          toolResponseMetadata: ${safeToolResponseMetadata},
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},

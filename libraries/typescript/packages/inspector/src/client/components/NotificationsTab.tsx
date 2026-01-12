@@ -1,4 +1,7 @@
-import type { MCPNotification } from "@/client/context/McpContext";
+import type { McpNotification } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPNotification = McpNotification;
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import {

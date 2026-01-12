@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
 from mcp_use import MCPAgent, MCPClient
@@ -48,7 +48,7 @@ async def test_stream_events_keeps_ai_messages_in_memory():
 
         def log_message(i, msg):
             """Helper to log message content with truncation."""
-            content = msg.content[:50] if hasattr(msg, "content") else str(msg)
+            content = msg.content[:50]
             logger.info(f"  {i}: {type(msg).__name__}: {content}")
 
         for i, msg in enumerate(agent._conversation_history):
@@ -59,12 +59,15 @@ async def test_stream_events_keeps_ai_messages_in_memory():
             f"Expected at least 2 messages after first query, got {len(agent._conversation_history)}"
         )
 
-        # Check message types
+        # Check message types (tool messages may exist in between)
         assert isinstance(agent._conversation_history[0], HumanMessage), "First message should be HumanMessage"
         assert isinstance(agent._conversation_history[-1], AIMessage), "Last message should be AIMessage"
 
         # Check that AI message has content
         assert len(agent._conversation_history[-1].content) > 0, "AI message should have content"
+
+        # If a tool was used, ensure tool output is also persisted
+        assert any(isinstance(m, ToolMessage) for m in agent._conversation_history), "Expected ToolMessage in history"
 
         # Second query - should maintain context
         logger.info("\n" + "=" * 80)
@@ -91,9 +94,10 @@ async def test_stream_events_keeps_ai_messages_in_memory():
             f"Expected at least 4 messages after second query, got {len(agent._conversation_history)}"
         )
 
-        # Verify message order and types
+        # Verify we have at least two user messages and two assistant messages.
+        # Note: tool-call AI messages and ToolMessage results may appear between them.
         messages = agent._conversation_history
-        expected_types = [HumanMessage, AIMessage, HumanMessage, AIMessage]
+        expected_types = [HumanMessage, AIMessage, ToolMessage, AIMessage, HumanMessage, AIMessage]
         for i, expected_type in enumerate(expected_types):
             assert isinstance(messages[i], expected_type), (
                 f"Message {i} should be {expected_type.__name__}, got {type(messages[i]).__name__}"
@@ -102,7 +106,7 @@ async def test_stream_events_keeps_ai_messages_in_memory():
         # Verify all AI messages have content
         for i, msg in enumerate(messages):
             if isinstance(msg, AIMessage):
-                assert len(msg.content) > 0, f"AI message at index {i} should have content"
+                assert msg.content is not None, f"AI message at index {i} should have content"
 
         logger.info("=" * 80 + "\n")
         logger.info("✅ Test passed: stream_events properly stores AI messages in memory")

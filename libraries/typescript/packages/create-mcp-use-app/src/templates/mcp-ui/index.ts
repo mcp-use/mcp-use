@@ -1,11 +1,13 @@
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 import type { RawHtmlUIResource, RemoteDomUIResource } from "mcp-use/server";
 
 // Create an MCP server with MCP-UI UIResource support
-const server = createMCPServer("uiresource-mcp-server", {
+const server = new MCPServer({
+  name: "uiresource-mcp-server",
   version: "1.0.0",
   description: "MCP server demonstrating all UIResource types",
-  baseUrl: process.env.MCP_URL, // Full base URL (e.g., https://myserver.com)
+  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
+  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

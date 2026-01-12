@@ -12,6 +12,7 @@ import type { WidgetMetadata } from "../types/widget.js";
 import { pathHelpers, getCwd } from "../utils/runtime.js";
 import {
   setupPublicRoutes,
+  setupFaviconRoute,
   registerWidgetFromTemplate,
 } from "./widget-helpers.js";
 import type {
@@ -28,17 +29,15 @@ const TMP_MCP_USE_DIR = ".mcp-use";
 export type MountWidgetsDevOptions = MountWidgetsOptions;
 
 /**
- * Mount widgets from resources/ directory in development mode with Vite HMR
+ * Mounts local widget sources under the project's resources directory into a shared Vite dev server with HMR so they can be served and inspected during development.
  *
- * Discovers TSX widget files and folders with widget.tsx, creates temporary entry files,
- * and sets up a shared Vite dev server with hot module replacement. Each widget is
- * registered as both a tool and resource for MCP-UI compatibility.
+ * Discovers top-level `.tsx`/`.ts` widget files and folders containing `widget.tsx`, generates per-widget temporary entry and HTML files under `.mcp-use`, starts a single Vite middleware server that watches the resources directory for changes, and registers each widget via the provided callback for MCP-UI compatibility.
  *
- * @param app - Hono app instance to mount routes on
- * @param serverConfig - Server configuration (baseUrl, port, CSP URLs)
- * @param registerWidget - Callback to register each discovered widget
- * @param options - Optional configuration (baseRoute, resourcesDir)
- * @returns Promise that resolves when all widgets are mounted
+ * @param app - Hono application instance to mount middleware and routes onto
+ * @param serverConfig - Server configuration (base URL, port, CSP, favicon, etc.) used to configure routes and Vite origin
+ * @param registerWidget - Callback invoked to register each discovered widget with the running server
+ * @param options - Optional overrides: `baseRoute` to change the mount path (default: `/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
+ * @returns Nothing.
  */
 export async function mountWidgetsDev(
   app: HonoType,
@@ -106,6 +105,30 @@ export async function mountWidgetsDev(
 
   // Create a temp directory for widget entry files
   const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
+
+  // Clean up stale widget directories in .mcp-use
+  try {
+    // Check if .mcp-use exists
+    await fs.access(tempDir);
+
+    // Get list of current widget names
+    const currentWidgetNames = new Set(entries.map((e) => e.name));
+
+    // Read existing directories in .mcp-use
+    const existingDirs = await fs.readdir(tempDir, { withFileTypes: true });
+
+    // Remove directories that are not in current widgets
+    for (const dirent of existingDirs) {
+      if (dirent.isDirectory() && !currentWidgetNames.has(dirent.name)) {
+        const staleDir = pathHelpers.join(tempDir, dirent.name);
+        await fs.rm(staleDir, { recursive: true, force: true });
+        console.log(`[WIDGETS] Cleaned up stale widget: ${dirent.name}`);
+      }
+    }
+  } catch {
+    // .mcp-use doesn't exist yet, no cleanup needed
+  }
+
   await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
 
   // Import dev dependencies - these are optional and only needed for dev mode
@@ -168,10 +191,18 @@ export async function mountWidgetsDev(
     const relativeResourcesPath = pathHelpers
       .relative(widgetTempDir, resourcesPath)
       .replace(/\\/g, "/");
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = pathHelpers.join(getCwd(), "node_modules", "mcp-use");
+    const relativeMcpUsePath = pathHelpers
+      .relative(widgetTempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
     const cssContent = `@import "tailwindcss";
 
-/* Configure Tailwind to scan the resources directory */
+/* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
+@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
 `;
     await fs.writeFile(
       pathHelpers.join(widgetTempDir, "styles.css"),
@@ -196,7 +227,12 @@ if (container && Component) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${widget.name} Widget</title>
+    <title>${widget.name} Widget</title>${
+      serverConfig.favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+        : ""
+    }
   </head>
   <body>
     <div id="widget-root"></div>
@@ -218,6 +254,11 @@ if (container && Component) {
 
   // Build the server origin URL
   const serverOrigin = serverConfig.serverBaseUrl;
+
+  // Derive WebSocket protocol from serverBaseUrl (wss for HTTPS, ws otherwise)
+  const wsProtocol = serverConfig.serverBaseUrl.startsWith("https:")
+    ? "wss"
+    : "ws";
 
   // Create a single shared Vite dev server for all widgets
   console.log(
@@ -263,6 +304,70 @@ if (container && Component) {
       const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
       server.watcher.add(resourcesPath);
       console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+
+      // Watch for file deletions and clean up corresponding .mcp-use directories
+      server.watcher.on("unlink", async (filePath: string) => {
+        // Check if the deleted file is a widget file
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Single file widget (e.g., widget-name.tsx)
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          const widgetName = relativePath.replace(/\.tsx?$/, "");
+          const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+        // Folder-based widget (e.g., widget-name/widget.tsx)
+        else if (relativePath.endsWith("widget.tsx")) {
+          const parts = relativePath.split("/");
+          if (parts.length === 2) {
+            const widgetName = parts[0];
+            const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+            try {
+              await fs.access(widgetDir);
+              await fs.rm(widgetDir, { recursive: true, force: true });
+              console.log(
+                `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+              );
+            } catch {
+              // Widget directory doesn't exist, nothing to clean up
+            }
+          }
+        }
+      });
+
+      // Watch for directory deletions (folder-based widgets)
+      server.watcher.on("unlinkDir", async (dirPath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, dirPath);
+
+        // Check if this is a top-level directory in resources/
+        if (relativePath && !relativePath.includes("/")) {
+          const widgetName = relativePath;
+          const widgetDir = pathHelpers.join(tempDir, widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Cleaned up stale widget (directory removed): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+      });
     },
   };
 
@@ -315,13 +420,20 @@ export default PostHog;
     server: {
       middlewareMode: true,
       origin: serverOrigin,
+      hmr: {
+        // Explicitly configure HMR for better cross-platform support
+        // Use wss for HTTPS deployments, ws otherwise
+        protocol: wsProtocol,
+      },
       watch: {
         // Watch the resources directory for HMR to work
         // This ensures changes to widget source files trigger hot reload
         ignored: ["**/node_modules/**", "**/.git/**"],
-        // Include the resources directory in watch list
-        // Vite will watch files imported from outside root
-        usePolling: false,
+        // Enable polling on Linux where file watching may not work reliably
+        // (especially in Docker, WSL, VMs, or network filesystems)
+        usePolling: process.platform === "linux",
+        // If polling is enabled, check every 100ms (reasonable default)
+        interval: 100,
       },
     },
     // Explicitly tell Vite to watch files outside root
@@ -398,6 +510,9 @@ export default PostHog;
   // Serve static files from public directory in dev mode
   setupPublicRoutes(app, false);
 
+  // Setup favicon route at server root
+  setupFaviconRoute(app, serverConfig.favicon, false);
+
   // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware
   // (like the inspector) which might intercept the request and return the wrong content
   app.use(`${baseRoute}/*`, async (c: Context) => {
@@ -429,15 +544,21 @@ export default PostHog;
       if (mod.widgetMetadata) {
         metadata = mod.widgetMetadata;
 
-        // Convert Zod schema to JSON schema for props if available
-        if (metadata.inputs) {
-          // The inputs is a Zod schema, we can use zodToJsonSchema or extract shape
+        // Handle props field (preferred) or inputs field (deprecated) for Zod schema
+        const schemaField = metadata.props || metadata.inputs;
+        if (schemaField) {
           try {
-            // Store the zod schema shape for inputs
-            metadata.inputs = (metadata.inputs as any).shape || metadata.inputs;
+            // Pass the full Zod schema object directly (don't extract .shape)
+            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+            // and raw shapes, so we preserve the full schema here
+            metadata.props = schemaField;
+            // Also set inputs as alias for backward compatibility
+            if (!metadata.inputs) {
+              metadata.inputs = schemaField;
+            }
           } catch (error) {
             console.warn(
-              `[WIDGET] Failed to extract props schema for ${widget.name}:`,
+              `[WIDGET] Failed to extract schema for ${widget.name}:`,
               error
             );
           }

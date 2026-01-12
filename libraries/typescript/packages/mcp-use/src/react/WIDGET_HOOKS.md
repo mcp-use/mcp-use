@@ -136,7 +136,7 @@ const propSchema = z.object({
 
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display weather for a city',
-  inputs: propSchema,
+  props: propSchema,
 }
 
 type WeatherProps = z.infer<typeof propSchema>;

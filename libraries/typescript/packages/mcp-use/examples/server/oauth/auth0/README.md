@@ -317,7 +317,6 @@ auth0 roles permissions add ROLE_ID --api-id "http://localhost:3001/" --permissi
 server.tool({
   name: "my-custom-tool",
   description: "My custom tool (requires tool:custom)",
-  inputs: [],
   cb: async (_args: any, context: any) => {
     const payload = context?.get?.("payload");
     if (!hasPermissions(payload, ["tool:custom"])) {
@@ -432,7 +431,7 @@ server.use("*", cors());
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [RFC 9068: JWT Profile for OAuth 2.0 Access Tokens](https://datatracker.ietf.org/doc/html/rfc9068)
 - [MCP Authentication Specification](https://modelcontextprotocol.io/docs/specification/authentication)
-- [mcp-use Documentation](https://docs.mcp-use.com)
+- [mcp-use Documentation](https://mcp-use.com/docs)
 - [PKCE Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce)
 
 ### Sample Applications

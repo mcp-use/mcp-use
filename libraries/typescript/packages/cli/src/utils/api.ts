@@ -70,6 +70,25 @@ export interface Deployment {
   gitCommitMessage?: string;
 }
 
+export interface UpdateDeploymentRequest {
+  name?: string;
+  customDomain?: string;
+  env?: Record<string, string>;
+  status?: "running" | "stopped";
+}
+
+export interface DeploymentListResponse {
+  deployments: Deployment[];
+  total: number;
+}
+
+export interface LogsResponse {
+  success: boolean;
+  data: {
+    logs: string;
+  };
+}
+
 /**
  * API client for mcp-use cloud
  */
@@ -100,6 +119,7 @@ export class McpUseAPI {
       method?: string;
       headers?: Record<string, string>;
       body?: string;
+      timeout?: number;
     } = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
@@ -112,17 +132,35 @@ export class McpUseAPI {
       headers["x-api-key"] = this.apiKey;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
+    // Add timeout support (default 30 seconds)
+    const timeout = options.timeout || 30000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API request failed: ${response.status} ${error}`);
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`API request failed: ${response.status} ${error}`);
+      }
+
+      return response.json() as Promise<T>;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === "AbortError") {
+        throw new Error(
+          `Request timeout after ${timeout / 1000}s. Try using --follow flag to stream logs instead.`
+        );
+      }
+      throw error;
     }
-
-    return response.json() as Promise<T>;
   }
 
   /**
@@ -303,5 +341,109 @@ export class McpUseAPI {
     }
 
     return response.json() as Promise<Deployment>;
+  }
+
+  /**
+   * List all deployments
+   */
+  async listDeployments(): Promise<Deployment[]> {
+    const response = await this.request<DeploymentListResponse>("/deployments");
+    return response.deployments;
+  }
+
+  /**
+   * Delete deployment
+   */
+  async deleteDeployment(deploymentId: string): Promise<void> {
+    await this.request(`/deployments/${deploymentId}`, {
+      method: "DELETE",
+    });
+  }
+
+  /**
+   * Update deployment
+   */
+  async updateDeployment(
+    deploymentId: string,
+    updates: UpdateDeploymentRequest
+  ): Promise<Deployment> {
+    return this.request<Deployment>(`/deployments/${deploymentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
+  }
+
+  /**
+   * Redeploy deployment
+   */
+  async redeployDeployment(
+    deploymentId: string,
+    filePath?: string
+  ): Promise<Deployment> {
+    if (filePath) {
+      // Redeploy with file upload (for local source)
+      const { readFile } = await import("node:fs/promises");
+      const { basename } = await import("node:path");
+      const { stat } = await import("node:fs/promises");
+
+      // Check file size
+      const stats = await stat(filePath);
+      const maxSize = 2 * 1024 * 1024;
+      if (stats.size > maxSize) {
+        throw new Error(
+          `File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`
+        );
+      }
+
+      const fileBuffer = await readFile(filePath);
+      const formData = new FormData();
+      const blob = new Blob([fileBuffer], { type: "application/gzip" });
+      formData.append("source_file", blob, basename(filePath));
+
+      const headers: Record<string, string> = {};
+      if (this.apiKey) headers["x-api-key"] = this.apiKey;
+
+      const response = await fetch(
+        `${this.baseUrl}/deployments/${deploymentId}/redeploy`,
+        {
+          method: "POST",
+          headers,
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Redeploy failed: ${error}`);
+      }
+      return response.json();
+    } else {
+      // Redeploy GitHub source
+      return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
+        method: "POST",
+      });
+    }
+  }
+
+  /**
+   * Get deployment logs
+   */
+  async getDeploymentLogs(deploymentId: string): Promise<string> {
+    const response = await this.request<LogsResponse>(
+      `/deployments/${deploymentId}/logs`,
+      { timeout: 60000 } // 60 second timeout for logs
+    );
+    return response.data.logs;
+  }
+
+  /**
+   * Get deployment build logs
+   */
+  async getDeploymentBuildLogs(deploymentId: string): Promise<string> {
+    const response = await this.request<LogsResponse>(
+      `/deployments/${deploymentId}/logs/build`,
+      { timeout: 60000 } // 60 second timeout for logs
+    );
+    return response.data.logs;
   }
 }

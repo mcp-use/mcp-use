@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.12.6",
+  "version": "0.14.4",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mcp-use/mcp-use.git",
-    "directory": "packages/inspector"
+    "directory": "libraries/typescript/packages/inspector"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
@@ -24,6 +24,10 @@
     ".": {
       "types": "./dist/server/index.d.ts",
       "import": "./dist/server/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
     }
   },
   "main": "./dist/server/index.js",
@@ -36,11 +40,12 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "vite --port 3000",
+    "dev:client": "rm -rf node_modules/.vite && vite --port 3000",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
-    "build": "npm run build:client && npm run build:server && npm run build:cli",
+    "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli",
     "build:client": "vite build",
+    "build:client-exports": "tsup src/client/index.ts --format esm --out-dir dist/client --tsconfig tsconfig.client.json --external react --external react-dom --external lucide-react --no-splitting && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
     "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm --filter mcp-use build && pnpm build",
@@ -56,8 +61,14 @@
     "lint:npm": "npm run lint:fix",
     "lint:pnpm": "pnpm lint:fix"
   },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "peerDependencies": {
-    "express": "^4.21.2 || ^5.0.0"
+    "express": "^4.21.2 || ^5.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "react-router": "^7.12.0"
   },
   "peerDependenciesMeta": {
     "express": {
@@ -65,14 +76,14 @@
     }
   },
   "dependencies": {
-    "@ai-sdk/react": "^2.0.104",
-    "@hono/node-server": "^1.19.6",
-    "@langchain/anthropic": "^1.1.3",
-    "@langchain/core": "^1.1.0",
-    "@langchain/google-genai": "^2.0.0",
-    "@langchain/openai": "^1.1.3",
-    "@mcp-ui/client": "^5.16.0",
-    "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.4",
+    "@ai-sdk/react": "^2.0.115",
+    "@hono/node-server": "^1.19.7",
+    "@langchain/anthropic": "^1.3.0",
+    "@langchain/core": "^1.1.8",
+    "@langchain/google-genai": "^2.1.0",
+    "@langchain/openai": "^1.2.0",
+    "@mcp-ui/client": "^5.17.1",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -83,25 +94,22 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@scarf/scarf": "^1.4.0",
-    "@tailwindcss/cli": "^4.1.17",
-    "@tailwindcss/vite": "^4.1.17",
+    "@tailwindcss/cli": "^4.1.18",
+    "@tailwindcss/vite": "^4.1.18",
     "@types/react-syntax-highlighter": "^15.5.13",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "framer-motion": "^12.23.24",
-    "hono": "^4.10.7",
-    "lucide-react": "^0.555.0",
-    "markdown-to-jsx": "^9.3.0",
+    "framer-motion": "^12.23.26",
+    "hono": "^4.11.1",
+    "lucide-react": "^0.561.0",
+    "markdown-to-jsx": "^9.3.5",
     "mcp-use": "workspace:*",
-    "motion": "^12.23.24",
+    "motion": "^12.23.26",
     "next-themes": "^0.4.6",
     "open": "^11.0.0",
-    "posthog-node": "^5.14.1",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "posthog-node": "^5.17.2",
     "react-resizable-panels": "^3.0.6",
-    "react-router-dom": "^7.9.6",
     "react-syntax-highlighter": "^16.1.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
@@ -111,27 +119,26 @@
     "access": "public"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^6.2.0",
-    "@eslint-react/eslint-plugin": "^2.3.9",
+    "@antfu/eslint-config": "^6.7.1",
+    "@eslint-react/eslint-plugin": "^2.3.13",
     "@langchain/anthropic": "^1.0.0",
-    "@langchain/core": "^1.0.0",
+    "@langchain/core": "^1.1.8",
     "@langchain/google-genai": "^1.0.0",
     "@langchain/openai": "^1.0.0",
     "@radix-ui/react-slot": "^1.2.4",
-    "@types/express": "^5.0.5",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@types/express": "^5.0.6",
+    "@vitejs/plugin-react": "^5.1.2",
     "concurrently": "^9.2.1",
-    "eslint": "^9.39.1",
+    "eslint": "^9.39.2",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "express": "^5.2.0",
-    "tailwindcss": "^4.1.17",
+    "eslint-plugin-react-refresh": "^0.4.25",
+    "express": "^5.2.1",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router": "^7.12.0",
+    "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.3.0"
   }
 }

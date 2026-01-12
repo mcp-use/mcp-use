@@ -8,7 +8,11 @@ import {
 } from "./shared-utils.js";
 
 /**
- * Register static file serving routes for the inspector client
+ * Register routes that serve the built inspector client, handle SPA entry routing, and provide a fallback when client files are missing.
+ *
+ * This registers asset serving under the inspector path, redirects the root path to `/inspector` while preserving query parameters, serves the SPA entry (`index.html`) for inspector routes, and installs a final catch-all that serves the SPA or a build-missing fallback page. If `clientDistPath` is not provided, the built client path is resolved automatically.
+ *
+ * @param clientDistPath - Optional path to the built inspector client directory; when omitted, the implementation resolves the default distribution path
  */
 export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
   const distPath = clientDistPath || getClientDistPath();
@@ -51,9 +55,11 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
     return c.notFound();
   });
 
-  // Redirect root path to /inspector
+  // Redirect root path to /inspector (preserving query parameters)
   app.get("/", (c) => {
-    return c.redirect("/inspector");
+    const url = new URL(c.req.url);
+    const queryString = url.search; // includes the '?' if there are params
+    return c.redirect(`/inspector${queryString}`);
   });
 
   // Serve the main HTML file for /inspector and all other routes (SPA routing)

@@ -142,10 +142,10 @@ if (context.auth.scopes?.includes('email')) {
 If you need to extract custom claims differently, use the `getUserInfo` function in your OAuth configuration:
 
 ```typescript
-import { McpServer, auth0 } from 'mcp-use/server'
+import { MCPServer, oauthAuth0Provider } from 'mcp-use/server'
 
-const server = new McpServer({
-  oauth: auth0({
+const server = new MCPServer({
+  oauth: oauthAuth0Provider({
     domain: 'your-tenant.auth0.com',
     audience: 'https://your-api.example.com',
     

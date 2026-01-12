@@ -1,5 +1,15 @@
-import type { Prompt } from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { PromptResult, SavedPrompt } from "./prompts";
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/client/components/ui/resizable";
+import { useInspector } from "@/client/context/InspectorContext";
+import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -8,17 +18,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/client/components/ui/resizable";
 import type { ImperativePanelHandle } from "react-resizable-panels";
-import { useInspector } from "@/client/context/InspectorContext";
-import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
+import type { PromptResult, SavedPrompt } from "./prompts";
 import {
   PromptExecutionPanel,
   PromptResultDisplay,
@@ -26,8 +28,6 @@ import {
   PromptsTabHeader,
   SavedPromptsList,
 } from "./prompts";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface PromptsTabRef {
   focusSearch: () => void;
@@ -43,6 +43,20 @@ interface PromptsTabProps {
 
 const SAVED_PROMPTS_KEY = "mcp-inspector-saved-prompts";
 
+/**
+ * Render the Prompts tab UI for browsing, selecting, executing, saving, and inspecting prompts.
+ *
+ * The component manages prompt selection, argument state, execution results, saved prompts (persisted
+ * to localStorage), keyboard navigation, responsive mobile/desktop layouts, RPC message viewing,
+ * and exposes `focusSearch` / `blurSearch` via the forwarded ref.
+ *
+ * @param ref - Optional forwarded ref exposing `focusSearch` and `blurSearch` methods.
+ * @param prompts - The list of available prompts to display.
+ * @param callPrompt - Function invoked to execute a prompt by name with an arguments object.
+ * @param serverId - Identifier for the current server; used for RPC scoping and telemetry.
+ * @param isConnected - Whether the application is currently connected to the backend (controls execution availability).
+ * @returns The PromptsTab UI element.
+ */
 export function PromptsTab({
   ref,
   prompts,
@@ -73,8 +87,11 @@ export function PromptsTab({
   );
   const [rpcMessageCount, setRpcMessageCount] = useState(0);
   const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
+  const [isMaximized, setIsMaximized] = useState(false);
   const rpcPanelRef = useRef<ImperativePanelHandle>(null);
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
+  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+  const topPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -175,19 +192,7 @@ export function PromptsTab({
     if (prompt.arguments) {
       // Handle MCP SDK structure: arguments is an array of PromptArgument objects
       prompt.arguments.forEach((arg) => {
-        if (arg.default !== undefined) {
-          initialArgs[arg.name] = arg.default;
-        } else if (arg.type === "string") {
-          initialArgs[arg.name] = "";
-        } else if (arg.type === "number") {
-          initialArgs[arg.name] = 0;
-        } else if (arg.type === "boolean") {
-          initialArgs[arg.name] = false;
-        } else if (arg.type === "array") {
-          initialArgs[arg.name] = [];
-        } else if (arg.type === "object") {
-          initialArgs[arg.name] = {};
-        }
+        initialArgs[arg.name] = "";
       });
     }
     setPromptArgs(initialArgs);
@@ -391,7 +396,10 @@ export function PromptsTab({
         duration: Date.now() - startTime,
       };
 
-      setResults((prev) => [errorResult, ...prev]);
+      setResults((prev) => [
+        ...prev,
+        { ...errorResult, result: { messages: [] } },
+      ]);
     } finally {
       setIsExecuting(false);
     }
@@ -406,6 +414,67 @@ export function PromptsTab({
       console.error("[PromptsTab] Failed to copy result:", error);
     }
   }, []);
+
+  const handleDeleteResult = useCallback((index: number) => {
+    setResults((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleFullscreen = useCallback(
+    (index: number) => {
+      // On mobile, show fullscreen view
+      if (isMobile) {
+        setMobileView("response");
+      } else {
+        // On desktop, open in new window
+        const result = results[index];
+        if (result) {
+          const newWindow = window.open("", "_blank", "width=800,height=600");
+          if (newWindow) {
+            const resultData = result.result;
+            newWindow.document.write(`
+            <html>
+              <head>
+                <title>${result.promptName} Result</title>
+                <style>
+                  body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+                  pre { white-space: pre-wrap; word-wrap: break-word; }
+                </style>
+              </head>
+              <body>
+                <h2>${result.promptName}</h2>
+                <pre>${JSON.stringify(resultData, null, 2)}</pre>
+              </body>
+            </html>
+          `);
+            newWindow.document.close();
+          }
+        }
+      }
+    },
+    [isMobile, results]
+  );
+
+  const handleMaximize = useCallback(() => {
+    if (!isMaximized) {
+      // Maximize: collapse left panel and top panel
+      if (leftPanelRef.current) {
+        leftPanelRef.current.collapse();
+      }
+      if (topPanelRef.current) {
+        topPanelRef.current.collapse();
+      }
+      setIsMaximized(true);
+    } else {
+      // Restore: expand left panel and top panel
+      if (leftPanelRef.current) {
+        leftPanelRef.current.expand();
+      }
+      if (topPanelRef.current) {
+        topPanelRef.current.expand();
+      }
+      setIsMaximized(false);
+    }
+  }, [isMaximized]);
 
   const openSaveDialog = useCallback(() => {
     if (!selectedPrompt) return;
@@ -455,14 +524,12 @@ export function PromptsTab({
               >
                 Prompts
               </button>
-              {mobileView !== "list" && (
+              {mobileView === "detail" && (
                 <>
                   <span className="mx-2 text-muted-foreground">/</span>
                   <button
                     onClick={() => {
-                      if (mobileView === "response") {
-                        setMobileView("detail");
-                      }
+                      setMobileView("response");
                     }}
                     className={
                       mobileView === "detail"
@@ -566,6 +633,8 @@ export function PromptsTab({
                   results={results}
                   copiedResult={copiedResult}
                   onCopy={handleCopyResult}
+                  onDelete={handleDeleteResult}
+                  onFullscreen={handleFullscreen}
                 />
               </motion.div>
             )}
@@ -578,7 +647,9 @@ export function PromptsTab({
   return (
     <ResizablePanelGroup direction="horizontal" className="h-full">
       <ResizablePanel
+        ref={leftPanelRef}
         defaultSize={33}
+        collapsible
         className="flex flex-col h-full relative"
       >
         <ResizablePanelGroup
@@ -631,6 +702,9 @@ export function PromptsTab({
             collapsible
             minSize={5}
             collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => setRpcPanelCollapsed(true)}
             onExpand={() => setRpcPanelCollapsed(false)}
             className="flex flex-col border-t dark:border-zinc-700"
@@ -681,15 +755,15 @@ export function PromptsTab({
                 }`}
               />
             </div>
-            {!rpcPanelCollapsed && (
-              <div className="flex-1 overflow-hidden min-h-0">
-                <JsonRpcLoggerView
-                  serverIds={[serverId]}
-                  onCountChange={setRpcMessageCount}
-                  onClearRef={clearRpcMessagesRef}
-                />
-              </div>
-            )}
+            <div
+              className={`flex-1 overflow-hidden min-h-0 ${rpcPanelCollapsed ? "hidden" : ""}`}
+            >
+              <JsonRpcLoggerView
+                serverIds={[serverId]}
+                onCountChange={setRpcMessageCount}
+                onClearRef={clearRpcMessagesRef}
+              />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>
@@ -698,7 +772,7 @@ export function PromptsTab({
 
       <ResizablePanel defaultSize={67}>
         <ResizablePanelGroup direction="vertical">
-          <ResizablePanel defaultSize={40}>
+          <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
             <PromptExecutionPanel
               selectedPrompt={selectedPrompt}
               promptArgs={promptArgs}
@@ -718,6 +792,10 @@ export function PromptsTab({
                 results={results}
                 copiedResult={copiedResult}
                 onCopy={handleCopyResult}
+                onDelete={handleDeleteResult}
+                onFullscreen={handleFullscreen}
+                onMaximize={handleMaximize}
+                isMaximized={isMaximized}
               />
             </div>
           </ResizablePanel>

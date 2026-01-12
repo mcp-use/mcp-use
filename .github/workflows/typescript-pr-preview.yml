@@ -17,6 +17,8 @@ jobs:
   preview:
     name: Publish PR Preview
     runs-on: ubuntu-latest
+    outputs:
+      pr-number: ${{ steps.pr-number.outputs.pr-number }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -43,3 +45,110 @@ jobs:
 
       - name: Publish Preview Packages
         run: pnpm dlx pkg-pr-new publish './libraries/typescript/packages/*' --pnpm
+
+      - name: Get PR Number
+        id: pr-number
+        run: |
+          echo "pr-number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+
+  deno-test:
+    name: Test with Deno (PR Preview)
+    runs-on: ubuntu-latest
+    needs: preview
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Create temporary deno.json with PR preview imports
+        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        # Note: Hybrid mapping to satisfy conflicting Zod requirements:
+        # - SDK imports "zod/v3" and needs "z.custom" (available in Zod v3)
+        # - Other deps import "zod/v4" and "zod/v4-mini"
+        # - We map "zod/v3" to "zod@3.24.4" (aliasing v3 import to root v3 package)
+        # - We use esm.sh for zod to match the PR preview environment
+        run: |
+          cat > deno.json << EOF
+          {
+            "imports": {
+              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&external=zod",
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&external=zod",
+              "zod": "https://esm.sh/zod@3.24.4",
+              "zod/v3": "https://esm.sh/zod@3.24.4",
+              "zod/v4": "https://esm.sh/zod@4.2.0",
+              "zod/v4-mini": "https://esm.sh/zod@4.2.0",
+              "zod/v4/mini": "https://esm.sh/zod@4.2.0",
+              "zod/v4/core": "https://esm.sh/zod@4.2.0"
+            }
+          }
+          EOF
+          echo "Generated deno.json with PR #${{ needs.preview.outputs.pr-number }} preview packages:"
+          cat deno.json
+
+      - name: Wait for esm.sh to pick up the package
+        run: |
+          echo "Waiting for esm.sh to pick up the preview package..."
+          PR_NUMBER="${{ needs.preview.outputs.pr-number }}"
+          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          
+          MAX_RETRIES=10
+          RETRY_DELAY=30
+          
+          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}/server"
+          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}/server"
+          
+          echo "Checking URLs:"
+          echo "  PR URL: $PR_URL"
+          echo "  Commit URL: $COMMIT_URL"
+          
+          PR_READY=false
+          COMMIT_READY=false
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            # Check PR number URL
+            if [ "$PR_READY" = false ]; then
+              if curl -s -f -I "$PR_URL" > /dev/null 2>&1; then
+                echo "✅ PR URL is available"
+                PR_READY=true
+              fi
+            fi
+            
+            # Check commit SHA URL
+            if [ "$COMMIT_READY" = false ]; then
+              if curl -s -f -I "$COMMIT_URL" > /dev/null 2>&1; then
+                echo "✅ Commit URL is available"
+                COMMIT_READY=true
+              fi
+            fi
+            
+            # Both ready?
+            if [ "$PR_READY" = true ] && [ "$COMMIT_READY" = true ]; then
+              echo "✅ Both package URLs are available on esm.sh"
+              break
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "Waiting for packages... (attempt $RETRY_COUNT/$MAX_RETRIES, PR: $PR_READY, Commit: $COMMIT_READY)"
+              sleep $RETRY_DELAY
+            else
+              echo "⚠️ Packages didn't become fully available after ${MAX_RETRIES} attempts (5 minutes)"
+              echo "  PR URL ready: $PR_READY"
+              echo "  Commit URL ready: $COMMIT_READY"
+              echo "Proceeding with tests anyway..."
+            fi
+          done
+
+      - name: Run Deno Tests
+        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: |
+          echo "Running Deno tests against PR #${{ needs.preview.outputs.pr-number }} preview packages..."
+          deno test --no-check --allow-read --allow-env --allow-net

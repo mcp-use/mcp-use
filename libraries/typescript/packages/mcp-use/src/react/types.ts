@@ -9,7 +9,7 @@ import type {
   Resource,
   ResourceTemplate,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 export type UseMcpOptions = {
@@ -17,20 +17,74 @@ export type UseMcpOptions = {
   url?: string;
   /** Enable/disable the connection (similar to TanStack Query). When false, no connection will be attempted (default: true) */
   enabled?: boolean;
-  /** OAuth client name for registration (if dynamic registration is used) */
-  clientName?: string;
-  /** OAuth client URI for registration (if dynamic registration is used) */
-  clientUri?: string;
+  /** Proxy configuration for routing through a proxy server */
+  proxyConfig?: {
+    proxyAddress?: string;
+    headers?: Record<string, string>;
+    /**
+     * @deprecated Use `headers` instead. This option will be removed in a future version.
+     */
+    customHeaders?: Record<string, string>;
+  };
+  /**
+   * Enable automatic proxy fallback when direct connection fails
+   * When enabled, if a direct connection fails with FastMCP or CORS errors,
+   * automatically retries using the proxy configuration
+   *
+   * Can be:
+   * - `true`: Enable with default proxy (https://inspector.mcp-use.com/inspector/api/proxy)
+   * - `false`: Disable automatic fallback (default)
+   * - `{ enabled: boolean, proxyAddress?: string }`: Custom configuration
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * // Use default proxy
+   * useMcp({ url: '...', autoProxyFallback: true })
+   *
+   * // Use custom proxy
+   * useMcp({
+   *   url: '...',
+   *   autoProxyFallback: {
+   *     enabled: true,
+   *     proxyAddress: 'https://my-proxy.com/api/proxy'
+   *   }
+   * })
+   * ```
+   */
+  autoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
   /** Custom callback URL for OAuth redirect (defaults to /oauth/callback on the current origin) */
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /** Custom configuration for the MCP client identity */
+  /**
+   * @deprecated Use `clientInfo` instead. This option will be removed in a future version.
+   * The `clientConfig` will be automatically derived from `clientInfo` for OAuth registration.
+   *
+   * Client configuration for OAuth registration (deprecated - derived from clientInfo).
+   */
   clientConfig?: {
+    /** Client name (used for OAuth registration) */
     name?: string;
+    /** Client version (used for OAuth registration) */
     version?: string;
+    /** Client URI/homepage (used for OAuth registration) */
+    uri?: string;
+    /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
+    logo_uri?: string;
   };
-  /** Custom headers that can be used to bypass auth */
+  /** Headers that can be used to bypass auth */
+  headers?: Record<string, string>;
+  /**
+   * @deprecated Use `headers` instead. This option will be removed in a future version.
+   * Custom headers that can be used to bypass auth
+   */
   customHeaders?: Record<string, string>;
   /** Whether to enable verbose debug logging to the console and the log state */
   debug?: boolean;
@@ -40,7 +94,24 @@ export type UseMcpOptions = {
   autoReconnect?: boolean | number;
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
-  /** Transport type preference: 'auto' (HTTP with SSE fallback), 'http' (HTTP only), 'sse' (SSE only) */
+  /**
+   * Transport type preference.
+   *
+   * @deprecated The 'sse' option is deprecated. Use 'http' or 'auto' instead.
+   *
+   * As of MCP spec 2025-11-25, the old HTTP+SSE transport is deprecated in favor
+   * of Streamable HTTP (unified endpoint). StreamableHTTP still supports SSE for
+   * notifications - it just uses a single /mcp endpoint instead of separate endpoints.
+   *
+   * **Backward compatibility:** 'sse' option still works and is maintained.
+   *
+   * Options:
+   * - 'auto': Try HTTP (Streamable HTTP), fallback to SSE if needed (recommended)
+   * - 'http': Use Streamable HTTP only (recommended for new code)
+   * - 'sse': Use old SSE transport (deprecated, but still works)
+   *
+   * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
+   */
   transportType?: "auto" | "http" | "sse";
   /**
    * Prevent automatic authentication popup/redirect on initial connection (default: false)
@@ -78,6 +149,15 @@ export type UseMcpOptions = {
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
    */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
@@ -93,9 +173,27 @@ export type UseMcpOptions = {
   onElicitation?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+  /**
+   * Client information sent to the MCP server in the initialize request.
+   * If not provided, defaults to mcp-use client info.
+   */
+  clientInfo?: {
+    name: string;
+    title?: string;
+    version: string;
+    description?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    websiteUrl?: string;
+  };
 };
 
 export type UseMcpResult = {
+  name: string;
+
   /** List of tools available from the connected MCP server */
   tools: Tool[];
   /** List of resources available from the connected MCP server */
@@ -106,8 +204,16 @@ export type UseMcpResult = {
   prompts: Prompt[];
   /** Server information from the initialize response */
   serverInfo?: {
+    title?: string;
     name: string;
     version?: string;
+    websiteUrl?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+    }>;
+    /** Base64-encoded favicon auto-detected from server domain */
+    icon?: string;
   };
   /** Server capabilities from the initialize response */
   capabilities?: Record<string, any>;
@@ -116,19 +222,10 @@ export type UseMcpResult = {
    * - 'discovering': Checking server existence and capabilities (including auth requirements).
    * - 'pending_auth': Authentication is required but auto-popup was prevented. User action needed.
    * - 'authenticating': Authentication is required and the process (e.g., popup) has been initiated.
-   * - 'connecting': Establishing the SSE connection to the server.
-   * - 'loading': Connected; loading resources like the tool list.
    * - 'ready': Connected and ready for tool calls.
    * - 'failed': Connection or authentication failed. Check the `error` property.
    */
-  state:
-    | "discovering"
-    | "pending_auth"
-    | "authenticating"
-    | "connecting"
-    | "loading"
-    | "ready"
-    | "failed";
+  state: "discovering" | "pending_auth" | "authenticating" | "ready" | "failed";
   /** If the state is 'failed', this provides the error message */
   error?: string;
   /**
@@ -136,6 +233,17 @@ export type UseMcpResult = {
    * this URL can be presented to the user to complete authentication manually in a new tab.
    */
   authUrl?: string;
+  /**
+   * OAuth tokens if authentication was completed
+   * Available when state is 'ready' and OAuth was used
+   */
+  authTokens?: {
+    access_token: string;
+    token_type: string;
+    expires_at?: number;
+    refresh_token?: string;
+    scope?: string;
+  };
   /** Array of internal log messages (useful for debugging) */
   log: {
     level: "debug" | "info" | "warn" | "error";
@@ -218,6 +326,29 @@ export type UseMcpResult = {
       content: { type: string; text?: string; [key: string]: any };
     }>;
   }>;
+  /**
+   * Refresh the tools list from the server.
+   * Called automatically when notifications/tools/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshTools: () => Promise<void>;
+  /**
+   * Refresh the resources list from the server.
+   * Called automatically when notifications/resources/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshResources: () => Promise<void>;
+  /**
+   * Refresh the prompts list from the server.
+   * Called automatically when notifications/prompts/list_changed is received.
+   * Can also be called manually for explicit refresh.
+   */
+  refreshPrompts: () => Promise<void>;
+  /**
+   * Refresh all lists (tools, resources, prompts) from the server.
+   * Useful after reconnection or for manual refresh.
+   */
+  refreshAll: () => Promise<void>;
   /** Manually attempts to reconnect if the state is 'failed'. */
   retry: () => void;
   /** Disconnects the client from the MCP server. */
@@ -231,6 +362,21 @@ export type UseMcpResult = {
   authenticate: () => void;
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void;
+  /**
+   * Ensure the server icon is loaded and available in serverInfo
+   * Returns a promise that resolves when the icon is ready
+   * Use this before server creation to guarantee the icon is available
+   *
+   * @returns Promise that resolves with the base64 icon or null if not available
+   *
+   * @example
+   * ```typescript
+   * // Wait for icon before creating server
+   * const icon = await mcp.ensureIconLoaded();
+   * // Now mcp.serverInfo.icon is guaranteed to be set (if icon exists)
+   * ```
+   */
+  ensureIconLoaded: () => Promise<string | null>;
   /**
    * The underlying BrowserMCPClient instance.
    * Use this to create an MCPAgent for AI chat functionality.

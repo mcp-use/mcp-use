@@ -200,6 +200,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [create-github-release]
     if: needs.create-github-release.outputs.release_exists == 'false'
+    outputs:
+      publish_needed: ${{ steps.check-pypi.outputs.publish_needed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -272,3 +274,15 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  send-discord-notification:
+    name: Notify Discord of published release
+    runs-on: ubuntu-latest
+    needs: [publish-pypi]
+    if: needs.publish-pypi.outputs.publish_needed == 'true'
+    steps:
+      - name: GitHub Releases to Discord
+        uses: SethCohen/github-releases-to-discord@v1
+        with:
+          webhook_url: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}
+          reduce_headings: true

@@ -1,7 +1,7 @@
 import type {
   GetPromptResult,
   CallToolResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { InputDefinition, OptionalizeUndefinedFields } from "./common.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";

@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.8.0",
+  "version": "0.10.1",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mcp-use/mcp-use.git",
-    "directory": "packages/create-mcp-use-app"
+    "directory": "libraries/typescript/packages/create-mcp-use-app"
   },
   "bugs": {
     "url": "https://github.com/mcp-use/mcp-use/issues"
@@ -43,7 +43,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "dependencies": {
     "chalk": "^5.6.2",
@@ -53,14 +53,11 @@
     "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
     "ora": "^9.0.0",
-    "react": "^19.2.0"
+    "react": "^19.2.3"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.7",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.14"
+    "vitest": "^4.0.15"
   },
   "publishConfig": {
     "access": "public"

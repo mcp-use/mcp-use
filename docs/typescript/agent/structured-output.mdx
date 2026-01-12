@@ -1,24 +1,22 @@
 ---
 title: "Structured Output"
 description: "Type-safe responses with Zod schema validation"
-icon: "brackets-curly"
+icon: "braces"
 ---
 
-Structured output enables agents to return type-safe, validated data instead of plain text. By defining a Zod schema, you get automatic validation, type inference, and intelligent retry logic when data is incomplete.
+Structured output enables agents to return type-safe, validated data instead of plain text. By defining a Zod schema, you get automatic validation, type inference, and retry logic for formatting output.
 
 ## How Structured Output Works
 
 When you provide a Zod schema to the agent:
 
-1. **Schema awareness**: Agent understands exactly what data structure to return
-2. **Automatic validation**: Responses are validated against your schema
+1. **Schema awareness**: When using `streamEvents()`, the agent receives schema information in the query to understand what data structure to return
+2. **Automatic validation**: Responses are validated against your schema using Zod
 3. **Type safety**: Full TypeScript type inference from your schema
-4. **Intelligent retries**: Agent automatically gathers missing required fields
+4. **Formatting retries**: If the output doesn't match the schema format, the system retries up to 3 times to format it correctly
 5. **Guaranteed structure**: You always get data matching your schema or an error
 
-<Info>
-**Zod Integration**: We use Zod for schema definition because it provides excellent TypeScript integration, runtime validation, and clear error messages.
-</Info>
+
 
 ## Benefits
 
@@ -32,14 +30,17 @@ const schema = z.object({
   age: z.number()
 })
 
-const result = await agent.run(prompt, { schema })
+const result = await agent.run({
+  prompt: 'Get user information',
+  schema
+})
 // result.name is string
 // result.age is number
 ```
 
-### Automatic Retry
+### Formatting Retry
 
-If the agent's first response is missing required fields, it automatically tries again to gather the missing information.
+If the agent's response doesn't match the schema format, the system automatically retries up to 3 times to format the output correctly. This handles cases where the LLM output needs to be restructured to match your schema.
 
 ### Validation
 
@@ -47,8 +48,7 @@ Responses are validated at runtime, ensuring your code always receives correctly
 
 ## Basic Example
 
-<CodeGroup>
-```typescript TypeScript
+```typescript
 import { z } from 'zod'
 import { ChatOpenAI } from '@langchain/openai'
 import { MCPAgent, MCPClient } from 'mcp-use'
@@ -71,13 +71,10 @@ async function main() {
     const agent = new MCPAgent({ llm, client })
 
     // Get structured output
-    const weather = await agent.run(
-        'Get the current weather in San Francisco',
-        undefined, // maxSteps
-        undefined, // manageConnector
-        undefined, // externalHistory
-        WeatherInfo // output schema
-    )
+    const weather = await agent.run({
+        prompt: 'Get the current weather in San Francisco',
+        schema: WeatherInfo
+    })
 
     console.log(`Temperature in ${weather.city}: ${weather.temperature}°C`)
     console.log(`Condition: ${weather.condition}`)
@@ -89,53 +86,24 @@ async function main() {
 main().catch(console.error)
 ```
 
-```typescript TypeScript
-import { z } from 'zod'
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
 
-// Define the schema using Zod
-const WeatherInfo = z.object({
-    city: z.string().describe('City name'),
-    temperature: z.number().describe('Temperature in Celsius'),
-    condition: z.string().describe('Weather condition'),
-    humidity: z.number().describe('Humidity percentage')
-})
+<Note>
+**Schema-Aware Prompts**: When using `streamEvents()`, the query is automatically enhanced with schema information before execution, helping the agent understand what data structure is needed. When using `run()` or `stream()`, structured output conversion happens after execution completes.
+</Note>
 
-// TypeScript type inferred from schema
-type WeatherInfo = z.infer<typeof WeatherInfo>
+## Streaming with Structured Output
 
-async function main() {
-    // Setup client and agent
-    const client = new MCPClient({ mcpServers: {...} })
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
-    const agent = new MCPAgent({ llm, client })
+When using `streamEvents()` with structured output, you'll receive special events during the conversion process:
 
-    // Get structured output
-    const weather = await agent.run(
-        'Get the current weather in San Francisco',
-        undefined, // maxSteps
-        undefined, // manageConnector
-        undefined, // externalHistory
-        WeatherInfo // output schema
-    )
-
-    console.log(`Temperature in ${weather.city}: ${weather.temperature}°C`)
-    console.log(`Condition: ${weather.condition}`)
-    console.log(`Humidity: ${weather.humidity}%`)
-
-    await client.closeAllSessions()
-}
-
-main().catch(console.error)
-```
-</CodeGroup>
+- `on_structured_output_progress`: Emitted every 2 seconds while converting to structured format
+- `on_structured_output`: Emitted when structured output is successfully generated
+- `on_structured_output_error`: Emitted if structured output conversion fails
 
 ## Key Benefits
 
-- **Type Safety**: Get Pydantic (Python) or Zod (TypeScript) models with full IDE support and validation
-- **Intelligent Gathering**: Agent knows what information is required and won't stop until it has everything
-- **Automatic Retry**: Missing fields trigger continued execution automatically
-- **Field Validation**: Built-in validation for required fields, data types, and constraints
+- **Type Safety**: Get Zod (TypeScript) models with full IDE support and validation
+- **Schema-Aware Prompts**: When using `streamEvents()`, the agent receives enhanced prompts that include schema information, helping it understand what data structure is needed
+- **Formatting Retry**: Up to 3 automatic retries if the output format doesn't match the schema
+- **Field Validation**: Built-in validation for required fields, data types, and constraints using Zod
 
-The agent will continue working until all required fields in your schema can be populated, ensuring you always get complete, structured data.
+The agent is instructed to gather all required information during execution (when using `streamEvents()`), and the output is validated and formatted to match your schema. If validation fails after retries, an error is thrown.

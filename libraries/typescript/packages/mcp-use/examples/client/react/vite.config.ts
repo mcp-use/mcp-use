@@ -3,11 +3,28 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Plugin to ignore Node.js-only dynamic imports
+    {
+      name: "ignore-node-modules",
+      resolveId(id) {
+        // Mark Node.js-only modules as external to prevent bundling
+        if (id === "posthog-node") {
+          return { id, external: true };
+        }
+        return null;
+      },
+    },
+  ],
   build: {
     outDir: "dist",
     commonjsOptions: {
       transformMixedEsModules: true,
+      ignore: ["posthog-node"],
+    },
+    rollupOptions: {
+      external: ["posthog-node"],
     },
   },
   resolve: {
@@ -15,6 +32,7 @@ export default defineConfig({
       "mcp-use/browser": resolve(__dirname, "../../../dist/src/browser.js"),
       "mcp-use/react": resolve(__dirname, "../../../dist/src/react/index.js"),
     },
+    conditions: ["browser", "module", "import", "default"],
   },
   define: {
     global: "globalThis",
@@ -28,6 +46,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["react", "react-dom"],
+    exclude: ["posthog-node"],
     esbuildOptions: {
       define: {
         global: "globalThis",

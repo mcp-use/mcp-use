@@ -1,13 +1,8 @@
 import type {
   Client,
   ClientOptions,
-} from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
-import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
-import {
-  ListRootsRequestSchema,
-  CreateMessageRequestSchema,
-  ElicitRequestSchema,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/client/index.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   CallToolResult,
   CreateMessageRequest,
@@ -18,11 +13,16 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { ConnectionManager } from "../task_managers/base.js";
+} from "@modelcontextprotocol/sdk/types.js";
+import {
+  CreateMessageRequestSchema,
+  ElicitRequestSchema,
+  ListRootsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../logging.js";
-import { Telemetry } from "../telemetry/index.js";
+import type { ConnectionManager } from "../task_managers/base.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
+import { Telemetry } from "../telemetry/index.js";
 
 /**
  * Handler function for server notifications
@@ -60,6 +60,15 @@ export interface ConnectorInitOptions {
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
    */
+  onSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /**
+   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
+   * Optional callback function to handle sampling requests from servers.
+   * When provided, the client will declare sampling capability and handle
+   * `sampling/createMessage` requests by calling this callback.
+   */
   samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
@@ -92,10 +101,20 @@ export abstract class BaseConnector {
   protected rootsCache: Root[] = [];
 
   constructor(opts: ConnectorInitOptions = {}) {
-    this.opts = opts;
+    // Support both new and deprecated name
+    const finalOpts = {
+      ...opts,
+      onSampling: opts.onSampling ?? opts.samplingCallback,
+    };
+    if (opts.samplingCallback && !opts.onSampling) {
+      console.warn(
+        '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+      );
+    }
+    this.opts = finalOpts;
     // Initialize roots from options
-    if (opts.roots) {
-      this.rootsCache = [...opts.roots];
+    if (finalOpts.roots) {
+      this.rootsCache = [...finalOpts.roots];
     }
   }
 
@@ -272,7 +291,8 @@ export abstract class BaseConnector {
       logger.debug("setupSamplingHandler: No client available");
       return;
     }
-    if (!this.opts.samplingCallback) {
+    const samplingCallback = this.opts.onSampling ?? this.opts.samplingCallback;
+    if (!samplingCallback) {
       logger.debug("setupSamplingHandler: No sampling callback provided");
       return;
     }
@@ -283,7 +303,7 @@ export abstract class BaseConnector {
       CreateMessageRequestSchema,
       async (request: CreateMessageRequest, _extra: unknown) => {
         logger.debug("Server requested sampling, forwarding to callback");
-        return await this.opts.samplingCallback!(request.params);
+        return await samplingCallback(request.params);
       }
     );
     logger.debug(
@@ -440,6 +460,21 @@ export abstract class BaseConnector {
     );
     logger.debug(`Tool '${name}' returned`, res);
     return res as CallToolResult;
+  }
+
+  /**
+   * List all available tools from the MCP server.
+   * This method fetches fresh tools from the server, unlike the `tools` getter which returns cached tools.
+   *
+   * @param options - Optional request options
+   * @returns Array of available tools
+   */
+  async listTools(options?: RequestOptions): Promise<Tool[]> {
+    if (!this.client) {
+      throw new Error("MCP client is not connected");
+    }
+    const result = await this.client.listTools(undefined, options);
+    return (result.tools ?? []) as Tool[];
   }
 
   /**

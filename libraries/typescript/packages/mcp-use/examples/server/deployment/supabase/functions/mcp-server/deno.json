@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "mcp-use/": "npm:mcp-use@latest/",
+    "zod": "npm:zod@^4.2.0"
+  }
+}

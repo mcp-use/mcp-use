@@ -9,7 +9,8 @@ import json
 import warnings
 from typing import TYPE_CHECKING, Any
 
-from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import Root
 
 from mcp_use.client.config import create_connector_from_config, load_config_file
 from mcp_use.client.code_mode_config import CodeModeConfig
@@ -43,6 +44,8 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         middleware: list[Middleware] | None = None,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
         code_mode: bool | CodeModeConfig = False,
         verify: bool | None = True,
     ) -> None:
@@ -54,6 +57,9 @@ class MCPClient:
             sandbox: Whether to use sandboxed execution mode for running MCP servers.
             sandbox_options: Optional sandbox configuration options.
             sampling_callback: Optional sampling callback function.
+            roots: Optional list of Root objects to advertise to servers.
+                Roots represent directories or files the client has access to.
+            list_roots_callback: Optional custom callback for roots/list requests.
             code_mode: Whether to enable code execution mode for tools, or a CodeModeConfig object.
         """
         self.config: dict[str, Any] = {}
@@ -66,6 +72,8 @@ class MCPClient:
         self.elicitation_callback = elicitation_callback
         self.message_handler = message_handler
         self.logging_callback = logging_callback
+        self.roots = roots
+        self.list_roots_callback = list_roots_callback
         
         # Handle code_mode as bool or CodeModeConfig
         if isinstance(code_mode, bool):
@@ -119,10 +127,12 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
-        message_handler: MessageHandlerFnT | None = None,
-        logging_callback: LoggingFnT | None = None,
-        code_mode: bool | CodeModeConfig = False,
-        verify: bool | None = True,
+            message_handler: MessageHandlerFnT | None = None,
+            logging_callback: LoggingFnT | None = None,
+            code_mode: bool | CodeModeConfig = False,
+            verify: bool | None = True,
+            roots: list[Root] | None = None,
+            list_roots_callback: ListRootsFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -133,6 +143,8 @@ class MCPClient:
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
             code_mode: Whether to enable code execution mode for tools, or a CodeModeConfig object.
+            roots: Optional list of Root objects to advertise to servers.
+            list_roots_callback: Optional custom callback for roots/list requests.
         """
         return cls(
             config=config,
@@ -144,6 +156,8 @@ class MCPClient:
             logging_callback=logging_callback,
             code_mode=code_mode,
             verify=verify,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
 
     @classmethod
@@ -154,10 +168,12 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
-        message_handler: MessageHandlerFnT | None = None,
-        logging_callback: LoggingFnT | None = None,
-        code_mode: bool | CodeModeConfig = False,
-        verify: bool | None = True,
+            message_handler: MessageHandlerFnT | None = None,
+            logging_callback: LoggingFnT | None = None,
+            code_mode: bool | CodeModeConfig = False,
+            verify: bool | None = True,
+            roots: list[Root] | None = None,
+            list_roots_callback: ListRootsFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 
@@ -168,6 +184,8 @@ class MCPClient:
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
             code_mode: Whether to enable code execution mode for tools, or a CodeModeConfig object.
+            roots: Optional list of Root objects to advertise to servers.
+            list_roots_callback: Optional custom callback for roots/list requests.
         """
         return cls(
             config=load_config_file(filepath),
@@ -179,6 +197,8 @@ class MCPClient:
             logging_callback=logging_callback,
             code_mode=code_mode,
             verify=verify,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
 
     @telemetry("client_add_server")
@@ -302,6 +322,8 @@ class MCPClient:
             message_handler=self.message_handler,
             logging_callback=self.logging_callback,
             middleware=self.middleware,
+            roots=self.roots,
+            list_roots_callback=self.list_roots_callback,
         )
 
         # Create the session

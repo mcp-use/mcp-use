@@ -75,6 +75,7 @@
   --animate-status-pulse: status-pulse 2s infinite;
   --animate-status-pulse-red: status-pulse-red 2s infinite;
   --animate-status-pulse-yellow: status-pulse-yellow 2s infinite;
+  --animate-status-pulse-orange: status-pulse-orange 2s infinite;
   @keyframes shimmer-slide {
     to {
       transform: translate(calc(100cqw - 100%), 0);
@@ -127,6 +128,17 @@
     }
     100% {
       box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+    }
+  }
+  @keyframes status-pulse-orange {
+    0% {
+      box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
     }
   }
 }

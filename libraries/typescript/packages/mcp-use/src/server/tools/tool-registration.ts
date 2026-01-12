@@ -12,7 +12,7 @@ import type {
   ElicitResult,
   CallToolResult,
   ElicitRequest,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import { runWithContext, getRequestContext } from "../context-storage.js";
 import type {
   ToolDefinition,
@@ -114,9 +114,9 @@ export interface ToolServerContext<_HasOAuth extends boolean = false> {
  * // Using legacy inputs array
  * server.tool({
  *   name: 'greet',
- *   inputs: [{ name: 'name', type: 'string', required: true }],
- *   cb: async ({ name }) => text(`Hello, ${name}!`)
- * })
+ *   schema: z.object({ name: z.string().describe("The name to greet") }),
+ * }, async ({ name }) => text(`Hello, ${name}!`))
+ * )
  *
  * // With separate callback for better typing
  * server.tool({

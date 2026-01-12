@@ -1,8 +1,4 @@
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import type {
-  BaseLanguageModelInterface,
-  LanguageModelLike,
-} from "@langchain/core/language_models/base";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
 import {
@@ -12,7 +8,6 @@ import {
   modelCallLimitMiddleware,
   SystemMessage,
   ToolMessage,
-  type DynamicTool,
   type ReactAgent,
 } from "langchain";
 import type { ZodSchema } from "zod";
@@ -32,17 +27,22 @@ import {
   SERVER_MANAGER_SYSTEM_PROMPT_TEMPLATE,
 } from "./prompts/templates.js";
 import { RemoteAgent } from "./remote.js";
-import type { BaseMessage } from "./types.js";
+import type {
+  BaseMessage,
+  LanguageModel,
+  MCPAgentOptions,
+  MCPServerConfig,
+} from "./types.js";
+import { createLLMFromString, type LLMConfig } from "./utils/llm_provider.js";
 
-/**
- * Language model type that accepts any LangChain chat model.
- * createAgent accepts a LanguageModelLike but ChatOpenAI, ChatAnthropic, etc. are still of type BaseLanguageModelInterface.
- * Any is used to avoid TypeScript structural typing issues with protected properties until langchain fixes the issue.
- */
-export type LanguageModel =
-  | LanguageModelLike
-  | BaseLanguageModelInterface
-  | any;
+// Re-export types for convenience
+export type {
+  LanguageModel,
+  BaseMessage,
+  MCPAgentOptions,
+  MCPServerConfig,
+} from "./types.js";
+export type { LLMConfig } from "./utils/llm_provider.js";
 
 /**
  * Represents a single step in the agent's execution
@@ -54,6 +54,56 @@ export interface AgentStep {
     log: string;
   };
   observation: string;
+}
+
+/**
+ * Options for agent run, stream, and streamEvents methods
+ */
+export interface RunOptions<T = string> {
+  prompt: string;
+  maxSteps?: number;
+  manageConnector?: boolean;
+  externalHistory?: BaseMessage[];
+  schema?: ZodSchema<T>;
+}
+
+/**
+ * Helper function to normalize run options from either old-style positional arguments
+ * or new-style options object
+ */
+function normalizeRunOptions<T>(
+  queryOrOptions: string | RunOptions<T>,
+  maxSteps?: number,
+  manageConnector?: boolean,
+  externalHistory?: BaseMessage[],
+  outputSchema?: ZodSchema<T>
+): {
+  query: string;
+  maxSteps?: number;
+  manageConnector?: boolean;
+  externalHistory?: BaseMessage[];
+  outputSchema?: ZodSchema<T>;
+} {
+  // Check if first argument is an options object
+  if (typeof queryOrOptions === "object" && queryOrOptions !== null) {
+    const options = queryOrOptions as RunOptions<T>;
+    return {
+      query: options.prompt,
+      maxSteps: options.maxSteps,
+      manageConnector: options.manageConnector,
+      externalHistory: options.externalHistory,
+      outputSchema: options.schema,
+    };
+  }
+
+  // Old-style positional arguments
+  return {
+    query: queryOrOptions as string,
+    maxSteps,
+    manageConnector,
+    externalHistory,
+    outputSchema,
+  };
 }
 
 export class MCPAgent {
@@ -103,30 +153,14 @@ export class MCPAgent {
   private isRemote = false;
   private remoteAgent: RemoteAgent | null = null;
 
-  constructor(options: {
-    llm?: LanguageModel;
-    client?: MCPClient;
-    connectors?: BaseConnector[];
-    maxSteps?: number;
-    autoInitialize?: boolean;
-    memoryEnabled?: boolean;
-    systemPrompt?: string | null;
-    systemPromptTemplate?: string | null;
-    additionalInstructions?: string | null;
-    disallowedTools?: string[];
-    additionalTools?: StructuredToolInterface[];
-    toolsUsedNames?: string[];
-    useServerManager?: boolean;
-    verbose?: boolean;
-    observe?: boolean;
-    adapter?: LangChainAdapter;
-    serverManagerFactory?: (client: MCPClient) => ServerManager;
-    callbacks?: BaseCallbackHandler[];
-    // Remote agent parameters
-    agentId?: string;
-    apiKey?: string;
-    baseUrl?: string;
-  }) {
+  // Simplified mode support
+  private isSimplifiedMode = false;
+  private llmString?: string;
+  private llmConfig?: LLMConfig;
+  private mcpServersConfig?: Record<string, MCPServerConfig>;
+  private clientOwnedByAgent = false;
+
+  constructor(options: MCPAgentOptions) {
     // Handle remote execution
     if (options.agentId) {
       this.isRemote = true;
@@ -164,10 +198,52 @@ export class MCPAgent {
       );
     }
 
-    this.llm = options.llm;
+    // Detect mode: simplified (string llm) vs explicit (object llm)
+    const isSimplifiedMode = typeof options.llm === "string";
 
-    this.client = options.client;
-    this.connectors = options.connectors ?? [];
+    if (isSimplifiedMode) {
+      // Simplified mode: llm is string, mcpServers must be provided
+      this.isSimplifiedMode = true;
+      this.llmString = options.llm as string;
+      this.llmConfig = (options as any).llmConfig;
+      this.mcpServersConfig = (options as any).mcpServers;
+
+      if (
+        !this.mcpServersConfig ||
+        Object.keys(this.mcpServersConfig).length === 0
+      ) {
+        throw new Error(
+          "Simplified mode requires 'mcpServers' configuration. " +
+            "Provide an object with server configurations, e.g., { filesystem: { command: 'npx', args: [...] } }"
+        );
+      }
+
+      // LLM and client will be created during initialize()
+      this.llm = undefined;
+      this.client = undefined;
+      this.clientOwnedByAgent = true; // Mark for cleanup
+      this.connectors = [];
+
+      logger.info(
+        `🎯 Simplified mode enabled: LLM will be created from '${this.llmString}'`
+      );
+    } else {
+      // Explicit mode: llm is object, client or connectors must be provided
+      this.isSimplifiedMode = false;
+      this.llm = options.llm as LanguageModel;
+      this.client = (options as any).client;
+      this.connectors = (options as any).connectors ?? [];
+      this.clientOwnedByAgent = false;
+
+      if (!this.client && this.connectors.length === 0) {
+        throw new Error(
+          "Explicit mode requires either 'client' or at least one 'connector'. " +
+            "Alternatively, use simplified mode with 'llm' as a string and 'mcpServers' config."
+        );
+      }
+    }
+
+    // Common configuration for both modes
     this.maxSteps = options.maxSteps ?? 5;
     this.autoInitialize = options.autoInitialize ?? false;
     this.memoryEnabled = options.memoryEnabled ?? true;
@@ -181,38 +257,40 @@ export class MCPAgent {
     this.verbose = options.verbose ?? false;
     this.observe = options.observe ?? true;
 
-    if (!this.client && this.connectors.length === 0) {
-      throw new Error(
-        "Either 'client' or at least one 'connector' must be provided."
-      );
-    }
-
-    if (this.useServerManager) {
-      if (!this.client) {
-        throw new Error(
-          "'client' must be provided when 'useServerManager' is true."
-        );
+    // Set up adapter and server manager (only for explicit mode with client)
+    if (!this.isSimplifiedMode) {
+      if (this.useServerManager) {
+        if (!this.client) {
+          throw new Error(
+            "'client' must be provided when 'useServerManager' is true."
+          );
+        }
+        this.adapter =
+          options.adapter ?? new LangChainAdapter(this.disallowedTools);
+        this.serverManager =
+          options.serverManagerFactory?.(this.client) ??
+          new ServerManager(this.client, this.adapter);
+      } else {
+        this.adapter =
+          options.adapter ?? new LangChainAdapter(this.disallowedTools);
       }
-      this.adapter =
-        options.adapter ?? new LangChainAdapter(this.disallowedTools);
-      this.serverManager =
-        options.serverManagerFactory?.(this.client) ??
-        new ServerManager(this.client, this.adapter);
-    }
-    // Let consumers swap allowed tools dynamically
-    else {
-      this.adapter =
-        options.adapter ?? new LangChainAdapter(this.disallowedTools);
-    }
 
-    // Initialize telemetry
-    this.telemetry = Telemetry.getInstance();
-    // Track model info for telemetry
-    if (this.llm) {
-      const [provider, name] = extractModelInfo(this.llm as any);
-      this.modelProvider = provider;
-      this.modelName = name;
+      // Initialize telemetry for explicit mode
+      this.telemetry = Telemetry.getInstance();
+      if (this.llm) {
+        const [provider, name] = extractModelInfo(this.llm as any);
+        this.modelProvider = provider;
+        this.modelName = name;
+      } else {
+        this.modelProvider = "unknown";
+        this.modelName = "unknown";
+      }
     } else {
+      // For simplified mode, defer adapter/telemetry initialization
+      this.adapter =
+        options.adapter ?? new LangChainAdapter(this.disallowedTools);
+      this.telemetry = Telemetry.getInstance();
+      // Model info will be set during initialize()
       this.modelProvider = "unknown";
       this.modelName = "unknown";
     }
@@ -250,6 +328,52 @@ export class MCPAgent {
     }
 
     logger.info("🚀 Initializing MCP agent and connecting to services...");
+
+    // Handle simplified mode: create client and LLM from configuration
+    if (this.isSimplifiedMode) {
+      logger.info(
+        "🎯 Simplified mode: Creating client and LLM from configuration..."
+      );
+
+      // Create MCPClient from mcpServers configuration
+      if (this.mcpServersConfig) {
+        logger.info(
+          `Creating MCPClient with ${Object.keys(this.mcpServersConfig).length} server(s)...`
+        );
+        // Dynamically import MCPClient (Node.js version)
+        const { MCPClient } = await import("../client.js");
+        this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
+        logger.info("✅ MCPClient created successfully");
+      }
+
+      // Create LLM from string specification
+      if (this.llmString) {
+        logger.info(`Creating LLM from string: ${this.llmString}...`);
+        try {
+          this.llm = await createLLMFromString(this.llmString, this.llmConfig);
+          logger.info("✅ LLM created successfully");
+
+          // Update model info for telemetry
+          const [provider, name] = extractModelInfo(this.llm as any);
+          this.modelProvider = provider;
+          this.modelName = name;
+        } catch (error: any) {
+          throw new Error(
+            `Failed to create LLM from string '${this.llmString}': ${error?.message || error}`
+          );
+        }
+      }
+
+      // Set up server manager if needed
+      if (this.useServerManager) {
+        if (!this.client) {
+          throw new Error(
+            "'client' must be available when 'useServerManager' is true."
+          );
+        }
+        this.serverManager = new ServerManager(this.client, this.adapter);
+      }
+    }
 
     // Initialize observability callbacks
     this.callbacks = await this.observabilityManager.getCallbacks();
@@ -300,6 +424,7 @@ export class MCPAgent {
         if (this.client.codeMode) {
           const codeModeSession = this.sessions["code_mode"];
           if (codeModeSession) {
+            // Code mode only uses tools, not resources or prompts
             this._tools = await this.adapter.createToolsFromConnectors([
               codeModeSession.connector,
             ]);
@@ -310,9 +435,20 @@ export class MCPAgent {
             );
           }
         } else {
-          this._tools = await LangChainAdapter.createTools(this.client);
+          // Create tools, resources, and prompts from the client
+          const tools = await this.adapter.createToolsFromConnectors(
+            Object.values(this.sessions).map((session) => session.connector)
+          );
+          const resources = await this.adapter.createResourcesFromConnectors(
+            Object.values(this.sessions).map((session) => session.connector)
+          );
+          const prompts = await this.adapter.createPromptsFromConnectors(
+            Object.values(this.sessions).map((session) => session.connector)
+          );
+          this._tools = [...tools, ...resources, ...prompts];
           logger.info(
-            `🛠️ Created ${this._tools.length} LangChain tools from client`
+            `🛠️ Created ${this._tools.length} LangChain items from client: ` +
+              `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
           );
         }
         this._tools.push(...this.additionalTools);
@@ -327,13 +463,21 @@ export class MCPAgent {
           }
         }
 
-        // Create LangChain tools using the adapter with connectors
-        this._tools = await this.adapter.createToolsFromConnectors(
+        // Create LangChain tools, resources, and prompts using the adapter with connectors
+        const tools = await this.adapter.createToolsFromConnectors(
           this.connectors
         );
+        const resources = await this.adapter.createResourcesFromConnectors(
+          this.connectors
+        );
+        const prompts = await this.adapter.createPromptsFromConnectors(
+          this.connectors
+        );
+        this._tools = [...tools, ...resources, ...prompts];
         this._tools.push(...this.additionalTools);
         logger.info(
-          `🛠️ Created ${this._tools.length} LangChain tools from connectors`
+          `🛠️ Created ${this._tools.length} LangChain items from connectors: ` +
+            `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
         );
       }
 
@@ -403,7 +547,7 @@ export class MCPAgent {
 
     const agent = createAgent({
       model: this.llm,
-      tools: this._tools as DynamicTool[],
+      tools: this._tools as any,
       systemPrompt: systemContent,
       middleware,
     });
@@ -941,7 +1085,18 @@ export class MCPAgent {
   }
 
   /**
+   * Runs the agent with options object and returns a promise for the final result.
+   */
+  public async run(options: RunOptions): Promise<string>;
+
+  /**
+   * Runs the agent with options object and structured output, returns a promise for the typed result.
+   */
+  public async run<T>(options: RunOptions<T>): Promise<T>;
+
+  /**
    * Runs the agent and returns a promise for the final result.
+   * @deprecated Use options object instead: run({ prompt, maxSteps, ... })
    */
   public async run(
     query: string,
@@ -952,6 +1107,7 @@ export class MCPAgent {
 
   /**
    * Runs the agent with structured output and returns a promise for the typed result.
+   * @deprecated Use options object instead: run({ prompt, schema, maxSteps, ... })
    */
   public async run<T>(
     query: string,
@@ -962,48 +1118,88 @@ export class MCPAgent {
   ): Promise<T>;
 
   public async run<T>(
-    query: string,
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
     outputSchema?: ZodSchema<T>
   ): Promise<string | T> {
-    // Delegate to remote agent if in remote mode
-    if (this.isRemote && this.remoteAgent) {
-      return this.remoteAgent.run(
-        query,
-        maxSteps,
-        manageConnector,
-        externalHistory,
-        outputSchema
-      );
-    }
-
-    const generator = this.stream<T>(
+    // Normalize input to internal parameters
+    const {
       query,
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalizeRunOptions(
+      queryOrOptions,
       maxSteps,
       manageConnector,
       externalHistory,
       outputSchema
     );
+
+    // Delegate to remote agent if in remote mode
+    if (this.isRemote && this.remoteAgent) {
+      return this.remoteAgent.run(query, steps, manage, history, schema);
+    }
+
+    const generator = this.stream<T>(query, steps, manage, history, schema);
     return this._consumeAndReturn(generator);
   }
 
-  public async *stream<T = string>(
+  /**
+   * Streams the agent execution with options object and returns string result.
+   */
+  public stream(options: RunOptions): AsyncGenerator<AgentStep, string, void>;
+
+  /**
+   * Streams the agent execution with options object and structured output.
+   */
+  public stream<T>(options: RunOptions<T>): AsyncGenerator<AgentStep, T, void>;
+
+  /**
+   * Streams the agent execution and yields agent steps.
+   * @deprecated Use options object instead: stream({ prompt, maxSteps, ... })
+   */
+  public stream<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<AgentStep, string | T, void>;
+
+  public async *stream<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
     outputSchema?: ZodSchema<T>
   ): AsyncGenerator<AgentStep, string | T, void> {
+    // Normalize input to internal parameters
+    const {
+      query,
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalizeRunOptions(
+      queryOrOptions,
+      maxSteps,
+      manageConnector,
+      externalHistory,
+      outputSchema
+    );
+
     // Delegate to remote agent if in remote mode
     if (this.isRemote && this.remoteAgent) {
       const result = await this.remoteAgent.run(
         query,
-        maxSteps,
-        manageConnector,
-        externalHistory,
-        outputSchema
+        steps,
+        manage,
+        history,
+        schema
       );
       return result as string | T;
     }
@@ -1016,7 +1212,7 @@ export class MCPAgent {
 
     try {
       // 1. Initialize if needed
-      if (manageConnector && !this._initialized) {
+      if (manage && !this._initialized) {
         await this.initialize();
         initializedHere = true;
       } else if (!this._initialized && this.autoInitialize) {
@@ -1051,7 +1247,7 @@ export class MCPAgent {
       }
 
       // 2. Build inputs for the agent
-      const historyToUse = externalHistory ?? this.conversationHistory;
+      const historyToUse = history ?? this.conversationHistory;
 
       // Convert messages to format expected by LangChain agent
       const langchainHistory: BaseMessage[] = [];
@@ -1262,13 +1458,13 @@ export class MCPAgent {
       }
 
       // 5. Handle structured output if requested
-      if (outputSchema && finalOutput) {
+      if (schema && finalOutput) {
         try {
           logger.info("🔧 Attempting structured output...");
           const structuredResult = await this._attemptStructuredOutput<T>(
             finalOutput,
             this.llm!,
-            outputSchema
+            schema
           );
 
           if (this.memoryEnabled) {
@@ -1298,7 +1494,7 @@ export class MCPAgent {
       return (finalOutput || "No output generated") as string | T;
     } catch (e) {
       logger.error(`❌ Error running query: ${e}`);
-      if (initializedHere && manageConnector) {
+      if (initializedHere && manage) {
         logger.info("🧹 Cleaning up resources after error");
         await this.close();
       }
@@ -1336,9 +1532,9 @@ export class MCPAgent {
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
-        maxStepsUsed: maxSteps ?? null,
-        manageConnector,
-        externalHistoryUsed: externalHistory !== undefined,
+        maxStepsUsed: steps ?? null,
+        manageConnector: manage ?? true,
+        externalHistoryUsed: history !== undefined,
         stepsTaken,
         toolsUsedCount: this.toolsUsedNames.length,
         toolsUsedNames: this.toolsUsedNames,
@@ -1349,7 +1545,7 @@ export class MCPAgent {
       });
 
       // Clean up if necessary
-      if (manageConnector && !this.client && initializedHere) {
+      if (manage && !this.client && initializedHere) {
         logger.info("🧹 Closing agent after stream completion");
         await this.close();
       }
@@ -1384,16 +1580,36 @@ export class MCPAgent {
     try {
       this._agentExecutor = null;
       this._tools = [];
+
+      // Clean up client (always close if we own it, or if it exists in explicit mode)
       if (this.client) {
-        logger.info("🔄 Closing client and cleaning up resources");
-        await this.client.close();
-        this.sessions = {};
+        // In simplified mode, we always own the client and should close it
+        // In explicit mode, we only close if explicitly requested (current behavior)
+        if (this.clientOwnedByAgent) {
+          logger.info(
+            "🔄 Closing internally-created client (simplified mode) and cleaning up resources"
+          );
+          await this.client.close();
+          this.sessions = {};
+          this.client = undefined;
+        } else {
+          logger.info("🔄 Closing client and cleaning up resources");
+          await this.client.close();
+          this.sessions = {};
+        }
       } else {
         for (const connector of this.connectors) {
           logger.info("🔄 Disconnecting connector");
           await connector.disconnect();
         }
       }
+
+      // Clean up LLM reference (important for simplified mode)
+      if (this.isSimplifiedMode && this.llm) {
+        logger.debug("🔄 Clearing LLM reference (simplified mode)");
+        this.llm = undefined;
+      }
+
       if ("connectorToolMap" in this.adapter) {
         this.adapter = new LangChainAdapter();
       }
@@ -1404,11 +1620,34 @@ export class MCPAgent {
   }
 
   /**
+   * Yields with pretty-printed output for code mode with options object.
+   */
+  public prettyStreamEvents(
+    options: RunOptions
+  ): AsyncGenerator<void, string, void>;
+
+  /**
+   * Yields with pretty-printed output for code mode with options object and structured output.
+   */
+  public prettyStreamEvents<T>(
+    options: RunOptions<T>
+  ): AsyncGenerator<void, string, void>;
+
+  /**
    * Yields with pretty-printed output for code mode.
    * This method formats and displays tool executions in a user-friendly way with syntax highlighting.
+   * @deprecated Use options object instead: prettyStreamEvents({ prompt, maxSteps, ... })
    */
-  public async *prettyStreamEvents<T = string>(
+  public prettyStreamEvents<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<void, string, void>;
+
+  public async *prettyStreamEvents<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
@@ -1420,7 +1659,7 @@ export class MCPAgent {
 
     for await (const _ of prettyStream(
       this.streamEvents(
-        query,
+        queryOrOptions as any,
         maxSteps,
         manageConnector,
         externalHistory,
@@ -1434,16 +1673,55 @@ export class MCPAgent {
   }
 
   /**
+   * Yields LangChain StreamEvent objects with options object.
+   */
+  public streamEvents(
+    options: RunOptions
+  ): AsyncGenerator<StreamEvent, void, void>;
+
+  /**
+   * Yields LangChain StreamEvent objects with options object and structured output.
+   */
+  public streamEvents<T>(
+    options: RunOptions<T>
+  ): AsyncGenerator<StreamEvent, void, void>;
+
+  /**
    * Yields LangChain StreamEvent objects from the underlying streamEvents() method.
    * This provides token-level streaming and fine-grained event updates.
+   * @deprecated Use options object instead: streamEvents({ prompt, maxSteps, ... })
    */
-  public async *streamEvents<T = string>(
+  public streamEvents<T = string>(
     query: string,
+    maxSteps?: number,
+    manageConnector?: boolean,
+    externalHistory?: BaseMessage[],
+    outputSchema?: ZodSchema<T>
+  ): AsyncGenerator<StreamEvent, void, void>;
+
+  public async *streamEvents<T = string>(
+    queryOrOptions: string | RunOptions<T>,
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
     outputSchema?: ZodSchema<T>
   ): AsyncGenerator<StreamEvent, void, void> {
+    // Normalize input to internal parameters
+    const normalized = normalizeRunOptions(
+      queryOrOptions,
+      maxSteps,
+      manageConnector,
+      externalHistory,
+      outputSchema
+    );
+    let { query } = normalized;
+    const {
+      maxSteps: steps,
+      manageConnector: manage,
+      externalHistory: history,
+      outputSchema: schema,
+    } = normalized;
+
     let initializedHere = false;
     const startTime = Date.now();
     let success = false;
@@ -1452,13 +1730,13 @@ export class MCPAgent {
     let finalResponse = "";
 
     // Enhance query with schema information if structured output is requested
-    if (outputSchema) {
-      query = this._enhanceQueryWithSchema(query, outputSchema);
+    if (schema) {
+      query = this._enhanceQueryWithSchema(query, schema);
     }
 
     try {
       // Initialize if needed
-      if (manageConnector && !this._initialized) {
+      if (manage && !this._initialized) {
         await this.initialize();
         initializedHere = true;
       } else if (!this._initialized && this.autoInitialize) {
@@ -1472,7 +1750,7 @@ export class MCPAgent {
       }
 
       // Set max iterations
-      this.maxSteps = maxSteps ?? this.maxSteps;
+      this.maxSteps = steps ?? this.maxSteps;
 
       const display_query =
         typeof query === "string" && query.length > 50
@@ -1489,7 +1767,7 @@ export class MCPAgent {
       }
 
       // Prepare history
-      const historyToUse = externalHistory ?? this.conversationHistory;
+      const historyToUse = history ?? this.conversationHistory;
       const langchainHistory: BaseMessage[] = [];
       for (const msg of historyToUse) {
         if (
@@ -1590,7 +1868,7 @@ export class MCPAgent {
       }
 
       // Convert to structured output if requested
-      if (outputSchema && finalResponse) {
+      if (schema && finalResponse) {
         logger.info("🔧 Attempting structured output conversion...");
 
         try {
@@ -1599,11 +1877,7 @@ export class MCPAgent {
           let conversionResult: T | null = null;
           let conversionError: Error | null = null;
 
-          this._attemptStructuredOutput<T>(
-            finalResponse,
-            this.llm!,
-            outputSchema
-          )
+          this._attemptStructuredOutput<T>(finalResponse, this.llm!, schema)
             .then((result) => {
               conversionCompleted = true;
               conversionResult = result;
@@ -1674,7 +1948,7 @@ export class MCPAgent {
       success = true;
     } catch (e) {
       logger.error(`❌ Error during streamEvents: ${e}`);
-      if (initializedHere && manageConnector) {
+      if (initializedHere && manage) {
         logger.info(
           "🧹 Cleaning up resources after initialization error in streamEvents"
         );
@@ -1711,9 +1985,9 @@ export class MCPAgent {
         maxStepsConfigured: this.maxSteps,
         memoryEnabled: this.memoryEnabled,
         useServerManager: this.useServerManager,
-        maxStepsUsed: maxSteps ?? null,
-        manageConnector,
-        externalHistoryUsed: externalHistory !== undefined,
+        maxStepsUsed: steps ?? null,
+        manageConnector: manage ?? true,
+        externalHistoryUsed: history !== undefined,
         response: `[STREAMED RESPONSE - ${totalResponseLength} chars]`,
         executionTimeMs,
         errorType: success ? null : "streaming_error",
@@ -1721,7 +1995,7 @@ export class MCPAgent {
       });
 
       // Clean up if needed
-      if (manageConnector && !this.client && initializedHere) {
+      if (manage && !this.client && initializedHere) {
         logger.info("🧹 Closing agent after streamEvents completion");
         await this.close();
       }

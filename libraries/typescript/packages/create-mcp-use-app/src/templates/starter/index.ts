@@ -1,10 +1,13 @@
-import { createMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
+import { z } from "zod";
 
 // Create MCP server instance
-const server = createMCPServer("my-mcp-server", {
+const server = new MCPServer({
+  name: "my-mcp-server",
   version: "1.0.0",
   description: "My first MCP server with all features",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
+  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
 });
 
 /**
@@ -32,10 +35,11 @@ server.tool(
   {
     name: "fetch-weather",
     description: "Fetch the weather for a city",
-    inputs: [{ name: "city", type: "string", required: true }],
+    schema: z.object({
+      city: z.string().describe("The city to fetch the weather for"),
+    }),
   },
-  async (params: Record<string, any>) => {
-    const city = params.city as string;
+  async ({ city }) => {
     const response = await fetch(`https://wttr.in/${city}?format=j1`);
     const data: any = await response.json();
     const current = data.current_condition[0];

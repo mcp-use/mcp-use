@@ -1,0 +1,465 @@
+---
+title: "Server Manager"
+description: "Manage and connect to multiple MCP servers simultaneously"
+icon: "server"
+---
+
+The Server Manager enables your applications to connect to multiple MCP servers simultaneously, combining capabilities from different sources to build powerful, integrated workflows.
+
+## Why Use Multiple Servers?
+
+Combining multiple MCP servers allows you to:
+
+- **Compose capabilities**: Combine tools from different domains (file operations + database + web)
+- **Specialize**: Use dedicated servers for specific tasks
+- **Scale**: Distribute workload across multiple servers
+- **Integrate**: Connect to both local and remote services
+
+<Tip>
+**Common Patterns**: Web scraping with Playwright + File operations with filesystem server, Database queries with SQLite + API calls with HTTP server, Code execution + Git operations + Documentation generation.
+</Tip>
+
+## Basic Multi-Server Configuration
+
+Create a configuration file that defines multiple servers:
+
+```json multi_server_config.json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {
+        "DISPLAY": ":1",
+        "PLAYWRIGHT_HEADLESS": "true"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/safe/workspace/directory"],
+      "env": {
+        "FILESYSTEM_READONLY": "false"
+      }
+    },
+    "sqlite": {
+      "command": "mcp-server-sqlite",
+      "args": ["--db", "/path/to/database.db"],
+      "env": {
+        "SQLITE_READONLY": "false"
+      }
+    },
+    "github": {
+      "command": "mcp-server-github",
+      "args": ["--token", "${GITHUB_TOKEN}"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+## Using Multiple Servers
+
+### Basic Approach (Manual Server Selection)
+
+<CodeGroup>
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    // Load multi-server configuration
+    const config = await loadConfigFile('multi_server_config.json')
+    const client = new MCPClient(config)
+
+    // Create agent (all servers will be connected)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+    const agent = new MCPAgent({ llm, client })
+
+    // Agent has access to tools from all servers
+    const result = await agent.run(
+        'Search for Python tutorials online, save the best ones to a file, ' +
+        'then create a database table to track my learning progress'
+    )
+    console.log(result)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    // Load multi-server configuration
+    const config = await loadConfigFile('multi_server_config.json')
+    const client = new MCPClient(config)
+
+    // Create agent (all servers will be connected)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+    const agent = new MCPAgent({ llm, client })
+
+    // Agent has access to tools from all servers
+    const result = await agent.run(
+        'Search for Python tutorials online, save the best ones to a file, ' +
+        'then create a database table to track my learning progress'
+    )
+    console.log(result)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
+
+### Advanced Approach (Server Manager)
+
+Enable the server manager for more efficient resource usage:
+
+<CodeGroup>
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    const config = await loadConfigFile('multi_server_config.json')
+    const client = new MCPClient(config)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+
+    // Enable server manager for dynamic server selection
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useServerManager: true,  // Only connects to servers as needed
+        maxSteps: 30
+    })
+
+    // The agent will automatically choose appropriate servers
+    const result = await agent.run(
+        'Research the latest AI papers, summarize them in a markdown file, ' +
+        'and commit the file to my research repository on GitHub'
+    )
+    console.log(result)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+
+async function main() {
+    const config = await loadConfigFile('multi_server_config.json')
+    const client = new MCPClient(config)
+    const llm = new ChatOpenAI({ model: 'gpt-4' })
+
+    // Enable server manager for dynamic server selection
+    const agent = new MCPAgent({
+        llm,
+        client,
+        useServerManager: true,  // Only connects to servers as needed
+        maxSteps: 30
+    })
+
+    // The agent will automatically choose appropriate servers
+    const result = await agent.run(
+        'Research the latest AI papers, summarize them in a markdown file, ' +
+        'and commit the file to my research repository on GitHub'
+    )
+    console.log(result)
+
+    await client.closeAllSessions()
+}
+
+main().catch(console.error)
+```
+</CodeGroup>
+
+
+## Managing Server Dependencies
+
+### Environment Variables
+
+Use environment variables for sensitive information:
+
+```bash .env
+GITHUB_TOKEN=ghp_...
+DATABASE_URL=postgresql://user:pass@localhost/db
+API_KEY=sk-...
+WORKSPACE_PATH=/safe/workspace
+```
+
+Reference them in your configuration:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github",
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["${WORKSPACE_PATH}"]
+    }
+  }
+}
+```
+
+### Conditional Server Loading
+
+You can conditionally include servers based on availability:
+
+<CodeGroup>
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPClient, MCPAgent } from 'mcp-use'
+
+async function createAgentWithAvailableServers() {
+    const config: any = { mcpServers: {} }
+
+    // Always include filesystem
+    config.mcpServers.filesystem = {
+        command: 'mcp-server-filesystem',
+        args: ['/workspace']
+    }
+
+    // Include GitHub server if token is available
+    if (process.env.GITHUB_TOKEN) {
+        config.mcpServers.github = {
+            command: 'mcp-server-github',
+            env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN }
+        }
+    }
+
+    // Include database server if URL is available
+    if (process.env.DATABASE_URL) {
+        config.mcpServers.postgres = {
+            command: 'mcp-server-postgres',
+            env: { DATABASE_URL: process.env.DATABASE_URL }
+        }
+    }
+
+    const client = new MCPClient(config)
+    return new MCPAgent({
+        llm: new ChatOpenAI({ model: 'gpt-4' }),
+        client
+    })
+}
+```
+
+```typescript TypeScript
+import { ChatOpenAI } from '@langchain/openai'
+import { MCPClient, MCPAgent } from 'mcp-use'
+
+async function createAgentWithAvailableServers() {
+    const config: any = { mcpServers: {} }
+
+    // Always include filesystem
+    config.mcpServers.filesystem = {
+        command: 'mcp-server-filesystem',
+        args: ['/workspace']
+    }
+
+    // Include GitHub server if token is available
+    if (process.env.GITHUB_TOKEN) {
+        config.mcpServers.github = {
+            command: 'mcp-server-github',
+            env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN }
+        }
+    }
+
+    // Include database server if URL is available
+    if (process.env.DATABASE_URL) {
+        config.mcpServers.postgres = {
+            command: 'mcp-server-postgres',
+            env: { DATABASE_URL: process.env.DATABASE_URL }
+        }
+    }
+
+    const client = new MCPClient(config)
+    return new MCPAgent({
+        llm: new ChatOpenAI({ model: 'gpt-4' }),
+        client
+    })
+}
+```
+</CodeGroup>
+
+## Performance Optimization
+
+### Server Manager Benefits
+
+The server manager provides several performance benefits:
+
+<Tabs>
+  <Tab title="Lazy Loading">
+    <CodeGroup>
+```typescript TypeScript
+    // Without server manager - all servers start immediately
+    const agent = new MCPAgent({ llm, client, useServerManager: false })
+    // Result: All 5 servers start, consuming resources
+
+    // With server manager - servers start only when needed
+    const agentOptimized = new MCPAgent({ llm, client, useServerManager: true })
+    // Result: Only the required servers start for each task
+    ```
+
+```typescript TypeScript
+    // Without server manager - all servers start immediately
+    const agent = new MCPAgent({ llm, client, useServerManager: false })
+    // Result: All 5 servers start, consuming resources
+
+    // With server manager - servers start only when needed
+    const agentOptimized = new MCPAgent({ llm, client, useServerManager: true })
+    // Result: Only the required servers start for each task
+    ```
+</CodeGroup>
+  </Tab>
+</Tabs>
+
+### Tool Filtering
+
+Control which tools are available by disallowing specific tools:
+
+<CodeGroup>
+```typescript TypeScript
+// Restrict specific tools
+const agent = new MCPAgent({
+    llm,
+    client,
+    disallowedTools: ['system_exec', 'network_request']
+})
+```
+
+```typescript TypeScript
+// Restrict specific tools
+const agent = new MCPAgent({
+    llm,
+    client,
+    disallowedTools: ['system_exec', 'network_request']
+})
+```
+</CodeGroup>
+
+## Troubleshooting Multi-Server Setups
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Server startup failures">
+    Check server logs and ensure all dependencies are installed:
+
+    <CodeGroup>
+```typescript TypeScript
+    import { logger } from 'mcp-use'
+
+    // Enable detailed logging
+    logger.level = 'debug'
+    const config = await loadConfigFile('config.json')
+    const client = new MCPClient(config)
+    ```
+
+```typescript TypeScript
+    import { logger } from 'mcp-use'
+
+    // Enable detailed logging
+    logger.level = 'debug'
+    const config = await loadConfigFile('config.json')
+    const client = new MCPClient(config)
+    ```
+</CodeGroup>
+  </Accordion>
+
+</AccordionGroup>
+
+### Debug Configuration
+
+Enable comprehensive debugging:
+
+<CodeGroup>
+```typescript TypeScript
+import { logger, MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+// Enable debug logging
+logger.level = 'debug'
+
+// Create client with debug mode
+const config = await loadConfigFile('multi_server_config.json')
+const client = new MCPClient(config)
+
+const llm = new ChatOpenAI({ model: 'gpt-4' })
+
+// Create agent with verbose output
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true,
+    verbose: true
+})
+```
+
+```typescript TypeScript
+import { logger, MCPAgent, MCPClient, loadConfigFile } from 'mcp-use'
+import { ChatOpenAI } from '@langchain/openai'
+
+// Enable debug logging
+logger.level = 'debug'
+
+// Create client with debug mode
+const config = await loadConfigFile('multi_server_config.json')
+const client = new MCPClient(config)
+
+const llm = new ChatOpenAI({ model: 'gpt-4' })
+
+// Create agent with verbose output
+const agent = new MCPAgent({
+    llm,
+    client,
+    useServerManager: true,
+    verbose: true
+})
+```
+</CodeGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start Simple" icon="seedling">
+    Begin with 2-3 servers and add more as needed. Too many servers can overwhelm the LLM.
+  </Card>
+  <Card title="Use Server Manager" icon="gear">
+    Enable `useServerManager: true` for better performance and resource management.
+  </Card>
+  <Card title="Environment Variables" icon="lock">
+    Store sensitive configuration like API keys in environment variables, not config files.
+  </Card>
+  <Card title="Error Handling" icon="shield">
+    Implement graceful degradation when servers are unavailable or fail.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Server Manager" icon="server" href="/typescript/agent/server-manager">
+    Learn more about dynamic server selection and management
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/typescript/development/security">
+    Best practices for secure multi-server configurations
+  </Card>
+  <Card title="Agent Configuration" icon="zap" href="/typescript/agent/agent-configuration">
+    Optimize your multi-server setup for better performance
+  </Card>
+</CardGroup>

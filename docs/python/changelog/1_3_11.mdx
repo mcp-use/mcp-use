@@ -2,10 +2,12 @@
 title: "Version 1.3.11"
 description: "Enhanced error handling, authorization features, and critical bug fixes"
 icon: "key"
-og:image: "/images/Release1.3.11.png"
+og:image: "https://mcp-use.com/api/og/release?v=1.3.11"
 ---
 
-<Card img="/images/Release1.3.11.png" title="Release 1.3.11" href="https://github.com/mcp-use/mcp-use/releases/tag/1.3.11">
+import { Contributors } from '/snippets/contributors.jsx'
+
+<Card img="https://mcp-use.com/api/og/release?v=1.3.11" title="Release 1.3.11" href="https://github.com/mcp-use/mcp-use/releases/tag/1.3.11">
   This release brings significant improvements to MCP-Use with enhanced error handling, new authorization capabilities, and several critical bug fixes. The most notable additions include a comprehensive authorization system and improved reliability across HTTP connectors and subprocess management.
 </Card>
 
@@ -73,3 +75,9 @@ Fixed a critical resource leak in subprocess management when running multiple MC
 **[PRs #261](https://github.com/pietrozullo/mcp-use/pull/261), [#253](https://github.com/pietrozullo/mcp-use/pull/253), [#248](https://github.com/pietrozullo/mcp-use/pull/248) by @github-actions[bot]**
 
 Regular automated updates to dependent package information, ensuring the project stays current with its ecosystem and maintains compatibility with the latest versions of dependencies.
+
+## Contributors
+
+Thank you to all contributors who made this release possible:
+
+<Contributors users="pietrozullo,renvins,Amrithesh-Kakkoth,hetsaraiya,lorenss-m" />

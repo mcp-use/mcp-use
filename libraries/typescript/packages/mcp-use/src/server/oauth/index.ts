@@ -10,16 +10,16 @@ export type { OAuthProvider, UserInfo } from "./providers/types.js";
 
 // Export provider factory functions
 export {
-  oauthSupabaseProvider,
   oauthAuth0Provider,
-  oauthKeycloakProvider,
-  oauthWorkOSProvider,
   oauthCustomProvider,
-  type SupabaseProviderConfig,
+  oauthKeycloakProvider,
+  oauthSupabaseProvider,
+  oauthWorkOSProvider,
   type Auth0ProviderConfig,
-  type KeycloakProviderConfig,
-  type WorkOSProviderConfig,
   type CustomProviderConfig,
+  type KeycloakProviderConfig,
+  type SupabaseProviderConfig,
+  type WorkOSProviderConfig,
 } from "./providers.js";
 
 // Export utilities
@@ -27,10 +27,10 @@ export { createBearerAuthMiddleware } from "./middleware.js";
 export { setupOAuthRoutes } from "./routes.js";
 export {
   getAuth,
-  hasScope,
   hasAnyScope,
-  requireScope,
+  hasScope,
   requireAnyScope,
+  requireScope,
 } from "./utils.js";
 export type { AuthInfo } from "./utils.js";
 
