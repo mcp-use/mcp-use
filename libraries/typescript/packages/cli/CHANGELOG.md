@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.9.0-canary.3
+
+### Patch Changes
+
+- e962a16: fix: remove import from "mcp-use" which causes langchain import in server
+- Updated dependencies [e962a16]
+  - @mcp-use/inspector@0.14.5-canary.3
+  - mcp-use@1.13.0-canary.3
+
 ## 2.9.0-canary.2
 
 ### Patch Changes

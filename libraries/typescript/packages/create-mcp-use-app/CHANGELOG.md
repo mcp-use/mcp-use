@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.10.2-canary.2
+
+### Patch Changes
+
+- e962a16: fix: remove import from "mcp-use" which causes langchain import in server
+
 ## 0.10.2-canary.1
 
 ### Patch Changes
