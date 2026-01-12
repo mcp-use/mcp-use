@@ -35,16 +35,18 @@ export function isLocalServer(domain: string): boolean {
 
 /**
  * Generate all subdomain levels from most specific to least specific.
- * For example: "mcp.supabase.com" → ["mcp.supabase.com", "supabase.com", "com"]
+ * For example: "mcp.supabase.com" → ["mcp.supabase.com", "supabase.com"]
+ * Note: Excludes TLDs (single-part domains like "com", "run", etc.)
  *
  * @param hostname - Full hostname to generate subdomain levels from
- * @returns Array of domain levels from most specific to least specific
+ * @returns Array of domain levels from most specific to least specific (minimum 2 parts)
  */
 function getSubdomainLevels(hostname: string): string[] {
   const parts = hostname.split(".");
   const levels: string[] = [];
 
-  for (let i = 0; i < parts.length; i++) {
+  // Only include domains with at least 2 parts (e.g., "example.com" yes, "com" no)
+  for (let i = 0; i < parts.length - 1; i++) {
     levels.push(parts.slice(i).join("."));
   }
 
