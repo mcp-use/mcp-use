@@ -17,6 +17,29 @@ describe("HMR CLI Integration", () => {
     testDir = path.join(tmpdir(), `mcp-hmr-test-${Date.now()}`);
     await mkdir(testDir, { recursive: true });
     port = 3000 + Math.floor(Math.random() * 1000);
+
+    // Create package.json to enable module resolution
+    const packageJson = {
+      type: "module",
+    };
+    await writeFile(
+      path.join(testDir, "package.json"),
+      JSON.stringify(packageJson, null, 2)
+    );
+
+    // Create node_modules/mcp-use symlink to actual built package
+    const mcpUsePackagePath = path.resolve(__dirname, "../..");
+    const testNodeModules = path.join(testDir, "node_modules");
+    await mkdir(testNodeModules, { recursive: true });
+    const mcpUseSymlink = path.join(testNodeModules, "mcp-use");
+
+    try {
+      await import("node:fs/promises").then((fs) =>
+        fs.symlink(mcpUsePackagePath, mcpUseSymlink, "dir")
+      );
+    } catch (error) {
+      // Ignore if symlink already exists or fails
+    }
   });
 
   afterEach(async () => {
@@ -46,10 +69,7 @@ describe("HMR CLI Integration", () => {
 
   const startDevServer = (filePath: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      const cliPath = path.resolve(
-        __dirname,
-        "../../packages/cli/dist/index.js"
-      );
+      const cliPath = path.resolve(__dirname, "../../../cli/dist/index.cjs");
 
       serverProcess = spawn(
         "node",
@@ -268,20 +288,34 @@ describe("HMR CLI Integration", () => {
           name: "test-tool",
           description: "Test tool",
         },
-        async () => object({ value: "test" }) // Missing closing brace
+        async () => object({ value: "test" })
       );
+      
+      // Syntax error: unclosed brace
+      const broken = {
+        field: "value"
     `;
 
     let errorOutput = "";
     const errorPromise = new Promise<string>((resolve) => {
-      const dataHandler = (data: Buffer) => {
+      const stdoutHandler = (data: Buffer) => {
         errorOutput += data.toString();
         if (errorOutput.includes("[HMR] Reload failed")) {
-          serverProcess?.stdout?.off("data", dataHandler);
+          serverProcess?.stdout?.off("data", stdoutHandler);
+          serverProcess?.stderr?.off("data", stderrHandler);
           resolve(errorOutput);
         }
       };
-      serverProcess?.stdout?.on("data", dataHandler);
+      const stderrHandler = (data: Buffer) => {
+        errorOutput += data.toString();
+        if (errorOutput.includes("[HMR] Reload failed")) {
+          serverProcess?.stdout?.off("data", stdoutHandler);
+          serverProcess?.stderr?.off("data", stderrHandler);
+          resolve(errorOutput);
+        }
+      };
+      serverProcess?.stdout?.on("data", stdoutHandler);
+      serverProcess?.stderr?.on("data", stderrHandler);
 
       // Timeout after 5 seconds
       setTimeout(() => resolve(errorOutput), 5000);
