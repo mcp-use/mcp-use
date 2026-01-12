@@ -220,17 +220,60 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       }
 
       // Get request body for POST/PUT/PATCH methods
+      // IMPORTANT: Create a stable copy of the body bytes using .slice() to prevent
+      // ArrayBuffer detachment issues. Node.js undici can detach the underlying
+      // ArrayBuffer during fetch operations, especially with redirects.
       const body =
         method !== "GET" && method !== "HEAD"
-          ? await c.req.arrayBuffer()
+          ? new Uint8Array(await c.req.arrayBuffer()).slice()
           : undefined;
 
       // Forward request to target server
+      // Use redirect: 'manual' to handle redirects ourselves, avoiding undici's
+      // internal body re-use which can trigger detachment errors.
       const response = await fetch(targetUrl, {
         method,
         headers,
-        body: body ? new Uint8Array(body) : undefined,
+        body,
+        redirect: "manual",
       });
+
+      // Handle redirects manually to avoid ArrayBuffer detachment issues in Node.js
+      // When undici follows redirects automatically, it tries to re-use the request body,
+      // but by that point the ArrayBuffer may be detached, causing "Cannot perform
+      // ArrayBuffer.prototype.slice on a detached ArrayBuffer" errors.
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (location) {
+          // For redirects, make a new fetch to the redirect location
+          // We can reuse `body` since we created a stable copy with .slice()
+          const redirectResponse = await fetch(location, {
+            method,
+            headers,
+            body,
+            redirect: "manual",
+          });
+
+          // Return the redirect response (or follow one more level if needed)
+          const redirectHeaders: Record<string, string> = {};
+          redirectResponse.headers.forEach((value, key) => {
+            const lowerKey = key.toLowerCase();
+            if (
+              lowerKey !== "content-encoding" &&
+              lowerKey !== "transfer-encoding" &&
+              lowerKey !== "content-length"
+            ) {
+              redirectHeaders[key] = value;
+            }
+          });
+
+          return new Response(redirectResponse.body, {
+            status: redirectResponse.status,
+            statusText: redirectResponse.statusText,
+            headers: redirectHeaders,
+          });
+        }
+      }
 
       // Forward response headers, excluding problematic encoding headers
       // Node.js fetch() auto-decompresses the body but preserves these headers,

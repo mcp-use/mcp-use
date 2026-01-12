@@ -286,36 +286,56 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
 
         // Directly inject into all active sessions' native servers
-        for (const [_sessionId, session] of this.sessions) {
+        for (const [sessionId, session] of this.sessions) {
           if (session.server) {
-            const nativeServer = session.server as any;
-            // Create the tool entry directly (bypasses "can't register after connect" check)
-            const toolEntry = {
-              title: newReg.config.title,
-              description: newReg.config.description ?? "",
-              inputSchema,
-              outputSchema: undefined,
-              annotations: newReg.config.annotations,
-              execution: (newReg.config as any).execution || {
-                taskSupport: "forbidden",
-              },
-              _meta: newReg.config._meta,
-              handler: newReg.handler,
-              enabled: true,
-              disable: () => {
-                toolEntry.enabled = false;
-              },
-              enable: () => {
-                toolEntry.enabled = true;
-              },
-              remove: () => {
-                delete nativeServer._registeredTools[name];
-              },
-              update: (updates: any) => {
-                Object.assign(toolEntry, updates);
-              },
-            };
-            nativeServer._registeredTools[name] = toolEntry;
+            try {
+              // Access internal SDK structure - casting to any since _registeredTools is private
+              const nativeServer = session.server as any;
+
+              if (
+                !nativeServer._registeredTools ||
+                typeof nativeServer._registeredTools !== "object"
+              ) {
+                throw new Error(
+                  `Session ${sessionId}: Native server missing _registeredTools object`
+                );
+              }
+
+              // Create entry matching SDK's RegisteredTool structure (bypasses post-connect registration check)
+              const toolEntry = {
+                title: newReg.config.title,
+                description: newReg.config.description ?? "",
+                inputSchema,
+                outputSchema: undefined,
+                annotations: newReg.config.annotations,
+                execution: { taskSupport: "forbidden" },
+                _meta: newReg.config._meta,
+                handler: newReg.handler,
+                enabled: true,
+                disable: function (this: RegisteredTool) {
+                  this.enabled = false;
+                },
+                enable: function (this: RegisteredTool) {
+                  this.enabled = true;
+                },
+                remove: () => {
+                  delete nativeServer._registeredTools[name];
+                },
+                update: function (
+                  this: RegisteredTool,
+                  updates: Record<string, unknown>
+                ) {
+                  Object.assign(this, updates);
+                },
+              } as RegisteredTool;
+
+              nativeServer._registeredTools[name] = toolEntry;
+            } catch (error) {
+              console.error(
+                `[HMR] Failed to inject tool "${name}" into session ${sessionId}:`,
+                error instanceof Error ? error.message : String(error)
+              );
+            }
           }
         }
         changes.tools.added.push(name);
@@ -384,29 +404,52 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
 
         // Directly inject into all active sessions' native servers
-        for (const [_sessionId, session] of this.sessions) {
+        for (const [sessionId, session] of this.sessions) {
           if (session.server) {
-            const nativeServer = session.server as any;
-            const promptEntry = {
-              title: newReg.config.title,
-              description: newReg.config.description ?? "",
-              argsSchema,
-              handler: newReg.handler,
-              enabled: true,
-              disable: () => {
-                promptEntry.enabled = false;
-              },
-              enable: () => {
-                promptEntry.enabled = true;
-              },
-              remove: () => {
-                delete nativeServer._registeredPrompts[name];
-              },
-              update: (updates: any) => {
-                Object.assign(promptEntry, updates);
-              },
-            };
-            nativeServer._registeredPrompts[name] = promptEntry;
+            try {
+              // Access internal SDK structure - casting to any since _registeredPrompts is private
+              const nativeServer = session.server as any;
+
+              if (
+                !nativeServer._registeredPrompts ||
+                typeof nativeServer._registeredPrompts !== "object"
+              ) {
+                throw new Error(
+                  `Session ${sessionId}: Native server missing _registeredPrompts object`
+                );
+              }
+
+              // Create entry matching SDK's RegisteredPrompt structure (bypasses post-connect registration check)
+              const promptEntry = {
+                title: newReg.config.title,
+                description: newReg.config.description ?? "",
+                argsSchema,
+                callback: newReg.handler, // SDK uses 'callback' not 'handler'
+                enabled: true,
+                disable: function (this: RegisteredPrompt) {
+                  this.enabled = false;
+                },
+                enable: function (this: RegisteredPrompt) {
+                  this.enabled = true;
+                },
+                remove: () => {
+                  delete nativeServer._registeredPrompts[name];
+                },
+                update: function (
+                  this: RegisteredPrompt,
+                  updates: Record<string, unknown>
+                ) {
+                  Object.assign(this, updates);
+                },
+              } as RegisteredPrompt;
+
+              nativeServer._registeredPrompts[name] = promptEntry;
+            } catch (error) {
+              console.error(
+                `[HMR] Failed to inject prompt "${name}" into session ${sessionId}:`,
+                error instanceof Error ? error.message : String(error)
+              );
+            }
           }
         }
         changes.prompts.added.push(name);
@@ -455,31 +498,55 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.registrations.resources.set(key, newReg);
 
         // Directly inject into all active sessions' native servers
-        for (const [_sessionId, session] of this.sessions) {
+        for (const [sessionId, session] of this.sessions) {
           if (session.server) {
-            const nativeServer = session.server as any;
-            const resourceEntry = {
-              name: newReg.config.name,
-              uri: newReg.config.uri,
-              title: newReg.config.title,
-              description: newReg.config.description,
-              mimeType: newReg.config.mimeType || "text/plain",
-              handler: newReg.handler,
-              enabled: true,
-              disable: () => {
-                resourceEntry.enabled = false;
-              },
-              enable: () => {
-                resourceEntry.enabled = true;
-              },
-              remove: () => {
-                delete nativeServer._registeredResources[key];
-              },
-              update: (updates: any) => {
-                Object.assign(resourceEntry, updates);
-              },
-            };
-            nativeServer._registeredResources[key] = resourceEntry;
+            try {
+              // Access internal SDK structure - casting to any since _registeredResources is private
+              const nativeServer = session.server as any;
+
+              if (
+                !nativeServer._registeredResources ||
+                typeof nativeServer._registeredResources !== "object"
+              ) {
+                throw new Error(
+                  `Session ${sessionId}: Native server missing _registeredResources object`
+                );
+              }
+
+              // Create entry matching SDK's RegisteredResource structure (bypasses post-connect registration check)
+              // Note: mcp-use's ReadResourceCallback signature differs from SDK's, so we cast through unknown
+              const resourceEntry = {
+                name: newReg.config.name,
+                uri: newReg.config.uri,
+                title: newReg.config.title,
+                description: newReg.config.description,
+                mimeType: newReg.config.mimeType || "text/plain",
+                readCallback: newReg.handler as unknown, // SDK uses different callback signature
+                enabled: true,
+                disable: function (this: RegisteredResource) {
+                  this.enabled = false;
+                },
+                enable: function (this: RegisteredResource) {
+                  this.enabled = true;
+                },
+                remove: () => {
+                  delete nativeServer._registeredResources[key];
+                },
+                update: function (
+                  this: RegisteredResource,
+                  updates: Record<string, unknown>
+                ) {
+                  Object.assign(this, updates);
+                },
+              } as unknown as RegisteredResource;
+
+              nativeServer._registeredResources[key] = resourceEntry;
+            } catch (error) {
+              console.error(
+                `[HMR] Failed to inject resource "${key}" into session ${sessionId}:`,
+                error instanceof Error ? error.message : String(error)
+              );
+            }
           }
         }
         changes.resources.added.push(key);
@@ -580,42 +647,45 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
       // Send list_changed notifications to all sessions
       // Wrap in try-catch because some sessions may not support these notifications
-      for (const [_sessionId, session] of this.sessions) {
+      for (const [sessionId, session] of this.sessions) {
         if (session.server) {
+          // Only check added/updated since HMR disables removals
           try {
-            if (
-              changes.tools.added.length ||
-              changes.tools.removed.length ||
-              changes.tools.updated.length
-            ) {
+            if (changes.tools.added.length || changes.tools.updated.length) {
               session.server.sendToolListChanged();
             }
-          } catch {
-            // Session doesn't support tool list change notifications
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
           }
           try {
             if (
               changes.prompts.added.length ||
-              changes.prompts.removed.length ||
               changes.prompts.updated.length
             ) {
               session.server.sendPromptListChanged();
             }
-          } catch {
-            // Session doesn't support prompt list change notifications
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send prompts/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
           }
           try {
             if (
               changes.resources.added.length ||
-              changes.resources.removed.length ||
               changes.resources.updated.length ||
-              changes.resourceTemplates.added.length ||
-              changes.resourceTemplates.removed.length
+              changes.resourceTemplates.added.length
             ) {
               session.server.sendResourceListChanged();
             }
-          } catch {
-            // Session doesn't support resource list change notifications
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send resources/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
           }
         }
       }

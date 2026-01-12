@@ -884,11 +884,29 @@ program
           const projectRequire = createRequire(
             path.join(projectPath, "package.json")
           );
-          const tsxBin = projectRequire.resolve("tsx/dist/cli.mjs");
+          // Resolve tsx bin from package.json instead of hardcoding internal path
+          const tsxPkgPath = projectRequire.resolve("tsx/package.json");
+          const tsxPkg = JSON.parse(await readFile(tsxPkgPath, "utf-8"));
+          // Handle both string and object forms of the bin field
+          let binPath: string;
+          if (typeof tsxPkg.bin === "string") {
+            binPath = tsxPkg.bin;
+          } else if (tsxPkg.bin && typeof tsxPkg.bin === "object") {
+            // Use 'tsx' entry or the first entry
+            binPath = tsxPkg.bin.tsx || Object.values(tsxPkg.bin)[0];
+          } else {
+            throw new Error("No bin field found in tsx package.json");
+          }
+          const tsxBin = path.resolve(path.dirname(tsxPkgPath), binPath);
           cmd = "node";
           args = [tsxBin, "watch", serverFile];
-        } catch {
-          // tsx not found locally, use npx (will prompt to install)
+        } catch (error) {
+          // tsx not found locally or bin resolution failed, use npx
+          console.log(
+            chalk.yellow(
+              `Could not resolve local tsx: ${error instanceof Error ? error.message : "unknown error"}`
+            )
+          );
           cmd = "npx";
           args = ["tsx", "watch", serverFile];
         }
