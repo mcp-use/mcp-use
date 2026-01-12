@@ -1,5 +1,19 @@
 # mcp-use
 
+## 1.13.0-canary.2
+
+### Patch Changes
+
+- 118cb30: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+- Updated dependencies [118cb30]
+  - @mcp-use/inspector@0.14.5-canary.2
+  - @mcp-use/cli@2.9.0-canary.2
+
 ## 1.13.0-canary.1
 
 ### Patch Changes
