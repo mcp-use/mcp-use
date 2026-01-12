@@ -110,9 +110,7 @@ export class AppsSdkAdaptor implements WidgetHostAdaptor {
     window.openai.openExternal({ href });
   }
 
-  async requestDisplayMode(
-    mode: DisplayMode
-  ): Promise<{ mode: DisplayMode }> {
+  async requestDisplayMode(mode: DisplayMode): Promise<{ mode: DisplayMode }> {
     if (!window.openai?.requestDisplayMode) {
       throw new Error("window.openai.requestDisplayMode is not available");
     }

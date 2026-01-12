@@ -274,9 +274,7 @@ export class StandaloneAdaptor implements WidgetHostAdaptor {
     }
   }
 
-  async requestDisplayMode(
-    mode: DisplayMode
-  ): Promise<{ mode: DisplayMode }> {
+  async requestDisplayMode(mode: DisplayMode): Promise<{ mode: DisplayMode }> {
     console.warn(
       "[StandaloneAdaptor] requestDisplayMode not available in standalone mode"
     );

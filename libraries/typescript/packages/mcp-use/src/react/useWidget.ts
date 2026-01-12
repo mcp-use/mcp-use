@@ -1,6 +1,13 @@
 /**
- * React hook for OpenAI Apps SDK widget development
- * Wraps window.openai API and adapts MCP UI props to toolInput
+ * React hook for widget development across multiple host environments
+ *
+ * Supports three host types:
+ * - apps-sdk: OpenAI Apps SDK (ChatGPT native widgets)
+ * - mcp-app: MCP Apps standard (SEP-1865 compliant hosts)
+ * - standalone: Inspector, development, testing mode
+ *
+ * The hook provides a unified API regardless of the host environment,
+ * with the adaptor pattern handling the underlying communication differences.
  */
 
 import {
@@ -13,60 +20,95 @@ import {
 import type {
   CallToolResponse,
   DisplayMode,
-  OpenAiGlobals,
   SafeArea,
-  SetGlobalsEvent,
   Theme,
   UnknownObject,
   UserAgent,
-  UseWidgetResult,
 } from "./widget-types.js";
-import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
+import { createHostAdaptor, type HostType } from "./host/index.js";
 
 /**
- * Hook to subscribe to a single value from window.openai globals
+ * Extended result type for the useWidget hook
  */
-function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
-  key: K
-): OpenAiGlobals[K] | undefined {
-  return useSyncExternalStore(
-    (onChange) => {
-      const handleSetGlobal = (event: any) => {
-        const customEvent = event as SetGlobalsEvent;
-        const value = customEvent.detail.globals[key];
-        if (value === undefined) {
-          return;
-        }
-        onChange();
-      };
+export interface UseWidgetResult<
+  TProps extends UnknownObject = UnknownObject,
+  TOutput extends UnknownObject = UnknownObject,
+  TMetadata extends UnknownObject = UnknownObject,
+  TState extends UnknownObject = UnknownObject,
+  TToolInput extends UnknownObject = UnknownObject,
+> {
+  // Props and state
+  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model) */
+  props: TProps;
+  /** Original tool input arguments */
+  toolInput: TToolInput;
+  /** Tool output from the last execution */
+  output: TOutput | null;
+  /** Response metadata from the tool */
+  metadata: TMetadata | null;
+  /** Persisted widget state */
+  state: TState | null;
+  /** Update widget state (persisted and shown to model) */
+  setState: (
+    state: TState | ((prevState: TState | null) => TState)
+  ) => Promise<void>;
 
-      if (typeof window !== "undefined") {
-        window.addEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobal);
-      }
+  // Layout and theme
+  /** Current theme (light/dark) */
+  theme: Theme;
+  /** Current display mode */
+  displayMode: DisplayMode;
+  /** Safe area insets for layout */
+  safeArea: SafeArea;
+  /** Maximum height available */
+  maxHeight: number;
+  /** User agent information */
+  userAgent: UserAgent;
+  /** Current locale */
+  locale: string;
+  /** MCP server base URL for making API requests */
+  mcp_url: string;
 
-      return () => {
-        if (typeof window !== "undefined") {
-          window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobal);
-        }
-      };
-    },
-    () =>
-      typeof window !== "undefined" && window.openai
-        ? window.openai[key]
-        : undefined
-  );
+  // Actions
+  /** Call a tool on the MCP server */
+  callTool: (
+    name: string,
+    args: Record<string, unknown>
+  ) => Promise<CallToolResponse>;
+  /** Send a follow-up message to the conversation */
+  sendFollowUpMessage: (prompt: string) => Promise<void>;
+  /** Open an external URL */
+  openExternal: (href: string) => void;
+  /** Request a different display mode */
+  requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>;
+
+  /** Whether the widget API is available */
+  isAvailable: boolean;
+  /** Whether the tool is currently executing (metadata is null) */
+  isPending: boolean;
+
+  /** The current host environment type */
+  hostType: HostType;
 }
 
 /**
- * React hook for building OpenAI Apps SDK widgets with MCP-use
+ * Get or create the singleton adaptor instance
+ */
+function getAdaptor() {
+  return createHostAdaptor();
+}
+
+/**
+ * React hook for building widgets that work across multiple host environments
  *
- * Provides type-safe access to the window.openai API. Widget props come from
- * _meta["mcp-use/props"] (widget-only data), while toolInput contains the original tool arguments.
+ * Provides type-safe access to host APIs through a unified interface.
+ * Widget props come from _meta["mcp-use/props"] (widget-only data),
+ * while toolInput contains the original tool arguments.
  *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
- *   const { props, toolInput, output, theme } = useWidget<
+ *   const { props, toolInput, output, theme, hostType } = useWidget<
  *     { city: string; temperature: number },  // Props (widget-only)
  *     string,                                  // Output (model sees)
  *     {},                                      // Metadata
@@ -78,7 +120,7 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  *     <div data-theme={theme}>
  *       <h1>{props.city}</h1>
  *       <p>{props.temperature}°C</p>
- *       <p>Requested: {toolInput.city}</p>
+ *       <p>Host: {hostType}</p>
  *     </div>
  *   );
  * };
@@ -93,131 +135,86 @@ export function useWidget<
 >(
   defaultProps?: TProps
 ): UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput> {
-  // Check if window.openai is available - use state to allow re-checking after async injection
-  const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
-    () => typeof window !== "undefined" && !!window.openai
+  const adaptor = getAdaptor();
+
+  // Track availability state (for async adaptor initialization like apps-sdk)
+  const [isAvailable, setIsAvailable] = useState(() => adaptor.isAvailable());
+
+  // Use external store for reactive state updates from adaptor
+  const subscriptionCount = useSyncExternalStore(
+    adaptor.subscribe.bind(adaptor),
+    () => {
+      // Force re-render on any adaptor state change
+      // The actual values are retrieved via adaptor getters below
+      return Date.now();
+    }
   );
 
-  // Re-check for window.openai availability after mount (in case it's injected asynchronously)
+  // Re-check availability after mount (for async script injection in apps-sdk)
   useEffect(() => {
-    // Initial check
-    if (typeof window !== "undefined" && window.openai) {
-      setIsOpenAiAvailable(true);
+    if (adaptor.isAvailable()) {
+      setIsAvailable(true);
       return;
     }
 
-    // Poll for window.openai if not immediately available (for async script injection)
+    // Poll for availability (handles async injection)
     const checkInterval = setInterval(() => {
-      if (typeof window !== "undefined" && window.openai) {
-        setIsOpenAiAvailable(true);
+      if (adaptor.isAvailable()) {
+        setIsAvailable(true);
         clearInterval(checkInterval);
       }
     }, 100);
 
-    // Also listen for the openai:set_globals event which fires when the API is ready
-    const handleSetGlobals = () => {
-      if (typeof window !== "undefined" && window.openai) {
-        setIsOpenAiAvailable(true);
-        clearInterval(checkInterval);
-      }
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
-    }
-
-    // Cleanup after 5 seconds max (should be injected by then)
+    // Cleanup after 5 seconds
     const timeout = setTimeout(() => {
       clearInterval(checkInterval);
-      if (typeof window !== "undefined") {
-        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
-      }
     }, 5000);
 
     return () => {
       clearInterval(checkInterval);
       clearTimeout(timeout);
-      if (typeof window !== "undefined") {
-        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
-      }
     };
-  }, []);
+  }, [adaptor]);
 
-  const provider = useMemo(() => {
-    return isOpenAiAvailable ? "openai" : "mcp-ui";
-  }, [isOpenAiAvailable]);
-
-  // Extract search string to avoid dependency issues
-  const searchString =
-    typeof window !== "undefined" ? window.location.search : "";
-
-  const urlParams = useMemo(() => {
-    // check if it has mcpUseParams
-    const urlParams = new URLSearchParams(searchString);
-    if (urlParams.has("mcpUseParams")) {
-      return JSON.parse(urlParams.get("mcpUseParams") as string) as {
-        toolInput: TProps;
-        toolOutput: TOutput;
-        toolId: string;
-      };
-    }
-    return {
-      toolInput: {} as TProps,
-      toolOutput: {} as TOutput,
-      toolId: "",
-    };
-  }, [searchString]);
-
-  // Subscribe to globals
-  const toolInput =
-    provider === "openai"
-      ? (useOpenAiGlobal("toolInput") as TToolInput | undefined)
-      : (urlParams.toolInput as TToolInput | undefined);
-  const toolOutput =
-    provider === "openai"
-      ? (useOpenAiGlobal("toolOutput") as TOutput | null | undefined)
-      : (urlParams.toolOutput as TOutput | null | undefined);
-  const toolResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as
-    | TMetadata
-    | null
-    | undefined;
+  // Get current state from adaptor (reactive via useSyncExternalStore)
+  const toolInput = adaptor.getToolInput<TToolInput>();
+  const toolOutput = adaptor.getToolOutput<TOutput>();
+  const toolResponseMetadata = adaptor.getToolResponseMetadata<TMetadata>();
+  const widgetState = adaptor.getWidgetState<TState>();
+  const theme = adaptor.getTheme();
+  const displayMode = adaptor.getDisplayMode();
+  const safeArea = adaptor.getSafeArea();
+  const maxHeight = adaptor.getMaxHeight();
+  const userAgent = adaptor.getUserAgent();
+  const locale = adaptor.getLocale();
 
   // Extract widget props from toolResponseMetadata["mcp-use/props"]
   const widgetProps = useMemo(() => {
     if (toolResponseMetadata && typeof toolResponseMetadata === "object") {
-      const metaProps = (toolResponseMetadata as any)["mcp-use/props"];
+      const metaProps = (toolResponseMetadata as Record<string, unknown>)[
+        "mcp-use/props"
+      ];
       if (metaProps) {
         return metaProps as TProps;
       }
     }
     return defaultProps || ({} as TProps);
   }, [toolResponseMetadata, defaultProps]);
-  const widgetState = useOpenAiGlobal("widgetState") as
-    | TState
-    | null
-    | undefined;
-  const theme = useOpenAiGlobal("theme") as Theme | undefined;
-  const displayMode = useOpenAiGlobal("displayMode") as DisplayMode | undefined;
-  const safeArea = useOpenAiGlobal("safeArea") as SafeArea | undefined;
-  const maxHeight = useOpenAiGlobal("maxHeight") as number | undefined;
-  const userAgent = useOpenAiGlobal("userAgent") as UserAgent | undefined;
-  const locale = useOpenAiGlobal("locale") as string | undefined;
 
-  // Compute MCP server base URL from window.__mcpPublicUrl
+  // Compute MCP server base URL
   const mcp_url = useMemo(() => {
     if (typeof window !== "undefined" && window.__mcpPublicUrl) {
-      // Remove the /mcp-use/public suffix to get the base server URL
       return window.__mcpPublicUrl.replace(/\/mcp-use\/public$/, "");
     }
     return "";
   }, []);
 
-  // Use local state for widget state with sync to window.openai
+  // Local widget state with sync to adaptor
   const [localWidgetState, setLocalWidgetState] = useState<TState | null>(null);
 
-  // Sync widget state from window.openai
+  // Sync widget state from adaptor
   useEffect(() => {
-    if (widgetState !== undefined) {
+    if (widgetState !== undefined && widgetState !== null) {
       setLocalWidgetState(widgetState);
     }
   }, [widgetState]);
@@ -228,67 +225,54 @@ export function useWidget<
       name: string,
       args: Record<string, unknown>
     ): Promise<CallToolResponse> => {
-      if (!window.openai?.callTool) {
-        throw new Error("window.openai.callTool is not available");
-      }
-      return window.openai.callTool(name, args);
+      return adaptor.callTool(name, args);
     },
-    []
+    [adaptor]
   );
 
   const sendFollowUpMessage = useCallback(
     async (prompt: string): Promise<void> => {
-      if (!window.openai?.sendFollowUpMessage) {
-        throw new Error("window.openai.sendFollowUpMessage is not available");
-      }
-      return window.openai.sendFollowUpMessage({ prompt });
+      return adaptor.sendMessage(prompt);
     },
-    []
+    [adaptor]
   );
 
-  const openExternal = useCallback((href: string): void => {
-    if (!window.openai?.openExternal) {
-      throw new Error("window.openai.openExternal is not available");
-    }
-    window.openai.openExternal({ href });
-  }, []);
+  const openExternal = useCallback(
+    (href: string): void => {
+      adaptor.openLink(href);
+    },
+    [adaptor]
+  );
 
   const requestDisplayMode = useCallback(
     async (mode: DisplayMode): Promise<{ mode: DisplayMode }> => {
-      if (!window.openai?.requestDisplayMode) {
-        throw new Error("window.openai.requestDisplayMode is not available");
-      }
-      return window.openai.requestDisplayMode({ mode });
+      return adaptor.requestDisplayMode(mode);
     },
-    []
+    [adaptor]
   );
 
   const setState = useCallback(
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      if (!window.openai?.setWidgetState) {
-        throw new Error("window.openai.setWidgetState is not available");
-      }
-
-      // Use functional update to always get latest state
-      // Prefer widgetState (from window.openai) over localWidgetState for most up-to-date value
       const currentState =
         widgetState !== undefined ? widgetState : localWidgetState;
       const newState =
         typeof state === "function" ? state(currentState) : state;
 
       setLocalWidgetState(newState);
-      return window.openai.setWidgetState(newState);
+      return adaptor.setWidgetState(newState);
     },
-    [widgetState, localWidgetState]
+    [adaptor, widgetState, localWidgetState]
   );
 
   // Determine if tool is still executing
-  // When widget first loads before tool completes, toolResponseMetadata is null
   const isPending = useMemo(() => {
-    return provider === "openai" && toolResponseMetadata === null;
-  }, [provider, toolResponseMetadata]);
+    return isAvailable && toolResponseMetadata === null;
+  }, [isAvailable, toolResponseMetadata]);
+
+  // Force re-render dependency (from useSyncExternalStore)
+  void subscriptionCount;
 
   return {
     // Props and state (with defaults)
@@ -318,8 +302,11 @@ export function useWidget<
     requestDisplayMode,
 
     // Availability
-    isAvailable: isOpenAiAvailable,
+    isAvailable,
     isPending,
+
+    // Host type
+    hostType: adaptor.hostType,
   };
 }
 
@@ -362,7 +349,7 @@ export function useWidgetState<TState extends UnknownObject>(
   TState | null,
   (state: TState | ((prev: TState | null) => TState)) => Promise<void>,
 ] {
-  const { state, setState } = useWidget<
+  const { state, setState, isAvailable } = useWidget<
     UnknownObject,
     UnknownObject,
     UnknownObject,
@@ -371,14 +358,25 @@ export function useWidgetState<TState extends UnknownObject>(
 
   // Initialize with default if provided and state is null
   useEffect(() => {
-    if (
-      state === null &&
-      defaultState !== undefined &&
-      window.openai?.setWidgetState
-    ) {
+    if (state === null && defaultState !== undefined && isAvailable) {
       setState(defaultState);
     }
   }, []); // Only run once on mount
 
   return [state, setState] as const;
+}
+
+/**
+ * Hook to get the current host type
+ * @example
+ * ```tsx
+ * const hostType = useWidgetHostType();
+ * if (hostType === 'mcp-app') {
+ *   // MCP Apps specific behavior
+ * }
+ * ```
+ */
+export function useWidgetHostType(): HostType {
+  const { hostType } = useWidget();
+  return hostType;
 }

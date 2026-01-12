@@ -252,7 +252,7 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
 
     return {
       device: {
-        type: platform === "web" ? "desktop" : (platform as any) ?? "unknown",
+        type: platform === "web" ? "desktop" : ((platform as any) ?? "unknown"),
       },
       capabilities: {
         hover: caps?.hover ?? true,
@@ -308,9 +308,7 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
       });
   }
 
-  async requestDisplayMode(
-    mode: DisplayMode
-  ): Promise<{ mode: DisplayMode }> {
+  async requestDisplayMode(mode: DisplayMode): Promise<{ mode: DisplayMode }> {
     await this.initialize();
     if (!this.app) {
       throw new Error("MCP App not initialized");
@@ -387,7 +385,10 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
     // Trigger initialization on first subscriber
     if (this.listeners.size === 1 && this.isAvailable()) {
       this.initialize().catch((error) => {
-        console.error("[McpAppAdaptor] Background initialization failed:", error);
+        console.error(
+          "[McpAppAdaptor] Background initialization failed:",
+          error
+        );
       });
     }
 
