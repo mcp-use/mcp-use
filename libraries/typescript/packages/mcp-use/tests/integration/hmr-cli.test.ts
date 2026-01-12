@@ -152,6 +152,7 @@ describe("HMR CLI Integration", () => {
 
   it(
     "should start server and detect file changes",
+    { timeout: 60000 },
     async () => {
       const initialContent = `
       import { MCPServer, object } from "mcp-use/server";
@@ -224,14 +225,11 @@ describe("HMR CLI Integration", () => {
       const updatedTools = await listTools();
       expect(updatedTools).toContain("initial-tool");
       expect(updatedTools).toContain("new-hmr-tool");
-    },
-    { timeout: 60000 }
+    }
   );
 
-  it(
-    "should handle syntax errors gracefully",
-    async () => {
-      const validContent = `
+  it("should handle syntax errors gracefully", { timeout: 60000 }, async () => {
+    const validContent = `
       import { MCPServer, object } from "mcp-use/server";
       
       const server = new MCPServer({
@@ -250,14 +248,14 @@ describe("HMR CLI Integration", () => {
       server.listen();
     `;
 
-      const { filePath } = await createTestServer(validContent);
-      await startDevServer(filePath);
+    const { filePath } = await createTestServer(validContent);
+    await startDevServer(filePath);
 
-      // Wait for server to be ready
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    // Wait for server to be ready
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // Introduce syntax error
-      const brokenContent = `
+    // Introduce syntax error
+    const brokenContent = `
       import { MCPServer, object } from "mcp-use/server";
       
       const server = new MCPServer({
@@ -274,44 +272,43 @@ describe("HMR CLI Integration", () => {
       );
     `;
 
-      let errorOutput = "";
-      const errorPromise = new Promise<string>((resolve) => {
-        const dataHandler = (data: Buffer) => {
-          errorOutput += data.toString();
-          if (errorOutput.includes("[HMR] Reload failed")) {
-            serverProcess?.stdout?.off("data", dataHandler);
-            resolve(errorOutput);
-          }
-        };
-        serverProcess?.stdout?.on("data", dataHandler);
+    let errorOutput = "";
+    const errorPromise = new Promise<string>((resolve) => {
+      const dataHandler = (data: Buffer) => {
+        errorOutput += data.toString();
+        if (errorOutput.includes("[HMR] Reload failed")) {
+          serverProcess?.stdout?.off("data", dataHandler);
+          resolve(errorOutput);
+        }
+      };
+      serverProcess?.stdout?.on("data", dataHandler);
 
-        // Timeout after 5 seconds
-        setTimeout(() => resolve(errorOutput), 5000);
-      });
+      // Timeout after 5 seconds
+      setTimeout(() => resolve(errorOutput), 5000);
+    });
 
-      await writeFile(filePath, brokenContent);
-      const output = await errorPromise;
+    await writeFile(filePath, brokenContent);
+    const output = await errorPromise;
 
-      // Verify error was caught
-      expect(output).toContain("[HMR] Reload failed");
+    // Verify error was caught
+    expect(output).toContain("[HMR] Reload failed");
 
-      // Verify server is still running (can still list tools)
-      const tools = await listTools();
-      expect(tools).toContain("test-tool");
+    // Verify server is still running (can still list tools)
+    const tools = await listTools();
+    expect(tools).toContain("test-tool");
 
-      // Fix the error
-      await writeFile(filePath, validContent);
-      await waitForHMR();
+    // Fix the error
+    await writeFile(filePath, validContent);
+    await waitForHMR();
 
-      // Verify recovery
-      const recoveredTools = await listTools();
-      expect(recoveredTools).toContain("test-tool");
-    },
-    { timeout: 60000 }
-  );
+    // Verify recovery
+    const recoveredTools = await listTools();
+    expect(recoveredTools).toContain("test-tool");
+  });
 
   it(
     "should update tool descriptions via HMR",
+    { timeout: 60000 },
     async () => {
       const initialContent = `
       import { MCPServer, object } from "mcp-use/server";
@@ -384,7 +381,6 @@ describe("HMR CLI Integration", () => {
         (t: any) => t.name === "update-test"
       );
       expect(tool?.description).toBe("Updated via HMR");
-    },
-    { timeout: 60000 }
+    }
   );
 });
