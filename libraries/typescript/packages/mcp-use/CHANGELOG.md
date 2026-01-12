@@ -1,5 +1,192 @@
 # mcp-use
 
+## 1.12.4
+
+### Patch Changes
+
+- Updated dependencies [5161914]
+  - @mcp-use/inspector@0.14.4
+  - @mcp-use/cli@2.8.4
+
+## 1.12.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a308b3f]
+  - @mcp-use/inspector@0.14.4-canary.0
+  - @mcp-use/cli@2.8.4-canary.0
+
+## 1.12.3
+
+### Patch Changes
+
+- 2f89a3b: Updated dependency `react-router` to `^7.12.0`.
+- 2f89a3b: Security: Fixed 13 vulnerabilities (3 moderate, 10 high)
+  - Updated `langchain` to `^1.2.3` (fixes serialization injection vulnerability)
+  - Updated `@langchain/core` to `^1.1.8` (fixes serialization injection vulnerability)
+  - Updated `react-router` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Updated `react-router-dom` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Added override for `qs` to `>=6.14.1` (fixes DoS vulnerability)
+  - Added override for `preact` to `>=10.28.2` (fixes JSON VNode injection)
+
+- 2f89a3b: fix: resolve OAuth flow looping issue by removing duplicate fallback logic
+  - Fixed OAuth authentication loop in inspector by removing duplicated fallback logic in useAutoConnect hook
+  - Simplified connection handling by consolidating state management and removing unnecessary complexity
+  - Enhanced OAuth authentication flow with improved connection settings and user-initiated actions
+  - Refactored connection handling to default to manual authentication, requiring explicit user action for OAuth
+  - Improved auto-connect functionality with better proxy handling and error management
+  - Enhanced theme toggling with dropdown menu for better UX and accessibility
+  - Updated OAuth flow management in browser provider and callback handling for better state management
+  - Streamlined proxy fallback configuration to use useMcp's built-in autoProxyFallback
+
+- Updated dependencies [2f89a3b]
+- Updated dependencies [2f89a3b]
+- Updated dependencies [2f89a3b]
+  - @mcp-use/inspector@0.14.3
+  - @mcp-use/cli@2.8.3
+
+## 1.12.3-canary.1
+
+### Patch Changes
+
+- 9cdc757: Security: Fixed 13 vulnerabilities (3 moderate, 10 high)
+  - Updated `langchain` to `^1.2.3` (fixes serialization injection vulnerability)
+  - Updated `@langchain/core` to `^1.1.8` (fixes serialization injection vulnerability)
+  - Updated `react-router` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Updated `react-router-dom` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Added override for `qs` to `>=6.14.1` (fixes DoS vulnerability)
+  - Added override for `preact` to `>=10.28.2` (fixes JSON VNode injection)
+
+- cbf2bb8: fix: resolve OAuth flow looping issue by removing duplicate fallback logic
+  - Fixed OAuth authentication loop in inspector by removing duplicated fallback logic in useAutoConnect hook
+  - Simplified connection handling by consolidating state management and removing unnecessary complexity
+  - Enhanced OAuth authentication flow with improved connection settings and user-initiated actions
+  - Refactored connection handling to default to manual authentication, requiring explicit user action for OAuth
+  - Improved auto-connect functionality with better proxy handling and error management
+  - Enhanced theme toggling with dropdown menu for better UX and accessibility
+  - Updated OAuth flow management in browser provider and callback handling for better state management
+  - Streamlined proxy fallback configuration to use useMcp's built-in autoProxyFallback
+
+- Updated dependencies [9cdc757]
+- Updated dependencies [cbf2bb8]
+  - @mcp-use/inspector@0.14.3-canary.1
+  - @mcp-use/cli@2.8.3-canary.1
+
+## 1.12.3-canary.0
+
+### Patch Changes
+
+- 708f6e5: Updated dependency `react-router` to `^7.12.0`.
+- Updated dependencies [708f6e5]
+  - @mcp-use/inspector@0.14.3-canary.0
+  - @mcp-use/cli@2.8.3-canary.0
+
+## 1.12.2
+
+### Patch Changes
+
+- 198fffd: Add configurable clientInfo support for MCP connection initialization. Clients can now customize how they identify themselves to MCP servers with full metadata including name, title, version, description, icons, and website URL. The clientConfig option is deprecated in favor of deriving it from clientInfo. Default clientInfo is set for mcp-use, inspector sets "mcp-use Inspector" with its own version, and CLI sets "mcp-use CLI".
+- 198fffd: feat(inspector): add reconnect functionality for failed connections
+  - Introduced a reconnect button in the InspectorDashboard for connections that fail, allowing users to attempt reconnection directly from the UI.
+  - Enhanced the dropdown menu to include a reconnect option for failed connections, improving user experience and accessibility.
+  - Updated HttpConnector to disable automatic reconnection, shifting the responsibility to higher-level logic for better control over connection management.
+
+- 198fffd: chore: updated docs
+- 198fffd: ## Breaking Changes (with Deprecation Warnings)
+  - **Renamed `customHeaders` to `headers`**: The `customHeaders` option has been renamed to `headers` across all APIs for better consistency. The old name still works but shows deprecation warnings. Update your code to use `headers` instead.
+  - **Renamed `samplingCallback` to `onSampling`**: Callback naming is now more consistent with event handler patterns. The old name still works but shows deprecation warnings.
+
+  ## New Features
+  - **Automatic Proxy Fallback**: Added `autoProxyFallback` option to `useMcp` hook and `McpClientProvider`. When enabled (default: `true` in provider), automatically retries failed connections through a proxy when CORS errors or HTTP 4xx errors are detected. This makes connecting to MCP servers much more reliable in browser environments.
+  - **Provider-Level Proxy Defaults**: `McpClientProvider` now supports `defaultProxyConfig` and `defaultAutoProxyFallback` props to set proxy configuration for all servers. Individual servers can override these defaults.
+  - **OAuth Proxy Support**: Added OAuth request proxying through fetch interceptor in `BrowserOAuthClientProvider`. Configure with `oauthProxyUrl` to route OAuth discovery and token requests through your backend proxy.
+
+  ## Improvements
+  - **Enhanced Error Detection**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+  - **Smarter Connection Logic**: OAuth provider now always uses the original target URL for OAuth discovery, not the proxy URL
+  - **Better Session Management**: Improved session cleanup to avoid noisy warning logs
+  - **Type Safety**: Added deprecation notices in TypeScript types for deprecated options
+  - **Proxy Header Support**: `proxyConfig` now accepts a `headers` field for custom headers to the proxy
+
+  ## Refactoring
+  - **Removed `oauth-helper.ts`** (521 lines): OAuth helper utilities consolidated into `browser-provider.ts`
+  - **Removed `react_example.html`**: Outdated example file removed
+  - **Major `useMcp` Hook Refactor**: Complete rewrite of connection logic with automatic retry, better error handling, and proxy fallback support
+
+  ## Documentation
+  - Updated all client documentation to use new `headers` naming
+  - Added comprehensive examples for automatic proxy fallback
+  - Updated sampling documentation with new `onSampling` callback name
+  - Refreshed React integration guide with provider-based approach
+
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+  - @mcp-use/inspector@0.14.2
+  - @mcp-use/cli@2.8.2
+
+## 1.12.2-canary.2
+
+### Patch Changes
+
+- f9b1001: chore: updated docs
+- Updated dependencies [f9b1001]
+  - @mcp-use/inspector@0.14.2-canary.2
+  - @mcp-use/cli@2.8.2-canary.2
+
+## 1.12.2-canary.1
+
+### Patch Changes
+
+- 94e4e63: Add configurable clientInfo support for MCP connection initialization. Clients can now customize how they identify themselves to MCP servers with full metadata including name, title, version, description, icons, and website URL. The clientConfig option is deprecated in favor of deriving it from clientInfo. Default clientInfo is set for mcp-use, inspector sets "mcp-use Inspector" with its own version, and CLI sets "mcp-use CLI".
+- 94e4e63: ## Breaking Changes (with Deprecation Warnings)
+  - **Renamed `customHeaders` to `headers`**: The `customHeaders` option has been renamed to `headers` across all APIs for better consistency. The old name still works but shows deprecation warnings. Update your code to use `headers` instead.
+  - **Renamed `samplingCallback` to `onSampling`**: Callback naming is now more consistent with event handler patterns. The old name still works but shows deprecation warnings.
+
+  ## New Features
+  - **Automatic Proxy Fallback**: Added `autoProxyFallback` option to `useMcp` hook and `McpClientProvider`. When enabled (default: `true` in provider), automatically retries failed connections through a proxy when CORS errors or HTTP 4xx errors are detected. This makes connecting to MCP servers much more reliable in browser environments.
+  - **Provider-Level Proxy Defaults**: `McpClientProvider` now supports `defaultProxyConfig` and `defaultAutoProxyFallback` props to set proxy configuration for all servers. Individual servers can override these defaults.
+  - **OAuth Proxy Support**: Added OAuth request proxying through fetch interceptor in `BrowserOAuthClientProvider`. Configure with `oauthProxyUrl` to route OAuth discovery and token requests through your backend proxy.
+
+  ## Improvements
+  - **Enhanced Error Detection**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+  - **Smarter Connection Logic**: OAuth provider now always uses the original target URL for OAuth discovery, not the proxy URL
+  - **Better Session Management**: Improved session cleanup to avoid noisy warning logs
+  - **Type Safety**: Added deprecation notices in TypeScript types for deprecated options
+  - **Proxy Header Support**: `proxyConfig` now accepts a `headers` field for custom headers to the proxy
+
+  ## Refactoring
+  - **Removed `oauth-helper.ts`** (521 lines): OAuth helper utilities consolidated into `browser-provider.ts`
+  - **Removed `react_example.html`**: Outdated example file removed
+  - **Major `useMcp` Hook Refactor**: Complete rewrite of connection logic with automatic retry, better error handling, and proxy fallback support
+
+  ## Documentation
+  - Updated all client documentation to use new `headers` naming
+  - Added comprehensive examples for automatic proxy fallback
+  - Updated sampling documentation with new `onSampling` callback name
+  - Refreshed React integration guide with provider-based approach
+
+- Updated dependencies [94e4e63]
+- Updated dependencies [94e4e63]
+- Updated dependencies [94e4e63]
+  - @mcp-use/inspector@0.14.2-canary.1
+  - @mcp-use/cli@2.8.2-canary.1
+
+## 1.12.2-canary.0
+
+### Patch Changes
+
+- a0aa464: feat(inspector): add reconnect functionality for failed connections
+  - Introduced a reconnect button in the InspectorDashboard for connections that fail, allowing users to attempt reconnection directly from the UI.
+  - Enhanced the dropdown menu to include a reconnect option for failed connections, improving user experience and accessibility.
+  - Updated HttpConnector to disable automatic reconnection, shifting the responsibility to higher-level logic for better control over connection management.
+
+- Updated dependencies [a0aa464]
+  - @mcp-use/inspector@0.14.2-canary.0
+  - @mcp-use/cli@2.8.2-canary.0
+
 ## 1.12.1
 
 ### Patch Changes

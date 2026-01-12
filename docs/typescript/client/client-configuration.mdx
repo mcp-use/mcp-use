@@ -7,11 +7,16 @@ icon: "cog"
 The MCPClient is your gateway to connecting with MCP servers. This guide covers all configuration options for establishing connections, managing sessions, and customizing client behavior.
 
 <Info>
-**Looking for agent configuration?** If you're building AI agents that interact with MCP servers, see the [Agent Configuration](/typescript/agent/agent-configuration) guide instead.
+  **Looking for agent configuration?** If you're building AI agents that
+  interact with MCP servers, see the [Agent
+  Configuration](/typescript/agent/agent-configuration) guide instead.
 </Info>
 
 <Tip>
-**Using in browser or React?** This guide uses the Node.js import (`mcp-use`). For browser or React environments, see the [Environments](/typescript/client/environments) guide to learn about the different entry points.
+  **Using in browser or React?** This guide uses the Node.js import (`mcp-use`).
+  For browser or React environments, see the
+  [Environments](/typescript/client/environments) guide to learn about the
+  different entry points.
 </Tip>
 
 ## Quick Start
@@ -22,17 +27,18 @@ import { MCPClient } from 'mcp-use'
 
 // Configure your MCP servers
 const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
+mcpServers: {
+playwright: {
+command: 'npx',
+args: ['@playwright/mcp@latest'],
+env: { DISPLAY: ':1' }
+}
+}
 }
 
 const client = new MCPClient(config)
-```
+
+````
 </CodeGroup>
 
 
@@ -84,11 +90,12 @@ const mcp = useMcp({
   url: 'http://localhost:3000/mcp',
   transportType: 'http'  // or 'auto'
 });
-```
+````
 
 **No action required** for existing code. Migrate at your own pace.
 
 Learn more: [MCP Spec - Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http)
+
 </Note>
 
 ## Automatic Session Management
@@ -104,25 +111,25 @@ sequenceDiagram
     participant App as Your App
     participant Client as mcp-use Client
     participant Server as MCP Server
-    
+
     Note over App,Server: Normal operation
     App->>Client: callTool("fetch_data")
     Client->>Server: POST /mcp<br/>session-id: abc-123
     Server-->>Client: 200 OK + result
     Client-->>App: Tool result
-    
+
     Note over Server: SERVER RESTARTS
-    
+
     Note over App,Server: Next request
     App->>Client: callTool("another_tool")
     Client->>Server: POST /mcp<br/>session-id: abc-123
     Server-->>Client: 404 Session not found
-    
+
     Note over Client: Auto-detect 404<br/>Clear stale session<br/>Re-initialize
-    
+
     Client->>Server: POST /mcp<br/>(no session-id)<br/>initialize
     Server-->>Client: 200 OK<br/>new session-id: def-456
-    
+
     Client->>Server: POST /mcp<br/>session-id: def-456<br/>Retry callTool
     Server-->>Client: 200 OK + result
     Client-->>App: Tool result
@@ -172,9 +179,10 @@ STDIO connections are stateless and don't use sessions.
 The MCPClient uses a flexible configuration system that supports any MCP server, regardless of connection type.
 
 <Tip>
-**Looking for MCP servers?** Check out these curated lists:
-- [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)
-- [appcypher/awesome-mcp-servers](https://github.com/appcypher/awesome-mcp-servers)
+  **Looking for MCP servers?** Check out these curated lists: -
+  [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)
+  -
+  [appcypher/awesome-mcp-servers](https://github.com/appcypher/awesome-mcp-servers)
 </Tip>
 
 ### Configuration Structure
@@ -200,6 +208,7 @@ Server configuration is defined as a JavaScript object:
 Each server entry requires a unique name and connection-specific parameters. The client automatically detects the connection type based on the provided configuration.
 
 **Common Parameters:**
+
 - `server_name`: Unique identifier for the server (used as the object key)
 
 **STDIO Servers (Local Process):**
@@ -209,15 +218,22 @@ For servers that run as local child processes:
 - `command`: Executable command to start the server (e.g., `"npx"`, `"python"`)
 - `args`: Array of command-line arguments
 - `env`: Environment variables for the server process
+- `clientInfo`: (Optional) Client information sent to the server in the initialize request. If not provided, defaults to mcp-use client info.
 
 **Example:**
+
 ```json
 {
   "mcpServers": {
     "stdio_server": {
       "command": "npx",
       "args": ["@my-mcp/server"],
-      "env": {}
+      "env": {},
+      "clientInfo": {
+        "name": "My Custom Client",
+        "title": "My Custom Client Display Name",
+        "version": "1.0.0"
+      }
     }
   }
 }
@@ -229,8 +245,10 @@ For servers accessible via HTTP endpoints:
 
 - `url`: Full URL to the MCP server endpoint
 - `headers`: Custom HTTP headers (useful for authentication)
+- `clientInfo`: (Optional) Client information sent to the server in the initialize request. If not provided, defaults to mcp-use client info.
 
 **Example:**
+
 ```json
 {
   "mcpServers": {
@@ -238,11 +256,47 @@ For servers accessible via HTTP endpoints:
       "url": "http://localhost:3000",
       "headers": {
         "Authorization": "Bearer ${AUTH_TOKEN}"
+      },
+      "clientInfo": {
+        "name": "My Custom Client",
+        "title": "My Custom Client Display Name",
+        "version": "1.0.0",
+        "description": "A custom MCP client application",
+        "icons": [
+          {
+            "src": "https://example.com/icon.png",
+            "mimeType": "image/png",
+            "sizes": ["48x48"]
+          }
+        ],
+        "websiteUrl": "https://example.com"
       }
     }
   }
 }
 ```
+
+**Client Info Structure:**
+
+The `clientInfo` parameter allows you to customize how your client identifies itself to MCP servers:
+
+- `name` (required): Client identifier name
+- `title` (optional): Display name for the client
+- `version` (required): Client version string
+- `description` (optional): Human-readable description of the client
+- `icons` (optional): Array of icon objects with `src`, `mimeType`, and `sizes` properties
+- `websiteUrl` (optional): URL to the client's website
+
+**Default Client Info:**
+
+If `clientInfo` is not specified, mcp-use automatically uses:
+
+- `name`: `"mcp-use"`
+- `title`: `"mcp-use"`
+- `version`: Current mcp-use package version
+- `description`: `"mcp-use is a complete TypeScript framework for building and using MCP"`
+- `icons`: `[{"src": "https://mcp-use.com/logo.png"}]`
+- `websiteUrl`: `"https://mcp-use.com"`
 
 ### Example Configuration
 
@@ -292,7 +346,6 @@ You can configure multiple MCP servers in a single configuration file, allowing 
 
 For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
 
-
 ## Client Creation Methods
 
 There are several ways to create an MCPClient:
@@ -302,19 +355,19 @@ There are several ways to create an MCPClient:
 Create configuration programmatically:
 
 ```typescript TypeScript
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "mcp-use";
 
 const config = {
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest'],
-            env: { DISPLAY: ':1' }
-        }
-    }
-}
+  mcpServers: {
+    playwright: {
+      command: "npx",
+      args: ["@playwright/mcp@latest"],
+      env: { DISPLAY: ":1" },
+    },
+  },
+};
 
-const client = new MCPClient(config)
+const client = new MCPClient(config);
 ```
 
 ### From Configuration File
@@ -327,16 +380,17 @@ import { MCPClient, loadConfigFile } from 'mcp-use'
 
 const config = await loadConfigFile('config.json')
 const client = new MCPClient(config)
-```
+
+````
 
 ```typescript TypeScript
 import { MCPClient, loadConfigFile } from 'mcp-use'
 
 const config = await loadConfigFile('config.json')
 const client = new MCPClient(config)
-```
-</CodeGroup>
+````
 
+</CodeGroup>
 
 ### With Sandbox Options
 
@@ -352,6 +406,7 @@ Enable sandboxed execution:
 // Note: Sandbox mode is not yet supported in the TypeScript library
 // This is a planned feature for a future release
 ```
+
 </CodeGroup>
 
 ## Best Practices

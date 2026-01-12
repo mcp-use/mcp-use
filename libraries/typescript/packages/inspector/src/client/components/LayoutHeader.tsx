@@ -35,10 +35,10 @@ import type { McpServer } from "mcp-use/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AddToClientDropdown } from "./AddToClientDropdown";
-import { AnimatedThemeToggler } from "./AnimatedThemeToggler";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
 import { ServerDropdown } from "./ServerDropdown";
+import { ThemeToggle } from "./ThemeToggle";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -314,7 +314,7 @@ export function LayoutHeader({
                   <p>Give us a star ⭐</p>
                 </TooltipContent>
               </Tooltip>
-              <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
+              <ThemeToggle />
             </div>
           )}
         </div>
@@ -616,14 +616,7 @@ export function LayoutHeader({
                   </>
                 );
               })()}
-            <Tooltip>
-              <TooltipTrigger>
-                <AnimatedThemeToggler className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors cursor-pointer" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Toggle theme</p>
-              </TooltipContent>
-            </Tooltip>
+            <ThemeToggle />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

@@ -515,7 +515,7 @@ If the official library is not available, you can replace the imports with custo
 - [OpenAI Apps SDK UI Components](https://openai.github.io/apps-sdk-ui/) - Official component library
 - [MCP Documentation](https://modelcontextprotocol.io)
 - [OpenAI Apps SDK](https://platform.openai.com/docs/apps)
-- [mcp-use Documentation](https://docs.mcp-use.com)
+- [mcp-use Documentation](https://mcp-use.com/docs)
 - [React Documentation](https://react.dev/)
 - [Zod Documentation](https://zod.dev/)
 

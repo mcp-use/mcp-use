@@ -127,6 +127,21 @@ async def analyze_sentiment(text: str, ctx: Context) -> str:
     return ""
 
 
+@mcp.tool()
+async def get_client_roots(ctx: Context) -> str:
+    """Request and return the list of roots from the client.
+
+    This tool demonstrates the roots capability - it requests the
+    list of file/directory roots that the client has made available.
+    """
+    roots = await ctx.list_roots()
+    if not roots:
+        return json.dumps({"roots": [], "count": 0})
+
+    roots_data = [{"uri": str(r.uri), "name": r.name} for r in roots]
+    return json.dumps({"roots": roots_data, "count": len(roots)})
+
+
 @dataclass
 class Info:
     quantity: int

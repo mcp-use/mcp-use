@@ -2,12 +2,7 @@
 export function isValidUrl(urlString: string): boolean {
   try {
     const url = new URL(urlString);
-    return (
-      url.protocol === "http:" ||
-      url.protocol === "https:" ||
-      url.protocol === "ws:" ||
-      url.protocol === "wss:"
-    );
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }

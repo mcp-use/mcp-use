@@ -218,8 +218,16 @@ export function ConnectionSettingsForm({
           setProxyAddress(config.proxyConfig.proxyAddress);
         }
 
-        if (config.customHeaders) {
-          const headers = Object.entries(config.customHeaders).map(
+        // Extract headers from proxyConfig (preferred) or top-level customHeaders/headers
+        const headersToExtract =
+          config.proxyConfig?.customHeaders ||
+          config.proxyConfig?.headers ||
+          config.customHeaders ||
+          config.headers ||
+          {};
+
+        if (Object.keys(headersToExtract).length > 0) {
+          const headers = Object.entries(headersToExtract).map(
             ([name, value], index) => ({
               id: `header-${index}`,
               name,

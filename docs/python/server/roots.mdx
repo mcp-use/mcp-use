@@ -1,0 +1,80 @@
+---
+title: "Roots"
+description: "Access client file system roots from your server"
+icon: "folder-tree"
+---
+
+Roots allow your MCP server to discover which directories or files the client has made available.
+
+## Basic Usage
+
+Use the `list_roots()` method on the context object:
+
+```python
+from mcp_use.server import Context, MCPServer
+
+server = MCPServer(name="File Server")
+
+@server.tool()
+async def get_workspace_info(ctx: Context) -> str:
+    """Get information about the client's available workspaces."""
+    roots = await ctx.list_roots()
+
+    if not roots:
+        return "No roots available from client"
+
+    lines = [f"Available workspaces ({len(roots)}):"]
+    for root in roots:
+        name = root.name or "(unnamed)"
+        lines.append(f"  - {name}: {root.uri}")
+
+    return "\n".join(lines)
+```
+
+## Root Object Structure
+
+Each `Root` object returned by `list_roots()` contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `uri` | `AnyUrl` | A file:// URI pointing to the root directory or file |
+| `name` | `str \| None` | Optional human-readable name for the root |
+
+## Use Cases
+
+### File Search Tool
+
+```python
+@server.tool()
+async def search_files(pattern: str, ctx: Context) -> str:
+    """Search for files matching a pattern in client workspaces."""
+    roots = await ctx.list_roots()
+
+    if not roots:
+        return "No workspaces available to search"
+
+    results = []
+    for root in roots:
+        path = str(root.uri).replace("file://", "")
+        # Search logic here...
+        results.append(f"Searched in: {root.name or path}")
+
+    return "\n".join(results)
+```
+
+### Project Analyzer
+
+```python
+@server.tool()
+async def analyze_project(ctx: Context) -> dict:
+    """Analyze the client's project structure."""
+    roots = await ctx.list_roots()
+
+    return {
+        "total_roots": len(roots),
+        "projects": [
+            {"name": root.name, "path": str(root.uri)}
+            for root in roots
+        ]
+    }
+```

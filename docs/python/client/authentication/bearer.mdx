@@ -1,0 +1,140 @@
+---
+title: "Bearer Token"
+description: "Simple token-based authentication for MCP servers using API keys or static tokens."
+icon: "ticket"
+---
+
+Bearer token authentication is the simplest method - just pass your API key or token as a string.
+
+<Info>
+`mcp-use` adds `Authorization: Bearer <token>` to every request automatically.
+</Info>
+
+## Quick Start
+
+```python
+from mcp_use import MCPClient
+
+config = {
+    "mcpServers": {
+        "api": {
+            "url": "https://api.example.com/mcp/sse",
+            "auth": "sk-your-api-key-here"
+        }
+    }
+}
+
+client = MCPClient(config=config)
+```
+
+## When to Use
+
+<CardGroup cols={2}>
+  <Card title="API Keys" icon="key">
+    Services that issue static API keys for authentication
+  </Card>
+  <Card title="Service Tokens" icon="server">
+    Machine-to-machine authentication between services
+  </Card>
+  <Card title="Personal Access Tokens" icon="user">
+    GitHub PATs, GitLab tokens, and similar credentials
+  </Card>
+  <Card title="Internal Services" icon="lock">
+    Pre-shared secrets for private infrastructure
+  </Card>
+</CardGroup>
+
+## Secure Configuration
+
+<Tabs>
+  <Tab title="Environment Variables">
+    ```python
+    import os
+
+    config = {
+        "mcpServers": {
+            "api": {
+                "url": "https://api.example.com/mcp/sse",
+                "auth": os.getenv("MCP_API_KEY")
+            }
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="python-dotenv">
+    ```python
+    from dotenv import load_dotenv
+    import os
+
+    load_dotenv()
+
+    config = {
+        "mcpServers": {
+            "api": {
+                "url": os.getenv("MCP_SERVER_URL"),
+                "auth": os.getenv("MCP_API_KEY")
+            }
+        }
+    }
+    ```
+
+    **.env file:**
+    ```bash
+    MCP_SERVER_URL=https://api.example.com/mcp/sse
+    MCP_API_KEY=sk-your-api-key-here
+    ```
+  </Tab>
+  <Tab title="Multiple Servers">
+    ```python
+    import os
+
+    config = {
+        "mcpServers": {
+            "service_a": {
+                "url": "https://service-a.example.com/mcp",
+                "auth": os.getenv("SERVICE_A_TOKEN")
+            },
+            "service_b": {
+                "url": "https://service-b.example.com/mcp",
+                "auth": os.getenv("SERVICE_B_TOKEN")
+            }
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+Never hardcode API keys in source code. Always use environment variables or a secrets manager.
+</Warning>
+
+## Bearer vs OAuth
+
+| | Bearer Token | OAuth 2.1 |
+|---|:---:|:---:|
+| **Setup** | Simple | More complex |
+| **Token refresh** | Manual | Automatic |
+| **User consent** | Not required | Required |
+| **Token lifetime** | Long-lived | Short-lived + refresh |
+| **Best for** | API keys, services | User authentication |
+
+<Tip>
+If your token expires frequently or requires user authorization, consider using [OAuth 2.1](/python/client/authentication/oauth) instead.
+</Tip>
+
+## Security Checklist
+
+<Steps>
+  <Step title="Use environment variables">
+    Never commit tokens to version control. Use `.env` files locally and secrets management in production.
+  </Step>
+  <Step title="Rotate tokens regularly">
+    Implement a rotation policy to limit exposure from compromised tokens.
+  </Step>
+  <Step title="Use minimal permissions">
+    If the service supports scoped tokens, request only what you need.
+  </Step>
+  <Step title="Monitor usage">
+    Enable logging to detect unauthorized access attempts.
+  </Step>
+</Steps>

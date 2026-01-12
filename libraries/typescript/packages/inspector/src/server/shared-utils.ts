@@ -105,7 +105,10 @@ export async function* handleChatRequestStream(requestBody: {
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
-  const serverConfig: ServerConfig = { url: mcpServerUrl };
+  const serverConfig: ServerConfig = {
+    url: mcpServerUrl,
+    preventAutoAuth: true, // Prevent auto OAuth popup in server-side context
+  };
 
   // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== "none") {
@@ -273,7 +276,10 @@ export async function handleChatRequest(requestBody: {
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
-  const serverConfig: ServerConfig = { url: mcpServerUrl };
+  const serverConfig: ServerConfig = {
+    url: mcpServerUrl,
+    preventAutoAuth: true, // Prevent auto OAuth popup in server-side context
+  };
 
   // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== "none") {
