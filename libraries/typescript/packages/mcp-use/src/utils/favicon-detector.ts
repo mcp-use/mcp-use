@@ -103,8 +103,6 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
     const domainsToTry = getSubdomainLevels(domain);
     console.debug("[favicon-detector] Domains to try:", domainsToTry);
 
-    let lastFallback: string | null = null;
-
     for (const currentDomain of domainsToTry) {
       try {
         // Use favicon.tools.mcp-use.com API with JSON response to check if it's a default
@@ -145,11 +143,15 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
           );
 
           // Fetch the actual image from the URL in the response
-          const imageResponse = await fetch(data.url);
+          // Normalize http:// to https:// to avoid CORS and mixed content issues
+          const imageUrl = data.url.replace(/^http:\/\//, "https://");
+          const imageResponse = await fetch(imageUrl);
           if (!imageResponse.ok) {
             console.debug(
               "[favicon-detector] Failed to fetch favicon image for",
-              currentDomain
+              currentDomain,
+              "status:",
+              imageResponse.status
             );
             continue;
           }
@@ -158,12 +160,11 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
           const base64Image = await blobToBase64(blob);
 
           if (data.source === "default") {
-            // This is a fallback, keep it but continue looking for a non-default
-            lastFallback = base64Image;
+            // This is a default favicon, skip it and continue looking for a non-default
             console.debug(
               "[favicon-detector] Found default favicon for:",
               currentDomain,
-              "continuing to search for non-default"
+              "skipping and continuing to search for non-default"
             );
             continue;
           }
@@ -202,17 +203,12 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
       }
     }
 
-    // All attempts failed to find a non-default favicon, return the last fallback if we have one
-    if (lastFallback) {
-      console.debug(
-        "[favicon-detector] Returning default fallback for:",
-        serverUrl
-      );
-      return lastFallback;
-    }
-
-    // All attempts failed
-    console.debug("[favicon-detector] All attempts failed for:", serverUrl);
+    // All attempts failed to find a non-default favicon
+    console.debug(
+      "[favicon-detector] No non-default favicon found for:",
+      serverUrl,
+      "returning null to show gradient fallback"
+    );
     return null;
   } catch (error) {
     console.warn("[favicon-detector] Error detecting favicon:", error);

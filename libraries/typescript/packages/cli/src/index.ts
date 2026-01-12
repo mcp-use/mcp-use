@@ -876,13 +876,42 @@ program
           NODE_ENV: "development",
         };
 
-        const serverCommand = runCommand(
-          "npx",
-          ["tsx", "watch", serverFile],
-          projectPath,
-          env,
-          true
-        );
+        // Use local tsx if available, otherwise fall back to npx
+        const { createRequire } = await import("node:module");
+        let cmd: string;
+        let args: string[];
+        try {
+          const projectRequire = createRequire(
+            path.join(projectPath, "package.json")
+          );
+          // Resolve tsx bin from package.json instead of hardcoding internal path
+          const tsxPkgPath = projectRequire.resolve("tsx/package.json");
+          const tsxPkg = JSON.parse(await readFile(tsxPkgPath, "utf-8"));
+          // Handle both string and object forms of the bin field
+          let binPath: string;
+          if (typeof tsxPkg.bin === "string") {
+            binPath = tsxPkg.bin;
+          } else if (tsxPkg.bin && typeof tsxPkg.bin === "object") {
+            // Use 'tsx' entry or the first entry
+            binPath = tsxPkg.bin.tsx || Object.values(tsxPkg.bin)[0];
+          } else {
+            throw new Error("No bin field found in tsx package.json");
+          }
+          const tsxBin = path.resolve(path.dirname(tsxPkgPath), binPath);
+          cmd = "node";
+          args = [tsxBin, "watch", serverFile];
+        } catch (error) {
+          // tsx not found locally or bin resolution failed, use npx
+          console.log(
+            chalk.yellow(
+              `Could not resolve local tsx: ${error instanceof Error ? error.message : "unknown error"}`
+            )
+          );
+          cmd = "npx";
+          args = ["tsx", "watch", serverFile];
+        }
+
+        const serverCommand = runCommand(cmd, args, projectPath, env, true);
         processes.push(serverCommand.process);
 
         // Auto-open inspector if enabled
@@ -931,15 +960,28 @@ program
       const chokidarModule = await import("chokidar");
       const chokidar = (chokidarModule as any).default || chokidarModule;
       const { pathToFileURL } = await import("node:url");
-      const { register } = await import("node:module");
+      const { createRequire } = await import("node:module");
 
-      // Register tsx loader for TypeScript support in dynamic imports
-      // This allows us to import .ts files directly
+      // Try to get tsx's tsImport function for TypeScript support
+      let tsImport:
+        | ((specifier: string, parentUrl: string) => Promise<any>)
+        | null = null;
       try {
-        register("tsx/esm", pathToFileURL("./"));
+        const projectRequire = createRequire(
+          path.join(projectPath, "package.json")
+        );
+        // Resolve tsx/esm/api from the user's project
+        const tsxApiPath = projectRequire.resolve("tsx/esm/api");
+        const tsxApi = await import(pathToFileURL(tsxApiPath).href);
+        tsImport = tsxApi.tsImport;
       } catch {
-        // tsx loader might already be registered or not available
-        // We'll try to import anyway
+        // tsx not found - continue without it (JS files only, or tsx might be globally available)
+        console.log(
+          chalk.yellow(
+            "Warning: tsx not found in project dependencies. TypeScript HMR may not work.\n" +
+              "Add tsx to your devDependencies: npm install -D tsx"
+          )
+        );
       }
 
       const serverFilePath = path.join(projectPath, serverFile);
@@ -951,10 +993,16 @@ program
 
       // Helper to import server module with cache busting
       const importServerModule = async () => {
-        // Import with cache-busting query string
-        // This will execute the module and create an MCPServer instance
-        // Note: MCPServer.listen() becomes a no-op due to __mcpUseHmrMode flag
-        await import(`${serverFileUrl}?t=${Date.now()}`);
+        // Use tsx's tsImport if available for TypeScript support
+        // Otherwise fall back to native import (for JS files or if tsx is globally loaded)
+        if (tsImport) {
+          // tsImport handles TypeScript compilation
+          // Add cache-busting timestamp to force re-import
+          await tsImport(`${serverFilePath}?t=${Date.now()}`, import.meta.url);
+        } else {
+          // Native import - works for JS files or if tsx is already loaded via --import
+          await import(`${serverFileUrl}?t=${Date.now()}`);
+        }
 
         // Get the server instance from the global registry
         // No export required - MCPServer tracks itself when created via globalThis
@@ -1031,38 +1079,47 @@ program
         console.log(chalk.gray(`Watching for changes...\n`));
       }
 
-      // Watch for file changes - only watch src directory and root .ts files
-      const watchPaths = [
-        path.join(projectPath, "src"),
-        path.join(projectPath, "*.ts"),
-        path.join(projectPath, "*.tsx"),
-      ];
-
-      const watcher = chokidar.watch(watchPaths, {
+      // Watch for file changes - watch .ts/.tsx files in project directory
+      const watcher = chokidar.watch(".", {
+        cwd: projectPath,
         ignored: [
           /(^|[/\\])\../, // dotfiles
           "**/node_modules/**",
           "**/dist/**",
+          "**/resources/**", // widgets are watched separately by vite
+          "**/*.d.ts", // type definitions
         ],
         persistent: true,
         ignoreInitial: true,
+        depth: 3, // Limit depth to avoid watching too many files
       });
 
-      watcher.on("error", (error: unknown) => {
-        console.error(
-          chalk.red(
-            `[HMR] Watcher error: ${error instanceof Error ? error.message : String(error)}`
-          )
-        );
-      });
+      watcher
+        .on("ready", () => {
+          const watched = watcher.getWatched();
+          const dirs = Object.keys(watched);
+          console.log(
+            chalk.gray(`[HMR] Watcher ready, watching ${dirs.length} paths`)
+          );
+        })
+        .on("error", (error: unknown) => {
+          console.error(
+            chalk.red(
+              `[HMR] Watcher error: ${error instanceof Error ? error.message : String(error)}`
+            )
+          );
+        });
 
       // Debounce rapid changes
       let reloadTimeout: NodeJS.Timeout | null = null;
       let isReloading = false;
 
       watcher.on("change", async (filePath: string) => {
-        // Only handle .ts and .tsx files
-        if (!filePath.endsWith(".ts") && !filePath.endsWith(".tsx")) {
+        // Only handle .ts and .tsx files (not .d.ts)
+        if (
+          (!filePath.endsWith(".ts") && !filePath.endsWith(".tsx")) ||
+          filePath.endsWith(".d.ts")
+        ) {
           return;
         }
         if (isReloading) return;
@@ -1074,8 +1131,8 @@ program
 
         reloadTimeout = setTimeout(async () => {
           isReloading = true;
-          const relativePath = path.relative(projectPath, filePath);
-          console.log(chalk.yellow(`\n[HMR] File changed: ${relativePath}`));
+          // filePath is already relative due to cwd option
+          console.log(chalk.yellow(`\n[HMR] File changed: ${filePath}`));
 
           try {
             // Re-import the server module (this creates a new MCPServer instance)

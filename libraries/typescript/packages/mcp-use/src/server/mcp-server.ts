@@ -261,65 +261,80 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     };
 
     // --- TOOLS ---
+    // Note: We only add/update tools, not remove them during HMR
+    // This preserves widget tools and other system-registered tools
+    // Users can restart the server to fully remove tools
     const oldToolNames = new Set(this.registrations.tools.keys());
     const newToolNames = new Set(other.registrations.tools.keys());
-
-    // Remove tools that no longer exist
-    for (const name of oldToolNames) {
-      if (!newToolNames.has(name)) {
-        // Remove from all active sessions using SDK's remove()
-        for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-          const toolRef = refs.tools.get(name);
-          if (toolRef) {
-            toolRef.remove();
-            refs.tools.delete(name);
-          }
-        }
-        this.registrations.tools.delete(name);
-        changes.tools.removed.push(name);
-      }
-    }
 
     // Add new tools and update changed tools
     for (const name of newToolNames) {
       const newReg = other.registrations.tools.get(name)!;
 
       if (!oldToolNames.has(name)) {
-        // New tool - add to registrations and register on all sessions
+        // New tool - add to registrations and directly inject into active sessions
         this.registrations.tools.set(name, newReg);
 
-        // Register on all active sessions
+        // Build input schema
+        let inputSchema: Record<string, any>;
+        if (newReg.config.schema) {
+          inputSchema = this.convertZodSchemaToParams(newReg.config.schema);
+        } else if (newReg.config.inputs && newReg.config.inputs.length > 0) {
+          inputSchema = this.createParamsSchema(newReg.config.inputs);
+        } else {
+          inputSchema = {};
+        }
+
+        // Directly inject into all active sessions' native servers
         for (const [sessionId, session] of this.sessions) {
           if (session.server) {
-            const refs = this.sessionRegisteredRefs.get(sessionId);
-            if (refs) {
-              // Build input schema
-              let inputSchema: Record<string, any>;
-              if (newReg.config.schema) {
-                inputSchema = this.convertZodSchemaToParams(
-                  newReg.config.schema
-                );
-              } else if (
-                newReg.config.inputs &&
-                newReg.config.inputs.length > 0
+            try {
+              // Access internal SDK structure - casting to any since _registeredTools is private
+              const nativeServer = session.server as any;
+
+              if (
+                !nativeServer._registeredTools ||
+                typeof nativeServer._registeredTools !== "object"
               ) {
-                inputSchema = this.createParamsSchema(newReg.config.inputs);
-              } else {
-                inputSchema = {};
+                throw new Error(
+                  `Session ${sessionId}: Native server missing _registeredTools object`
+                );
               }
 
-              const registeredTool = session.server.registerTool(
-                name,
-                {
-                  title: newReg.config.title,
-                  description: newReg.config.description ?? "",
-                  inputSchema,
-                  annotations: newReg.config.annotations,
-                  _meta: newReg.config._meta,
+              // Create entry matching SDK's RegisteredTool structure (bypasses post-connect registration check)
+              const toolEntry = {
+                title: newReg.config.title,
+                description: newReg.config.description ?? "",
+                inputSchema,
+                outputSchema: undefined,
+                annotations: newReg.config.annotations,
+                execution: { taskSupport: "forbidden" },
+                _meta: newReg.config._meta,
+                handler: newReg.handler,
+                enabled: true,
+                disable: function (this: RegisteredTool) {
+                  this.enabled = false;
                 },
-                newReg.handler as any
+                enable: function (this: RegisteredTool) {
+                  this.enabled = true;
+                },
+                remove: () => {
+                  delete nativeServer._registeredTools[name];
+                },
+                update: function (
+                  this: RegisteredTool,
+                  updates: Record<string, unknown>
+                ) {
+                  Object.assign(this, updates);
+                },
+              } as RegisteredTool;
+
+              nativeServer._registeredTools[name] = toolEntry;
+            } catch (error) {
+              console.error(
+                `[HMR] Failed to inject tool "${name}" into session ${sessionId}:`,
+                error instanceof Error ? error.message : String(error)
               );
-              refs.tools.set(name, registeredTool);
             }
           }
         }
@@ -369,52 +384,71 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // --- PROMPTS ---
+    // Note: We only add/update prompts, not remove them during HMR
     const oldPromptNames = new Set(this.registrations.prompts.keys());
     const newPromptNames = new Set(other.registrations.prompts.keys());
-
-    for (const name of oldPromptNames) {
-      if (!newPromptNames.has(name)) {
-        for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-          const promptRef = refs.prompts.get(name);
-          if (promptRef) {
-            promptRef.remove();
-            refs.prompts.delete(name);
-          }
-        }
-        this.registrations.prompts.delete(name);
-        changes.prompts.removed.push(name);
-      }
-    }
 
     for (const name of newPromptNames) {
       const newReg = other.registrations.prompts.get(name)!;
 
       if (!oldPromptNames.has(name)) {
+        // New prompt - add to registrations and directly inject into active sessions
         this.registrations.prompts.set(name, newReg);
-        // Register on all active sessions
+
+        // Build args schema
+        let argsSchema: Record<string, any> | undefined;
+        if (newReg.config.schema) {
+          argsSchema = this.convertZodSchemaToParams(newReg.config.schema);
+        } else if (newReg.config.args && newReg.config.args.length > 0) {
+          argsSchema = this.createParamsSchema(newReg.config.args);
+        }
+
+        // Directly inject into all active sessions' native servers
         for (const [sessionId, session] of this.sessions) {
           if (session.server) {
-            const refs = this.sessionRegisteredRefs.get(sessionId);
-            if (refs) {
-              let argsSchema: Record<string, any> | undefined;
-              if (newReg.config.schema) {
-                argsSchema = this.convertZodSchemaToParams(
-                  newReg.config.schema
+            try {
+              // Access internal SDK structure - casting to any since _registeredPrompts is private
+              const nativeServer = session.server as any;
+
+              if (
+                !nativeServer._registeredPrompts ||
+                typeof nativeServer._registeredPrompts !== "object"
+              ) {
+                throw new Error(
+                  `Session ${sessionId}: Native server missing _registeredPrompts object`
                 );
-              } else if (newReg.config.args && newReg.config.args.length > 0) {
-                argsSchema = this.createParamsSchema(newReg.config.args);
               }
 
-              const registeredPrompt = session.server.registerPrompt(
-                name,
-                {
-                  title: newReg.config.title,
-                  description: newReg.config.description ?? "",
-                  argsSchema: argsSchema as any,
+              // Create entry matching SDK's RegisteredPrompt structure (bypasses post-connect registration check)
+              const promptEntry = {
+                title: newReg.config.title,
+                description: newReg.config.description ?? "",
+                argsSchema,
+                callback: newReg.handler, // SDK uses 'callback' not 'handler'
+                enabled: true,
+                disable: function (this: RegisteredPrompt) {
+                  this.enabled = false;
                 },
-                newReg.handler as any
+                enable: function (this: RegisteredPrompt) {
+                  this.enabled = true;
+                },
+                remove: () => {
+                  delete nativeServer._registeredPrompts[name];
+                },
+                update: function (
+                  this: RegisteredPrompt,
+                  updates: Record<string, unknown>
+                ) {
+                  Object.assign(this, updates);
+                },
+              } as RegisteredPrompt;
+
+              nativeServer._registeredPrompts[name] = promptEntry;
+            } catch (error) {
+              console.error(
+                `[HMR] Failed to inject prompt "${name}" into session ${sessionId}:`,
+                error instanceof Error ? error.message : String(error)
               );
-              refs.prompts.set(name, registeredPrompt);
             }
           }
         }
@@ -452,43 +486,66 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // --- RESOURCES ---
+    // Note: We only add/update resources, not remove them during HMR
     const oldResourceKeys = new Set(this.registrations.resources.keys());
     const newResourceKeys = new Set(other.registrations.resources.keys());
-
-    for (const key of oldResourceKeys) {
-      if (!newResourceKeys.has(key)) {
-        for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-          const resourceRef = refs.resources.get(key);
-          if (resourceRef) {
-            resourceRef.remove();
-            refs.resources.delete(key);
-          }
-        }
-        this.registrations.resources.delete(key);
-        changes.resources.removed.push(key);
-      }
-    }
 
     for (const key of newResourceKeys) {
       const newReg = other.registrations.resources.get(key)!;
 
       if (!oldResourceKeys.has(key)) {
+        // New resource - add to registrations and directly inject into active sessions
         this.registrations.resources.set(key, newReg);
+
+        // Directly inject into all active sessions' native servers
         for (const [sessionId, session] of this.sessions) {
           if (session.server) {
-            const refs = this.sessionRegisteredRefs.get(sessionId);
-            if (refs) {
-              const registeredResource = session.server.registerResource(
-                newReg.config.name,
-                newReg.config.uri,
-                {
-                  title: newReg.config.title,
-                  description: newReg.config.description,
-                  mimeType: newReg.config.mimeType || "text/plain",
-                } as any,
-                newReg.handler as any
+            try {
+              // Access internal SDK structure - casting to any since _registeredResources is private
+              const nativeServer = session.server as any;
+
+              if (
+                !nativeServer._registeredResources ||
+                typeof nativeServer._registeredResources !== "object"
+              ) {
+                throw new Error(
+                  `Session ${sessionId}: Native server missing _registeredResources object`
+                );
+              }
+
+              // Create entry matching SDK's RegisteredResource structure (bypasses post-connect registration check)
+              // Note: mcp-use's ReadResourceCallback signature differs from SDK's, so we cast through unknown
+              const resourceEntry = {
+                name: newReg.config.name,
+                uri: newReg.config.uri,
+                title: newReg.config.title,
+                description: newReg.config.description,
+                mimeType: newReg.config.mimeType || "text/plain",
+                readCallback: newReg.handler as unknown, // SDK uses different callback signature
+                enabled: true,
+                disable: function (this: RegisteredResource) {
+                  this.enabled = false;
+                },
+                enable: function (this: RegisteredResource) {
+                  this.enabled = true;
+                },
+                remove: () => {
+                  delete nativeServer._registeredResources[key];
+                },
+                update: function (
+                  this: RegisteredResource,
+                  updates: Record<string, unknown>
+                ) {
+                  Object.assign(this, updates);
+                },
+              } as unknown as RegisteredResource;
+
+              nativeServer._registeredResources[key] = resourceEntry;
+            } catch (error) {
+              console.error(
+                `[HMR] Failed to inject resource "${key}" into session ${sessionId}:`,
+                error instanceof Error ? error.message : String(error)
               );
-              refs.resources.set(key, registeredResource);
             }
           }
         }
@@ -520,6 +577,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // --- RESOURCE TEMPLATES ---
+    // Note: We only add resource templates during HMR, not remove them
     const oldTemplateNames = new Set(
       this.registrations.resourceTemplates.keys()
     );
@@ -527,22 +585,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       other.registrations.resourceTemplates.keys()
     );
 
-    for (const name of oldTemplateNames) {
-      if (!newTemplateNames.has(name)) {
-        for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-          const templateRef = refs.resourceTemplates.get(name);
-          if (templateRef) {
-            templateRef.remove();
-            refs.resourceTemplates.delete(name);
-          }
-        }
-        this.registrations.resourceTemplates.delete(name);
-        changes.resourceTemplates.removed.push(name);
-      }
-    }
-
-    // For resource templates, we only handle remove for now
-    // Adding/updating templates is more complex due to the template pattern
+    // For resource templates, we only handle adds for now
     for (const name of newTemplateNames) {
       if (!oldTemplateNames.has(name)) {
         const newReg = other.registrations.resourceTemplates.get(name)!;
@@ -603,30 +646,46 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         );
 
       // Send list_changed notifications to all sessions
-      for (const [_sessionId, session] of this.sessions) {
+      // Wrap in try-catch because some sessions may not support these notifications
+      for (const [sessionId, session] of this.sessions) {
         if (session.server) {
-          if (
-            changes.tools.added.length ||
-            changes.tools.removed.length ||
-            changes.tools.updated.length
-          ) {
-            session.server.sendToolListChanged();
+          // Only check added/updated since HMR disables removals
+          try {
+            if (changes.tools.added.length || changes.tools.updated.length) {
+              session.server.sendToolListChanged();
+            }
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
           }
-          if (
-            changes.prompts.added.length ||
-            changes.prompts.removed.length ||
-            changes.prompts.updated.length
-          ) {
-            session.server.sendPromptListChanged();
+          try {
+            if (
+              changes.prompts.added.length ||
+              changes.prompts.updated.length
+            ) {
+              session.server.sendPromptListChanged();
+            }
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send prompts/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
           }
-          if (
-            changes.resources.added.length ||
-            changes.resources.removed.length ||
-            changes.resources.updated.length ||
-            changes.resourceTemplates.added.length ||
-            changes.resourceTemplates.removed.length
-          ) {
-            session.server.sendResourceListChanged();
+          try {
+            if (
+              changes.resources.added.length ||
+              changes.resources.updated.length ||
+              changes.resourceTemplates.added.length
+            ) {
+              session.server.sendResourceListChanged();
+            }
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send resources/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
           }
         }
       }
@@ -683,6 +742,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       {
         capabilities: {
           logging: {},
+          tools: {
+            listChanged: true,
+          },
+          prompts: {
+            listChanged: true,
+          },
           resources: {
             subscribe: true,
             listChanged: true,
@@ -883,6 +948,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       {
         capabilities: {
           logging: {},
+          tools: {
+            listChanged: true,
+          },
+          prompts: {
+            listChanged: true,
+          },
+          resources: {
+            subscribe: true,
+            listChanged: true,
+          },
         },
       }
     );
