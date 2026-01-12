@@ -291,6 +291,26 @@ export function ResourcesTab({
     setSelectedResourceUri,
   ]);
 
+  // Sync selectedResource with updated resources list (for HMR support)
+  // When resources change via HMR, update selectedResource to the new object reference
+  useEffect(() => {
+    if (selectedResource) {
+      const updatedResource = resources.find(
+        (r) => r.uri === selectedResource.uri
+      );
+      if (updatedResource && updatedResource !== selectedResource) {
+        // Resource definition changed - update the reference
+        const hasChanges =
+          updatedResource.description !== selectedResource.description ||
+          updatedResource.mimeType !== selectedResource.mimeType ||
+          updatedResource.name !== selectedResource.name;
+        if (hasChanges) {
+          setSelectedResource(updatedResource);
+        }
+      }
+    }
+  }, [resources, selectedResource]);
+
   const handleCopy = useCallback(async () => {
     if (!currentResult) return;
     try {
