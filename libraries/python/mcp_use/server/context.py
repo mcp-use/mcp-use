@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from mcp.server.elicitation import ElicitationResult, ElicitSchemaModelT
 from mcp.server.fastmcp import Context as FastMCPContext
-from mcp.types import CreateMessageResult, ModelPreferences, SamplingMessage, TextContent
+from mcp.types import CreateMessageResult, ListRootsResult, ModelPreferences, Root, SamplingMessage, TextContent
 from pydantic import BaseModel, Field, create_model
 from starlette.requests import Request
 
@@ -74,6 +74,30 @@ class Context(FastMCPContext):
         """Notify the client that the prompt list changed."""
         _telemetry.track_server_context(context_type="notification", notification_type="prompts/list_changed")
         await self.session.send_prompt_list_changed()
+
+    async def list_roots(self) -> list[Root]:
+        """Request the list of roots from the client.
+
+        Roots represent directories or files that the client has access to
+        and wants to make available to the server.
+
+        Returns:
+            A list of Root objects, each with a 'uri' (file:// URI) and
+            optional 'name' field.
+
+        Example:
+            ```python
+            @mcp.tool()
+            async def analyze_workspace(ctx: Context) -> str:
+                roots = await ctx.list_roots()
+                if not roots:
+                    return "No roots provided by client"
+                return f"Client has {len(roots)} root(s): {[str(r.uri) for r in roots]}"
+            ```
+        """
+        _telemetry.track_server_context(context_type="list_roots")
+        result: ListRootsResult = await self.session.list_roots()
+        return result.roots
 
     def get_http_request(self) -> Request | None:
         """Return the underlying Starlette Request when running over HTTP transports."""
