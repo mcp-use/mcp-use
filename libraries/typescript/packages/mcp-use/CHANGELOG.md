@@ -1,5 +1,128 @@
 # mcp-use
 
+## 1.13.0
+
+### Minor Changes
+
+- bcdecd4: feat: Hot Module Reloading (HMR) for MCP server development
+
+  Added HMR support to the `mcp-use dev` command. When you modify your server file (add/remove/update tools, prompts, or resources), changes are applied instantly without restarting the server or dropping client connections.
+
+  **Features:**
+  - Tools, prompts, and resources can be added, removed, or updated on-the-fly
+  - Connected clients (like the inspector) receive `list_changed` notifications and auto-refresh
+  - No changes required to user code - existing server files work as-is
+  - Syntax errors during reload are caught gracefully without crashing the server
+
+  **How it works:**
+  - CLI uses `chokidar` to watch `src/` directory and root `.ts`/`.tsx` files
+  - On file change, the module is re-imported with cache-busting
+  - `syncRegistrationsFrom()` diffs registrations and uses the SDK's native `RegisteredTool.update()` and `remove()` methods
+  - `list_changed` notifications are sent to all connected sessions
+
+  **Usage:**
+
+  ```bash
+  mcp-use dev  # HMR enabled by default
+  mcp-use dev --no-hmr  # Disable HMR, use tsx watch instead
+  ```
+
+### Patch Changes
+
+- bcdecd4: Add comprehensive test suite for Hot Module Replacement (HMR) functionality
+
+  **Testing Approach:**
+
+  Tests use minimal mocking, focusing on:
+  - Real `MCPServer` instances
+  - Actual console logs (the developer experience)
+  - Direct registration state inspection
+  - Light session mocking only for injection tests
+
+  This approach is more robust and less brittle than heavy mocking, as tests verify real behavior and won't break when SDK internals change.
+
+  **Test Coverage:**
+
+  **Unit Tests** (`tests/unit/server/hmr.test.ts` - 15 tests):
+  - Tool registration (add, update, inject)
+  - Prompt registration (add, inject)
+  - Resource registration (add, inject)
+  - Notification sending (tools/list_changed, prompts/list_changed, resources/list_changed)
+  - Entry methods (enable, disable, remove, update)
+  - Error handling for injection failures
+  - Graceful notification error handling
+
+  **Integration Tests** (`tests/integration/hmr-cli.test.ts`):
+  - End-to-end file change detection
+  - Tool addition via HMR
+  - Tool description updates
+  - Syntax error handling and recovery
+  - Connection persistence during HMR
+
+  **CLI Tests** (`packages/cli/tests/tsx-resolution.test.ts`):
+  - tsx binary resolution from package.json bin field
+  - Handling string and object bin formats
+  - Graceful error handling for missing bin field
+  - Preference for 'tsx' entry in object form
+
+  All tests include proper setup/teardown, mocking, and comprehensive assertions.
+
+- bcdecd4: This release includes significant enhancements to OAuth flow handling, server metadata caching, and favicon detection:
+
+  **OAuth Flow Enhancements**
+  - Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+  - Added automatic metadata URL rewriting from gateway URLs to actual server URLs
+  - Implemented resource parameter rewriting for authorize and token requests to use actual server URLs
+  - Added WWW-Authenticate header discovery for OAuth metadata endpoints
+  - Store and reuse OAuth proxy settings in callback flow for CORS bypass during token exchange
+  - Added X-Forwarded-Host support for proper proxy URL construction in dev environments
+
+  **Client Info Support**
+  - Added `clientInfo` configuration prop to `McpClientProvider` for OAuth registration
+  - Client info (name, version, icons, websiteUrl) is now sent during OAuth registration and displayed on consent pages
+  - Supports per-server client info override
+  - Inspector now includes client info with branding
+
+  **Server Metadata Caching**
+  - Added `CachedServerMetadata` interface for storing server name, version, icons, and other metadata
+  - Extended `StorageProvider` interface with optional metadata methods (`getServerMetadata`, `setServerMetadata`, `removeServerMetadata`)
+  - Implemented metadata caching in `LocalStorageProvider` and `MemoryStorageProvider`
+  - Server metadata is now automatically cached when servers connect and used as initial display while fetching fresh data
+  - Improves UX by showing server info immediately on reconnect
+
+  **Inspector Improvements**
+  - Added logging middleware to API routes for better debugging
+  - Simplified server ID handling by removing redundant URL decoding (searchParams.get() already decodes)
+  - Added X-Forwarded-Host header forwarding in Vite proxy configuration
+  - Enabled OAuth proxy logging for better visibility
+
+  **Favicon Detection Improvements**
+  - Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com → com)
+  - Added detection of default vs custom favicons using JSON API response
+  - Prefer non-default favicons when available
+  - Better handling of fallback cases
+
+  **Other Changes**
+  - Updated multi-server example with Supabase OAuth proxy example
+  - Added connectionUrl parameter passing for resource field rewriting throughout OAuth flow
+  - Improved logging and error messages throughout OAuth flow
+
+- bcdecd4: fix: remove import from "mcp-use" which causes langchain import in server
+- bcdecd4: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+  - @mcp-use/cli@2.9.0
+  - @mcp-use/inspector@0.14.5
+
 ## 1.13.0-canary.3
 
 ### Patch Changes
