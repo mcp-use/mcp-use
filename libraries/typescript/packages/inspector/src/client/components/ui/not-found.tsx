@@ -1,4 +1,3 @@
-import type React from "react";
 import { cn } from "@/client/lib/utils";
 
 interface NotFoundProps {

@@ -35,12 +35,12 @@ For ES256 tokens (new):
 For new Supabase projects using ES256 tokens:
 
 ```typescript
-import { McpServer, supabase } from 'mcp-use/server'
+import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
 
-const server = new McpServer({
+const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  oauth: supabase({
+  oauth: oauthSupabaseProvider({
     projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
     // ES256 tokens use JWKS automatically
   })
@@ -54,8 +54,8 @@ server.listen(3000)
 For projects still using HS256 tokens:
 
 ```typescript
-const server = new McpServer({
-  oauth: supabase({
+const server = new MCPServer({
+  oauth: oauthSupabaseProvider({
     projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
     jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
   })
@@ -75,8 +75,8 @@ MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret  # Only for HS256
 ### Full Configuration Options
 
 ```typescript
-const server = new McpServer({
-  oauth: supabase({
+const server = new MCPServer({
+  oauth: oauthSupabaseProvider({
     // Required
     projectId: 'your-project-id',
     
@@ -111,8 +111,8 @@ const server = new McpServer({
 New Supabase projects use ES256 tokens with JWKS:
 
 ```typescript
-const server = new McpServer({
-  oauth: supabase({
+const server = new MCPServer({
+  oauth: oauthSupabaseProvider({
     projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!
     // No jwtSecret needed - uses JWKS automatically
   })
@@ -129,8 +129,8 @@ const server = new McpServer({
 Older projects may still use HS256:
 
 ```typescript
-const server = new McpServer({
-  oauth: supabase({
+const server = new MCPServer({
+  oauth: oauthSupabaseProvider({
     projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
     jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
   })

@@ -5,7 +5,7 @@ import type {
   Tool as MCPTool,
   Resource,
   Prompt,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { ZodTypeAny } from "zod";
 import type { BaseConnector } from "../connectors/base.js";
 

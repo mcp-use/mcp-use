@@ -58,7 +58,8 @@ describe("Telemetry", () => {
 
   describe("singleton pattern", () => {
     it("should return the same instance on multiple calls", async () => {
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const instance1 = Telemetry.getInstance();
       const instance2 = Telemetry.getInstance();
       expect(instance1).toBe(instance2);
@@ -69,7 +70,8 @@ describe("Telemetry", () => {
     it("should disable telemetry when MCP_USE_ANONYMIZED_TELEMETRY=false", async () => {
       process.env.MCP_USE_ANONYMIZED_TELEMETRY = "false";
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
       expect(telemetry.isEnabled).toBe(false);
@@ -78,7 +80,8 @@ describe("Telemetry", () => {
     it("should enable telemetry when MCP_USE_ANONYMIZED_TELEMETRY is not set", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
       expect(telemetry.isEnabled).toBe(true);
@@ -87,7 +90,8 @@ describe("Telemetry", () => {
     it("should use custom source from MCP_USE_TELEMETRY_SOURCE env var", async () => {
       process.env.MCP_USE_TELEMETRY_SOURCE = "custom-source";
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
       expect(telemetry.getSource()).toBe("custom-source");
@@ -98,7 +102,8 @@ describe("Telemetry", () => {
     it("should default source to detected runtime environment", async () => {
       delete process.env.MCP_USE_TELEMETRY_SOURCE;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
       // In Node.js test environment, source defaults to "node"
@@ -107,7 +112,8 @@ describe("Telemetry", () => {
     });
 
     it("should allow setting source via setSource()", async () => {
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
       telemetry.setSource("my-custom-app");
@@ -119,7 +125,8 @@ describe("Telemetry", () => {
     it("should not capture events when telemetry is disabled", async () => {
       process.env.MCP_USE_ANONYMIZED_TELEMETRY = "false";
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const { MCPClientInitEvent } =
         await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
@@ -141,7 +148,8 @@ describe("Telemetry", () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
       mockCapture.mockClear();
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const { MCPClientInitEvent } =
         await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
@@ -175,7 +183,8 @@ describe("Telemetry", () => {
     it("should not track when telemetry is disabled", async () => {
       process.env.MCP_USE_ANONYMIZED_TELEMETRY = "false";
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture");
 
@@ -194,7 +203,8 @@ describe("Telemetry", () => {
     it("should call capture for trackAgentExecution when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -226,7 +236,8 @@ describe("Telemetry", () => {
     it("should call capture for trackServerToolCall when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -247,7 +258,8 @@ describe("Telemetry", () => {
     it("should call capture for trackServerResourceCall when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -268,7 +280,8 @@ describe("Telemetry", () => {
     it("should call capture for trackServerPromptCall when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -288,7 +301,8 @@ describe("Telemetry", () => {
     it("should call capture for trackServerContext when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -306,7 +320,8 @@ describe("Telemetry", () => {
     it("should call capture for trackConnectorInit when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -325,7 +340,8 @@ describe("Telemetry", () => {
     it("should call capture for trackServerInitialize when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
 
@@ -349,8 +365,12 @@ describe("Telemetry", () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
       mockFlush.mockClear();
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
+
+      // Wait for PostHog to initialize (it's async)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       telemetry.flush();
 
@@ -361,8 +381,12 @@ describe("Telemetry", () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
       mockShutdown.mockClear();
 
-      const { Telemetry } = await import("../../../src/telemetry/telemetry.js");
+      const { Telemetry } =
+        await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
+
+      // Wait for PostHog to initialize (it's async)
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       telemetry.shutdown();
 

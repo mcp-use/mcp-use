@@ -3,7 +3,7 @@ title: "Introduction"
 description: "Build MCP servers with mcp-use's enhanced server framework"
 icon: "list-start"
 ---
-<Card title="" img="./images/Server.jpg" horizontal="true">
+<Card title="" img="https://cdn.mcp-use.com/docs/python/Server.jpg" horizontal="true">
 The mcp-use server framework extends the official MCP Python SDK with enhanced features for building production-ready MCP servers. It provides built-in documentation endpoints, inspector UI, improved logging, and seamless integration with the mcp-use ecosystem.
 </Card>
 
@@ -19,16 +19,16 @@ If you have any ideas, please let us know on Discord. 💜
 
 While the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) provides the core functionality for building MCP servers, mcp-use enhances it with:
 <Columns cols={2}>
-  <Card title="Official SDK Compatibility" icon="check" href="/python/server/compatibility" img="./images/MCP.jpg">
+  <Card title="Official SDK Compatibility" icon="check" href="/python/server/compatibility" img="https://cdn.mcp-use.com/docs/python/MCP.jpg">
     Fully compatible with the official MCP Python SDK. Extends existing functionality without breaking changes, ensuring seamless migration.
   </Card>
-  <Card title="Inspector UI" icon="monitor" href="/python/server/inspector" img="./images/Inspector.jpg">
+  <Card title="Inspector UI" icon="monitor" href="/python/server/inspector" img="https://cdn.mcp-use.com/docs/python/Inspector.jpg">
     Built-in web interface for real-time server monitoring, tool exploration, and debugging. Accessible at /inspector endpoint.
   </Card>
-  <Card title="openmcp.json" icon="file-text" href="/python/server/openmcp" img="./images/OpenMCP.jpg">
+  <Card title="openmcp.json" icon="file-text" href="/python/server/openmcp" img="https://cdn.mcp-use.com/docs/python/OpenMCP.jpg">
     Automatic generation of openmcp.json endpoint for server discovery and metadata. Provides standardized server information for MCP clients and tools.
   </Card>
-  <Card title="MCP-Specific Logging" icon="activity" href="/python/server/logging" img="./images/Logging.jpg">
+  <Card title="MCP-Specific Logging" icon="activity" href="/python/server/logging" img="https://cdn.mcp-use.com/docs/python/Logging.jpg">
     Enhanced logging system designed specifically for MCP servers with structured output, request tracing, and performance metrics.
   </Card>
 </Columns>
@@ -110,7 +110,7 @@ Build your first MCP server in minutes with this step-by-step guide:
 
     ```python
     if __name__ == "__main__":
-        server.run(transport="streamable-http", debug=True)
+        server.run(transport="streamable-http", run_debug=True)
     ```
 
     Then run it:
@@ -159,7 +159,7 @@ def get_time() -> str:
     return datetime.now().isoformat()
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", debug=True)
+    server.run(transport="streamable-http", run_debug=True)
 ```
 
 ### Transport Options

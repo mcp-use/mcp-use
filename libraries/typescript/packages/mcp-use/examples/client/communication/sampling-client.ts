@@ -9,12 +9,15 @@
  * To run this example:
  * 1. Start the sampling server: cd examples/server/sampling && npm run dev
  * 2. Run this client: tsx examples/client/sampling-client.ts
+ *
+ * Note: This example uses `onSampling`. The deprecated `samplingCallback` name
+ * is still supported for backward compatibility but will be removed in a future version.
  */
 
 import type {
   CreateMessageRequest,
   TextContent,
-} from "@mcp-use/modelcontextprotocol-sdk/types";
+} from "@modelcontextprotocol/sdk/types";
 import { MCPClient } from "../../../dist/src/client";
 
 // Mock LLM function - replace this with your actual LLM integration
@@ -56,11 +59,10 @@ async function mockLLM(prompt: string): Promise<string> {
 }
 
 // Create sampling callback
-async function samplingCallback(
+// Note: The function name can be anything, but we use `onSampling` to match the option name
+async function onSampling(
   params: CreateMessageRequest["params"]
-): Promise<
-  import("@mcp-use/modelcontextprotocol-sdk/types.js").CreateMessageResult
-> {
+): Promise<import("@modelcontextprotocol/sdk/types.js").CreateMessageResult> {
   console.log("📥 Received sampling request:");
   console.log("   Messages:", params.messages.length);
   console.log("   Model preferences:", params.modelPreferences);
@@ -92,16 +94,20 @@ async function main() {
   console.log("🚀 Starting Sampling Client Example\n");
 
   // Create client with sampling callback
+  // Configure clientInfo to identify this client to the server
+  // This is sent in the MCP initialize request and helps with server-side logging/observability
   const client = new MCPClient(
     {
       mcpServers: {
         sampling: {
           url: "http://localhost:3000/mcp",
+          clientInfo: { name: "sampling-client", version: "1.0.0" },
         },
       },
     },
     {
-      samplingCallback,
+      onSampling,
+      // Note: The deprecated `samplingCallback` name is still supported for backward compatibility
     }
   );
 

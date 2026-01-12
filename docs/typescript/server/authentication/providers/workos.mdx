@@ -34,12 +34,12 @@ For enterprise SSO, configure directory connections:
 ### Basic Configuration
 
 ```typescript
-import { McpServer, workos } from 'mcp-use/server'
+import { MCPServer, oauthWorkOSProvider } from 'mcp-use/server'
 
-const server = new McpServer({
+const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  oauth: workos({
+  oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     // Optional: for WorkOS API calls
     apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
@@ -63,8 +63,8 @@ MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_...      # Optional
 ### Full Configuration Options
 
 ```typescript
-const server = new McpServer({
-  oauth: workos({
+const server = new MCPServer({
+  oauth: oauthWorkOSProvider({
     // Required
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     
@@ -94,8 +94,8 @@ const server = new McpServer({
 WorkOS supports **Dynamic Client Registration (DCR)** where MCP clients register themselves automatically:
 
 ```typescript
-const server = new McpServer({
-  oauth: workos({
+const server = new MCPServer({
+  oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY, // Optional, for API calls
   })
@@ -105,8 +105,8 @@ const server = new McpServer({
 Alternatively, use a **pre-registered OAuth client**:
 
 ```typescript
-const server = new McpServer({
-  oauth: workos({
+const server = new MCPServer({
+  oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID!, // Pre-registered client
     apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
@@ -134,8 +134,8 @@ window.location.href = authUrl.toString()
 
 Server configuration:
 ```typescript
-const server = new McpServer({
-  oauth: workos({
+const server = new MCPServer({
+  oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
     clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
@@ -201,8 +201,8 @@ server.tool({
 ### Custom User Info Extraction
 
 ```typescript
-const server = new McpServer({
-  oauth: workos({
+const server = new MCPServer({
+  oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
     
@@ -425,7 +425,7 @@ authUrl.searchParams.set('organization', 'org_123')
 
 Or configure in server:
 ```typescript
-oauth: workos({
+oauth: oauthWorkOSProvider({
   organization: process.env.WORKOS_ORGANIZATION
 })
 ```
@@ -453,16 +453,16 @@ echo $MCP_USE_OAUTH_WORKOS_CLIENT_ID
 ## Complete Example
 
 ```typescript
-import { McpServer, workos, text, error, json } from 'mcp-use/server'
+import { MCPServer, oauthWorkOSProvider, text, error, json } from 'mcp-use/server'
 import { WorkOS } from '@workos-inc/node'
 import { z } from 'zod'
 
 const workosClient = new WorkOS(process.env.MCP_USE_OAUTH_WORKOS_API_KEY!)
 
-const server = new McpServer({
+const server = new MCPServer({
   name: 'workos-example',
   version: '1.0.0',
-  oauth: workos({
+  oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
     apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY!,
     clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,

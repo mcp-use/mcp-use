@@ -13,6 +13,7 @@ The MCP Inspector provides extensive configuration options for connecting to MCP
 Connect directly to the MCP server without a proxy. This is the default and recommended option for most use cases.
 
 **When to use:**
+
 - Local development servers
 - Servers accessible from your network
 - Servers with public endpoints
@@ -22,6 +23,7 @@ Connect directly to the MCP server without a proxy. This is the default and reco
 Connect through a proxy server. Useful when you need to route traffic through an intermediary or when direct connections are blocked.
 
 **When to use:**
+
 - Corporate networks with proxy requirements
 - CORS restrictions
 - Testing proxy configurations
@@ -36,7 +38,8 @@ The inspector can automatically try both connection types if one fails. Enable t
 3. If Direct connection fails, the inspector will automatically try Via Proxy (and vice versa)
 
 <Note>
-Auto-switch is skipped for authentication errors (401, Unauthorized) since both connection types will fail the same way.
+  Auto-switch is skipped for authentication errors (401, Unauthorized) since
+  both connection types will fail the same way.
 </Note>
 
 ## Advanced Configuration
@@ -95,14 +98,16 @@ The inspector shows different states during OAuth:
 - **Ready**: Successfully authenticated and connected
 - **Failed**: Authentication or connection failed
 
-### Manual Authentication
+### OAuth Authentication
 
-If automatic OAuth redirect doesn't work:
+When a server requires OAuth authentication:
 
-1. Look for the **Authenticate** button in the server card
-2. Click to open the OAuth page in a new tab
-3. Complete the authorization
-4. Return to the inspector - it will detect the completed auth
+1. The connection will enter **pending_auth** state
+2. Click the **Authenticate** button in the server card
+3. Complete the authorization in the popup or new tab
+4. Return to the inspector - it will automatically detect the completed auth
+
+If the popup is blocked, use the **"open auth page"** link as a fallback.
 
 ## Custom Headers
 
@@ -125,7 +130,9 @@ Add custom HTTP headers to all requests sent to the MCP server.
 ### Security Considerations
 
 <Warning>
-Custom headers are stored in browser localStorage. Never include sensitive credentials that shouldn't be stored locally. Use OAuth for secure authentication instead.
+  Custom headers are stored in browser localStorage. Never include sensitive
+  credentials that shouldn't be stored locally. Use OAuth for secure
+  authentication instead.
 </Warning>
 
 ### Header Visibility
@@ -143,12 +150,13 @@ Export your connection configuration as JSON:
 3. The configuration is copied to your clipboard as JSON
 
 **Example configuration:**
+
 ```json
 {
   "url": "https://mcp.example.com/mcp",
   "transportType": "http",
   "connectionType": "Direct",
-  "customHeaders": {
+  "headers": {
     "Authorization": "Bearer token123"
   },
   "requestTimeout": 10000,
@@ -171,7 +179,8 @@ Import a connection configuration from JSON:
 3. The form automatically populates with all settings
 
 <Note>
-The paste detection only works when pasting into the URL field. The inspector recognizes valid JSON configuration and populates the form automatically.
+  The paste detection only works when pasting into the URL field. The inspector
+  recognizes valid JSON configuration and populates the form automatically.
 </Note>
 
 ### Sharing Configurations
@@ -184,7 +193,8 @@ You can share connection configurations with team members:
 4. All settings are automatically applied
 
 <Warning>
-Never share configurations containing sensitive credentials. Remove OAuth tokens, API keys, and other secrets before sharing.
+  Never share configurations containing sensitive credentials. Remove OAuth
+  tokens, API keys, and other secrets before sharing.
 </Warning>
 
 ## Connection Status Indicators
@@ -203,4 +213,3 @@ Hover over the indicator to see detailed status information.
 - [Getting Started](/inspector/index) - Basic connection setup
 - [Overview](/inspector/index) - Connection management features
 - [CLI Usage](/inspector/cli) - Command-line connection options
-

@@ -75,7 +75,8 @@
                   "inspector/integration",
                   "inspector/debugging-chatgpt-apps",
                   "inspector/self-hosting",
-                  "inspector/development"
+                  "inspector/development",
+                  "inspector/changelog"
                 ]
               },
               "tunneling/index"
@@ -177,7 +178,16 @@
                       "python/client/logging"
                     ]
                   },
-                  "python/client/authentication",
+                  {
+                    "group": "Authentication",
+                    "icon": "key",
+                    "pages": [
+                      "python/client/authentication/index",
+                      "python/client/authentication/oauth",
+                      "python/client/authentication/bearer",
+                      "python/client/authentication/custom"
+                    ]
+                  },
                   "python/client/code-mode"
                 ]
               },
@@ -657,6 +667,10 @@
     {
       "source": "/typescript/getting-started",
       "destination": "/typescript/getting-started/quickstart"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/python/changelog/changelog"
     }
   ],
   "logo": {
@@ -705,10 +719,6 @@
           {
             "label": "Website",
             "href": "https://mcp-use.com"
-          },
-          {
-            "label": "Cloud Chat",
-            "href": "https://chat.mcp-use.com"
           },
           {
             "label": "GitHub",

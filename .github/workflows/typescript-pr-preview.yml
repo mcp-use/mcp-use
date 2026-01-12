@@ -66,13 +66,23 @@ jobs:
 
       - name: Create temporary deno.json with PR preview imports
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        # Note: Hybrid mapping to satisfy conflicting Zod requirements:
+        # - SDK imports "zod/v3" and needs "z.custom" (available in Zod v3)
+        # - Other deps import "zod/v4" and "zod/v4-mini"
+        # - We map "zod/v3" to "zod@3.24.4" (aliasing v3 import to root v3 package)
+        # - We use esm.sh for zod to match the PR preview environment
         run: |
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts",
-              "zod": "npm:zod@^4.2.0"
+              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&external=zod",
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&external=zod",
+              "zod": "https://esm.sh/zod@3.24.4",
+              "zod/v3": "https://esm.sh/zod@3.24.4",
+              "zod/v4": "https://esm.sh/zod@4.2.0",
+              "zod/v4-mini": "https://esm.sh/zod@4.2.0",
+              "zod/v4/mini": "https://esm.sh/zod@4.2.0",
+              "zod/v4/core": "https://esm.sh/zod@4.2.0"
             }
           }
           EOF
@@ -82,22 +92,55 @@ jobs:
       - name: Wait for esm.sh to pick up the package
         run: |
           echo "Waiting for esm.sh to pick up the preview package..."
-          MAX_RETRIES=30
-          RETRY_COUNT=0
-          RETRY_DELAY=10
+          PR_NUMBER="${{ needs.preview.outputs.pr-number }}"
+          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
           
+          MAX_RETRIES=10
+          RETRY_DELAY=30
+          
+          PR_URL="https://esm.sh/pr/mcp-use/mcp-use@${PR_NUMBER}/server"
+          COMMIT_URL="https://esm.sh/pr/mcp-use/mcp-use@${SHORT_SHA}/server"
+          
+          echo "Checking URLs:"
+          echo "  PR URL: $PR_URL"
+          echo "  Commit URL: $COMMIT_URL"
+          
+          PR_READY=false
+          COMMIT_READY=false
+          RETRY_COUNT=0
+
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if curl -s -f -I "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server" > /dev/null 2>&1; then
-              echo "✅ Package is available on esm.sh"
+            # Check PR number URL
+            if [ "$PR_READY" = false ]; then
+              if curl -s -f -I "$PR_URL" > /dev/null 2>&1; then
+                echo "✅ PR URL is available"
+                PR_READY=true
+              fi
+            fi
+            
+            # Check commit SHA URL
+            if [ "$COMMIT_READY" = false ]; then
+              if curl -s -f -I "$COMMIT_URL" > /dev/null 2>&1; then
+                echo "✅ Commit URL is available"
+                COMMIT_READY=true
+              fi
+            fi
+            
+            # Both ready?
+            if [ "$PR_READY" = true ] && [ "$COMMIT_READY" = true ]; then
+              echo "✅ Both package URLs are available on esm.sh"
               break
             fi
             
             RETRY_COUNT=$((RETRY_COUNT + 1))
             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-              echo "Package not yet available, retrying in ${RETRY_DELAY}s... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+              echo "Waiting for packages... (attempt $RETRY_COUNT/$MAX_RETRIES, PR: $PR_READY, Commit: $COMMIT_READY)"
               sleep $RETRY_DELAY
             else
-              echo "⚠️ Package didn't become available after ${MAX_RETRIES} attempts"
+              echo "⚠️ Packages didn't become fully available after ${MAX_RETRIES} attempts (5 minutes)"
+              echo "  PR URL ready: $PR_READY"
+              echo "  Commit URL ready: $COMMIT_READY"
               echo "Proceeding with tests anyway..."
             fi
           done

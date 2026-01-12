@@ -3,12 +3,12 @@
  * Tests server-side validation of returned data against Zod schemas
  */
 
-import { Client } from "@mcp-use/modelcontextprotocol-sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@mcp-use/modelcontextprotocol-sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   ElicitRequestSchema,
   type ElicitResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 const SERVER_URL = "http://localhost:3002/mcp";
 

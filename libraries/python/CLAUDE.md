@@ -1,6 +1,10 @@
-# CLAUDE.md
+# CLAUDE.md - Python Library
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance for working with the Python implementation of mcp-use.
+
+**IMPORTANT:** Read the root `/CLAUDE.md` first for critical workflow requirements around planning, breaking changes, and testing standards.
+
+---
 
 ## Project Overview
 
@@ -176,18 +180,30 @@ export MCP_USE_DEBUG=2
 
 ## Testing Strategy
 
+**Tests are MANDATORY for new functionality. See root CLAUDE.md for standards.**
+
 ### Unit Tests (`tests/unit/`)
 
 - Test individual components in isolation
-- Mock external dependencies
+- Mock only external dependencies (network, file I/O), NOT internal logic
 - Focus on business logic and edge cases
+- **DO NOT** create tests that only verify mocks were called
 
 ### Integration Tests (`tests/integration/`)
 
-- Test component interactions
-- Include real MCP server integrations
-- Organized by transport type (stdio, sse, websocket, etc.)
+- Test component interactions with real MCP servers
+- Organized by category:
+  - `client/transports/` - stdio, sse, streamable_http
+  - `client/primitives/` - tools, resources, prompts
+  - `agent/` - Full agent workflows (require API keys)
 - Custom test servers in `tests/integration/servers_for_testing/`
+
+### Test Requirements
+
+- Every new public method/function needs tests
+- Test both success cases AND error handling
+- Integration tests preferred over heavily mocked unit tests
+- If you mock everything, you're testing nothing
 
 ### Test Configuration
 
@@ -226,3 +242,13 @@ export MCP_USE_DEBUG=2
 1. Create test server in `tests/integration/servers_for_testing/`
 2. Add integration test in appropriate transport directory
 3. Use custom servers for controlled testing scenarios
+
+## Post-Implementation Checklist
+
+After completing any feature or fix:
+
+1. **Tests pass**: `pytest tests/unit` (and integration if applicable)
+2. **Linting passes**: `ruff check && ruff format --check`
+3. **Documentation updated**: Check `docs/`, README, docstrings
+4. **Examples updated**: Check `examples/` directory if API changed
+5. **PR description ready**: Follow `.github/pull_request_template.md`

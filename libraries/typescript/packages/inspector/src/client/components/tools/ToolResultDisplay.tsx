@@ -64,7 +64,7 @@ function getRelativeTime(timestamp: number): string {
 // Helper function to extract error message from result with isError: true
 function extractErrorMessage(
   result:
-    | import("@mcp-use/modelcontextprotocol-sdk/types.js").CallToolResult
+    | import("@modelcontextprotocol/sdk/types.js").CallToolResult
     | { error?: string; isError?: boolean }
 ): string | null {
   if (!result?.isError) {

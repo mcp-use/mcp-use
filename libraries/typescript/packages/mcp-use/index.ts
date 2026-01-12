@@ -13,11 +13,12 @@ import { MCPAgent } from "./src/agents/mcp_agent.js";
 import { RemoteAgent } from "./src/agents/remote.js";
 import { MCPClient } from "./src/client.js";
 import { loadConfigFile } from "./src/config.js";
-import { BaseConnector } from "./src/connectors/base.js";
 import type { NotificationHandler } from "./src/connectors/base.js";
+import { BaseConnector } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
 import { StdioConnector } from "./src/connectors/stdio.js";
 
+import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
 import { Logger, logger } from "./src/logging.js";
 import {
   MCPSession,
@@ -26,7 +27,6 @@ import {
   type Root,
   type Tool,
 } from "./src/session.js";
-import type { CreateMessageRequest } from "@mcp-use/modelcontextprotocol-sdk/types.js";
 
 export { BaseAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
@@ -47,20 +47,6 @@ export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./src/version.js";
 
-// Export OAuth helper (legacy - for backward compatibility)
-export {
-  createOAuthMCPConfig,
-  LINEAR_OAUTH_CONFIG,
-  OAuthHelper,
-} from "./src/oauth-helper.js";
-export type {
-  ClientRegistration,
-  OAuthConfig,
-  OAuthDiscovery,
-  OAuthResult,
-  OAuthState,
-} from "./src/oauth-helper.js";
-
 // Export new SDK-integrated auth utilities (recommended for new projects)
 export {
   BrowserOAuthClientProvider,
@@ -70,6 +56,9 @@ export type { StoredState } from "./src/auth/types.js";
 
 // Export React hooks
 export * from "./src/react/index.js";
+
+// Export utility functions
+export * from "./src/utils/index.js";
 
 // Export client prompts
 export { PROMPTS } from "./src/agents/index.js";
@@ -111,8 +100,8 @@ export type {
 export {
   BaseCodeExecutor,
   E2BCodeExecutor,
-  VMCodeExecutor,
   isVMAvailable,
+  VMCodeExecutor,
 } from "./src/client.js";
 
 export type {
@@ -133,7 +122,7 @@ export {
 export type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Type alias for the params property of CreateMessageRequest.

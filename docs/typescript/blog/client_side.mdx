@@ -26,11 +26,13 @@ Browser UI → Backend Proxy → Target API
 ```
 
 **Examples:**
+
 - Postman: Desktop app or cloud service
 - Swagger UI: Requires CORS proxy for external APIs
 - GraphQL Playground: Server-side rendering
 
 **Problems:**
+
 1. **Installation friction:** Download, install, update
 2. **CORS limitations:** Can't call localhost from deployed tools
 3. **Security concerns:** Backend sees all your API keys
@@ -51,6 +53,7 @@ Browser UI → MCP Server
 **No backend. No proxy. No installation.**
 
 **Benefits:**
+
 1. **Zero installation:** Just open a URL
 2. **Local-first:** Debug `localhost` servers directly from your browser
 3. **Private by default:** Your API keys never leave your machine
@@ -64,6 +67,7 @@ But this simplicity comes with significant technical challenges.
 ### The Problem
 
 The MCP SDK is designed for Node.js environments. It uses:
+
 - Node's `http` module for connections
 - File system APIs for stdio transport
 - Process spawning for local servers
@@ -77,27 +81,29 @@ We built a browser-native MCP client that works with any MCP server:
 
 ```typescript
 // src/client/browser.ts
-import { HttpConnector } from '../connectors/http.js'
+import { HttpConnector } from "../connectors/http.js";
 
 export class BrowserMCPClient extends BaseMCPClient {
-  protected createConnectorFromConfig(serverConfig: Record<string, any>): BaseConnector {
-    const { url, headers, authToken } = serverConfig
-    
+  protected createConnectorFromConfig(
+    serverConfig: Record<string, any>
+  ): BaseConnector {
+    const { url, headers, authToken } = serverConfig;
+
     // Use HTTP connector with automatic SSE fallback
-    return new HttpConnector(url, { headers, authToken })
+    return new HttpConnector(url, { headers, authToken });
   }
 }
 ```
 
 **Key differences from official SDK:**
 
-| Feature | Official SDK | BrowserMCPClient |
-|---------|-------------|------------------|
-| Transports | stdio, SSE, HTTP | HTTP, SSE |
-| Environment | Node.js only | Browser + Node.js |
-| File system | Required for stdio | Not used |
-| Process spawning | Native modules | Fetch API only |
-| Bundle size | ~200KB (with Node deps) | ~50KB (browser-only) |
+| Feature          | Official SDK            | BrowserMCPClient     |
+| ---------------- | ----------------------- | -------------------- |
+| Transports       | stdio, SSE, HTTP        | HTTP, SSE            |
+| Environment      | Node.js only            | Browser + Node.js    |
+| File system      | Required for stdio      | Not used             |
+| Process spawning | Native modules          | Fetch API only       |
+| Bundle size      | ~200KB (with Node deps) | ~50KB (browser-only) |
 
 ### HTTP Connector Implementation
 
@@ -109,35 +115,36 @@ export class HttpConnector extends BaseConnector {
   async connect(): Promise<void> {
     try {
       // Try Streamable HTTP first (best performance)
-      await this.connectWithStreamableHttp(this.baseUrl)
+      await this.connectWithStreamableHttp(this.baseUrl);
     } catch (err) {
       // Fallback to SSE if Streamable HTTP not supported
-      logger.info('🔄 Falling back to SSE transport...')
-      await this.connectWithSse(this.baseUrl)
+      logger.info("🔄 Falling back to SSE transport...");
+      await this.connectWithSse(this.baseUrl);
     }
   }
 
   private async connectWithStreamableHttp(url: string): Promise<void> {
     const transport = new StreamableHTTPClientTransport(url, {
       headers: this.headers,
-      fetch: fetch.bind(globalThis)  // ← Browser's native fetch
-    })
+      fetch: fetch.bind(globalThis), // ← Browser's native fetch
+    });
 
     this.client = new Client(
-      { name: 'mcp-use-browser', version: '1.0.0' },
+      { name: "mcp-use-browser", version: "1.0.0" },
       { capabilities: {} }
-    )
+    );
 
-    await this.client.connect(transport)
-    this.connected = true
+    await this.client.connect(transport);
+    this.connected = true;
   }
 }
 ```
 
 **Transport selection logic:**
+
 1. Try Streamable HTTP (efficient, bidirectional)
 2. Fall back to SSE (widely supported, server-push)
-All transports work in the browser using standard Web APIs.
+   All transports work in the browser using standard Web APIs.
 
 ## Challenge 2: Authentication Without Exposing Secrets
 
@@ -148,15 +155,16 @@ When debugging an MCP server that requires authentication:
 ```typescript
 // Your MCP server
 server.use((req, res, next) => {
-  const apiKey = req.headers['authorization']
-  if (!apiKey) return res.status(401).json({ error: 'Unauthorized' })
-  next()
-})
+  const apiKey = req.headers["authorization"];
+  if (!apiKey) return res.status(401).json({ error: "Unauthorized" });
+  next();
+});
 ```
 
 How does the inspector authenticate **without sending your API key to a backend**?
 
 Traditional tools solve this by:
+
 - **Option A:** Send credentials to their servers (Postman cloud)
 - **Option B:** Install a local proxy (Postman desktop app)
 - **Option C:** Disable CORS (insecure)
@@ -167,23 +175,23 @@ The inspector stores and sends auth headers directly from the browser:
 
 ```typescript
 // react/useMcp.ts
-export function useMcp({ url, customHeaders }) {
-  const clientRef = useRef<BrowserMCPClient | null>(null)
+export function useMcp({ url, headers }) {
+  const clientRef = useRef<BrowserMCPClient | null>(null);
 
   const connect = async () => {
-    clientRef.current = new BrowserMCPClient()
+    clientRef.current = new BrowserMCPClient();
 
-    // Add server with custom headers
-    clientRef.current.addServer('server', {
+    // Add server with headers
+    clientRef.current.addServer("server", {
       url: url,
-      headers: customHeaders  // ← Set once, used forever
-    })
+      headers: headers, // ← Set once, used forever
+    });
 
     // All subsequent requests include these headers
-    await clientRef.current.createSession('server')
-  }
+    await clientRef.current.createSession("server");
+  };
 
-  return { connect, /* ... */ }
+  return { connect /* ... */ };
 }
 ```
 
@@ -191,22 +199,21 @@ export function useMcp({ url, customHeaders }) {
 
 ```typescript
 // Inspector connection form
-const [customHeaders, setCustomHeaders] = useState([
-  { name: 'Authorization', value: '' }
-])
+const [headers, setHeaders] = useState([{ name: "Authorization", value: "" }]);
 
 const handleConnect = () => {
-  const headers = {}
-  customHeaders.forEach(h => {
-    if (h.name && h.value) headers[h.name] = h.value
-  })
+  const headerObj = {};
+  headers.forEach((h) => {
+    if (h.name && h.value) headerObj[h.name] = h.value;
+  });
 
   // Headers stored in browser memory only
-  addConnection(url, name, { customHeaders: headers })
-}
+  addConnection(url, name, { headers: headerObj });
+};
 ```
 
 **Security model:**
+
 - ✅ API keys stay in browser memory (never sent to mcp-use servers)
 - ✅ Headers included in every MCP request automatically
 - ✅ Supports Bearer tokens, Basic auth, custom headers
@@ -234,22 +241,22 @@ We made `MCPAgent` fully browser-compatible:
 // agents/mcp_agent.ts - Works in browser AND Node.js
 export class MCPAgent {
   constructor(options: {
-    llm: BaseLanguageModelInterface,
-    client: MCPClient,
-    memoryEnabled?: boolean
+    llm: BaseLanguageModelInterface;
+    client: MCPClient;
+    memoryEnabled?: boolean;
   }) {
-    this.llm = options.llm
-    this.client = options.client
-    this.memoryEnabled = options.memoryEnabled ?? false
+    this.llm = options.llm;
+    this.client = options.client;
+    this.memoryEnabled = options.memoryEnabled ?? false;
   }
 
-  async* streamEvents(query: string): AsyncGenerator<StreamEvent> {
+  async *streamEvents(query: string): AsyncGenerator<StreamEvent> {
     // Create agent executor with tools from MCP client
-    const tools = await this.adapter.createToolsFromClient(this.client)
+    const tools = await this.adapter.createToolsFromClient(this.client);
 
     // Stream LLM responses
     for await (const event of agentExecutor.streamEvents(query)) {
-      yield event
+      yield event;
     }
   }
 }
@@ -263,21 +270,23 @@ Instead of bundling all LLM providers, we import them on-demand:
 // react/useMcp.ts
 const sendChatMessage = async (message, llmConfig) => {
   // Lazy-load LLM based on user's choice
-  let llm
-  if (llmConfig.provider === 'openai') {
-    const { ChatOpenAI } = await import('@langchain/openai')
+  let llm;
+  if (llmConfig.provider === "openai") {
+    const { ChatOpenAI } = await import("@langchain/openai");
     llm = new ChatOpenAI({
       model: llmConfig.model,
-      apiKey: llmConfig.apiKey  // ← User provides, stored in browser
-    })
-  } else if (llmConfig.provider === 'anthropic') {
-    const { ChatAnthropic } = await import('@langchain/anthropic')
-    llm = new ChatAnthropic({ /* ... */ })
+      apiKey: llmConfig.apiKey, // ← User provides, stored in browser
+    });
+  } else if (llmConfig.provider === "anthropic") {
+    const { ChatAnthropic } = await import("@langchain/anthropic");
+    llm = new ChatAnthropic({
+      /* ... */
+    });
   }
 
-  const agent = new MCPAgent({ llm, client: existingClient })
-  yield* agent.streamEvents(message)
-}
+  const agent = new MCPAgent({ llm, client: existingClient });
+  yield * agent.streamEvents(message);
+};
 ```
 
 **Bundle optimization:**
@@ -288,14 +297,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       external: [
-        '@langchain/google-genai',  // Optional, loaded on-demand
-      ]
-    }
-  }
-})
+        "@langchain/google-genai", // Optional, loaded on-demand
+      ],
+    },
+  },
+});
 ```
 
 **Result:**
+
 - Base bundle: ~600KB (React, UI, MCP client)
 - OpenAI SDK: +150KB (only if user selects OpenAI)
 - Anthropic SDK: +130KB (only if user selects Anthropic)
@@ -326,52 +336,55 @@ The `useMcp` hook provides one connection for all features:
 
 ```typescript
 // react/useMcp.ts
-export function useMcp(options: { url: string, customHeaders?: Record<string, string> }) {
-  const clientRef = useRef<BrowserMCPClient | null>(null)
-  const agentRef = useRef<MCPAgent | null>(null)
+export function useMcp(options: {
+  url: string;
+  headers?: Record<string, string>;
+}) {
+  const clientRef = useRef<BrowserMCPClient | null>(null);
+  const agentRef = useRef<MCPAgent | null>(null);
 
   const connect = async () => {
     // Create client once
-    clientRef.current = new BrowserMCPClient()
-    clientRef.current.addServer('inspector', {
+    clientRef.current = new BrowserMCPClient();
+    clientRef.current.addServer("inspector", {
       url: options.url,
-      headers: options.customHeaders
-    })
+      headers: options.headers,
+    });
 
     // Create session once
-    const session = await clientRef.current.createSession('inspector')
-    await session.initialize()  // Caches tools/resources/prompts
+    const session = await clientRef.current.createSession("inspector");
+    await session.initialize(); // Caches tools/resources/prompts
 
-    setState('ready')
-  }
+    setState("ready");
+  };
 
   // Tools tab uses this
   const callTool = async (name, args) => {
-    const session = clientRef.current.getSession('inspector')
-    return await session.connector.callTool(name, args)
-  }
+    const session = clientRef.current.getSession("inspector");
+    return await session.connector.callTool(name, args);
+  };
 
   // Resources tab uses this
   const readResource = async (uri) => {
-    const session = clientRef.current.getSession('inspector')
-    return await session.connector.readResource(uri)
-  }
+    const session = clientRef.current.getSession("inspector");
+    return await session.connector.readResource(uri);
+  };
 
   // Chat tab uses this
   const sendChatMessage = async function* (message, llmConfig) {
     // Lazy-create agent on first chat
     if (!agentRef.current || llmConfigChanged) {
-      const llm = await createLLM(llmConfig)
+      const llm = await createLLM(llmConfig);
       agentRef.current = new MCPAgent({
         llm,
-        client: clientRef.current  // ← REUSE existing client!
-      })
-      await agentRef.current.initialize()  // No reconnection!
+        client: clientRef.current, // ← REUSE existing client!
+      });
+      await agentRef.current.initialize(); // No reconnection!
     }
 
     // Agent uses existing session - no new connection
-    yield* agentRef.current.streamEvents(message)
-  }
+    yield* agentRef.current.streamEvents(message);
+  };
 
   return {
     state,
@@ -382,8 +395,8 @@ export function useMcp(options: { url: string, customHeaders?: Record<string, st
     readResource,
     sendChatMessage,
     connect,
-    disconnect
-  }
+    disconnect,
+  };
 }
 ```
 
@@ -418,6 +431,7 @@ has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is pres
 ```
 
 Traditional solutions:
+
 - **Browser extensions** (require installation, permissions)
 - **CORS proxy** (defeats the purpose of client-side)
 - **Disable security** (terrible idea)
@@ -431,21 +445,21 @@ The inspector is designed to be **hosted alongside your MCP server:**
 export class McpServer {
   private mountInspector(): void {
     // Dynamically import inspector package
-    import('@mcp-use/inspector')
+    import("@mcp-use/inspector")
       .then(({ mountInspector }) => {
         // Mount inspector at /inspector
-        mountInspector(this.app)
-        console.log(`[INSPECTOR] UI at http://localhost:3000/inspector`)
+        mountInspector(this.app);
+        console.log(`[INSPECTOR] UI at http://localhost:3000/inspector`);
       })
       .catch(() => {
         // Inspector not installed - server still works
-      })
+      });
   }
 
   async listen(port: number) {
-    await this.mountMcp()      // /mcp endpoints
-    this.mountInspector()      // /inspector UI
-    this.app.listen(port)
+    await this.mountMcp(); // /mcp endpoints
+    this.mountInspector(); // /inspector UI
+    this.app.listen(port);
   }
 }
 ```
@@ -458,6 +472,7 @@ http://localhost:3000/inspector  → Inspector UI (static files)
 ```
 
 **Why this works:**
+
 - ✅ Same origin → No CORS issues
 - ✅ Direct access to `localhost` servers
 - ✅ Auth headers pass through naturally
@@ -468,11 +483,13 @@ http://localhost:3000/inspector  → Inspector UI (static files)
 
 ```typescript
 // server/mcp-server.ts (built into framework)
-this.app.use(cors({
-  origin: '*',
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'mcp-protocol-version']
-}))
+this.app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "mcp-protocol-version"],
+  })
+);
 ```
 
 MCP servers automatically allow connections from any origin, so you CAN use a deployed inspector if needed. But self-hosting is the default for privacy.
@@ -492,6 +509,7 @@ Many MCP servers (GitHub, Linear, Google APIs) use OAuth for authentication. OAu
 Step 3 is the problem: **where do you redirect back to?**
 
 Traditional apps have a backend callback endpoint:
+
 ```
 https://yourapp.com/api/oauth/callback?code=xxx
                       ↑
@@ -509,36 +527,39 @@ We implemented a complete OAuth flow in the browser:
 export class BrowserOAuthClientProvider {
   async authenticate(): Promise<OAuthTokens> {
     // Step 1: Auto-register OAuth client (if server supports DCR)
-    const clientInfo = await this.registerClient()
+    const clientInfo = await this.registerClient();
 
     // Step 2: Open popup for authorization
-    const popup = window.open(authUrl, 'oauth', 'width=500,height=600')
+    const popup = window.open(authUrl, "oauth", "width=500,height=600");
 
     // Step 3: Listen for callback message
     const authCode = await new Promise((resolve) => {
-      window.addEventListener('message', (event) => {
-        if (event.data.type === 'oauth-callback') {
-          resolve(event.data.code)
+      window.addEventListener("message", (event) => {
+        if (event.data.type === "oauth-callback") {
+          resolve(event.data.code);
         }
-      })
-    })
+      });
+    });
 
     // Step 4: Exchange code for token (in browser!)
     const tokens = await fetch(tokenEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
         code: authCode,
         client_id: clientInfo.client_id,
-        redirect_uri: `${window.location.origin}/inspector/oauth/callback`
-      })
-    }).then(r => r.json())
+        redirect_uri: `${window.location.origin}/inspector/oauth/callback`,
+      }),
+    }).then((r) => r.json());
 
     // Step 5: Store tokens in localStorage
-    localStorage.setItem(`mcp:auth_${serverHash}_tokens`, JSON.stringify(tokens))
+    localStorage.setItem(
+      `mcp:auth_${serverHash}_tokens`,
+      JSON.stringify(tokens)
+    );
 
-    return tokens
+    return tokens;
   }
 }
 ```
@@ -550,24 +571,28 @@ export class BrowserOAuthClientProvider {
 export function OAuthCallback() {
   useEffect(() => {
     // Get code from URL
-    const params = new URLSearchParams(window.location.search)
-    const code = params.get('code')
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
 
     // Send to opener window
     if (window.opener) {
-      window.opener.postMessage({
-        type: 'oauth-callback',
-        code: code
-      }, window.location.origin)
-      window.close()
+      window.opener.postMessage(
+        {
+          type: "oauth-callback",
+          code: code,
+        },
+        window.location.origin
+      );
+      window.close();
     }
-  }, [])
+  }, []);
 
-  return <div>Authentication successful. You can close this window.</div>
+  return <div>Authentication successful. You can close this window.</div>;
 }
 ```
 
 **Security considerations:**
+
 - Tokens stored in `localStorage` (sandboxed per origin)
 - PKCE support for public clients (mitigates code interception)
 - Token refresh handled automatically
@@ -594,20 +619,23 @@ We only import what's actually used:
 // Inspector chat implementation
 const sendChatMessage = async (message, llmConfig) => {
   // Import ONLY the chosen provider
-  if (llmConfig.provider === 'openai') {
-    const { ChatOpenAI } = await import('@langchain/openai')
-    llm = new ChatOpenAI({ apiKey: llmConfig.apiKey, model: llmConfig.model })
-  } else if (llmConfig.provider === 'anthropic') {
-    const { ChatAnthropic } = await import('@langchain/anthropic')
-    llm = new ChatAnthropic({ apiKey: llmConfig.apiKey, model: llmConfig.model })
+  if (llmConfig.provider === "openai") {
+    const { ChatOpenAI } = await import("@langchain/openai");
+    llm = new ChatOpenAI({ apiKey: llmConfig.apiKey, model: llmConfig.model });
+  } else if (llmConfig.provider === "anthropic") {
+    const { ChatAnthropic } = await import("@langchain/anthropic");
+    llm = new ChatAnthropic({
+      apiKey: llmConfig.apiKey,
+      model: llmConfig.model,
+    });
   }
 
   // Import MCPAgent (only when chat is used)
-  const { MCPAgent } = await import('mcp-use/browser')
+  const { MCPAgent } = await import("mcp-use/browser");
 
-  const agent = new MCPAgent({ llm, client })
-  yield* agent.streamEvents(message)
-}
+  const agent = new MCPAgent({ llm, client });
+  yield * agent.streamEvents(message);
+};
 ```
 
 **Vite configuration:**
@@ -617,31 +645,34 @@ const sendChatMessage = async (message, llmConfig) => {
 export default defineConfig({
   resolve: {
     alias: {
-      'mcp-use/browser': path.resolve(__dirname, '../mcp-use/dist/src/browser.js'),
+      "mcp-use/browser": path.resolve(
+        __dirname,
+        "../mcp-use/dist/src/browser.js"
+      ),
       // Stub Node.js modules for browser
-      'fs': path.resolve(__dirname, './src/stubs/fs.js'),
-      'path': path.resolve(__dirname, './src/stubs/path.js'),
-    }
+      fs: path.resolve(__dirname, "./src/stubs/fs.js"),
+      path: path.resolve(__dirname, "./src/stubs/path.js"),
+    },
   },
   build: {
     rollupOptions: {
       external: [
-        /^node:/,  // Exclude Node.js built-ins
-        '@langchain/google-genai',  // Optional peer dep
-      ]
-    }
-  }
-})
+        /^node:/, // Exclude Node.js built-ins
+        "@langchain/google-genai", // Optional peer dep
+      ],
+    },
+  },
+});
 ```
 
 **Bundle analysis:**
 
-| Chunk | Size | Loaded When |
-|-------|------|-------------|
-| Base UI | 620KB | Initial page load |
-| OpenAI SDK | 150KB | First OpenAI chat |
+| Chunk         | Size  | Loaded When          |
+| ------------- | ----- | -------------------- |
+| Base UI       | 620KB | Initial page load    |
+| OpenAI SDK    | 150KB | First OpenAI chat    |
 | Anthropic SDK | 130KB | First Anthropic chat |
-| Google SDK | 140KB | First Google chat |
+| Google SDK    | 140KB | First Google chat    |
 
 **Result:** Users only download the LLM SDK they actually use.
 
@@ -653,13 +684,13 @@ In a traditional server-based chat:
 
 ```typescript
 // Server-side chat (easy)
-const conversationHistory = []  // Persists in server memory
+const conversationHistory = []; // Persists in server memory
 
-app.post('/chat', async (req, res) => {
-  conversationHistory.push({ role: 'user', content: req.body.message })
-  const response = await agent.run(req.body.message)
-  conversationHistory.push({ role: 'assistant', content: response })
-})
+app.post("/chat", async (req, res) => {
+  conversationHistory.push({ role: "user", content: req.body.message });
+  const response = await agent.run(req.body.message);
+  conversationHistory.push({ role: "assistant", content: response });
+});
 ```
 
 In a client-side app, memory is trickier:
@@ -674,7 +705,7 @@ We persist the agent instance across messages:
 
 ```typescript
 // react/useMcp.ts
-const agentRef = useRef<MCPAgent | null>(null)
+const agentRef = useRef<MCPAgent | null>(null);
 
 const sendChatMessage = async function* (message, llmConfig) {
   // Create agent ONCE, reuse across messages
@@ -682,18 +713,18 @@ const sendChatMessage = async function* (message, llmConfig) {
     agentRef.current = new MCPAgent({
       llm,
       client,
-      memoryEnabled: true  // ← Agent tracks conversation internally
-    })
-    await agentRef.current.initialize()
+      memoryEnabled: true, // ← Agent tracks conversation internally
+    });
+    await agentRef.current.initialize();
   }
 
   // Agent maintains its own history
-  yield* agentRef.current.streamEvents(message)
-}
+  yield* agentRef.current.streamEvents(message);
+};
 
 const clearChatHistory = () => {
-  agentRef.current?.clearConversationHistory()
-}
+  agentRef.current?.clearConversationHistory();
+};
 ```
 
 **Memory lifecycle:**
@@ -710,20 +741,21 @@ User disconnects: Destroy agent → Clear history
 
 ```typescript
 // chat/useChatMessagesClientSide.ts
-const [messages, setMessages] = useState<Message[]>([])
+const [messages, setMessages] = useState<Message[]>([]);
 
 const sendMessage = async (userInput) => {
   // Add to UI state
-  setMessages(prev => [...prev, { role: 'user', content: userInput }])
+  setMessages((prev) => [...prev, { role: "user", content: userInput }]);
 
   // Agent tracks its own history for LLM context
   for await (const event of connection.sendChatMessage(userInput, llmConfig)) {
     // Update UI with streaming response
   }
-}
+};
 ```
 
 **Two sources of truth:**
+
 1. **UI state** (`messages`) - For rendering chat bubbles
 2. **Agent memory** - For LLM context (includes system prompts, tool results, etc.)
 
@@ -732,6 +764,7 @@ const sendMessage = async (userInput) => {
 ### Network Efficiency
 
 **Traditional inspector (backend proxy):**
+
 ```
 Browser → Proxy → MCP Server
    ↓        ↓         ↓
@@ -739,6 +772,7 @@ Browser → Proxy → MCP Server
 ```
 
 **Client-side inspector:**
+
 ```
 Browser → MCP Server
    ↓          ↓
@@ -748,6 +782,7 @@ Browser → MCP Server
 ### Connection Overhead
 
 **Before (new connection per message):**
+
 ```
 Message 1: Connect (600ms) + Handshake (400ms) + List Tools (300ms) + Chat (2s) = 3.3s
 Message 2: Connect (600ms) + Handshake (400ms) + List Tools (300ms) + Chat (2s) = 3.3s
@@ -755,6 +790,7 @@ Total for 5 messages: ~16 seconds
 ```
 
 **After (shared connection):**
+
 ```
 Initial: Connect (600ms) + Handshake (400ms) + List Tools (300ms) = 1.3s
 Message 1: Chat (600ms) = 600ms
@@ -768,6 +804,7 @@ Total for 5 messages: ~2 seconds (87% faster!)
 ### Browser Bundle Size
 
 **Optimized splitting:**
+
 - Initial load: 620KB (inspector UI + base libraries)
 - First tool call: +0KB (already loaded)
 - First chat: +150KB (LLM SDK)
@@ -782,47 +819,49 @@ The same architecture works for any MCP-powered application:
 ### Example: Client-Side Todo App with MCP
 
 ```typescript
-import { BrowserMCPClient } from 'mcp-use/browser'
-import { useState, useEffect } from 'react'
+import { BrowserMCPClient } from "mcp-use/browser";
+import { useState, useEffect } from "react";
 
 function TodoApp() {
-  const [client] = useState(() => new BrowserMCPClient())
-  const [todos, setTodos] = useState([])
+  const [client] = useState(() => new BrowserMCPClient());
+  const [todos, setTodos] = useState([]);
 
   useEffect(() => {
     // Connect to your MCP server
-    client.addServer('todos', {
-      url: 'http://localhost:3000/mcp',
-      headers: { Authorization: `Bearer ${process.env.API_KEY}` }
-    })
+    client.addServer("todos", {
+      url: "http://localhost:3000/mcp",
+      headers: { Authorization: `Bearer ${process.env.API_KEY}` },
+    });
 
-    client.createSession('todos').then(async (session) => {
-      await session.initialize()
+    client.createSession("todos").then(async (session) => {
+      await session.initialize();
 
       // Fetch initial todos
-      const result = await session.connector.callTool('list-todos', {})
-      setTodos(result.todos)
-    })
-  }, [])
+      const result = await session.connector.callTool("list-todos", {});
+      setTodos(result.todos);
+    });
+  }, []);
 
   const addTodo = async (text) => {
-    const session = client.getSession('todos')
-    await session.connector.callTool('create-todo', { text })
+    const session = client.getSession("todos");
+    await session.connector.callTool("create-todo", { text });
 
     // Refresh list
-    const result = await session.connector.callTool('list-todos', {})
-    setTodos(result.todos)
-  }
+    const result = await session.connector.callTool("list-todos", {});
+    setTodos(result.todos);
+  };
 
   return (
     <div>
       <h1>Todos</h1>
       <ul>
-        {todos.map(todo => <li key={todo.id}>{todo.text}</li>)}
+        {todos.map((todo) => (
+          <li key={todo.id}>{todo.text}</li>
+        ))}
       </ul>
-      <button onClick={() => addTodo('New task')}>Add Todo</button>
+      <button onClick={() => addTodo("New task")}>Add Todo</button>
     </div>
-  )
+  );
 }
 ```
 
@@ -831,34 +870,37 @@ function TodoApp() {
 ### Example: AI Chat Widget
 
 ```typescript
-import { useMcp } from 'mcp-use/react'
-import { useState } from 'react'
+import { useMcp } from "mcp-use/react";
+import { useState } from "react";
 
 function ChatWidget() {
   const { sendChatMessage, state } = useMcp({
-    url: 'https://api.example.com/mcp',
-    customHeaders: { Authorization: `Bearer ${apiKey}` }
-  })
+    url: "https://api.example.com/mcp",
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
 
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState([]);
 
   const handleSend = async (input) => {
-    setMessages(prev => [...prev, { role: 'user', content: input }])
+    setMessages((prev) => [...prev, { role: "user", content: input }]);
 
-    let response = ''
+    let response = "";
     for await (const event of sendChatMessage(input, {
-      provider: 'openai',
-      model: 'gpt-4',
-      apiKey: openaiKey
+      provider: "openai",
+      model: "gpt-4",
+      apiKey: openaiKey,
     })) {
-      if (event.event === 'on_chat_model_stream') {
-        response += event.data.chunk.text
-        setMessages(prev => [...prev, { role: 'assistant', content: response }])
+      if (event.event === "on_chat_model_stream") {
+        response += event.data.chunk.text;
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: response },
+        ]);
       }
     }
-  }
+  };
 
-  return <ChatUI messages={messages} onSend={handleSend} />
+  return <ChatUI messages={messages} onSend={handleSend} />;
 }
 ```
 
@@ -869,6 +911,7 @@ Embed this in any React app. No server needed.
 ### Client-Side Security Model
 
 **What's stored in the browser:**
+
 - MCP server URLs (localStorage)
 - Auth headers (memory only, or localStorage if user opts in)
 - OAuth tokens (localStorage with encryption)
@@ -876,6 +919,7 @@ Embed this in any React app. No server needed.
 - Chat history (memory only)
 
 **What's NOT sent to mcp-use:**
+
 - Your API keys (never leave your browser)
 - Your MCP tool calls (direct to your server)
 - Your chat messages (processed locally)
@@ -900,6 +944,7 @@ Your Browser
 ### When to Use Client-Side vs Server-Side
 
 **Use client-side when:**
+
 - ✅ Debugging/development tools
 - ✅ Personal productivity apps
 - ✅ Internal company tools (same network)
@@ -907,6 +952,7 @@ Your Browser
 - ✅ Offline-capable apps
 
 **Use server-side when:**
+
 - ✅ Public-facing products (need rate limiting)
 - ✅ Shared state across users
 - ✅ Background processing
@@ -924,6 +970,7 @@ The mcp-use Inspector is now:
 - **Powerful:** Full MCP protocol support + AI agent
 
 **Usage in the wild:**
+
 - 500+ developers using it to debug MCP servers
 - Works with Linear, GitHub, Cloudflare, custom servers
 - Supports Bearer tokens, Basic auth, OAuth
@@ -933,6 +980,7 @@ The mcp-use Inspector is now:
 ## Technical Stack
 
 **Core libraries:**
+
 - `BrowserMCPClient` - Browser-native MCP client
 - `HttpConnector` - Fetch-based MCP transport
 - `MCPAgent` - LangChain agent for tool orchestration
@@ -941,11 +989,13 @@ The mcp-use Inspector is now:
 - TailwindCSS - Styling
 
 **Optional dependencies (loaded on-demand):**
+
 - `@langchain/openai` - OpenAI integration
 - `@langchain/anthropic` - Anthropic integration
 - `@langchain/google-genai` - Google integration
 
 **Browser APIs used:**
+
 - `fetch` - HTTP requests
 - `EventSource` - SSE transport
 - `localStorage` - OAuth token storage
@@ -962,19 +1012,21 @@ npm install mcp-use @mcp-use/inspector
 **Create your MCP server:**
 
 ```typescript
-import { MCPServer, text } from 'mcp-use/server'
-import { z } from 'zod'
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
 
-const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
+const server = new MCPServer({ name: "my-server", version: "1.0.0" });
 
-server.tool({
-  name: 'hello',
-  description: 'Say hello',
-  schema: z.object({ name: z.string().describe('The name to say hello to') }),
-}, async ({ name }) => {
-  return text(`Hello, ${name}!`);
-})
-
+server.tool(
+  {
+    name: "hello",
+    description: "Say hello",
+    schema: z.object({ name: z.string().describe("The name to say hello to") }),
+  },
+  async ({ name }) => {
+    return text(`Hello, ${name}!`);
+  }
+);
 ```
 
 **Open the inspector:**
@@ -1002,7 +1054,8 @@ The future of MCP tooling is client-side. And it's faster, simpler, and more pri
 ---
 
 **Read more:**
-- [MCP Inspector Documentation](https://docs.mcp-use.com/inspector)
-- [Authentication Guide](https://docs.mcp-use.com/typescript/server/authentication)
-- [Building MCP Servers](https://docs.mcp-use.com/typescript/server)
+
+- [MCP Inspector Documentation](https://mcp-use.com/docs/inspector)
+- [Authentication Guide](https://mcp-use.com/docs/typescript/server/authentication)
+- [Building MCP Servers](https://mcp-use.com/docs/typescript/server)
 - [GitHub Repository](https://github.com/mcp-use/mcp-use)

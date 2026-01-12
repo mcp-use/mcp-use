@@ -195,7 +195,7 @@ async def daily_prompt(context: Context) -> str:
     return f"{greeting}! What would you like to work on?"
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", debug=True)
+    server.run(transport="streamable-http", run_debug=True)
 ```
 
 ## Prompts vs Tools vs Resources

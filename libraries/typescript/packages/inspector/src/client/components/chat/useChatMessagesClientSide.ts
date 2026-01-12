@@ -1,4 +1,7 @@
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import { useCallback, useRef, useState } from "react";
 import type { LLMConfig, Message } from "./types";

@@ -1,8 +1,12 @@
 /**
  * Browser entry point - exports OAuth utilities and MCP client/agent for browser-based MCP usage
+ *
+ * MCPAgent is now exported and works in the browser when:
+ * - A BrowserMCPClient instance is passed to it (not using simplified mode)
+ * - Or using RemoteAgent for remote agent capabilities
  */
 
-// Export core client and agent classes - these work in both Node.js and browser
+// Export core client and agent classes for browsers
 export { BrowserMCPClient as MCPClient } from "./client/browser.js";
 export { MCPAgent } from "./agents/mcp_agent.js";
 export { RemoteAgent } from "./agents/remote.js";
@@ -27,12 +31,16 @@ export type { StoredState } from "./auth/types.js";
 // Export logging (uses browser console in browser environments)
 export { Logger, logger } from "./logging.js";
 
-// Export unified telemetry (auto-detects browser/Node.js)
-export { Tel, Telemetry, setTelemetrySource } from "./telemetry/index.js";
+// Export browser telemetry (browser-specific implementation)
+export {
+  Tel,
+  Telemetry,
+  setTelemetrySource,
+} from "./telemetry/telemetry-browser.js";
 
 // Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "./telemetry/index.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "./telemetry/index.js";
+export { Tel as BrowserTelemetry } from "./telemetry/telemetry-browser.js";
+export { setTelemetrySource as setBrowserTelemetrySource } from "./telemetry/telemetry-browser.js";
 
 // Export observability
 export {
@@ -54,7 +62,7 @@ export type {
   OAuthClientInformation,
   OAuthMetadata,
   OAuthTokens,
-} from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
+} from "@modelcontextprotocol/sdk/shared/auth.js";
 
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./version.js";

@@ -1,5 +1,476 @@
 # @mcp-use/cli
 
+## 2.8.4
+
+### Patch Changes
+
+- Updated dependencies [5161914]
+  - @mcp-use/inspector@0.14.4
+  - mcp-use@1.12.4
+
+## 2.8.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a308b3f]
+  - @mcp-use/inspector@0.14.4-canary.0
+  - mcp-use@1.12.4-canary.0
+
+## 2.8.3
+
+### Patch Changes
+
+- 2f89a3b: Security: Fixed 13 vulnerabilities (3 moderate, 10 high)
+  - Updated `langchain` to `^1.2.3` (fixes serialization injection vulnerability)
+  - Updated `@langchain/core` to `^1.1.8` (fixes serialization injection vulnerability)
+  - Updated `react-router` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Updated `react-router-dom` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Added override for `qs` to `>=6.14.1` (fixes DoS vulnerability)
+  - Added override for `preact` to `>=10.28.2` (fixes JSON VNode injection)
+
+- Updated dependencies [2f89a3b]
+- Updated dependencies [2f89a3b]
+- Updated dependencies [2f89a3b]
+  - @mcp-use/inspector@0.14.3
+  - mcp-use@1.12.3
+
+## 2.8.3-canary.1
+
+### Patch Changes
+
+- 9cdc757: Security: Fixed 13 vulnerabilities (3 moderate, 10 high)
+  - Updated `langchain` to `^1.2.3` (fixes serialization injection vulnerability)
+  - Updated `@langchain/core` to `^1.1.8` (fixes serialization injection vulnerability)
+  - Updated `react-router` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Updated `react-router-dom` to `^7.12.0` (fixes XSS and CSRF vulnerabilities)
+  - Added override for `qs` to `>=6.14.1` (fixes DoS vulnerability)
+  - Added override for `preact` to `>=10.28.2` (fixes JSON VNode injection)
+
+- Updated dependencies [9cdc757]
+- Updated dependencies [cbf2bb8]
+  - mcp-use@1.12.3-canary.1
+  - @mcp-use/inspector@0.14.3-canary.1
+
+## 2.8.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [708f6e5]
+  - @mcp-use/inspector@0.14.3-canary.0
+  - mcp-use@1.12.3-canary.0
+
+## 2.8.2
+
+### Patch Changes
+
+- 198fffd: Add configurable clientInfo support for MCP connection initialization. Clients can now customize how they identify themselves to MCP servers with full metadata including name, title, version, description, icons, and website URL. The clientConfig option is deprecated in favor of deriving it from clientInfo. Default clientInfo is set for mcp-use, inspector sets "mcp-use Inspector" with its own version, and CLI sets "mcp-use CLI".
+- 198fffd: chore: updated docs
+- 198fffd: ## Breaking Changes (with Deprecation Warnings)
+  - **Renamed `customHeaders` to `headers`**: The `customHeaders` option has been renamed to `headers` across all APIs for better consistency. The old name still works but shows deprecation warnings. Update your code to use `headers` instead.
+  - **Renamed `samplingCallback` to `onSampling`**: Callback naming is now more consistent with event handler patterns. The old name still works but shows deprecation warnings.
+
+  ## New Features
+  - **Automatic Proxy Fallback**: Added `autoProxyFallback` option to `useMcp` hook and `McpClientProvider`. When enabled (default: `true` in provider), automatically retries failed connections through a proxy when CORS errors or HTTP 4xx errors are detected. This makes connecting to MCP servers much more reliable in browser environments.
+  - **Provider-Level Proxy Defaults**: `McpClientProvider` now supports `defaultProxyConfig` and `defaultAutoProxyFallback` props to set proxy configuration for all servers. Individual servers can override these defaults.
+  - **OAuth Proxy Support**: Added OAuth request proxying through fetch interceptor in `BrowserOAuthClientProvider`. Configure with `oauthProxyUrl` to route OAuth discovery and token requests through your backend proxy.
+
+  ## Improvements
+  - **Enhanced Error Detection**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+  - **Smarter Connection Logic**: OAuth provider now always uses the original target URL for OAuth discovery, not the proxy URL
+  - **Better Session Management**: Improved session cleanup to avoid noisy warning logs
+  - **Type Safety**: Added deprecation notices in TypeScript types for deprecated options
+  - **Proxy Header Support**: `proxyConfig` now accepts a `headers` field for custom headers to the proxy
+
+  ## Refactoring
+  - **Removed `oauth-helper.ts`** (521 lines): OAuth helper utilities consolidated into `browser-provider.ts`
+  - **Removed `react_example.html`**: Outdated example file removed
+  - **Major `useMcp` Hook Refactor**: Complete rewrite of connection logic with automatic retry, better error handling, and proxy fallback support
+
+  ## Documentation
+  - Updated all client documentation to use new `headers` naming
+  - Added comprehensive examples for automatic proxy fallback
+  - Updated sampling documentation with new `onSampling` callback name
+  - Refreshed React integration guide with provider-based approach
+
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+- Updated dependencies [198fffd]
+  - @mcp-use/inspector@0.14.2
+  - mcp-use@1.12.2
+
+## 2.8.2-canary.2
+
+### Patch Changes
+
+- f9b1001: chore: updated docs
+- Updated dependencies [f9b1001]
+  - @mcp-use/inspector@0.14.2-canary.2
+  - mcp-use@1.12.2-canary.2
+
+## 2.8.2-canary.1
+
+### Patch Changes
+
+- 94e4e63: Add configurable clientInfo support for MCP connection initialization. Clients can now customize how they identify themselves to MCP servers with full metadata including name, title, version, description, icons, and website URL. The clientConfig option is deprecated in favor of deriving it from clientInfo. Default clientInfo is set for mcp-use, inspector sets "mcp-use Inspector" with its own version, and CLI sets "mcp-use CLI".
+- 94e4e63: ## Breaking Changes (with Deprecation Warnings)
+  - **Renamed `customHeaders` to `headers`**: The `customHeaders` option has been renamed to `headers` across all APIs for better consistency. The old name still works but shows deprecation warnings. Update your code to use `headers` instead.
+  - **Renamed `samplingCallback` to `onSampling`**: Callback naming is now more consistent with event handler patterns. The old name still works but shows deprecation warnings.
+
+  ## New Features
+  - **Automatic Proxy Fallback**: Added `autoProxyFallback` option to `useMcp` hook and `McpClientProvider`. When enabled (default: `true` in provider), automatically retries failed connections through a proxy when CORS errors or HTTP 4xx errors are detected. This makes connecting to MCP servers much more reliable in browser environments.
+  - **Provider-Level Proxy Defaults**: `McpClientProvider` now supports `defaultProxyConfig` and `defaultAutoProxyFallback` props to set proxy configuration for all servers. Individual servers can override these defaults.
+  - **OAuth Proxy Support**: Added OAuth request proxying through fetch interceptor in `BrowserOAuthClientProvider`. Configure with `oauthProxyUrl` to route OAuth discovery and token requests through your backend proxy.
+
+  ## Improvements
+  - **Enhanced Error Detection**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+  - **Smarter Connection Logic**: OAuth provider now always uses the original target URL for OAuth discovery, not the proxy URL
+  - **Better Session Management**: Improved session cleanup to avoid noisy warning logs
+  - **Type Safety**: Added deprecation notices in TypeScript types for deprecated options
+  - **Proxy Header Support**: `proxyConfig` now accepts a `headers` field for custom headers to the proxy
+
+  ## Refactoring
+  - **Removed `oauth-helper.ts`** (521 lines): OAuth helper utilities consolidated into `browser-provider.ts`
+  - **Removed `react_example.html`**: Outdated example file removed
+  - **Major `useMcp` Hook Refactor**: Complete rewrite of connection logic with automatic retry, better error handling, and proxy fallback support
+
+  ## Documentation
+  - Updated all client documentation to use new `headers` naming
+  - Added comprehensive examples for automatic proxy fallback
+  - Updated sampling documentation with new `onSampling` callback name
+  - Refreshed React integration guide with provider-based approach
+
+- Updated dependencies [94e4e63]
+- Updated dependencies [94e4e63]
+- Updated dependencies [94e4e63]
+  - @mcp-use/inspector@0.14.2-canary.1
+  - mcp-use@1.12.2-canary.1
+
+## 2.8.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a0aa464]
+  - @mcp-use/inspector@0.14.2-canary.0
+  - mcp-use@1.12.2-canary.0
+
+## 2.8.1
+
+### Patch Changes
+
+- e36d1ab: fix: directory separator on Windows platform causing widgets build fail. Normalize Windows backslash path separators to forward slashes when building widget entry paths to ensure cross-platform compatibility.
+- Updated dependencies [e36d1ab]
+- Updated dependencies [e36d1ab]
+- Updated dependencies [e36d1ab]
+  - @mcp-use/inspector@0.14.1
+  - mcp-use@1.12.1
+
+## 2.8.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [74ff401]
+  - @mcp-use/inspector@0.14.1-canary.2
+  - mcp-use@1.12.1-canary.2
+
+## 2.8.1-canary.1
+
+### Patch Changes
+
+- 4ff190a: fix: directory separator on Windows platform causing widgets build fail. Normalize Windows backslash path separators to forward slashes when building widget entry paths to ensure cross-platform compatibility.
+  - mcp-use@1.12.1-canary.1
+  - @mcp-use/inspector@0.14.1-canary.1
+
+## 2.8.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1674a02]
+- Updated dependencies [1674a02]
+  - @mcp-use/inspector@0.14.1-canary.0
+  - mcp-use@1.12.1-canary.0
+
+## 2.8.0
+
+### Minor Changes
+
+- 53fb670: ## Multi-Server Support and Architecture Improvements
+
+  ### Features
+  - **Multi-server management**: Introduced `McpClientProvider` to manage multiple MCP server connections, allowing dynamic addition and removal of servers in React applications
+  - **Storage providers**: Added pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+  - **Enhanced RPC logging**: New `rpc-logger` module with filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+  - **Browser support**: Exported `MCPAgent` for browser usage with `BrowserMCPClient` instance or through `RemoteAgent`
+
+  ### Inspector Enhancements
+  - **Improved UI responsiveness**: Enhanced mobile and tablet layouts with adaptive component visibility
+  - **Better server management**: Refactored server connection handling with improved icon display and status tracking
+  - **Enhanced debugging**: Added detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+  - **Simplified connection settings**: Removed deprecated transport types for cleaner configuration
+
+  ### Architecture Changes
+  - Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+  - Refactored `useMcp` hook for better multi-server support
+  - Updated components across inspector for cleaner architecture and imports
+  - Added multi-server React example demonstrating new capabilities
+
+  ### Bug Fixes
+  - Fixed server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+
+- 53fb670: chore: make broser bundle node js free
+- 53fb670: feat: remove Node.js dependencies and improve browser compatibility
+
+  This release removes Node.js-specific dependencies and significantly improves browser compatibility across the mcp-use ecosystem.
+
+  ## Breaking Changes
+  - **Logging**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+
+  ## New Features
+
+  ### Browser Runtime Support
+  - **Browser Telemetry**: Added `telemetry-browser.ts` that uses `posthog-js` for browser environments, separate from Node.js telemetry
+  - **Browser Entry Point**: Enhanced `browser.ts` entry point with improved browser-specific utilities
+  - **Browser Utilities**: Added new utilities:
+    - `utils/favicon-detector.ts` - Detect and extract favicons from URLs
+    - `utils/proxy-config.ts` - Proxy configuration utilities for browser environments
+    - `utils/mcpClientUtils.ts` - MCP client utilities moved from client package
+
+  ### React Components
+  - **AddToClientDropdown**: New React component (`src/react/AddToClientDropdown.tsx`) for adding MCP servers to clients with enhanced UI and functionality
+
+  ### Server Middleware
+  - **MCP Proxy Middleware**: Added `server/middleware/mcp-proxy.ts` - Hono middleware for proxying MCP server requests with optional authentication and request validation
+
+  ### Inspector Improvements
+  - Enhanced inspector components for better browser compatibility
+  - Improved server icon support and component interactions
+  - Added embedded mode support
+  - Better configuration handling and MCP proxy integration
+
+  ## Refactoring
+  - **Telemetry Split**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
+  - **Logging Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+  - **Build Configuration**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
+  - **Package Dependencies**: Removed `winston` and related Node.js-only dependencies from `package.json`
+
+  ## Testing
+  - Added comprehensive test (`browser-react-no-node-deps.test.ts`) to ensure `mcp-use/react` and `mcp-use/browser` do not import Node.js dependencies
+
+  This release makes mcp-use fully compatible with browser environments while maintaining backward compatibility with Node.js applications.
+
+### Patch Changes
+
+- 53fb670: ci: add dev command testing to CI workflow & fix issue [#742](https://github.com/mcp-use/mcp-use/issues/742)
+- 53fb670: chore: lint & format
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+- Updated dependencies [53fb670]
+  - @mcp-use/inspector@0.14.0
+  - mcp-use@1.12.0
+
+## 2.8.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [b16431b]
+  - @mcp-use/inspector@0.14.0-canary.14
+  - mcp-use@1.12.0-canary.14
+
+## 2.8.0-canary.13
+
+### Patch Changes
+
+- a95e8bb: ci: add dev command testing to CI workflow & fix issue [#742](https://github.com/mcp-use/mcp-use/issues/742)
+  - mcp-use@1.12.0-canary.13
+  - @mcp-use/inspector@0.14.0-canary.13
+
+## 2.8.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [d02b8df]
+  - mcp-use@1.12.0-canary.12
+  - @mcp-use/inspector@0.14.0-canary.12
+
+## 2.8.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [55db23e]
+  - @mcp-use/inspector@0.14.0-canary.11
+  - mcp-use@1.12.0-canary.11
+
+## 2.8.0-canary.10
+
+### Patch Changes
+
+- ce4647d: chore: lint & format
+- Updated dependencies [ce4647d]
+  - @mcp-use/inspector@0.14.0-canary.10
+  - mcp-use@1.12.0-canary.10
+
+## 2.8.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [4fb8223]
+  - mcp-use@1.12.0-canary.9
+  - @mcp-use/inspector@0.14.0-canary.9
+
+## 2.8.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [daf3c81]
+  - mcp-use@1.12.0-canary.8
+  - @mcp-use/inspector@0.14.0-canary.8
+
+## 2.8.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [4f93dc3]
+  - mcp-use@1.12.0-canary.7
+  - @mcp-use/inspector@0.14.0-canary.7
+
+## 2.8.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [2113c43]
+  - @mcp-use/inspector@0.14.0-canary.6
+  - mcp-use@1.12.0-canary.6
+
+## 2.8.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [7381ec3]
+  - @mcp-use/inspector@0.14.0-canary.5
+  - mcp-use@1.12.0-canary.5
+
+## 2.8.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [ef5a71d]
+  - @mcp-use/inspector@0.14.0-canary.4
+  - mcp-use@1.12.0-canary.4
+
+## 2.8.0-canary.3
+
+### Minor Changes
+
+- 8bc7f4d: ## Multi-Server Support and Architecture Improvements
+
+  ### Features
+  - **Multi-server management**: Introduced `McpClientProvider` to manage multiple MCP server connections, allowing dynamic addition and removal of servers in React applications
+  - **Storage providers**: Added pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+  - **Enhanced RPC logging**: New `rpc-logger` module with filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+  - **Browser support**: Exported `MCPAgent` for browser usage with `BrowserMCPClient` instance or through `RemoteAgent`
+
+  ### Inspector Enhancements
+  - **Improved UI responsiveness**: Enhanced mobile and tablet layouts with adaptive component visibility
+  - **Better server management**: Refactored server connection handling with improved icon display and status tracking
+  - **Enhanced debugging**: Added detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+  - **Simplified connection settings**: Removed deprecated transport types for cleaner configuration
+
+  ### Architecture Changes
+  - Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+  - Refactored `useMcp` hook for better multi-server support
+  - Updated components across inspector for cleaner architecture and imports
+  - Added multi-server React example demonstrating new capabilities
+
+  ### Bug Fixes
+  - Fixed server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+
+### Patch Changes
+
+- Updated dependencies [8bc7f4d]
+  - @mcp-use/inspector@0.14.0-canary.3
+  - mcp-use@1.12.0-canary.3
+
+## 2.8.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [93fd156]
+  - @mcp-use/inspector@0.14.0-canary.2
+  - mcp-use@1.12.0-canary.2
+
+## 2.8.0-canary.1
+
+### Minor Changes
+
+- 2156916: chore: make broser bundle node js free
+- 2156916: feat: remove Node.js dependencies and improve browser compatibility
+
+  This release removes Node.js-specific dependencies and significantly improves browser compatibility across the mcp-use ecosystem.
+
+  ## Breaking Changes
+  - **Logging**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+
+  ## New Features
+
+  ### Browser Runtime Support
+  - **Browser Telemetry**: Added `telemetry-browser.ts` that uses `posthog-js` for browser environments, separate from Node.js telemetry
+  - **Browser Entry Point**: Enhanced `browser.ts` entry point with improved browser-specific utilities
+  - **Browser Utilities**: Added new utilities:
+    - `utils/favicon-detector.ts` - Detect and extract favicons from URLs
+    - `utils/proxy-config.ts` - Proxy configuration utilities for browser environments
+    - `utils/mcpClientUtils.ts` - MCP client utilities moved from client package
+
+  ### React Components
+  - **AddToClientDropdown**: New React component (`src/react/AddToClientDropdown.tsx`) for adding MCP servers to clients with enhanced UI and functionality
+
+  ### Server Middleware
+  - **MCP Proxy Middleware**: Added `server/middleware/mcp-proxy.ts` - Hono middleware for proxying MCP server requests with optional authentication and request validation
+
+  ### Inspector Improvements
+  - Enhanced inspector components for better browser compatibility
+  - Improved server icon support and component interactions
+  - Added embedded mode support
+  - Better configuration handling and MCP proxy integration
+
+  ## Refactoring
+  - **Telemetry Split**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
+  - **Logging Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+  - **Build Configuration**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
+  - **Package Dependencies**: Removed `winston` and related Node.js-only dependencies from `package.json`
+
+  ## Testing
+  - Added comprehensive test (`browser-react-no-node-deps.test.ts`) to ensure `mcp-use/react` and `mcp-use/browser` do not import Node.js dependencies
+
+  This release makes mcp-use fully compatible with browser environments while maintaining backward compatibility with Node.js applications.
+
+### Patch Changes
+
+- Updated dependencies [2156916]
+- Updated dependencies [2156916]
+  - @mcp-use/inspector@0.14.0-canary.1
+  - mcp-use@1.12.0-canary.1
+
+## 2.7.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [841cccf]
+  - @mcp-use/inspector@0.14.0-canary.0
+  - mcp-use@1.11.3-canary.0
+
 ## 2.7.0
 
 ### Minor Changes

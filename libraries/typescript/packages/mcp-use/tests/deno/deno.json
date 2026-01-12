@@ -1,8 +1,7 @@
 {
   "nodeModulesDir": "auto",
   "imports": {
-    "@modelcontextprotocol/sdk": "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.4",
-    "@mcp-use/modelcontextprotocol-sdk": "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.4",
+    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1.25.1",
     "@mcp-ui/server": "npm:@mcp-ui/server@^5.15.0",
     "mcp-use/server": "../../dist/src/server/index.js",
     "zod": "npm:zod@^4.2.0",

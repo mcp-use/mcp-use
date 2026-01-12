@@ -1,7 +1,7 @@
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { logger } from "../logging.js";
-import { Tel } from "../telemetry/index.js";
+import { Tel } from "../telemetry/telemetry-browser.js";
 import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 
@@ -64,15 +64,22 @@ export class BrowserMCPClient extends BaseMCPClient {
       authProvider,
       wrapTransport,
       clientOptions,
+      onSampling,
       samplingCallback,
       elicitationCallback,
       disableSseFallback,
       preferSse,
+      clientInfo,
+      gatewayUrl,
+      serverId,
     } = serverConfig;
 
     if (!url) {
       throw new Error("Server URL is required");
     }
+
+    // Support both new and deprecated name
+    const finalOnSampling = onSampling ?? samplingCallback;
 
     // Prepare connector options
     const connectorOptions = {
@@ -81,10 +88,14 @@ export class BrowserMCPClient extends BaseMCPClient {
       authProvider, // ← Pass OAuth provider to connector
       wrapTransport, // ← Pass transport wrapper if provided
       clientOptions, // ← Pass client options (capabilities, etc.) to connector
-      samplingCallback, // ← Pass sampling callback to connector
+      onSampling: finalOnSampling, // ← Pass sampling callback to connector (new name)
+      samplingCallback: finalOnSampling, // ← Backward compatibility: also pass as old name
       elicitationCallback, // ← Pass elicitation callback to connector
       disableSseFallback, // ← Disable automatic SSE fallback
       preferSse, // ← Use SSE transport directly
+      clientInfo, // ← Pass client info (name, version) to connector
+      gatewayUrl, // ← Pass gateway/proxy URL to connector
+      serverId, // ← Pass server ID for gateway observability
     };
 
     // Debug: Log if clientOptions are being passed

@@ -10,7 +10,7 @@ export default defineConfig({
       name: "ignore-node-modules",
       resolveId(id) {
         // Mark Node.js-only modules as external to prevent bundling
-        if (id === "posthog-node" || id === "winston") {
+        if (id === "posthog-node") {
           return { id, external: true };
         }
         return null;
@@ -21,10 +21,10 @@ export default defineConfig({
     outDir: "dist",
     commonjsOptions: {
       transformMixedEsModules: true,
-      ignore: ["posthog-node", "winston"],
+      ignore: ["posthog-node"],
     },
     rollupOptions: {
-      external: ["posthog-node", "winston"],
+      external: ["posthog-node"],
     },
   },
   resolve: {
@@ -46,7 +46,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["react", "react-dom"],
-    exclude: ["posthog-node", "winston"],
+    exclude: ["posthog-node"],
     esbuildOptions: {
       define: {
         global: "globalThis",

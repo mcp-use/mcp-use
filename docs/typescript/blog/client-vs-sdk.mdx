@@ -15,17 +15,25 @@ The answer: **multi-server orchestration**. Our client is designed for AI agents
 The official SDK's `Client` is designed for **one server at a time**:
 
 ```typescript
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 // Connect to ONE server
-const transport = new StreamableHTTPClientTransport('http://localhost:3000/mcp')
-const client = new Client({ name: 'my-app', version: '1.0.0' }, { capabilities: {} })
+const transport = new StreamableHTTPClientTransport(
+  "http://localhost:3000/mcp"
+);
+const client = new Client(
+  { name: "my-app", version: "1.0.0" },
+  { capabilities: {} }
+);
 
-await client.connect(transport)
+await client.connect(transport);
 
 // Call tools on THIS server
-await client.callTool({ name: 'send-email', arguments: { to: 'user@example.com' } })
+await client.callTool({
+  name: "send-email",
+  arguments: { to: "user@example.com" },
+});
 ```
 
 **For a single integration, this is perfect.** Simple, direct, no abstractions.
@@ -34,25 +42,31 @@ await client.callTool({ name: 'send-email', arguments: { to: 'user@example.com' 
 
 ```typescript
 // Managing multiple servers with official SDK (manual)
-const githubTransport = new StreamableHTTPClientTransport('https://api.github.com/mcp')
-const githubClient = new Client({ name: 'agent', version: '1.0.0' }, {})
-await githubClient.connect(githubTransport)
+const githubTransport = new StreamableHTTPClientTransport(
+  "https://api.github.com/mcp"
+);
+const githubClient = new Client({ name: "agent", version: "1.0.0" }, {});
+await githubClient.connect(githubTransport);
 
-const linearTransport = new StreamableHTTPClientTransport('https://mcp.linear.app/mcp')
-const linearClient = new Client({ name: 'agent', version: '1.0.0' }, {})
-await linearClient.connect(linearTransport)
+const linearTransport = new StreamableHTTPClientTransport(
+  "https://mcp.linear.app/mcp"
+);
+const linearClient = new Client({ name: "agent", version: "1.0.0" }, {});
+await linearClient.connect(linearTransport);
 
-const customTransport = new StreamableHTTPClientTransport('http://localhost:3000/mcp')
-const customClient = new Client({ name: 'agent', version: '1.0.0' }, {})
-await customClient.connect(customTransport)
+const customTransport = new StreamableHTTPClientTransport(
+  "http://localhost:3000/mcp"
+);
+const customClient = new Client({ name: "agent", version: "1.0.0" }, {});
+await customClient.connect(customTransport);
 
 // Now manually route tool calls to the right client
-if (toolName === 'create_issue') {
-  await linearClient.callTool({ name: toolName, arguments: args })
-} else if (toolName === 'search_code') {
-  await githubClient.callTool({ name: toolName, arguments: args })
+if (toolName === "create_issue") {
+  await linearClient.callTool({ name: toolName, arguments: args });
+} else if (toolName === "search_code") {
+  await githubClient.callTool({ name: toolName, arguments: args });
 } else {
-  await customClient.callTool({ name: toolName, arguments: args })
+  await customClient.callTool({ name: toolName, arguments: args });
 }
 ```
 
@@ -63,37 +77,39 @@ This becomes unmaintainable with 5+ servers.
 Our client provides a unified interface for multiple servers:
 
 ```typescript
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "mcp-use";
 
-const client = new MCPClient()
+const client = new MCPClient();
 
 // Add multiple servers
-client.addServer('github', {
-  url: 'https://api.github.com/mcp',
-  headers: { Authorization: `Bearer ${githubToken}` }
-})
+client.addServer("github", {
+  url: "https://api.github.com/mcp",
+  headers: { Authorization: `Bearer ${githubToken}` },
+});
 
-client.addServer('linear', {
-  url: 'https://mcp.linear.app/mcp',
-  headers: { Authorization: `Bearer ${linearToken}` }
-})
+client.addServer("linear", {
+  url: "https://mcp.linear.app/mcp",
+  headers: { Authorization: `Bearer ${linearToken}` },
+});
 
-client.addServer('custom', {
-  url: 'http://localhost:3000/mcp',
-  headers: { Authorization: `Bearer ${customKey}` }
-})
+client.addServer("custom", {
+  url: "http://localhost:3000/mcp",
+  headers: { Authorization: `Bearer ${customKey}` },
+});
 
 // Create sessions for all servers
-await client.createSession('github')
-await client.createSession('linear')
-await client.createSession('custom')
+await client.createSession("github");
+await client.createSession("linear");
+await client.createSession("custom");
 
 // Get a session and call tools
-const githubSession = client.getSession('github')
-await githubSession.connector.callTool('search_code', { query: 'async function' })
+const githubSession = client.getSession("github");
+await githubSession.connector.callTool("search_code", {
+  query: "async function",
+});
 
-const linearSession = client.getSession('linear')
-await linearSession.connector.callTool('create_issue', { title: 'Bug fix' })
+const linearSession = client.getSession("linear");
+await linearSession.connector.callTool("create_issue", { title: "Bug fix" });
 ```
 
 **Key difference:** The client **knows about all your servers** and provides a unified API.
@@ -103,24 +119,27 @@ await linearSession.connector.callTool('create_issue', { title: 'Bug fix' })
 ### 1. Session Management
 
 **Official SDK:**
+
 ```typescript
 // You manage transport lifecycle
-const transport = new StreamableHTTPClientTransport(url)
-const client = new Client(info, {})
-await client.connect(transport)
+const transport = new StreamableHTTPClientTransport(url);
+const client = new Client(info, {});
+await client.connect(transport);
 // ... use client
-await client.close()  // Don't forget cleanup!
+await client.close(); // Don't forget cleanup!
 ```
 
 **mcp-use:**
+
 ```typescript
 // Client manages sessions
-const session = await client.createSession('server-name')
+const session = await client.createSession("server-name");
 // Session auto-connects, caches tools, handles lifecycle
-await client.closeSession('server-name')
+await client.closeSession("server-name");
 ```
 
 Sessions encapsulate:
+
 - ✅ Transport creation and lifecycle
 - ✅ Connection state management
 - ✅ Tool/resource/prompt caching
@@ -130,6 +149,7 @@ Sessions encapsulate:
 ### 2. Config File Support
 
 **Official SDK:**
+
 ```typescript
 // Manual configuration
 const transport1 = new StreamableHTTPClientTransport(url1, { headers: {...} })
@@ -138,6 +158,7 @@ const client1 = new Client({...}, {})
 ```
 
 **mcp-use:**
+
 ```json
 // mcp-config.json
 {
@@ -156,8 +177,8 @@ const client1 = new Client({...}, {})
 
 ```typescript
 // One line to connect to all servers
-const client = MCPClient.fromConfigFile('./mcp-config.json')
-await client.createAllSessions()
+const client = MCPClient.fromConfigFile("./mcp-config.json");
+await client.createAllSessions();
 ```
 
 This matches the Python API (Python SDK uses config files) and makes multi-server setups declarative.
@@ -167,77 +188,88 @@ This matches the Python API (Python SDK uses config files) and makes multi-serve
 The official SDK supports OAuth but requires manual wiring:
 
 **Official SDK:**
+
 ```typescript
-import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
+import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 
 // You implement OAuthClientProvider interface
 class MyOAuthProvider implements OAuthClientProvider {
-  async saveClientInformation(info) { /* ... */ }
-  async tokens() { /* ... */ }
-  async redirectToAuthorization() { /* ... */ }
+  async saveClientInformation(info) {
+    /* ... */
+  }
+  async tokens() {
+    /* ... */
+  }
+  async redirectToAuthorization() {
+    /* ... */
+  }
 }
 
-const authProvider = new MyOAuthProvider()
+const authProvider = new MyOAuthProvider();
 const transport = new StreamableHTTPClientTransport(url, {
-  authProvider  // ← Must pass to EVERY transport
-})
+  authProvider, // ← Must pass to EVERY transport
+});
 ```
 
 **mcp-use:**
+
 ```typescript
-import { BrowserOAuthClientProvider } from 'mcp-use/browser'
+import { BrowserOAuthClientProvider } from "mcp-use/browser";
 
 // Built-in browser OAuth with automatic DCR
 const authProvider = new BrowserOAuthClientProvider(url, {
-  clientName: 'My App',
-  callbackUrl: window.location.origin + '/oauth/callback',
-  storageKeyPrefix: 'mcp:auth'
-})
+  clientName: "My App",
+  callbackUrl: window.location.origin + "/oauth/callback",
+  storageKeyPrefix: "mcp:auth",
+});
 
 // Add to client once - works for all sessions
-client.addServer('server', {
+client.addServer("server", {
   url: url,
-  authProvider  // ← Client passes to transport automatically
-})
+  authProvider, // ← Client passes to transport automatically
+});
 
-// OAuth handled automatically:
+// OAuth infrastructure built-in:
 // - Token refresh
 // - Dynamic Client Registration (DCR)
-// - Popup flow
+// - Popup flow (user-initiated)
 // - localStorage persistence
-await client.createSession('server')
+await client.createSession("server");
 ```
 
 Our `BrowserOAuthClientProvider` implements:
-- ✅ Automatic popup-based auth flow
+
+- ✅ User-initiated popup auth flow with fallback
 - ✅ Token storage in `localStorage`
-- ✅ Token refresh before expiration
+- ✅ Automatic token refresh before expiration
 - ✅ Dynamic Client Registration (DCR)
 - ✅ Callback handling via `window.postMessage`
 
 ### 4. Transport Abstraction and Fallback
 
 **Official SDK:**
+
 ```typescript
 // You choose transport manually
-const transport = new StreamableHTTPClientTransport(url)
+const transport = new StreamableHTTPClientTransport(url);
 // If server doesn't support it, you get an error
 
 // To support fallback:
 try {
-  const httpTransport = new StreamableHTTPClientTransport(url)
-  await client.connect(httpTransport)
+  const httpTransport = new StreamableHTTPClientTransport(url);
+  await client.connect(httpTransport);
 } catch (err) {
-  const sseTransport = new SSEClientTransport(url)
-  await client.connect(sseTransport)
+  const sseTransport = new SSEClientTransport(url);
+  await client.connect(sseTransport);
 }
 ```
 
 **mcp-use:**
+
 ```typescript
 // HttpConnector tries transports automatically
-const connector = new HttpConnector(url, { headers })
-await connector.connect()
+const connector = new HttpConnector(url, { headers });
+await connector.connect();
 
 // Internally:
 // 1. Try Streamable HTTP (best performance)
@@ -250,21 +282,23 @@ Graceful degradation without manual logic.
 ### 5. Capability-Aware Methods
 
 **Official SDK:**
+
 ```typescript
 // You check capabilities manually
-const caps = client.getServerCapabilities()
+const caps = client.getServerCapabilities();
 
 if (caps.resources) {
-  await client.listResources()  // OK
+  await client.listResources(); // OK
 } else {
   // Skip resources
 }
 ```
 
 **mcp-use:**
+
 ```typescript
 // Connector checks capabilities automatically
-const resources = await session.connector.listAllResources()
+const resources = await session.connector.listAllResources();
 // Returns [] if not supported, instead of throwing
 ```
 
@@ -273,24 +307,26 @@ During `initialize()`, our connector caches capabilities and checks them before 
 ### 6. Tool Caching
 
 **Official SDK:**
+
 ```typescript
 // You cache tools manually
-let toolsCache: Tool[] = []
+let toolsCache: Tool[] = [];
 
 const listTools = async () => {
-  const result = await client.listTools()
-  toolsCache = result.tools
-  return toolsCache
-}
+  const result = await client.listTools();
+  toolsCache = result.tools;
+  return toolsCache;
+};
 ```
 
 **mcp-use:**
+
 ```typescript
 // Connector caches on initialize()
-await session.initialize()  // Fetches and caches tools once
+await session.initialize(); // Fetches and caches tools once
 
 // Subsequent access is instant (no network call)
-const tools = session.connector.tools  // ← From cache
+const tools = session.connector.tools; // ← From cache
 ```
 
 Especially useful for AI agents that query tool lists frequently.
@@ -298,23 +334,29 @@ Especially useful for AI agents that query tool lists frequently.
 ### 7. Unified Error Handling
 
 **Official SDK:**
+
 ```typescript
 // Different error types from different transports
 try {
-  await client.callTool({ name: 'my-tool', arguments: {} })
+  await client.callTool({ name: "my-tool", arguments: {} });
 } catch (err) {
-  if (err instanceof StreamableHTTPError) { /* ... */ }
-  else if (err instanceof SSEError) { /* ... */ }
-  else if (err.code === -32601) { /* ... */ }
+  if (err instanceof StreamableHTTPError) {
+    /* ... */
+  } else if (err instanceof SSEError) {
+    /* ... */
+  } else if (err.code === -32601) {
+    /* ... */
+  }
   // Different error shapes!
 }
 ```
 
 **mcp-use:**
+
 ```typescript
 // Consistent error interface
 try {
-  await session.connector.callTool('my-tool', {})
+  await session.connector.callTool("my-tool", {});
 } catch (err) {
   // Always has err.code, err.message
   if (err.code === -32601) {
@@ -330,6 +372,7 @@ try {
 For teams using both Python and TypeScript, our client provides API consistency:
 
 **Python:**
+
 ```python
 from mcp_use import MCPClient
 
@@ -341,14 +384,17 @@ result = await session.connector.call_tool('search_code', {'query': 'bug'})
 ```
 
 **TypeScript (mcp-use):**
+
 ```typescript
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "mcp-use";
 
-const client = MCPClient.fromConfigFile('mcp-config.json')
-await client.createAllSessions()
+const client = MCPClient.fromConfigFile("mcp-config.json");
+await client.createAllSessions();
 
-const session = client.getSession('github')
-const result = await session.connector.callTool('search_code', { query: 'bug' })
+const session = client.getSession("github");
+const result = await session.connector.callTool("search_code", {
+  query: "bug",
+});
 ```
 
 Nearly identical APIs reduce cognitive load when switching languages.
@@ -369,7 +415,7 @@ Nearly identical APIs reduce cognitive load when switching languages.
 
 - ✅ Building **AI agents** that use multiple MCP servers
 - ✅ Need **config file** driven setup
-- ✅ Want **automatic OAuth** with DCR
+- ✅ Want **built-in OAuth** with DCR and token management
 - ✅ Prefer **session management** over manual transport lifecycle
 - ✅ Building apps that match the **Python mcp-use API**
 - ✅ Need **automatic capability checking**
@@ -381,43 +427,43 @@ Nearly identical APIs reduce cognitive load when switching languages.
 Here's why the multi-server client matters for AI agents:
 
 ```typescript
-import { MCPAgent, MCPClient } from 'mcp-use'
+import { MCPAgent, MCPClient } from "mcp-use";
 
 // One client, three servers
 const client = new MCPClient({
   mcpServers: {
     github: {
-      url: 'https://api.github.com/mcp',
-      headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+      url: "https://api.github.com/mcp",
+      headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
     },
     linear: {
-      url: 'https://mcp.linear.app/mcp',
-      headers: { Authorization: `Bearer ${process.env.LINEAR_TOKEN}` }
+      url: "https://mcp.linear.app/mcp",
+      headers: { Authorization: `Bearer ${process.env.LINEAR_TOKEN}` },
     },
     database: {
-      url: 'http://localhost:3000/mcp',
-      headers: { Authorization: `Bearer ${process.env.DB_API_KEY}` }
-    }
-  }
-})
+      url: "http://localhost:3000/mcp",
+      headers: { Authorization: `Bearer ${process.env.DB_API_KEY}` },
+    },
+  },
+});
 
 // Connect to all servers
-await client.createAllSessions()
+await client.createAllSessions();
 
 // Create agent with ALL servers
 const agent = new MCPAgent({
-  llm: new ChatOpenAI({ model: 'gpt-4' }),
-  client  // ← Agent has access to tools from all 3 servers
-})
+  llm: new ChatOpenAI({ model: "gpt-4" }),
+  client, // ← Agent has access to tools from all 3 servers
+});
 
-await agent.initialize()
+await agent.initialize();
 
 // Agent can use tools from ANY server
 const result = await agent.run(
   "Search GitHub for bugs related to authentication, " +
-  "create a Linear issue for each one, " +
-  "and log them to our database"
-)
+    "create a Linear issue for each one, " +
+    "and log them to our database"
+);
 
 // Agent automatically:
 // - Calls search_code on github
@@ -455,18 +501,19 @@ A session represents a **connection lifecycle** to one server:
 
 ```typescript
 // Session API
-const session = await client.createSession('server-name')
+const session = await client.createSession("server-name");
 
 // Provides:
-session.connector.tools           // Cached tool list
-session.connector.callTool()      // Call a tool
-session.connector.readResource()  // Read a resource
-session.isConnected               // Connection state
+session.connector.tools; // Cached tool list
+session.connector.callTool(); // Call a tool
+session.connector.readResource(); // Read a resource
+session.isConnected; // Connection state
 
-await client.closeSession('server-name')  // Cleanup
+await client.closeSession("server-name"); // Cleanup
 ```
 
 Sessions give you:
+
 - **Isolation:** Each server's state is separate
 - **Caching:** Tools/resources cached per server
 - **Lifecycle:** Clear connect/disconnect
@@ -480,31 +527,35 @@ The inspector started with the official SDK but hit limitations:
 
 ```typescript
 // react/useMcp.ts (OLD)
-const clientRef = useRef<Client | null>(null)
+const clientRef = useRef<Client | null>(null);
 
 const connect = async () => {
   const transport = new StreamableHTTPClientTransport(url, {
-    headers: customHeaders,
-    authProvider: oauthProvider
-  })
+    headers: headers,
+    authProvider: oauthProvider,
+  });
 
-  clientRef.current = new Client({ name: 'inspector', version: '1.0.0' }, {})
-  await clientRef.current.connect(transport)
+  clientRef.current = new Client({ name: "inspector", version: "1.0.0" }, {});
+  await clientRef.current.connect(transport);
 
   // Manually list and cache tools
-  const toolsResult = await clientRef.current.listTools()
-  setTools(toolsResult.tools)
-}
+  const toolsResult = await clientRef.current.listTools();
+  setTools(toolsResult.tools);
+};
 
 const callTool = async (name, args) => {
-  return await clientRef.current.request({
-    method: 'tools/call',
-    params: { name, arguments: args }
-  }, CallToolResultSchema)
-}
+  return await clientRef.current.request(
+    {
+      method: "tools/call",
+      params: { name, arguments: args },
+    },
+    CallToolResultSchema
+  );
+};
 ```
 
 **Problems:**
+
 - ❌ Can't add second server without major refactoring
 - ❌ Manual tool caching
 - ❌ Manual capability checking
@@ -514,32 +565,33 @@ const callTool = async (name, args) => {
 
 ```typescript
 // react/useMcp.ts (NEW)
-const clientRef = useRef<BrowserMCPClient | null>(null)
+const clientRef = useRef<BrowserMCPClient | null>(null);
 
 const connect = async () => {
-  clientRef.current = new BrowserMCPClient()
+  clientRef.current = new BrowserMCPClient();
 
-  client.current.addServer('inspector-server', {
+  client.current.addServer("inspector-server", {
     url: url,
-    headers: customHeaders,
-    authProvider: oauthProvider
-  })
+    headers: headers,
+    authProvider: oauthProvider,
+  });
 
   // Session handles everything
-  const session = await clientRef.current.createSession('inspector-server')
-  await session.initialize()  // Caches tools automatically
+  const session = await clientRef.current.createSession("inspector-server");
+  await session.initialize(); // Caches tools automatically
 
   // Tools already available
-  setTools(session.connector.tools)
-}
+  setTools(session.connector.tools);
+};
 
 const callTool = async (name, args) => {
-  const session = clientRef.current.getSession('inspector-server')
-  return await session.connector.callTool(name, args)
-}
+  const session = clientRef.current.getSession("inspector-server");
+  return await session.connector.callTool(name, args);
+};
 ```
 
 **Benefits:**
+
 - ✅ Can add second server by calling `addServer()` again
 - ✅ Automatic tool caching
 - ✅ Automatic capability checking
@@ -553,58 +605,61 @@ Both clients support OAuth, but the approach differs:
 ### Official SDK: You Implement OAuthClientProvider
 
 ```typescript
-import { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
+import { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 
 class MyOAuthProvider implements OAuthClientProvider {
   async saveClientInformation(info: OAuthClientInformation) {
     // You implement storage
-    localStorage.setItem('oauth_client', JSON.stringify(info))
+    localStorage.setItem("oauth_client", JSON.stringify(info));
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
     // You implement token retrieval
-    const data = localStorage.getItem('oauth_tokens')
-    return data ? JSON.parse(data) : undefined
+    const data = localStorage.getItem("oauth_tokens");
+    return data ? JSON.parse(data) : undefined;
   }
 
   async redirectToAuthorization() {
     // You implement popup/redirect logic
-    const authUrl = buildAuthUrl()
-    window.open(authUrl, 'oauth', 'width=500,height=600')
+    const authUrl = buildAuthUrl();
+    window.open(authUrl, "oauth", "width=500,height=600");
   }
 
   // ... more methods
 }
 
-const provider = new MyOAuthProvider()
-const transport = new StreamableHTTPClientTransport(url, { authProvider: provider })
+const provider = new MyOAuthProvider();
+const transport = new StreamableHTTPClientTransport(url, {
+  authProvider: provider,
+});
 ```
 
 ### mcp-use: BrowserOAuthClientProvider Built-In
 
 ```typescript
-import { BrowserOAuthClientProvider } from 'mcp-use/browser'
+import { BrowserOAuthClientProvider } from "mcp-use/browser";
 
 // Pre-built provider for browser environments
 const provider = new BrowserOAuthClientProvider(url, {
-  clientName: 'My App',
-  callbackUrl: '/oauth/callback',
-  storageKeyPrefix: 'mcp:auth'
-})
+  clientName: "My App",
+  callbackUrl: "/oauth/callback",
+  storageKeyPrefix: "mcp:auth",
+});
 
-// Pass to client - OAuth handled automatically
-client.addServer('server', {
+// Pass to client - OAuth infrastructure built-in
+client.addServer("server", {
   url: url,
-  authProvider: provider
-})
+  authProvider: provider,
+});
 ```
 
 **What it handles:**
+
 - ✅ Dynamic Client Registration (DCR)
-- ✅ Popup-based authorization flow
+- ✅ User-initiated popup authorization flow
 - ✅ Callback via `window.postMessage`
 - ✅ Token storage in `localStorage`
-- ✅ Token refresh before expiration
+- ✅ Automatic token refresh before expiration
 - ✅ Multiple servers (different tokens per server)
 
 The official SDK provides the **interface**. We provide the **implementation**.
@@ -614,21 +669,24 @@ The official SDK provides the **interface**. We provide the **implementation**.
 Official SDK exposes specific transport classes:
 
 ```typescript
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 ```
 
 mcp-use abstracts this:
 
 ```typescript
 // HttpConnector auto-selects transport
-const connector = new HttpConnector(url, { headers, authProvider })
-await connector.connect()  // Tries HTTP, falls back to SSE
+const connector = new HttpConnector(url, { headers, authProvider });
+await connector.connect(); // Tries HTTP, falls back to SSE
 
 // StdioConnector for local processes
-const connector = new StdioConnector({ command: 'python', args: ['server.py'] })
-await connector.connect()
+const connector = new StdioConnector({
+  command: "python",
+  args: ["server.py"],
+});
+await connector.connect();
 ```
 
 **Why this matters:**
@@ -641,6 +699,7 @@ await connector.connect()
 ## Bundle Size Comparison
 
 **Official SDK (minimal):**
+
 ```
 @modelcontextprotocol/sdk: ~120KB
 Your transport choice: ~30KB
@@ -648,12 +707,13 @@ Total: ~150KB
 ```
 
 **mcp-use Client:**
+
 ```
 mcp-use (base): ~180KB
 Includes: Multi-server, sessions, all transports, OAuth provider
 ```
 
-**Extra 30KB** gets you multi-server support, automatic OAuth, and simplified API.
+**Extra 30KB** gets you multi-server support, built-in OAuth infrastructure, and simplified API.
 
 **For browser apps:** Use `mcp-use/browser` (no Node.js deps) at ~50KB total.
 
@@ -665,12 +725,12 @@ Already using the official SDK? Migration is straightforward:
 
 ```typescript
 // If you only need one server, official SDK is simpler
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const transport = new StreamableHTTPClientTransport(url)
-const client = new Client(info, {})
-await client.connect(transport)
+const transport = new StreamableHTTPClientTransport(url);
+const client = new Client(info, {});
+await client.connect(transport);
 ```
 
 ### Multiple Servers (Migrate to mcp-use)
@@ -694,13 +754,13 @@ await client.createAllSessions()
 ### AI Agents (Use mcp-use)
 
 ```typescript
-import { MCPAgent, MCPClient } from 'mcp-use'
+import { MCPAgent, MCPClient } from "mcp-use";
 
-const client = MCPClient.fromConfigFile('./mcp-config.json')
-const agent = new MCPAgent({ llm, client })
+const client = MCPClient.fromConfigFile("./mcp-config.json");
+const agent = new MCPAgent({ llm, client });
 
-await agent.initialize()  // Connects to ALL servers
-const result = await agent.run('Your multi-server query')
+await agent.initialize(); // Connects to ALL servers
+const result = await agent.run("Your multi-server query");
 ```
 
 ## Compatibility: We Don't Fork the SDK
@@ -709,30 +769,31 @@ const result = await agent.run('Your multi-server query')
 
 ```typescript
 // connectors/http.ts (our code)
-import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 export class HttpConnector extends BaseConnector {
   async connect() {
     const transport = new StreamableHTTPClientTransport(this.baseUrl, {
-      authProvider: this.opts.authProvider  // ← Official SDK feature
-    })
+      authProvider: this.opts.authProvider, // ← Official SDK feature
+    });
 
-    this.client = new Client(  // ← Official SDK client
-      { name: 'mcp-use', version: '1.0.0' },
+    this.client = new Client( // ← Official SDK client
+      { name: "mcp-use", version: "1.0.0" },
       { capabilities: {} }
-    )
+    );
 
-    await this.client.connect(transport)  // ← Official SDK method
+    await this.client.connect(transport); // ← Official SDK method
   }
 
   async callTool(name, args) {
-    return await this.client.callTool({ name, arguments: args })  // ← Official SDK
+    return await this.client.callTool({ name, arguments: args }); // ← Official SDK
   }
 }
 ```
 
 **This means:**
+
 - ✅ We benefit from SDK updates automatically
 - ✅ No compatibility issues
 - ✅ Can use official SDK features directly
@@ -758,7 +819,8 @@ Both are valid choices. We're not replacing the SDK—we're extending it for com
 ---
 
 **Learn more:**
-- [mcp-use Client Documentation](https://docs.mcp-use.com/typescript/client)
-- [Server Manager Guide](https://docs.mcp-use.com/typescript/client/server-manager)
+
+- [mcp-use Client Documentation](https://mcp-use.com/docs/typescript/client)
+- [Server Manager Guide](https://mcp-use.com/docs/typescript/client/server-manager)
 - [Official MCP SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- [Python mcp-use Client](https://docs.mcp-use.com/python/client)
+- [Python mcp-use Client](https://mcp-use.com/docs/python/client)
