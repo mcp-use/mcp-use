@@ -61,7 +61,7 @@ describe("CLI tsx Resolution", () => {
     const tsxBin = path.resolve(path.dirname(tsxPkgPath), binPath);
 
     expect(tsxBin).toContain("dist/cli.mjs");
-    expect(tsxBin).not.toContain("tsx/dist/cli.mjs"); // Should not be hardcoded
+    expect(tsxBin).toContain("node_modules/tsx/dist/cli.mjs"); // Should resolve to node_modules
   });
 
   it("should resolve tsx bin from package.json bin field (object form)", async () => {

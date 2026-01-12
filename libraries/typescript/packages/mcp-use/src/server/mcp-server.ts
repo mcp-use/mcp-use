@@ -1,10 +1,10 @@
 import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
-  type RegisteredTool,
   type RegisteredPrompt,
   type RegisteredResource,
   type RegisteredResourceTemplate,
+  type RegisteredTool,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   CreateMessageRequest,
@@ -29,6 +29,7 @@ import {
   toolRegistration,
 } from "./tools/index.js";
 import { mountWidgets, uiResourceRegistration } from "./widgets/index.js";
+import { syncPrimitive, logChanges, countChanges } from "./hmr-sync.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -237,421 +238,529 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * ```
    */
   public syncRegistrationsFrom(other: MCPServerClass<boolean>): void {
-    const changes = {
-      tools: {
-        added: [] as string[],
-        removed: [] as string[],
-        updated: [] as string[],
-      },
-      prompts: {
-        added: [] as string[],
-        removed: [] as string[],
-        updated: [] as string[],
-      },
-      resources: {
-        added: [] as string[],
-        removed: [] as string[],
-        updated: [] as string[],
-      },
-      resourceTemplates: {
-        added: [] as string[],
-        removed: [] as string[],
-        updated: [] as string[],
-      },
+    // Build session contexts array (shared across all primitives)
+    const sessionContexts = Array.from(this.sessions.entries()).map(
+      ([sessionId, session]) => ({
+        sessionId,
+        session,
+        refs: this.sessionRegisteredRefs.get(sessionId),
+      })
+    );
+
+    // Helper to create tool entry for SDK
+    const createToolEntry = (
+      name: string,
+      config: ToolDefinition,
+      handler: unknown,
+      nativeServer: any
+    ): RegisteredTool => {
+      let inputSchema: Record<string, any>;
+      if (config.schema) {
+        inputSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.inputs && config.inputs.length > 0) {
+        inputSchema = this.createParamsSchema(config.inputs);
+      } else {
+        inputSchema = {};
+      }
+
+      return {
+        title: config.title,
+        description: config.description ?? "",
+        inputSchema,
+        outputSchema: undefined,
+        annotations: config.annotations,
+        execution: { taskSupport: "forbidden" },
+        _meta: config._meta,
+        handler: handler,
+        enabled: true,
+        disable: function (this: RegisteredTool) {
+          this.enabled = false;
+        },
+        enable: function (this: RegisteredTool) {
+          this.enabled = true;
+        },
+        remove: () => {
+          delete nativeServer._registeredTools[name];
+        },
+        update: function (
+          this: RegisteredTool,
+          updates: Record<string, unknown>
+        ) {
+          Object.assign(this, updates);
+        },
+      } as RegisteredTool;
     };
 
     // --- TOOLS ---
-    // Note: We only add/update tools, not remove them during HMR
-    // This preserves widget tools and other system-registered tools
-    // Users can restart the server to fully remove tools
-    const oldToolNames = new Set(this.registrations.tools.keys());
-    const newToolNames = new Set(other.registrations.tools.keys());
+    const toolsResult = syncPrimitive({
+      primitiveName: "Tools",
+      currentRegistrations: this.registrations.tools,
+      newRegistrations: other.registrations.tools,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.tools,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          const nativeServer = session.server as any;
+          const toolEntry = createToolEntry(
+            name,
+            config as ToolDefinition,
+            handler,
+            nativeServer
+          );
+          nativeServer._registeredTools[name] = toolEntry;
+          return toolEntry;
+        },
+      })),
+      supportsInPlaceUpdate: true,
+      // Order-preserving rename for tools
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
 
-    // Add new tools and update changed tools
-    for (const name of newToolNames) {
-      const newReg = other.registrations.tools.get(name)!;
-
-      if (!oldToolNames.has(name)) {
-        // New tool - add to registrations and directly inject into active sessions
-        this.registrations.tools.set(name, newReg);
-
-        // Build input schema
-        let inputSchema: Record<string, any>;
-        if (newReg.config.schema) {
-          inputSchema = this.convertZodSchemaToParams(newReg.config.schema);
-        } else if (newReg.config.inputs && newReg.config.inputs.length > 0) {
-          inputSchema = this.createParamsSchema(newReg.config.inputs);
-        } else {
-          inputSchema = {};
-        }
-
-        // Directly inject into all active sessions' native servers
-        for (const [sessionId, session] of this.sessions) {
-          if (session.server) {
-            try {
-              // Access internal SDK structure - casting to any since _registeredTools is private
-              const nativeServer = session.server as any;
-
-              if (
-                !nativeServer._registeredTools ||
-                typeof nativeServer._registeredTools !== "object"
-              ) {
-                throw new Error(
-                  `Session ${sessionId}: Native server missing _registeredTools object`
-                );
-              }
-
-              // Create entry matching SDK's RegisteredTool structure (bypasses post-connect registration check)
-              const toolEntry = {
-                title: newReg.config.title,
-                description: newReg.config.description ?? "",
-                inputSchema,
-                outputSchema: undefined,
-                annotations: newReg.config.annotations,
-                execution: { taskSupport: "forbidden" },
-                _meta: newReg.config._meta,
-                handler: newReg.handler,
-                enabled: true,
-                disable: function (this: RegisteredTool) {
-                  this.enabled = false;
-                },
-                enable: function (this: RegisteredTool) {
-                  this.enabled = true;
-                },
-                remove: () => {
-                  delete nativeServer._registeredTools[name];
-                },
-                update: function (
-                  this: RegisteredTool,
-                  updates: Record<string, unknown>
-                ) {
-                  Object.assign(this, updates);
-                },
-              } as RegisteredTool;
-
-              nativeServer._registeredTools[name] = toolEntry;
-            } catch (error) {
-              console.error(
-                `[HMR] Failed to inject tool "${name}" into session ${sessionId}:`,
-                error instanceof Error ? error.message : String(error)
-              );
-            }
+        // Rebuild _registeredTools object with new name in same position
+        const oldTools = nativeServer._registeredTools;
+        const newTools: Record<string, any> = {};
+        for (const key of Object.keys(oldTools)) {
+          if (key === oldKey) {
+            newTools[newKey] = createToolEntry(
+              newKey,
+              config as ToolDefinition,
+              handler,
+              nativeServer
+            );
+          } else {
+            newTools[key] = oldTools[key];
           }
         }
-        changes.tools.added.push(name);
-      } else {
-        // Existing tool - check if it changed and update
-        const oldReg = this.registrations.tools.get(name)!;
+        nativeServer._registeredTools = newTools;
 
-        // Simple change detection: compare serialized configs
-        const configChanged =
-          JSON.stringify(oldReg.config) !== JSON.stringify(newReg.config) ||
-          oldReg.handler.toString() !== newReg.handler.toString();
-
-        if (configChanged) {
-          this.registrations.tools.set(name, newReg);
-
-          // Update on all active sessions using SDK's update()
-          for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-            const toolRef = refs.tools.get(name);
-            if (toolRef) {
-              // Build input schema for update
-              let inputSchema: Record<string, any>;
-              if (newReg.config.schema) {
-                inputSchema = this.convertZodSchemaToParams(
-                  newReg.config.schema
-                );
-              } else if (
-                newReg.config.inputs &&
-                newReg.config.inputs.length > 0
-              ) {
-                inputSchema = this.createParamsSchema(newReg.config.inputs);
-              } else {
-                inputSchema = {};
-              }
-
-              toolRef.update({
-                title: newReg.config.title,
-                description: newReg.config.description,
-                paramsSchema: inputSchema as any,
-                callback: newReg.handler as any,
-              });
+        // Update refs map preserving order
+        if (refs?.tools) {
+          const newRefs = new Map<string, RegisteredTool>();
+          for (const [k, v] of refs.tools) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newTools[newKey]);
+            } else {
+              newRefs.set(k, v);
             }
           }
-          changes.tools.updated.push(name);
+          refs.tools.clear();
+          for (const [k, v] of newRefs) refs.tools.set(k, v);
         }
+      },
+      // Order-preserving update for tools (schema/description changes)
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Update in place to preserve order
+        if (nativeServer._registeredTools?.[key]) {
+          const newEntry = createToolEntry(
+            key,
+            config as ToolDefinition,
+            handler,
+            nativeServer
+          );
+          nativeServer._registeredTools[key] = newEntry;
+          if (refs?.tools) {
+            refs.tools.set(key, newEntry);
+          }
+        }
+      },
+    });
+    this.registrations.tools = toolsResult.updatedRegistrations;
+
+    // Helper to register prompt on session
+    const registerPromptOnSession = (
+      server: OfficialMcpServer,
+      name: string,
+      config: PromptDefinition,
+      handler: unknown
+    ): RegisteredPrompt => {
+      let argsSchema: Record<string, any> | undefined;
+      if (config.schema) {
+        argsSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.args && config.args.length > 0) {
+        argsSchema = this.createParamsSchema(config.args);
       }
-    }
+      return server.registerPrompt(
+        name,
+        {
+          title: config.title,
+          description: config.description ?? "",
+          argsSchema: argsSchema as any,
+        },
+        handler as any
+      );
+    };
 
     // --- PROMPTS ---
-    // Note: We only add/update prompts, not remove them during HMR
-    const oldPromptNames = new Set(this.registrations.prompts.keys());
-    const newPromptNames = new Set(other.registrations.prompts.keys());
+    const promptsResult = syncPrimitive({
+      primitiveName: "Prompts",
+      currentRegistrations: this.registrations.prompts,
+      newRegistrations: other.registrations.prompts,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.prompts,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          return registerPromptOnSession(
+            session.server,
+            name,
+            config as PromptDefinition,
+            handler
+          );
+        },
+      })),
+      supportsInPlaceUpdate: true,
+      // Order-preserving rename for prompts
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
 
-    for (const name of newPromptNames) {
-      const newReg = other.registrations.prompts.get(name)!;
-
-      if (!oldPromptNames.has(name)) {
-        // New prompt - add to registrations and directly inject into active sessions
-        this.registrations.prompts.set(name, newReg);
-
-        // Build args schema
-        let argsSchema: Record<string, any> | undefined;
-        if (newReg.config.schema) {
-          argsSchema = this.convertZodSchemaToParams(newReg.config.schema);
-        } else if (newReg.config.args && newReg.config.args.length > 0) {
-          argsSchema = this.createParamsSchema(newReg.config.args);
-        }
-
-        // Directly inject into all active sessions' native servers
-        for (const [sessionId, session] of this.sessions) {
-          if (session.server) {
-            try {
-              // Access internal SDK structure - casting to any since _registeredPrompts is private
-              const nativeServer = session.server as any;
-
-              if (
-                !nativeServer._registeredPrompts ||
-                typeof nativeServer._registeredPrompts !== "object"
-              ) {
-                throw new Error(
-                  `Session ${sessionId}: Native server missing _registeredPrompts object`
-                );
-              }
-
-              // Create entry matching SDK's RegisteredPrompt structure (bypasses post-connect registration check)
-              const promptEntry = {
-                title: newReg.config.title,
-                description: newReg.config.description ?? "",
-                argsSchema,
-                callback: newReg.handler, // SDK uses 'callback' not 'handler'
-                enabled: true,
-                disable: function (this: RegisteredPrompt) {
-                  this.enabled = false;
-                },
-                enable: function (this: RegisteredPrompt) {
-                  this.enabled = true;
-                },
-                remove: () => {
-                  delete nativeServer._registeredPrompts[name];
-                },
-                update: function (
-                  this: RegisteredPrompt,
-                  updates: Record<string, unknown>
-                ) {
-                  Object.assign(this, updates);
-                },
-              } as RegisteredPrompt;
-
-              nativeServer._registeredPrompts[name] = promptEntry;
-            } catch (error) {
-              console.error(
-                `[HMR] Failed to inject prompt "${name}" into session ${sessionId}:`,
-                error instanceof Error ? error.message : String(error)
-              );
-            }
+        // Rebuild _registeredPrompts object with new name in same position
+        const oldPrompts = nativeServer._registeredPrompts || {};
+        const newPrompts: Record<string, any> = {};
+        for (const key of Object.keys(oldPrompts)) {
+          if (key === oldKey) {
+            // Register new prompt to get proper entry, then move to correct position
+            const registered = registerPromptOnSession(
+              session.server,
+              newKey,
+              config as PromptDefinition,
+              handler
+            );
+            delete nativeServer._registeredPrompts[newKey]; // Remove from end
+            newPrompts[newKey] = registered;
+          } else {
+            newPrompts[key] = oldPrompts[key];
           }
         }
-        changes.prompts.added.push(name);
-      } else {
-        const oldReg = this.registrations.prompts.get(name)!;
-        const configChanged =
-          JSON.stringify(oldReg.config) !== JSON.stringify(newReg.config) ||
-          oldReg.handler.toString() !== newReg.handler.toString();
+        nativeServer._registeredPrompts = newPrompts;
 
-        if (configChanged) {
-          this.registrations.prompts.set(name, newReg);
-          for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-            const promptRef = refs.prompts.get(name);
-            if (promptRef) {
-              let argsSchema: Record<string, any> | undefined;
-              if (newReg.config.schema) {
-                argsSchema = this.convertZodSchemaToParams(
-                  newReg.config.schema
-                );
-              } else if (newReg.config.args && newReg.config.args.length > 0) {
-                argsSchema = this.createParamsSchema(newReg.config.args);
-              }
-
-              promptRef.update({
-                description: newReg.config.description,
-                argsSchema: argsSchema as any,
-                callback: newReg.handler as any,
-              });
+        // Update refs map preserving order
+        if (refs?.prompts) {
+          const newRefs = new Map<string, RegisteredPrompt>();
+          for (const [k, v] of refs.prompts) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newPrompts[newKey]);
+            } else {
+              newRefs.set(k, v);
             }
           }
-          changes.prompts.updated.push(name);
+          refs.prompts.clear();
+          for (const [k, v] of newRefs) refs.prompts.set(k, v);
         }
-      }
-    }
+      },
+      // Order-preserving update for prompts - use SDK's update method
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        const promptRef = refs?.prompts.get(key);
+        if (promptRef) {
+          const newReg = config as PromptDefinition;
+          let argsSchema: Record<string, any> | undefined;
+          if (newReg.schema) {
+            argsSchema = this.convertZodSchemaToParams(newReg.schema);
+          } else if (newReg.args && newReg.args.length > 0) {
+            argsSchema = this.createParamsSchema(newReg.args);
+          }
+          promptRef.update({
+            title: newReg.title,
+            description: newReg.description,
+            argsSchema: argsSchema as any,
+            callback: handler as any,
+          });
+        }
+      },
+    });
+    this.registrations.prompts = promptsResult.updatedRegistrations;
+
+    // Helper to register resource on session
+    const registerResourceOnSession = (
+      server: OfficialMcpServer,
+      name: string,
+      config: ResourceDefinition,
+      handler: unknown
+    ): RegisteredResource => {
+      return server.registerResource(
+        config.name || name,
+        config.uri,
+        {
+          title: config.title,
+          description: config.description,
+          mimeType: config.mimeType || "text/plain",
+        },
+        handler as any
+      );
+    };
 
     // --- RESOURCES ---
-    // Note: We only add/update resources, not remove them during HMR
-    const oldResourceKeys = new Set(this.registrations.resources.keys());
-    const newResourceKeys = new Set(other.registrations.resources.keys());
+    const resourcesResult = syncPrimitive({
+      primitiveName: "Resources",
+      currentRegistrations: this.registrations.resources,
+      newRegistrations: other.registrations.resources,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.resources,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          return registerResourceOnSession(
+            session.server,
+            name,
+            config as ResourceDefinition,
+            handler
+          );
+        },
+      })),
+      supportsInPlaceUpdate: true,
+      // Order-preserving rename for resources
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
 
-    for (const key of newResourceKeys) {
-      const newReg = other.registrations.resources.get(key)!;
-
-      if (!oldResourceKeys.has(key)) {
-        // New resource - add to registrations and directly inject into active sessions
-        this.registrations.resources.set(key, newReg);
-
-        // Directly inject into all active sessions' native servers
-        for (const [sessionId, session] of this.sessions) {
-          if (session.server) {
-            try {
-              // Access internal SDK structure - casting to any since _registeredResources is private
-              const nativeServer = session.server as any;
-
-              if (
-                !nativeServer._registeredResources ||
-                typeof nativeServer._registeredResources !== "object"
-              ) {
-                throw new Error(
-                  `Session ${sessionId}: Native server missing _registeredResources object`
-                );
-              }
-
-              // Create entry matching SDK's RegisteredResource structure (bypasses post-connect registration check)
-              // Note: mcp-use's ReadResourceCallback signature differs from SDK's, so we cast through unknown
-              const resourceEntry = {
-                name: newReg.config.name,
-                uri: newReg.config.uri,
-                title: newReg.config.title,
-                description: newReg.config.description,
-                mimeType: newReg.config.mimeType || "text/plain",
-                readCallback: newReg.handler as unknown, // SDK uses different callback signature
-                enabled: true,
-                disable: function (this: RegisteredResource) {
-                  this.enabled = false;
-                },
-                enable: function (this: RegisteredResource) {
-                  this.enabled = true;
-                },
-                remove: () => {
-                  delete nativeServer._registeredResources[key];
-                },
-                update: function (
-                  this: RegisteredResource,
-                  updates: Record<string, unknown>
-                ) {
-                  Object.assign(this, updates);
-                },
-              } as unknown as RegisteredResource;
-
-              nativeServer._registeredResources[key] = resourceEntry;
-            } catch (error) {
-              console.error(
-                `[HMR] Failed to inject resource "${key}" into session ${sessionId}:`,
-                error instanceof Error ? error.message : String(error)
-              );
-            }
+        // Rebuild _registeredResources object with new key in same position
+        const oldResources = nativeServer._registeredResources || {};
+        const newResources: Record<string, any> = {};
+        for (const key of Object.keys(oldResources)) {
+          if (key === oldKey) {
+            const registered = registerResourceOnSession(
+              session.server,
+              newKey,
+              config as ResourceDefinition,
+              handler
+            );
+            delete nativeServer._registeredResources[newKey]; // Remove from end
+            newResources[newKey] = registered;
+          } else {
+            newResources[key] = oldResources[key];
           }
         }
-        changes.resources.added.push(key);
-      } else {
-        const oldReg = this.registrations.resources.get(key)!;
-        const configChanged =
-          JSON.stringify(oldReg.config) !== JSON.stringify(newReg.config) ||
-          oldReg.handler.toString() !== newReg.handler.toString();
+        nativeServer._registeredResources = newResources;
 
-        if (configChanged) {
-          this.registrations.resources.set(key, newReg);
-          for (const [_sessionId, refs] of this.sessionRegisteredRefs) {
-            const resourceRef = refs.resources.get(key);
-            if (resourceRef) {
-              resourceRef.update({
-                metadata: {
-                  title: newReg.config.title,
-                  description: newReg.config.description,
-                  mimeType: newReg.config.mimeType || "text/plain",
-                },
-                callback: newReg.handler as any,
-              });
+        // Update refs map preserving order
+        if (refs?.resources) {
+          const newRefs = new Map<string, RegisteredResource>();
+          for (const [k, v] of refs.resources) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newResources[newKey]);
+            } else {
+              newRefs.set(k, v);
             }
           }
-          changes.resources.updated.push(key);
+          refs.resources.clear();
+          for (const [k, v] of newRefs) refs.resources.set(k, v);
         }
-      }
-    }
+      },
+      // Order-preserving update for resources - use SDK's update method
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        const resourceRef = refs?.resources.get(key);
+        if (resourceRef) {
+          const newReg = config as ResourceDefinition;
+          resourceRef.update({
+            metadata: {
+              title: newReg.title,
+              description: newReg.description,
+              mimeType: newReg.mimeType || "text/plain",
+            },
+            callback: handler as any,
+          });
+        }
+      },
+    });
+    this.registrations.resources = resourcesResult.updatedRegistrations;
+
+    // Helper to register resource template on session
+    const registerTemplateOnSession = (
+      server: OfficialMcpServer,
+      name: string,
+      config: ResourceTemplateDefinition,
+      handler: unknown
+    ): RegisteredResourceTemplate => {
+      const isFlatStructure = "uriTemplate" in config;
+      const uriTemplate = isFlatStructure
+        ? (config as any).uriTemplate
+        : config.resourceTemplate.uriTemplate;
+      const mimeType = isFlatStructure
+        ? (config as any).mimeType
+        : config.resourceTemplate.mimeType;
+      const templateDescription = isFlatStructure
+        ? undefined
+        : config.resourceTemplate.description;
+
+      const template = new ResourceTemplate(uriTemplate, {
+        list: undefined,
+        complete: undefined,
+      });
+      const metadata: Record<string, unknown> = {};
+      if (config.title) metadata.title = config.title;
+      if (config.description || templateDescription)
+        metadata.description = config.description || templateDescription;
+      if (mimeType) metadata.mimeType = mimeType;
+      if (config.annotations) metadata.annotations = config.annotations;
+
+      return server.registerResource(
+        name,
+        template,
+        metadata as any,
+        handler as any
+      ) as unknown as RegisteredResourceTemplate;
+    };
 
     // --- RESOURCE TEMPLATES ---
-    // Note: We only add resource templates during HMR, not remove them
-    const oldTemplateNames = new Set(
-      this.registrations.resourceTemplates.keys()
-    );
-    const newTemplateNames = new Set(
-      other.registrations.resourceTemplates.keys()
-    );
+    const templatesResult = syncPrimitive({
+      primitiveName: "Resource Templates",
+      currentRegistrations: this.registrations.resourceTemplates,
+      newRegistrations: other.registrations.resourceTemplates,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.resourceTemplates as Map<string, any> | undefined,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          return registerTemplateOnSession(
+            session.server,
+            name,
+            config as ResourceTemplateDefinition,
+            handler
+          );
+        },
+      })),
+      supportsInPlaceUpdate: false, // Templates require full re-registration
+      // Order-preserving rename for resource templates
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
 
-    // For resource templates, we only handle adds for now
-    for (const name of newTemplateNames) {
-      if (!oldTemplateNames.has(name)) {
-        const newReg = other.registrations.resourceTemplates.get(name)!;
-        this.registrations.resourceTemplates.set(name, newReg);
-        changes.resourceTemplates.added.push(name);
-        // Note: Registering new templates on existing sessions would require
-        // rebuilding the full handler with parseTemplateUri etc.
-        // For now, new templates will only be available on new sessions.
-      }
-    }
+        // Resource templates are stored in _registeredResources with URI as key
+        const oldResources = nativeServer._registeredResources || {};
+        const newResources: Record<string, any> = {};
+        for (const key of Object.keys(oldResources)) {
+          if (key === oldKey) {
+            const registered = registerTemplateOnSession(
+              session.server,
+              newKey,
+              config as ResourceTemplateDefinition,
+              handler
+            );
+            delete nativeServer._registeredResources[newKey]; // Remove from end
+            newResources[newKey] = registered;
+          } else {
+            newResources[key] = oldResources[key];
+          }
+        }
+        nativeServer._registeredResources = newResources;
+
+        // Update refs map preserving order
+        if (refs?.resourceTemplates) {
+          const newRefs = new Map<string, RegisteredResourceTemplate>();
+          for (const [k, v] of refs.resourceTemplates) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newResources[newKey]);
+            } else {
+              newRefs.set(k, v);
+            }
+          }
+          refs.resourceTemplates.clear();
+          for (const [k, v] of newRefs) refs.resourceTemplates.set(k, v);
+        }
+      },
+      // Order-preserving update for resource templates - need full re-registration
+      // since templates are complex, but we rebuild the object to preserve order
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Get original keys order
+        const originalKeys = Object.keys(
+          nativeServer._registeredResources || {}
+        );
+
+        // Remove old and register new
+        const oldRef = refs?.resourceTemplates.get(key);
+        if (oldRef) oldRef.remove();
+
+        const registered = registerTemplateOnSession(
+          session.server,
+          key,
+          config as ResourceTemplateDefinition,
+          handler
+        );
+
+        // Rebuild to preserve original order
+        const current = nativeServer._registeredResources || {};
+        const newResources: Record<string, any> = {};
+        for (const k of originalKeys) {
+          if (current[k]) {
+            newResources[k] = current[k];
+          }
+        }
+        // Add any new keys that weren't in original
+        for (const k of Object.keys(current)) {
+          if (!newResources[k]) {
+            newResources[k] = current[k];
+          }
+        }
+        nativeServer._registeredResources = newResources;
+
+        if (refs?.resourceTemplates && registered) {
+          refs.resourceTemplates.set(key, registered);
+        }
+      },
+    });
+    this.registrations.resourceTemplates = templatesResult.updatedRegistrations;
 
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
     this.registeredResources = Array.from(this.registrations.resources.keys());
 
-    // Log changes
-    const totalChanges =
-      changes.tools.added.length +
-      changes.tools.removed.length +
-      changes.tools.updated.length +
-      changes.prompts.added.length +
-      changes.prompts.removed.length +
-      changes.prompts.updated.length +
-      changes.resources.added.length +
-      changes.resources.removed.length +
-      changes.resources.updated.length +
-      changes.resourceTemplates.added.length +
-      changes.resourceTemplates.removed.length;
+    // Log all changes
+    const allChanges = [
+      toolsResult.changes,
+      promptsResult.changes,
+      resourcesResult.changes,
+      templatesResult.changes,
+    ];
+    const totalChanges = countChanges(...allChanges);
 
     if (totalChanges > 0) {
       console.log("[HMR] Registration changes:");
-      if (changes.tools.added.length)
-        console.log(`  + Tools: ${changes.tools.added.join(", ")}`);
-      if (changes.tools.removed.length)
-        console.log(`  - Tools: ${changes.tools.removed.join(", ")}`);
-      if (changes.tools.updated.length)
-        console.log(`  ~ Tools: ${changes.tools.updated.join(", ")}`);
-      if (changes.prompts.added.length)
-        console.log(`  + Prompts: ${changes.prompts.added.join(", ")}`);
-      if (changes.prompts.removed.length)
-        console.log(`  - Prompts: ${changes.prompts.removed.join(", ")}`);
-      if (changes.prompts.updated.length)
-        console.log(`  ~ Prompts: ${changes.prompts.updated.join(", ")}`);
-      if (changes.resources.added.length)
-        console.log(`  + Resources: ${changes.resources.added.join(", ")}`);
-      if (changes.resources.removed.length)
-        console.log(`  - Resources: ${changes.resources.removed.join(", ")}`);
-      if (changes.resources.updated.length)
-        console.log(`  ~ Resources: ${changes.resources.updated.join(", ")}`);
-      if (changes.resourceTemplates.added.length)
-        console.log(
-          `  + Resource Templates: ${changes.resourceTemplates.added.join(", ")}`
-        );
-      if (changes.resourceTemplates.removed.length)
-        console.log(
-          `  - Resource Templates: ${changes.resourceTemplates.removed.join(", ")}`
-        );
+      logChanges("Tools", toolsResult.changes);
+      logChanges("Prompts", promptsResult.changes);
+      logChanges("Resources", resourcesResult.changes);
+      logChanges("Resource Templates", templatesResult.changes);
 
       // Send list_changed notifications to all sessions
-      // Wrap in try-catch because some sessions may not support these notifications
       for (const [sessionId, session] of this.sessions) {
         if (session.server) {
-          // Only check added/updated since HMR disables removals
           try {
-            if (changes.tools.added.length || changes.tools.updated.length) {
+            if (
+              toolsResult.changes.added.length ||
+              toolsResult.changes.updated.length
+            ) {
               session.server.sendToolListChanged();
             }
           } catch (e) {
@@ -662,8 +771,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           }
           try {
             if (
-              changes.prompts.added.length ||
-              changes.prompts.updated.length
+              promptsResult.changes.added.length ||
+              promptsResult.changes.updated.length
             ) {
               session.server.sendPromptListChanged();
             }
@@ -675,9 +784,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           }
           try {
             if (
-              changes.resources.added.length ||
-              changes.resources.updated.length ||
-              changes.resourceTemplates.added.length
+              resourcesResult.changes.added.length ||
+              resourcesResult.changes.updated.length ||
+              templatesResult.changes.added.length ||
+              templatesResult.changes.updated.length
             ) {
               session.server.sendResourceListChanged();
             }

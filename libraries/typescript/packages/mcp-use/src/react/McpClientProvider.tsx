@@ -514,9 +514,53 @@ function McpServerWrapper({
     [notifications]
   );
 
+  // Create stable fingerprints for tools/resources/prompts that detect ANY content changes
+  // This catches renames, schema changes, description updates, etc.
+  const toolsFingerprint = useMemo(
+    () =>
+      JSON.stringify(
+        mcp.tools
+          .map((t) => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      ),
+    [mcp.tools]
+  );
+  const resourcesFingerprint = useMemo(
+    () =>
+      JSON.stringify(
+        mcp.resources
+          .map((r) => ({
+            uri: r.uri,
+            name: r.name,
+            description: r.description,
+            mimeType: r.mimeType,
+          }))
+          .sort((a, b) => a.uri.localeCompare(b.uri))
+      ),
+    [mcp.resources]
+  );
+  const promptsFingerprint = useMemo(
+    () =>
+      JSON.stringify(
+        mcp.prompts
+          .map((p) => ({
+            name: p.name,
+            description: p.description,
+            arguments: p.arguments,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      ),
+    [mcp.prompts]
+  );
+
   // Update parent when state changes
   const onUpdateRef = useRef(onUpdate);
   const prevServerRef = useRef<McpServer | null>(null);
+  const prevFingerprintsRef = useRef({ tools: "", resources: "", prompts: "" });
 
   useEffect(() => {
     onUpdateRef.current = onUpdate;
@@ -543,14 +587,22 @@ function McpServerWrapper({
 
     // Only update if something actually changed
     const prevServer = prevServerRef.current;
+    const prevFingerprints = prevFingerprintsRef.current;
+
+    // Check if tools/resources/prompts content changed (not just length)
+    const toolsChanged = prevFingerprints.tools !== toolsFingerprint;
+    const resourcesChanged =
+      prevFingerprints.resources !== resourcesFingerprint;
+    const promptsChanged = prevFingerprints.prompts !== promptsFingerprint;
+
     if (
       !prevServer ||
       prevServer.state !== server.state ||
       prevServer.error !== server.error ||
       prevServer.authUrl !== server.authUrl ||
-      prevServer.tools.length !== server.tools.length ||
-      prevServer.resources.length !== server.resources.length ||
-      prevServer.prompts.length !== server.prompts.length ||
+      toolsChanged ||
+      resourcesChanged ||
+      promptsChanged ||
       prevServer.serverInfo !== server.serverInfo ||
       prevServer.capabilities !== server.capabilities ||
       prevServer.notifications.length !== server.notifications.length ||
@@ -562,6 +614,11 @@ function McpServerWrapper({
       !prevServer.client
     ) {
       prevServerRef.current = server;
+      prevFingerprintsRef.current = {
+        tools: toolsFingerprint,
+        resources: resourcesFingerprint,
+        prompts: promptsFingerprint,
+      };
       onUpdateRef.current(server);
     }
   }, [
@@ -572,11 +629,10 @@ function McpServerWrapper({
     mcp.state,
     mcp.error,
     mcp.authUrl,
-    // Use array LENGTHS instead of array references to avoid triggering on reference changes
-    mcp.tools.length,
-    mcp.resources.length,
-    mcp.resourceTemplates.length,
-    mcp.prompts.length,
+    // Use fingerprints to detect content changes (including renames)
+    toolsFingerprint,
+    resourcesFingerprint,
+    promptsFingerprint,
     // serverInfo and capabilities - include for reference comparison
     mcp.serverInfo,
     mcp.capabilities,
