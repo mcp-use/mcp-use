@@ -8,7 +8,9 @@
     "mcp-use": "1.12.4"
   },
   "changesets": [
+    "hmr-test-suite",
     "hot-icons-listen",
-    "some-toes-report"
+    "some-toes-report",
+    "tiny-owls-notice"
   ]
 }
