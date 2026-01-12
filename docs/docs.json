@@ -440,18 +440,6 @@
                 ]
               }
             ]
-          },
-          {
-            "tab": "Blog",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Blog",
-                "pages": [
-                  "python/blog/middleware"
-                ]
-              }
-            ]
           }
         ]
       },
