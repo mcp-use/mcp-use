@@ -36,7 +36,7 @@
 
 ### 📖 Documentation
 
-For detailed usage instructions and guides, visit [docs.mcp-use.com/inspector](https://docs.mcp-use.com/inspector)
+For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](https://mcp-use.com/docs/inspector)
 
 ---
 
@@ -319,7 +319,7 @@ Deploy instantly to Railway with automatic HTTPS and custom domains:
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template)
 
-For more deployment options and support, visit the [self-hosting documentation](https://docs.mcp-use.com/inspector/self-hosting).
+For more deployment options and support, visit the [self-hosting documentation](https://mcp-use.com/docs/inspector/self-hosting).
 
 ---
 
@@ -392,9 +392,9 @@ See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRI
 
 ## 📚 Learn More
 
-- [Inspector Documentation](https://docs.mcp-use.com/inspector) - Complete usage guide and tutorials
-- [Self-Hosting Guide](https://docs.mcp-use.com/inspector/self-hosting) - Deploy your own instance
-- [mcp-use Documentation](https://docs.mcp-use.com) - Full framework documentation
+- [Inspector Documentation](https://mcp-use.com/docs/inspector) - Complete usage guide and tutorials
+- [Self-Hosting Guide](https://mcp-use.com/docs/inspector/self-hosting) - Deploy your own instance
+- [mcp-use Documentation](https://mcp-use.com/docs) - Full framework documentation
 - [Model Context Protocol](https://modelcontextprotocol.io) - Official MCP specification
 - [GitHub Repository](https://github.com/mcp-use/mcp-use) - Source code and examples
 

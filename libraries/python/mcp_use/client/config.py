@@ -7,7 +7,8 @@ This module provides functionality to load MCP configuration from JSON files.
 import json
 from typing import Any
 
-from mcp.client.session import ElicitationFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import Root
 
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.client.connectors.http import HttpConnector
@@ -44,6 +45,8 @@ def create_connector_from_config(
     logging_callback: LoggingFnT | None = None,
     middleware: list[Middleware] | None = None,
     verify: bool | None = True,
+    roots: list[Root] | None = None,
+    list_roots_callback: ListRootsFnT | None = None,
 ) -> BaseConnector:
     """Create a connector based on server configuration.
     This function can be called with just the server_config parameter:
@@ -74,6 +77,8 @@ def create_connector_from_config(
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
 
     # Sandboxed connector
@@ -94,6 +99,8 @@ def create_connector_from_config(
             message_handler=message_handler,
             logging_callback=logging_callback,
             middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
 
     # HTTP connector
@@ -115,6 +122,8 @@ def create_connector_from_config(
             logging_callback=logging_callback,
             middleware=middleware,
             verify=verify,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
 
     # WebSocket connector

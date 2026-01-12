@@ -48,13 +48,15 @@ Initialize a new stdio connector.
 ><ParamField body="errlog" default="<_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>" >   Stream to write error output to. </ParamField>
 ><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Optional callback to sample the client. </ParamField>
 ><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Optional callback to elicit the client. </ParamField>
-><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
-><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
-><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Optional callback to handle messages. </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Optional callback to handle log messages. </ParamField>
+><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Optional list of middleware. </ParamField>
+><ParamField body="roots" type="list[mcp.types.Root] | None" default="None" >   Optional initial list of roots to advertise to the server. </ParamField>
+><ParamField body="list_roots_callback" type="mcp.client.session.ListRootsFnT | None" default="None" >   Optional custom callback to handle roots/list requests. </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(command: str = "npx", args: list[str] | None = None, env: dict[str, str] | None = None, errlog = <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None):
+def __init__(command: str = "npx", args: list[str] | None = None, env: dict[str, str] | None = None, errlog = <_io.TextIOWrapper name='<stderr>' mode='w' encoding='utf-8'>, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, roots: list[mcp.types.Root] | None = None, list_roots_callback: mcp.client.session.ListRootsFnT | None = None):
 ```
 
 </Card>

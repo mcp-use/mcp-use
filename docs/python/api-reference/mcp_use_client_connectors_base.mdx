@@ -38,16 +38,19 @@ from mcp_use.client.connectors.base import BaseConnector
 
 Initialize base connector with common attributes.
 
+
 **Parameters**
-><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Callback function </ParamField>
-><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Callback function </ParamField>
-><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
-><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
-><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+><ParamField body="sampling_callback" type="mcp.client.session.SamplingFnT | None" default="None" >   Optional callback to handle sampling requests from servers. </ParamField>
+><ParamField body="elicitation_callback" type="mcp.client.session.ElicitationFnT | None" default="None" >   Optional callback to handle elicitation requests from servers. </ParamField>
+><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Optional callback to handle messages from servers. </ParamField>
+><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Optional callback to handle log messages from servers. </ParamField>
+><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Optional list of middleware to apply to requests. </ParamField>
+><ParamField body="roots" type="list[mcp.types.Root] | None" default="None" >   Optional initial list of roots to advertise to the server. </ParamField>
+><ParamField body="list_roots_callback" type="mcp.client.session.ListRootsFnT | None" default="None" >   Optional custom callback to handle roots/list requests. </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None):
+def __init__(sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, roots: list[mcp.types.Root] | None = None, list_roots_callback: mcp.client.session.ListRootsFnT | None = None):
 ```
 
 </Card>
@@ -141,6 +144,23 @@ def get_prompt(name: str, arguments: dict[str, typing.Any] | None = None):
 </Card>
 
 <Card type="info">
+### `method` get_roots
+
+Get the current list of roots.
+
+
+
+**Returns**
+><ResponseField name="returns" type="list[mcp.types.Root]" >A copy of the current roots list.</ResponseField>
+
+**Signature**
+```python wrap
+def get_roots():
+```
+
+</Card>
+
+<Card type="info">
 ### `method` initialize
 
 Initialize the MCP session and return session information.
@@ -204,6 +224,24 @@ List all available resources from the MCP implementation.
 **Signature**
 ```python wrap
 def list_resources():
+```
+
+</Card>
+
+<Card type="info">
+### `property` list_roots_callback
+
+Get the list_roots_callback to pass to ClientSession.
+
+        This always returns a callback to ensure the roots capability is advertised.
+
+
+**Returns**
+><ResponseField name="returns" type="mcp.client.session.ListRootsFnT" />
+
+**Signature**
+```python wrap
+def list_roots_callback():
 ```
 
 </Card>
@@ -297,6 +335,32 @@ Get the list of available resources.
 **Signature**
 ```python wrap
 def resources():
+```
+
+</Card>
+
+<Card type="info">
+### `method` set_roots
+
+Set the roots and notify the server if connected.
+
+        Roots represent directories or files that the client has access to.
+
+        Example:
+            ```python
+            await connector.set_roots([
+                Root(uri="file:///home/user/project", name="My Project"),
+                Root(uri="file:///home/user/data"),
+            ])
+            ```
+
+
+**Parameters**
+><ParamField body="roots" type="list[mcp.types.Root]" required="True" >   Array of Root objects with `uri` (must start with "file://") and optional `name`. </ParamField>
+
+**Signature**
+```python wrap
+def set_roots(roots: list[mcp.types.Root]):
 ```
 
 </Card>

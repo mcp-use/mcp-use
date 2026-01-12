@@ -1,0 +1,226 @@
+---
+title: "Custom Auth"
+description: "Use httpx.Auth objects for custom authentication schemes like Basic Auth, Digest Auth, or your own implementations."
+icon: "wrench"
+---
+
+For authentication beyond Bearer tokens and OAuth, pass any `httpx.Auth` object to get full control over request authentication.
+
+## Built-in Options
+
+<Tabs>
+  <Tab title="Basic Auth">
+    HTTP Basic Auth encodes username:password in Base64:
+
+    ```python
+    from httpx import BasicAuth
+    from mcp_use import MCPClient
+
+    config = {
+        "mcpServers": {
+            "secure": {
+                "url": "https://secure.example.com/mcp/sse",
+                "auth": BasicAuth("username", "password")
+            }
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Digest Auth">
+    More secure than Basic - password never sent in cleartext:
+
+    ```python
+    from httpx import DigestAuth
+
+    config = {
+        "mcpServers": {
+            "digest": {
+                "url": "https://digest.example.com/mcp/sse",
+                "auth": DigestAuth("username", "password")
+            }
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="NetRC">
+    Load credentials from `~/.netrc`:
+
+    ```python
+    from httpx import NetRCAuth
+
+    config = {
+        "mcpServers": {
+            "netrc": {
+                "url": "https://example.com/mcp/sse",
+                "auth": NetRCAuth()
+            }
+        }
+    }
+    ```
+
+    **~/.netrc:**
+    ```
+    machine example.com
+    login myuser
+    password mypassword
+    ```
+  </Tab>
+</Tabs>
+
+## Custom Implementations
+
+Create your own by subclassing `httpx.Auth`:
+
+<AccordionGroup>
+  <Accordion title="API Key in Header" icon="key">
+    ```python
+    import httpx
+
+    class ApiKeyAuth(httpx.Auth):
+        def __init__(self, api_key: str, header_name: str = "X-API-Key"):
+            self.api_key = api_key
+            self.header_name = header_name
+
+        def auth_flow(self, request: httpx.Request):
+            request.headers[self.header_name] = self.api_key
+            yield request
+
+    # Usage
+    config = {
+        "mcpServers": {
+            "api": {
+                "url": "https://api.example.com/mcp/sse",
+                "auth": ApiKeyAuth("your-api-key", "X-API-Key")
+            }
+        }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="API Key in Query Parameter" icon="link">
+    ```python
+    import httpx
+
+    class QueryParamAuth(httpx.Auth):
+        def __init__(self, api_key: str, param_name: str = "api_key"):
+            self.api_key = api_key
+            self.param_name = param_name
+
+        def auth_flow(self, request: httpx.Request):
+            url = request.url.copy_add_param(self.param_name, self.api_key)
+            request.url = url
+            yield request
+
+    # Usage
+    config = {
+        "mcpServers": {
+            "api": {
+                "url": "https://api.example.com/mcp/sse",
+                "auth": QueryParamAuth("your-api-key")
+            }
+        }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Request Signing (HMAC)" icon="signature">
+    For APIs requiring request signatures:
+
+    ```python
+    import httpx
+    import hmac
+    import hashlib
+    import time
+
+    class SignatureAuth(httpx.Auth):
+        def __init__(self, api_key: str, api_secret: str):
+            self.api_key = api_key
+            self.api_secret = api_secret
+
+        def auth_flow(self, request: httpx.Request):
+            timestamp = str(int(time.time()))
+            message = f"{request.method}{request.url.path}{timestamp}"
+
+            signature = hmac.new(
+                self.api_secret.encode(),
+                message.encode(),
+                hashlib.sha256
+            ).hexdigest()
+
+            request.headers["X-API-Key"] = self.api_key
+            request.headers["X-Timestamp"] = timestamp
+            request.headers["X-Signature"] = signature
+            yield request
+    ```
+  </Accordion>
+
+  <Accordion title="Multiple Headers" icon="list">
+    Add several authentication headers at once:
+
+    ```python
+    import httpx
+
+    class MultiHeaderAuth(httpx.Auth):
+        def __init__(self, headers: dict[str, str]):
+            self.headers = headers
+
+        def auth_flow(self, request: httpx.Request):
+            for key, value in self.headers.items():
+                request.headers[key] = value
+            yield request
+
+    # Usage
+    config = {
+        "mcpServers": {
+            "multi": {
+                "url": "https://api.example.com/mcp/sse",
+                "auth": MultiHeaderAuth({
+                    "X-API-Key": "your-api-key",
+                    "X-Tenant-ID": "tenant-123"
+                })
+            }
+        }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Combining with Headers
+
+You can use both `auth` and `headers` together:
+
+```python
+config = {
+    "mcpServers": {
+        "api": {
+            "url": "https://api.example.com/mcp/sse",
+            "headers": {
+                "X-Custom-Header": "static-value"
+            },
+            "auth": BasicAuth("user", "pass")
+        }
+    }
+}
+```
+
+<Note>
+The `auth` object handles dynamic authentication while `headers` adds static headers to every request.
+</Note>
+
+## When to Use What
+
+| Scenario | Approach |
+|----------|----------|
+| API key in custom header | Custom `ApiKeyAuth` |
+| API key in query string | Custom `QueryParamAuth` |
+| Request signing (AWS, etc.) | Custom signature class |
+| Username/password | `httpx.BasicAuth` or `DigestAuth` |
+| OAuth 2.0 | Use [built-in OAuth](/python/client/authentication/oauth) |
+| Static bearer token | Use [Bearer Token](/python/client/authentication/bearer) |
+
+<Warning>
+When implementing custom auth:
+- Never log credentials
+- Use `hmac.compare_digest` for signature comparison
+- Store secrets in environment variables
+</Warning>

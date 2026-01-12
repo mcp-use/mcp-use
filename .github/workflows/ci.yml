@@ -370,6 +370,7 @@ jobs:
             elicitation,
             notifications,
             auth,
+            roots,
           ]
     defaults:
       run:
@@ -433,7 +434,7 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             
-            const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth'];
+            const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth', 'roots'];
             let tableRows = [];
             let allPassed = true;
             

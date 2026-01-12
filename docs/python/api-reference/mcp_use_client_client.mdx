@@ -50,12 +50,14 @@ Initialize a new MCP client.
 ><ParamField body="message_handler" type="mcp.client.session.MessageHandlerFnT | None" default="None" >   Parameter value </ParamField>
 ><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
 ><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
+><ParamField body="roots" type="list[mcp.types.Root] | None" default="None" >   Optional list of Root objects to advertise to servers. </ParamField>
+><ParamField body="list_roots_callback" type="mcp.client.session.ListRootsFnT | None" default="None" >   Optional custom callback for roots/list requests. </ParamField>
 ><ParamField body="code_mode" type="bool" default="False" >   Whether to enable code execution mode for tools. </ParamField>
 ><ParamField body="verify" type="bool | None" default="True" >   Boolean flag </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.client.connectors.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, code_mode: bool = False, verify: bool | None = True):
+def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.client.connectors.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, roots: list[mcp.types.Root] | None = None, list_roots_callback: mcp.client.session.ListRootsFnT | None = None, code_mode: bool = False, verify: bool | None = True):
 ```
 
 </Card>
