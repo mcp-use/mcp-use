@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { getPackageVersion } from "mcp-use";
+import { getPackageVersion } from "mcp-use/server";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
 import { createInterface } from "node:readline";
