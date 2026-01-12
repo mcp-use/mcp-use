@@ -133,6 +133,7 @@
                       "python/server/prompts",
                       "python/server/sampling",
                       "python/server/elicitation",
+                      "python/server/roots",
                       "python/server/notifications"
                     ]
                   },
@@ -174,6 +175,7 @@
                       "python/client/middleware",
                       "python/client/sampling",
                       "python/client/elicitation",
+                      "python/client/roots",
                       "python/client/notifications",
                       "python/client/logging"
                     ]

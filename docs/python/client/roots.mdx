@@ -1,0 +1,139 @@
+---
+title: "Roots"
+description: "Expose file system roots to MCP servers"
+icon: "folder-tree"
+---
+
+<Info>
+Roots allow clients to expose directories or files that MCP servers can access or operate on.
+</Info>
+
+## Overview
+
+Roots represent directories or files that the client wants to make available to the server. This is useful for file-based operations where the server needs to know which paths are accessible. The server can request the list of roots at any time using `ctx.list_roots()`.
+
+## Configuration
+
+To expose roots to MCP servers, provide a `roots` list when initializing the MCPClient:
+
+<CodeGroup>
+```python Python
+from mcp.types import Root
+from mcp_use.client import MCPClient
+
+# Define roots to expose to servers
+roots = [
+    Root(uri="file:///home/user/projects", name="Projects"),
+    Root(uri="file:///home/user/documents", name="Documents"),
+]
+
+# Initialize client with roots
+client = MCPClient(
+    config="config.json",
+    roots=roots
+)
+```
+</CodeGroup>
+
+## Dynamic Roots Updates
+
+You can update the roots dynamically after connecting to a server. The client will automatically notify the server when roots change:
+
+```python
+from mcp.types import Root
+from mcp_use.client import MCPClient
+
+client = MCPClient(config="config.json")
+await client.create_all_sessions()
+
+session = client.get_session("my-server")
+
+# Update roots dynamically
+new_roots = [
+    Root(uri="file:///home/user/new-project", name="New Project"),
+]
+await session.connector.set_roots(new_roots)
+
+# Get current roots
+current_roots = session.connector.get_roots()
+```
+
+## Custom Roots Callback
+
+For advanced use cases, you can provide a custom callback that dynamically determines which roots to expose:
+
+```python
+from mcp.types import ListRootsResult, Root
+from mcp_use.client import MCPClient
+
+async def custom_roots_callback(context):
+    """Dynamically determine roots based on context."""
+    # You could check user permissions, load from config, etc.
+    return ListRootsResult(roots=[
+        Root(uri="file:///dynamic/path", name="Dynamic Root"),
+    ])
+
+client = MCPClient(
+    config="config.json",
+    list_roots_callback=custom_roots_callback
+)
+```
+
+<Note>
+When a custom `list_roots_callback` is provided, it takes precedence over the static `roots` list.
+</Note>
+
+## Root Structure
+
+Each `Root` object has the following fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uri` | `AnyUrl` | Yes | A file:// URI pointing to the root directory or file |
+| `name` | `str` | No | A human-readable name for the root |
+
+## Example: File Manager Server
+
+Here's a complete example showing a client exposing roots to a file management server:
+
+```python
+import asyncio
+from mcp.types import Root
+from mcp_use.client import MCPClient
+
+async def main():
+    # Expose workspace directories to the server
+    roots = [
+        Root(uri="file:///home/user/workspace", name="Workspace"),
+        Root(uri="file:///home/user/config", name="Config Files"),
+    ]
+
+    config = {
+        "mcpServers": {
+            "file-manager": {"url": "http://localhost:8000/mcp"}
+        }
+    }
+
+    client = MCPClient(config, roots=roots)
+
+    try:
+        await client.create_all_sessions()
+        session = client.get_session("file-manager")
+
+        # The server can now query available roots
+        # and operate on files within them
+        result = await session.call_tool("list_files", {})
+        print(result.content[0].text)
+
+    finally:
+        await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Next Steps
+
+- See [Server Roots](/python/server/roots) for how servers can request and use roots
+- Learn about [Sampling](/python/client/sampling) for enabling LLM capabilities
+- Explore [Elicitation](/python/client/elicitation) for user input requests
