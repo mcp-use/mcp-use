@@ -38,6 +38,8 @@ from mcp_use.client.config import create_connector_from_config
 ><ParamField body="logging_callback" type="mcp.client.session.LoggingFnT | None" default="None" >   Callback function </ParamField>
 ><ParamField body="middleware" type="list[mcp_use.client.middleware.middleware.Middleware] | None" default="None" >   Middleware instance </ParamField>
 ><ParamField body="verify" type="bool | None" default="True" >   Boolean flag </ParamField>
+><ParamField body="roots" type="list[mcp.types.Root] | None" default="None" >   List of items </ParamField>
+><ParamField body="list_roots_callback" type="mcp.client.session.ListRootsFnT | None" default="None" >   Callback function </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="mcp_use.client.connectors.base.BaseConnector" >A configured connector instance</ResponseField>
@@ -54,7 +56,9 @@ server_config: dict[str,
     message_handler: mcp.client.session.MessageHandlerFnT | None = None,
     logging_callback: mcp.client.session.LoggingFnT | None = None,
     middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None,
-    verify: bool | None = True
+    verify: bool | None = True,
+    roots: list[mcp.types.Root] | None = None,
+    list_roots_callback: mcp.client.session.ListRootsFnT | None = None
 ):
 ```
 
