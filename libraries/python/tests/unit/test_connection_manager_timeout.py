@@ -187,3 +187,54 @@ class TestConnectionManagerTimeout:
         # Verify forced cleanup occurred
         assert manager._connection is None
         assert manager._done_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_stop_with_negative_timeout_waits_indefinitely(self):
+        """Test that negative timeout means infinite wait (no timeout)."""
+        manager = MockConnectionManager(close_delay=0.2)
+        await manager.start()
+
+        start = time.monotonic()
+        # Negative timeout should wait indefinitely (no forced cleanup)
+        await manager.stop(timeout=-1.0)
+        elapsed = time.monotonic() - start
+
+        # Should wait for actual cleanup (~0.2s), not timeout
+        assert elapsed >= 0.15, f"stop() returned too quickly: {elapsed}s"
+        assert manager.close_called
+        assert manager._connection is None
+        assert manager._done_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_stop_with_none_timeout_waits_indefinitely(self):
+        """Test that None timeout means infinite wait (no timeout)."""
+        manager = MockConnectionManager(close_delay=0.2)
+        await manager.start()
+
+        start = time.monotonic()
+        # None timeout should wait indefinitely (no forced cleanup)
+        await manager.stop(timeout=None)
+        elapsed = time.monotonic() - start
+
+        # Should wait for actual cleanup (~0.2s), not timeout
+        assert elapsed >= 0.15, f"stop() returned too quickly: {elapsed}s"
+        assert manager.close_called
+        assert manager._connection is None
+        assert manager._done_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_stop_with_zero_timeout_is_infinite(self):
+        """Test that zero timeout means infinite wait (no timeout), not immediate timeout."""
+        manager = MockConnectionManager(close_delay=0.2)
+        await manager.start()
+
+        start = time.monotonic()
+        # Zero timeout should be treated as infinite (no forced cleanup)
+        await manager.stop(timeout=0)
+        elapsed = time.monotonic() - start
+
+        # Should wait for actual cleanup (~0.2s), not force immediate timeout
+        assert elapsed >= 0.15, f"stop() returned too quickly: {elapsed}s"
+        assert manager.close_called
+        assert manager._connection is None
+        assert manager._done_event.is_set()

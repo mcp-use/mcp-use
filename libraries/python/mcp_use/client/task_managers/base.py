@@ -6,7 +6,9 @@ managers used in MCP connectors.
 """
 
 import asyncio
+import time
 from abc import ABC, abstractmethod
+from asyncio import CancelledError
 from typing import Generic, TypeVar
 
 from mcp_use.logging import logger
@@ -85,7 +87,7 @@ class ConnectionManager(Generic[T], ABC):
             raise RuntimeError("Connection was not established")
         return self._connection
 
-    async def stop(self, timeout: float = 30.0) -> None:
+    async def stop(self, timeout: float | None = 30.0) -> None:
         """Stop the connection manager and close the connection.
 
         This method ensures graceful shutdown by waiting for the connection task
@@ -95,12 +97,14 @@ class ConnectionManager(Generic[T], ABC):
         Args:
             timeout: Maximum time to wait for cleanup in seconds (default: 30.0).
                     This is the total timeout for the entire stop operation.
+                    If None or <= 0, waits indefinitely (no timeout).
 
         Note:
             This method does not raise exceptions and guarantees graceful shutdown
             even if cleanup times out.
         """
-        import time
+        # Normalize timeout: None or <= 0 means no timeout (infinite wait)
+        effective_timeout: float | None = timeout if timeout is not None and timeout > 0 else None
 
         start_time = time.monotonic()
 
@@ -117,37 +121,41 @@ class ConnectionManager(Generic[T], ABC):
             self._stop_event.set()
 
             try:
-                await asyncio.wait_for(self._task, timeout=timeout)
+                await asyncio.wait_for(self._task, timeout=effective_timeout)
             except TimeoutError:
                 elapsed = time.monotonic() - start_time
-                remaining_timeout = max(0.1, timeout - elapsed)
+                remaining_timeout = max(0.1, effective_timeout - elapsed) if effective_timeout else None
 
-                logger.warning(f"{self.__class__.__name__} task did not stop within {timeout}s, cancelling")
+                logger.warning(
+                    f"{self.__class__.__name__} task did not stop within {effective_timeout}s "
+                    f"(elapsed: {elapsed:.2f}s), cancelling"
+                )
                 self._task.cancel()
                 try:
                     await asyncio.wait_for(self._task, timeout=remaining_timeout)
-                except asyncio.CancelledError:
+                except CancelledError:
                     logger.debug(f"{self.__class__.__name__} task cancelled successfully")
                 except TimeoutError:
                     logger.error(
                         f"{self.__class__.__name__} task did not finish cancellation within {remaining_timeout}s; "
                         f"proceeding with forced shutdown"
                     )
-            except asyncio.CancelledError:
+            except CancelledError:
                 logger.debug(f"{self.__class__.__name__} task cancelled during stop")
             except Exception as e:
                 logger.warning(f"Error waiting for {self.__class__.__name__} task to stop: {e}")
 
         # Calculate remaining time for done event wait
         elapsed = time.monotonic() - start_time
-        remaining_timeout = max(0.1, timeout - elapsed)
+        remaining_timeout = max(0.1, effective_timeout - elapsed) if effective_timeout else None
 
         try:
             await asyncio.wait_for(self._done_event.wait(), timeout=remaining_timeout)
             logger.debug(f"{self.__class__.__name__} task completed")
         except TimeoutError:
+            total_elapsed = time.monotonic() - start_time
             logger.error(
-                f"Cleanup did not complete within {timeout}s total (remaining: {remaining_timeout}s). "
+                f"Cleanup did not complete within {effective_timeout}s total (elapsed: {total_elapsed:.2f}s). "
                 f"Resources may not have been properly released for {self.__class__.__name__}. "
                 f"Forcing cleanup to prevent resource leaks."
             )
