@@ -418,11 +418,11 @@ program
 
           projectName = await promptForProjectName();
           console.log("");
+        }
 
-          // Only prompt for template if one wasn't provided via --template flag
-          if (!options.template) {
-            selectedTemplate = await promptForTemplate();
-          }
+        // Prompt for template if one wasn't provided via --template flag
+        if (!options.template && !selectedTemplate) {
+          selectedTemplate = await promptForTemplate();
         }
 
         // Set default template if still not selected

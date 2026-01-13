@@ -1,17 +1,13 @@
 import chalk from "chalk";
-import { exec } from "node:child_process";
 import { promises as fs } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
 import { isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
-
-const execAsync = promisify(exec);
+import { loginCommand } from "./auth.js";
 
 /**
  * Parse environment variables from .env file
@@ -173,7 +169,6 @@ interface DeployOptions {
   name?: string;
   port?: number;
   runtime?: "node" | "python";
-  fromSource?: boolean;
   new?: boolean;
   env?: string[];
   envFile?: string;
@@ -333,62 +328,6 @@ async function prompt(
       }
     });
   });
-}
-
-/**
- * Create a tarball of the project, excluding common build artifacts and dependencies
- */
-async function createTarball(cwd: string): Promise<string> {
-  const tmpDir = os.tmpdir();
-  const tarballPath = path.join(tmpDir, `mcp-deploy-${Date.now()}.tar.gz`);
-
-  // Common patterns to exclude
-  const excludePatterns = [
-    "node_modules",
-    ".git",
-    "dist",
-    "build",
-    ".next",
-    ".venv",
-    "__pycache__",
-    "*.pyc",
-    ".DS_Store",
-    "._*", // macOS resource fork files
-    ".mcp-use", // Build artifacts directory
-    ".env",
-    ".env.local",
-    "*.log",
-  ];
-
-  // Build tar exclude flags
-  // Use --exclude for each pattern (more reliable than single string)
-  const excludeFlags = excludePatterns
-    .map((pattern) => `--exclude=${pattern}`)
-    .join(" ");
-
-  // Create tarball with explicit exclusions
-  // Note: tar on macOS handles patterns differently, so we use both --exclude and --exclude-vcs-ignores
-  const command = `tar ${excludeFlags} -czf "${tarballPath}" -C "${cwd}" . 2>&1 || true`;
-
-  try {
-    await execAsync(command);
-    return tarballPath;
-  } catch (error) {
-    throw new Error(
-      `Failed to create tarball: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
-  }
-}
-
-/**
- * Get file size in human-readable format
- */
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 /**
@@ -602,10 +541,40 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Check if logged in
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+      const shouldLogin = await prompt(
+        chalk.white("Would you like to login now? (Y/n): "),
+        "y"
       );
-      process.exit(1);
+
+      if (shouldLogin) {
+        try {
+          await loginCommand({ silent: false });
+
+          // Verify login was successful
+          if (!(await isLoggedIn())) {
+            console.log(
+              chalk.red("✗ Login verification failed. Please try again.")
+            );
+            process.exit(1);
+          }
+
+          console.log(chalk.gray("\nContinuing with deployment...\n"));
+        } catch (error) {
+          console.error(
+            chalk.red.bold("✗ Login failed:"),
+            chalk.red(error instanceof Error ? error.message : "Unknown error")
+          );
+          process.exit(1);
+        }
+      } else {
+        console.log(
+          chalk.gray(
+            "Run " + chalk.white("npx mcp-use login") + " to get started."
+          )
+        );
+        console.log(chalk.gray("Deployment cancelled."));
+        process.exit(0);
+      }
     }
 
     console.log(chalk.cyan.bold("🚀 Deploying to mcp-use cloud...\n"));
@@ -631,367 +600,221 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Get git info
     const gitInfo = await getGitInfo(cwd);
 
-    if (
-      !options.fromSource &&
-      gitInfo.isGitRepo &&
-      gitInfo.remoteUrl &&
-      isGitHubUrl(gitInfo.remoteUrl)
-    ) {
-      // GitHub repo detected
-      if (!gitInfo.owner || !gitInfo.repo) {
-        console.log(
-          chalk.red(
-            "✗ Could not parse GitHub repository information from remote URL."
-          )
-        );
-        process.exit(1);
-      }
+    // Validate GitHub repository
+    if (!gitInfo.isGitRepo) {
+      console.log(chalk.red("✗ Not a git repository\n"));
+      console.log(chalk.white("To deploy, initialize git and push to GitHub:"));
+      console.log(chalk.gray("  1. Initialize git:"));
+      console.log(chalk.cyan("     git init\n"));
+      console.log(chalk.gray("  2. Create a GitHub repository at:"));
+      console.log(chalk.cyan("     https://github.com/new\n"));
+      console.log(chalk.gray("  3. Add the remote and push:"));
+      console.log(chalk.cyan("     git remote add origin <your-github-url>"));
+      console.log(chalk.cyan("     git add ."));
+      console.log(chalk.cyan("     git commit -m 'Initial commit'"));
+      console.log(chalk.cyan("     git push -u origin main\n"));
+      process.exit(1);
+    }
 
-      console.log(chalk.white("GitHub repository detected:"));
-      console.log(
-        chalk.gray(`  Repository: `) +
-          chalk.cyan(`${gitInfo.owner}/${gitInfo.repo}`)
-      );
-      console.log(
-        chalk.gray(`  Branch:     `) + chalk.cyan(gitInfo.branch || "main")
-      );
-      if (gitInfo.commitSha) {
-        console.log(
-          chalk.gray(`  Commit:     `) +
-            chalk.gray(gitInfo.commitSha.substring(0, 7))
-        );
-      }
-      if (gitInfo.commitMessage) {
-        console.log(
-          chalk.gray(`  Message:    `) +
-            chalk.gray(gitInfo.commitMessage.split("\n")[0])
-        );
-      }
-      console.log();
+    if (!gitInfo.remoteUrl) {
+      console.log(chalk.red("✗ No git remote configured\n"));
+      console.log(chalk.white("Add a GitHub remote:"));
+      console.log(chalk.cyan("  git remote add origin <your-github-url>\n"));
+      process.exit(1);
+    }
 
-      // Confirm deployment
-      const shouldDeploy = await prompt(
+    if (!isGitHubUrl(gitInfo.remoteUrl)) {
+      console.log(chalk.red("✗ Remote is not a GitHub repository"));
+      console.log(chalk.yellow(`   Current remote: ${gitInfo.remoteUrl}\n`));
+      console.log(chalk.white("Please add a GitHub remote to deploy."));
+      process.exit(1);
+    }
+
+    if (!gitInfo.owner || !gitInfo.repo) {
+      console.log(chalk.red("✗ Could not parse GitHub repository information"));
+      process.exit(1);
+    }
+
+    // Warn about uncommitted changes
+    if (gitInfo.hasUncommittedChanges) {
+      console.log(chalk.yellow("⚠️  You have uncommitted changes\n"));
+      console.log(chalk.white("Deployments use the code pushed to GitHub."));
+      console.log(
         chalk.white(
-          `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (y/n): `
+          "Local changes will not be included until you commit and push.\n"
         )
       );
 
-      if (!shouldDeploy) {
+      const shouldContinue = await prompt(
+        chalk.white("Continue with deployment from GitHub? (y/n): ")
+      );
+
+      if (!shouldContinue) {
         console.log(chalk.gray("Deployment cancelled."));
         process.exit(0);
       }
-
-      // Detect project settings
-      const projectName = options.name || (await getProjectName(cwd));
-      const runtime = options.runtime || (await detectRuntime(cwd));
-      const port = options.port || 3000;
-      const buildCommand = await detectBuildCommand(cwd);
-      const startCommand = await detectStartCommand(cwd);
-
-      // Build environment variables
-      const envVars = await buildEnvVars(options);
-
       console.log();
-      console.log(chalk.white("Deployment configuration:"));
-      console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
-      console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
-      console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
-      if (buildCommand) {
-        console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
-      }
-      if (startCommand) {
-        console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
-      }
-      if (envVars && Object.keys(envVars).length > 0) {
-        console.log(
-          chalk.gray(`  Environment:   `) +
-            chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
-        );
-        console.log(
-          chalk.gray(`                 `) +
-            chalk.gray(Object.keys(envVars).join(", "))
-        );
-      }
-      console.log();
+    }
 
-      // Check if project is linked to an existing deployment
-      const api = await McpUseAPI.create();
-      const existingLink = !options.new ? await getProjectLink(cwd) : null;
+    console.log(chalk.white("GitHub repository detected:"));
+    console.log(
+      chalk.gray(`  Repository: `) +
+        chalk.cyan(`${gitInfo.owner}/${gitInfo.repo}`)
+    );
+    console.log(
+      chalk.gray(`  Branch:     `) + chalk.cyan(gitInfo.branch || "main")
+    );
+    if (gitInfo.commitSha) {
+      console.log(
+        chalk.gray(`  Commit:     `) +
+          chalk.gray(gitInfo.commitSha.substring(0, 7))
+      );
+    }
+    if (gitInfo.commitMessage) {
+      console.log(
+        chalk.gray(`  Message:    `) +
+          chalk.gray(gitInfo.commitMessage.split("\n")[0])
+      );
+    }
+    console.log();
 
-      if (existingLink) {
-        try {
-          // Verify deployment still exists
-          const existingDeployment = await api.getDeployment(
+    // Confirm deployment
+    const shouldDeploy = await prompt(
+      chalk.white(
+        `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (y/n): `
+      )
+    );
+
+    if (!shouldDeploy) {
+      console.log(chalk.gray("Deployment cancelled."));
+      process.exit(0);
+    }
+
+    // Detect project settings
+    const projectName = options.name || (await getProjectName(cwd));
+    const runtime = options.runtime || (await detectRuntime(cwd));
+    const port = options.port || 3000;
+    const buildCommand = await detectBuildCommand(cwd);
+    const startCommand = await detectStartCommand(cwd);
+
+    // Build environment variables
+    const envVars = await buildEnvVars(options);
+
+    console.log();
+    console.log(chalk.white("Deployment configuration:"));
+    console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
+    console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
+    console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
+    if (buildCommand) {
+      console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
+    }
+    if (startCommand) {
+      console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
+    }
+    if (envVars && Object.keys(envVars).length > 0) {
+      console.log(
+        chalk.gray(`  Environment:   `) +
+          chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
+      );
+      console.log(
+        chalk.gray(`                 `) +
+          chalk.gray(Object.keys(envVars).join(", "))
+      );
+    }
+    console.log();
+
+    // Check if project is linked to an existing deployment
+    const api = await McpUseAPI.create();
+    const existingLink = !options.new ? await getProjectLink(cwd) : null;
+
+    if (existingLink) {
+      try {
+        // Verify deployment still exists
+        const existingDeployment = await api.getDeployment(
+          existingLink.deploymentId
+        );
+
+        if (existingDeployment && existingDeployment.status !== "failed") {
+          console.log(chalk.green(`✓ Found linked deployment`));
+          console.log(chalk.gray(`  Redeploying to maintain the same URL...`));
+          console.log(
+            chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
+          );
+
+          // Redeploy
+          const deployment = await api.redeployDeployment(
             existingLink.deploymentId
           );
 
-          if (existingDeployment && existingDeployment.status !== "failed") {
-            console.log(chalk.green(`✓ Found linked deployment`));
-            console.log(
-              chalk.gray(`  Redeploying to maintain the same URL...`)
-            );
-            console.log(
-              chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
-            );
+          // Update link timestamp
+          await saveProjectLink(cwd, {
+            ...existingLink,
+            linkedAt: new Date().toISOString(),
+          });
 
-            // Redeploy
-            const deployment = await api.redeployDeployment(
-              existingLink.deploymentId
-            );
+          // Display progress
+          await displayDeploymentProgress(api, deployment);
 
-            // Update link timestamp
-            await saveProjectLink(cwd, {
-              ...existingLink,
-              linkedAt: new Date().toISOString(),
-            });
-
-            // Display progress
-            await displayDeploymentProgress(api, deployment);
-
-            // Open in browser if requested
-            if (options.open && deployment.domain) {
-              console.log();
-              console.log(chalk.gray("Opening deployment in browser..."));
-              await open(`https://${deployment.domain}`);
-            }
-            return; // Exit early
+          // Open in browser if requested
+          if (options.open && deployment.domain) {
+            console.log();
+            console.log(chalk.gray("Opening deployment in browser..."));
+            await open(`https://${deployment.domain}`);
           }
-        } catch (error) {
-          // Deployment not found or error - continue to create new
-          console.log(
-            chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
-          );
+          return; // Exit early
         }
-      }
-
-      // Create deployment request
-      const deploymentRequest: CreateDeploymentRequest = {
-        name: projectName,
-        source: {
-          type: "github",
-          repo: `${gitInfo.owner}/${gitInfo.repo}`,
-          branch: gitInfo.branch || "main",
-          runtime,
-          port,
-          buildCommand,
-          startCommand,
-          env: Object.keys(envVars).length > 0 ? envVars : undefined,
-        },
-        healthCheckPath: "/healthz",
-      };
-
-      // Create deployment
-      console.log(chalk.gray("Creating deployment..."));
-      const deployment = await api.createDeployment(deploymentRequest);
-
-      console.log(
-        chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
-      );
-
-      // Save project link
-      await saveProjectLink(cwd, {
-        deploymentId: deployment.id,
-        deploymentName: projectName,
-        deploymentUrl: deployment.domain,
-        linkedAt: new Date().toISOString(),
-      });
-      console.log(
-        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
-      );
-      console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
-
-      // Display progress
-      await displayDeploymentProgress(api, deployment);
-
-      // Open in browser if requested
-      if (options.open && deployment.domain) {
-        console.log();
-        console.log(chalk.gray("Opening deployment in browser..."));
-        await open(`https://${deployment.domain}`);
-      }
-    } else {
-      // Not a GitHub repo or --from-source flag - deploy from source upload
-      if (options.fromSource) {
+      } catch (error) {
+        // Deployment not found or error - continue to create new
         console.log(
-          chalk.white("📦 Deploying from local source code (--from-source)...")
+          chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
         );
-      } else {
-        console.log(
-          chalk.yellow(
-            "⚠️  This is not a GitHub repository or no remote is configured."
-          )
-        );
-        console.log(chalk.white("Deploying from local source code instead..."));
       }
+    }
+
+    // Create deployment request
+    const deploymentRequest: CreateDeploymentRequest = {
+      name: projectName,
+      source: {
+        type: "github",
+        repo: `${gitInfo.owner}/${gitInfo.repo}`,
+        branch: gitInfo.branch || "main",
+        runtime,
+        port,
+        buildCommand,
+        startCommand,
+        env: Object.keys(envVars).length > 0 ? envVars : undefined,
+      },
+      healthCheckPath: "/healthz",
+    };
+
+    // Create deployment
+    console.log(chalk.gray("Creating deployment..."));
+    const deployment = await api.createDeployment(deploymentRequest);
+
+    console.log(
+      chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
+    );
+
+    // Save project link
+    await saveProjectLink(cwd, {
+      deploymentId: deployment.id,
+      deploymentName: projectName,
+      deploymentUrl: deployment.domain,
+      linkedAt: new Date().toISOString(),
+    });
+    console.log(
+      chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
+    );
+    console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
+
+    // Display progress
+    await displayDeploymentProgress(api, deployment);
+
+    // Open in browser if requested
+    if (options.open && deployment.domain) {
       console.log();
-
-      // Detect project settings
-      const projectName = options.name || (await getProjectName(cwd));
-      const runtime = options.runtime || (await detectRuntime(cwd));
-      const port = options.port || 3000;
-      const buildCommand = await detectBuildCommand(cwd);
-      const startCommand = await detectStartCommand(cwd);
-
-      // Build environment variables
-      const envVars = await buildEnvVars(options);
-
-      console.log(chalk.white("Deployment configuration:"));
-      console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
-      console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
-      console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
-      if (buildCommand) {
-        console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
-      }
-      if (startCommand) {
-        console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
-      }
-      if (envVars && Object.keys(envVars).length > 0) {
-        console.log(
-          chalk.gray(`  Environment:   `) +
-            chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
-        );
-        console.log(
-          chalk.gray(`                 `) +
-            chalk.gray(Object.keys(envVars).join(", "))
-        );
-      }
-      console.log();
-
-      // Confirm deployment (default to yes)
-      const shouldDeploy = await prompt(
-        chalk.white("Deploy from local source? (y/n): "),
-        "y"
-      );
-
-      if (!shouldDeploy) {
-        console.log(chalk.gray("Deployment cancelled."));
-        process.exit(0);
-      }
-
-      // Create tarball
-      console.log();
-      console.log(chalk.gray("Packaging source code..."));
-      const tarballPath = await createTarball(cwd);
-      const stats = await fs.stat(tarballPath);
-      console.log(
-        chalk.green("✓ Packaged: ") + chalk.gray(formatFileSize(stats.size))
-      );
-
-      // Check file size (2MB max)
-      const maxSize = 2 * 1024 * 1024; // 2MB
-      if (stats.size > maxSize) {
-        console.log(
-          chalk.red(
-            `✗ File size (${formatFileSize(stats.size)}) exceeds maximum of 2MB`
-          )
-        );
-        await fs.unlink(tarballPath);
-        process.exit(1);
-      }
-
-      // Check if project is linked to an existing deployment
-      const api = await McpUseAPI.create();
-      const existingLink = !options.new ? await getProjectLink(cwd) : null;
-
-      if (existingLink) {
-        try {
-          // Verify deployment still exists
-          const existingDeployment = await api.getDeployment(
-            existingLink.deploymentId
-          );
-
-          if (existingDeployment && existingDeployment.status !== "failed") {
-            console.log(chalk.green(`✓ Found linked deployment`));
-            console.log(
-              chalk.gray(`  Redeploying to maintain the same URL...`)
-            );
-            console.log(
-              chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
-            );
-
-            // Redeploy with file upload
-            const deployment = await api.redeployDeployment(
-              existingLink.deploymentId,
-              tarballPath
-            );
-
-            // Clean up tarball
-            await fs.unlink(tarballPath);
-
-            // Update link timestamp
-            await saveProjectLink(cwd, {
-              ...existingLink,
-              linkedAt: new Date().toISOString(),
-            });
-
-            // Display progress
-            await displayDeploymentProgress(api, deployment);
-
-            // Open in browser if requested
-            if (options.open && deployment.domain) {
-              console.log();
-              console.log(chalk.gray("Opening deployment in browser..."));
-              await open(`https://${deployment.domain}`);
-            }
-            return; // Exit early
-          }
-        } catch (error) {
-          // Deployment not found or error - continue to create new
-          console.log(
-            chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
-          );
-        }
-      }
-
-      // Create deployment request
-      const deploymentRequest: CreateDeploymentRequest = {
-        name: projectName,
-        source: {
-          type: "upload",
-          runtime,
-          port,
-          buildCommand,
-          startCommand,
-          env: Object.keys(envVars).length > 0 ? envVars : undefined,
-        },
-        healthCheckPath: "/healthz",
-      };
-
-      // Create deployment with file upload
-      console.log(chalk.gray("Creating deployment..."));
-      const deployment = await api.createDeploymentWithUpload(
-        deploymentRequest,
-        tarballPath
-      );
-
-      // Clean up tarball
-      await fs.unlink(tarballPath);
-
-      console.log(
-        chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
-      );
-
-      // Save project link
-      await saveProjectLink(cwd, {
-        deploymentId: deployment.id,
-        deploymentName: projectName,
-        deploymentUrl: deployment.domain,
-        linkedAt: new Date().toISOString(),
-      });
-      console.log(
-        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
-      );
-      console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
-
-      // Display progress
-      await displayDeploymentProgress(api, deployment);
-
-      // Open in browser if requested
-      if (options.open && deployment.domain) {
-        console.log();
-        console.log(chalk.gray("Opening deployment in browser..."));
-        await open(`https://${deployment.domain}`);
-      }
+      console.log(chalk.gray("Opening deployment in browser..."));
+      await open(`https://${deployment.domain}`);
     }
   } catch (error) {
     console.error(
