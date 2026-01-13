@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.13.1
+
+### Patch Changes
+
+- b8626dc: fix: enable json response in stateless mode
+- Updated dependencies [b8626dc]
+  - @mcp-use/cli@2.9.1
+  - @mcp-use/inspector@0.14.6
+
 ## 1.13.1-canary.1
 
 ### Patch Changes

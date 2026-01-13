@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 2.9.1
+
+### Patch Changes
+
+- b8626dc: chore: update mcp-use version
+- Updated dependencies [b8626dc]
+- Updated dependencies [b8626dc]
+  - mcp-use@1.13.1
+  - @mcp-use/inspector@0.14.6
+
 ## 2.9.1-canary.1
 
 ### Patch Changes
