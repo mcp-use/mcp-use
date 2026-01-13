@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.14.6-canary.1
+
+### Patch Changes
+
+- 727df09: chore: update mcp-use version
+  - mcp-use@1.13.1-canary.1
+
 ## 0.14.6-canary.0
 
 ### Patch Changes

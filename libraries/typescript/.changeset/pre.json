@@ -8,6 +8,7 @@
     "mcp-use": "1.13.0"
   },
   "changesets": [
-    "fancy-stars-clap"
+    "fancy-stars-clap",
+    "little-adults-serve"
   ]
 }
