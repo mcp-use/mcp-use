@@ -101,9 +101,10 @@ export async function mountMcp(
       const server = mcpServerInstance.getServerForSession();
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // No session tracking
-        // Enable plain JSON responses ONLY if client doesn't support SSE
-        // This allows k6/curl to work while maintaining SSE format for compatible clients
-        enableJsonResponse: !clientSupportsSSE,
+        // IMPORTANT: Always use JSON responses in stateless mode
+        // Edge runtimes (Deno, Cloudflare Workers, Supabase) cannot maintain long-lived SSE streams
+        // Even if client supports SSE, we must use request-response JSON in stateless environments
+        enableJsonResponse: true,
       });
 
       try {
