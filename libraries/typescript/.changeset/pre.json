@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.14.5",
     "mcp-use": "1.13.0"
   },
-  "changesets": []
+  "changesets": [
+    "fancy-stars-clap"
+  ]
 }

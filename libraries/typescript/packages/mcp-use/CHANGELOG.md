@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.13.1-canary.0
+
+### Patch Changes
+
+- 548206f: fix: enable json response in stateless mode
+  - @mcp-use/cli@2.9.1-canary.0
+  - @mcp-use/inspector@0.14.6-canary.0
+
 ## 1.13.0
 
 ### Minor Changes
