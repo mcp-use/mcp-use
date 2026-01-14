@@ -34,7 +34,6 @@ from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
-from mcp_use.server.utils.signals import setup_signal_handlers
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
 from mcp_use.telemetry.utils import track_server_run_from_server
 
@@ -105,9 +104,6 @@ class MCPServer(FastMCP):
             self._add_dev_routes()
 
         self.app = self.streamable_http_app()
-
-        # Set up signal handlers for immediate shutdown
-        setup_signal_handlers()
 
         # Inject middleware in the ServerSession
         MiddlewareServerSession._middleware_manager = self.middleware_manager
