@@ -351,6 +351,19 @@ export function useChatMessagesClientSide({
           }
         }
 
+        // If aborted, mark any pending tool calls as cancelled
+        if (abortControllerRef.current?.signal.aborted) {
+          for (const part of parts) {
+            if (
+              part.type === "tool-invocation" &&
+              part.toolInvocation?.state === "pending"
+            ) {
+              part.toolInvocation.state = "error";
+              part.toolInvocation.result = "Cancelled by user";
+            }
+          }
+        }
+
         // Final update
         setMessages((prev) =>
           prev.map((msg) =>
