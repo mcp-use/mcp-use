@@ -27,10 +27,11 @@ class ConnectionGuard(Middleware):
 
         return await call_next(context)
 
+
 class ClientCapabilitiesGuard(Middleware):
     async def on_initialize(self, context, call_next) -> Any:
         print(f"Client capabilities: {context.message.capabilities}")
-        
+
         capabilities = context.message.capabilities
         if not capabilities.elicitation:
             raise ValueError("Client must support elicitation")
@@ -39,6 +40,7 @@ class ClientCapabilitiesGuard(Middleware):
         if not capabilities.roots:
             raise ValueError("Client must support roots")
         return await call_next(context)
+
 
 class LoggingMiddleware(Middleware):
     """Minimal logging."""
