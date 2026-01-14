@@ -7,5 +7,9 @@
     "@mcp-use/inspector": "0.14.6",
     "mcp-use": "1.13.1"
   },
-  "changesets": []
+  "changesets": [
+    "brave-planets-glow",
+    "dependabot-b4f8a44f",
+    "open-doodles-pump"
+  ]
 }
