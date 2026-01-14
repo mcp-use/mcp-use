@@ -124,7 +124,6 @@ export function useChatMessages({
 
         let buffer = "";
         while (true) {
-
           // Check for abort
           if (abortControllerRef.current?.signal.aborted) {
             await reader.cancel();

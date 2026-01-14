@@ -124,7 +124,7 @@ export function useChatMessagesClientSide({
 
           agentRef.current = new MCPAgent({
             llm: llmRef.current.instance,
-            client: connection.client,
+            client: (connection.client ?? undefined) as any,
             memoryEnabled: true,
             systemPrompt:
               "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
@@ -142,9 +142,11 @@ export function useChatMessagesClientSide({
           userInput,
           10, // maxSteps
           false, // manageConnector - don't manage, already connected
-          undefined // externalHistory - agent maintains its own with memoryEnabled
+          undefined, // externalHistory - agent maintains its own with memoryEnabled
+          undefined, // outputSchema
+          abortControllerRef.current?.signal // pass abort signal to enable immediate cancellation
         )) {
-          // Check for abort
+          // Check for abort (defensive - signal is also passed to LangChain)
           if (abortControllerRef.current?.signal.aborted) {
             break;
           }
@@ -383,6 +385,11 @@ export function useChatMessagesClientSide({
             });
         }
       } catch (error) {
+        // Don't show AbortError - user initiated cancellation
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
         console.error("Client-side agent error:", error);
 
         // Extract detailed error message
