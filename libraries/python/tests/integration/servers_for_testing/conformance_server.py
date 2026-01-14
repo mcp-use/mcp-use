@@ -12,7 +12,9 @@ import json
 from dataclasses import dataclass
 from typing import get_args
 
+from mcp.server.fastmcp.prompts.base import UserMessage
 from mcp.types import (
+    AudioContent,
     EmbeddedResource,
     ImageContent,
     SamplingMessage,
@@ -28,6 +30,8 @@ mcp = MCPServer(
     name="ConformanceTestServer",
     version="1.0.0",
     instructions="MCP Conformance Test Server implementing all supported features.",
+    debug=True,
+    pretty_print_jsonrpc=False,
 )
 
 # =============================================================================
@@ -120,10 +124,19 @@ def test_simple_text(message: str = "Hello, World!") -> str:
 
 
 # tools-call-image - Return ImageContent directly
-@mcp.tool(name="test_image")
-async def test_image() -> ImageContent:
+@mcp.tool(name="test_image_content")
+async def test_image_content() -> ImageContent:
     """A tool that returns image content."""
     return ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png")
+
+
+# tools-call-audio - Return AudioContent directly
+@mcp.tool(name="test_audio_content")
+async def test_audio_content() -> AudioContent:
+    """A tool that returns audio content."""
+    return AudioContent(
+        type="audio", data="UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA", mimeType="audio/wav"
+    )
 
 
 # tools-call-embedded-resource - Return EmbeddedResource directly
@@ -141,18 +154,26 @@ async def test_embedded_resource() -> EmbeddedResource:
 
 
 # tools-call-mixed-content - Return list of content types
-@mcp.tool(name="test_mixed_content")
-async def test_mixed_content() -> list:
-    """A tool that returns mixed content (text + image)."""
+@mcp.tool(name="test_multiple_content_types")
+async def test_multiple_content_types() -> list:
+    """A tool that returns multiple content types (text + image + embedded resource)."""
     return [
-        TextContent(type="text", text="Here is some text content"),
+        TextContent(type="text", text="Multiple content types test:"),
         ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png"),
+        EmbeddedResource(
+            type="resource",
+            resource=TextResourceContents(
+                uri="test://mixed-content-resource",
+                mimeType="application/json",
+                text='{"test":"data","value":123}',
+            ),
+        ),
     ]
 
 
 # tools-call-with-logging
-@mcp.tool(name="test_logging")
-async def test_logging(ctx: Context) -> str:
+@mcp.tool(name="test_tool_with_logging")
+async def test_logging_tool(ctx: Context) -> str:
     """A tool that emits log messages at various levels."""
     await ctx.debug("Debug message from tool")
     await ctx.info("Info message from tool")
@@ -255,25 +276,27 @@ def test_simple_prompt() -> str:
 
 # prompts-get-with-args (parameters optional with defaults)
 @mcp.prompt(name="test_prompt_with_arguments", description="A prompt that accepts arguments")
-def test_prompt_with_arguments(topic: str = "general", style: str = "formal") -> str:
+def test_prompt_with_arguments(arg1: str = "general", arg2: str = "formal") -> str:
     """A prompt that generates content about a topic in a specific style."""
-    return f"Please write about {topic} in a {style} style."
+    return f"Please write about {arg1} in a {arg2} style."
 
 
 # prompts-get-embedded-resource (resourceUri parameter for conformance test)
 @mcp.prompt(name="test_prompt_with_embedded_resource", description="A prompt with embedded resource")
-def test_prompt_with_embedded_resource(resourceUri: str = "config://embedded") -> list:
+def test_prompt_with_embedded_resource(resourceUri: str) -> list:
     """A prompt that includes an embedded resource."""
     return [
-        TextContent(type="text", text="Here is the configuration:"),
-        EmbeddedResource(
-            type="resource",
-            resource=TextResourceContents(
-                uri=resourceUri,
-                mimeType="application/json",
-                text='{"setting": "value"}',
-            ),
+        UserMessage(
+            content=EmbeddedResource(
+                type="resource",
+                resource=TextResourceContents(
+                    uri=resourceUri,
+                    mimeType="text/plain",
+                    text="Embedded resource content for testing.",
+                ),
+            )
         ),
+        UserMessage(content=TextContent(type="text", text="Please process the embedded resource above.")),
     ]
 
 
@@ -282,8 +305,8 @@ def test_prompt_with_embedded_resource(resourceUri: str = "config://embedded") -
 def test_prompt_with_image() -> list:
     """A prompt that includes image content."""
     return [
-        TextContent(type="text", text="Here is a test image:"),
-        ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png"),
+        UserMessage(content=TextContent(type="text", text="Here is a test image:")),
+        UserMessage(content=ImageContent(type="image", data=RED_PIXEL_PNG, mimeType="image/png")),
     ]
 
 
