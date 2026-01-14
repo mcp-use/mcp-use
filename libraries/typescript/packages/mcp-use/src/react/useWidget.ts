@@ -22,6 +22,10 @@ import type {
   UseWidgetResult,
 } from "./widget-types.js";
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
+import {
+  useCallTool as useCallToolWidget,
+  type UseCallToolOptions,
+} from "./hooks/widget/useCallTool.js";
 
 /**
  * Hook to subscribe to a single value from window.openai globals
@@ -290,6 +294,17 @@ export function useWidget<
     return provider === "openai" && toolResponseMetadata === null;
   }, [provider, toolResponseMetadata]);
 
+  // Factory function for typed callTool hook
+  const createUseCallTool = useCallback(
+    <TInput = any, TOutput = any>(
+      toolName: string,
+      options?: UseCallToolOptions<TInput, TOutput>
+    ) => {
+      return useCallToolWidget<TInput, TOutput>(toolName, options);
+    },
+    []
+  );
+
   return {
     // Props and state (with defaults)
     props: widgetProps,
@@ -320,6 +335,9 @@ export function useWidget<
     // Availability
     isAvailable: isOpenAiAvailable,
     isPending,
+
+    // Typed hook factory
+    useCallTool: createUseCallTool,
   };
 }
 

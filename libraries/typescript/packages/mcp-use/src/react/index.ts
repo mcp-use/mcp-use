@@ -89,3 +89,19 @@ export {
 
 // Export WidgetMetadata type for widget developers
 export type { WidgetMetadata } from "../server/types/widget.js";
+
+// Export typed callTool hooks for widgets and MCP clients
+export { useCallTool as useWidgetCallTool } from "./hooks/widget/useCallTool.js";
+export type {
+  UseCallToolOptions as UseWidgetCallToolOptions,
+  UseCallToolResult as UseWidgetCallToolResult,
+} from "./hooks/widget/useCallTool.js";
+
+export { useCallTool as useMcpCallTool } from "./hooks/client/useCallTool.js";
+export type {
+  UseCallToolOptions as UseMcpCallToolOptions,
+  UseCallToolResult as UseMcpCallToolResult,
+} from "./hooks/client/useCallTool.js";
+
+// Re-export type inference utilities from server for convenience
+export type { InferToolInput, InferToolOutput } from "../server/types/tool.js";

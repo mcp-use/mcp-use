@@ -15,6 +15,10 @@ import { applyProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { getPackageVersion } from "../version.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
+import {
+  useCallTool as useCallToolClient,
+  type UseCallToolOptions,
+} from "./hooks/client/useCallTool.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
@@ -1951,6 +1955,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return null;
   }, [serverInfo, addLog]);
 
+  // Factory function for typed callTool hook
+  const createUseCallTool = useCallback(
+    <TInput = any, TOutput = any>(
+      toolName: string,
+      options?: UseCallToolOptions<TInput, TOutput>
+    ) => {
+      return useCallToolClient<TInput, TOutput>(
+        clientRef.current,
+        toolName,
+        options
+      );
+    },
+    []
+  );
+
   return {
     state,
     name: serverInfo?.name || url || "",
@@ -1979,5 +1998,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     authenticate,
     clearStorage,
     ensureIconLoaded,
+    useCallTool: createUseCallTool,
   };
 }
