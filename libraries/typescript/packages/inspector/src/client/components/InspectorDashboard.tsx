@@ -802,40 +802,33 @@ export function InspectorDashboard() {
                   {(connection.state === "pending_auth" ||
                     connection.state === "authenticating") && (
                     <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                      <Button
-                        size="sm"
-                        className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
-                        variant="outline"
-                        onClick={(e) =>
-                          handleActionClick(e, connection.authenticate)
-                        }
-                        disabled={connection.state === "authenticating"}
-                      >
-                        {connection.state === "authenticating" ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Authenticating...
-                          </>
-                        ) : (
-                          "Authenticate"
-                        )}
-                      </Button>
-                      {connection.authUrl &&
-                        connection.state === "pending_auth" && (
-                          <>
-                            {" "}
-                            or{" "}
-                            <a
-                              href={connection.authUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              open auth page
-                            </a>
-                          </>
-                        )}
+                      {connection.state === "authenticating" ? (
+                        <Button
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          disabled
+                        >
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Authenticating...
+                        </Button>
+                      ) : connection.authUrl ? (
+                        <Button
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          asChild
+                        >
+                          <a
+                            href={connection.authUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Authenticate
+                          </a>
+                        </Button>
+                      ) : null}
                     </div>
                   )}
                 </div>

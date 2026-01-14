@@ -252,15 +252,20 @@ async function startCallbackServer(
 /**
  * Login command - opens browser for OAuth flow
  */
-export async function loginCommand(): Promise<void> {
+export async function loginCommand(options?: {
+  silent?: boolean;
+}): Promise<void> {
   try {
     // Check if already logged in
     if (await isLoggedIn()) {
-      console.log(
-        chalk.yellow(
-          "⚠️  You are already logged in. Run 'mcp-use logout' first if you want to login with a different account."
-        )
-      );
+      // Only show message if not in silent mode
+      if (!options?.silent) {
+        console.log(
+          chalk.yellow(
+            "⚠️  You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account."
+          )
+        );
+      }
       return;
     }
 
@@ -322,26 +327,46 @@ export async function loginCommand(): Promise<void> {
     });
 
     console.log(chalk.green.bold("\n✓ Successfully logged in!"));
+
+    // Show user info card (same as whoami)
+    try {
+      const api = await McpUseAPI.create();
+      const authInfo = await api.testAuth();
+
+      console.log(chalk.cyan.bold("\n👤 Current user:\n"));
+      console.log(chalk.white("Email:   ") + chalk.cyan(authInfo.email));
+      console.log(chalk.white("User ID: ") + chalk.gray(authInfo.user_id));
+
+      const apiKey = await getApiKey();
+      if (apiKey) {
+        const masked = apiKey.substring(0, 6) + "...";
+        console.log(chalk.white("API Key: ") + chalk.gray(masked));
+      }
+    } catch (error) {
+      // If fetching user info fails, just skip it
+      console.log(
+        chalk.gray(
+          `\nYour API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
+        )
+      );
+    }
+
     console.log(
       chalk.gray(
-        `\nYour API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
+        "\nYou can now deploy your MCP servers with " +
+          chalk.white("npx mcp-use deploy")
       )
     );
     console.log(
-      chalk.gray(
-        "You can now deploy your MCP servers with " +
-          chalk.white("mcp-use deploy")
-      )
+      chalk.gray("To logout later, run " + chalk.white("npx mcp-use logout"))
     );
 
-    // Exit successfully
-    process.exit(0);
+    // Return successfully (no process.exit so it can be reused by other commands)
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Login failed:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
+    // Throw error instead of exiting so calling code can handle it
+    throw new Error(
+      `Login failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
-    process.exit(1);
   }
 }
 
@@ -389,7 +414,9 @@ export async function whoamiCommand(): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.yellow("⚠️  You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       return;
     }

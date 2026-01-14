@@ -56,7 +56,9 @@ async function listDeploymentsCommand(): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -124,7 +126,9 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -236,7 +240,9 @@ async function restartDeploymentCommand(
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -321,7 +327,9 @@ async function deleteDeploymentCommand(
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -375,7 +383,9 @@ async function logsCommand(
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -467,7 +477,9 @@ async function listEnvCommand(deploymentId: string): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -523,7 +535,9 @@ async function setEnvCommand(
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -589,7 +603,9 @@ async function unsetEnvCommand(
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -635,7 +651,9 @@ async function stopDeploymentCommand(deploymentId: string): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }
@@ -663,7 +681,9 @@ async function startDeploymentCommand(deploymentId: string): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       process.exit(1);
     }

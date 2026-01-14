@@ -1403,7 +1403,16 @@ program
   .command("login")
   .description("Login to mcp-use cloud")
   .action(async () => {
-    await loginCommand();
+    try {
+      await loginCommand();
+      process.exit(0);
+    } catch (error) {
+      console.error(
+        chalk.red.bold("\n✗ Login failed:"),
+        chalk.red(error instanceof Error ? error.message : "Unknown error")
+      );
+      process.exit(1);
+    }
   });
 
 program
@@ -1423,15 +1432,11 @@ program
 // Deployment command
 program
   .command("deploy")
-  .description("Deploy MCP server to mcp-use cloud")
+  .description("Deploy MCP server from GitHub to mcp-use cloud")
   .option("--open", "Open deployment in browser after successful deploy")
   .option("--name <name>", "Custom deployment name")
   .option("--port <port>", "Server port", "3000")
   .option("--runtime <runtime>", "Runtime (node or python)")
-  .option(
-    "--from-source",
-    "Deploy from local source code (even for GitHub repos)"
-  )
   .option(
     "--new",
     "Force creation of new deployment instead of reusing linked deployment"
@@ -1447,7 +1452,6 @@ program
       name: options.name,
       port: options.port ? parseInt(options.port, 10) : undefined,
       runtime: options.runtime,
-      fromSource: options.fromSource,
       new: options.new,
       env: options.env,
       envFile: options.envFile,
