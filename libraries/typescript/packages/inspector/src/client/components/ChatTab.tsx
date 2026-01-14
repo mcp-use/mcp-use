@@ -62,9 +62,8 @@ export function ChatTab({
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
-  const { messages, isLoading, sendMessage, clearMessages } = useClientSide
-    ? clientSideChat
-    : serverSideChat;
+  const { messages, isLoading, sendMessage, clearMessages, stop } =
+    useClientSide ? clientSideChat : serverSideChat;
 
   // Register keyboard shortcuts (only active when ChatTab is mounted)
   useKeyboardShortcuts({
@@ -196,6 +195,7 @@ export function ChatTab({
           onInputChange={setInputValue}
           onKeyDown={handleKeyDown}
           onSendMessage={handleSendMessage}
+          onStopStreaming={stop}
         />
       )}
     </div>
