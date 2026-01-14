@@ -18,7 +18,11 @@ Signal handling for graceful server shutdown.
 <Card type="info">
 ### `function` setup_signal_handlers
 
-Set up signal handlers for immediate shutdown.
+Set up signal handlers for server shutdown.
+
+    Note:
+        Currently a no-op. uvicorn handles SIGINT/SIGTERM gracefully.
+        This function exists for potential future customization.
 
 ```python
 from mcp_use.server.utils.signals import setup_signal_handlers
