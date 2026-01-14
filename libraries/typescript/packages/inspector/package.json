@@ -101,7 +101,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "framer-motion": "^12.23.26",
-    "hono": "^4.11.1",
+    "hono": "^4.11.4",
     "lucide-react": "^0.561.0",
     "markdown-to-jsx": "^9.3.5",
     "mcp-use": "workspace:*",
