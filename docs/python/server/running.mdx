@@ -41,7 +41,7 @@ server.run(
     host="127.0.0.1",
     port=8000,
     reload=False,
-    run_debug=False
+    debug=False
 )
 ```
 
@@ -56,7 +56,7 @@ server = MCPServer(name="My Server", debug=True)
 # - /openmcp.json endpoint
 # - /docs endpoint
 # - Enhanced logging
-server.run(transport="streamable-http", run_debug=True)
+server.run(transport="streamable-http", debug=True)
 ```
 
 ## Auto-reload
@@ -75,7 +75,7 @@ server.run(
     host="0.0.0.0",
     port=8000,
     reload=False,
-    run_debug=False
+    debug=False
 )
 ```
 

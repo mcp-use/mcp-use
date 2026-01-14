@@ -286,7 +286,7 @@ class MCPServer(FastMCP):
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
-        run_debug: bool = False,
+        debug: bool = False,
     ) -> None:
         """Run the MCP server.
 
@@ -295,15 +295,20 @@ class MCPServer(FastMCP):
             host: Host to bind to
             port: Port to bind to
             reload: Whether to enable auto-reload
-            run_debug: Whether to enable debug mode (adds /docs and /openmcp.json endpoints)
+            debug: Whether to enable debug mode. Overrides the server's debug setting,
+                   adds /docs and /openmcp.json endpoints if not already added.
         """
+        # Override debug_level if debug=True is passed to run()
+        if debug and self.debug_level < 1:
+            self.debug_level = 1
+
         self._transport_type = transport
         track_server_run_from_server(self, transport, host, port, _telemetry)
 
         self._wrap_handlers_with_middleware()
 
         runner = ServerRunner(self)
-        runner.run(transport=transport, host=host, port=port, reload=reload, debug=run_debug)
+        runner.run(transport=transport, host=host, port=port, reload=reload, debug=debug)
 
     def get_context(self) -> MCPContext:  # type: ignore[override]
         """Use the extended MCP-Use context that adds convenience helpers."""

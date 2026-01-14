@@ -1,16 +1,13 @@
 """Signal handling for graceful server shutdown."""
 
-import os
-import signal
-import sys
-
 
 def setup_signal_handlers():
-    """Set up signal handlers for immediate shutdown."""
+    """Set up signal handlers for server shutdown.
 
-    def force_exit_handler(signum, frame):
-        print("\n⏹  Force quitting...", file=sys.stderr)
-        os._exit(0)
-
-    signal.signal(signal.SIGINT, force_exit_handler)
-    signal.signal(signal.SIGTERM, force_exit_handler)
+    Note:
+        Currently a no-op. uvicorn handles SIGINT/SIGTERM gracefully.
+        This function exists for potential future customization.
+    """
+    # uvicorn already handles SIGINT (Ctrl+C) and SIGTERM gracefully.
+    # No custom signal handling needed.
+    pass

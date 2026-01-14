@@ -85,4 +85,4 @@ if __name__ == "__main__":
     #     openmcp_path="/custom-openmcp.json"
     # )
 
-    server.run(transport="streamable-http", port=8000, reload=True)
+    server.run(transport="streamable-http", port=8000, reload=True, debug=True)
