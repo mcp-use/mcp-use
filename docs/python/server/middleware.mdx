@@ -60,6 +60,10 @@ Override these methods to intercept specific request types:
 | `on_list_resources` | Resource listing |
 | `on_list_prompts` | Prompt listing |
 
+<Tip>
+**Typed context**: Each hook receives a fully-typed `context.message`. For example, `on_initialize` gets `ServerMiddlewareContext[InitializeRequestParams]`, so your editor knows exactly what fields are available (like `context.message.clientInfo.name`). No guessing, full autocomplete.
+</Tip>
+
 ### Hook nesting
 
 When you override both `on_request` and a specific hook, they nest: `on_request` wraps the specific hook.
