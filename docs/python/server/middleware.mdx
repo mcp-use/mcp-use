@@ -1,68 +1,207 @@
 ---
 title: Middleware
-description: Add middleware to intercept and modify MCP requests
+description: Intercept and process MCP requests with middleware
 icon: "layers"
-tags: ["beta"]
 ---
 
-<Warning>
-**Beta Feature**: Middleware support is currently in beta. The API is stable but some features are still being refined.
-</Warning>
+Middleware lets you intercept MCP requests to add logging, authentication, rate limiting, validation, or any cross-cutting logic.
 
-Use middleware to run cross-cutting logic (logging, auth, rate limiting, validation, caching) around MCP requests.
-
-## Hooks (typed)
-
-- `on_request` (all requests)
-- `on_initialize`
-- `on_call_tool`
-- `on_read_resource`
-- `on_get_prompt`
-- `on_list_tools/resources/prompts`
-
-All hooks receive `ServerMiddlewareContext[...]` with typed `message`, `method`, `timestamp`, `transport`, `session_id`, `headers`, `client_ip`, `metadata`. Use `context.copy(...)` to enrich metadata.
-
-## Minimal middleware
+## Quick Start
 
 ```python
+from mcp_use.server import MCPServer
+from mcp_use.server.middleware import Middleware
+
 class LoggingMiddleware(Middleware):
     async def on_request(self, context, call_next):
-        start = time.time()
         print(f"→ {context.method}")
-        try:
-            result = await call_next(context)
-            print(f"← {context.method} ({(time.time()-start)*1000:.1f}ms)")
-            return result
-        except Exception:
-            print("✗ failed"); raise
+        result = await call_next(context)
+        print(f"← {context.method}")
+        return result
+
+server = MCPServer(
+    name="my-server",
+    middleware=[LoggingMiddleware()]
+)
 ```
 
-## Common patterns
+## How It Works
 
-- **Auth**: read `context.headers.get("x-api-key")`, raise on failure, stash auth info in `context.copy(metadata=...)`.
-- **Rate limit**: key by `context.session_id or "anonymous"`, track timestamps, reject when over limit.
-- **Validation**: inspect `context.message` (typed params) before calling `call_next`.
-- **Caching**: cache by resource URI (or by session) and TTL; on miss call `call_next` then store.
+Middleware executes in an **onion model**: each middleware wraps the next, with the handler at the center.
 
-## Sessions in middleware
+```
+Request
+  → Middleware A (before)
+    → Middleware B (before)
+      → Handler
+    ← Middleware B (after)
+  ← Middleware A (after)
+Response
+```
 
-Session IDs come from the SDK via the `mcp-session-id` header; available as `context.session_id`. Use for per-session state, limits, caching. Spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+Each middleware can:
+- Inspect/modify the request before calling `call_next`
+- Inspect/modify the response after `call_next` returns
+- **Short-circuit** by returning early without calling `call_next`
+- **Reject** by raising an exception
+
+## Hooks
+
+Override these methods to intercept specific request types:
+
+| Hook | When it runs |
+|------|--------------|
+| `on_request` | Every request (wraps all other hooks) |
+| `on_initialize` | Client connection handshake |
+| `on_call_tool` | Tool execution |
+| `on_read_resource` | Resource reads |
+| `on_get_prompt` | Prompt retrieval |
+| `on_list_tools` | Tool listing |
+| `on_list_resources` | Resource listing |
+| `on_list_prompts` | Prompt listing |
+
+### Hook nesting
+
+When you override both `on_request` and a specific hook, they nest: `on_request` wraps the specific hook.
 
 ```python
-class SessionTracking(Middleware):
-    def __init__(self): self.stats = defaultdict(int)
+class MyMiddleware(Middleware):
     async def on_request(self, context, call_next):
-        sid = context.session_id or "anonymous"
-        self.stats[sid] += 1
-        return await call_next(context)
+        print("1. on_request before")
+        result = await call_next(context)  # Calls on_call_tool (if tool request)
+        print("4. on_request after")
+        return result
+
+    async def on_call_tool(self, context, call_next):
+        print("2. on_call_tool before")
+        result = await call_next(context)  # Calls handler
+        print("3. on_call_tool after")
+        return result
 ```
 
-## Best practices
+<Tip>
+Use `on_request` for logic that applies to all requests. Use specific hooks when you only care about certain operations.
+</Tip>
 
-- Order matters: metadata/logging first, auth early, validation before business logic.
-- Keep each middleware focused; use `context.metadata` to pass data.
-- Avoid blocking calls; handle errors with try/except and re-raise.
+## Context
 
-## Reference
+Every hook receives a `ServerMiddlewareContext` with:
 
-See the full example: [libraries/python/examples/server/middleware_example.py](https://github.com/mcp-use/mcp-use/blob/main/libraries/python/examples/server/middleware_example.py).
+| Field | Type | Description |
+|-------|------|-------------|
+| `message` | Typed params | Request parameters (e.g., `CallToolRequestParams`) |
+| `method` | `str` | MCP method name (e.g., `"tools/call"`) |
+| `session_id` | `str \| None` | Client session ID (from `mcp-session-id` header) |
+| `transport` | `str` | Transport type (`"stdio"`, `"streamable-http"`) |
+| `timestamp` | `datetime` | Request timestamp |
+| `headers` | `dict \| None` | HTTP headers (HTTP transports only) |
+| `client_ip` | `str \| None` | Client IP (HTTP transports only) |
+| `metadata` | `dict` | Custom data passed between middleware |
+
+<Note>
+Context is immutable. Use `context.copy()` to pass data downstream:
+
+```python
+enriched = context.copy(metadata={**context.metadata, "user_id": "123"})
+return await call_next(enriched)
+```
+</Note>
+
+## Examples
+
+<Tabs>
+  <Tab title="Authentication">
+    Reject requests without a valid API key:
+
+    ```python
+    class AuthMiddleware(Middleware):
+        async def on_call_tool(self, context, call_next):
+            api_key = context.headers.get("x-api-key") if context.headers else None
+            if not api_key or api_key != "secret":
+                raise PermissionError("Invalid API key")
+            return await call_next(context)
+    ```
+  </Tab>
+
+  <Tab title="Rate Limiting">
+    Limit requests per session:
+
+    ```python
+    from collections import defaultdict
+    from datetime import datetime
+
+    class RateLimitMiddleware(Middleware):
+        def __init__(self, max_per_minute: int = 30):
+            self.max = max_per_minute
+            self.requests: dict[str, list[datetime]] = defaultdict(list)
+
+        async def on_call_tool(self, context, call_next):
+            sid = context.session_id or "anonymous"
+            now = datetime.now()
+            # Keep only requests from last minute
+            self.requests[sid] = [
+                t for t in self.requests[sid]
+                if (now - t).total_seconds() < 60
+            ]
+            if len(self.requests[sid]) >= self.max:
+                raise Exception("Rate limit exceeded")
+            self.requests[sid].append(now)
+            return await call_next(context)
+    ```
+  </Tab>
+
+  <Tab title="Connection Guard">
+    Reject clients during the MCP handshake:
+
+    ```python
+    class ConnectionGuard(Middleware):
+        async def on_initialize(self, context, call_next):
+            client = context.message.clientInfo.name
+            if client in ["blocked-client"]:
+                raise ValueError(f"Client {client} not allowed")
+            print(f"Connection from: {client}")
+            return await call_next(context)
+    ```
+  </Tab>
+</Tabs>
+
+## Middleware Order
+
+Order matters. Middleware runs in the order added, with earlier middleware wrapping later ones.
+
+```python
+server = MCPServer(
+    middleware=[
+        LoggingMiddleware(),      # 1. Outermost - sees all requests
+        AuthMiddleware(),         # 2. Rejects unauthorized early
+        RateLimitMiddleware(),    # 3. Limits request rate
+        ValidationMiddleware(),   # 4. Innermost - validates data
+    ]
+)
+```
+
+<Tip>
+**Recommended order**: Logging → Authentication → Rate limiting → Validation. This ensures logging sees all requests (including rejected ones) and auth rejects early before expensive operations.
+</Tip>
+
+## Best Practices
+
+- **Single responsibility**: Each middleware does one thing
+- **Fail fast**: Reject invalid requests early, before expensive operations
+- **Always call `call_next`**: Unless intentionally short-circuiting
+- **Re-raise exceptions**: If you catch errors to log them, always re-raise
+
+```python
+async def on_request(self, context, call_next):
+    try:
+        return await call_next(context)
+    except Exception as e:
+        print(f"Request failed: {e}")
+        raise  # Always re-raise
+```
+
+## Full Example
+
+<Card title="middleware_example.py" icon="github" href="https://github.com/mcp-use/mcp-use/blob/main/libraries/python/examples/server/middleware_example.py">
+  Complete working server with logging, auth, rate limiting, and validation middleware.
+</Card>

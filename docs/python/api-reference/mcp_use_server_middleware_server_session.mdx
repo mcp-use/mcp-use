@@ -18,6 +18,30 @@ View the source code for this module on GitHub: <a href='https://github.com/mcp-
 <div className="text-black">
 <div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MiddlewareServerSession</div>
 
+Extended ServerSession that routes initialize requests through middleware.
+
+    This class intercepts the MCP initialize handshake at the protocol layer,
+    allowing middleware to:
+    - Validate client capabilities or metadata during connection
+    - Log connection attempts and protocol versions
+    - Reject connections early based on initialization parameters
+
+    The class is injected via monkey-patching of ``mcp.server.session.ServerSession``
+    to intercept session creation within the MCP SDK.
+
+    Note:
+        This implementation uses class attributes for middleware injection,
+        which means only ONE MCPServer instance is supported per process.
+        This is compatible with standard deployment patterns (e.g., uvicorn workers
+        run in separate processes), but multiple MCPServer instances in the
+        same process will share/override each other's middleware configuration.
+
+    Attributes:
+        _middleware_manager: The middleware manager to process initialize requests.
+            Injected by MCPServer during initialization.
+        _transport_type: The transport type (e.g., "stdio", "streamable-http").
+            Injected by MCPServer during initialization.
+
 </div>
 </RandomGradientBackground>
 ```python
