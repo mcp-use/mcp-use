@@ -447,10 +447,17 @@ export function useChatMessagesClientSide({
     }
   }, []);
 
+  const stop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
   return {
     messages,
     isLoading,
     sendMessage,
     clearMessages,
+    stop,
   };
 }

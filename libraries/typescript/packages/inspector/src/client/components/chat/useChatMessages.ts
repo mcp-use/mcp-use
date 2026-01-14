@@ -1,5 +1,5 @@
 import type { AuthConfig, LLMConfig, Message } from "./types";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { hashString } from "./utils";
 
 interface UseChatMessagesProps {
@@ -17,6 +17,7 @@ export function useChatMessages({
 }: UseChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
     async (userInput: string) => {
@@ -33,6 +34,9 @@ export function useChatMessages({
 
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
+
+      // Create abort controller for cancellation
+      abortControllerRef.current = new AbortController();
 
       try {
         // If using OAuth, retrieve tokens from localStorage
@@ -68,6 +72,7 @@ export function useChatMessages({
           headers: {
             "Content-Type": "application/json",
           },
+          signal: abortControllerRef.current.signal,
           body: JSON.stringify({
             mcpServerUrl,
             llmConfig,
@@ -119,6 +124,13 @@ export function useChatMessages({
 
         let buffer = "";
         while (true) {
+
+          // Check for abort
+          if (abortControllerRef.current?.signal.aborted) {
+            await reader.cancel();
+            break;
+          }
+
           const { done, value } = await reader.read();
 
           if (done) break;
@@ -264,6 +276,11 @@ export function useChatMessages({
           }
         }
       } catch (error) {
+        // Don't show Abort Error
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
         // Extract detailed error message with HTTP status
         let errorDetail = "Unknown error occurred";
         if (error instanceof Error) {
@@ -290,6 +307,7 @@ export function useChatMessages({
         setMessages((prev) => [...prev, errorMessage]);
       } finally {
         setIsLoading(false);
+        abortControllerRef.current = null;
       }
     },
     [llmConfig, isConnected, mcpServerUrl, messages, authConfig]
@@ -299,10 +317,17 @@ export function useChatMessages({
     setMessages([]);
   }, []);
 
+  const stop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
   return {
     messages,
     isLoading,
     sendMessage,
     clearMessages,
+    stop,
   };
 }
