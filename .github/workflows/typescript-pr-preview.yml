@@ -145,10 +145,36 @@ jobs:
             fi
           done
 
+      - name: Cache Deno Dependencies
+        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        env:
+          DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
+        run: |
+          echo "Pre-caching Deno dependencies to avoid download timeouts during tests..."
+          MAX_CACHE_RETRIES=3
+          RETRY_DELAY=30
+          
+          for i in $(seq 1 $MAX_CACHE_RETRIES); do
+            echo "Cache attempt $i/$MAX_CACHE_RETRIES..."
+            if deno cache --reload basic-server.test.ts; then
+              echo "✅ Dependencies cached successfully"
+              break
+            fi
+            
+            if [ $i -lt $MAX_CACHE_RETRIES ]; then
+              echo "⚠️ Cache attempt $i failed, retrying in ${RETRY_DELAY}s..."
+              sleep $RETRY_DELAY
+            else
+              echo "⚠️ Failed to cache after $MAX_CACHE_RETRIES attempts"
+              echo "Proceeding with tests anyway - they may download dependencies on demand..."
+            fi
+          done
+
       - name: Run Deno Tests
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
+          DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
         run: |
           echo "Running Deno tests against PR #${{ needs.preview.outputs.pr-number }} preview packages..."
           deno test --no-check --allow-read --allow-env --allow-net
