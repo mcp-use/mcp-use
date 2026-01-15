@@ -315,27 +315,46 @@ class MCPServer(FastMCP):
 
         Args:
             transport: Transport protocol to use ("stdio", "streamable-http" or "sse")
-            host: Host to bind to. If not provided, uses the value from __init__.
+            host: Host to bind to. If provided, overrides __init__ value and reconfigures
+                  DNS rebinding protection accordingly.
             port: Port to bind to. If not provided, uses the value from __init__.
             reload: Whether to enable auto-reload
             debug: Whether to enable debug mode. Overrides the server's debug setting,
                    adds /docs and /openmcp.json endpoints if not already added.
         """
         # Use settings from __init__, run() values override
-        host = host if host is not None else self.settings.host
-        port = port if port is not None else self.settings.port
+        final_host = host if host is not None else self.settings.host
+        final_port = port if port is not None else self.settings.port
+
+        # If host changed, update settings and rebuild app to reconfigure DNS protection
+        if final_host != self.settings.host:
+            self.settings.host = final_host
+            self.settings.port = final_port
+            # Reconfigure transport security based on new host (FastMCP logic)
+            if final_host in ("127.0.0.1", "localhost", "::1"):
+                from mcp.server.transport_security import TransportSecuritySettings
+
+                self.settings.transport_security = TransportSecuritySettings(
+                    enable_dns_rebinding_protection=True,
+                    allowed_hosts=[f"{final_host}:*", "localhost:*", "[::1]:*"],
+                    allowed_origins=[f"http://{final_host}:*", "http://localhost:*", "http://[::1]:*"],
+                )
+            else:
+                self.settings.transport_security = None
+            # Rebuild app with new security settings
+            self.app = self.streamable_http_app()
 
         # Override debug_level if debug=True is passed to run()
         if debug and self.debug_level < 1:
             self.debug_level = 1
 
         self._transport_type = transport
-        track_server_run_from_server(self, transport, host, port, _telemetry)
+        track_server_run_from_server(self, transport, final_host, final_port, _telemetry)
 
         self._wrap_handlers_with_middleware()
 
         runner = ServerRunner(self)
-        runner.run(transport=transport, host=host, port=port, reload=reload, debug=debug)
+        runner.run(transport=transport, host=final_host, port=final_port, reload=reload, debug=debug)
 
     def get_context(self) -> MCPContext:  # type: ignore[override]
         """Use the extended MCP-Use context that adds convenience helpers."""

@@ -48,15 +48,16 @@ server.run(
 ## Host and Port Configuration
 
 You can configure host and port either at initialization or when calling `run()`.
-Values passed to `run()` override those set in `__init__()`:
+Values passed to `run()` override those set in `__init__()`, and DNS rebinding
+protection is automatically reconfigured to match:
 
 ```python
 # Set defaults at initialization
 server = MCPServer(name="My Server", host="0.0.0.0", port=3000)
-server.run()  # Uses host="0.0.0.0", port=3000
+server.run()  # Uses host="0.0.0.0", port=3000, no DNS protection
 
-# Override at runtime
-server.run(host="127.0.0.1", port=8080)  # Overrides to 127.0.0.1:8080
+# Override at runtime - DNS protection is reconfigured automatically
+server.run(host="127.0.0.1", port=8080)  # Switches to localhost with DNS protection
 ```
 
 ### Default Values
