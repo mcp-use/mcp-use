@@ -34,6 +34,14 @@ import type {
   MCPServerConfig,
 } from "./types.js";
 import { createLLMFromString, type LLMConfig } from "./utils/llm_provider.js";
+import {
+  accumulateMessages,
+  detectToolUpdates,
+  extractToolCallsFromMessage,
+  formatObservationForLogging,
+  formatToolInputForLogging,
+  normalizeMessageContent,
+} from "./utils/stream_utils.js";
 
 // Re-export types for convenience
 export type {
@@ -1249,15 +1257,12 @@ export class MCPAgent {
       // Check for tool updates before starting execution (if using server manager)
       if (this.useServerManager && this.serverManager) {
         const currentTools = this.serverManager.tools;
-        const currentToolNames = new Set(currentTools.map((t) => t.name));
-        const existingToolNames = new Set(this._tools.map((t) => t.name));
+        const toolUpdateDetected = detectToolUpdates(currentTools, this._tools);
 
-        if (
-          currentToolNames.size !== existingToolNames.size ||
-          [...currentToolNames].some((n) => !existingToolNames.has(n))
-        ) {
+        if (toolUpdateDetected) {
+          const currentToolNames = currentTools.map((t) => t.name);
           logger.info(
-            `🔄 Tools changed before execution, updating agent. New tools: ${[...currentToolNames].join(", ")}`
+            `🔄 Tools changed before execution, updating agent. New tools: ${currentToolNames.join(", ")}`
           );
           this._tools = currentTools;
           this._tools.push(...this.additionalTools);
@@ -1338,41 +1343,31 @@ export class MCPAgent {
               `📦 Node '${nodeName}' output: ${JSON.stringify(nodeOutput)}`
             );
 
-            // Extract messages from the node output and accumulate them
-            if (
-              nodeOutput &&
-              typeof nodeOutput === "object" &&
-              "messages" in nodeOutput
-            ) {
-              let messages = (nodeOutput as any).messages;
-              if (!Array.isArray(messages)) {
-                messages = [messages];
-              }
-
-              // Add new messages to accumulated messages for potential restart
-              for (const msg of messages) {
-                if (!accumulatedMessages.includes(msg)) {
-                  accumulatedMessages.push(msg);
+              // Extract messages from the node output and accumulate them
+              if (
+                nodeOutput &&
+                typeof nodeOutput === "object" &&
+                "messages" in nodeOutput
+              ) {
+                let messages = (nodeOutput as any).messages;
+                if (!Array.isArray(messages)) {
+                  messages = [messages];
                 }
-              }
+
+                // Add new messages to accumulated messages for potential restart
+                accumulateMessages(messages, accumulatedMessages);
 
               for (const message of messages) {
                 // Track tool calls
-                if (
-                  "tool_calls" in message &&
-                  Array.isArray(message.tool_calls) &&
-                  message.tool_calls.length > 0
-                ) {
-                  for (const toolCall of message.tool_calls) {
-                    const toolName = toolCall.name || "unknown";
-                    const toolInput = toolCall.args || {};
+                const toolCalls = extractToolCallsFromMessage(message);
+                if (toolCalls.length > 0) {
+                  for (const toolCall of toolCalls) {
+                    const toolName = toolCall.name;
+                    const toolInput = toolCall.args;
                     this.toolsUsedNames.push(toolName);
                     stepsTaken++;
 
-                    let toolInputStr = JSON.stringify(toolInput);
-                    if (toolInputStr.length > 100) {
-                      toolInputStr = `${toolInputStr.slice(0, 97)}...`;
-                    }
+                    const toolInputStr = formatToolInputForLogging(toolInput);
                     logger.info(
                       `🔧 Tool call: ${toolName} with input: ${toolInputStr}`
                     );
@@ -1392,31 +1387,21 @@ export class MCPAgent {
                 // Track tool results (ToolMessage)
                 if (this._isToolMessageLike(message)) {
                   const observation = message.content;
-                  let observationStr = String(observation);
-                  if (observationStr.length > 100) {
-                    observationStr = `${observationStr.slice(0, 97)}...`;
-                  }
-                  observationStr = observationStr.replace(/\n/g, " ");
+                  const observationStr = formatObservationForLogging(observation);
                   logger.info(`📄 Tool result: ${observationStr}`);
 
                   // --- Check for tool updates after tool results (safe restart point) ---
                   if (this.useServerManager && this.serverManager) {
                     const currentTools = this.serverManager.tools;
-                    const currentToolNames = new Set(
-                      currentTools.map((t) => t.name)
-                    );
-                    const existingToolNames = new Set(
-                      this._tools.map((t) => t.name)
+                    const toolUpdateDetected = detectToolUpdates(
+                      currentTools,
+                      this._tools
                     );
 
-                    if (
-                      currentToolNames.size !== existingToolNames.size ||
-                      [...currentToolNames].some(
-                        (n) => !existingToolNames.has(n)
-                      )
-                    ) {
+                    if (toolUpdateDetected) {
+                      const currentToolNames = currentTools.map((t) => t.name);
                       logger.info(
-                        `🔄 Tools changed during execution. New tools: ${[...currentToolNames].join(", ")}`
+                        `🔄 Tools changed during execution. New tools: ${currentToolNames.join(", ")}`
                       );
                       this._tools = currentTools;
                       this._tools.push(...this.additionalTools);
@@ -1441,9 +1426,7 @@ export class MCPAgent {
                   this._isAIMessageLike(message) &&
                   !this._messageHasToolCalls(message)
                 ) {
-                  finalOutput = this._normalizeOutput(
-                    this._getMessageContent(message)
-                  );
+                  finalOutput = normalizeMessageContent(message);
                   logger.info("✅ Agent finished with output");
                 }
               }
