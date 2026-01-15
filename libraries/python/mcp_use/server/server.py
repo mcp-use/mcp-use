@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 import mcp.server.lowlevel.server as lowlevel
 import mcp.server.session as mcp_session
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import (
     AnyFunction,
     CallToolRequest,
@@ -67,9 +68,18 @@ class MCPServer(FastMCP):
         openmcp_path: str = "/openmcp.json",
         show_inspector_logs: bool = False,
         pretty_print_jsonrpc: bool = False,
+        host: str = "0.0.0.0",
+        port: int = 8000,
+        transport_security: TransportSecuritySettings | None = None,
     ):
         self._start_time = time.time()
-        super().__init__(name=name or "mcp-use server", instructions=instructions)
+        super().__init__(
+            name=name or "mcp-use server",
+            instructions=instructions,
+            host=host,
+            port=port,
+            transport_security=transport_security,
+        )
 
         if version:
             self._mcp_server.version = version
