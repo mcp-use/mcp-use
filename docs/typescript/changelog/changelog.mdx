@@ -12,7 +12,7 @@ tag: "New"
 
 ### Breaking Changes
 
-- **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+- **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments. See [Server Logging](/typescript/server/logging#migration-from-winston) for migration guide.
 
 ### Browser Runtime Support
 
@@ -51,12 +51,12 @@ tag: "New"
 
 ### RPC Logging
 
-- **New**: Enhanced RPC logging with new `rpc-logger` module and filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+- **New**: Enhanced RPC logging with new `rpc-logger` module and filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams). See [Client Logging](/typescript/client/logging) for usage.
 
 ### Architecture Improvements
 
 - **Refactor**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
-- **Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+- **Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments. See [Server Logging](/typescript/server/logging#built-in-logging-system) for configuration details.
 - **Refactor**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
 - **Refactor**: Updated components across inspector for cleaner architecture and imports
 

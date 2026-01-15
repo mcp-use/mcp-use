@@ -210,64 +210,43 @@ server.get('/api/protected', authenticateJWT, (req, res) => {
 
 ### Logging Configuration
 
-Set up comprehensive logging:
+mcp-use provides a built-in logging system that works in both Node.js and browser environments. The server uses environment variables for log level control.
 
 ```typescript
-import winston from 'winston'
-import morgan from 'morgan'
+import { Logger } from 'mcp-use/server'
 
-// Configure Winston logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    }),
-    new winston.transports.File({
-      filename: 'error.log',
-      level: 'error'
-    }),
-    new winston.transports.File({
-      filename: 'combined.log'
-    })
-  ]
+// Configure logging programmatically
+Logger.configure({
+  level: 'debug',              // Log level: error, warn, info, http, verbose, debug, silly
+  format: 'detailed'           // Format: minimal, detailed, or emoji
 })
 
-// HTTP request logging with Morgan
-const morganFormat = ':method :url :status :response-time ms - :res[content-length]'
+// Or use environment-based configuration
+// DEBUG=0 - Production mode (info level)
+// DEBUG=1 - Debug mode (info level with more details)
+// DEBUG=2 - Verbose mode (debug level with full details)
 
-server.use(morgan(morganFormat, {
-  stream: {
-    write: (message) => logger.info(message.trim())
-  }
-}))
+// Set debug level programmatically
+Logger.setDebug(2)  // Enable verbose logging
 
-// Use logger in tools
-import { text } from 'mcp-use/server';
-
-server.tool({
-  name: 'example_tool',
-  cb: async (params) => {
-    logger.info('Tool executed', { tool: 'example_tool', params })
-
-    try {
-      // Tool logic
-      const result = await performOperation(params)
-      logger.debug('Tool result', { result })
-
-      return text(result)
-    } catch (error) {
-      logger.error('Tool error', { error: error.message, stack: error.stack })
-      throw error
-    }
-  }
-})
+// Change log format
+Logger.setFormat('emoji')  // Use emoji-based format for better visibility
 ```
+
+**Environment Variable Usage:**
+
+```bash
+# Production logging (default)
+node server.js
+
+# Debug mode
+DEBUG=1 node server.js
+
+# Verbose debug with full details
+DEBUG=2 node server.js
+```
+
+For comprehensive logging configuration and log level details, see the [Server Logging](./logging) documentation.
 
 ## Security Configuration
 

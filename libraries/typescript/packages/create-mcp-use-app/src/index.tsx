@@ -1038,7 +1038,10 @@ function copyDirectoryWithProcessing(
     }
 
     const srcPath = join(src, entry.name);
-    const destPath = join(dest, entry.name);
+    // Special handling: rename gitignore to .gitignore
+    // This is necessary because npm excludes .gitignore files when publishing packages
+    const destName = entry.name === "gitignore" ? ".gitignore" : entry.name;
+    const destPath = join(dest, destName);
 
     if (entry.isDirectory()) {
       mkdirSync(destPath, { recursive: true });
