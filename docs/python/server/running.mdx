@@ -18,7 +18,7 @@ server = MCPServer(name="My Server")
 server.run(transport="stdio")
 
 # Run with HTTP transport (for web clients)
-server.run(transport="streamable-http", host="127.0.0.1", port=8000)
+server.run(transport="streamable-http")
 ```
 
 ## Transport Methods
@@ -38,12 +38,59 @@ HTTP-based transport for web clients:
 ```python
 server.run(
     transport="streamable-http",
-    host="127.0.0.1",
+    host="0.0.0.0",
     port=8000,
     reload=False,
     debug=False
 )
 ```
+
+## Host and Port Configuration
+
+You can configure host and port either at initialization or when calling `run()`.
+Values passed to `run()` override those set in `__init__()`:
+
+```python
+# Set defaults at initialization
+server = MCPServer(name="My Server", host="0.0.0.0", port=3000)
+server.run()  # Uses host="0.0.0.0", port=3000
+
+# Override at runtime
+server.run(host="127.0.0.1", port=8080)  # Overrides to 127.0.0.1:8080
+```
+
+### Default Values
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `host` | `"0.0.0.0"` | Bind address. Use `"127.0.0.1"` for local-only access |
+| `port` | `8000` | Port number |
+
+## Cloud and Proxy Deployments
+
+When deploying behind reverse proxies (Cloudflare, nginx, Fly.io, etc.), the server
+automatically configures DNS rebinding protection based on the host:
+
+- **`host="0.0.0.0"`** (default): DNS rebinding protection is **disabled**, allowing
+  any Host header. This is safe when your proxy handles host validation.
+
+- **`host="127.0.0.1"`**: DNS rebinding protection is **enabled**, only allowing
+  requests with `Host: 127.0.0.1:*` or `Host: localhost:*`.
+
+```python
+# Cloud deployment (behind proxy) - default, no DNS protection
+server = MCPServer(name="My Server")
+server.run(transport="streamable-http")
+
+# Local development - auto-enables DNS protection
+server = MCPServer(name="My Server", host="127.0.0.1")
+server.run(transport="streamable-http")
+```
+
+<Warning>
+If you get **421 Misdirected Request** errors behind a proxy, ensure you're using
+`host="0.0.0.0"` (the default).
+</Warning>
 
 ## Debug Mode
 
@@ -55,6 +102,7 @@ server = MCPServer(name="My Server", debug=True)
 # Debug mode enables:
 # - /openmcp.json endpoint
 # - /docs endpoint
+# - /inspector endpoint
 # - Enhanced logging
 server.run(transport="streamable-http", debug=True)
 ```
@@ -70,10 +118,14 @@ server.run(transport="streamable-http", reload=True)
 ## Production Configuration
 
 ```python
-server.run(
-    transport="streamable-http",
+server = MCPServer(
+    name="My Server",
     host="0.0.0.0",
     port=8000,
+)
+
+server.run(
+    transport="streamable-http",
     reload=False,
     debug=False
 )

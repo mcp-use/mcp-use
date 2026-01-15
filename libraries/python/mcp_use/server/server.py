@@ -67,9 +67,36 @@ class MCPServer(FastMCP):
         openmcp_path: str = "/openmcp.json",
         show_inspector_logs: bool = False,
         pretty_print_jsonrpc: bool = False,
+        host: str = "0.0.0.0",
+        port: int = 8000,
     ):
+        """Initialize an MCP server.
+
+        Args:
+            name: Server name for identification
+            version: Server version string
+            instructions: Instructions for the AI model using this server
+            middleware: List of middleware to apply to requests
+            debug: Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints)
+            mcp_path: Path for MCP endpoint (default: "/mcp")
+            docs_path: Path for documentation endpoint (default: "/docs")
+            inspector_path: Path for inspector UI (default: "/inspector")
+            openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
+            show_inspector_logs: Show inspector-related logs
+            pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
+            host: Default host for server binding. Also controls DNS rebinding protection:
+                  - "0.0.0.0" (default): Disables DNS protection, suitable for cloud/proxy deployments
+                  - "127.0.0.1": Enables DNS protection, suitable for local development
+                  Can be overridden in run().
+            port: Default port for server binding (default: 8000). Can be overridden in run().
+        """
         self._start_time = time.time()
-        super().__init__(name=name or "mcp-use server", instructions=instructions)
+        super().__init__(
+            name=name or "mcp-use server",
+            instructions=instructions,
+            host=host,
+            port=port,
+        )
 
         if version:
             self._mcp_server.version = version
@@ -279,8 +306,8 @@ class MCPServer(FastMCP):
     def run(  # type: ignore[override]
         self,
         transport: TransportType = "streamable-http",
-        host: str = "127.0.0.1",
-        port: int = 8000,
+        host: str | None = None,
+        port: int | None = None,
         reload: bool = False,
         debug: bool = False,
     ) -> None:
@@ -288,12 +315,16 @@ class MCPServer(FastMCP):
 
         Args:
             transport: Transport protocol to use ("stdio", "streamable-http" or "sse")
-            host: Host to bind to
-            port: Port to bind to
+            host: Host to bind to. If not provided, uses the value from __init__.
+            port: Port to bind to. If not provided, uses the value from __init__.
             reload: Whether to enable auto-reload
             debug: Whether to enable debug mode. Overrides the server's debug setting,
                    adds /docs and /openmcp.json endpoints if not already added.
         """
+        # Use settings from __init__, run() values override
+        host = host if host is not None else self.settings.host
+        port = port if port is not None else self.settings.port
+
         # Override debug_level if debug=True is passed to run()
         if debug and self.debug_level < 1:
             self.debug_level = 1
