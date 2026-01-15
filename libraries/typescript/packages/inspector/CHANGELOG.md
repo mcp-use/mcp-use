@@ -1,5 +1,36 @@
 # @mcp-use/inspector
 
+## 0.15.0
+
+### Minor Changes
+
+- 0144a31: feat(inspector): add stop functionality to inspector chat
+  - Export stop function from `useChatMessagesClientSide` hook and connect it to `abortControllerRef`
+  - Add `abortControllerRef` to `useChatMessages` hook
+  - Connect stop button to abort streaming responses
+  - Enable users to stop ongoing chat responses in the inspector
+
+  Co-authored-by: Joaquin Coromina <bjoaquinc@users.noreply.github.com>
+
+### Patch Changes
+
+- 0144a31: Updated dependency `hono` to `^4.11.4`.
+- 0144a31: feat(cli): enhance login and deployment commands
+  - Updated the login command to handle errors gracefully
+  - Modified the deployment command to prompt users for login if not authenticated
+  - Removed the `fromSource` option from the deployment command
+  - Added checks for uncommitted changes in the git repository before deployment
+  - Updated various commands to consistently use `npx mcp-use login` for login instructions
+
+  refactor(inspector, multi-server-example): authentication UI and logic
+  - Simplified the authentication button logic in InspectorDashboard
+  - Updated the multi-server example to directly link to the authentication URL
+
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+  - mcp-use@1.13.2
+
 ## 0.15.0-canary.1
 
 ### Patch Changes

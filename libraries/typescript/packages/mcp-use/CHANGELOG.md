@@ -1,5 +1,28 @@
 # mcp-use
 
+## 1.13.2
+
+### Patch Changes
+
+- 0144a31: Updated dependency `hono` to `^4.11.4`.
+- 0144a31: chore(docs): update documentation with the latest release notes
+- 0144a31: feat(cli): enhance login and deployment commands
+  - Updated the login command to handle errors gracefully
+  - Modified the deployment command to prompt users for login if not authenticated
+  - Removed the `fromSource` option from the deployment command
+  - Added checks for uncommitted changes in the git repository before deployment
+  - Updated various commands to consistently use `npx mcp-use login` for login instructions
+
+  refactor(inspector, multi-server-example): authentication UI and logic
+  - Simplified the authentication button logic in InspectorDashboard
+  - Updated the multi-server example to directly link to the authentication URL
+
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+  - @mcp-use/inspector@0.15.0
+  - @mcp-use/cli@2.10.0
+
 ## 1.13.2-canary.1
 
 ### Patch Changes
