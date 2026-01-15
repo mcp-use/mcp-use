@@ -6,6 +6,141 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.13.2" description="January 2026">
+  ## Dependency Updates & CLI Enhancements
+  Minor release with dependency updates and CLI improvements for deployment workflows.
+
+- **Fix**: Updated dependency `hono` to 4.11.4
+- **Enhancement**: CLI login command with improved error handling and user feedback
+- **Enhancement**: CLI deployment command now prompts for login if not authenticated
+- **Enhancement**: Added git uncommitted changes check before deployment
+- **Fix**: Removed `fromSource` option from CLI deployment command
+- **Enhancement**: Simplified authentication UI in Inspector
+  </Update>
+
+<Update label="v1.13.1" description="January 2026">
+  ## Edge Runtime Fix
+  Patch release improving edge runtime compatibility.
+
+- **Fix**: Enable JSON response in stateless mode for edge runtimes (Deno, Cloudflare Workers)
+- **Enhancement**: Improved reliability of API in various deployment scenarios
+  </Update>
+
+<Update label="v1.13.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.13.0&title=Hot%20Module%20Reloading%20%26%20OAuth%20Enhancements&date=2026-01&lang=typescript" alt="Release 1.13.0" />
+  </Frame>
+  ## Hot Module Reloading & OAuth Enhancements
+  Release introducing Hot Module Reloading for development and enhanced OAuth capabilities.
+
+### Hot Module Reloading (HMR)
+
+- **New**: HMR support for `mcp-use dev` command - tools, prompts, and resources update instantly without server restart
+- **New**: Connected clients receive `list_changed` notifications and auto-refresh
+- **New**: Syntax errors during reload caught gracefully without crashing server
+- **New**: Comprehensive test suite for HMR functionality with integration tests
+- **Enhancement**: CLI uses `chokidar` to watch file changes with automatic module re-import
+- **Enhancement**: Session persistence during HMR - no client disconnections
+
+### OAuth & Client Info
+
+- **New**: Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+- **New**: `clientInfo` configuration prop for OAuth registration with client metadata (name, version, icons, website)
+- **New**: Server metadata caching with `CachedServerMetadata` interface for instant display on reconnect
+- **Enhancement**: OAuth metadata URL rewriting from gateway URLs to actual server URLs
+- **Enhancement**: Client info displayed on OAuth consent pages
+- **Enhancement**: Extended `StorageProvider` interface with metadata methods
+
+### Inspector & Favicon
+
+- **Enhancement**: Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com)
+- **Enhancement**: Detection of default vs custom favicons using JSON API response
+- **Enhancement**: Improved logging middleware for API routes
+- **Enhancement**: X-Forwarded-Host support for proxy URL construction in dev
+
+### Bug Fixes
+
+- **Fix**: Remove import from "mcp-use" which causes langchain import in server
+- **Fix**: Enhanced synchronization for tools, prompts, and resources during HMR
+  </Update>
+
+<Update label="v1.12.4" description="January 2026">
+  ## Connection Fix
+  Patch release fixing autoconnect configuration parsing.
+
+- **Fix**: Autoconnect now correctly parses config objects in addition to string URLs
+  </Update>
+
+<Update label="v1.12.3" description="January 2026">
+  ## Security Fixes & OAuth Improvements
+  Patch release addressing multiple security vulnerabilities and fixing OAuth flow issues.
+
+### Security Fixes
+
+- **Security**: Fixed 13 vulnerabilities (3 moderate, 10 high)
+- **Security**: Updated `langchain` to 1.2.3 (fixes serialization injection vulnerability)
+- **Security**: Updated `@langchain/core` to 1.1.8 (fixes serialization injection vulnerability)
+- **Security**: Updated `react-router` to 7.12.0 (fixes XSS and CSRF vulnerabilities)
+- **Security**: Added override for `qs` to >=6.14.1 (fixes DoS vulnerability)
+- **Security**: Added override for `preact` to >=10.28.2 (fixes JSON VNode injection)
+
+### OAuth & Connection Improvements
+
+- **Fix**: Resolved OAuth flow looping issue by removing duplicate fallback logic
+- **Enhancement**: Simplified connection handling with consolidated state management
+- **Enhancement**: Enhanced OAuth authentication flow with improved connection settings
+- **Enhancement**: Improved auto-connect functionality with better proxy handling and error management
+- **Enhancement**: Enhanced theme toggling with dropdown menu for better UX and accessibility
+  </Update>
+
+<Update label="v1.12.2" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.12.2&title=Automatic%20Proxy%20Fallback%20%26%20API%20Improvements&date=2026-01&lang=typescript" alt="Release 1.12.2" />
+  </Frame>
+  ## Automatic Proxy Fallback & API Improvements
+  Release with automatic proxy fallback, OAuth proxy support, and API naming improvements.
+
+### Breaking Changes (with Deprecation Warnings)
+
+- **Breaking**: Renamed `customHeaders` to `headers` across all APIs for consistency. Old name still works but shows deprecation warnings.
+- **Breaking**: Renamed `samplingCallback` to `onSampling` for consistency with event handler patterns. Old name still works but shows deprecation warnings.
+- **Deprecated**: `clientConfig` option in favor of deriving configuration from `clientInfo`
+
+### New Features
+
+- **New**: Automatic Proxy Fallback - `autoProxyFallback` option automatically retries failed connections through proxy on CORS/4xx errors
+- **New**: Provider-level proxy defaults with `defaultProxyConfig` and `defaultAutoProxyFallback` props in `McpClientProvider`
+- **New**: OAuth Proxy Support - `oauthProxyUrl` configuration to route OAuth discovery and token requests through backend proxy
+- **New**: Configurable `clientInfo` for MCP connection initialization with full metadata (name, title, version, description, icons, website URL)
+- **New**: Reconnect functionality for failed connections with reconnect button in Inspector UI
+
+### Improvements
+
+- **Enhancement**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+- **Enhancement**: OAuth provider uses original target URL for discovery, not proxy URL
+- **Enhancement**: Improved session cleanup to avoid noisy warning logs
+- **Enhancement**: Type safety with deprecation notices in TypeScript types
+- **Enhancement**: Proxy header support - `proxyConfig` now accepts a `headers` field for custom headers
+
+### Bug Fixes
+
+- **Fix**: Custom headers now correctly included when copying connection configuration from saved tiles
+- **Fix**: HttpConnector automatic reconnection disabled, shifting responsibility to higher-level logic
+
+### Refactoring
+
+- **Refactor**: Removed `oauth-helper.ts` (521 lines), consolidated into `browser-provider.ts`
+- **Refactor**: Major `useMcp` hook refactor with automatic retry, better error handling, and proxy fallback support
+  </Update>
+
+<Update label="v1.12.1" description="January 2026">
+  ## Security Update
+  Patch release with security fixes and build improvements.
+
+- **Security**: Updated `@modelcontextprotocol/sdk` to 1.25.2 (fixes ReDoS vulnerability in UriTemplate regex patterns)
+- **Fix**: Updated building script to correctly export types for inspector/client components
+  </Update>
+
 <Update label="v1.12.0" description="January 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.12.0&title=Browser%20Compatibility%20%26%20Multi-Server%20Support&date=2026-01&lang=typescript" alt="Release 1.12.0" />
@@ -79,7 +214,7 @@ tag: "New"
 
 - **New**: Added troubleshooting section for Zod version conflicts in Supabase deployment
 - **Enhancement**: Updated Supabase deployment documentation with improved compatibility information
-</Update>
+  </Update>
 
 <Update label="v1.11.2" description="December 2025">
   ## Documentation Updates - **Enhancement**: Updated examples and documentation
@@ -95,7 +230,7 @@ tag: "New"
     <img src="https://mcp-use.com/api/og/release?v=1.11.0&title=Session%20Management%20Architecture%20%26%20CLI%20Client&date=2025-12&lang=typescript" alt="Release 1.11.0" />
   </Frame>
   ## Session Management Architecture & CLI Client
-  Major release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
+  Release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
 
 ### Breaking Changes
 
@@ -188,7 +323,7 @@ tag: "New"
 - **Fix**: Import paths in CLI to avoid mixing dependencies
 - **Fix**: UUID generation and URL handling improvements
 - **Fix**: Various formatting and linting improvements
-</Update>
+  </Update>
 
 <Update label="v1.10.0" description="December 2025">
   <Frame>
@@ -230,7 +365,7 @@ tag: "New"
 - **Fix**: Clear transport when session becomes idle
 - **Fix**: Allow agent to access resources and prompts
 - **Enhancement**: Added repository metadata in package.json
-</Update>
+  </Update>
 
 <Update label="v1.9.0" description="December 2025">
   <Frame>
@@ -247,7 +382,7 @@ tag: "New"
 - **Enhancement**: Type-safe return types automatically inferred from Zod schemas
 - **Enhancement**: Configurable timeout with 5-minute default for user interactions
 - **Fix**: Transport bug fixes
-</Update>
+  </Update>
 
 <Update label="v1.8.0" description="November 2025">
   <Frame>
@@ -259,7 +394,7 @@ tag: "New"
 - **New**: LLM sampling capabilities in inspector
 - **Fix**: Long running sampling requests no longer timeout after 60 seconds
 - **Enhancement**: Better handling of extended sampling operations
-</Update>
+  </Update>
 
 <Update label="v1.7.0" description="November 2025">
   <Frame>
@@ -280,7 +415,7 @@ tag: "New"
 - **Enhancement**: Better authentication flow handling with OAuth integration
 - **Enhancement**: Enhanced HTTP connectors with OAuth token handling
 - **Fix**: Dependency optimizations and AI SDK updates
-</Update>
+  </Update>
 
 <Update label="v1.6.0" description="November 2025">
   <Frame>
@@ -301,14 +436,14 @@ tag: "New"
 - **Enhancement**: Server methods for session management and targeted notifications
 - **Enhancement**: Enhanced search_tools with metadata (total_tools, namespaces, result_count)
 - **Enhancement**: RPC message logging support in inspector
-</Update>
+  </Update>
 
 <Update label="v1.5.0" description="October 2025">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.5.0&title=OpenAI%20Apps%20SDK%20Integration&date=2025-10&lang=typescript" alt="Release 1.5.0" />
   </Frame>
   ## OpenAI Apps SDK Integration
-  Major release with comprehensive OpenAI Apps SDK support and widget system.
+  Release with comprehensive OpenAI Apps SDK support and widget system.
 
 - **New**: McpUseProvider component combining React setup (StrictMode, ThemeProvider, BrowserRouter, ErrorBoundary)
 - **New**: WidgetControls component with debug overlay and view controls (fullscreen, PIP)
@@ -326,7 +461,7 @@ tag: "New"
 - **Enhancement**: Enhanced tool result display with multiple content types
 - **Enhancement**: Resizable panels with collapse support
 - **Enhancement**: Better widget security headers and CSP configuration
-</Update>
+  </Update>
 
 <Update label="v1.4.0" description="October 2025">
   <Frame>
@@ -341,7 +476,7 @@ tag: "New"
 - **New**: CodeModeConnector for tool discovery and execution
 - **Enhancement**: Enhanced MCPClient with code execution configuration
 - **Enhancement**: Comprehensive tests for code execution functionality
-</Update>
+  </Update>
 
 <Update label="v1.3.0" description="October 2025">
   <Frame>
@@ -359,7 +494,7 @@ tag: "New"
 - **Enhancement**: Fixed server base URL handling for proper connection and routing
 - **Enhancement**: Better auto-connection logic with error handling and retry mechanisms
 - **Enhancement**: Enhanced useMcp hook with improved connection state management
-</Update>
+  </Update>
 
 <Update label="v1.2.0" description="October 2025">
   <Frame>
@@ -372,7 +507,7 @@ tag: "New"
 - **Fix**: Model type compatibility for LangChain 1.0.0
 - **Fix**: Apps SDK metadata setup from widget build
 - **Enhancement**: Set CLI and inspector as dependencies
-</Update>
+  </Update>
 
 <Update label="v1.1.0" description="October 2025">
   <Frame>
@@ -388,4 +523,4 @@ tag: "New"
 - **Enhancement**: Comprehensive test suite for Apps SDK resources
 - **Refactor**: Renamed `fn` to `cb` in tool and prompt definitions for consistency
 - **Refactor**: Updated resource definitions to use `readCallback`
-</Update>
+  </Update>
