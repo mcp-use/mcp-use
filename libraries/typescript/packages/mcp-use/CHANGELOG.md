@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.13.2-canary.1
+
+### Patch Changes
+
+- 7b137c2: chore(docs): update documentation with the latest release notes
+  - @mcp-use/cli@2.10.0-canary.1
+  - @mcp-use/inspector@0.15.0-canary.1
+
 ## 1.13.2-canary.0
 
 ### Patch Changes
