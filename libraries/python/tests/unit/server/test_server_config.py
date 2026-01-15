@@ -74,8 +74,10 @@ class TestRunHostOverride:
 
         server = MCPServer(name="test-server", host="0.0.0.0")
         # Initially no DNS protection
-        assert server.settings.transport_security is None or \
-               server.settings.transport_security.enable_dns_rebinding_protection is False
+        assert (
+            server.settings.transport_security is None
+            or server.settings.transport_security.enable_dns_rebinding_protection is False
+        )
 
         # Mock ServerRunner to prevent actual server start
         with patch("mcp_use.server.server.ServerRunner"):
