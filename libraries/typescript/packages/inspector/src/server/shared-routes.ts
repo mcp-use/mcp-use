@@ -649,4 +649,108 @@ export function registerInspectorRoutes(
       },
     });
   });
+
+  // ========================================================================
+  // MCP Apps (SEP-1865) Routes
+  // ========================================================================
+
+  // MCP Apps widget storage endpoint
+  app.post("/inspector/api/mcp-apps/widget/store", async (c) => {
+    try {
+      const body = await c.req.json();
+      const { serverId, resourceUri, toolId, toolName, cspMode } = body;
+
+      if (!serverId || !resourceUri || !toolId || !toolName) {
+        return c.json(
+          { success: false, error: "Missing required fields" },
+          400
+        );
+      }
+
+      // Store MCP Apps widget data using shared utility
+      const result = storeWidgetData({
+        ...body,
+        protocol: "mcp-apps",
+        cspMode: cspMode || "permissive",
+      });
+
+      return c.json(result);
+    } catch (error) {
+      console.error("[MCP Apps] Error storing widget data:", error);
+      return c.json(formatErrorResponse(error, "storeMcpAppsWidget"), 500);
+    }
+  });
+
+  // MCP Apps widget content endpoint - serves widget HTML with CSP metadata
+  app.get("/inspector/api/mcp-apps/widget-content/:toolId", async (c) => {
+    try {
+      const toolId = c.req.param("toolId");
+      const cspModeParam = c.req.query("csp_mode") as
+        | "permissive"
+        | "widget-declared"
+        | undefined;
+
+      const widgetData = getWidgetData(toolId);
+
+      if (!widgetData) {
+        return c.json({ error: "Widget data not found or expired" }, 404);
+      }
+
+      // Use query param override if provided, otherwise use stored mode
+      const effectiveCspMode =
+        cspModeParam || widgetData.cspMode || "permissive";
+
+      // Return JSON with HTML and metadata for CSP enforcement
+      c.header("Cache-Control", "no-cache, no-store, must-revalidate");
+      return c.json({
+        html: widgetData.html || "",
+        csp: widgetData.csp,
+        permissions: widgetData.permissions,
+        permissive: effectiveCspMode === "permissive",
+        cspMode: effectiveCspMode,
+        prefersBorder: widgetData.prefersBorder !== false,
+        mimeType: widgetData.mimeType,
+        mimeTypeValid: widgetData.mimeType === "text/html;profile=mcp-app",
+        mimeTypeWarning:
+          widgetData.mimeType !== "text/html;profile=mcp-app"
+            ? `Invalid mimetype "${widgetData.mimeType || "missing"}" - SEP-1865 requires "text/html;profile=mcp-app"`
+            : null,
+      });
+    } catch (error) {
+      console.error("[MCP Apps] Error fetching widget content:", error);
+      return c.json(formatErrorResponse(error, "getMcpAppsContent"), 500);
+    }
+  });
+
+  // Sandbox proxy endpoint - serves the double-iframe sandbox HTML
+  app.get("/inspector/api/sandbox-proxy", async (c) => {
+    try {
+      // Import the sandbox proxy HTML
+      const { readFile } = await import("fs/promises");
+      const { join, dirname } = await import("path");
+      const { fileURLToPath } = await import("url");
+
+      // Get the path to the sandbox-proxy.html file
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      const sandboxProxyPath = join(__dirname, "sandbox-proxy.html");
+
+      const html = await readFile(sandboxProxyPath, "utf-8");
+
+      // Set permissive CSP for the sandbox proxy itself
+      c.header(
+        "Content-Security-Policy",
+        "default-src 'self'; img-src * data: blob: 'unsafe-inline'; media-src * blob: data:; font-src * blob: data:; script-src * 'wasm-unsafe-eval' 'unsafe-inline' 'unsafe-eval' blob: data:; style-src * blob: data: 'unsafe-inline'; connect-src * data: blob: about:; frame-src * blob: data: http://localhost:* https://localhost:* http://127.0.0.1:* https://127.0.0.1:*;"
+      );
+      c.header("Cache-Control", "no-cache, no-store, must-revalidate");
+
+      return c.html(html);
+    } catch (error) {
+      console.error("[MCP Apps] Error serving sandbox proxy:", error);
+      return c.html(
+        "<html><body>Error: Failed to load sandbox proxy</body></html>",
+        500
+      );
+    }
+  });
 }

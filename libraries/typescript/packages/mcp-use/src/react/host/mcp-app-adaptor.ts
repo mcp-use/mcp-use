@@ -44,7 +44,7 @@ interface McpAppToolResultParams {
 interface McpAppHostContext {
   theme?: "light" | "dark";
   locale?: string;
-  displayMode?: "inline" | "fullscreen" | "picture-in-picture";
+  displayMode?: "inline" | "fullscreen" | "pip";
   viewport?: {
     maxHeight?: number;
     maxWidth?: number;
@@ -85,7 +85,7 @@ interface McpApp {
     logger?: string;
   }): Promise<void>;
   requestDisplayMode(params: {
-    mode: "inline" | "fullscreen" | "picture-in-picture";
+    mode: "inline" | "fullscreen" | "pip";
   }): Promise<{ mode: string }>;
   sendSizeChanged(params: { width?: number; height?: number }): Promise<void>;
   getHostContext(): McpAppHostContext | undefined;
@@ -155,6 +155,13 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
       };
 
       this.app.ontoolresult = (params) => {
+        console.log("[McpAppAdaptor] ontoolresult received params:", params);
+        console.log("[McpAppAdaptor] params._meta:", params._meta);
+        console.log(
+          "[McpAppAdaptor] params.structuredContent:",
+          params.structuredContent
+        );
+        console.log("[McpAppAdaptor] params.content:", params.content);
         this.state.toolResult = params;
         this.notifyListeners();
       };
@@ -208,7 +215,13 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
   }
 
   getToolResponseMetadata<T>(): T | null {
-    return (this.state.toolResult?._meta as T | null) ?? null;
+    const metadata = (this.state.toolResult?._meta as T | null) ?? null;
+    console.log(
+      "[McpAppAdaptor] getToolResponseMetadata called, returning:",
+      metadata
+    );
+    console.log("[McpAppAdaptor] Full toolResult:", this.state.toolResult);
+    return metadata;
   }
 
   getWidgetState<T>(): T | null {
@@ -221,7 +234,8 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
 
   getDisplayMode(): DisplayMode {
     const mode = this.state.hostContext.displayMode;
-    if (mode === "picture-in-picture") return "pip";
+    // MCP Apps spec uses "pip" (not "picture-in-picture")
+    if (mode === "pip") return "pip";
     if (mode === "fullscreen") return "fullscreen";
     return "inline";
   }
@@ -314,25 +328,11 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
       throw new Error("MCP App not initialized");
     }
 
-    // Map mcp-use display modes to MCP Apps modes
-    const mcpMode =
-      mode === "pip"
-        ? "picture-in-picture"
-        : mode === "fullscreen"
-          ? "fullscreen"
-          : "inline";
+    // MCP Apps spec uses "pip" not "picture-in-picture"
+    // DisplayMode type already matches: "inline" | "fullscreen" | "pip"
+    const result = await this.app.requestDisplayMode({ mode });
 
-    const result = await this.app.requestDisplayMode({ mode: mcpMode });
-
-    // Map back to mcp-use display mode
-    const resultMode =
-      result.mode === "picture-in-picture"
-        ? "pip"
-        : result.mode === "fullscreen"
-          ? "fullscreen"
-          : "inline";
-
-    return { mode: resultMode as DisplayMode };
+    return { mode: result.mode as DisplayMode };
   }
 
   async setWidgetState<T>(state: T): Promise<void> {

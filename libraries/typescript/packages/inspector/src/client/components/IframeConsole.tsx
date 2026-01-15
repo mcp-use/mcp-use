@@ -185,7 +185,12 @@ export function IframeConsole({
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{errorCount + warnCount} console logs from the iframe</p>
+            <p>
+              {logs.length} console log{logs.length !== 1 ? "s" : ""} from the
+              iframe
+              {(errorCount > 0 || warnCount > 0) &&
+                ` (${errorCount} errors, ${warnCount} warnings)`}
+            </p>
           </TooltipContent>
         </Tooltip>
       </SheetTrigger>

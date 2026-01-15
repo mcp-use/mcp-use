@@ -779,20 +779,30 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         successfulTransportRef.current = transportTypeParam;
 
         // Set up connection health monitoring
-        // This detects when the SSE stream is broken (e.g., server restart) and triggers reconnection
+        // This detects when the transport is closed (e.g., SSE stream broken, server restart) and triggers reconnection
         const setupConnectionMonitoring = () => {
-          let healthCheckInterval: NodeJS.Timeout | null = null;
-          let lastSuccessfulCheck = Date.now();
-          const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
-          const HEALTH_CHECK_TIMEOUT = 30000; // Consider dead after 30 seconds of no response
+          // Access the transport from the connector's client
+          const transport = (session.connector as any)?.client?._transport;
 
-          const checkConnectionHealth = async () => {
-            if (!isMountedRef.current || stateRef.current !== "ready") {
-              if (healthCheckInterval) {
-                clearInterval(healthCheckInterval);
-                healthCheckInterval = null;
-              }
-              return;
+          if (!transport) {
+            addLog("debug", "No transport found for connection monitoring");
+            return () => {};
+          }
+
+          // Store original handlers to preserve them
+          const originalOnClose = transport.onclose;
+          const originalOnError = transport.onerror;
+
+          // Set up close handler
+          transport.onclose = () => {
+            addLog(
+              "warn",
+              "Transport closed unexpectedly, attempting to reconnect..."
+            );
+
+            // Call original handler if it exists
+            if (originalOnClose) {
+              originalOnClose();
             }
 
             try {
@@ -814,53 +824,51 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             } catch (err) {
               const timeSinceLastSuccess = Date.now() - lastSuccessfulCheck;
 
-              // If we haven't had a successful check in a while, consider connection dead
-              if (timeSinceLastSuccess > HEALTH_CHECK_TIMEOUT) {
-                addLog(
-                  "warn",
-                  `Connection appears to be broken (no response for ${Math.round(timeSinceLastSuccess / 1000)}s), attempting to reconnect...`
-                );
+              // Trigger reconnection if autoReconnect is enabled
+              if (
+                autoReconnectRef.current &&
+                isMountedRef.current &&
+                stateRef.current === "ready"
+              ) {
+                setState("discovering");
+                addLog("info", "Auto-reconnecting to MCP server...");
 
-                if (healthCheckInterval) {
-                  clearInterval(healthCheckInterval);
-                  healthCheckInterval = null;
-                }
-
-                // Trigger reconnection if autoReconnect is enabled
-                if (autoReconnectRef.current && isMountedRef.current) {
-                  setState("discovering");
-                  addLog("info", "Auto-reconnecting to MCP server...");
-
-                  // Small delay before reconnecting
-                  setTimeout(
-                    () => {
-                      if (
-                        isMountedRef.current &&
-                        stateRef.current === "discovering"
-                      ) {
-                        connect();
-                      }
-                    },
-                    typeof autoReconnectRef.current === "number"
-                      ? autoReconnectRef.current
-                      : DEFAULT_RECONNECT_DELAY
-                  );
-                }
-              }
+              // Small delay before reconnecting
+              setTimeout(
+                () => {
+                  if (
+                    isMountedRef.current &&
+                    stateRef.current === "discovering"
+                  ) {
+                    connect();
+                  }
+                },
+                typeof autoReconnectRef.current === "number"
+                  ? autoReconnectRef.current
+                  : DEFAULT_RECONNECT_DELAY
+              );
             }
           };
 
-          // Start health check interval
-          healthCheckInterval = setInterval(
-            checkConnectionHealth,
-            HEALTH_CHECK_INTERVAL
-          );
+          // Set up error handler
+          transport.onerror = (error: Error) => {
+            addLog("warn", "Transport error occurred:", error);
+
+            // Call original handler if it exists
+            if (originalOnError) {
+              originalOnError(error);
+            }
+
+            // Note: We don't trigger reconnection on error alone,
+            // only when the transport actually closes
+          };
 
           // Return cleanup function
           return () => {
-            if (healthCheckInterval) {
-              clearInterval(healthCheckInterval);
-              healthCheckInterval = null;
+            // Restore original handlers
+            if (transport) {
+              transport.onclose = originalOnClose;
+              transport.onerror = originalOnError;
             }
           };
         };

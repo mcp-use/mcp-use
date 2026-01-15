@@ -190,15 +190,19 @@ export function useWidget<
 
   // Extract widget props from toolResponseMetadata["mcp-use/props"]
   const widgetProps = useMemo(() => {
+    console.log("[useWidget] toolResponseMetadata:", toolResponseMetadata);
     if (toolResponseMetadata && typeof toolResponseMetadata === "object") {
       const metaProps = (toolResponseMetadata as Record<string, unknown>)[
         "mcp-use/props"
       ];
+      console.log("[useWidget] extracted mcp-use/props:", metaProps);
       if (metaProps) {
         return metaProps as TProps;
       }
     }
-    return defaultProps || ({} as TProps);
+    const result = defaultProps || ({} as TProps);
+    console.log("[useWidget] using default props:", result);
+    return result;
   }, [toolResponseMetadata, defaultProps]);
 
   // Compute MCP server base URL

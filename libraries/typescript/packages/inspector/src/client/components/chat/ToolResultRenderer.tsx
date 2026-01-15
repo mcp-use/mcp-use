@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { MCPUIResource } from "./MCPUIResource";
+import { MCPAppsRenderer } from "./MCPAppsRenderer";
 import { Spinner } from "../ui/spinner";
+import {
+  detectUIType,
+  getUIResourceUri,
+  UIType,
+} from "@/client/utils/mcpAppsUtils";
 
 interface ToolResultRendererProps {
   toolName: string;
@@ -10,10 +16,16 @@ interface ToolResultRendererProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
+  toolsMetadata?: Record<string, Record<string, unknown>>;
+  onCallTool?: (
+    toolName: string,
+    params: Record<string, unknown>
+  ) => Promise<unknown>;
+  onSendFollowUp?: (text: string) => void;
 }
 
 /**
- * Renders tool results - handles both OpenAI Apps SDK components and MCP-UI resources
+ * Renders tool results - handles MCP Apps, OpenAI Apps SDK, and MCP-UI resources
  */
 export function ToolResultRenderer({
   toolName,
@@ -22,6 +34,9 @@ export function ToolResultRenderer({
   serverId,
   readResource,
   toolMeta,
+  toolsMetadata,
+  onCallTool,
+  onSendFollowUp,
 }: ToolResultRendererProps) {
   const [resourceData, setResourceData] = useState<any>(null);
 
@@ -30,6 +45,7 @@ export function ToolResultRenderer({
     console.log("[ToolResultRenderer] Rendering:", {
       toolName,
       hasToolMeta: !!toolMeta,
+      uiResourceUri: toolMeta?.ui,
       outputTemplate: toolMeta?.["openai/outputTemplate"],
       hasResult: !!result,
       hasServerId: !!serverId,
@@ -50,12 +66,18 @@ export function ToolResultRenderer({
     return result;
   }, [result]);
 
+  // Detect UI type using detection utilities (MCP Apps → OpenAI SDK → MCP-UI)
+  const uiType = useMemo(
+    () => detectUIType(toolMeta, parsedResult),
+    [toolMeta, parsedResult]
+  );
+
   // Check if this is an OpenAI Apps SDK tool by checking tool metadata
   // (The tool definition has openai/outputTemplate in its _meta)
-  const isAppsSdkTool = useMemo(
-    () => !!toolMeta?.["openai/outputTemplate"],
-    [toolMeta]
-  );
+  const isAppsSdkTool = useMemo(() => uiType === UIType.OPENAI_SDK, [uiType]);
+
+  // Check if this is an MCP Apps tool
+  const isMcpAppsTool = useMemo(() => uiType === UIType.MCP_APPS, [uiType]);
 
   // Check if the result content has the Apps SDK resource embedded
   const hasAppsSdkComponent = useMemo(
@@ -128,6 +150,30 @@ export function ToolResultRenderer({
         });
     }
   }, [extractedResource, isAppsSdkTool, toolMeta, readResource]);
+
+  // Render MCP Apps component (priority over OpenAI SDK)
+  if (isMcpAppsTool && serverId && readResource) {
+    const resourceUri = getUIResourceUri(uiType, toolMeta, parsedResult);
+    if (resourceUri) {
+      return (
+        <MCPAppsRenderer
+          serverId={serverId}
+          toolCallId={`${toolName}-${Date.now()}`}
+          toolName={toolName}
+          toolState="output-available"
+          toolInput={toolArgs}
+          toolOutput={parsedResult}
+          resourceUri={resourceUri}
+          toolMetadata={toolMeta}
+          toolsMetadata={toolsMetadata}
+          readResource={readResource}
+          onCallTool={onCallTool}
+          onSendFollowUp={onSendFollowUp}
+          className="my-4"
+        />
+      );
+    }
+  }
 
   // Render OpenAI Apps SDK component
   if (
@@ -210,7 +256,9 @@ export function ToolResultRenderer({
   // Debug: Log when we're not rendering anything
   console.log("[ToolResultRenderer] Not rendering (no UI resources found):", {
     toolName,
+    uiType,
     isAppsSdkTool,
+    isMcpAppsTool,
     hasAppsSdkComponent,
     hasResourceData: !!resourceData,
     contentLength: parsedResult?.content?.length,
