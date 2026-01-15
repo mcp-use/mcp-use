@@ -1,5 +1,12 @@
 # create-mcp-use-app
 
+## 0.10.3-canary.0
+
+### Patch Changes
+
+- 372dad4: Fix .gitignore file not being created in generated projects.
+  Fix long initialization due to wrong git initialization
+
 ## 0.10.2
 
 ### Patch Changes

@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.15.0",
     "mcp-use": "1.13.2"
   },
-  "changesets": []
+  "changesets": [
+    "pretty-meals-happen"
+  ]
 }
