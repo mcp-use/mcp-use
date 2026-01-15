@@ -5,7 +5,7 @@ import { Command } from "commander";
 import { Box, render, Text } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
-import { execSync, spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   copyFileSync,
   existsSync,
@@ -107,59 +107,6 @@ function getInstallArgs(packageManager: string): string[] {
     default:
       // npm: prefer offline cache, skip audit and funding messages
       return ["install"];
-  }
-}
-
-function isInGitRepository(): boolean {
-  try {
-    execSync("git rev-parse --is-inside-work-tree", { stdio: "ignore" });
-    return true;
-  } catch (_) {
-    // Not in a git repository
-  }
-  return false;
-}
-
-function isDefaultBranchSet(): boolean {
-  try {
-    execSync("git config init.defaultBranch", { stdio: "ignore" });
-    return true;
-  } catch (_) {
-    // Default branch is not set
-  }
-  return false;
-}
-
-function tryGitInit(root: string): boolean {
-  let didInit = false;
-  try {
-    execSync("git --version", { stdio: "ignore" });
-    if (isInGitRepository()) {
-      return false;
-    }
-
-    execSync("git init", { cwd: root, stdio: "ignore" });
-    didInit = true;
-
-    if (!isDefaultBranchSet()) {
-      execSync("git checkout -b main", { cwd: root, stdio: "ignore" });
-    }
-
-    execSync("git add -A", { cwd: root, stdio: "ignore" });
-    execSync('git commit -m "Initial commit from create-mcp-use-app"', {
-      cwd: root,
-      stdio: "ignore",
-    });
-    return true;
-  } catch (e) {
-    if (didInit) {
-      try {
-        rmSync(join(root, ".git"), { recursive: true, force: true });
-      } catch (_) {
-        // Failed to remove .git directory
-      }
-    }
-    return false;
   }
 }
 
@@ -650,10 +597,8 @@ program
           }
         }
 
-        // Initialize git repository if requested (skip for GitHub repo templates)
-        if (options.git && !isGitHubRepoUrl(validatedTemplate)) {
-          tryGitInit(projectPath);
-        }
+        // Note: Git initialization is skipped to avoid delays when scanning node_modules.
+        // Users can run `git init` themselves when ready.
 
         console.log("");
         console.log(chalk.green("✅ MCP server created successfully!"));
@@ -691,7 +636,11 @@ program
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
         console.log(chalk.cyan(`   cd ${sanitizedProjectName}`));
-        console.log(chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`));
+        if (!options.install) {
+          console.log(
+            chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`)
+          );
+        }
         console.log(chalk.cyan(`   ${getDevCommand(usedPackageManager)}`));
         console.log("");
         console.log(chalk.bold("📤 To deploy:"));
