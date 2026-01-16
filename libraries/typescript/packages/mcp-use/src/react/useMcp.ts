@@ -520,6 +520,17 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       `Connecting attempt #${connectAttemptRef.current} to ${url}...`
     );
 
+    // Clear any stale OAuth storage before connecting to ensure fresh start
+    if (authProviderRef.current) {
+      const clearedCount = authProviderRef.current.clearStorage();
+      if (clearedCount > 0) {
+        addLog(
+          "debug",
+          `Cleared ${clearedCount} stale OAuth storage item(s) before connecting`
+        );
+      }
+    }
+
     if (!authProviderRef.current) {
       // Determine OAuth proxy URL based on gateway configuration
       // If a proxy is configured, use the same base URL with /oauth path
@@ -1297,11 +1308,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
         assert(url, "Server URL is required for authentication");
 
-        // NOTE: We no longer clear state here. The existing state from the initial
-        // discovery is valid and should be preserved. If auth() creates new state,
-        // that's fine - old state will be cleaned up on successful auth or clearStorage().
-        // Clearing state prematurely caused issues when auth() failed to create new state.
-        addLog("info", "Initiating OAuth flow (preserving existing state)...");
+        // Clear OAuth storage to ensure fresh authentication flow
+        const clearedCount = authProviderRef.current.clearStorage();
+        addLog(
+          "info",
+          `Cleared ${clearedCount} OAuth storage item(s) for fresh authentication`
+        );
 
         // Update state to authenticating before redirect
         setState("authenticating");

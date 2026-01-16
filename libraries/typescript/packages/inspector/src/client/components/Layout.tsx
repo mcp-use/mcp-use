@@ -553,6 +553,44 @@ export function Layout({ children }: LayoutProps) {
           </LayoutContent>
         </main>
 
+        {/* Footer Helper */}
+        {!isEmbedded && (
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 px-2">
+            Having trouble connecting?{" "}
+            <button
+              onClick={() => {
+                // Clear all mcp-related localStorage keys
+                const keysToRemove: string[] = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                  const key = localStorage.key(i);
+                  if (
+                    key &&
+                    (key.startsWith("mcp:auth") ||
+                      key.startsWith("mcp-inspector"))
+                  ) {
+                    keysToRemove.push(key);
+                  }
+                }
+
+                keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+                toast.success(
+                  `Cleared ${keysToRemove.length} localStorage item(s). Refreshing page...`,
+                  { duration: 2000 }
+                );
+
+                // Refresh the page after a brief delay to show the toast
+                setTimeout(() => {
+                  window.location.reload();
+                }, 500);
+              }}
+              className="text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:underline"
+            >
+              Clear localStorage
+            </button>
+          </div>
+        )}
+
         {/* Command Palette */}
         <CommandPalette
           isOpen={isCommandPaletteOpen}
