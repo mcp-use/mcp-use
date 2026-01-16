@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.15.1",
     "mcp-use": "1.13.3"
   },
-  "changesets": []
+  "changesets": [
+    "grumpy-eels-begin"
+  ]
 }
