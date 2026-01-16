@@ -215,19 +215,35 @@ export function InspectorDashboard() {
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
 
-    // Validate URL format
+    // Validate URL format and auto-add https:// if protocol is missing
+    let normalizedUrl = url.trim();
     try {
-      const parsedUrl = new URL(url.trim());
+      const parsedUrl = new URL(normalizedUrl);
       const isValid =
         parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
       if (!isValid) {
-        toast.error("Invalid URL protocol. Please use http://, https://");
+        toast.error("Invalid URL protocol. Please use http:// or https://");
         return;
       }
     } catch (error) {
-      toast.error("Invalid URL format. Please enter a valid URL.");
-      return;
+      // If parsing fails, try adding https:// prefix
+      try {
+        const urlWithHttps = `https://${normalizedUrl}`;
+        const parsedUrl = new URL(urlWithHttps);
+        const isValid =
+          parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+
+        if (!isValid) {
+          toast.error("Invalid URL protocol. Please use http:// or https://");
+          return;
+        }
+        // Use the normalized URL with https://
+        normalizedUrl = urlWithHttps;
+      } catch (retryError) {
+        toast.error("Invalid URL format. Please enter a valid URL.");
+        return;
+      }
     }
 
     // Convert custom headers array to object
@@ -252,8 +268,8 @@ export function InspectorDashboard() {
 
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
-      url: url.trim(),
-      name: url.trim(),
+      url: normalizedUrl,
+      name: normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       ...(proxyConfig
@@ -270,7 +286,7 @@ export function InspectorDashboard() {
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
-    addServer(url.trim(), serverConfig);
+    addServer(normalizedUrl, serverConfig);
 
     // Track server added
     const telemetry = Telemetry.getInstance();
