@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.15.1-canary.1
+
+### Patch Changes
+
+- c3f2ebf: feat(inspector): allow urls with no protocol dafaulting to https
+  - mcp-use@1.13.3-canary.1
+
 ## 0.15.1-canary.0
 
 ### Patch Changes
