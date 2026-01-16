@@ -520,16 +520,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       `Connecting attempt #${connectAttemptRef.current} to ${url}...`
     );
 
-    // Clear any stale OAuth storage before connecting to ensure fresh start
-    if (authProviderRef.current) {
-      const clearedCount = authProviderRef.current.clearStorage();
-      if (clearedCount > 0) {
-        addLog(
-          "debug",
-          `Cleared ${clearedCount} stale OAuth storage item(s) before connecting`
-        );
-      }
-    }
+    // NOTE: We intentionally do NOT clear OAuth storage before connecting.
+    // The clearStorage() function clears tokens and client_info which should
+    // persist across connections. Clearing them would force re-authentication
+    // even when valid tokens exist from a previous OAuth flow.
+    //
+    // Stale state/verifier items are cleaned up:
+    // - By the callback handler after successful token exchange
+    // - By the unmount cleanup when OAuth flow is interrupted
+    // - By the state expiry check in the callback handler
 
     if (!authProviderRef.current) {
       // Determine OAuth proxy URL based on gateway configuration
