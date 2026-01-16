@@ -115,7 +115,7 @@ export async function onMcpAuthorization() {
     // The callback URL is like: http://localhost:3000/inspector/oauth/callback
     // The OAuth proxy URL should be: http://localhost:3000/inspector/api/oauth
     let oauthProxyUrl = providerOptions.oauthProxyUrl;
-    let connectionUrl = providerOptions.connectionUrl;
+    const connectionUrl = providerOptions.connectionUrl;
     if (!oauthProxyUrl) {
       try {
         const callbackUrl = new URL(window.location.href);
@@ -123,12 +123,29 @@ export async function onMcpAuthorization() {
         if (callbackUrl.pathname.includes("/oauth/callback")) {
           // Derive the OAuth proxy URL from the callback URL
           // e.g., /inspector/oauth/callback -> /inspector/api/oauth
-          const basePath = callbackUrl.pathname.replace(
+          let basePath = callbackUrl.pathname.replace(
             /\/oauth\/callback.*$/,
             ""
           );
+
+          // IMPORTANT: If the callback is at root /oauth/callback (empty basePath),
+          // the OAuth proxy is likely at /inspector/api/oauth since that's where
+          // the inspector package mounts its routes. This handles the case where:
+          // - The hosted inspector serves the callback at /oauth/callback (via Next.js page)
+          // - But the OAuth proxy is mounted at /inspector/api/oauth (via inspector package)
+          if (!basePath || basePath === "") {
+            basePath = "/inspector";
+            console.log(
+              `${logPrefix} Callback at root /oauth/callback, using /inspector as base path for OAuth proxy`
+            );
+          }
+
           oauthProxyUrl = `${callbackUrl.origin}${basePath}/api/oauth`;
-          connectionUrl = `${callbackUrl.origin}${basePath}/api/proxy`;
+          // NOTE: We only infer oauthProxyUrl here, NOT connectionUrl.
+          // connectionUrl is the MCP gateway/proxy URL that the client connected to,
+          // which is different from the OAuth proxy URL. If the client connected
+          // directly to the MCP server (no gateway), connectionUrl should remain
+          // undefined so the SDK uses the original serverUrl for client info lookup.
           console.log(
             `${logPrefix} Inferred OAuth proxy URL from callback: ${oauthProxyUrl}`
           );
