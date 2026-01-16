@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.13.3-canary.0
+
+### Patch Changes
+
+- d446ee5: fix(telemetry): enhance localStorage checks for availability and functionality
+- Updated dependencies [d446ee5]
+  - @mcp-use/inspector@0.15.1-canary.0
+  - @mcp-use/cli@2.10.1-canary.0
+
 ## 1.13.2
 
 ### Patch Changes
