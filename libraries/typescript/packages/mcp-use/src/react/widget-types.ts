@@ -174,45 +174,7 @@ export interface UseWidgetResult<
   /** Whether the tool is currently executing (metadata is null) */
   isPending: boolean;
 
-  /**
-   * Create a typed callTool hook with loading states (for widgets)
-   * Returns a hook with isPending, isSuccess, isError, data, and error states
-   *
-   * @param toolName - The name of the tool to call
-   * @param options - Optional callbacks for success/error/settled
-   * @returns Hook with callTool function and loading states
-   *
-   * @example
-   * ```typescript
-   * const widget = useWidget();
-   * const { callTool, isPending, data } = widget.useCallTool<
-   *   { city: string },
-   *   { temperature: number }
-   * >('get-weather');
-   *
-   * callTool({ city: 'Paris' });
-   * ```
-   */
-  useCallTool: <TInput = any, TOutput = any>(
-    toolName: string,
-    options?: {
-      onSuccess?: (data: TOutput, input: TInput) => void;
-      onError?: (error: Error, input: TInput) => void;
-      onSettled?: (
-        data: TOutput | undefined,
-        error: Error | undefined,
-        input: TInput
-      ) => void;
-    }
-  ) => {
-    callTool: (args: TInput) => Promise<void>;
-    callToolAsync: (args: TInput) => Promise<TOutput>;
-    isPending: boolean;
-    isSuccess: boolean;
-    isError: boolean;
-    isIdle: boolean;
-    data: TOutput | undefined;
-    error: Error | undefined;
-    reset: () => void;
-  };
+  // Note: For typed callTool with loading states, use the standalone useCallTool hook:
+  // import { useCallTool } from 'mcp-use/react';
+  // const hook = useCallTool('tool-name', options);
 }

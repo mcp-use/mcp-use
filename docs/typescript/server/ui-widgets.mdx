@@ -299,7 +299,46 @@ await setState(prev => ({
 
 ### Calling Other Tools
 
-Widgets can call other MCP tools directly using `callTool`:
+Widgets can call other MCP tools using the `useCallTool` hook (recommended) or `useWidget().callTool`:
+
+**Using useCallTool (Recommended):**
+
+```typescript
+import { useCallTool } from 'mcp-use/react';
+
+// Define your tools for type safety
+type MyWidgetTools = {
+  'search_cities': {
+    input: { query: string };
+    output: { cities: Array<{ name: string; country: string }> };
+  };
+};
+
+function MyWidget() {
+  // In widget context, just pass the tool name
+  const { callTool, isPending, data, error } = useCallTool<
+    MyWidgetTools,
+    'search_cities'
+  >('search_cities');
+
+  return (
+    <button 
+      onClick={() => callTool({ query: 'tokyo' })}
+      disabled={isPending}
+    >
+      {isPending ? 'Searching...' : 'Search Cities'}
+    </button>
+  );
+}
+```
+
+<Tip>
+  The `useCallTool` hook provides loading states (`isPending`, `isSuccess`, `isError`), 
+  type safety, and lifecycle callbacks. See the [useCallTool documentation](/typescript/client/use-call-tool) 
+  for full details.
+</Tip>
+
+**Using useWidget().callTool:**
 
 ```typescript
 const { callTool } = useWidget();

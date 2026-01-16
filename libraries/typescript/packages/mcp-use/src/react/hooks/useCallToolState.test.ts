@@ -116,8 +116,9 @@ describe("useCallToolState", () => {
 
     // Update via function
     act(() => {
-      result.current.setState((prev) => ({
-        ...prev,
+      result.current.setState((prev: typeof result.current) => ({
+        status: prev.status,
+        error: prev.error,
         data: { count: (prev.data?.count || 0) + 1 },
       }));
     });

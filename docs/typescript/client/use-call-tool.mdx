@@ -1,0 +1,393 @@
+---
+title: "useCallTool"
+description: "Type-safe React hook for calling MCP tools with loading states"
+icon: "bolt"
+tag: "New"
+---
+
+The `useCallTool` hook provides a type-safe way to call MCP tools from React components. It includes built-in loading states, error handling, and supports both MCP client and widget contexts.
+
+## Features
+
+- ✅ **Type-safe** with autocomplete for tool names
+- ✅ **React Query-style states** (`isPending`, `isSuccess`, `isError`, `isIdle`)
+- ✅ **Two calling patterns**: fire-and-forget (`callTool`) or async/await (`callToolAsync`)
+- ✅ **Lifecycle callbacks**: `onSuccess`, `onError`, `onSettled`
+- ✅ **Context-aware**: Works with both MCP clients and OpenAI Apps SDK widgets
+- ✅ **Timeout configuration** for long-running operations
+
+## Installation
+
+```typescript
+import { useCallTool } from "mcp-use/react";
+```
+
+## Basic Usage
+
+### With MCP Client (useMcp)
+
+```typescript
+import { useMcp, useCallTool, type TypedMcpServer } from "mcp-use/react";
+
+// Define your tool registry for autocomplete
+type MyTools = {
+  "get-weather": {
+    input: { city: string };
+    output: { temperature: number; conditions: string };
+  };
+  "send-email": {
+    input: { to: string; subject: string };
+    output: { sent: boolean };
+  };
+};
+
+function WeatherWidget() {
+  const mcp = useMcp({ url: "http://localhost:3000/mcp" });
+  
+  // Cast to typed server for autocomplete
+  const typedServer = mcp as TypedMcpServer<MyTools>;
+  
+  // Tool names autocomplete! 🎉
+  const { callTool, isPending, data, error } = useCallTool(
+    typedServer, 
+    "get-weather"  // <-- autocompletes!
+  );
+  
+  return (
+    <div>
+      <button 
+        onClick={() => callTool({ city: "Paris" })}
+        disabled={isPending}
+      >
+        {isPending ? "Loading..." : "Get Weather"}
+      </button>
+      {data && <p>Temperature: {data.temperature}°C</p>}
+      {error && <p>Error: {error.message}</p>}
+    </div>
+  );
+}
+```
+
+### With McpClientProvider (Multi-Server)
+
+```typescript
+import { 
+  McpClientProvider, 
+  useMcpServer, 
+  useCallTool,
+  type TypedMcpServer,
+} from "mcp-use/react";
+
+type LinearTools = {
+  "create-issue": { input: { title: string }; output: { id: string } };
+};
+
+function App() {
+  return (
+    <McpClientProvider>
+      <LinearTools />
+    </McpClientProvider>
+  );
+}
+
+function LinearTools() {
+  const { addServer } = useMcpClient();
+  
+  useEffect(() => {
+    addServer("linear", { url: "https://mcp.linear.app/mcp" });
+  }, [addServer]);
+
+  const linearServer = useMcpServer("linear") as TypedMcpServer<LinearTools>;
+  
+  const createIssue = useCallTool(linearServer, "create-issue");
+  
+  return (
+    <button onClick={() => createIssue.callTool({ title: "Bug fix" })}>
+      Create Issue
+    </button>
+  );
+}
+```
+
+### In Widget Context (OpenAI Apps SDK)
+
+When used without a server object (or with `null`), the hook automatically uses the widget context:
+
+```typescript
+import { useCallTool } from "mcp-use/react";
+
+// Define types for your widget's tools
+type MyWidgetTools = {
+  "search-products": {
+    input: { query: string };
+    output: { products: Array<{ id: string; name: string }> };
+  };
+};
+
+function MyWidget() {
+  // No server needed - uses widget context automatically
+  const { callTool, isPending, data } = useCallTool<
+    MyWidgetTools,
+    "search-products"
+  >("search-products");
+  
+  return (
+    <button onClick={() => callTool({ query: "laptop" })}>
+      Search Products
+    </button>
+  );
+}
+```
+
+## API Reference
+
+### Parameters
+
+The hook supports two calling conventions:
+
+**With MCP Server:**
+```typescript
+useCallTool(server, toolName, options?)
+```
+
+**Widget Context (no server):**
+```typescript
+useCallTool(toolName, options?)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `server` | `TypedMcpServer<T> \| null` | The MCP server object (from `useMcp` or `useMcpServer`) |
+| `toolName` | `string` | Name of the tool to call |
+| `options` | `UseCallToolOptions` | Optional configuration |
+
+### Options
+
+```typescript
+interface UseCallToolOptions<TInput, TOutput> {
+  // Lifecycle callbacks
+  onSuccess?: (data: TOutput, input: TInput) => void;
+  onError?: (error: Error, input: TInput) => void;
+  onSettled?: (data: TOutput | undefined, error: Error | null, input: TInput) => void;
+  
+  // MCP Client only - timeout configuration
+  timeout?: number;                    // Request timeout in ms (default: 60000)
+  maxTotalTimeout?: number;            // Max total time even with progress resets
+  resetTimeoutOnProgress?: boolean;    // Reset timeout on progress notifications
+}
+```
+
+### Return Value
+
+```typescript
+interface UseCallToolResult<TInput, TOutput> {
+  // State
+  status: "idle" | "pending" | "success" | "error";
+  isIdle: boolean;
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  data: TOutput | undefined;
+  error: Error | undefined;
+  
+  // Methods
+  callTool: (input: TInput) => void;           // Fire-and-forget
+  callToolAsync: (input: TInput) => Promise<TOutput>;  // Async/await
+  reset: () => void;                           // Reset to idle state
+}
+```
+
+## Type Safety
+
+### Using TypedMcpServer
+
+For full autocomplete support, define a tool registry and cast your server:
+
+```typescript
+import { type TypedMcpServer } from "mcp-use/react";
+
+// Define all tools your server exposes
+type MyServerTools = {
+  "get-weather": {
+    input: { city: string; units?: "celsius" | "fahrenheit" };
+    output: { temperature: number; conditions: string };
+  };
+  "send-email": {
+    input: { to: string; subject: string; body: string };
+    output: { sent: boolean; messageId: string };
+  };
+  "list-tasks": {
+    input: { status?: "pending" | "completed" };
+    output: { tasks: Array<{ id: string; title: string }> };
+  };
+};
+
+function MyComponent() {
+  const mcp = useMcp({ url: "..." });
+  
+  // Cast for autocomplete
+  const server = mcp as TypedMcpServer<MyServerTools>;
+  
+  // Now tool names autocomplete!
+  const weather = useCallTool(server, "get-weather");
+  const email = useCallTool(server, "send-email");
+  const tasks = useCallTool(server, "list-tasks");
+  
+  // Input and output are fully typed
+  weather.callTool({ city: "Paris" });  // ✅ typed input
+  weather.data?.temperature;             // ✅ typed output
+}
+```
+
+### Manual Type Parameters
+
+For simpler cases without a registry:
+
+```typescript
+type Input = { city: string };
+type Output = { temperature: number };
+
+const hook = useCallTool<Input, Output>(mcp, "get-weather");
+```
+
+## Patterns
+
+### Chaining Tool Calls
+
+```typescript
+function WeatherEmailer() {
+  const server = mcp as TypedMcpServer<MyTools>;
+  
+  const weather = useCallTool(server, "get-weather");
+  const email = useCallTool(server, "send-email");
+  
+  const handleSendWeatherReport = async () => {
+    const weatherData = await weather.callToolAsync({ city: "Paris" });
+    await email.callToolAsync({
+      to: "user@example.com",
+      subject: "Weather Report",
+      body: `Temperature: ${weatherData.temperature}°C`,
+    });
+  };
+  
+  return (
+    <button 
+      onClick={handleSendWeatherReport}
+      disabled={weather.isPending || email.isPending}
+    >
+      Send Weather Report
+    </button>
+  );
+}
+```
+
+### With Lifecycle Callbacks
+
+```typescript
+const { callTool } = useCallTool(server, "get-weather", {
+  onSuccess: (data, input) => {
+    toast.success(`Weather for ${input.city}: ${data.temperature}°C`);
+    analytics.track("weather_fetched", { city: input.city });
+  },
+  onError: (error, input) => {
+    toast.error(`Failed to get weather for ${input.city}`);
+    console.error(error);
+  },
+  onSettled: (data, error, input) => {
+    // Always runs after success or error
+    setLoading(false);
+  },
+});
+```
+
+### Error Handling
+
+```typescript
+function WeatherComponent() {
+  const { callTool, callToolAsync, isError, error, reset } = useCallTool(
+    server, 
+    "get-weather"
+  );
+  
+  // Pattern 1: Use state
+  if (isError) {
+    return (
+      <div>
+        <p>Error: {error?.message}</p>
+        <button onClick={reset}>Try Again</button>
+      </div>
+    );
+  }
+  
+  // Pattern 2: Try/catch with async
+  const handleFetch = async () => {
+    try {
+      const data = await callToolAsync({ city: "Paris" });
+      console.log(data);
+    } catch (err) {
+      console.error("Failed:", err);
+    }
+  };
+}
+```
+
+### Loading States
+
+```typescript
+function ToolButton() {
+  const { callTool, isPending, isSuccess, data } = useCallTool(
+    server, 
+    "get-weather"
+  );
+  
+  return (
+    <div>
+      <button 
+        onClick={() => callTool({ city: "Paris" })}
+        disabled={isPending}
+      >
+        {isPending ? (
+          <span>
+            <Spinner /> Loading...
+          </span>
+        ) : (
+          "Get Weather"
+        )}
+      </button>
+      
+      {isSuccess && (
+        <div className="result">
+          Temperature: {data?.temperature}°C
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Comparison with Other Methods
+
+### vs `server.callTool()`
+
+| Feature | `useCallTool` | `server.callTool()` |
+|---------|---------------|---------------------|
+| Loading states | ✅ Built-in | ❌ Manual |
+| Type inference | ✅ With TypedMcpServer | ❌ Manual |
+| Callbacks | ✅ onSuccess/onError | ❌ Manual |
+| Widget support | ✅ Automatic | ❌ N/A |
+| Reset state | ✅ Built-in | ❌ N/A |
+
+### vs `useWidget().callTool`
+
+| Feature | `useCallTool` | `useWidget().callTool` |
+|---------|---------------|------------------------|
+| Loading states | ✅ Built-in | ❌ Manual |
+| Type inference | ✅ With registry | ❌ Manual |
+| MCP client support | ✅ Yes | ❌ Widget only |
+| Unified API | ✅ Same for both | ❌ Different API |
+
+## Next Steps
+
+- [useMcp](/typescript/client/usemcp) - React hooks for MCP connections
+- [useWidget](/typescript/server/widget-components/usewidget) - Widget-specific hook
+- [Tools](/typescript/client/tools) - Tool calling fundamentals

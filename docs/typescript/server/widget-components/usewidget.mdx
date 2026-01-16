@@ -275,6 +275,18 @@ const handleSearch = async () => {
 };
 ```
 
+<Tip>
+  For a better developer experience with loading states, type safety, and callbacks,
+  use the [`useCallTool`](/typescript/client/use-call-tool) hook:
+  
+  ```tsx
+  import { useCallTool } from 'mcp-use/react';
+  
+  // In widget context, just pass the tool name
+  const { callTool, isPending, data, error } = useCallTool('search-products');
+  ```
+</Tip>
+
 ### 7. Follow-up Messages
 
 Send messages to the ChatGPT conversation:
