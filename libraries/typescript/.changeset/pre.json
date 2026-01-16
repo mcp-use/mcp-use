@@ -8,6 +8,7 @@
     "mcp-use": "1.13.2"
   },
   "changesets": [
+    "green-jobs-tell",
     "legal-suns-care",
     "tidy-lines-agree"
   ]

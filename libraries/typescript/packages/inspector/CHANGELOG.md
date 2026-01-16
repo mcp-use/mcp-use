@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.15.1-canary.2
+
+### Patch Changes
+
+- b06fa78: feat(inspector): add localStorage clearing functionality to enhance user experience
+- Updated dependencies [b06fa78]
+  - mcp-use@1.13.3-canary.2
+
 ## 0.15.1-canary.1
 
 ### Patch Changes
