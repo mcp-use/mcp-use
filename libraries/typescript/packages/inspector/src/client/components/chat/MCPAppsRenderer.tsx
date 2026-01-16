@@ -624,6 +624,16 @@ export function MCPAppsRenderer({
     lastToolOutputRef.current = serialized;
 
     console.log("[MCP Apps] Sending tool output:", toolOutput);
+    console.log("[MCP Apps] Tool output type:", typeof toolOutput);
+    console.log(
+      "[MCP Apps] Tool output keys:",
+      toolOutput ? Object.keys(toolOutput) : "null"
+    );
+    console.log("[MCP Apps] Tool output._meta:", (toolOutput as any)?._meta);
+    console.log(
+      "[MCP Apps] Tool output._meta['mcp-use/props']:",
+      (toolOutput as any)?._meta?.["mcp-use/props"]
+    );
     bridge.sendToolResult(toolOutput as CallToolResult);
   }, [isReady, toolOutput, toolState]);
 

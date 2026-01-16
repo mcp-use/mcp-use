@@ -158,10 +158,18 @@ export class McpAppAdaptor implements WidgetHostAdaptor {
         console.log("[McpAppAdaptor] ontoolresult received params:", params);
         console.log("[McpAppAdaptor] params._meta:", params._meta);
         console.log(
+          "[McpAppAdaptor] params._meta['mcp-use/props']:",
+          params._meta?.["mcp-use/props"]
+        );
+        console.log(
           "[McpAppAdaptor] params.structuredContent:",
           params.structuredContent
         );
         console.log("[McpAppAdaptor] params.content:", params.content);
+        console.log(
+          "[McpAppAdaptor] Full params keys:",
+          params ? Object.keys(params) : "null"
+        );
         this.state.toolResult = params;
         this.notifyListeners();
       };

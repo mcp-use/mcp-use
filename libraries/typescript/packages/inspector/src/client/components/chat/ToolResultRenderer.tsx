@@ -155,6 +155,18 @@ export function ToolResultRenderer({
   if (isMcpAppsTool && serverId && readResource) {
     const resourceUri = getUIResourceUri(uiType, toolMeta, parsedResult);
     if (resourceUri) {
+      console.log(
+        "[ToolResultRenderer] Rendering MCP Apps with parsedResult:",
+        parsedResult
+      );
+      console.log(
+        "[ToolResultRenderer] parsedResult._meta:",
+        parsedResult?._meta
+      );
+      console.log(
+        "[ToolResultRenderer] parsedResult._meta['mcp-use/props']:",
+        parsedResult?._meta?.["mcp-use/props"]
+      );
       return (
         <MCPAppsRenderer
           serverId={serverId}
