@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.13.3
+
+### Patch Changes
+
+- 294d17d: feat(inspector): add localStorage clearing functionality to enhance user experience
+- 294d17d: fix(telemetry): enhance localStorage checks for availability and functionality
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - @mcp-use/inspector@0.15.1
+  - @mcp-use/cli@2.10.1
+
 ## 1.13.3-canary.2
 
 ### Patch Changes

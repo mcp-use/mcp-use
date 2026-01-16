@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.15.1
+
+### Patch Changes
+
+- 294d17d: feat(inspector): add localStorage clearing functionality to enhance user experience
+- 294d17d: fix(telemetry): enhance localStorage checks for availability and functionality
+- 294d17d: feat(inspector): allow urls with no protocol dafaulting to https
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - mcp-use@1.13.3
+
 ## 0.15.1-canary.2
 
 ### Patch Changes
