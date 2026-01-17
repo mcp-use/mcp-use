@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.10.3-canary.0
+
+### Patch Changes
+
+- de5f030: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+  - mcp-use@1.13.5-canary.0
+  - @mcp-use/inspector@0.15.3-canary.0
+
 ## 2.10.2
 
 ### Patch Changes

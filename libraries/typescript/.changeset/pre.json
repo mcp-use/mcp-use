@@ -8,6 +8,7 @@
     "mcp-use": "1.13.3"
   },
   "changesets": [
-    "grumpy-eels-begin"
+    "grumpy-eels-begin",
+    "modern-cities-enter"
   ]
 }
