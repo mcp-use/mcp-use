@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import crypto from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -43,7 +44,8 @@ async function findAvailablePort(startPort: number = 8765): Promise<number> {
  * Start local server to receive OAuth callback
  */
 async function startCallbackServer(
-  port: number
+  port: number,
+  expectedState: string
 ): Promise<{ server: any; token: Promise<string> }> {
   return new Promise((resolve, reject) => {
     let tokenResolver: ((value: string) => void) | null = null;
@@ -55,6 +57,51 @@ async function startCallbackServer(
       if (req.url?.startsWith("/callback")) {
         const url = new URL(req.url, `http://localhost:${port}`);
         const token = url.searchParams.get("token");
+        const state = url.searchParams.get("state");
+
+        // Validate state parameter for CSRF protection
+        if (state !== expectedState) {
+          res.writeHead(400, { "Content-Type": "text/html" });
+          res.end(`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <title>Security Error</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      display: flex;
+                      justify-content: center;
+                      align-items: center;
+                      min-height: 100vh;
+                      background: #000;
+                      padding: 1rem;
+                      margin: 0;
+                    }
+                    .container {
+                      max-width: 28rem;
+                      padding: 3rem;
+                      text-align: center;
+                      background: rgba(255, 255, 255, 0.1);
+                      backdrop-filter: blur(40px);
+                      border: 1px solid rgba(255, 255, 255, 0.2);
+                      border-radius: 1.5rem;
+                    }
+                    h1 { color: #fff; font-size: 2rem; margin-bottom: 1rem; }
+                    p { color: rgba(255, 255, 255, 0.8); font-size: 1rem; }
+                  </style>
+                </head>
+                <body>
+                  <div class="container">
+                    <h1>Security Error</h1>
+                    <p>Invalid state parameter. Please try logging in again.</p>
+                  </div>
+                </body>
+              </html>
+            `);
+          return;
+        }
 
         if (token && tokenResolver) {
           // Send success response
@@ -271,6 +318,9 @@ export async function loginCommand(options?: {
 
     console.log(chalk.cyan.bold("🔐 Logging in to mcp-use cloud...\n"));
 
+    // Generate state for CSRF protection
+    const state = crypto.randomBytes(32).toString("hex");
+
     // Find available port
     const port = await findAvailablePort();
     const redirectUri = `http://localhost:${port}/callback`;
@@ -278,11 +328,11 @@ export async function loginCommand(options?: {
     console.log(chalk.gray(`Starting local server on port ${port}...`));
 
     // Start callback server
-    const { server, token } = await startCallbackServer(port);
+    const { server, token } = await startCallbackServer(port, state);
 
     // Get the web URL (respects NEXT_PUBLIC_API_URL)
     const webUrl = await getWebUrl();
-    const loginUrl = `${webUrl}/auth/cli?redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const loginUrl = `${webUrl}/auth/cli?redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
 
     console.log(chalk.gray(`Opening browser to ${webUrl}/auth/cli...\n`));
     console.log(

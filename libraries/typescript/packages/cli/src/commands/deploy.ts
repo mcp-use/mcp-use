@@ -457,35 +457,96 @@ async function displayDeploymentProgress(
     }
 
     if (finalDeployment.status === "running") {
-      const mcpUrl = `https://${finalDeployment.domain}/mcp`;
-      const inspectorUrl = `https://inspector.mcp-use.com/inspector?autoConnect=${encodeURIComponent(mcpUrl)}`;
+      // Determine the MCP Server URL to display
+      let mcpServerUrl: string;
+      let dashboardUrl: string | null = null;
+
+      if (finalDeployment.customDomain) {
+        // Custom domain takes precedence
+        mcpServerUrl = `https://${finalDeployment.customDomain}/mcp`;
+        if (finalDeployment.serverSlug) {
+          dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverSlug}`;
+        }
+      } else if (finalDeployment.serverSlug) {
+        // Gateway URL via haikunator slug
+        mcpServerUrl = `https://${finalDeployment.serverSlug}.mcp-use.run/mcp`;
+        dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverSlug}`;
+      } else if (finalDeployment.serverId) {
+        // Gateway URL via serverId (fallback if slug not available yet)
+        mcpServerUrl = `https://${finalDeployment.serverId}.mcp-use.run/mcp`;
+        dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverId}`;
+      } else {
+        // Direct deployment URL (legacy deployments without server)
+        mcpServerUrl = `https://${finalDeployment.domain}/mcp`;
+      }
+
+      const inspectorUrl = `https://inspector.mcp-use.com/inspector?autoConnect=${encodeURIComponent(
+        mcpServerUrl
+      )}`;
 
       console.log(chalk.green.bold("✓ Deployment successful!\n"));
       console.log(chalk.white("🌐 MCP Server URL:"));
-      console.log(chalk.cyan.bold(`   ${mcpUrl}\n`));
+      console.log(chalk.cyan.bold(`   ${mcpServerUrl}\n`));
+
+      if (dashboardUrl) {
+        console.log(chalk.white("📊 Dashboard:"));
+        console.log(chalk.cyan.bold(`   ${dashboardUrl}\n`));
+      }
 
       console.log(chalk.white("🔍 Inspector URL:"));
       console.log(chalk.cyan.bold(`   ${inspectorUrl}\n`));
-
-      if (finalDeployment.customDomain) {
-        const customMcpUrl = `https://${finalDeployment.customDomain}/mcp`;
-        const customInspectorUrl = `https://inspector.mcp-use.com/inspect?autoConnect=${encodeURIComponent(customMcpUrl)}`;
-
-        console.log(chalk.white("🔗 Custom Domain:"));
-        console.log(chalk.cyan.bold(`   ${customMcpUrl}\n`));
-        console.log(chalk.white("🔍 Custom Inspector:"));
-        console.log(chalk.cyan.bold(`   ${customInspectorUrl}\n`));
-      }
 
       console.log(
         chalk.gray("Deployment ID: ") + chalk.white(finalDeployment.id)
       );
       return;
     } else if (finalDeployment.status === "failed") {
+      stopSpinner();
       console.log(chalk.red.bold("✗ Deployment failed\n"));
+
       if (finalDeployment.error) {
         console.log(chalk.red("Error: ") + finalDeployment.error);
+
+        // Check for GitHub access errors and offer to fix
+        if (finalDeployment.error.includes("No GitHub installations found")) {
+          console.log();
+          const retry = await promptGitHubInstallation(api, "not_connected");
+          if (retry) {
+            console.log(chalk.cyan("\n🔄 Retrying deployment...\n"));
+            const newDeployment = await api.redeployDeployment(deployment.id);
+            await displayDeploymentProgress(api, newDeployment);
+            return;
+          }
+        } else if (
+          finalDeployment.error.includes("Authenticated git clone failed")
+        ) {
+          // Extract repo name from error or deployment source
+          let repoName: string | undefined;
+
+          const repoMatch = finalDeployment.error.match(
+            /github\.com\/([^/]+\/[^/\s]+)/
+          );
+          if (repoMatch) {
+            repoName = repoMatch[1].replace(/\.git$/, "");
+          } else if (finalDeployment.source.type === "github") {
+            repoName = finalDeployment.source.repo;
+          }
+
+          console.log();
+          const retry = await promptGitHubInstallation(
+            api,
+            "no_access",
+            repoName
+          );
+          if (retry) {
+            console.log(chalk.cyan("\n🔄 Retrying deployment...\n"));
+            const newDeployment = await api.redeployDeployment(deployment.id);
+            await displayDeploymentProgress(api, newDeployment);
+            return;
+          }
+        }
       }
+
       if (finalDeployment.buildLogs) {
         console.log(chalk.gray("\nBuild logs:"));
         // Parse and display build logs nicely
@@ -529,6 +590,176 @@ async function displayDeploymentProgress(
     chalk.gray("Check status with: ") +
       chalk.white(`mcp-use status ${deployment.id}`)
   );
+}
+
+/**
+ * Check if a specific repository is accessible via GitHub App
+ */
+async function checkRepoAccess(
+  api: McpUseAPI,
+  owner: string,
+  repo: string
+): Promise<boolean> {
+  try {
+    const reposResponse = await api.getGitHubRepos(true); // Force refresh
+    const repoFullName = `${owner}/${repo}`;
+    return reposResponse.repos.some((r) => r.full_name === repoFullName);
+  } catch (error) {
+    console.log(chalk.gray("Could not verify repository access"));
+    return false;
+  }
+}
+
+/**
+ * Prompt user to install/configure GitHub App with repo verification
+ */
+async function promptGitHubInstallation(
+  api: McpUseAPI,
+  reason: "not_connected" | "no_access",
+  repoName?: string
+): Promise<boolean> {
+  console.log();
+
+  if (reason === "not_connected") {
+    console.log(chalk.yellow("⚠️  GitHub account not connected"));
+    console.log(
+      chalk.white("Deployments require a connected GitHub account.\n")
+    );
+  } else {
+    console.log(
+      chalk.yellow("⚠️  GitHub App doesn't have access to this repository")
+    );
+    console.log(
+      chalk.white(
+        `The GitHub App needs permission to access ${chalk.cyan(repoName || "this repository")}.\n`
+      )
+    );
+  }
+
+  const shouldInstall = await prompt(
+    chalk.white(
+      `Would you like to ${reason === "not_connected" ? "connect" : "configure"} GitHub now? (Y/n): `
+    ),
+    "y"
+  );
+
+  if (!shouldInstall) {
+    return false;
+  }
+
+  try {
+    // Get the GitHub App name with fallback
+    const appName = process.env.MCP_GITHUB_APP_NAME || "mcp-use";
+
+    const installUrl =
+      reason === "not_connected"
+        ? `https://github.com/apps/${appName}/installations/new`
+        : `https://github.com/settings/installations`;
+
+    console.log(
+      chalk.cyan(
+        `\nOpening browser to ${reason === "not_connected" ? "install" : "configure"} GitHub App...`
+      )
+    );
+    console.log(chalk.gray(`URL: ${installUrl}\n`));
+
+    if (reason === "no_access") {
+      console.log(chalk.white("Please:"));
+      console.log(
+        chalk.cyan("  1. Find the 'mcp-use' (or similar) GitHub App")
+      );
+      console.log(chalk.cyan("  2. Click 'Configure'"));
+      console.log(
+        chalk.cyan(
+          `  3. Grant access to ${chalk.bold(repoName || "your repository")}`
+        )
+      );
+      console.log(chalk.cyan("  4. Save your changes"));
+      console.log(chalk.cyan("  5. Return here when done\n"));
+    } else {
+      console.log(chalk.white("Please:"));
+      console.log(chalk.cyan("  1. Select the repositories to grant access"));
+      if (repoName) {
+        console.log(
+          chalk.cyan(`  2. Make sure to include ${chalk.bold(repoName)}`)
+        );
+        console.log(chalk.cyan("  3. Complete the installation"));
+      } else {
+        console.log(chalk.cyan("  2. Complete the installation"));
+      }
+      console.log();
+    }
+
+    // Open the browser
+    await open(installUrl);
+
+    // Wait for user confirmation
+    console.log(chalk.gray("Waiting for GitHub configuration..."));
+    await prompt(
+      chalk.white("Press Enter when you've completed the GitHub setup..."),
+      "y"
+    );
+
+    // Verify connection (best effort)
+    console.log(chalk.gray("Verifying GitHub connection..."));
+
+    let verified = false;
+    try {
+      const status = await api.getGitHubConnectionStatus();
+
+      if (!status.is_connected) {
+        console.log(chalk.yellow("⚠️  GitHub connection not detected."));
+      } else if (repoName) {
+        // Try to verify specific repo access
+        const [owner, repo] = repoName.split("/");
+        console.log(chalk.gray(`Checking access to ${repoName}...`));
+
+        const hasAccess = await checkRepoAccess(api, owner, repo);
+
+        if (!hasAccess) {
+          console.log(
+            chalk.yellow(
+              `⚠️  The GitHub App may not have access to ${chalk.cyan(repoName)} yet`
+            )
+          );
+        } else {
+          console.log(chalk.green(`✓ Repository ${repoName} is accessible!\n`));
+          verified = true;
+        }
+      } else {
+        console.log(chalk.green("✓ GitHub connected successfully!\n"));
+        verified = true;
+      }
+    } catch (error) {
+      console.log(
+        chalk.yellow("⚠️  Could not verify GitHub connection (API issue)")
+      );
+    }
+
+    // Even if verification failed, the user may have configured it successfully
+    // Offer to retry the deployment
+    if (!verified) {
+      console.log(
+        chalk.gray(
+          "\nNote: If you completed the GitHub setup, the deployment may work now.\n"
+        )
+      );
+    }
+
+    return true;
+  } catch (error) {
+    console.log(
+      chalk.yellow("\n⚠️  Unable to open GitHub installation automatically")
+    );
+    console.log(
+      chalk.white("Please visit: ") +
+        chalk.cyan("https://cloud.mcp-use.com/cloud/settings")
+    );
+    console.log(
+      chalk.gray("Then connect your GitHub account and try again.\n")
+    );
+    return false;
+  }
 }
 
 /**
@@ -681,8 +912,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Confirm deployment
     const shouldDeploy = await prompt(
       chalk.white(
-        `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (y/n): `
-      )
+        `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (Y/n): `
+      ),
+      "y"
     );
 
     if (!shouldDeploy) {
@@ -725,6 +957,123 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     // Check if project is linked to an existing deployment
     const api = await McpUseAPI.create();
+
+    // Pre-flight GitHub connection and repo access check (REQUIRED for GitHub repos)
+    let githubVerified = false;
+    try {
+      // Debug: show which API URL is being used
+      console.log(chalk.gray(`[DEBUG] API URL: ${(api as any).baseUrl}`));
+      const connectionStatus = await api.getGitHubConnectionStatus();
+
+      if (!connectionStatus.is_connected) {
+        // No GitHub connection at all
+        const repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
+        const installed = await promptGitHubInstallation(
+          api,
+          "not_connected",
+          repoFullName
+        );
+        if (!installed) {
+          console.log(chalk.gray("Deployment cancelled."));
+          process.exit(0);
+        }
+        // After installation, verify again
+        const retryStatus = await api.getGitHubConnectionStatus();
+        if (!retryStatus.is_connected) {
+          console.log(
+            chalk.red("\n✗ GitHub connection could not be verified.")
+          );
+          console.log(
+            chalk.gray("Please try connecting GitHub from the web UI:")
+          );
+          console.log(
+            chalk.cyan("  https://cloud.mcp-use.com/cloud/settings\n")
+          );
+          process.exit(1);
+        }
+        githubVerified = true;
+      } else if (gitInfo.owner && gitInfo.repo) {
+        // GitHub is connected, but check if this specific repo is accessible
+        console.log(chalk.gray("Checking repository access..."));
+        const hasAccess = await checkRepoAccess(
+          api,
+          gitInfo.owner,
+          gitInfo.repo
+        );
+
+        if (!hasAccess) {
+          const repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
+          console.log(
+            chalk.yellow(
+              `⚠️  GitHub App doesn't have access to ${chalk.cyan(repoFullName)}`
+            )
+          );
+
+          const configured = await promptGitHubInstallation(
+            api,
+            "no_access",
+            repoFullName
+          );
+          if (!configured) {
+            console.log(chalk.gray("Deployment cancelled."));
+            process.exit(0);
+          }
+          // After configuration, verify again
+          const hasAccessRetry = await checkRepoAccess(
+            api,
+            gitInfo.owner,
+            gitInfo.repo
+          );
+          if (!hasAccessRetry) {
+            console.log(
+              chalk.red(
+                `\n✗ Repository ${chalk.cyan(repoFullName)} is still not accessible.`
+              )
+            );
+            console.log(
+              chalk.gray(
+                "Please make sure the GitHub App has access to this repository."
+              )
+            );
+            console.log(
+              chalk.cyan("  https://github.com/settings/installations\n")
+            );
+            process.exit(1);
+          }
+          githubVerified = true;
+        } else {
+          console.log(chalk.green("✓ Repository access confirmed"));
+          githubVerified = true;
+        }
+      }
+    } catch (error) {
+      // For GitHub repos, connection check must succeed
+      console.log(chalk.red("✗ Could not verify GitHub connection"));
+      console.log(
+        chalk.gray(
+          "Error: " + (error instanceof Error ? error.message : "Unknown error")
+        )
+      );
+      console.log(chalk.gray("\nPlease ensure:"));
+      console.log(
+        chalk.cyan(
+          "  1. You have connected GitHub at https://cloud.mcp-use.com/cloud/settings"
+        )
+      );
+      console.log(
+        chalk.cyan("  2. The GitHub App has access to your repository")
+      );
+      console.log(chalk.cyan("  3. Your internet connection is stable\n"));
+      process.exit(1);
+    }
+
+    if (!githubVerified) {
+      console.log(
+        chalk.red("\n✗ GitHub verification required for this deployment")
+      );
+      process.exit(1);
+    }
+
     const existingLink = !options.new ? await getProjectLink(cwd) : null;
 
     if (existingLink) {
