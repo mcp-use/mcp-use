@@ -56,6 +56,10 @@ export default defineConfig({
         __dirname,
         "../mcp-use/dist/src/browser.js"
       ),
+      "mcp-use/utils": path.resolve(
+        __dirname,
+        "../mcp-use/dist/src/utils/index.js"
+      ),
       "posthog-node": path.resolve(
         __dirname,
         "./src/client/stubs/posthog-node.js"
@@ -105,7 +109,12 @@ export default defineConfig({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["mcp-use/react", "mcp-use/browser", "react-syntax-highlighter"],
+    include: [
+      "mcp-use/react",
+      "mcp-use/browser",
+      "mcp-use/utils",
+      "react-syntax-highlighter",
+    ],
     exclude: [
       "posthog-node",
       "tar", // Node.js file system package
@@ -117,7 +126,7 @@ export default defineConfig({
   },
   build: {
     minify: true,
-    outDir: "dist/client",
+    outDir: "dist/web",
     rollupOptions: {
       external: [
         "langfuse-langchain",
@@ -149,6 +158,13 @@ export default defineConfig({
       "^/inspector/api/.*": {
         target: "http://localhost:3001",
         changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on("proxyReq", (proxyReq, req) => {
+            // Preserve the original host for OAuth resource URL rewriting
+            const originalHost = req.headers.host || "localhost:3000";
+            proxyReq.setHeader("X-Forwarded-Host", originalHost);
+          });
+        },
       },
     },
   },

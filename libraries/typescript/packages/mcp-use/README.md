@@ -13,7 +13,7 @@
         <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
     <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
         <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
-    <a href="https://docs.mcp-use.io" alt="Documentation">
+    <a href="https://mcp-use.com/docs" alt="Documentation">
         <img src="https://img.shields.io/badge/docs-mcp--use.io-blue" /></a>
     <a href="https://mcp-use.io" alt="Website">
         <img src="https://img.shields.io/badge/website-mcp--use.io-blue" /></a>
@@ -33,12 +33,12 @@
 
 ## 📦 mcp-use Ecosystem
 
-| Package                                                                                           | Description                                 | Version                                                                                                         |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **mcp-use**                                                                                       | Core framework for MCP clients and servers  | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/packages/cli)                      | Build tool for MCP apps with UI widgets     | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)          | Web-based MCP server inspector and debugger | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/packages/create-mcp-use-app) | Create MCP apps with one command            | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                                                                                             | Description                                 | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **mcp-use**                                                                                                         | Core framework for MCP clients and servers  | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli)                      | Build tool for MCP apps with UI widgets     | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
+| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)          | Web-based MCP server inspector and debugger | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps with one command            | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
@@ -85,33 +85,33 @@ OPENAI_API_KEY=your_api_key
 ### Basic Usage
 
 ```ts
-import { ChatOpenAI } from '@langchain/openai'
-import { MCPAgent, MCPClient } from 'mcp-use'
-import 'dotenv/config'
+import { ChatOpenAI } from "@langchain/openai";
+import { MCPAgent, MCPClient } from "mcp-use";
+import "dotenv/config";
 
 async function main() {
   // 1. Configure MCP servers
   const config = {
     mcpServers: {
-      playwright: { command: 'npx', args: ['@playwright/mcp@latest'] },
+      playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
     },
-  }
-  const client = MCPClient.fromDict(config)
+  };
+  const client = MCPClient.fromDict(config);
 
   // 2. Create LLM
-  const llm = new ChatOpenAI({ modelName: 'gpt-4o' })
+  const llm = new ChatOpenAI({ modelName: "gpt-4o" });
 
   // 3. Instantiate agent
-  const agent = new MCPAgent({ llm, client, maxSteps: 20 })
+  const agent = new MCPAgent({ llm, client, maxSteps: 20 });
 
   // 4. Run query
   const result = await agent.run(
-    'Find the best restaurant in Tokyo using Google Search'
-  )
-  console.log('Result:', result)
+    "Find the best restaurant in Tokyo using Google Search"
+  );
+  console.log("Result:", result);
 }
 
-main().catch(console.error)
+main().catch(console.error);
 ```
 
 ---
@@ -127,8 +127,8 @@ The `MCPAgent` class provides several methods for executing queries with differe
 Executes a query and returns the final result as a string.
 
 ```ts
-const result = await agent.run('What tools are available?')
-console.log(result)
+const result = await agent.run("What tools are available?");
+console.log(result);
 ```
 
 #### `stream(query: string, maxSteps?: number): AsyncGenerator<AgentStep, string, void>`
@@ -136,10 +136,10 @@ console.log(result)
 Yields intermediate steps during execution, providing visibility into the agent's reasoning process.
 
 ```ts
-const stream = agent.stream('Search for restaurants in Tokyo')
+const stream = agent.stream("Search for restaurants in Tokyo");
 for await (const step of stream) {
-  console.log(`Tool: ${step.action.tool}, Input: ${step.action.toolInput}`)
-  console.log(`Result: ${step.observation}`)
+  console.log(`Tool: ${step.action.tool}, Input: ${step.action.toolInput}`);
+  console.log(`Result: ${step.observation}`);
 }
 ```
 
@@ -148,22 +148,22 @@ for await (const step of stream) {
 Yields fine-grained LangChain StreamEvent objects, enabling token-by-token streaming and detailed event tracking.
 
 ```ts
-const eventStream = agent.streamEvents('What is the weather today?')
+const eventStream = agent.streamEvents("What is the weather today?");
 for await (const event of eventStream) {
   // Handle different event types
   switch (event.event) {
-    case 'on_chat_model_stream':
+    case "on_chat_model_stream":
       // Token-by-token streaming from the LLM
       if (event.data?.chunk?.content) {
-        process.stdout.write(event.data.chunk.content)
+        process.stdout.write(event.data.chunk.content);
       }
-      break
-    case 'on_tool_start':
-      console.log(`\nTool started: ${event.name}`)
-      break
-    case 'on_tool_end':
-      console.log(`Tool completed: ${event.name}`)
-      break
+      break;
+    case "on_tool_start":
+      console.log(`\nTool started: ${event.name}`);
+      break;
+    case "on_tool_end":
+      console.log(`Tool completed: ${event.name}`);
+      break;
   }
 }
 ```
@@ -187,66 +187,66 @@ npm install ai @langchain/anthropic
 ### Basic Usage
 
 ```ts
-import { ChatAnthropic } from '@langchain/anthropic'
-import { createTextStreamResponse } from 'ai'
+import { ChatAnthropic } from "@langchain/anthropic";
+import { createTextStreamResponse } from "ai";
 import {
   createReadableStreamFromGenerator,
   MCPAgent,
   MCPClient,
   streamEventsToAISDK,
-} from 'mcp-use'
+} from "mcp-use";
 
 async function createApiHandler() {
   const config = {
     mcpServers: {
       everything: {
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-everything'],
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-everything"],
       },
     },
-  }
+  };
 
-  const client = new MCPClient(config)
-  const llm = new ChatAnthropic({ model: 'claude-sonnet-4-20250514' })
-  const agent = new MCPAgent({ llm, client, maxSteps: 5 })
+  const client = new MCPClient(config);
+  const llm = new ChatAnthropic({ model: "claude-sonnet-4-20250514" });
+  const agent = new MCPAgent({ llm, client, maxSteps: 5 });
 
   return async (request: { prompt: string }) => {
-    const streamEvents = agent.streamEvents(request.prompt)
-    const aiSDKStream = streamEventsToAISDK(streamEvents)
-    const readableStream = createReadableStreamFromGenerator(aiSDKStream)
+    const streamEvents = agent.streamEvents(request.prompt);
+    const aiSDKStream = streamEventsToAISDK(streamEvents);
+    const readableStream = createReadableStreamFromGenerator(aiSDKStream);
 
-    return createTextStreamResponse({ textStream: readableStream })
-  }
+    return createTextStreamResponse({ textStream: readableStream });
+  };
 }
 ```
 
 ### Enhanced Usage with Tool Visibility
 
 ```ts
-import { streamEventsToAISDKWithTools } from 'mcp-use'
+import { streamEventsToAISDKWithTools } from "mcp-use";
 
 async function createEnhancedApiHandler() {
   const config = {
     mcpServers: {
       everything: {
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-everything'],
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-everything"],
       },
     },
-  }
+  };
 
-  const client = new MCPClient(config)
-  const llm = new ChatAnthropic({ model: 'claude-sonnet-4-20250514' })
-  const agent = new MCPAgent({ llm, client, maxSteps: 8 })
+  const client = new MCPClient(config);
+  const llm = new ChatAnthropic({ model: "claude-sonnet-4-20250514" });
+  const agent = new MCPAgent({ llm, client, maxSteps: 8 });
 
   return async (request: { prompt: string }) => {
-    const streamEvents = agent.streamEvents(request.prompt)
+    const streamEvents = agent.streamEvents(request.prompt);
     // Enhanced stream includes tool usage notifications
-    const enhancedStream = streamEventsToAISDKWithTools(streamEvents)
-    const readableStream = createReadableStreamFromGenerator(enhancedStream)
+    const enhancedStream = streamEventsToAISDKWithTools(streamEvents);
+    const readableStream = createReadableStreamFromGenerator(enhancedStream);
 
-    return createTextStreamResponse({ textStream: readableStream })
-  }
+    return createTextStreamResponse({ textStream: readableStream });
+  };
 }
 ```
 
@@ -254,39 +254,39 @@ async function createEnhancedApiHandler() {
 
 ```ts
 // pages/api/chat.ts or app/api/chat/route.ts
-import { ChatAnthropic } from '@langchain/anthropic'
-import { createTextStreamResponse } from 'ai'
+import { ChatAnthropic } from "@langchain/anthropic";
+import { createTextStreamResponse } from "ai";
 import {
   createReadableStreamFromGenerator,
   MCPAgent,
   MCPClient,
   streamEventsToAISDK,
-} from 'mcp-use'
+} from "mcp-use";
 
 export async function POST(req: Request) {
-  const { prompt } = await req.json()
+  const { prompt } = await req.json();
 
   const config = {
     mcpServers: {
       everything: {
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-everything'],
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-everything"],
       },
     },
-  }
+  };
 
-  const client = new MCPClient(config)
-  const llm = new ChatAnthropic({ model: 'claude-sonnet-4-20250514' })
-  const agent = new MCPAgent({ llm, client, maxSteps: 10 })
+  const client = new MCPClient(config);
+  const llm = new ChatAnthropic({ model: "claude-sonnet-4-20250514" });
+  const agent = new MCPAgent({ llm, client, maxSteps: 10 });
 
   try {
-    const streamEvents = agent.streamEvents(prompt)
-    const aiSDKStream = streamEventsToAISDK(streamEvents)
-    const readableStream = createReadableStreamFromGenerator(aiSDKStream)
+    const streamEvents = agent.streamEvents(prompt);
+    const aiSDKStream = streamEventsToAISDK(streamEvents);
+    const readableStream = createReadableStreamFromGenerator(aiSDKStream);
 
-    return createTextStreamResponse({ textStream: readableStream })
+    return createTextStreamResponse({ textStream: readableStream });
   } finally {
-    await client.closeAllSessions()
+    await client.closeAllSessions();
   }
 }
 ```
@@ -295,12 +295,12 @@ export async function POST(req: Request) {
 
 ```tsx
 // components/Chat.tsx
-import { useCompletion } from 'ai/react'
+import { useCompletion } from "ai/react";
 
 export function Chat() {
   const { completion, input, handleInputChange, handleSubmit } = useCompletion({
-    api: '/api/chat',
-  })
+    api: "/api/chat",
+  });
 
   return (
     <div>
@@ -313,7 +313,7 @@ export function Chat() {
         />
       </form>
     </div>
-  )
+  );
 }
 ```
 
@@ -345,39 +345,39 @@ LANGFUSE_HOST=https://cloud.langfuse.com  # or your self-hosted instance
 ```ts
 // Set custom metadata for the current execution
 agent.setMetadata({
-  userId: 'user123',
-  sessionId: 'session456',
-  environment: 'production',
-})
+  userId: "user123",
+  sessionId: "session456",
+  environment: "production",
+});
 
 // Set tags for better organization
-agent.setTags(['production', 'user-query', 'tool-discovery'])
+agent.setTags(["production", "user-query", "tool-discovery"]);
 
 // Run query with metadata and tags
-const result = await agent.run('Search for restaurants in Tokyo')
+const result = await agent.run("Search for restaurants in Tokyo");
 ```
 
 #### Monitoring Agent Performance
 
 ```ts
 // Stream events for detailed monitoring
-const eventStream = agent.streamEvents('Complex multi-step query')
+const eventStream = agent.streamEvents("Complex multi-step query");
 
 for await (const event of eventStream) {
   // Monitor different event types
   switch (event.event) {
-    case 'on_llm_start':
-      console.log('LLM call started:', event.data)
-      break
-    case 'on_tool_start':
-      console.log('Tool execution started:', event.name, event.data)
-      break
-    case 'on_tool_end':
-      console.log('Tool execution completed:', event.name, event.data)
-      break
-    case 'on_chain_end':
-      console.log('Agent execution completed:', event.data)
-      break
+    case "on_llm_start":
+      console.log("LLM call started:", event.data);
+      break;
+    case "on_tool_start":
+      console.log("Tool execution started:", event.name, event.data);
+      break;
+    case "on_tool_end":
+      console.log("Tool execution completed:", event.name, event.data);
+      break;
+    case "on_chain_end":
+      console.log("Agent execution completed:", event.data);
+      break;
   }
 }
 ```
@@ -391,7 +391,7 @@ const agent = new MCPAgent({
   llm,
   client,
   observe: false,
-})
+});
 ```
 
 ---
@@ -414,9 +414,9 @@ You can store servers in a JSON file:
 Load it:
 
 ```ts
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "mcp-use";
 
-const client = MCPClient.fromConfigFile('./mcp-config.json')
+const client = MCPClient.fromConfigFile("./mcp-config.json");
 ```
 
 ---
@@ -463,13 +463,13 @@ See the [examples README](./examples/README.md) for detailed documentation and p
 ```ts
 const config = {
   mcpServers: {
-    airbnb: { command: 'npx', args: ['@openbnb/mcp-server-airbnb'] },
-    playwright: { command: 'npx', args: ['@playwright/mcp@latest'] },
+    airbnb: { command: "npx", args: ["@openbnb/mcp-server-airbnb"] },
+    playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
   },
-}
-const client = MCPClient.fromDict(config)
-const agent = new MCPAgent({ llm, client, useServerManager: true })
-await agent.run('Search Airbnb in Barcelona, then Google restaurants nearby')
+};
+const client = MCPClient.fromDict(config);
+const agent = new MCPAgent({ llm, client, useServerManager: true });
+await agent.run("Search Airbnb in Barcelona, then Google restaurants nearby");
 ```
 
 ---
@@ -480,8 +480,8 @@ await agent.run('Search Airbnb in Barcelona, then Google restaurants nearby')
 const agent = new MCPAgent({
   llm,
   client,
-  disallowedTools: ['file_system', 'network'],
-})
+  disallowedTools: ["file_system", "network"],
+});
 ```
 
 ---
@@ -493,48 +493,48 @@ Beyond being a powerful MCP client, mcp-use also provides a complete server fram
 ### Quick Server Setup
 
 ```ts
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer } from "mcp-use/server";
 
 // Create your MCP server
 const server = new MCPServer({
-  name: 'my-awesome-server',
-  version: '1.0.0',
-  description: 'My MCP server with tools, resources, and prompts',
-})
+  name: "my-awesome-server",
+  version: "1.0.0",
+  description: "My MCP server with tools, resources, and prompts",
+});
 
 // Define tools
-server.tool('search_web', {
-  description: 'Search the web for information',
+server.tool("search_web", {
+  description: "Search the web for information",
   parameters: z.object({
-    query: z.string().describe('Search query'),
+    query: z.string().describe("Search query"),
   }),
   execute: async (args) => {
     // Your tool implementation
-    return { results: await performSearch(args.query) }
+    return { results: await performSearch(args.query) };
   },
-})
+});
 
 // Define resources
-server.resource('config', {
-  description: 'Application configuration',
-  uri: 'config://settings',
-  mimeType: 'application/json',
+server.resource("config", {
+  description: "Application configuration",
+  uri: "config://settings",
+  mimeType: "application/json",
   fetch: async () => {
-    return JSON.stringify(await getConfig(), null, 2)
+    return JSON.stringify(await getConfig(), null, 2);
   },
-})
+});
 
 // Define prompts
-server.prompt('code_review', {
-  description: 'Review code for best practices',
-  arguments: [{ name: 'code', description: 'Code to review', required: true }],
+server.prompt("code_review", {
+  description: "Review code for best practices",
+  arguments: [{ name: "code", description: "Code to review", required: true }],
   render: async (args) => {
-    return `Please review this code:\n\n${args.code}`
+    return `Please review this code:\n\n${args.code}`;
   },
-})
+});
 
 // Start the server
-server.listen(3000)
+server.listen(3000);
 // 🎉 Inspector automatically available at http://localhost:3000/inspector
 // 🚀 MCP endpoint available at http://localhost:3000/mcp
 ```
@@ -558,32 +558,32 @@ mcp-use provides a unified `uiResource()` method for registering interactive UI 
 #### Quick Start
 
 ```ts
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer } from "mcp-use/server";
 
-const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
+const server = new MCPServer({ name: "my-server", version: "1.0.0" });
 
 // Register a widget - creates both tool and resource automatically
 server.uiResource({
-  type: 'externalUrl',
-  name: 'kanban-board',
-  widget: 'kanban-board',
-  title: 'Kanban Board',
-  description: 'Interactive task management board',
+  type: "externalUrl",
+  name: "kanban-board",
+  widget: "kanban-board",
+  title: "Kanban Board",
+  description: "Interactive task management board",
   props: {
     initialTasks: {
-      type: 'array',
-      description: 'Initial tasks',
+      type: "array",
+      description: "Initial tasks",
       required: false,
     },
     theme: {
-      type: 'string',
-      default: 'light',
+      type: "string",
+      default: "light",
     },
   },
-  size: ['900px', '600px'],
-})
+  size: ["900px", "600px"],
+});
 
-server.listen(3000)
+server.listen(3000);
 ```
 
 This automatically creates:
@@ -598,11 +598,11 @@ Serve widgets from your filesystem via iframe:
 
 ```ts
 server.uiResource({
-  type: 'externalUrl',
-  name: 'dashboard',
-  widget: 'dashboard',
-  props: { userId: { type: 'string', required: true } },
-})
+  type: "externalUrl",
+  name: "dashboard",
+  widget: "dashboard",
+  props: { userId: { type: "string", required: true } },
+});
 ```
 
 **2. Raw HTML**
@@ -610,15 +610,15 @@ Direct HTML content rendering:
 
 ```ts
 server.uiResource({
-  type: 'rawHtml',
-  name: 'welcome-card',
+  type: "rawHtml",
+  name: "welcome-card",
   htmlContent: `
     <!DOCTYPE html>
     <html>
       <body><h1>Welcome!</h1></body>
     </html>
   `,
-})
+});
 ```
 
 **3. Remote DOM**
@@ -626,15 +626,15 @@ Interactive components using MCP-UI React components:
 
 ```ts
 server.uiResource({
-  type: 'remoteDom',
-  name: 'quick-poll',
+  type: "remoteDom",
+  name: "quick-poll",
   script: `
     const button = document.createElement('ui-button');
     button.setAttribute('label', 'Vote');
     root.appendChild(button);
   `,
-  framework: 'react',
-})
+  framework: "react",
+});
 ```
 
 #### Get Started with Templates
@@ -655,24 +655,24 @@ mcp-use supports building custom UI widgets for your MCP tools using React:
 
 ```tsx
 // resources/task-manager.tsx
-import React, { useState } from 'react'
-import { useMcp } from 'mcp-use/react'
+import React, { useState } from "react";
+import { useMcp } from "mcp-use/react";
 
 export default function TaskManager() {
-  const { callTool } = useMcp()
-  const [tasks, setTasks] = useState<Task[]>([])
+  const { callTool } = useMcp();
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const addTask = async (title: string) => {
-    const result = await callTool('create_task', { title })
-    setTasks([...tasks, result])
-  }
+    const result = await callTool("create_task", { title });
+    setTasks([...tasks, result]);
+  };
 
   return (
     <div>
       <h1>Task Manager</h1>
       {/* Your UI implementation */}
     </div>
-  )
+  );
 }
 ```
 
@@ -693,29 +693,29 @@ npx @mcp-use/cli start
 
 ```ts
 const server = new MCPServer({
-  name: 'advanced-server',
-  version: '1.0.0',
-  description: 'Advanced MCP server with custom configuration',
+  name: "advanced-server",
+  version: "1.0.0",
+  description: "Advanced MCP server with custom configuration",
   // Custom inspector path (default: /inspector)
-  inspectorPath: '/debug',
+  inspectorPath: "/debug",
   // Custom MCP endpoint (default: /mcp)
-  mcpPath: '/api/mcp',
+  mcpPath: "/api/mcp",
   // Enable CORS for browser access
   cors: {
-    origin: ['http://localhost:3000', 'https://myapp.com'],
+    origin: ["http://localhost:3000", "https://myapp.com"],
     credentials: true,
   },
   // OAuth configuration
   oauth: {
     clientId: process.env.OAUTH_CLIENT_ID,
     clientSecret: process.env.OAUTH_CLIENT_SECRET,
-    authorizationUrl: 'https://api.example.com/oauth/authorize',
-    tokenUrl: 'https://api.example.com/oauth/token',
-    scopes: ['read', 'write'],
+    authorizationUrl: "https://api.example.com/oauth/authorize",
+    tokenUrl: "https://api.example.com/oauth/token",
+    scopes: ["read", "write"],
   },
   // Custom middleware
   middleware: [authenticationMiddleware, rateLimitingMiddleware],
-})
+});
 ```
 
 ### Server Deployment
@@ -739,24 +739,24 @@ docker run -p 3000:3000 my-mcp-server
 You can also integrate MCP server into existing Express applications:
 
 ```ts
-import express from 'express'
-import { mountMCPServer } from 'mcp-use/server'
+import express from "express";
+import { mountMCPServer } from "mcp-use/server";
 
-const app = express()
+const app = express();
 
 // Your existing routes
-app.get('/api/health', (req, res) => res.send('OK'))
+app.get("/api/health", (req, res) => res.send("OK"));
 
 // Mount MCP server
 const mcpServer = new MCPServer({
-  name: 'integrated-server',
+  name: "integrated-server",
   /* ... */
-})
+});
 mountMCPServer(app, mcpServer, {
-  basePath: '/mcp-service', // Optional custom base path
-})
+  basePath: "/mcp-service", // Optional custom base path
+});
 
-app.listen(3000)
+app.listen(3000);
 // Inspector at: http://localhost:3000/mcp-service/inspector
 // MCP endpoint: http://localhost:3000/mcp-service/mcp
 ```

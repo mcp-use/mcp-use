@@ -163,7 +163,11 @@ export const MessageList = memo(
                             args={part.toolInvocation.args}
                             result={part.toolInvocation.result}
                             state={
-                              part.toolInvocation.result ? "result" : "call"
+                              part.toolInvocation.state === "error"
+                                ? "error"
+                                : part.toolInvocation.state === "pending"
+                                  ? "call"
+                                  : "result"
                             }
                           />
                           {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}

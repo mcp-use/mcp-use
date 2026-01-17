@@ -10,8 +10,8 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { Textarea } from "@/client/components/ui/textarea";
-import { CreateMessageResultSchema } from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { CreateMessageResult } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
 import type { LLMConfig } from "../chat/types";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";

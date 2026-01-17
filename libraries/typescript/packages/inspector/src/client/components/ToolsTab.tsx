@@ -1,4 +1,7 @@
-import type { Tool } from "@mcp-use/modelcontextprotocol-sdk/types.js";
+import { Button } from "@/client/components/ui/button";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -7,23 +10,22 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
-import { Button } from "@/client/components/ui/button";
 import type { SavedRequest, ToolResult } from "./tools";
 
+import { Badge } from "@/client/components/ui/badge";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
-import type { ImperativePanelHandle } from "react-resizable-panels";
 import { useInspector } from "@/client/context/InspectorContext";
 import {
   MCPToolExecutionEvent,
   MCPToolSavedEvent,
   Telemetry,
 } from "@/client/telemetry";
+import type { ImperativePanelHandle } from "react-resizable-panels";
+import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import {
   SavedRequestsList,
   SaveRequestDialog,
@@ -32,8 +34,6 @@ import {
   ToolsList,
   ToolsTabHeader,
 } from "./tools";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
-import { Badge } from "@/client/components/ui/badge";
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -59,6 +59,19 @@ interface ToolsTabProps {
 
 const SAVED_REQUESTS_KEY = "mcp-inspector-saved-requests";
 
+/**
+ * Render the Tools tab UI for browsing, executing, and managing tools and saved requests.
+ *
+ * Renders a responsive interface with a searchable tools list and saved-requests list, a tool execution panel, a results history (with copying, deleting, fullscreen, preview and Apps SDK resource integration), and an RPC message logger. Supports mobile-specific navigation, resizable panels for desktop, saved request persistence, keyboard navigation, execution abort/timeout handling, and telemetry for executions and saved requests.
+ *
+ * @param ref - Optional imperative ref exposing `focusSearch` and `blurSearch` methods.
+ * @param tools - Array of available tools to list and execute.
+ * @param callTool - Function to invoke a tool by name with arguments and options (timeout, reset behavior, abort signal).
+ * @param readResource - Function to fetch a resource by URI (used for Apps SDK output templates).
+ * @param serverId - Identifier for the current server (used for telemetry and RPC filtering).
+ * @param isConnected - Whether the inspector is connected to the server (affects execution UI).
+ * @returns The React element for the Tools tab.
+ */
 export function ToolsTab({
   ref,
   tools,
@@ -344,6 +357,25 @@ export function ToolsTab({
     handleToolSelect,
     setSelectedToolName,
   ]);
+
+  // Sync selectedTool with updated tools list (for HMR support)
+  // When tools change via HMR, update selectedTool to the new object reference
+  useEffect(() => {
+    if (selectedTool) {
+      const updatedTool = tools.find((t) => t.name === selectedTool.name);
+      if (updatedTool && updatedTool !== selectedTool) {
+        // Tool definition changed - update the reference
+        // We compare by reference to detect if it's a different object
+        const hasChanges =
+          JSON.stringify(updatedTool.inputSchema) !==
+            JSON.stringify(selectedTool.inputSchema) ||
+          updatedTool.description !== selectedTool.description;
+        if (hasChanges) {
+          setSelectedTool(updatedTool);
+        }
+      }
+    }
+  }, [tools, selectedTool]);
 
   const handleArgChange = useCallback(
     (key: string, value: string) => {
@@ -924,6 +956,9 @@ export function ToolsTab({
             collapsible
             minSize={5}
             collapsedSize={5}
+            style={{
+              minHeight: 45,
+            }}
             onCollapse={() => {
               setRpcPanelCollapsed(true);
             }}

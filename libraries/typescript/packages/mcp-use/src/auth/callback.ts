@@ -1,5 +1,5 @@
 // callback.ts
-import { auth } from "@mcp-use/modelcontextprotocol-sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust path
 import type { StoredState } from "./types.js"; // Adjust path, ensure definition includes providerOptions
 
@@ -24,7 +24,7 @@ export async function onMcpAuthorization() {
 
   let provider: BrowserOAuthClientProvider | null = null;
   let storedStateData: StoredState | null = null;
-  const stateKey = state ? `mcp:auth:state_${state}` : null; // Reconstruct state key prefix assumption
+  let stateKey: string | null = null;
 
   try {
     // --- Basic Error Handling ---
@@ -38,9 +38,49 @@ export async function onMcpAuthorization() {
         "Authorization code not found in callback query parameters."
       );
     }
-    if (!state || !stateKey) {
+    if (!state) {
       throw new Error(
         "State parameter not found or invalid in callback query parameters."
+      );
+    }
+
+    // --- Find State Key ---
+    // Debug: Log all localStorage keys to help diagnose state issues
+    console.log(`[mcp-callback] Looking for state: ${state}`);
+    console.log(
+      `[mcp-callback] All localStorage keys:`,
+      Object.keys(localStorage)
+    );
+
+    // Try default prefix first, then search dynamically for other prefixes
+    // This handles different storageKeyPrefix values used by different servers
+    const defaultStateKey = `mcp:auth:state_${state}`;
+    if (localStorage.getItem(defaultStateKey)) {
+      stateKey = defaultStateKey;
+      console.log(
+        `[mcp-callback] Found state with default key: ${defaultStateKey}`
+      );
+    } else {
+      // Search through localStorage for keys matching the pattern *:state_${state}
+      const stateKeySuffix = `:state_${state}`;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith(stateKeySuffix)) {
+          stateKey = key;
+          console.log(`[mcp-callback] Found state with dynamic key: ${key}`);
+          break;
+        }
+      }
+    }
+
+    if (!stateKey) {
+      // Log all state-related keys for debugging
+      const stateKeys = Object.keys(localStorage).filter((k) =>
+        k.includes("state")
+      );
+      console.log(`[mcp-callback] State keys in storage:`, stateKeys);
+      throw new Error(
+        `Invalid or expired state parameter "${state}". No matching state found in storage.`
       );
     }
 
@@ -71,11 +111,68 @@ export async function onMcpAuthorization() {
     }
     const { serverUrl, ...providerOptions } = storedStateData.providerOptions;
 
+    // Infer OAuth proxy URL from callback URL if not stored
+    // The callback URL is like: http://localhost:3000/inspector/oauth/callback
+    // The OAuth proxy URL should be: http://localhost:3000/inspector/api/oauth
+    let oauthProxyUrl = providerOptions.oauthProxyUrl;
+    const connectionUrl = providerOptions.connectionUrl;
+    if (!oauthProxyUrl) {
+      try {
+        const callbackUrl = new URL(window.location.href);
+        // Check if this looks like an inspector callback
+        if (callbackUrl.pathname.includes("/oauth/callback")) {
+          // Derive the OAuth proxy URL from the callback URL
+          // e.g., /inspector/oauth/callback -> /inspector/api/oauth
+          let basePath = callbackUrl.pathname.replace(
+            /\/oauth\/callback.*$/,
+            ""
+          );
+
+          // IMPORTANT: If the callback is at root /oauth/callback (empty basePath),
+          // the OAuth proxy is likely at /inspector/api/oauth since that's where
+          // the inspector package mounts its routes. This handles the case where:
+          // - The hosted inspector serves the callback at /oauth/callback (via Next.js page)
+          // - But the OAuth proxy is mounted at /inspector/api/oauth (via inspector package)
+          if (!basePath || basePath === "") {
+            basePath = "/inspector";
+            console.log(
+              `${logPrefix} Callback at root /oauth/callback, using /inspector as base path for OAuth proxy`
+            );
+          }
+
+          oauthProxyUrl = `${callbackUrl.origin}${basePath}/api/oauth`;
+          // NOTE: We only infer oauthProxyUrl here, NOT connectionUrl.
+          // connectionUrl is the MCP gateway/proxy URL that the client connected to,
+          // which is different from the OAuth proxy URL. If the client connected
+          // directly to the MCP server (no gateway), connectionUrl should remain
+          // undefined so the SDK uses the original serverUrl for client info lookup.
+          console.log(
+            `${logPrefix} Inferred OAuth proxy URL from callback: ${oauthProxyUrl}`
+          );
+        }
+      } catch (e) {
+        console.warn(`${logPrefix} Could not infer OAuth proxy URL:`, e);
+      }
+    }
+
     // --- Instantiate Provider ---
     console.log(
       `${logPrefix} Re-instantiating provider for server: ${serverUrl}`
     );
-    provider = new BrowserOAuthClientProvider(serverUrl, providerOptions);
+    provider = new BrowserOAuthClientProvider(serverUrl, {
+      ...providerOptions,
+      oauthProxyUrl,
+      connectionUrl,
+    });
+
+    // Install fetch interceptor if OAuth proxy was configured or inferred
+    // This is needed to bypass CORS for token exchange requests
+    if (oauthProxyUrl) {
+      console.log(
+        `${logPrefix} Installing fetch interceptor for token exchange (proxy: ${oauthProxyUrl})`
+      );
+      provider.installFetchInterceptor();
+    }
 
     // --- Call SDK Auth Function ---
     console.log(`${logPrefix} Calling SDK auth() to exchange code...`);
@@ -84,10 +181,17 @@ export async function onMcpAuthorization() {
     // 2. Use provider.codeVerifier()
     // 3. Call exchangeAuthorization()
     // 4. Use provider.saveTokens() on success
-    // Extract base URL (origin) for OAuth discovery - OAuth metadata should be at the origin level
-    const baseUrl = new URL(serverUrl).origin;
+
+    // IMPORTANT: When using a gateway/proxy, the metadata's resource field was rewritten
+    // to match the gateway URL. We need to pass that EXACT URL to the SDK so validation passes.
+    // The SDK compares the resource field with serverUrl, so they must match exactly.
+    const sdkServerUrl = connectionUrl || new URL(serverUrl).origin;
+    console.log(
+      `${logPrefix} Using SDK serverUrl: ${sdkServerUrl} (connectionUrl: ${connectionUrl || "none"})`
+    );
+
     const authResult = await auth(provider, {
-      serverUrl: baseUrl,
+      serverUrl: sdkServerUrl,
       authorizationCode: code,
     });
 
@@ -113,8 +217,16 @@ export async function onMcpAuthorization() {
         );
         localStorage.removeItem(stateKey);
         window.close();
+      } else if (storedStateData.returnUrl) {
+        // Fallback for popup flow when popup was blocked and user clicked link manually
+        // Use the stored returnUrl to navigate back to the original page
+        console.log(
+          `${logPrefix} Popup flow without opener. Returning to: ${storedStateData.returnUrl}`
+        );
+        localStorage.removeItem(stateKey);
+        window.location.href = storedStateData.returnUrl;
       } else {
-        // Fallback: no opener and no return URL, redirect to root
+        // Last resort fallback: no opener and no return URL, redirect to root
         console.warn(
           `${logPrefix} No opener window or return URL detected. Redirecting to root.`
         );

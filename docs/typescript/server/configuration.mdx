@@ -210,64 +210,43 @@ server.get('/api/protected', authenticateJWT, (req, res) => {
 
 ### Logging Configuration
 
-Set up comprehensive logging:
+mcp-use provides a built-in logging system that works in both Node.js and browser environments. The server uses environment variables for log level control.
 
 ```typescript
-import winston from 'winston'
-import morgan from 'morgan'
+import { Logger } from 'mcp-use/server'
 
-// Configure Winston logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.simple()
-    }),
-    new winston.transports.File({
-      filename: 'error.log',
-      level: 'error'
-    }),
-    new winston.transports.File({
-      filename: 'combined.log'
-    })
-  ]
+// Configure logging programmatically
+Logger.configure({
+  level: 'debug',              // Log level: error, warn, info, http, verbose, debug, silly
+  format: 'detailed'           // Format: minimal, detailed, or emoji
 })
 
-// HTTP request logging with Morgan
-const morganFormat = ':method :url :status :response-time ms - :res[content-length]'
+// Or use environment-based configuration
+// DEBUG=0 - Production mode (info level)
+// DEBUG=1 - Debug mode (info level with more details)
+// DEBUG=2 - Verbose mode (debug level with full details)
 
-server.use(morgan(morganFormat, {
-  stream: {
-    write: (message) => logger.info(message.trim())
-  }
-}))
+// Set debug level programmatically
+Logger.setDebug(2)  // Enable verbose logging
 
-// Use logger in tools
-import { text } from 'mcp-use/server';
-
-server.tool({
-  name: 'example_tool',
-  cb: async (params) => {
-    logger.info('Tool executed', { tool: 'example_tool', params })
-
-    try {
-      // Tool logic
-      const result = await performOperation(params)
-      logger.debug('Tool result', { result })
-
-      return text(result)
-    } catch (error) {
-      logger.error('Tool error', { error: error.message, stack: error.stack })
-      throw error
-    }
-  }
-})
+// Change log format
+Logger.setFormat('emoji')  // Use emoji-based format for better visibility
 ```
+
+**Environment Variable Usage:**
+
+```bash
+# Production logging (default)
+node server.js
+
+# Debug mode
+DEBUG=1 node server.js
+
+# Verbose debug with full details
+DEBUG=2 node server.js
+```
+
+For comprehensive logging configuration and log level details, see the [Server Logging](./logging) documentation.
 
 ## Security Configuration
 
@@ -819,6 +798,59 @@ Configure MCP clients to connect to your server:
   }
 }
 ```
+
+## Development Configuration
+
+### CLI Options
+
+The `mcp-use` CLI provides several options for development:
+
+```bash
+# Start development server (HMR enabled by default)
+mcp-use dev
+
+# Specify port
+mcp-use dev --port 3001
+
+# Disable Hot Module Reloading (uses tsx watch instead)
+mcp-use dev --no-hmr
+
+# Don't auto-open inspector in browser
+mcp-use dev --no-open
+
+# Specify project path
+mcp-use dev --path ./my-server
+```
+
+### Hot Module Reloading (HMR)
+
+HMR is enabled by default during development. It allows you to modify tools, prompts, and resources without restarting the server or dropping client connections.
+
+**How it works:**
+1. The CLI watches your `src/` directory for `.ts` and `.tsx` changes
+2. When a file changes, it re-imports your server module
+3. Changes are diffed and applied to the running server
+4. Connected clients receive `list_changed` notifications
+
+**What can be hot-reloaded:**
+- Adding new tools, prompts, resources, or resource templates
+- Updating existing registrations (descriptions, schemas, handlers)
+- Removing registrations
+
+**What requires a restart:**
+- Server configuration changes (name, version, port)
+- Adding new middleware
+- Changes to OAuth configuration
+
+**Disabling HMR:**
+
+If you encounter issues with HMR, you can disable it:
+
+```bash
+mcp-use dev --no-hmr
+```
+
+This falls back to `tsx watch`, which restarts the entire server on changes.
 
 ## Best Practices
 

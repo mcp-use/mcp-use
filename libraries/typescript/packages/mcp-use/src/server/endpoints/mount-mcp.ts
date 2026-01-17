@@ -27,15 +27,18 @@ import { join } from "node:path";
 export async function mountMcp(
   app: HonoType,
   mcpServerInstance: {
-    getServerForSession: () => import("@mcp-use/modelcontextprotocol-sdk/server/mcp.js").McpServer;
+    getServerForSession: (
+      sessionId?: string
+    ) => import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;
     cleanupSessionSubscriptions?: (sessionId: string) => void;
+    cleanupSessionRefs?: (sessionId: string) => void;
   }, // The McpServer instance with getServerForSession() method
   sessions: Map<string, SessionData>,
   config: ServerConfig,
   isProductionMode: boolean
 ): Promise<{ mcpMounted: boolean; idleCleanupInterval?: NodeJS.Timeout }> {
-  const { FetchStreamableHTTPServerTransport } =
-    await import("@mcp-use/modelcontextprotocol-sdk/experimental/fetch-streamable-http/index.js");
+  const { WebStandardStreamableHTTPServerTransport } =
+    await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
 
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
 
@@ -96,11 +99,12 @@ export async function mountMcp(
       // STATELESS MODE: New server instance per request
       // Used for: Deno/edge runtimes, k6 load testing, curl, clients without SSE
       const server = mcpServerInstance.getServerForSession();
-      const transport = new FetchStreamableHTTPServerTransport({
+      const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // No session tracking
-        // Enable plain JSON responses ONLY if client doesn't support SSE
-        // This allows k6/curl to work while maintaining SSE format for compatible clients
-        enableJsonResponse: !clientSupportsSSE,
+        // IMPORTANT: Always use JSON responses in stateless mode
+        // Edge runtimes (Deno, Cloudflare Workers, Supabase) cannot maintain long-lived SSE streams
+        // Even if client supports SSE, we must use request-response JSON in stateless environments
+        enableJsonResponse: true,
       });
 
       try {
@@ -159,8 +163,8 @@ export async function mountMcp(
           `[MCP] Session metadata found but transport lost (likely hot reload): ${sessionId} - recreating transport`
         );
 
-        const server = mcpServerInstance.getServerForSession();
-        const transport = new FetchStreamableHTTPServerTransport({
+        const server = mcpServerInstance.getServerForSession(sessionId);
+        const transport = new WebStandardStreamableHTTPServerTransport({
           sessionIdGenerator: () => sessionId, // Reuse existing session ID
 
           onsessioninitialized: async (sid: string) => {
@@ -251,6 +255,7 @@ export async function mountMcp(
             await sessionStore.delete(sid);
             sessions.delete(sid);
             mcpServerInstance.cleanupSessionSubscriptions?.(sid);
+            mcpServerInstance.cleanupSessionRefs?.(sid);
           },
         });
 
@@ -300,9 +305,11 @@ export async function mountMcp(
       }
 
       // For new sessions or initialization, create new transport and server
-      const server = mcpServerInstance.getServerForSession();
-      const transport = new FetchStreamableHTTPServerTransport({
-        sessionIdGenerator: () => generateUUID(),
+      // Generate session ID first so we can pass it to getServerForSession for ref storage
+      const newSessionId = generateUUID();
+      const server = mcpServerInstance.getServerForSession(newSessionId);
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: () => newSessionId,
 
         onsessioninitialized: async (sid: string) => {
           console.log(`[MCP] Session initialized: ${sid}`);
@@ -378,6 +385,9 @@ export async function mountMcp(
 
           // Clean up resource subscriptions for this session
           mcpServerInstance.cleanupSessionSubscriptions?.(sid);
+
+          // Clean up registered refs for hot reload support
+          mcpServerInstance.cleanupSessionRefs?.(sid);
         },
       });
 

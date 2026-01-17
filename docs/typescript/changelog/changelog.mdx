@@ -6,256 +6,552 @@ rss: true
 tag: "New"
 ---
 
-<Update label="v1.11.0 - December 2025">
-  ## Session Management Architecture & CLI Client
-  Major release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
+<Update label="v1.13.5" description="January 2026">
+  ## CLI Documentation Enhancement
+  Patch release adding comprehensive CLI documentation.
 
-  ### Breaking Changes
-  - **Breaking**: WebSocket transport support removed. Use streamable HTTP or SSE transports instead.
-  - **Breaking**: LangChain adapter moved from main entry point to `mcp-use/adapters` subpath. `@langchain/core` and `langchain` are now optional peer dependencies.
-  - **Deprecated**: `autoCreateSessionOnInvalidId` server config option. Now follows MCP spec strictly (returns 404 for invalid sessions).
-
-  ### Session Management Features
-  - **New**: Pluggable session management architecture separating metadata storage (`SessionStore`) from active connections (`StreamManager`)
-  - **New**: `RedisSessionStore` for persistent, distributed session metadata storage
-  - **New**: `RedisStreamManager` for cross-server notifications via Redis Pub/Sub
-  - **New**: `FileSystemSessionStore` (dev mode default) persists sessions to `.mcp-use/sessions.json` for hot reload support
-  - **New**: `InMemorySessionStore` and `InMemoryStreamManager` (production defaults)
-  - **New**: Automatic 404 handling and re-initialization in clients per MCP spec
-  - **New**: Convenience methods: `sendToolsListChanged()`, `sendResourcesListChanged()`, `sendPromptsListChanged()`
-  - **Enhancement**: Auto-detection of stateless/stateful mode based on client `Accept` header
-  - **Enhancement**: Sessions survive server restarts in dev mode with filesystem storage
-  - **Enhancement**: Auto-cleanup of expired sessions (>24 hours)
-
-  ### CLI Client Features
-  - **New**: Full-featured CLI client for terminal MCP interactions (`npx mcp-use client`)
-  - **New**: Scoped commands for tools, resources, prompts, and session management
-  - **New**: Session persistence to `~/.mcp-use/cli-sessions.json` across terminal sessions
-  - **New**: Interactive REPL mode for server exploration
-  - **New**: JSON output mode (`--json`) for scripting and automation
-  - **New**: Multi-session support with session switching
-  - **New**: HTTP and stdio server connection support
-  - **New**: Formatted output with colored tables for human readability
-  - **New**: Automatic session restoration and reconnection
-  - **New**: Shell script examples for automation workflows
-
-  ### Client Improvements
-  - **New**: Auto-refresh tools/resources/prompts when receiving list change notifications
-  - **New**: Manual refresh methods: `refreshTools()`, `refreshResources()`, `refreshPrompts()`, `refreshAll()`
-  - **New**: Automatic 404 handling and re-initialization per MCP spec
-  - **Enhancement**: Deprecated `sse` transport type in React (use `http` or `auto`)
-
-  ### Additional Features
-  - **New**: CommonJS module support - full compatibility with `require()` syntax
-  - **New**: Favicon support for widget pages with automatic serving and long-term caching
-  - **New**: Enhanced session methods: `callTool()` defaults args to empty object, new `requireSession()` method
-  - **New**: Session architecture documentation with ARCHITECTURE.md
-  - **New**: Comparison guide with other MCP implementations (tmcp, FastMCP, xmcp, official SDK)
-  - **New**: Comprehensive environments guide (Node.js, Browser, React, CLI)
-
-  ### Documentation
-  - **New**: Session Management guide with storage provider documentation (Memory, FileSystem, Redis)
-  - **New**: CLI Client documentation with usage examples and scripting patterns
-  - **New**: Environments guide explaining usage across different JavaScript runtimes
-  - **New**: Comparison documentation analyzing mcp-use vs other implementations
-  - **Enhancement**: Major documentation restructuring for better organization
-  - **Enhancement**: Removed/consolidated outdated guides (direct-tool-calls, sandbox, connection-types)
-  - **Enhancement**: Updated agent documentation with improved examples
-
-  ### Widget Improvements
-  - **Enhancement**: Automatic cleanup of stale widget directories in `.mcp-use` folder
-  - **Enhancement**: Dev mode watches for widget file/directory deletions and cleans up build artifacts
-  - **Fix**: Fixed widget styling isolation - widgets no longer pick up mcp-use styles
-  - **Fix**: Fixed favicon URL generator for proper asset resolution
-  - **Fix**: Fixed transport cleanup when session becomes idle
-
-  ### Testing & Quality
-  - **New**: Comprehensive test suite for session stores (498 lines)
-  - **New**: Stream managers test suite (478 lines)
-  - **New**: Widget data flow tests (496 lines)
-  - **New**: CLI integration tests (242 lines)
-  - **New**: CommonJS compatibility tests (256 lines)
-  - **New**: Documentation example tests (agent, prompts, tools)
-  - **New**: Client 404 re-initialization tests
-  - **Enhancement**: Improved test coverage across all major features
-
-  ### Dependencies & Compatibility
-  - **Enhancement**: Added support for Node.js >= 18
-  - **Enhancement**: CommonJS builds for all entry points
-  - **Enhancement**: Migrated from `react-router-dom` to `react-router` for better compatibility
-  - **Enhancement**: Repository metadata added to package.json
-  - **Enhancement**: Dependency updates and optimizations
-
-  ### Fixes
-  - **Fix**: Agent access to resources and prompts
-  - **Fix**: Import paths in CLI to avoid mixing dependencies
-  - **Fix**: UUID generation and URL handling improvements
-  - **Fix**: Various formatting and linting improvements
+- **Enhancement**: Added `.gitignore` file to CLI package to exclude `.mcp-use` directory from version control
+- **Enhancement**: Added `CLAUDE.md` to CLI package with comprehensive guidance on usage, development commands, architecture details, and deployment instructions
+- **Enhancement**: Improved CSRF protection in authentication flow
+- **Enhancement**: Enhanced error handling for GitHub integration in deploy command
 </Update>
 
-<Update label="v1.10.0 - December 2025">
+<Update label="v1.13.4" description="January 2026">
+  ## OAuth Proxy URL Handling Improvements
+  Patch release improving OAuth proxy URL handling and connection logic.
+
+- **Refactor**: Changed `connectionUrl` from `let` to `const` to enforce immutability
+- **Enhancement**: Enhanced logic for deriving `oauthProxyUrl` from callback URL, including handling cases where callback is at root path
+- **Enhancement**: Updated comments to clarify distinction between `oauthProxyUrl` and `connectionUrl`
+- **Fix**: Removed clearing of OAuth storage before connecting to maintain valid tokens across sessions
+</Update>
+
+<Update label="v1.13.3" description="January 2026">
+  ## Telemetry & Inspector Enhancements
+  Patch release with telemetry improvements and inspector URL validation enhancements.
+
+- **Fix**: Enhanced localStorage checks in Telemetry class to verify both existence and functional methods (getItem, setItem, removeItem)
+- **Enhancement**: Added error handling to throw exception if localStorage is not available or functional
+- **Enhancement**: Inspector now automatically prepends "https://" to URLs without protocol for better user experience
+- **Enhancement**: Improved error handling for invalid URLs in Inspector dashboard and server connection modal
+- **Enhancement**: Added localStorage clearing functionality in Inspector for troubleshooting
+</Update>
+
+<Update label="v1.13.2" description="January 2026">
+  ## Dependency Updates & CLI Enhancements
+  Minor release with dependency updates and CLI improvements for deployment workflows.
+
+- **Fix**: Updated dependency `hono` to 4.11.4
+- **Enhancement**: CLI login command with improved error handling and user feedback
+- **Enhancement**: CLI deployment command now prompts for login if not authenticated
+- **Enhancement**: Added git uncommitted changes check before deployment
+- **Fix**: Removed `fromSource` option from CLI deployment command
+- **Enhancement**: Simplified authentication UI in Inspector
+</Update>
+
+<Update label="v1.13.1" description="January 2026">
+  ## Edge Runtime Fix
+  Patch release improving edge runtime compatibility.
+
+- **Fix**: Enable JSON response in stateless mode for edge runtimes (Deno, Cloudflare Workers)
+- **Enhancement**: Improved reliability of API in various deployment scenarios
+</Update>
+
+<Update label="v1.13.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.13.0&title=Hot%20Module%20Reloading%20%26%20OAuth%20Enhancements&date=2026-01&lang=typescript" alt="Release 1.13.0" />
+  </Frame>
+  ## Hot Module Reloading & OAuth Enhancements
+  Release introducing Hot Module Reloading for development and enhanced OAuth capabilities.
+
+### Hot Module Reloading (HMR)
+
+- **New**: HMR support for `mcp-use dev` command - tools, prompts, and resources update instantly without server restart
+- **New**: Connected clients receive `list_changed` notifications and auto-refresh
+- **New**: Syntax errors during reload caught gracefully without crashing server
+- **New**: Comprehensive test suite for HMR functionality with integration tests
+- **Enhancement**: CLI uses `chokidar` to watch file changes with automatic module re-import
+- **Enhancement**: Session persistence during HMR - no client disconnections
+
+### OAuth & Client Info
+
+- **New**: Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+- **New**: `clientInfo` configuration prop for OAuth registration with client metadata (name, version, icons, website)
+- **New**: Server metadata caching with `CachedServerMetadata` interface for instant display on reconnect
+- **Enhancement**: OAuth metadata URL rewriting from gateway URLs to actual server URLs
+- **Enhancement**: Client info displayed on OAuth consent pages
+- **Enhancement**: Extended `StorageProvider` interface with metadata methods
+
+### Inspector & Favicon
+
+- **Enhancement**: Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com)
+- **Enhancement**: Detection of default vs custom favicons using JSON API response
+- **Enhancement**: Improved logging middleware for API routes
+- **Enhancement**: X-Forwarded-Host support for proxy URL construction in dev
+
+### Bug Fixes
+
+- **Fix**: Remove import from "mcp-use" which causes langchain import in server
+- **Fix**: Enhanced synchronization for tools, prompts, and resources during HMR
+</Update>
+
+<Update label="v1.12.4" description="January 2026">
+  ## Connection Fix
+  Patch release fixing autoconnect configuration parsing.
+
+- **Fix**: Autoconnect now correctly parses config objects in addition to string URLs
+</Update>
+
+<Update label="v1.12.3" description="January 2026">
+  ## Security Fixes & OAuth Improvements
+  Patch release addressing multiple security vulnerabilities and fixing OAuth flow issues.
+
+### Security Fixes
+
+- **Security**: Fixed 13 vulnerabilities (3 moderate, 10 high)
+- **Security**: Updated `langchain` to 1.2.3 (fixes serialization injection vulnerability)
+- **Security**: Updated `@langchain/core` to 1.1.8 (fixes serialization injection vulnerability)
+- **Security**: Updated `react-router` to 7.12.0 (fixes XSS and CSRF vulnerabilities)
+- **Security**: Added override for `qs` to >=6.14.1 (fixes DoS vulnerability)
+- **Security**: Added override for `preact` to >=10.28.2 (fixes JSON VNode injection)
+
+### OAuth & Connection Improvements
+
+- **Fix**: Resolved OAuth flow looping issue by removing duplicate fallback logic
+- **Enhancement**: Simplified connection handling with consolidated state management
+- **Enhancement**: Enhanced OAuth authentication flow with improved connection settings
+- **Enhancement**: Improved auto-connect functionality with better proxy handling and error management
+- **Enhancement**: Enhanced theme toggling with dropdown menu for better UX and accessibility
+</Update>
+
+<Update label="v1.12.2" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.12.2&title=Automatic%20Proxy%20Fallback%20%26%20API%20Improvements&date=2026-01&lang=typescript" alt="Release 1.12.2" />
+  </Frame>
+  ## Automatic Proxy Fallback & API Improvements
+  Release with automatic proxy fallback, OAuth proxy support, and API naming improvements.
+
+### Breaking Changes (with Deprecation Warnings)
+
+- **Breaking**: Renamed `customHeaders` to `headers` across all APIs for consistency. Old name still works but shows deprecation warnings.
+- **Breaking**: Renamed `samplingCallback` to `onSampling` for consistency with event handler patterns. Old name still works but shows deprecation warnings.
+- **Deprecated**: `clientConfig` option in favor of deriving configuration from `clientInfo`
+
+### New Features
+
+- **New**: Automatic Proxy Fallback - `autoProxyFallback` option automatically retries failed connections through proxy on CORS/4xx errors
+- **New**: Provider-level proxy defaults with `defaultProxyConfig` and `defaultAutoProxyFallback` props in `McpClientProvider`
+- **New**: OAuth Proxy Support - `oauthProxyUrl` configuration to route OAuth discovery and token requests through backend proxy
+- **New**: Configurable `clientInfo` for MCP connection initialization with full metadata (name, title, version, description, icons, website URL)
+- **New**: Reconnect functionality for failed connections with reconnect button in Inspector UI
+
+### Improvements
+
+- **Enhancement**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+- **Enhancement**: OAuth provider uses original target URL for discovery, not proxy URL
+- **Enhancement**: Improved session cleanup to avoid noisy warning logs
+- **Enhancement**: Type safety with deprecation notices in TypeScript types
+- **Enhancement**: Proxy header support - `proxyConfig` now accepts a `headers` field for custom headers
+
+### Bug Fixes
+
+- **Fix**: Custom headers now correctly included when copying connection configuration from saved tiles
+- **Fix**: HttpConnector automatic reconnection disabled, shifting responsibility to higher-level logic
+
+### Refactoring
+
+- **Refactor**: Removed `oauth-helper.ts` (521 lines), consolidated into `browser-provider.ts`
+- **Refactor**: Major `useMcp` hook refactor with automatic retry, better error handling, and proxy fallback support
+</Update>
+
+<Update label="v1.12.1" description="January 2026">
+  ## Security Update
+  Patch release with security fixes and build improvements.
+
+- **Security**: Updated `@modelcontextprotocol/sdk` to 1.25.2 (fixes ReDoS vulnerability in UriTemplate regex patterns)
+- **Fix**: Updated building script to correctly export types for inspector/client components
+</Update>
+
+<Update label="v1.12.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.12.0&title=Browser%20Compatibility%20%26%20Multi-Server%20Support&date=2026-01&lang=typescript" alt="Release 1.12.0" />
+  </Frame>
+  ## Browser Compatibility & Multi-Server Support
+  Release focusing on browser compatibility, multi-server management, and improved React architecture.
+
+### Breaking Changes
+
+- **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments. See [Server Logging](/typescript/server/logging#migration-from-winston) for migration guide.
+
+### Browser Runtime Support
+
+- **New**: Full browser compatibility - removed Node.js-specific dependencies from browser builds
+- **New**: Enhanced `browser.ts` entry point with improved browser-specific utilities
+- **New**: Browser utilities:
+  - `utils/favicon-detector.ts` - Detect and extract favicons from URLs
+  - `utils/proxy-config.ts` - Proxy configuration utilities for browser environments
+  - `utils/mcpClientUtils.ts` - MCP client utilities moved from client package
+- **New**: `MCPAgent` exported for browser usage with `BrowserMCPClient` instance or through `RemoteAgent`
+- **Enhancement**: Comprehensive test suite to ensure `mcp-use/react` and `mcp-use/browser` do not import Node.js dependencies
+
+### Multi-Server Support
+
+- **New**: `McpClientProvider` component to manage multiple MCP server connections in React applications
+- **New**: Pluggable storage system with `LocalStorageProvider` and `MemoryStorageProvider` for flexible server configuration persistence
+- **New**: Dynamic addition and removal of servers in React applications
+- **New**: Multi-server React example demonstrating new capabilities
+- **Enhancement**: Refactored `useMcp` hook for better multi-server support
+- **Enhancement**: Removed obsolete `McpContext` (replaced with `McpClientProvider`)
+
+### Server Middleware
+
+- **New**: MCP Proxy Middleware (`server/middleware/mcp-proxy.ts`) - Hono middleware for proxying MCP server requests with optional authentication and request validation
+
+### Inspector Enhancements
+
+- **Enhancement**: Improved UI responsiveness with enhanced mobile and tablet layouts and adaptive component visibility
+- **Enhancement**: Better server management with refactored server connection handling, improved icon display, and status tracking
+- **Enhancement**: Enhanced debugging with detailed logging in Layout and useAutoConnect components for better monitoring of server connection states
+- **Enhancement**: Simplified connection settings by removing deprecated transport types
+- **Enhancement**: Enhanced inspector components for better browser compatibility
+- **Enhancement**: Improved server icon support and component interactions
+- **Enhancement**: Added embedded mode support
+- **Enhancement**: Better configuration handling and MCP proxy integration
+
+### RPC Logging
+
+- **New**: Enhanced RPC logging with new `rpc-logger` module and filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams). See [Client Logging](/typescript/client/logging) for usage.
+
+### Architecture Improvements
+
+- **Refactor**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
+- **Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments. See [Server Logging](/typescript/server/logging#built-in-logging-system) for configuration details.
+- **Refactor**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
+- **Refactor**: Updated components across inspector for cleaner architecture and imports
+
+### Bug Fixes
+
+- **Fix**: Prevent rendering loop when autoretry is true in React hooks
+- **Fix**: Respect options timeout in HTTP connector (reduced default timeout from 30 seconds to 10 seconds)
+- **Fix**: Add client SDKs to add to client dropdown in inspector
+- **Fix**: Server connection retrieval in `OpenAIComponentRenderer` to directly access connections array
+- **Fix**: Linux patch for watch mode
+- **Fix**: Query URL handling in built mode to preserve arguments
+- **Fix**: Enhanced Zod version mapping in TypeScript PR preview workflow
+- **Fix**: Pinned Zod version to 3.24.4 for compatibility with modelcontextprotocol/sdk
+- **Fix**: Updated modelcontextprotocol-sdk references to new package name
+
+### Documentation
+
+- **New**: Added troubleshooting section for Zod version conflicts in Supabase deployment
+- **Enhancement**: Updated Supabase deployment documentation with improved compatibility information
+</Update>
+
+<Update label="v1.11.2" description="December 2025">
+  ## Documentation Updates - **Enhancement**: Updated examples and documentation
+  to use preferred methods and APIs
+</Update>
+
+<Update label="v1.11.1" description="December 2025">
+  ## Bug Fixes - **Fix**: Widget props not picked up when using Zod schemas
+</Update>
+
+<Update label="v1.11.0" description="December 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.11.0&title=Session%20Management%20Architecture%20%26%20CLI%20Client&date=2025-12&lang=typescript" alt="Release 1.11.0" />
+  </Frame>
+  ## Session Management Architecture & CLI Client
+  Release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
+
+### Breaking Changes
+
+- **Breaking**: WebSocket transport support removed. Use streamable HTTP or SSE transports instead.
+- **Breaking**: LangChain adapter moved from main entry point to `mcp-use/adapters` subpath. `@langchain/core` and `langchain` are now optional peer dependencies.
+- **Deprecated**: `autoCreateSessionOnInvalidId` server config option. Now follows MCP spec strictly (returns 404 for invalid sessions).
+
+### Session Management Features
+
+- **New**: Pluggable session management architecture separating metadata storage (`SessionStore`) from active connections (`StreamManager`)
+- **New**: `RedisSessionStore` for persistent, distributed session metadata storage
+- **New**: `RedisStreamManager` for cross-server notifications via Redis Pub/Sub
+- **New**: `FileSystemSessionStore` (dev mode default) persists sessions to `.mcp-use/sessions.json` for hot reload support
+- **New**: `InMemorySessionStore` and `InMemoryStreamManager` (production defaults)
+- **New**: Automatic 404 handling and re-initialization in clients per MCP spec
+- **New**: Convenience methods: `sendToolsListChanged()`, `sendResourcesListChanged()`, `sendPromptsListChanged()`
+- **Enhancement**: Auto-detection of stateless/stateful mode based on client `Accept` header
+- **Enhancement**: Sessions survive server restarts in dev mode with filesystem storage
+- **Enhancement**: Auto-cleanup of expired sessions (>24 hours)
+
+### CLI Client Features
+
+- **New**: Full-featured CLI client for terminal MCP interactions (`npx mcp-use client`)
+- **New**: Scoped commands for tools, resources, prompts, and session management
+- **New**: Session persistence to `~/.mcp-use/cli-sessions.json` across terminal sessions
+- **New**: Interactive REPL mode for server exploration
+- **New**: JSON output mode (`--json`) for scripting and automation
+- **New**: Multi-session support with session switching
+- **New**: HTTP and stdio server connection support
+- **New**: Formatted output with colored tables for human readability
+- **New**: Automatic session restoration and reconnection
+- **New**: Shell script examples for automation workflows
+
+### Client Improvements
+
+- **New**: Auto-refresh tools/resources/prompts when receiving list change notifications
+- **New**: Manual refresh methods: `refreshTools()`, `refreshResources()`, `refreshPrompts()`, `refreshAll()`
+- **New**: Automatic 404 handling and re-initialization per MCP spec
+- **Enhancement**: Deprecated `sse` transport type in React (use `http` or `auto`)
+
+### Additional Features
+
+- **New**: CommonJS module support - full compatibility with `require()` syntax
+- **New**: Favicon support for widget pages with automatic serving and long-term caching
+- **New**: Enhanced session methods: `callTool()` defaults args to empty object, new `requireSession()` method
+- **New**: Session architecture documentation with ARCHITECTURE.md
+- **New**: Comparison guide with other MCP implementations (tmcp, FastMCP, xmcp, official SDK)
+- **New**: Comprehensive environments guide (Node.js, Browser, React, CLI)
+
+### Documentation
+
+- **New**: Session Management guide with storage provider documentation (Memory, FileSystem, Redis)
+- **New**: CLI Client documentation with usage examples and scripting patterns
+- **New**: Environments guide explaining usage across different JavaScript runtimes
+- **New**: Comparison documentation analyzing mcp-use vs other implementations
+- **Enhancement**: Major documentation restructuring for better organization
+- **Enhancement**: Removed/consolidated outdated guides (direct-tool-calls, sandbox, connection-types)
+- **Enhancement**: Updated agent documentation with improved examples
+
+### Widget Improvements
+
+- **Enhancement**: Automatic cleanup of stale widget directories in `.mcp-use` folder
+- **Enhancement**: Dev mode watches for widget file/directory deletions and cleans up build artifacts
+- **Fix**: Fixed widget styling isolation - widgets no longer pick up mcp-use styles
+- **Fix**: Fixed favicon URL generator for proper asset resolution
+- **Fix**: Fixed transport cleanup when session becomes idle
+
+### Testing & Quality
+
+- **New**: Comprehensive test suite for session stores (498 lines)
+- **New**: Stream managers test suite (478 lines)
+- **New**: Widget data flow tests (496 lines)
+- **New**: CLI integration tests (242 lines)
+- **New**: CommonJS compatibility tests (256 lines)
+- **New**: Documentation example tests (agent, prompts, tools)
+- **New**: Client 404 re-initialization tests
+- **Enhancement**: Improved test coverage across all major features
+
+### Dependencies & Compatibility
+
+- **Enhancement**: Added support for Node.js >= 18
+- **Enhancement**: CommonJS builds for all entry points
+- **Enhancement**: Migrated from `react-router-dom` to `react-router` for better compatibility
+- **Enhancement**: Repository metadata added to package.json
+- **Enhancement**: Dependency updates and optimizations
+
+### Fixes
+
+- **Fix**: Agent access to resources and prompts
+- **Fix**: Import paths in CLI to avoid mixing dependencies
+- **Fix**: UUID generation and URL handling improvements
+- **Fix**: Various formatting and linting improvements
+</Update>
+
+<Update label="v1.10.0" description="December 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.10.0&title=API%20Improvements%20%26%20Session%20Management&date=2025-12&lang=typescript" alt="Release 1.10.0" />
+  </Frame>
   ## API Improvements & Session Management
   Enhanced APIs with better type safety and improved session management capabilities.
 
-  ### Breaking Changes
-  - **Breaking**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. Factory function still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
-  - **Breaking**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct session methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
-  - **Breaking**: Standardized OAuth environment variables to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
+### Breaking Changes
 
-  ### New Features
-  - **New**: Client Capabilities API with `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks
-  - **New**: Session Notifications API with `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks
-  - **New**: Session Info API with `ctx.session.sessionId` to access current session ID in tool callbacks
-  - **New**: Resource Template Flat Structure support with `uriTemplate` directly on definition (in addition to nested structure)
-  - **New**: Resource Template Callback Signatures now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`
-  - **New**: Type Exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types
+- **Breaking**: Renamed `createMCPServer()` factory function to `MCPServer` class constructor. Factory function still available for backward compatibility but new code should use `new MCPServer({ name, ... })`.
+- **Breaking**: Replaced `session.connector.tools`, `session.connector.callTool()`, etc. with direct session methods: `session.tools`, `session.callTool()`, `session.listResources()`, `session.readResource()`, etc.
+- **Breaking**: Standardized OAuth environment variables to `MCP_USE_OAUTH_*` prefix (e.g., `AUTH0_DOMAIN` → `MCP_USE_OAUTH_AUTH0_DOMAIN`).
 
-  ### Improvements
-  - **Enhancement**: Enhanced type inference for resource template callbacks with better overload support
-  - **Enhancement**: Server now captures and stores client capabilities during initialization
-  - **Enhancement**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.)
-  - **Enhancement**: Major documentation refactoring and restructuring for better organization
+### New Features
 
-  ### Fixes (v1.10.1 - v1.10.6)
-  - **Fix**: Stateless mode for Deno runtime
-  - **Fix**: Added CORS support to `getHandler()` method
-  - **Fix**: Deno 5 compatibility improvements
-  - **Fix**: Deno 3 compatibility fixes
-  - **Fix**: Zod error handling improvements
-  - **Fix**: Zod import in official SDK
-  - **Fix**: Clear transport when session becomes idle
-  - **Fix**: Allow agent to access resources and prompts
-  - **Enhancement**: Added repository metadata in package.json
+- **New**: Client Capabilities API with `ctx.client.can()` and `ctx.client.capabilities()` to check client capabilities in tool callbacks
+- **New**: Session Notifications API with `ctx.sendNotification()` and `ctx.sendNotificationToSession()` for sending notifications from tool callbacks
+- **New**: Session Info API with `ctx.session.sessionId` to access current session ID in tool callbacks
+- **New**: Resource Template Flat Structure support with `uriTemplate` directly on definition (in addition to nested structure)
+- **New**: Resource Template Callback Signatures now support multiple signatures: `()`, `(uri)`, `(uri, params)`, `(uri, params, ctx)`
+- **New**: Type Exports for `CallToolResult`, `Tool`, `ToolAnnotations`, `PromptResult`, `GetPromptResult` types
+
+### Improvements
+
+- **Enhancement**: Enhanced type inference for resource template callbacks with better overload support
+- **Enhancement**: Server now captures and stores client capabilities during initialization
+- **Enhancement**: Added convenience methods to `MCPSession` for all MCP operations (listResources, readResource, subscribeToResource, listPrompts, getPrompt, etc.)
+- **Enhancement**: Major documentation refactoring and restructuring for better organization
+
+### Fixes (v1.10.1 - v1.10.6)
+
+- **Fix**: Stateless mode for Deno runtime
+- **Fix**: Added CORS support to `getHandler()` method
+- **Fix**: Deno 5 compatibility improvements
+- **Fix**: Deno 3 compatibility fixes
+- **Fix**: Zod error handling improvements
+- **Fix**: Zod import in official SDK
+- **Fix**: Clear transport when session becomes idle
+- **Fix**: Allow agent to access resources and prompts
+- **Enhancement**: Added repository metadata in package.json
 </Update>
 
-<Update label="v1.9.0 - December 2025">
+<Update label="v1.9.0" description="December 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.9.0&title=Elicitation%20Support&date=2025-12&lang=typescript" alt="Release 1.9.0" />
+  </Frame>
   ## Elicitation Support
   Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
 
-  - **New**: Simplified API with `ctx.elicit(message, zodSchema)` and `ctx.elicit(message, url)` with automatic mode detection
-  - **New**: Form Mode for structured data collection with Zod schema validation and full TypeScript type inference
-  - **New**: URL Mode to direct users to external URLs for sensitive operations (OAuth, credentials)
-  - **New**: Server-side validation with automatic Zod validation and clear error messages
-  - **New**: Client support via `elicitationCallback` to MCPClient and `onElicitation` to React `useMcp` hook
-  - **Enhancement**: Type-safe return types automatically inferred from Zod schemas
-  - **Enhancement**: Configurable timeout with 5-minute default for user interactions
-  - **Fix**: Transport bug fixes
+- **New**: Simplified API with `ctx.elicit(message, zodSchema)` and `ctx.elicit(message, url)` with automatic mode detection
+- **New**: Form Mode for structured data collection with Zod schema validation and full TypeScript type inference
+- **New**: URL Mode to direct users to external URLs for sensitive operations (OAuth, credentials)
+- **New**: Server-side validation with automatic Zod validation and clear error messages
+- **New**: Client support via `elicitationCallback` to MCPClient and `onElicitation` to React `useMcp` hook
+- **Enhancement**: Type-safe return types automatically inferred from Zod schemas
+- **Enhancement**: Configurable timeout with 5-minute default for user interactions
+- **Fix**: Transport bug fixes
 </Update>
 
-<Update label="v1.8.0 - November 2025">
+<Update label="v1.8.0" description="November 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.8.0&title=Sampling%20Support&date=2025-11&lang=typescript" alt="Release 1.8.0" />
+  </Frame>
   ## Sampling Support
   Added sampling support in inspector with improved timeout handling for long-running requests.
 
-  - **New**: LLM sampling capabilities in inspector
-  - **Fix**: Long running sampling requests no longer timeout after 60 seconds
-  - **Enhancement**: Better handling of extended sampling operations
+- **New**: LLM sampling capabilities in inspector
+- **Fix**: Long running sampling requests no longer timeout after 60 seconds
+- **Enhancement**: Better handling of extended sampling operations
 </Update>
 
-<Update label="v1.7.0 - November 2025">
+<Update label="v1.7.0" description="November 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.7.0&title=OAuth%20Authentication%20System&date=2025-11&lang=typescript" alt="Release 1.7.0" />
+  </Frame>
   ## OAuth Authentication System
   Complete OAuth 2.0 support with built-in providers and enhanced server capabilities.
 
-  - **New**: Complete OAuth 2.0 authentication framework with built-in providers (Auth0, WorkOS, Supabase, Keycloak)
-  - **New**: OAuth middleware and routes for server-side OAuth flow handling with automatic token management
-  - **New**: OAuth callback component in inspector for authentication flows
-  - **New**: Context storage with async local storage for request-scoped context in servers
-  - **New**: Response helpers for standardized HTTP responses and error handling
-  - **New**: Runtime detection utilities for Node.js, Bun, and Deno environments
-  - **New**: Server authentication examples for Auth0, WorkOS, and Supabase
-  - **Enhancement**: Enhanced useMcp hook with improved connection management and OAuth support
-  - **Enhancement**: Enhanced inspector dashboard with OAuth configuration UI
-  - **Enhancement**: Better authentication flow handling with OAuth integration
-  - **Enhancement**: Enhanced HTTP connectors with OAuth token handling
-  - **Fix**: Dependency optimizations and AI SDK updates
+- **New**: Complete OAuth 2.0 authentication framework with built-in providers (Auth0, WorkOS, Supabase, Keycloak)
+- **New**: OAuth middleware and routes for server-side OAuth flow handling with automatic token management
+- **New**: OAuth callback component in inspector for authentication flows
+- **New**: Context storage with async local storage for request-scoped context in servers
+- **New**: Response helpers for standardized HTTP responses and error handling
+- **New**: Runtime detection utilities for Node.js, Bun, and Deno environments
+- **New**: Server authentication examples for Auth0, WorkOS, and Supabase
+- **Enhancement**: Enhanced useMcp hook with improved connection management and OAuth support
+- **Enhancement**: Enhanced inspector dashboard with OAuth configuration UI
+- **Enhancement**: Better authentication flow handling with OAuth integration
+- **Enhancement**: Enhanced HTTP connectors with OAuth token handling
+- **Fix**: Dependency optimizations and AI SDK updates
 </Update>
 
-<Update label="v1.6.0 - November 2025">
+<Update label="v1.6.0" description="November 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.6.0&title=Notifications%20%26%20Sampling&date=2025-11&lang=typescript" alt="Release 1.6.0" />
+  </Frame>
   ## Notifications & Sampling
   Bidirectional notification support and LLM sampling capabilities.
 
-  - **New**: Bidirectional notification support between clients and servers with handler registration
-  - **New**: LLM sampling allowing MCP tools to request completions from connected clients
-  - **New**: Widget build ID support for cache busting in widget UI resources
-  - **New**: Inspector notifications tab with real-time display
-  - **New**: Server capabilities modal showing supported MCP features
-  - **Enhancement**: Refactored HTTP transport to reuse sessions across requests with configurable idle timeout
-  - **Enhancement**: Session management with tracking and automatic cleanup
-  - **Enhancement**: Roots support in connectors and session API
-  - **Enhancement**: Session event handling API for notification registration
-  - **Enhancement**: Server methods for session management and targeted notifications
-  - **Enhancement**: Enhanced search_tools with metadata (total_tools, namespaces, result_count)
-  - **Enhancement**: RPC message logging support in inspector
+- **New**: Bidirectional notification support between clients and servers with handler registration
+- **New**: LLM sampling allowing MCP tools to request completions from connected clients
+- **New**: Widget build ID support for cache busting in widget UI resources
+- **New**: Inspector notifications tab with real-time display
+- **New**: Server capabilities modal showing supported MCP features
+- **Enhancement**: Refactored HTTP transport to reuse sessions across requests with configurable idle timeout
+- **Enhancement**: Session management with tracking and automatic cleanup
+- **Enhancement**: Roots support in connectors and session API
+- **Enhancement**: Session event handling API for notification registration
+- **Enhancement**: Server methods for session management and targeted notifications
+- **Enhancement**: Enhanced search_tools with metadata (total_tools, namespaces, result_count)
+- **Enhancement**: RPC message logging support in inspector
 </Update>
 
-<Update label="v1.5.0 - October 2025">
+<Update label="v1.5.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.5.0&title=OpenAI%20Apps%20SDK%20Integration&date=2025-10&lang=typescript" alt="Release 1.5.0" />
+  </Frame>
   ## OpenAI Apps SDK Integration
-  Major release with comprehensive OpenAI Apps SDK support and widget system.
+  Release with comprehensive OpenAI Apps SDK support and widget system.
 
-  - **New**: McpUseProvider component combining React setup (StrictMode, ThemeProvider, BrowserRouter, ErrorBoundary)
-  - **New**: WidgetControls component with debug overlay and view controls (fullscreen, PIP)
-  - **New**: useWidget hook for type-safe React adapter to OpenAI Apps SDK API
-  - **New**: ErrorBoundary component for graceful error handling
-  - **New**: Image component handling data URLs and public file paths
-  - **New**: ThemeProvider for consistent theme management
-  - **New**: WidgetInspectorControls for inspector-specific debugging
-  - **New**: Console proxy toggle for iframe console logs
-  - **New**: Product search result widget template with carousel and accordion components
-  - **New**: Folder-based widget support with automatic detection
-  - **New**: Public folder support for static assets
-  - **Enhancement**: Enhanced SSR configuration with proper Vite settings
-  - **Enhancement**: Improved OpenAI component renderer with better height calculation
-  - **Enhancement**: Enhanced tool result display with multiple content types
-  - **Enhancement**: Resizable panels with collapse support
-  - **Enhancement**: Better widget security headers and CSP configuration
+- **New**: McpUseProvider component combining React setup (StrictMode, ThemeProvider, BrowserRouter, ErrorBoundary)
+- **New**: WidgetControls component with debug overlay and view controls (fullscreen, PIP)
+- **New**: useWidget hook for type-safe React adapter to OpenAI Apps SDK API
+- **New**: ErrorBoundary component for graceful error handling
+- **New**: Image component handling data URLs and public file paths
+- **New**: ThemeProvider for consistent theme management
+- **New**: WidgetInspectorControls for inspector-specific debugging
+- **New**: Console proxy toggle for iframe console logs
+- **New**: Product search result widget template with carousel and accordion components
+- **New**: Folder-based widget support with automatic detection
+- **New**: Public folder support for static assets
+- **Enhancement**: Enhanced SSR configuration with proper Vite settings
+- **Enhancement**: Improved OpenAI component renderer with better height calculation
+- **Enhancement**: Enhanced tool result display with multiple content types
+- **Enhancement**: Resizable panels with collapse support
+- **Enhancement**: Better widget security headers and CSP configuration
 </Update>
 
-<Update label="v1.4.0 - October 2025">
+<Update label="v1.4.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.4.0&title=Code%20Mode&date=2025-10&lang=typescript" alt="Release 1.4.0" />
+  </Frame>
   ## Code Mode
   Introduced code execution capabilities for agents.
 
-  - **New**: Code Mode feature allowing agents to execute code using MCP tools
-  - **New**: VMCodeExecutor for local execution environments
-  - **New**: E2BCodeExecutor for remote execution in cloud sandboxes
-  - **New**: CodeModeConnector for tool discovery and execution
-  - **Enhancement**: Enhanced MCPClient with code execution configuration
-  - **Enhancement**: Comprehensive tests for code execution functionality
+- **New**: Code Mode feature allowing agents to execute code using MCP tools
+- **New**: VMCodeExecutor for local execution environments
+- **New**: E2BCodeExecutor for remote execution in cloud sandboxes
+- **New**: CodeModeConnector for tool discovery and execution
+- **Enhancement**: Enhanced MCPClient with code execution configuration
+- **Enhancement**: Comprehensive tests for code execution functionality
 </Update>
 
-<Update label="v1.3.0 - October 2025">
+<Update label="v1.3.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.3.0&title=Edge%20Runtime%20Support&date=2025-10&lang=typescript" alt="Release 1.3.0" />
+  </Frame>
   ## Edge Runtime Support
   Migrated to Hono framework for edge runtime compatibility.
 
-  - **Major**: Migrated from Express to Hono framework for edge runtime support (Cloudflare Workers, Deno Deploy, Supabase)
-  - **New**: Runtime detection for Deno and Node.js environments
-  - **New**: Connect middleware adapter for compatibility
-  - **New**: `getHandler()` method for edge deployment
-  - **New**: Supabase deployment documentation and templates
-  - **Enhancement**: Improved MCPAgent message detection with robust helpers for different LangChain formats
-  - **Enhancement**: Fixed server base URL handling for proper connection and routing
-  - **Enhancement**: Better auto-connection logic with error handling and retry mechanisms
-  - **Enhancement**: Enhanced useMcp hook with improved connection state management
+- **Major**: Migrated from Express to Hono framework for edge runtime support (Cloudflare Workers, Deno Deploy, Supabase)
+- **New**: Runtime detection for Deno and Node.js environments
+- **New**: Connect middleware adapter for compatibility
+- **New**: `getHandler()` method for edge deployment
+- **New**: Supabase deployment documentation and templates
+- **Enhancement**: Improved MCPAgent message detection with robust helpers for different LangChain formats
+- **Enhancement**: Fixed server base URL handling for proper connection and routing
+- **Enhancement**: Better auto-connection logic with error handling and retry mechanisms
+- **Enhancement**: Enhanced useMcp hook with improved connection state management
 </Update>
 
-<Update label="v1.2.0 - October 2025">
+<Update label="v1.2.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.2.0&title=LangChain%201.0.0%20Support&date=2025-10&lang=typescript" alt="Release 1.2.0" />
+  </Frame>
   ## LangChain 1.0.0 Support
   Updated to support LangChain 1.0.0 with improved compatibility.
 
-  - **Major**: Support for LangChain 1.0.0
-  - **Fix**: Model type compatibility for LangChain 1.0.0
-  - **Fix**: Apps SDK metadata setup from widget build
-  - **Enhancement**: Set CLI and inspector as dependencies
+- **Major**: Support for LangChain 1.0.0
+- **Fix**: Model type compatibility for LangChain 1.0.0
+- **Fix**: Apps SDK metadata setup from widget build
+- **Enhancement**: Set CLI and inspector as dependencies
 </Update>
 
-<Update label="v1.1.0 - October 2025">
+<Update label="v1.1.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.1.0&title=Apps%20SDK%20Initial%20Integration&date=2025-10&lang=typescript" alt="Release 1.1.0" />
+  </Frame>
   ## Apps SDK Initial Integration
   First integration of OpenAI Apps SDK support.
 
-  - **New**: OpenAI Apps SDK integration with UI resource type
-  - **New**: Enhanced MCP-UI adapter for Apps SDK metadata
-  - **New**: Resource URI format supporting `ui://widget/` scheme
-  - **New**: Tool definitions with Apps SDK-specific metadata
-  - **Enhancement**: Comprehensive test suite for Apps SDK resources
-  - **Refactor**: Renamed `fn` to `cb` in tool and prompt definitions for consistency
-  - **Refactor**: Updated resource definitions to use `readCallback`
+- **New**: OpenAI Apps SDK integration with UI resource type
+- **New**: Enhanced MCP-UI adapter for Apps SDK metadata
+- **New**: Resource URI format supporting `ui://widget/` scheme
+- **New**: Tool definitions with Apps SDK-specific metadata
+- **Enhancement**: Comprehensive test suite for Apps SDK resources
+- **Refactor**: Renamed `fn` to `cb` in tool and prompt definitions for consistency
+- **Refactor**: Updated resource definitions to use `readCallback`
 </Update>
-

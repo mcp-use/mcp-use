@@ -5,11 +5,11 @@
  * Implements the MCP resources/subscribe and resources/unsubscribe protocol.
  */
 
-import type { McpServer as OfficialMcpServer } from "@mcp-use/modelcontextprotocol-sdk/server/mcp.js";
+import type { McpServer as OfficialMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   SubscribeRequestSchema,
   UnsubscribeRequestSchema,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { SessionData } from "../sessions/index.js";
 import { getRequestContext } from "../context-storage.js";
 

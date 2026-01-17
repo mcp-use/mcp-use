@@ -1,3 +1,5 @@
+import { Button } from "@/client/components/ui/button";
+import { Card, CardContent } from "@/client/components/ui/card";
 import {
   Activity,
   CheckCircle2,
@@ -10,15 +12,21 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Button } from "@/client/components/ui/button";
-import { Card, CardContent } from "@/client/components/ui/card";
-import { useMcpContext } from "../../client/context/McpContext";
-import type { MCPConnection } from "../../client/context/McpContext";
+import { useMcpClient, type McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
 
+/**
+ * Renders a list and management UI for MCP servers, including status badges, quick actions, and a modal to view server capabilities.
+ *
+ * @returns The React element that displays MCP server connections, controls for inspecting and removing servers, and the server capabilities modal.
+ */
 export function ServerList() {
-  const { connections, removeConnection } = useMcpContext();
+  const { servers: connections, removeServer: removeConnection } =
+    useMcpClient();
   const [capabilitiesModalOpen, setCapabilitiesModalOpen] = useState(false);
   const [selectedConnection, setSelectedConnection] =
     useState<MCPConnection | null>(null);
@@ -91,11 +99,7 @@ export function ServerList() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
-                    <ServerIcon
-                      serverUrl={connection.url}
-                      serverName={connection.name}
-                      size="lg"
-                    />
+                    <ServerIcon server={connection} size="lg" />
                     <div className="space-y-1">
                       <h3 className="font-semibold text-lg">
                         {connection.name}

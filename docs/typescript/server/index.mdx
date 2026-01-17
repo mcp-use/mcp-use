@@ -15,6 +15,7 @@ It improves the official Model Context Protocol SDK with support for Edge Runtim
 - **Apps SDK & MCP-UI support**: UI widgets are compatible with Apps SDK for ChatGPT and MCP-UI resources. [UI Widgets](/typescript/server/ui-widgets).
 - **Edge runtime support**: Built-in Edge runtime support
 - **Built-in Inspector**: An handy MCP inspector is launched for you to test you MCP server.
+- **Hot Module Reloading**: Add, remove, or update tools, prompts, and resources without restarting the server or dropping connections.
 - **One command to get started**: Use `npx create-mcp-use-app` command to scaffold a complete MCP server.
 
 ## Installation
@@ -27,18 +28,21 @@ The easiest way to get started is to use the `create-mcp-use-app` command, which
 ```bash npm
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
+npm install
 npm run dev
 ```
 
 ```bash pnpm
 pnpm create mcp-use-app my-mcp-server
 cd my-mcp-server
+pnpm install
 pnpm dev
 ```
 
 ```bash yarn
 yarn create mcp-use-app my-mcp-server
 cd my-mcp-server
+yarn install
 yarn dev
 ```
 </CodeGroup>
@@ -94,6 +98,25 @@ When you run your MCP server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
 - **MCP Inspector**: `http://localhost:3000/inspector` 
 
+### Hot Module Reloading (HMR)
+
+The development server supports Hot Module Reloading for tools, prompts, and resources. When you modify your server file, changes are applied instantly without restarting the server or dropping client connections.
+
+```bash
+# HMR is enabled by default
+npm run dev
+
+# Disable HMR if needed (uses tsx watch instead)
+npx mcp-use dev --no-hmr
+```
+
+**What HMR does:**
+- **Add tools/prompts/resources**: New registrations appear immediately
+- **Update existing ones**: Changes to descriptions, schemas, or handlers are applied in-place
+- **Remove registrations**: Deleted tools/prompts/resources are removed from the server
+- **Notify clients**: Connected clients (like the Inspector) receive `list_changed` notifications and auto-refresh
+
+This means you can keep the Inspector open, modify your server code, and see your changes reflected immediately without losing your session.
 
 ### Deploy Your MCP Server
 You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.

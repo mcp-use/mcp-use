@@ -1,6 +1,9 @@
 """OAuth authentication support for MCP clients."""
 
+import base64
+import hashlib
 import json
+import re
 import secrets
 import webbrowser
 from datetime import UTC, datetime, timedelta
@@ -44,9 +47,22 @@ class ServerOAuthMetadata(BaseModel):
     token_endpoint_auth_methods_supported: list[str] = Field(default_factory=lambda: ["client_secret_basic"])
     claims_supported: list[str] | None = None
     code_challenge_methods_supported: list[str] | None = None
+    client_id_metadata_document_supported: bool | None = None
 
     class Config:
         extra = "allow"  # Allow additional fields
+
+
+class ProtectedResourceMetadata(BaseModel):
+    """
+    PRM (Protected Resource Metadata) can have metadata
+    describing their configuration. It could contain information
+    about the OAuth metadata.
+    """
+
+    resource: str
+    authorization_servers: list[str]
+    scopes_supported: list[str] | None = None
 
 
 class OAuthClientProvider(BaseModel):
@@ -184,6 +200,7 @@ class OAuth:
         client_secret: str | None = None,
         callback_port: int | None = None,
         oauth_provider: OAuthClientProvider | None = None,
+        client_metadata_url: str | None = None,
     ):
         """Initialize OAuth handler.
 
@@ -195,13 +212,15 @@ class OAuth:
             client_secret: OAuth client secret (for confidential clients)
             callback_port: Port for local callback server, if empty, 8080 is used
             oauth_provider: OAuth client provider to prevent metadata discovery
+            client_metadata_url: Field used to authenticate with CIMD
         """
-        logger.debug(f"Initializing OAuth for server: {server_url}")
+        logger.debug(f"Initializing OAuth for server: {urlparse(server_url).netloc}")
         self.server_url = server_url
         self.token_storage = token_storage or FileTokenStorage()
         self.scope = scope
         self.client_id = client_id
         self.client_secret = client_secret
+        self.client_metadata_url = client_metadata_url
 
         if callback_port:
             self.callback_port = callback_port
@@ -214,6 +233,7 @@ class OAuth:
         self.redirect_uri = f"http://localhost:{self.callback_port}/callback"
         self._oauth_provider = oauth_provider
         self._metadata: ServerOAuthMetadata | None = None
+        self._resource_metadata: ProtectedResourceMetadata | None = None
 
         if self._oauth_provider:
             self._metadata = self._oauth_provider.oauth_metadata
@@ -221,7 +241,7 @@ class OAuth:
 
         self._client: AsyncOAuth2Client | None = None
         self._bearer_auth: BearerAuth | None = None
-        logger.debug(f"OAuth initialized with scope='{self.scope}', client_id='{self.client_id}'")
+        logger.debug(f"OAuth initialized with scope='{self.scope}', has_client_id={self.client_id is not None}")
 
     @telemetry("oauth_initialize")
     async def initialize(self, client: httpx.AsyncClient) -> BearerAuth | None:
@@ -275,38 +295,67 @@ class OAuth:
             logger.error(f"The port {self.callback_port} is not available! Try using a different port!")
             raise exception
 
-        # Try to get client_id - either from config or dynamic registration
+        # Check if code challenge exists with S256
+        if (
+            not self._metadata.code_challenge_methods_supported
+            or "S256" not in self._metadata.code_challenge_methods_supported
+        ):
+            raise OAuthAuthenticationError("The auth must support code challenge S256. Can't complete auth without it.")
+
+        # Check if it supports CIMD
+        supports_cimd = (
+            self._metadata.client_id_metadata_document_supported
+            if self._metadata.client_id_metadata_document_supported
+            else False
+        )
+
         client_id = self.client_id
         client_secret = self.client_secret
-        registration = None  # Track if we used DCR
 
-        if not client_id:
-            logger.debug("No client_id provided, attempting dynamic client registration")
-            # Try to load previously registered client
-            registration = await self._load_client_registration()
+        # 1) CIMD path (preferred when configured as specified in MCP spec)
+        if self.client_metadata_url and supports_cimd:
+            logger.debug(f"Using Client ID Metadata Document (CIMD) as client_id: {self.client_metadata_url}")
+            client_id = self.client_metadata_url
+            client_secret = None  # public client
+        else:
+            # 2) Legacy paths: pre-registered clients or DCR
+            registration = None  # Track if we used DCR
+            if not client_id:
+                logger.debug("No client_id provided, attempting dynamic client registration")
+                # Try to load previously registered client
+                registration = await self._load_client_registration()
 
-            if registration:
-                logger.debug("Using previously registered client")
-                client_id = registration.client_id
-                client_secret = registration.client_secret
-            else:
-                # Attempt dynamic registration
-                registration = await self._try_dynamic_registration()
                 if registration:
-                    logger.debug("Dynamic registration successful")
+                    logger.debug("Using previously registered client")
                     client_id = registration.client_id
                     client_secret = registration.client_secret
-                    # Store for future use
-                    await self._store_client_registration(registration)
                 else:
-                    logger.error("Dynamic client registration failed or not supported")
-                    raise OAuthAuthenticationError(
-                        "OAuth requires a client_id. Server does not support dynamic registration. "
-                        "Please provide one in the auth configuration. "
-                        "Example: {'auth': {'client_id': 'your-registered-client-id'}}"
-                    )
+                    # Attempt dynamic registration
+                    registration = await self._try_dynamic_registration()
+                    if registration:
+                        logger.debug("Dynamic registration successful")
+                        client_id = registration.client_id
+                        client_secret = registration.client_secret
+                        # Store for future use
+                        await self._store_client_registration(registration)
+                    else:
+                        if supports_cimd and not self._metadata.registration_endpoint:
+                            raise OAuthAuthenticationError(
+                                "OAuth server only supports Client ID Metadata Documents. "
+                                "Please provide 'client_metadata_url' in the auth configuration "
+                                "pointing to your CIMD JSON document."
+                            )
+                        logger.error("Dynamic client registration failed or not supported")
+                        raise OAuthAuthenticationError(
+                            "OAuth requires a client_id. Server does not support dynamic registration. "
+                            "Please provide one in the auth configuration. "
+                            "Example: {'auth': {'client_id': 'your-registered-client-id'}}"
+                        )
 
         logger.debug(f"Using client_id: {client_id}")
+
+        # Generate PKCE code_verifier/challenge
+        code_verifier, code_challenge = self._generate_pkce_pair()
 
         # Create OAuth client
         logger.debug("Creating AsyncOAuth2Client")
@@ -329,11 +378,17 @@ class OAuth:
         state = secrets.token_urlsafe(32)
         logger.debug(f"Generated state for CSRF protection: {state}")
 
+        # Get resource as required in the MCP spec
+        resource = self._resource_metadata.resource if self._resource_metadata else self.server_url
+
         # Build authorization URL
         logger.debug("Creating authorization URL")
         auth_url, _ = self._client.create_authorization_url(
             str(self._metadata.authorization_endpoint),
+            resource=resource,
             state=state,
+            code_challenge=code_challenge,
+            code_challenge_method="S256",
         )
 
         logger.debug("OAuth flow started:")
@@ -385,6 +440,7 @@ class OAuth:
                 str(self._metadata.token_endpoint),
                 authorization_response=f"{redirect_uri}?code={response.code}&state={response.state}",
                 grant_type="authorization_code",
+                code_verifier=code_verifier,
             )
             logger.debug("Successfully fetched tokens")
         except OAuth2Error as e:
@@ -400,63 +456,183 @@ class OAuth:
         self._bearer_auth = BearerAuth(token=SecretStr(token_response["access_token"]))
         return self._bearer_auth
 
+    def _generate_pkce_pair(self) -> tuple[str, str]:
+        """Generate PKCE code_verifier and S256 code_challenge"""
+        code_verifier = secrets.token_urlsafe(64)
+        code_challenge = (
+            base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("ascii")).digest())
+            .rstrip(b"=")
+            .decode("ascii")
+        )
+
+        return code_verifier, code_challenge
+
     async def _discover_metadata(self, client: httpx.AsyncClient) -> None:
         """Discover OAuth metadata from server."""
         logger.debug(f"Discovering OAuth metadata for {self.server_url}")
         # Try well-known endpoint first
         parsed = urlparse(self.server_url)
 
-        # Edge case for GH that doesn't have metadata discovery
-        if parsed.netloc == "api.githubcopilot.com":
-            logger.debug("Detected GitHub MCP server, using its metadata")
-            issuer = "https://github.com/login/oauth"
-            authorization_endpoint = "https://github.com/login/oauth/authorize"
-            token_endpoint = "https://github.com/login/oauth/access_token"
-            self._metadata = ServerOAuthMetadata(
-                issuer=issuer, authorization_endpoint=authorization_endpoint, token_endpoint=token_endpoint
-            )
-            return
-
         base_url = f"{parsed.scheme}://{parsed.netloc}"
-        well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
+        prm_url: str | None = None
 
+        # 1) Try to get PRM URL from 401 + WWW-Authenticate
         try:
-            logger.debug(f"Trying OAuth metadata discovery at: {well_known_url}")
-            response = await client.get(well_known_url)
-            response.raise_for_status()
-            metadata = response.json()
-            self._metadata = ServerOAuthMetadata(**metadata)
-            logger.debug("Successfully discovered OAuth metadata")
-            logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
-            logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
-            return
-        except (httpx.HTTPError, ValueError) as e:
-            logger.debug(f"Failed to discover OAuth metadata at {well_known_url}: {e}")
-            pass
+            init_resp = await client.get(self.server_url, headers={"Accept": "application/json"})
+            if init_resp.status_code == 401:
+                # Parse the resource_metadata
+                prm_url = self._extract_prm(init_resp)
+        except httpx.HTTPError as e:
+            logger.debug(f"Failed probing server for PRM via 401: {e}")
 
-        # Try OpenID Connect discovery
-        oidc_url = f"{base_url}/.well-known/openid-configuration"
-        logger.debug(f"Trying OpenID Connect discovery at: {oidc_url}")
-        try:
-            response = await client.get(oidc_url)
-            response.raise_for_status()
-            metadata = response.json()
-            self._metadata = ServerOAuthMetadata(**metadata)
-            logger.debug("Successfully discovered OIDC metadata")
-            logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
-            logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
-            return
-        except (httpx.HTTPError, ValueError) as e:
-            logger.debug(f"Failed to discover OIDC metadata at {oidc_url}: {e}")
-            pass
+        # 1b) If WWW-Authenticate didn’t give us a URL, try well-known PRM paths
+        if not prm_url:
+            path = (parsed.path or "").rstrip("/")
+            candidate_prm_urls: list[str] = []
 
-        # If discovery fails, we'll need the metadata from somewhere else
+            # Path-specific form: /.well-known/oauth-protected-resource{path}
+            if path:
+                candidate_prm_urls.append(f"{base_url}/.well-known/oauth-protected-resource{path}")
+
+            # Root form: /.well-known/oauth-protected-resource
+            candidate_prm_urls.append(f"{base_url}/.well-known/oauth-protected-resource")
+
+            for candidate in candidate_prm_urls:
+                try:
+                    logger.debug(f"Trying OAuth PRM endpoint at: {candidate}")
+                    prm_response = await client.get(candidate)
+                    prm_response.raise_for_status()
+                    prm = prm_response.json()
+                    self._resource_metadata = ProtectedResourceMetadata(**prm)
+                    logger.debug("Successfully got the PRM data")
+                    logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
+                    prm_url = candidate
+                    break
+                except (httpx.HTTPError, ValueError) as e:
+                    logger.debug(f"Failed to discover OAuth PRM at {candidate}: {e}")
+
+        # 2) If we have PRM URL but _resource_metadata is still None
+        if prm_url and not self._resource_metadata:
+            try:
+                logger.debug(f"Trying OAuth PRM endpoint at: {prm_url}")
+                prm_response = await client.get(prm_url)
+                prm_response.raise_for_status()
+                prm = prm_response.json()
+                self._resource_metadata = ProtectedResourceMetadata(**prm)
+                logger.debug("Successfully got the PRM data")
+                logger.debug(f"Authorization servers: {self._resource_metadata.authorization_servers}")
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OAuth PRM at {prm_url}: {e}")
+                pass
+
+        # 3) For each authorization server, try AS metadata and stop on first success
+        #
+        # Well-known URL construction differs between OAuth 2.0 and OpenID Connect:
+        #   - OAuth 2.0 (RFC 8414): Insert .well-known between host and path
+        #   - OpenID Connect: Append .well-known to issuer
+        #
+        # Example for issuer https://github.com/login/oauth:
+        #   - OAuth 2.0:  https://github.com/.well-known/oauth-authorization-server/login/oauth
+        #   - OIDC:       https://github.com/login/oauth/.well-known/openid-configuration
+        #
+        # See: https://www.rfc-editor.org/rfc/rfc8414.html#section-3.1
+        auth_servers = self._resource_metadata.authorization_servers if self._resource_metadata else []
+        for auth_server in auth_servers:
+            parsed_issuer = urlparse(auth_server)
+            issuer_base = f"{parsed_issuer.scheme}://{parsed_issuer.netloc}"
+            issuer_path = (parsed_issuer.path or "").rstrip("/")
+
+            # OAuth 2.0 (RFC 8414): Insert .well-known between host and path
+            oauth_candidates: list[str] = []
+            if issuer_path:
+                # e.g., https://github.com/.well-known/oauth-authorization-server/login/oauth
+                oauth_candidates.append(f"{issuer_base}/.well-known/oauth-authorization-server{issuer_path}")
+            else:
+                oauth_candidates.append(f"{issuer_base}/.well-known/oauth-authorization-server")
+
+            # OpenID Connect: Append .well-known to issuer
+            oidc_candidates: list[str] = []
+            # e.g., https://github.com/login/oauth/.well-known/openid-configuration
+            oidc_candidates.append(f"{auth_server.rstrip('/')}/.well-known/openid-configuration")
+
+            # Try OAuth 2.0 Authorization Server Metadata endpoints first
+            for well_known_url in oauth_candidates:
+                try:
+                    logger.debug(f"Trying OAuth metadata discovery for issuer: {parsed_issuer.netloc}")
+                    response = await client.get(well_known_url)
+                    response.raise_for_status()
+                    metadata = response.json()
+                    self._metadata = ServerOAuthMetadata(**metadata)
+                    logger.debug("Successfully discovered OAuth metadata")
+                    logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
+                    logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
+                    return
+                except (httpx.HTTPError, ValueError) as e:
+                    logger.debug(f"Failed to discover OAuth metadata: {e}")
+
+            # Then try OpenID Connect Discovery endpoints
+            for oidc_url in oidc_candidates:
+                logger.debug(f"Trying OpenID Connect discovery for issuer: {parsed_issuer.netloc}")
+                try:
+                    response = await client.get(oidc_url)
+                    response.raise_for_status()
+                    metadata = response.json()
+                    self._metadata = ServerOAuthMetadata(**metadata)
+                    logger.debug("Successfully discovered OIDC metadata")
+                    logger.debug(f"  Authorization endpoint: {self._metadata.authorization_endpoint}")
+                    logger.debug(f"  Token endpoint: {self._metadata.token_endpoint}")
+                    return
+                except (httpx.HTTPError, ValueError) as e:
+                    logger.debug(f"Failed to discover OIDC metadata: {e}")
+
+        # 4) If PRM path didn't yield anything, fall back to old host-level discovery
+        if not self._metadata:
+            well_known_url = f"{base_url}/.well-known/oauth-authorization-server"
+            try:
+                logger.debug(f"Trying OAuth metadata discovery for host: {parsed.netloc}")
+                resp = await client.get(well_known_url)
+                resp.raise_for_status()
+                self._metadata = ServerOAuthMetadata(**resp.json())
+                logger.debug("Successfully discovered OAuth metadata (host-level fallback)")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OAuth metadata: {e}")
+
+            oidc_url = f"{base_url}/.well-known/openid-configuration"
+            logger.debug(f"Trying OpenID Connect discovery for host: {parsed.netloc}")
+            try:
+                resp = await client.get(oidc_url)
+                resp.raise_for_status()
+                self._metadata = ServerOAuthMetadata(**resp.json())
+                logger.debug("Successfully discovered OIDC metadata (host-level fallback)")
+                return
+            except (httpx.HTTPError, ValueError) as e:
+                logger.debug(f"Failed to discover OIDC metadata: {e}")
+
         logger.error(f"Failed to discover OAuth/OIDC metadata for {self.server_url}")
         raise OAuthDiscoveryError(
             f"Failed to discover OAuth metadata for {self.server_url}. "
             "Server must support OAuth metadata discovery at "
             "/.well-known/oauth-authorization-server or /.well-known/openid-configuration"
         )
+
+    def _extract_prm(self, response: httpx.Response) -> str | None:
+        www_auth = response.headers.get("WWW-Authenticate")
+        if not www_auth:
+            return None
+
+        # If the server has a scope and the user didn't override it
+        scope_match = re.search(r'scope="([^"]+)"', www_auth)
+        if scope_match and not self.scope:
+            self.scope = scope_match.group(1)
+            logger.debug("Using scope from WWW-Authenticate header")
+
+        # Extract PRM url
+        match = re.search(r'resource_metadata="([^"]+)"', www_auth)
+        if match:
+            return match.group(1)
+
+        return None
 
     def _is_token_valid(self, token_data: TokenData) -> bool:
         """Check if token is still valid."""

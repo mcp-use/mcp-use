@@ -3,27 +3,158 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
-import type { RequestOptions } from "@mcp-use/modelcontextprotocol-sdk/shared/protocol.js";
+} from "@modelcontextprotocol/sdk/types.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type { BaseConnector, NotificationHandler } from "./connectors/base.js";
 
+/**
+ * MCP Session for managing connections to MCP servers.
+ *
+ * An MCPSession represents a single connection to an MCP server. It wraps a
+ * {@link BaseConnector} (Stdio, HTTP, or WebSocket) and provides high-level
+ * methods for interacting with the server's tools, resources, and prompts.
+ *
+ * Sessions handle:
+ * - Connection lifecycle (connect, disconnect, initialize)
+ * - Tool invocation
+ * - Resource access
+ * - Prompt retrieval
+ * - Notification handling
+ * - Root directory management
+ *
+ * Sessions are typically created by {@link MCPClient.createSession} rather than
+ * being instantiated directly.
+ *
+ * @example
+ * ```typescript
+ * // Create via client
+ * const client = new MCPClient('./config.json');
+ * const session = await client.createSession('my-server');
+ *
+ * // Use the session
+ * const tools = await session.listTools();
+ * const result = await session.callTool('my-tool', { arg: 'value' });
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Manual creation (advanced)
+ * import { StdioConnector } from 'mcp-use/client';
+ *
+ * const connector = new StdioConnector({
+ *   command: 'node',
+ *   args: ['server.js']
+ * });
+ * const session = new MCPSession(connector);
+ * await session.initialize();
+ * ```
+ *
+ * @see {@link MCPClient} for managing multiple sessions
+ * @see {@link BaseConnector} for connector implementations
+ */
 export class MCPSession {
+  /**
+   * The underlying connector managing the transport layer.
+   * This is the Stdio, HTTP, or WebSocket connector handling actual communication.
+   */
   readonly connector: BaseConnector;
+
+  /**
+   * Whether to automatically connect when initializing.
+   * @internal
+   */
   private autoConnect: boolean;
 
+  /**
+   * Creates a new MCP session.
+   *
+   * @param connector - The connector to use for communication (Stdio, HTTP, WebSocket)
+   * @param autoConnect - Whether to automatically connect during initialization (default: true)
+   *
+   * @example
+   * ```typescript
+   * const connector = new HttpConnector({ url: 'http://localhost:3000/mcp' });
+   * const session = new MCPSession(connector);
+   * await session.initialize(); // Auto-connects and initializes
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Manual connection control
+   * const session = new MCPSession(connector, false);
+   * await session.connect();
+   * await session.initialize();
+   * ```
+   */
   constructor(connector: BaseConnector, autoConnect = true) {
     this.connector = connector;
     this.autoConnect = autoConnect;
   }
 
+  /**
+   * Establishes the connection to the MCP server.
+   *
+   * This method starts the underlying transport (spawns process for Stdio,
+   * opens WebSocket, etc.) but does not perform the MCP initialization
+   * handshake. Call {@link initialize} after connecting.
+   *
+   * @returns Promise that resolves when connected
+   *
+   * @example
+   * ```typescript
+   * await session.connect();
+   * await session.initialize();
+   * ```
+   *
+   * @see {@link initialize} for performing the MCP handshake
+   * @see {@link disconnect} for closing the connection
+   */
   async connect(): Promise<void> {
     await this.connector.connect();
   }
 
+  /**
+   * Closes the connection to the MCP server.
+   *
+   * This method gracefully shuts down the transport and cleans up resources.
+   * After disconnecting, the session cannot be used until reconnected.
+   *
+   * @returns Promise that resolves when disconnected
+   *
+   * @example
+   * ```typescript
+   * await session.disconnect();
+   * console.log('Session closed');
+   * ```
+   *
+   * @see {@link connect} for establishing connections
+   */
   async disconnect(): Promise<void> {
     await this.connector.disconnect();
   }
 
+  /**
+   * Initializes the MCP session with the server.
+   *
+   * This method performs the MCP initialization handshake, exchanging
+   * capabilities and metadata with the server. If `autoConnect` is true
+   * and the session is not yet connected, it will connect first.
+   *
+   * After initialization, you can list and call tools, read resources, etc.
+   *
+   * @returns Promise that resolves when initialized
+   *
+   * @example
+   * ```typescript
+   * const session = await client.createSession('my-server', false);
+   * await session.connect();
+   * await session.initialize();
+   * // Now ready to use
+   * const tools = await session.listTools();
+   * ```
+   *
+   * @see {@link connect} for establishing the connection first
+   */
   async initialize(): Promise<void> {
     if (!this.isConnected && this.autoConnect) {
       await this.connect();
@@ -31,6 +162,18 @@ export class MCPSession {
     await this.connector.initialize();
   }
 
+  /**
+   * Checks if the session is currently connected to the server.
+   *
+   * @returns True if connected, false otherwise
+   *
+   * @example
+   * ```typescript
+   * if (session.isConnected) {
+   *   const tools = await session.listTools();
+   * }
+   * ```
+   */
   get isConnected(): boolean {
     return this.connector && this.connector.isClientConnected;
   }
@@ -77,7 +220,20 @@ export class MCPSession {
   }
 
   /**
-   * Get the current roots.
+   * Gets the current roots advertised to the server.
+   *
+   * Roots represent directories or files that the client has provided access to.
+   * The server may use this information to scope its operations.
+   *
+   * @returns Array of Root objects
+   *
+   * @example
+   * ```typescript
+   * const roots = session.getRoots();
+   * console.log(`Current roots: ${roots.map(r => r.uri).join(', ')}`);
+   * ```
+   *
+   * @see {@link setRoots} for updating roots
    */
   getRoots(): Root[] {
     return this.connector.getRoots();

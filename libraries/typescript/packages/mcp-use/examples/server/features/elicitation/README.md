@@ -12,17 +12,20 @@ This example demonstrates elicitation support in MCP, showing how servers can re
 ## Elicitation Modes
 
 ### Form Mode
+
 Collects structured data from users with Zod schema validation. Use this for non-sensitive information like:
+
 - User preferences
 - Configuration options
 - Form data
 
 **Example**:
+
 ```typescript
 const result = await ctx.elicit(
-  'Please provide your info',
+  "Please provide your info",
   z.object({
-    name: z.string().default('Anonymous'),
+    name: z.string().default("Anonymous"),
     age: z.number().min(0).max(150),
   })
 );
@@ -30,17 +33,20 @@ const result = await ctx.elicit(
 ```
 
 ### URL Mode
+
 Directs users to external URLs for sensitive interactions. **MUST** be used for:
+
 - Authentication credentials
 - API keys
 - OAuth flows
 - Any sensitive data
 
 **Example**:
+
 ```typescript
 const result = await ctx.elicit(
-  'Please authorize GitHub access',
-  'https://github.com/login/oauth/authorize?...'
+  "Please authorize GitHub access",
+  "https://github.com/login/oauth/authorize?..."
 );
 ```
 
@@ -51,7 +57,7 @@ pnpm install
 pnpm dev
 ```
 
-The server will start on port 3002 by default.
+The server will start on port 3000 by default.
 
 ## Available Tools
 
@@ -63,6 +69,7 @@ The server will start on port 3002 by default.
 ## Testing
 
 ### Basic Test
+
 ```bash
 pnpm exec tsx test-client.ts
 ```
@@ -70,11 +77,13 @@ pnpm exec tsx test-client.ts
 Tests basic elicitation functionality (form mode, URL mode).
 
 ### Validation Test
+
 ```bash
 pnpm exec tsx test-validation.ts
 ```
 
 Comprehensive validation testing:
+
 - ✅ Valid data acceptance
 - ✅ Invalid age (out of range) - rejected
 - ✅ Missing required fields - rejected
@@ -89,25 +98,25 @@ The server automatically validates all form mode data:
 
 ```typescript
 // Invalid age (exceeds max)
-age: 200  // max is 150
+age: 200; // max is 150
 // ❌ Rejected: "Too big: expected number to be <=150"
 
 // Invalid email format
-email: "not-an-email"
+email: "not-an-email";
 // ❌ Rejected: "Invalid email address"
 
 // Wrong type
-age: "twenty-five"  // should be number
+age: "twenty-five"; // should be number
 // ❌ Rejected: "Invalid input: expected number, received string"
 
 // Missing required field
-username: undefined  // required, no default
+username: undefined; // required, no default
 // ❌ Rejected: "Invalid input: expected string, received undefined"
 ```
 
 ## Testing with MCP Inspector
 
-1. Open http://localhost:3002/inspector
+1. Open http://localhost:3000/inspector
 2. Connect to the server
 3. Call any of the elicitation tools
 4. The client will receive an elicitation request and should present it to the user
@@ -115,4 +124,3 @@ username: undefined  // required, no default
 ## Security Notes
 
 ⚠️ **Important**: Always use URL mode for sensitive data collection. Form mode data passes through the MCP client and should only be used for non-sensitive information.
-

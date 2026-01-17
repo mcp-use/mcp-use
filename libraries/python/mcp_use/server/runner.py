@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 from starlette.applications import Starlette
 
-from mcp_use.server.utils.signals import setup_signal_handlers
-
 logger = logging.getLogger(__name__)
 
 
@@ -52,8 +50,6 @@ class ServerRunner:
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )
         server = uvicorn.Server(config)
-        # Set up signal handlers before starting server
-        setup_signal_handlers()
         await server.serve()
 
     async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:

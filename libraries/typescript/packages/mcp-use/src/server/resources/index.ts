@@ -9,11 +9,11 @@ import type {
   ResourceTemplateDefinition,
   EnhancedResourceContext,
 } from "../types/index.js";
-import { ResourceTemplate } from "@mcp-use/modelcontextprotocol-sdk/server/mcp.js";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   ReadResourceResult,
   CallToolResult,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import { convertToolResultToResourceResult } from "./conversion.js";
 

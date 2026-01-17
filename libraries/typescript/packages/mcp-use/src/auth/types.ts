@@ -1,4 +1,4 @@
-import type { OAuthMetadata } from "@mcp-use/modelcontextprotocol-sdk/shared/auth.js";
+import type { OAuthMetadata } from "@modelcontextprotocol/sdk/shared/auth.js";
 
 /**
  * Internal type for storing OAuth state in localStorage during the OAuth flow.
@@ -15,6 +15,9 @@ export interface StoredState {
     clientName: string;
     clientUri: string;
     callbackUrl: string;
+    // OAuth proxy settings for CORS bypass during token exchange
+    oauthProxyUrl?: string;
+    connectionUrl?: string;
   };
   // Track which flow was used (popup vs redirect)
   flowType?: "popup" | "redirect";

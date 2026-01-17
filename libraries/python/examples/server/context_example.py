@@ -6,6 +6,7 @@ This example demonstrates all Context features available in mcp-use servers:
 - Logging
 - Request metadata access
 - Resource reading from within tools
+- Client roots listing
 """
 
 import asyncio
@@ -99,6 +100,37 @@ async def read_resource_from_tool(resource_uri: str, context: Context) -> str:
     except Exception as e:
         await context.warning(f"Failed to read resource {resource_uri}: {e}")
         return f"Error reading resource: {e}"
+
+
+@server.tool()
+async def get_client_roots(context: Context) -> str:
+    """Get the list of roots exposed by the client.
+
+    Demonstrates: context.list_roots()
+
+    Roots represent directories or files that the client has made available
+    to the server. This is useful for file-based operations where the server
+    needs to know which paths are accessible.
+    """
+    try:
+        roots = await context.list_roots()
+
+        if not roots:
+            await context.info("Client has no roots configured")
+            return "No roots available from client"
+
+        await context.info(f"Client exposed {len(roots)} root(s)")
+
+        # Format roots for display
+        lines = [f"Client roots ({len(roots)}):"]
+        for root in roots:
+            name = root.name or "(unnamed)"
+            lines.append(f"  - {name}: {root.uri}")
+
+        return "\n".join(lines)
+    except Exception as e:
+        await context.warning(f"Failed to get client roots: {e}")
+        return f"Error getting roots: {e}"
 
 
 @server.tool(
@@ -222,6 +254,7 @@ This server demonstrates MCP Context features:
 - **log_demo**: Logging with `context.debug/info/warning/error()`
 - **get_request_info**: Access request metadata
 - **read_resource_from_tool**: Read resources with `context.read_resource()`
+- **get_client_roots**: Get client roots with `context.list_roots()`
 - **long_running_task**: Combined progress + logging
 
 ## Resources (readable via context)
@@ -263,5 +296,6 @@ if __name__ == "__main__":
     print("  - context.debug/info/warning/error(message)")
     print("  - context.request_id")
     print("  - context.read_resource(uri)")
+    print("  - context.list_roots()")
     print()
     server.run(transport="streamable-http", port=8000)

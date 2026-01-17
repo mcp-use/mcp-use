@@ -1,8 +1,7 @@
-import { Send } from "lucide-react";
+import { Send, Square } from "lucide-react";
 import React from "react";
 
 import { Button } from "@/client/components/ui/button";
-import { Spinner } from "@/client/components/ui/spinner";
 import { Textarea } from "@/client/components/ui/textarea";
 
 interface ChatInputAreaProps {
@@ -13,6 +12,7 @@ interface ChatInputAreaProps {
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onSendMessage: () => void;
+  onStopStreaming: () => void;
 }
 
 export function ChatInputArea({
@@ -23,6 +23,7 @@ export function ChatInputArea({
   onInputChange,
   onKeyDown,
   onSendMessage,
+  onStopStreaming,
 }: ChatInputAreaProps) {
   return (
     <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 sm:pt-0 text-foreground">
@@ -39,16 +40,14 @@ export function ChatInputArea({
         <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">
           <div className="flex items-center gap-2">
             {isLoading ? (
-              <button
-                className="bg-muted hover:bg-muted/80 text-foreground p-3 rounded-full font-medium flex items-center justify-center h-10 transition-colors border border-border aspect-square w-auto min-w-none"
+              <Button
+                className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
                 title="Stop streaming"
                 type="button"
-                onClick={() => {
-                  // Stop functionality would go here if needed
-                }}
+                onClick={onStopStreaming}
               >
-                <Spinner className="h-4 w-4" />
-              </button>
+                <Square className="h-4 w-4" />
+              </Button>
             ) : (
               <Button
                 disabled={!inputValue.trim() || !isConnected || isLoading}

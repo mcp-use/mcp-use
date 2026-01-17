@@ -2,12 +2,7 @@
 export function isValidUrl(urlString: string): boolean {
   try {
     const url = new URL(urlString);
-    return (
-      url.protocol === "http:" ||
-      url.protocol === "https:" ||
-      url.protocol === "ws:" ||
-      url.protocol === "wss:"
-    );
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
@@ -40,7 +35,12 @@ export async function findAvailablePort(
   );
 }
 
-// Check if a specific port is available
+/**
+ * Determines whether the given TCP port is available for binding on the local machine.
+ *
+ * @param port - The port number to check (1–65535)
+ * @returns `true` if the port can be bound (is available), `false` otherwise
+ */
 export async function isPortAvailable(port: number): Promise<boolean> {
   const net = await import("node:net");
 
@@ -51,6 +51,24 @@ export async function isPortAvailable(port: number): Promise<boolean> {
     });
     server.on("error", () => resolve(false));
   });
+}
+
+/**
+ * Parses a TCP port number from command-line arguments using the `--port` flag.
+ *
+ * If `--port` is present and followed by an integer between 1 and 65535, returns that port.
+ *
+ * @returns The parsed port number if valid, `null` if the flag is missing or the value is invalid.
+ */
+export function parsePortFromArgs(): number | null {
+  const portArgIndex = process.argv.indexOf("--port");
+  if (portArgIndex !== -1 && portArgIndex + 1 < process.argv.length) {
+    const portValue = Number.parseInt(process.argv[portArgIndex + 1], 10);
+    if (!Number.isNaN(portValue) && portValue >= 1 && portValue <= 65535) {
+      return portValue;
+    }
+  }
+  return null;
 }
 
 /**

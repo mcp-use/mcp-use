@@ -5,12 +5,12 @@
  * Used for integration testing
  */
 
-import { Server } from "@mcp-use/modelcontextprotocol-sdk/server/index.js";
-import { StdioServerTransport } from "@mcp-use/modelcontextprotocol-sdk/server/stdio.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
-} from "@mcp-use/modelcontextprotocol-sdk/types.js";
+} from "@modelcontextprotocol/sdk/types.js";
 
 // Create server instance
 const server = new Server(

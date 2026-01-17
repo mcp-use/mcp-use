@@ -17,7 +17,7 @@ const server = new MCPServer({
  * - server.tool('get-brand-info')
  * - server.resource('ui://widget/get-brand-info')
  *
- * See docs: https://docs.mcp-use.com/typescript/server/ui-widgets
+ * See docs: https://mcp-use.com/docs/typescript/server/ui-widgets
  */
 
 /**
@@ -74,7 +74,7 @@ server.tool(
       ],
       contact: {
         website: "https://mcp-use.com",
-        docs: "https://docs.mcp-use.com",
+        docs: "https://mcp-use.com/docs",
         github: "https://github.com/mcp-use/mcp-use",
       },
       features: [

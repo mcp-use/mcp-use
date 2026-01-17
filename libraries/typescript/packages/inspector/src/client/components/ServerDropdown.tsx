@@ -14,12 +14,17 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import type { MCPConnection } from "@/client/context/McpContext";
 import { cn } from "@/client/lib/utils";
-import { ChevronDown, Server, Settings } from "lucide-react";
+import { ChevronDown, Info, Server, Settings } from "lucide-react";
+import type { McpServer } from "mcp-use/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 
 interface ServerDropdownProps {
   connections: MCPConnection[];
@@ -29,6 +34,18 @@ interface ServerDropdownProps {
   mobileMode?: boolean;
 }
 
+/**
+ * Render a server selection dropdown with per-connection actions to view capabilities or open connection settings.
+ *
+ * Renders a compact trigger in mobileMode and a full trigger in desktop mode. Selecting a connection calls `onServerSelect` only if the connection exists and its state is `"ready"`; otherwise a toast error is shown. Clicking the info action opens the ServerCapabilitiesModal for that connection. Clicking the settings action invokes `onOpenConnectionOptions` with the connection id.
+ *
+ * @param connections - List of available MCP connections shown in the menu
+ * @param selectedServer - The currently selected connection (may be `undefined`)
+ * @param onServerSelect - Callback invoked with a server id when a ready server is selected
+ * @param onOpenConnectionOptions - Callback invoked with a connection id (or `null`) to open connection options
+ * @param mobileMode - If `true`, render the compact/mobile variant of the dropdown
+ * @returns The server dropdown React element
+ */
 export function ServerDropdown({
   connections,
   selectedServer,
@@ -37,6 +54,9 @@ export function ServerDropdown({
   mobileMode = false,
 }: ServerDropdownProps) {
   const navigate = useNavigate();
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalConnection, setInfoModalConnection] =
+    useState<MCPConnection | null>(null);
 
   const handleServerSelect = (serverId: string) => {
     const server = connections.find((c) => c.id === serverId);
@@ -59,11 +79,7 @@ export function ServerDropdown({
                 className="h-11 px-2 bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200 flex items-center gap-1.5"
               >
                 {selectedServer ? (
-                  <ServerIcon
-                    serverUrl={selectedServer.url}
-                    serverName={selectedServer.name}
-                    size="md"
-                  />
+                  <ServerIcon server={selectedServer} size="md" />
                 ) : (
                   <Server className="h-5 w-5" />
                 )}
@@ -92,26 +108,36 @@ export function ServerDropdown({
                     onClick={() => handleServerSelect(connection.id)}
                     className="flex items-center gap-3"
                   >
-                    <ServerIcon
-                      serverUrl={connection.url}
-                      serverName={connection.name}
-                      size="sm"
-                    />
+                    <ServerIcon server={connection} size="sm" />
                     <div className="flex items-center gap-2 flex-1">
                       <div className="font-medium">{connection.name}</div>
                       <StatusDot status={connection.state} />
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenConnectionOptions(connection.id);
-                      }}
-                    >
-                      <Settings className="h-3 w-3" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setInfoModalConnection(connection);
+                          setInfoModalOpen(true);
+                        }}
+                      >
+                        <Info className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenConnectionOptions(connection.id);
+                        }}
+                      >
+                        <Settings className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </DropdownMenuItem>
                 ))
               )}
@@ -124,6 +150,11 @@ export function ServerDropdown({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        <ServerCapabilitiesModal
+          open={infoModalOpen}
+          onOpenChange={setInfoModalOpen}
+          connection={infoModalConnection}
+        />
       </div>
     );
   }
@@ -136,23 +167,24 @@ export function ServerDropdown({
           <DropdownMenuTrigger asChild>
             <ShimmerButton
               className={cn(
-                "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
+                "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start  text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
                 !selectedServer && "pl-4",
-                selectedServer && "pr-10"
+                selectedServer && "pr-20"
               )}
             >
               {selectedServer && (
                 <ServerIcon
-                  serverUrl={selectedServer.url}
-                  serverName={selectedServer.name}
+                  server={selectedServer}
                   size="md"
                   className="mr-2"
                 />
               )}
               <div className="flex items-center gap-2 flex-1">
-                <span className="truncate">
+                <span className="truncate lg:max-w-[120px] xl:max-w-none">
                   {selectedServer
-                    ? selectedServer.name
+                    ? selectedServer.serverInfo?.title ||
+                      selectedServer.serverInfo?.name ||
+                      selectedServer.name
                     : "Select server to inspect"}
                 </span>
                 {selectedServer && (
@@ -192,23 +224,43 @@ export function ServerDropdown({
             </ShimmerButton>
           </DropdownMenuTrigger>
           {selectedServer && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onOpenConnectionOptions(selectedServer.id);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/10 dark:hover:bg-black/10 rounded-full transition-colors text-white dark:text-black"
-                  aria-label="Edit connection settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Edit connection settings</p>
-              </TooltipContent>
-            </Tooltip>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInfoModalConnection(selectedServer);
+                      setInfoModalOpen(true);
+                    }}
+                    className="p-1.5 hover:bg-white/10 dark:hover:bg-black/10 rounded-full transition-colors text-white dark:text-black"
+                    aria-label="View server info"
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View server info</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenConnectionOptions(selectedServer.id);
+                    }}
+                    className="p-1.5 hover:bg-white/10 dark:hover:bg-black/10 rounded-full transition-colors text-white dark:text-black"
+                    aria-label="Edit connection settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Edit connection settings</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           )}
           <DropdownMenuContent
             className="w-[calc(100vw-2rem)] sm:w-[300px]"
@@ -232,26 +284,40 @@ export function ServerDropdown({
                   onClick={() => handleServerSelect(connection.id)}
                   className="flex items-center gap-3"
                 >
-                  <ServerIcon
-                    serverUrl={connection.url}
-                    serverName={connection.name}
-                    size="sm"
-                  />
+                  <ServerIcon server={connection} size="sm" />
                   <div className="flex items-center gap-2 flex-1">
-                    <div className="font-medium">{connection.name}</div>
+                    <div className="font-medium">
+                      {connection.serverInfo?.title ||
+                        connection.serverInfo?.name ||
+                        connection.name}
+                    </div>
                     <StatusDot status={connection.state} />
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenConnectionOptions(connection.id);
-                    }}
-                  >
-                    <Settings className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setInfoModalConnection(connection);
+                        setInfoModalOpen(true);
+                      }}
+                    >
+                      <Info className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenConnectionOptions(connection.id);
+                      }}
+                    >
+                      <Settings className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </DropdownMenuItem>
               ))
             )}
@@ -263,6 +329,11 @@ export function ServerDropdown({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <ServerCapabilitiesModal
+          open={infoModalOpen}
+          onOpenChange={setInfoModalOpen}
+          connection={infoModalConnection}
+        />
       </div>
     </div>
   );

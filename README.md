@@ -17,7 +17,7 @@
         <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
         <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
-    <a href="https://docs.mcp-use.com" alt="Documentation">
+    <a href="https://mcp-use.com/docs" alt="Documentation">
         <img src="https://img.shields.io/badge/mcp--use-docs-red" /></a>
     <a href="https://mcp-use.com" alt="Website">
         <img src="https://img.shields.io/badge/cloud-mcp--use.com-blue" /></a>
@@ -32,7 +32,7 @@
         <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
         <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <a href="https://docs.mcp-use.com/python" alt="Python Documentation">
+    <a href="https://mcp-use.com/docs/python" alt="Python Documentation">
         <img src="https://img.shields.io/badge/python-docs-red" /></a>
     <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Conformance">
         <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" /></a>
@@ -43,7 +43,7 @@
         <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
     <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
         <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
-    <a href="https://docs.mcp-use.com/typescript" alt="Typescript Documentation">
+    <a href="https://mcp-use.com/docs/typescript" alt="Typescript Documentation">
         <img src="https://img.shields.io/badge/typescript-docs-red" /></a>
     <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Conformance">
         <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" /></a>
@@ -78,8 +78,8 @@
       <p>Create intelligent agents that can use tools, browse the web, manage files, and more.</p>
       <p>
         <a href="#build-an-ai-agent">Quick Start ↓</a> | 
-        <a href="https://docs.mcp-use.com/python/agent/agent-configuration">Python Docs</a> | 
-        <a href="https://docs.mcp-use.com/typescript/agent/agent-configuration">TypeScript Docs</a>
+        <a href="https://mcp-use.com/docs/python/agent/agent-configuration">Python Docs</a> | 
+        <a href="https://mcp-use.com/docs/typescript/agent/agent-configuration">TypeScript Docs</a>
       </p>
     </td>
     <td width="50%" valign="top">
@@ -87,8 +87,8 @@
       <p>Connect directly to MCP servers and call tools programmatically without an agent.</p>
       <p>
         <a href="#use-mcp-client">Quick Start ↓</a> | 
-        <a href="https://docs.mcp-use.com/python/client/client-configuration">Python Docs</a> | 
-        <a href="https://docs.mcp-use.com/typescript/client/client-configuration">TypeScript Docs</a>
+        <a href="https://mcp-use.com/docs/python/client/client-configuration">Python Docs</a> | 
+        <a href="https://mcp-use.com/docs/typescript/client/client-configuration">TypeScript Docs</a>
       </p>
     </td>
   </tr>
@@ -98,8 +98,8 @@
       <p>Build your own MCP servers with tools, resources, and prompts.</p>
       <p>
         <a href="#create-an-mcp-server">Quick Start ↓</a> |
-        <a href="https://docs.mcp-use.com/python/server/index">Python Docs</a> |
-        <a href="https://docs.mcp-use.com/typescript/server/getting-started">TypeScript Docs</a>
+        <a href="https://mcp-use.com/docs/python/server/index">Python Docs</a> |
+        <a href="https://mcp-use.com/docs/typescript/server/getting-started">TypeScript Docs</a>
       </p>
     </td>
     <td width="50%" valign="top">
@@ -107,7 +107,7 @@
       <p>Test, debug, and explore your MCP servers interactively.</p>
       <p>
         <a href="#use-the-inspector">Quick Start ↓</a> | 
-        <a href="https://docs.mcp-use.com/inspector/index">Inspector Docs</a> | 
+        <a href="https://mcp-use.com/docs/inspector/index">Inspector Docs</a> | 
         <a href="https://inspector.mcp-use.com">MCP Inspector online</a>
       </p>
     </td>
@@ -117,15 +117,15 @@
       <h3>🎨 Build ChatGPT Apps</h3>
       <p>Create interactive UIs with mcp-ui, react and live reload.</p>
       <p>
-        <a href="https://docs.mcp-use.com/typescript/server/ui-widgets">Quick Start</a> | 
-        <a href="https://docs.mcp-use.com/typescript/server/templates">Templates</a>
+        <a href="https://mcp-use.com/docs/typescript/server/ui-widgets">Quick Start</a> | 
+        <a href="https://mcp-use.com/docs/typescript/server/templates">Templates</a>
       </p>
     </td>
     <td width="50%" valign="top">
       <h3>☁️ Deploy to MCP Cloud</h3>
       <p>Deploy and manage your MCP agents and servers in the cloud.</p>
       <p>
-        <a href="https://docs.mcp-use.com/home/mcp101">Quick Start</a> | 
+        <a href="https://mcp-use.com/docs/home/mcp101">Quick Start</a> | 
         <a href="https://mcp-use.com">Cloud ↗</a>
       </p>
     </td>
@@ -372,7 +372,7 @@ npx @mcp-use/inspector --url http://localhost:3000/sse
 - **[📘 Python Documentation](./libraries/python/README.md)** - Complete Python guide
 - **[📗 TypeScript Documentation](./libraries/typescript/README.md)** - Complete TypeScript guide
 - **[🔍 Inspector Documentation](./libraries/typescript/packages/inspector/README.md)** - Inspector guide
-- **[🌐 Online Docs](https://docs.mcp-use.com)** - Full online documentation
+- **[🌐 Online Docs](https://mcp-use.com/docs)** - Full online documentation
 
 ---
 
@@ -519,7 +519,7 @@ MIT licensed and community-driven. Contribute, fork, or extend as needed.
 
 - **💬 Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
 - **🐛 GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
-- **📖 Documentation**: [docs.mcp-use.com](https://docs.mcp-use.com)
+- **📖 Documentation**: [mcp-use.com/docs](https://mcp-use.com/docs)
 - **🌐 Website**: [mcp-use.com](https://mcp-use.com)
 - **🐦 Twitter**: Follow [@pietrozullo](https://x.com/pietrozullo) and [@pederzh](https://x.com/pederzh)
 
@@ -535,8 +535,7 @@ MIT © [MCP-Use Contributors](https://github.com/mcp-use/mcp-use/graphs/contribu
 
 We love contributions! Check out our contributing guidelines:
 
-- [Python Contributing Guide](./libraries/python/CONTRIBUTING.md)
-- [TypeScript Contributing Guide](./libraries/typescript/README.md#-contributing)
+[CONTRIBUTING.md](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md)
 
 ---
 

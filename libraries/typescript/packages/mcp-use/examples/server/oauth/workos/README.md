@@ -20,6 +20,7 @@ A production-ready example of an MCP server with WorkOS AuthKit OAuth 2.0 authen
 ## What is WorkOS AuthKit?
 
 WorkOS AuthKit is a complete authentication solution that handles:
+
 - User authentication (email/password, SSO, social login)
 - Session management
 - OAuth 2.0 authorization server
@@ -49,6 +50,7 @@ From the [WorkOS Dashboard](https://dashboard.workos.com):
 Dynamic Client Registration allows MCP clients to self-register without prior configuration, which is required by the MCP OAuth specification.
 
 In the [WorkOS Dashboard](https://dashboard.workos.com):
+
 1. Go to **Connect** → **Configuration**
 2. Enable **Dynamic Client Registration**
 3. Save your changes
@@ -74,6 +76,7 @@ MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
 ```
 
 **How it works:**
+
 - MCP clients (like Claude Desktop, MCP Inspector) register themselves automatically
 - No pre-configuration needed in WorkOS Dashboard
 - Each client gets its own `client_id`
@@ -95,12 +98,14 @@ MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
 ```
 
 **How it works:**
+
 - MCP server proxies OAuth requests and injects your `client_id`
 - Must create OAuth Application in WorkOS Dashboard → Connect → OAuth Applications
 - Configure redirect URIs to match your MCP client (e.g., `http://localhost:*/callback`)
 - Works with standard MCP clients without them needing to know the `client_id`
 
 **Which mode to choose?**
+
 - Use **DCR** (Option A) for most cases - it's simpler and more flexible
 - Use **Pre-registered Client** (Option B) if you need tighter control over OAuth clients or have enterprise requirements
 
@@ -196,6 +201,7 @@ This example includes three tools demonstrating different aspects of authenticat
 ### 1. `get-user-info`
 
 Returns basic information about the authenticated user:
+
 ```typescript
 {
   userId: "user_01H5JQ5Z4...",
@@ -208,6 +214,7 @@ Returns basic information about the authenticated user:
 ### 2. `get-user-permissions`
 
 Shows the user's roles, permissions, and scopes:
+
 ```typescript
 {
   roles: ["admin"],
@@ -219,6 +226,7 @@ Shows the user's roles, permissions, and scopes:
 ### 3. `get-workos-user`
 
 Demonstrates making authenticated API calls to WorkOS:
+
 ```typescript
 // Fetches full user profile from WorkOS API
 {
@@ -230,66 +238,10 @@ Demonstrates making authenticated API calls to WorkOS:
 }
 ```
 
-## Testing with Claude Desktop
-
-1. **Build this example**:
-   ```bash
-   pnpm build
-   ```
-
-2. **Add to your Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-   ```json
-   {
-     "mcpServers": {
-       "workos-oauth": {
-         "command": "node",
-         "args": ["/absolute/path/to/examples/typescript/server/workos-oauth/dist/server.js"],
-         "env": {
-           "WORKOS_CLIENT_ID": "client_01KB5DRXBDDY1VGCBKY108SKJW",
-           "WORKOS_API_KEY": "sk_test_...",
-           "WORKOS_SUBDOMAIN": "imaginative-palm-54-staging"
-         }
-       }
-     }
-   }
-   ```
-
-3. **Restart Claude Desktop**
-
-4. **Use a tool**: When you first try to use a tool, Claude will prompt you to authenticate via WorkOS
-
-## Testing with MCP Inspector
-
-The MCP Inspector provides a web UI for testing OAuth flows:
-
-```bash
-# Install globally
-npm install -g @modelcontextprotocol/inspector
-
-# Run the inspector
-mcp-inspector node dist/server.js
-```
-
-Then open http://localhost:5173 in your browser.
-
-## Configuration Options
-
-### Development Mode
-
-To disable JWT verification during development (NOT RECOMMENDED for production):
-
-```typescript
-oauth: oauthWorkOSProvider({
-  subdomain: WORKOS_SUBDOMAIN,
-  clientId: WORKOS_CLIENT_ID,
-  apiKey: WORKOS_API_KEY,
-  verifyJwt: false  // ⚠️ Development only!
-})
-```
-
 ### Custom OAuth Endpoints
 
 The provider automatically configures endpoints based on your subdomain:
+
 - Issuer: `https://{subdomain}.authkit.app`
 - Authorization: `https://{subdomain}.authkit.app/oauth2/authorize`
 - Token: `https://{subdomain}.authkit.app/oauth2/token`
@@ -359,6 +311,7 @@ NODE_ENV=production
 **Most Common Cause**: `MCP_USE_OAUTH_WORKOS_CLIENT_ID` environment variable is set.
 
 **Solution**:
+
 1. Remove `MCP_USE_OAUTH_WORKOS_CLIENT_ID` from your environment variables
 2. Remove `WORKOS_CLIENT_ID` if you have it set
 3. Restart your MCP server
@@ -373,6 +326,7 @@ NODE_ENV=production
 **Most Common Cause**: Dynamic Client Registration is NOT enabled in WorkOS Dashboard.
 
 **Solution**:
+
 1. Go to [WorkOS Dashboard](https://dashboard.workos.com)
 2. Navigate to **Connect** → **Configuration**
 3. Enable **Dynamic Client Registration**
@@ -385,11 +339,13 @@ NODE_ENV=production
 **Symptom**: OAuth popup opens twice, or one popup stays open even though authentication succeeds.
 
 **Possible Causes**:
+
 - Browser popup blocker interfering with redirects
 - Race condition in OAuth flow handling
 - Browser caching old OAuth state
 
 **Solutions**:
+
 1. **Clear browser cache** and cookies for both your MCP server and WorkOS domains
 2. **Allow popups** for both `localhost:3001` and `*.authkit.app` in your browser
 3. **Try incognito/private mode** to rule out caching issues
@@ -401,6 +357,7 @@ NODE_ENV=production
 **Symptom**: All tool calls return 401 even after authentication.
 
 **Solutions**:
+
 - Verify your `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` environment variable is correct (just the subdomain, not the full URL)
 - Check that your `WORKOS_API_KEY` is valid and not expired
 - Ensure the token is being sent in the `Authorization: Bearer <token>` header
@@ -410,6 +367,7 @@ NODE_ENV=production
 **Symptom**: MCP client can't discover OAuth configuration.
 
 **Solutions**:
+
 - Verify your server is running and accessible at the expected URL
 - Check the metadata endpoint: `http://localhost:3000/.well-known/oauth-protected-resource`
 - Ensure your MCP server base URL is correctly configured
@@ -419,6 +377,7 @@ NODE_ENV=production
 **Symptom**: Token verification fails with "Invalid token" error.
 
 **Solutions**:
+
 - Confirm the token is being sent in the `Authorization: Bearer <token>` header
 - Verify your subdomain matches your AuthKit instance exactly
 - Check that the token hasn't expired (WorkOS tokens typically expire after 1 hour)
@@ -429,6 +388,7 @@ NODE_ENV=production
 **Symptom**: MCP client fails during the registration step.
 
 **Solutions**:
+
 - Enable Dynamic Client Registration in WorkOS Dashboard under Connect → Configuration
 - Ensure your MCP client supports Dynamic Client Registration (Claude Desktop and MCP Inspector do)
 - Check your AuthKit metadata endpoint returns valid JSON: `https://{subdomain}.authkit.app/.well-known/oauth-authorization-server`
@@ -444,14 +404,15 @@ NODE_ENV=production
 ## Support
 
 For WorkOS-specific questions:
+
 - [WorkOS Support](https://workos.com/support)
 - [WorkOS Community](https://community.workos.com)
 
 For MCP-related questions:
+
 - [MCP Documentation](https://modelcontextprotocol.io)
-- [mcp-use GitHub Issues](https://github.com/your-org/mcp-use/issues)
+- [mcp-use GitHub Issues](https://github.com/mcp-use/mcp-use/issues)
 
 ## License
 
 MIT
-

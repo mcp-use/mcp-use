@@ -9,6 +9,7 @@ from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
 from mcp.types import (
     CallToolRequestParams,
     GetPromptRequestParams,
+    InitializeRequestParams,
     PaginatedRequestParams,
     ReadResourceRequestParams,
 )
@@ -58,9 +59,9 @@ class Middleware:
     ) -> CallNext[Any, Any]:
         handler: CallNext[Any, Any] = call_next
 
-        # Note: "initialize" is not handled here - it occurs at the protocol layer
-        # before middleware is invoked. See ServerSession._received_request in the MCP SDK.
         match context.method:
+            case "initialize":
+                handler = partial(self.on_initialize, call_next=handler)
             case "tools/call":
                 handler = partial(self.on_call_tool, call_next=handler)
             case "resources/read":
@@ -78,6 +79,13 @@ class Middleware:
         return handler
 
     async def on_request(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+        return await call_next(context)
+
+    async def on_initialize(
+        self,
+        context: ServerMiddlewareContext[InitializeRequestParams],
+        call_next: CallNext[InitializeRequestParams, Any],
+    ) -> Any:
         return await call_next(context)
 
     async def on_call_tool(

@@ -25,11 +25,11 @@
 
 ## 📦 Related Packages
 
-| Package                                                                                           | Description             | Version                                                                                                         |
-| ------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)          | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                                                                                             | Description             | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)          | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
@@ -247,37 +247,37 @@ UI widgets are React components that get compiled into standalone HTML pages. Th
 
 ```tsx
 // resources/task-manager.tsx
-import React, { useState, useEffect } from 'react'
-import { useMcp } from 'mcp-use/react'
+import React, { useState, useEffect } from "react";
+import { useMcp } from "mcp-use/react";
 
 export default function TaskManager() {
-  const { callTool, status, error } = useMcp()
-  const [tasks, setTasks] = useState([])
-  const [newTask, setNewTask] = useState('')
+  const { callTool, status, error } = useMcp();
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState("");
 
   useEffect(() => {
-    loadTasks()
-  }, [])
+    loadTasks();
+  }, []);
 
   const loadTasks = async () => {
-    const result = await callTool('list_tasks')
-    setTasks(result.tasks)
-  }
+    const result = await callTool("list_tasks");
+    setTasks(result.tasks);
+  };
 
   const addTask = async () => {
-    if (!newTask.trim()) return
+    if (!newTask.trim()) return;
 
-    await callTool('create_task', {
+    await callTool("create_task", {
       title: newTask,
-      status: 'pending',
-    })
+      status: "pending",
+    });
 
-    setNewTask('')
-    await loadTasks()
-  }
+    setNewTask("");
+    await loadTasks();
+  };
 
-  if (status === 'connecting') return <div>Connecting...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (status === "connecting") return <div>Connecting...</div>;
+  if (error) return <div>Error: {error.message}</div>;
 
   return (
     <div className="p-4">
@@ -307,7 +307,7 @@ export default function TaskManager() {
         ))}
       </ul>
     </div>
-  )
+  );
 }
 ```
 
@@ -410,16 +410,16 @@ CMD ["npm", "start"]
 If you have an existing Express app, you can mount the built widgets:
 
 ```ts
-import express from 'express'
-import path from 'path'
+import express from "express";
+import path from "path";
 
-const app = express()
+const app = express();
 
 // Serve MCP widgets
 app.use(
-  '/widgets',
-  express.static(path.join(__dirname, '../dist/resources/mcp-use/widgets'))
-)
+  "/widgets",
+  express.static(path.join(__dirname, "../dist/resources/mcp-use/widgets"))
+);
 
 // Your other routes...
 ```
@@ -465,8 +465,8 @@ mcp-use dev --no-open
 
 - [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
 - [Model Context Protocol](https://modelcontextprotocol.io)
-- [Creating MCP Servers](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use#-mcp-server-framework)
-- [MCP Inspector Guide](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)
+- [Creating MCP Servers](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use#-mcp-server-framework)
+- [MCP Inspector Guide](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)
 
 ---
 

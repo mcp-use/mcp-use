@@ -1,11 +1,11 @@
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
-import { useInspector } from "@/client/context/InspectorContext";
-import { useMcpContext } from "@/client/context/McpContext";
+import { useInspector, type TabType } from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
+import { useMcpClient } from "mcp-use/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -19,16 +19,56 @@ interface LayoutProps {
   children: ReactNode;
 }
 
+/**
+ * Render the application layout that orchestrates header, main content, command palette, and server connection modal.
+ *
+ * This component wires MCP client and inspector state, synchronizes URL query parameters (server, tab, tunnelUrl, embedded),
+ * manages keyboard shortcuts, auto-connect flow, aggregated tool/prompt/resource lists, and provides adapters for legacy
+ * connection APIs while preserving backward compatibility.
+ *
+ * @param children - The main content to render within the layout's content area.
+ * @returns The React element representing the application layout.
+ */
 export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    connections,
-    addConnection,
-    removeConnection,
-    updateConnectionConfig,
-    configLoaded,
-  } = useMcpContext();
+    servers: connections,
+    addServer,
+    removeServer: removeConnection,
+    updateServer,
+    storageLoaded: configLoaded,
+  } = useMcpClient();
+
+  // Adapter functions for backward compatibility
+  const addConnection = useCallback(
+    (
+      url: string,
+      name?: string,
+      proxyConfig?: any,
+      transportType?: "http" | "sse"
+    ) => {
+      addServer(url, {
+        url,
+        name,
+        proxyConfig,
+        transportType,
+        preventAutoAuth: true,
+      });
+    },
+    [addServer]
+  );
+
+  const updateConnectionConfig = useCallback(
+    async (id: string, config: any) => {
+      try {
+        await updateServer(id, config);
+      } catch (error) {
+        console.error(`[Layout] Failed to update connection ${id}:`, error);
+      }
+    },
+    [updateServer]
+  );
   const {
     selectedServerId,
     setSelectedServerId,
@@ -36,6 +76,10 @@ export function Layout({ children }: LayoutProps) {
     setActiveTab,
     navigateToItem,
     setTunnelUrl,
+    tunnelUrl,
+    isEmbedded,
+    embeddedConfig,
+    setEmbeddedMode,
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -44,12 +88,52 @@ export function Layout({ children }: LayoutProps) {
   );
   const savedRequests = useSavedRequests();
 
+  // Initialize embedded mode from URL params once on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const embedded = urlParams.get("embedded") === "true";
+    const embeddedConfigParam = urlParams.get("embeddedConfig");
+
+    if (embedded) {
+      let config: { backgroundColor?: string; padding?: string } = {};
+      if (embeddedConfigParam) {
+        try {
+          config = JSON.parse(embeddedConfigParam);
+        } catch (error) {
+          console.error("Failed to parse embeddedConfig:", error);
+        }
+      }
+      setEmbeddedMode(true, config);
+    }
+  }, []); // Only run once on mount
+
   // Read tunnelUrl from query parameters and store in context
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
     setTunnelUrl(tunnelUrl);
   }, [location.search, setTunnelUrl]);
+
+  // Read tab from query parameters and set active tab
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const tab = urlParams.get("tab");
+    if (tab) {
+      // Validate that tab is a valid TabType
+      const validTabs: TabType[] = [
+        "tools",
+        "prompts",
+        "resources",
+        "chat",
+        "sampling",
+        "elicitation",
+        "notifications",
+      ];
+      if (validTabs.includes(tab as TabType)) {
+        setActiveTab(tab as TabType);
+      }
+    }
+  }, [location.search, setActiveTab]);
 
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
@@ -138,6 +222,7 @@ export function Layout({ children }: LayoutProps) {
     addConnection,
     removeConnection,
     configLoaded,
+    embedded: isEmbedded,
   });
 
   // Track command palette open
@@ -165,13 +250,15 @@ export function Layout({ children }: LayoutProps) {
       return;
     }
     setSelectedServerId(serverId);
-    // Preserve tunnelUrl parameter if present
+    // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
-    const newUrl = tunnelUrl
-      ? `/?server=${encodeURIComponent(serverId)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-      : `/?server=${encodeURIComponent(serverId)}`;
-    navigate(newUrl);
+    const tab = urlParams.get("tab");
+    const params = new URLSearchParams();
+    params.set("server", serverId);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    if (tab) params.set("tab", tab);
+    navigate(`/?${params.toString()}`);
   };
 
   const handleOpenConnectionOptions = useCallback(
@@ -258,12 +345,17 @@ export function Layout({ children }: LayoutProps) {
       // Use the context's navigateToItem to set all state atomically
       navigateToItem(serverId, tab, itemName);
       // Navigate using query params
-      // Preserve tunnelUrl parameter if present
+      // Preserve tunnelUrl and tab parameters if present
       const urlParams = new URLSearchParams(location.search);
       const tunnelUrl = urlParams.get("tunnelUrl");
-      const newUrl = tunnelUrl
-        ? `/?server=${encodeURIComponent(serverId)}&tunnelUrl=${encodeURIComponent(tunnelUrl)}`
-        : `/?server=${encodeURIComponent(serverId)}`;
+      const existingTab = urlParams.get("tab");
+      const params = new URLSearchParams();
+      params.set("server", serverId);
+      if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+      // Use the tab from the function parameter, or preserve existing tab if not changing
+      if (tab) params.set("tab", tab);
+      else if (existingTab) params.set("tab", existingTab);
+      const newUrl = `/?${params.toString()}`;
       console.warn("[Layout] Navigating to:", newUrl);
       navigate(newUrl);
     } else {
@@ -326,29 +418,25 @@ export function Layout({ children }: LayoutProps) {
   // Sync URL query params with selected server state
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    const decodedServerId = serverParam
-      ? decodeURIComponent(serverParam)
-      : null;
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverId = searchParams.get("server");
 
     // Update selected server if changed
-    if (decodedServerId !== selectedServerId) {
-      setSelectedServerId(decodedServerId);
+    if (serverId !== selectedServerId) {
+      setSelectedServerId(serverId);
     }
   }, [location.search, selectedServerId, setSelectedServerId]);
 
   // Handle failed server connections - redirect to home
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    if (!serverParam) {
+    const serverId = searchParams.get("server");
+    if (!serverId) {
       return;
     }
 
-    const decodedServerId = decodeURIComponent(serverParam);
-    const serverConnection = connections.find(
-      (conn) => conn.id === decodedServerId
-    );
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverConnection = connections.find((conn) => conn.id === serverId);
 
     // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {
@@ -425,9 +513,21 @@ export function Layout({ children }: LayoutProps) {
     );
   }
 
+  // Apply embedded styling
+  const containerStyle: React.CSSProperties = isEmbedded
+    ? {
+        backgroundColor: embeddedConfig.backgroundColor || "#f3f3f3",
+        padding: embeddedConfig.padding || "0.5rem",
+      }
+    : {};
+
+  const containerClassName = isEmbedded
+    ? "h-screen flex flex-col gap-2 sm:gap-4"
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+
   return (
     <TooltipProvider>
-      <div className="h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4">
+      <div className={containerClassName} style={containerStyle}>
         {/* Header */}
         <LayoutHeader
           connections={connections}
@@ -437,6 +537,7 @@ export function Layout({ children }: LayoutProps) {
           onTabChange={setActiveTab}
           onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
           onOpenConnectionOptions={handleOpenConnectionOptions}
+          embedded={isEmbedded}
         />
 
         {/* Main Content */}
@@ -452,6 +553,44 @@ export function Layout({ children }: LayoutProps) {
           </LayoutContent>
         </main>
 
+        {/* Footer Helper */}
+        {!isEmbedded && (
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 px-2">
+            Having trouble connecting?{" "}
+            <button
+              onClick={() => {
+                // Clear all mcp-related localStorage keys
+                const keysToRemove: string[] = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                  const key = localStorage.key(i);
+                  if (
+                    key &&
+                    (key.startsWith("mcp:auth") ||
+                      key.startsWith("mcp-inspector"))
+                  ) {
+                    keysToRemove.push(key);
+                  }
+                }
+
+                keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+                toast.success(
+                  `Cleared ${keysToRemove.length} localStorage item(s). Refreshing page...`,
+                  { duration: 2000 }
+                );
+
+                // Refresh the page after a brief delay to show the toast
+                setTimeout(() => {
+                  window.location.reload();
+                }, 500);
+              }}
+              className="text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:underline"
+            >
+              Clear localStorage
+            </button>
+          </div>
+        )}
+
         {/* Command Palette */}
         <CommandPalette
           isOpen={isCommandPaletteOpen}
@@ -461,6 +600,8 @@ export function Layout({ children }: LayoutProps) {
           resources={aggregatedResources}
           savedRequests={savedRequests}
           connections={connections}
+          selectedServer={selectedServer}
+          tunnelUrl={tunnelUrl}
           onNavigate={handleCommandPaletteNavigate}
           onServerSelect={handleServerSelect}
         />

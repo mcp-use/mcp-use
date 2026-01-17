@@ -92,7 +92,7 @@ function runCommand(
   const proc = spawn(command, args, {
     cwd,
     stdio: filterStderr ? (["inherit", "inherit", "pipe"] as const) : "inherit",
-    shell: false,
+    shell: process.platform === "win32",
     env: env ? { ...process.env, ...env } : process.env,
   });
 
@@ -142,7 +142,7 @@ async function startTunnel(
 
     const proc = spawn("npx", tunnelArgs, {
       stdio: ["ignore", "pipe", "pipe"],
-      shell: false,
+      shell: process.platform === "win32",
     });
 
     let resolved = false;
@@ -327,7 +327,7 @@ async function buildWidgets(
 
   for (const entry of entries) {
     const widgetName = entry.name;
-    const entryPath = entry.path;
+    const entryPath = entry.path.replace(/\\/g, "/");
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
@@ -838,12 +838,14 @@ program
   .option("--port <port>", "Server port", "3000")
   .option("--host <host>", "Server host", "localhost")
   .option("--no-open", "Do not auto-open inspector")
+  .option("--no-hmr", "Disable hot module reloading (use tsx watch instead)")
   // .option('--tunnel', 'Expose server through a tunnel')
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
       let port = parseInt(options.port, 10);
       const host = options.host;
+      const useHmr = options.hmr !== false;
 
       console.log(chalk.cyan.bold(`mcp-use v${packageJson.version}`));
 
@@ -858,79 +860,329 @@ program
       // Find the main source file
       const serverFile = await findServerFile(projectPath);
 
-      // Start all processes concurrently
-      const processes: any[] = [];
+      // Set environment variables for the server
+      process.env.PORT = String(port);
+      process.env.HOST = host;
+      process.env.NODE_ENV = "development";
 
-      const env: NodeJS.ProcessEnv = {
-        PORT: String(port),
-        HOST: host,
-        NODE_ENV: "development",
+      if (!useHmr) {
+        // Fallback: Use tsx watch (restarts process on changes)
+        console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
+
+        const processes: any[] = [];
+        const env: NodeJS.ProcessEnv = {
+          PORT: String(port),
+          HOST: host,
+          NODE_ENV: "development",
+        };
+
+        // Use local tsx if available, otherwise fall back to npx
+        const { createRequire } = await import("node:module");
+        let cmd: string;
+        let args: string[];
+        try {
+          const projectRequire = createRequire(
+            path.join(projectPath, "package.json")
+          );
+          // Resolve tsx bin from package.json instead of hardcoding internal path
+          const tsxPkgPath = projectRequire.resolve("tsx/package.json");
+          const tsxPkg = JSON.parse(await readFile(tsxPkgPath, "utf-8"));
+          // Handle both string and object forms of the bin field
+          let binPath: string;
+          if (typeof tsxPkg.bin === "string") {
+            binPath = tsxPkg.bin;
+          } else if (tsxPkg.bin && typeof tsxPkg.bin === "object") {
+            // Use 'tsx' entry or the first entry
+            binPath = tsxPkg.bin.tsx || Object.values(tsxPkg.bin)[0];
+          } else {
+            throw new Error("No bin field found in tsx package.json");
+          }
+          const tsxBin = path.resolve(path.dirname(tsxPkgPath), binPath);
+          cmd = "node";
+          args = [tsxBin, "watch", serverFile];
+        } catch (error) {
+          // tsx not found locally or bin resolution failed, use npx
+          console.log(
+            chalk.yellow(
+              `Could not resolve local tsx: ${error instanceof Error ? error.message : "unknown error"}`
+            )
+          );
+          cmd = "npx";
+          args = ["tsx", "watch", serverFile];
+        }
+
+        const serverCommand = runCommand(cmd, args, projectPath, env, true);
+        processes.push(serverCommand.process);
+
+        // Auto-open inspector if enabled
+        if (options.open !== false) {
+          const startTime = Date.now();
+          const ready = await waitForServer(port, host);
+          if (ready) {
+            const mcpEndpoint = `http://${host}:${port}/mcp`;
+            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+
+            const readyTime = Date.now() - startTime;
+            console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
+            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
+            console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+            console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
+            await open(inspectorUrl);
+          }
+        }
+
+        // Handle cleanup
+        const cleanup = () => {
+          console.log(chalk.gray("\n\nShutting down..."));
+          processes.forEach((proc) => {
+            if (proc && typeof proc.kill === "function") {
+              proc.kill("SIGINT");
+            }
+          });
+          setTimeout(() => process.exit(0), 1000);
+        };
+
+        process.on("SIGINT", cleanup);
+        process.on("SIGTERM", cleanup);
+
+        await new Promise(() => {});
+        return;
+      }
+
+      // HMR mode: Use chokidar to watch files and sync registrations
+      console.log(
+        chalk.gray(
+          "HMR enabled - changes will hot reload without dropping connections"
+        )
+      );
+
+      const chokidarModule = await import("chokidar");
+      const chokidar = (chokidarModule as any).default || chokidarModule;
+      const { pathToFileURL } = await import("node:url");
+      const { createRequire } = await import("node:module");
+
+      // Try to get tsx's tsImport function for TypeScript support
+      let tsImport:
+        | ((specifier: string, parentUrl: string) => Promise<any>)
+        | null = null;
+      try {
+        const projectRequire = createRequire(
+          path.join(projectPath, "package.json")
+        );
+        // Resolve tsx/esm/api from the user's project
+        const tsxApiPath = projectRequire.resolve("tsx/esm/api");
+        const tsxApi = await import(pathToFileURL(tsxApiPath).href);
+        tsImport = tsxApi.tsImport;
+      } catch {
+        // tsx not found - continue without it (JS files only, or tsx might be globally available)
+        console.log(
+          chalk.yellow(
+            "Warning: tsx not found in project dependencies. TypeScript HMR may not work.\n" +
+              "Add tsx to your devDependencies: npm install -D tsx"
+          )
+        );
+      }
+
+      const serverFilePath = path.join(projectPath, serverFile);
+      const serverFileUrl = pathToFileURL(serverFilePath).href;
+
+      // Set HMR mode flag - this tells MCPServer.listen() to skip during imports
+      // CLI manages the server lifecycle instead
+      (globalThis as any).__mcpUseHmrMode = true;
+
+      // Helper to import server module with cache busting
+      const importServerModule = async () => {
+        // Use tsx's tsImport if available for TypeScript support
+        // Otherwise fall back to native import (for JS files or if tsx is globally loaded)
+        if (tsImport) {
+          // tsImport handles TypeScript compilation
+          // Add cache-busting timestamp to force re-import
+          await tsImport(`${serverFilePath}?t=${Date.now()}`, import.meta.url);
+        } else {
+          // Native import - works for JS files or if tsx is already loaded via --import
+          await import(`${serverFileUrl}?t=${Date.now()}`);
+        }
+
+        // Get the server instance from the global registry
+        // No export required - MCPServer tracks itself when created via globalThis
+        const instance = (globalThis as any).__mcpUseLastServer;
+        return instance || null;
       };
 
-      const serverCommand = runCommand(
-        "npx",
-        ["tsx", "watch", serverFile],
-        projectPath,
-        env,
-        true
-      );
-      processes.push(serverCommand.process);
+      // Initial import
+      console.log(chalk.gray(`Loading server from ${serverFile}...`));
+      let runningServer: any;
 
-      // Auto-open inspector if enabled
-      if (options.open !== false) {
-        const startTime = Date.now();
-        const ready = await waitForServer(port, host);
-        if (ready) {
-          const mcpEndpoint = `http://${host}:${port}/mcp`;
-          const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+      try {
+        runningServer = await importServerModule();
 
-          const readyTime = Date.now() - startTime;
-          console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-          console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
-          console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
-          console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
-          console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
-          await open(inspectorUrl);
+        if (!runningServer) {
+          console.error(
+            chalk.red(
+              "Error: Could not find MCPServer instance.\n" +
+                "Make sure your server file creates an MCPServer:\n" +
+                "  const server = new MCPServer({ name: 'my-server', version: '1.0.0' });"
+            )
+          );
+          process.exit(1);
         }
+
+        // Check if it has the required methods
+        if (typeof runningServer.listen !== "function") {
+          console.error(
+            chalk.red("Error: MCPServer instance must have a listen() method")
+          );
+          process.exit(1);
+        }
+
+        // Start the server - temporarily disable HMR flag so listen() works
+        const startTime = Date.now();
+        (globalThis as any).__mcpUseHmrMode = false;
+        await runningServer.listen(port);
+        (globalThis as any).__mcpUseHmrMode = true;
+
+        // Auto-open inspector if enabled
+        if (options.open !== false) {
+          const ready = await waitForServer(port, host);
+          if (ready) {
+            const mcpEndpoint = `http://${host}:${port}/mcp`;
+            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+
+            const readyTime = Date.now() - startTime;
+            console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
+            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
+            console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+            console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
+            console.log(chalk.gray(`Watching for changes...\n`));
+            await open(inspectorUrl);
+          }
+        }
+      } catch (error: any) {
+        console.error(
+          chalk.red("Failed to start server:"),
+          error?.message || error
+        );
+        if (error?.stack) {
+          console.error(chalk.gray(error.stack));
+        }
+        process.exit(1);
       }
+
+      // Log success when --no-open is used
+      if (options.open === false) {
+        const mcpEndpoint = `http://${host}:${port}/mcp`;
+        console.log(chalk.green.bold(`✓ Server ready`));
+        console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+        console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+        console.log(chalk.gray(`Watching for changes...\n`));
+      }
+
+      // Watch for file changes - watch .ts/.tsx files in project directory
+      const watcher = chokidar.watch(".", {
+        cwd: projectPath,
+        ignored: [
+          /(^|[/\\])\../, // dotfiles
+          "**/node_modules/**",
+          "**/dist/**",
+          "**/resources/**", // widgets are watched separately by vite
+          "**/*.d.ts", // type definitions
+        ],
+        persistent: true,
+        ignoreInitial: true,
+        depth: 3, // Limit depth to avoid watching too many files
+      });
+
+      watcher
+        .on("ready", () => {
+          const watched = watcher.getWatched();
+          const dirs = Object.keys(watched);
+          console.log(
+            chalk.gray(`[HMR] Watcher ready, watching ${dirs.length} paths`)
+          );
+        })
+        .on("error", (error: unknown) => {
+          console.error(
+            chalk.red(
+              `[HMR] Watcher error: ${error instanceof Error ? error.message : String(error)}`
+            )
+          );
+        });
+
+      // Debounce rapid changes
+      let reloadTimeout: NodeJS.Timeout | null = null;
+      let isReloading = false;
+
+      watcher.on("change", async (filePath: string) => {
+        // Only handle .ts and .tsx files (not .d.ts)
+        if (
+          (!filePath.endsWith(".ts") && !filePath.endsWith(".tsx")) ||
+          filePath.endsWith(".d.ts")
+        ) {
+          return;
+        }
+        if (isReloading) return;
+
+        // Debounce multiple rapid changes
+        if (reloadTimeout) {
+          clearTimeout(reloadTimeout);
+        }
+
+        reloadTimeout = setTimeout(async () => {
+          isReloading = true;
+          // filePath is already relative due to cwd option
+          console.log(chalk.yellow(`\n[HMR] File changed: ${filePath}`));
+
+          try {
+            // Re-import the server module (this creates a new MCPServer instance)
+            const newServer = await importServerModule();
+
+            if (!newServer) {
+              console.warn(
+                chalk.yellow(
+                  "[HMR] Warning: No MCPServer instance found after reload, skipping"
+                )
+              );
+              isReloading = false;
+              return;
+            }
+
+            // Check if the running server has syncRegistrationsFrom
+            if (typeof runningServer.syncRegistrationsFrom !== "function") {
+              console.warn(
+                chalk.yellow(
+                  "[HMR] Warning: Server does not support hot reload (missing syncRegistrationsFrom)"
+                )
+              );
+              isReloading = false;
+              return;
+            }
+
+            // Sync registrations from the new server to the running server
+            runningServer.syncRegistrationsFrom(newServer);
+
+            console.log(
+              chalk.green(
+                `[HMR] ✓ Reloaded: ${runningServer.registeredTools?.length || 0} tools, ` +
+                  `${runningServer.registeredPrompts?.length || 0} prompts, ` +
+                  `${runningServer.registeredResources?.length || 0} resources`
+              )
+            );
+          } catch (error: any) {
+            console.error(chalk.red(`[HMR] Reload failed: ${error.message}`));
+            // Keep running with old registrations
+          }
+
+          isReloading = false;
+        }, 100);
+      });
 
       // Handle cleanup
       const cleanup = () => {
         console.log(chalk.gray("\n\nShutting down..."));
-        const processesToKill = processes.length;
-        let killedCount = 0;
-
-        const checkAndExit = () => {
-          killedCount++;
-          if (killedCount >= processesToKill) {
-            process.exit(0);
-          }
-        };
-
-        processes.forEach((proc) => {
-          if (proc && typeof proc.kill === "function") {
-            // Listen for process exit
-            proc.on("exit", checkAndExit);
-            // Send SIGINT (Ctrl+C) to tsx which it handles more gracefully
-            proc.kill("SIGINT");
-          } else {
-            checkAndExit();
-          }
-        });
-
-        // Fallback timeout in case processes don't exit
-        setTimeout(() => {
-          processes.forEach((proc) => {
-            if (
-              proc &&
-              typeof proc.kill === "function" &&
-              proc.exitCode === null
-            ) {
-              proc.kill("SIGKILL");
-            }
-          });
-          process.exit(0);
-        }, 1000);
+        watcher.close();
+        process.exit(0);
       };
 
       process.on("SIGINT", cleanup);
@@ -1151,7 +1403,16 @@ program
   .command("login")
   .description("Login to mcp-use cloud")
   .action(async () => {
-    await loginCommand();
+    try {
+      await loginCommand();
+      process.exit(0);
+    } catch (error) {
+      console.error(
+        chalk.red.bold("\n✗ Login failed:"),
+        chalk.red(error instanceof Error ? error.message : "Unknown error")
+      );
+      process.exit(1);
+    }
   });
 
 program
@@ -1171,15 +1432,11 @@ program
 // Deployment command
 program
   .command("deploy")
-  .description("Deploy MCP server to mcp-use cloud")
+  .description("Deploy MCP server from GitHub to mcp-use cloud")
   .option("--open", "Open deployment in browser after successful deploy")
   .option("--name <name>", "Custom deployment name")
   .option("--port <port>", "Server port", "3000")
   .option("--runtime <runtime>", "Runtime (node or python)")
-  .option(
-    "--from-source",
-    "Deploy from local source code (even for GitHub repos)"
-  )
   .option(
     "--new",
     "Force creation of new deployment instead of reusing linked deployment"
@@ -1195,7 +1452,6 @@ program
       name: options.name,
       port: options.port ? parseInt(options.port, 10) : undefined,
       runtime: options.runtime,
-      fromSource: options.fromSource,
       new: options.new,
       env: options.env,
       envFile: options.envFile,

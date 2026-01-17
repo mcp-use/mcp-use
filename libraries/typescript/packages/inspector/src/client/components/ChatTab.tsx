@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import type { MCPConnection } from "@/client/context/McpContext";
+import type { McpServer } from "mcp-use/react";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInputArea } from "./chat/ChatInputArea";
@@ -59,9 +62,8 @@ export function ChatTab({
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
-  const { messages, isLoading, sendMessage, clearMessages } = useClientSide
-    ? clientSideChat
-    : serverSideChat;
+  const { messages, isLoading, sendMessage, clearMessages, stop } =
+    useClientSide ? clientSideChat : serverSideChat;
 
   // Register keyboard shortcuts (only active when ChatTab is mounted)
   useKeyboardShortcuts({
@@ -193,6 +195,7 @@ export function ChatTab({
           onInputChange={setInputValue}
           onKeyDown={handleKeyDown}
           onSendMessage={handleSendMessage}
+          onStopStreaming={stop}
         />
       )}
     </div>
