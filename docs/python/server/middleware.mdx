@@ -132,6 +132,10 @@ server = MCPServer(
         )
     ]
 )
+```
+<Tip>
+**Concurrency Safe**: This middleware uses `asyncio.Lock` internally, ensuring that concurrent requests for the same key don't trigger race conditions or duplicate work.
+</Tip>
 
 ## Examples
 
