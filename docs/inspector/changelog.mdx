@@ -6,6 +6,34 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.15.3" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Enhancement**: Updated mcp-use dependency to latest version
+</Update>
+
+<Update label="v0.15.2" description="January 2026">
+  ## OAuth Proxy URL Handling Improvements
+  Patch release with improved OAuth proxy URL handling and connection logic.
+
+- **Enhancement**: Improved OAuth proxy URL derivation from callback URLs
+- **Enhancement**: Better handling of root path callbacks in OAuth flow
+- **Enhancement**: Clearer separation between OAuth proxy URLs and connection URLs
+- **Fix**: Maintains valid OAuth tokens across sessions by not clearing OAuth storage before connecting
+</Update>
+
+<Update label="v0.15.1" description="January 2026">
+  ## URL Validation & LocalStorage Enhancements
+  Patch release with URL validation improvements and localStorage functionality.
+
+- **Enhancement**: Automatically prepends "https://" to URLs without protocol for better user experience
+- **Enhancement**: Improved URL validation logic in InspectorDashboard and ServerConnectionModal
+- **Enhancement**: Added localStorage clearing functionality for MCP-related items to help with troubleshooting
+- **Fix**: Enhanced localStorage checks to verify both existence and functional methods before usage
+- **Fix**: Clear stale OAuth storage before connecting to ensure fresh authentication flow
+</Update>
+
 <Update label="v0.15.0" description="January 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=0.15.0&title=Chat%20Stop%20Functionality&date=2026-01&lang=inspector" alt="Release 0.15.0" />

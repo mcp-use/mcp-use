@@ -6,6 +6,37 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.13.5" description="January 2026">
+  ## CLI Documentation Enhancement
+  Patch release adding comprehensive CLI documentation.
+
+- **Enhancement**: Added `.gitignore` file to CLI package to exclude `.mcp-use` directory from version control
+- **Enhancement**: Added `CLAUDE.md` to CLI package with comprehensive guidance on usage, development commands, architecture details, and deployment instructions
+- **Enhancement**: Improved CSRF protection in authentication flow
+- **Enhancement**: Enhanced error handling for GitHub integration in deploy command
+</Update>
+
+<Update label="v1.13.4" description="January 2026">
+  ## OAuth Proxy URL Handling Improvements
+  Patch release improving OAuth proxy URL handling and connection logic.
+
+- **Refactor**: Changed `connectionUrl` from `let` to `const` to enforce immutability
+- **Enhancement**: Enhanced logic for deriving `oauthProxyUrl` from callback URL, including handling cases where callback is at root path
+- **Enhancement**: Updated comments to clarify distinction between `oauthProxyUrl` and `connectionUrl`
+- **Fix**: Removed clearing of OAuth storage before connecting to maintain valid tokens across sessions
+</Update>
+
+<Update label="v1.13.3" description="January 2026">
+  ## Telemetry & Inspector Enhancements
+  Patch release with telemetry improvements and inspector URL validation enhancements.
+
+- **Fix**: Enhanced localStorage checks in Telemetry class to verify both existence and functional methods (getItem, setItem, removeItem)
+- **Enhancement**: Added error handling to throw exception if localStorage is not available or functional
+- **Enhancement**: Inspector now automatically prepends "https://" to URLs without protocol for better user experience
+- **Enhancement**: Improved error handling for invalid URLs in Inspector dashboard and server connection modal
+- **Enhancement**: Added localStorage clearing functionality in Inspector for troubleshooting
+</Update>
+
 <Update label="v1.13.2" description="January 2026">
   ## Dependency Updates & CLI Enhancements
   Minor release with dependency updates and CLI improvements for deployment workflows.
