@@ -111,6 +111,28 @@ return await call_next(enriched)
 ```
 </Note>
 
+## Built-in Middleware
+
+`mcp-use` includes optimized middleware for common patterns, so you don't have to write them from scratch.
+
+### Tool Caching
+Use `ToolResultCachingMiddleware` to cache results of expensive tool calls (like database queries or API requests). 
+It implements **LRU (Least Recently Used)** eviction and **TTL (Time-To-Live)** expiration to keep memory usage predictable.
+
+```python
+from mcp_use.server.middleware.caching_middleware import ToolResultCachingMiddleware
+
+server = MCPServer(
+    name="my-server",
+    middleware=[
+        # Cache up to 1000 results for 5 minutes (300 seconds)
+        ToolResultCachingMiddleware(
+            max_size=1000,
+            ttl_seconds=300.0
+        )
+    ]
+)
+
 ## Examples
 
 <Tabs>
