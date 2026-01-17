@@ -183,7 +183,9 @@ export function registerInspectorRoutes(
       }
 
       // Fetch HTML from dev server
-      const response = await fetch(widgetData.devWidgetUrl);
+      const response = await fetch(widgetData.devWidgetUrl, {
+        signal: AbortSignal.timeout(60000), // 60 second timeout for Vite cold start
+      });
       if (!response.ok) {
         const status = response.status as 400 | 404 | 500 | 502 | 503;
         return c.html(
@@ -324,6 +326,20 @@ export function registerInspectorRoutes(
       return c.html(html);
     } catch (error) {
       console.error("[Dev Widget Proxy] Error:", error);
+
+      // Check if this is a timeout error
+      const isTimeout =
+        error instanceof Error &&
+        (error.name === "TimeoutError" || error.name === "AbortError");
+
+      if (isTimeout) {
+        return c.html(
+          `<html><body>Error: Request timed out while fetching widget from dev server. ` +
+            `This may happen during Vite cold start. Please try again.</body></html>`,
+          504
+        );
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
@@ -349,6 +365,7 @@ export function registerInspectorRoutes(
 
       // Forward request to dev server
       const response = await fetch(devAssetUrl, {
+        signal: AbortSignal.timeout(30000), // 30 second timeout for assets
         headers: {
           Accept: c.req.header("Accept") || "*/*",
         },
@@ -376,7 +393,17 @@ export function registerInspectorRoutes(
         headers,
       });
     } catch (error) {
-      console.error("[Dev Widget Asset Proxy] Error:", error);
+      // Check if this is a timeout error
+      const isTimeout =
+        error instanceof Error &&
+        (error.name === "TimeoutError" || error.name === "AbortError");
+
+      if (isTimeout) {
+        console.error("[Dev Widget Asset Proxy] Request timed out:", error);
+      } else {
+        console.error("[Dev Widget Asset Proxy] Error:", error);
+      }
+
       return c.notFound();
     }
   });
