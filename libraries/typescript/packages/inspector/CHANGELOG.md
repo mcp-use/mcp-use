@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.15.3
+
+### Patch Changes
+
+- Updated dependencies [b65d05d]
+  - mcp-use@1.13.5
+
 ## 0.15.3-canary.0
 
 ### Patch Changes
