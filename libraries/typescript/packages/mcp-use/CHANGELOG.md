@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.13.5
+
+### Patch Changes
+
+- b65d05d: refactor(auth): improve OAuth proxy URL handling and clarify connection URL logic
+- Updated dependencies [b65d05d]
+  - @mcp-use/cli@2.10.3
+  - @mcp-use/inspector@0.15.3
+
 ## 1.13.5-canary.0
 
 ### Patch Changes
