@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { EvalConfigError } from "../shared/errors.js";
-import { runGenerate } from "./generate.js";
-import { CliExitError } from "../shared/errors.js";
+import { EvalConfigError } from "../../../src/shared/errors.js";
+import { runGenerate } from "../../../src/cli/generate.js";
+import { CliExitError } from "../../../src/shared/errors.js";
 
 const inspectServersMock = vi.fn();
 const planTestsMock = vi.fn();
@@ -11,15 +11,15 @@ const selectResourcesMock = vi.fn();
 const selectPlanActionMock = vi.fn();
 const selectOutputFormatMock = vi.fn();
 
-vi.mock("../generator/inspectServers.js", () => ({
+vi.mock("../../../src/generator/inspectServers.js", () => ({
   inspectServers: (...args: any[]) => inspectServersMock(...args),
 }));
 
-vi.mock("../generator/planTests.js", () => ({
+vi.mock("../../../src/generator/planTests.js", () => ({
   planTests: (...args: any[]) => planTestsMock(...args),
 }));
 
-vi.mock("./prompts.js", () => ({
+vi.mock("../../../src/cli/prompts.js", () => ({
   selectServers: (...args: any[]) => selectServersMock(...args),
   selectTools: (...args: any[]) => selectToolsMock(...args),
   selectResources: (...args: any[]) => selectResourcesMock(...args),
@@ -48,9 +48,7 @@ describe("runGenerate", () => {
   });
 
   it("throws exit code 2 on config errors", async () => {
-    inspectServersMock.mockRejectedValueOnce(
-      new EvalConfigError("bad config")
-    );
+    inspectServersMock.mockRejectedValueOnce(new EvalConfigError("bad config"));
 
     await expect(
       runGenerate({ planner: "openai:gpt-4o-mini", config: "bad.json" })
@@ -59,7 +57,17 @@ describe("runGenerate", () => {
 
   it("writes generated code to stdout when selected", async () => {
     inspectServersMock.mockResolvedValueOnce([
-      { name: "simple", tools: [{ name: "add", description: "", inputSchema: { type: "object", properties: {} } }], resources: [] },
+      {
+        name: "simple",
+        tools: [
+          {
+            name: "add",
+            description: "",
+            inputSchema: { type: "object", properties: {} },
+          },
+        ],
+        resources: [],
+      },
     ]);
     selectServersMock.mockResolvedValueOnce(["simple"]);
     selectToolsMock.mockResolvedValueOnce(["add"]);
@@ -70,7 +78,11 @@ describe("runGenerate", () => {
       {
         server: "simple",
         tools: [
-          { name: "add", description: "", tests: [{ category: "direct", prompt: "Add 1 and 2" }] },
+          {
+            name: "add",
+            description: "",
+            tests: [{ category: "direct", prompt: "Add 1 and 2" }],
+          },
         ],
         resources: [],
       },

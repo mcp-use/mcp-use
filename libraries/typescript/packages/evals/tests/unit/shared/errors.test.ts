@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { EvalConfigError } from "./errors.js";
+import { EvalConfigError } from "../../../src/shared/errors.js";
 
 describe("EvalConfigError", () => {
   it("should create error with message", () => {
     const error = new EvalConfigError("Config is invalid");
-    
+
     expect(error.message).toBe("Config is invalid");
     expect(error.name).toBe("EvalConfigError");
     expect(error).toBeInstanceOf(Error);
@@ -13,7 +13,7 @@ describe("EvalConfigError", () => {
 
   it("should capture stack trace", () => {
     const error = new EvalConfigError("Test error");
-    
+
     expect(error.stack).toBeDefined();
     expect(error.stack).toContain("EvalConfigError");
   });
@@ -21,7 +21,7 @@ describe("EvalConfigError", () => {
   it("should work with instanceof checks", () => {
     const error = new EvalConfigError("Test");
     const genericError = new Error("Test");
-    
+
     expect(error instanceof EvalConfigError).toBe(true);
     expect(error instanceof Error).toBe(true);
     expect(genericError instanceof EvalConfigError).toBe(false);
@@ -29,7 +29,7 @@ describe("EvalConfigError", () => {
 
   it("should handle empty message", () => {
     const error = new EvalConfigError("");
-    
+
     expect(error.message).toBe("");
     expect(error.name).toBe("EvalConfigError");
   });
@@ -37,7 +37,7 @@ describe("EvalConfigError", () => {
   it("should handle long messages", () => {
     const longMessage = "A".repeat(1000);
     const error = new EvalConfigError(longMessage);
-    
+
     expect(error.message).toBe(longMessage);
     expect(error.message.length).toBe(1000);
   });
@@ -46,7 +46,7 @@ describe("EvalConfigError", () => {
     expect(() => {
       throw new EvalConfigError("Test error");
     }).toThrow(EvalConfigError);
-    
+
     expect(() => {
       throw new EvalConfigError("Test error");
     }).toThrow("Test error");

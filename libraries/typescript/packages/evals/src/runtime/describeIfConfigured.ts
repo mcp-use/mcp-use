@@ -35,7 +35,7 @@ export function describeIfConfigured(name: string, fn: () => void): void {
     describe.skip(name, () => {
       it("skipped: missing API keys for evals", () => {});
     });
-    // eslint-disable-next-line no-console
+
     console.warn(
       `⚠ Skipping "${name}" — missing OPENAI_API_KEY or ANTHROPIC_API_KEY`
     );

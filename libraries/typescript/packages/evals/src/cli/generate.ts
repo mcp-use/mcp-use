@@ -11,7 +11,11 @@ import {
   selectTools,
 } from "./prompts.js";
 import { writeOutput } from "./output.js";
-import { CliExitError, EvalConfigError, PlannerError } from "../shared/errors.js";
+import {
+  CliExitError,
+  EvalConfigError,
+  PlannerError,
+} from "../shared/errors.js";
 
 export interface GenerateOptions {
   planner: string;
@@ -28,23 +32,27 @@ function sanitizeFilename(name: string): string {
   // Remove or replace filesystem-unfriendly characters
   let sanitized = name
     .replace(/[/\\:*?"<>|]/g, "-") // Replace forbidden characters
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1F\x7F]/g, "") // Remove control characters
     .trim()
     .replace(/^\.+/, "") // Remove leading dots
     .replace(/\.+$/, ""); // Remove trailing dots
-  
+
   // Collapse consecutive separators
   sanitized = sanitized.replace(/[-_]+/g, "-");
-  
+
   // If sanitization yielded empty string, use a fallback
   if (!sanitized) {
     sanitized = "server";
   }
-  
+
   return sanitized;
 }
 
-function parsePlanner(planner: string): { provider: "openai" | "anthropic"; model: string } {
+function parsePlanner(planner: string): {
+  provider: "openai" | "anthropic";
+  model: string;
+} {
   const [provider, model] = planner.split(":");
   if (!provider || !model) {
     throw new CliExitError(
@@ -58,7 +66,9 @@ function parsePlanner(planner: string): { provider: "openai" | "anthropic"; mode
   return { provider, model };
 }
 
-function displayPlans(plans: Array<{ server?: string; tools: any[]; resources: any[] }>) {
+function displayPlans(
+  plans: Array<{ server?: string; tools: any[]; resources: any[] }>
+) {
   log("\nProposed test plan:\n");
   for (const plan of plans) {
     log(`  ${plan.server ?? "server"}:`);
@@ -115,7 +125,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     throw new CliExitError("No servers selected", 130);
   }
 
-  const selections: Record<string, { tools: string[]; resources: string[] }> = {};
+  const selections: Record<string, { tools: string[]; resources: string[] }> =
+    {};
   for (const serverName of selectedServers) {
     const schema = schemas.find((s) => s.name === serverName);
     if (!schema) continue;
@@ -174,42 +185,44 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
   log("🔨 Generating eval code...");
   const generator = new EvalCodeGenerator();
-  
+
   // Generate code for each plan
   const generatedCodes = plans.map((plan) => generator.generate(plan));
-  
+
   // Extract imports and bodies
   const importLines = new Set<string>();
   const bodies: string[] = [];
-  
+
   for (const code of generatedCodes) {
-    const lines = code.split('\n');
+    const lines = code.split("\n");
     let bodyStartIndex = 0;
-    
+
     // Find where imports end and body begins
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]?.trim() ?? "";
-      if (line.startsWith('import ')) {
+      if (line.startsWith("import ")) {
         importLines.add(lines[i] ?? "");
-      } else if (line && !line.startsWith('//')) {
+      } else if (line && !line.startsWith("//")) {
         bodyStartIndex = i;
         break;
       }
     }
-    
+
     // Extract body (everything after imports)
-    bodies.push(lines.slice(bodyStartIndex).join('\n').trim());
+    bodies.push(lines.slice(bodyStartIndex).join("\n").trim());
   }
-  
+
   // Consolidate: imports first, then bodies
   const consolidatedCode = [
     ...Array.from(importLines).sort(),
-    '',
-    ...bodies
-  ].join('\n');
+    "",
+    ...bodies,
+  ].join("\n");
 
   const outputMode = await selectOutputFormat();
-  const filename = options.output || `${selectedServers.map(sanitizeFilename).join("-")}.eval.test.ts`;
+  const filename =
+    options.output ||
+    `${selectedServers.map(sanitizeFilename).join("-")}.eval.test.ts`;
 
   await writeOutput(consolidatedCode, { mode: outputMode, filename });
 
