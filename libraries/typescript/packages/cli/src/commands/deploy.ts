@@ -1090,9 +1090,18 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
             chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
           );
 
+          // Build updated deployment config
+          const redeploymentConfig = {
+            buildCommand,
+            startCommand,
+            port,
+            env: Object.keys(envVars).length > 0 ? envVars : undefined,
+          };
+
           // Redeploy
           const deployment = await api.redeployDeployment(
-            existingLink.deploymentId
+            existingLink.deploymentId,
+            redeploymentConfig
           );
 
           // Update link timestamp
