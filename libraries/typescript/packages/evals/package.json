@@ -1,0 +1,89 @@
+{
+  "name": "@mcp-use/evals",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Eval runtime and generator for MCP agents using Vitest.",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/evals"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp-use",
+    "mcp",
+    "evals",
+    "vitest",
+    "testing"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "mcp-use-evals": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "eval.config.schema.json",
+    "eval.config.json",
+    "eval-template.ts",
+    "generator.md",
+    "generator-internals.md"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup && tsc --emitDeclarationOnly --declaration",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.2.0",
+    "clipboardy": "^5.0.2",
+    "commander": "^14.0.2",
+    "mcp-use": "workspace:*",
+    "ts-morph": "^27.0.2",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@langchain/anthropic": "^1.3.0",
+    "@langchain/core": "^1.1.12",
+    "@langchain/openai": "^1.2.0",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.15"
+  },
+  "peerDependencies": {
+    "@langchain/anthropic": "^1.3.0",
+    "@langchain/core": "^1.1.12",
+    "@langchain/openai": "^1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/anthropic": {
+      "optional": true
+    },
+    "@langchain/core": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    }
+  }
+}
