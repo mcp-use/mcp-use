@@ -76,8 +76,14 @@ class BaseAdapter(Generic[T], ABC):
 
         Returns:
             Sanitized tool name
+
+        Raises:
+            ValueError: If the sanitized name is empty
         """
-        return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:max_length]
+        sanitized = re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:max_length]
+        if not sanitized:
+            raise ValueError(f"Tool name '{name}' resulted in empty string after sanitization")
+        return sanitized
 
     def _create_tool_executor(
         self, connector: BaseConnector, tool_name: str
@@ -91,7 +97,7 @@ class BaseAdapter(Generic[T], ABC):
         Returns:
             Async callable that executes the tool
         """
-        return lambda **kwargs: connector.call_tool(tool_name, kwargs)
+        return lambda connector=connector, name=tool_name, **kwargs: connector.call_tool(name, kwargs)
 
     def _create_resource_executor(
         self, connector: BaseConnector, resource_uri: str
@@ -105,7 +111,7 @@ class BaseAdapter(Generic[T], ABC):
         Returns:
             Async callable that reads the resource
         """
-        return lambda **kwargs: connector.read_resource(resource_uri)
+        return lambda connector=connector, uri=resource_uri, **kwargs: connector.read_resource(uri)
 
     def _create_prompt_executor(
         self, connector: BaseConnector, prompt_name: str
@@ -119,7 +125,7 @@ class BaseAdapter(Generic[T], ABC):
         Returns:
             Async callable that gets the prompt
         """
-        return lambda **kwargs: connector.get_prompt(prompt_name, kwargs)
+        return lambda connector=connector, name=prompt_name, **kwargs: connector.get_prompt(name, kwargs)
 
     def _build_prompt_parameters_schema(self, mcp_prompt: Prompt) -> dict[str, Any]:
         """Build a JSON schema for prompt arguments.

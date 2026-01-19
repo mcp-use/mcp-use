@@ -1,3 +1,4 @@
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 from mcp.types import Prompt, Resource, Tool
@@ -19,7 +20,7 @@ class AnthropicMCPAdapter(BaseAdapter[dict[str, Any]]):
         """Initialize executor maps including Anthropic-specific tool_executors."""
         super()._init_executor_maps()
         # This map stores the actual async function to call for each tool
-        self.tool_executors: dict[str, Any] = {}
+        self.tool_executors: dict[str, Callable[..., Coroutine[Any, Any, Any]]] = {}
 
     def _convert_tool(self, mcp_tool: Tool, connector: BaseConnector) -> dict[str, Any] | None:
         """Convert an MCP tool to the Anthropic tool format."""
