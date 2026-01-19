@@ -415,4 +415,8 @@ export type UseMcpResult = {
    * ```
    */
   client: BrowserMCPClient | null;
+
+  // Note: For typed callTool with loading states, use the standalone useCallTool hook:
+  // import { useCallTool } from 'mcp-use/react';
+  // const hook = useCallTool(mcp, 'tool-name', options);
 };

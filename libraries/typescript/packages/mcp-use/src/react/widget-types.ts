@@ -173,4 +173,8 @@ export interface UseWidgetResult<
   isAvailable: boolean;
   /** Whether the tool is currently executing (metadata is null) */
   isPending: boolean;
+
+  // Note: For typed callTool with loading states, use the standalone useCallTool hook:
+  // import { useCallTool } from 'mcp-use/react';
+  // const hook = useCallTool('tool-name', options);
 }

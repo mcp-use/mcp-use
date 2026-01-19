@@ -373,6 +373,53 @@ export default function OAuthCallback() {
 
 ## Calling Tools
 
+<Tip>
+  For a better developer experience with loading states, type safety, and callbacks, 
+  use the [`useCallTool`](/typescript/client/use-call-tool) hook instead of calling 
+  `server.callTool()` directly.
+</Tip>
+
+### Using useCallTool (Recommended)
+
+```typescript
+import { useMcpServer, useCallTool, type TypedMcpServer } from "mcp-use/react";
+
+// Define your tools for autocomplete
+type MyTools = {
+  "send-email": {
+    input: { to: string; subject: string; body: string };
+    output: { sent: boolean };
+  };
+};
+
+function ToolExecutor({ serverId }: { serverId: string }) {
+  const server = useMcpServer(serverId) as TypedMcpServer<MyTools>;
+  
+  // useCallTool provides loading states, error handling, and type safety
+  const { callTool, isPending, isSuccess, data, error } = useCallTool(
+    server,
+    "send-email"  // <-- autocompletes!
+  );
+
+  return (
+    <div>
+      <button 
+        onClick={() => callTool({ to: "user@example.com", subject: "Hello", body: "Test" })}
+        disabled={isPending}
+      >
+        {isPending ? "Sending..." : "Send Email"}
+      </button>
+      {isSuccess && <p>Email sent!</p>}
+      {error && <p>Error: {error.message}</p>}
+    </div>
+  );
+}
+```
+
+### Direct callTool Method
+
+You can also call tools directly on the server object:
+
 ```typescript
 function ToolExecutor({ serverId }: { serverId: string }) {
   const server = useMcpServer(serverId);

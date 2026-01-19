@@ -89,3 +89,20 @@ export {
 
 // Export WidgetMetadata type for widget developers
 export type { WidgetMetadata } from "../server/types/widget.js";
+
+// Export unified typed callTool hook that adapts to context
+export { useCallTool } from "./hooks/useCallTool.js";
+export type {
+  UseCallToolOptions,
+  UseCallToolResult,
+  // Tool registry types for type-safe tool names
+  ToolDefinition,
+  ToolRegistry,
+  ToolInput,
+  ToolOutput,
+  McpServerLike,
+  TypedMcpServer,
+} from "./hooks/useCallTool.js";
+
+// Re-export type inference utilities from server for convenience
+export type { InferToolInput, InferToolOutput } from "../server/types/tool.js";

@@ -22,6 +22,8 @@ import type {
   UseWidgetResult,
 } from "./widget-types.js";
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
+// useCallTool is now used directly in widget context:
+// const hook = useCallTool('tool-name');
 
 /**
  * Hook to subscribe to a single value from window.openai globals
@@ -320,6 +322,10 @@ export function useWidget<
     // Availability
     isAvailable: isOpenAiAvailable,
     isPending,
+
+    // Note: For typed callTool with loading states, use the standalone useCallTool hook:
+    // import { useCallTool } from 'mcp-use/react';
+    // const hook = useCallTool('tool-name', options);
   };
 }
 

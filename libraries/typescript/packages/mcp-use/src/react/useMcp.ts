@@ -15,6 +15,8 @@ import { applyProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { getPackageVersion } from "../version.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
+// useCallTool is now used directly with the server object:
+// const hook = useCallTool(mcp, 'tool-name');
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
