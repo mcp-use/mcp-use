@@ -49,8 +49,8 @@ from mcp_use.server.auth.models import AccessToken
 **Attributes**
 >
 <ParamField body="token" type="str" required="True" >   String value </ParamField>
-<ParamField body="claims" type="dict[str, Any]" required="False" >   Dictionary of token claims (default: {}) </ParamField>
-<ParamField body="scopes" type="list[str]" required="False" >   List of authorized scopes (default: []) </ParamField>
+<ParamField body="claims" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+<ParamField body="scopes" type="list[str]" required="True" >   List of items </ParamField>
 
 </Card>
 
