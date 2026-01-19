@@ -75,6 +75,41 @@ export function ServerCapabilitiesModal({
                     </span>
                   </div>
                 )}
+                {connection.serverInfo?.websiteUrl && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium min-w-[80px]">
+                      Website:
+                    </span>
+                    <a
+                      href={connection.serverInfo.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      {connection.serverInfo.websiteUrl}
+                    </a>
+                  </div>
+                )}
+                {connection.serverInfo?.icons &&
+                  connection.serverInfo.icons.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium min-w-[80px]">
+                        Icons:
+                      </span>
+                      <div className="flex gap-2">
+                        {connection.serverInfo.icons.map(
+                          (icon: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className="text-xs bg-muted rounded-md p-1 px-2"
+                            >
+                              {icon.src} ({icon.sizes?.join(", ") || "no size"})
+                            </span>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
