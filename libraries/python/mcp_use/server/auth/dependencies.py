@@ -5,6 +5,8 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
+from .models import AuthenticationError
+
 if TYPE_CHECKING:
     from .models import AccessToken
 
@@ -37,7 +39,7 @@ def set_access_token(token: AccessToken | None) -> None:
 
 
 def require_auth() -> AccessToken:
-    """Get the access token or raise ValueError if not authenticated.
+    """Get the access token or raise AuthenticationError if not authenticated.
 
     Example:
         ```python
@@ -53,5 +55,5 @@ def require_auth() -> AccessToken:
     """
     token = get_access_token()
     if token is None:
-        raise ValueError("Authentication required")
+        raise AuthenticationError("Authentication required")
     return token

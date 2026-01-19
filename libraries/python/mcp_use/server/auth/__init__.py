@@ -26,15 +26,15 @@ Example:
 """
 
 from .bearer import BearerAuthProvider
-from .dependencies import get_access_token, require_auth, set_access_token
+from .dependencies import get_access_token, require_auth
 from .middleware import AuthMiddleware
-from .models import AccessToken
+from .models import AccessToken, AuthenticationError
 
 __all__ = [
     "BearerAuthProvider",
     "AccessToken",
     "AuthMiddleware",
+    "AuthenticationError",
     "get_access_token",
-    "set_access_token",
     "require_auth",
 ]

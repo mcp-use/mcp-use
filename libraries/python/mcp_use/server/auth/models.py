@@ -7,6 +7,12 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class AuthenticationError(Exception):
+    """Raised when authentication is required but not provided."""
+
+    pass
+
+
 class AccessToken(BaseModel):
     """Validated access token with user claims.
 

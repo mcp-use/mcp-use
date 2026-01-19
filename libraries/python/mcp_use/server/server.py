@@ -21,6 +21,8 @@ from mcp.types import (
     ServerResult,
 )
 
+# Import auth components
+from mcp_use.server.auth import AuthMiddleware, BearerAuthProvider
 from mcp_use.server.context import Context as MCPContext
 from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.middleware import (
@@ -32,13 +34,6 @@ from mcp_use.server.middleware import (
 from mcp_use.server.middleware.server_session import MiddlewareServerSession
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
-
-# Import auth components (optional)
-try:
-    from mcp_use.server.auth import AuthMiddleware, BearerAuthProvider
-except ImportError:
-    BearerAuthProvider = None  # type: ignore
-    AuthMiddleware = None  # type: ignore
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
@@ -250,19 +245,19 @@ class MCPServer(FastMCP):
         )
 
         # Add auth middleware if provider is configured
-        if self._auth and AuthMiddleware:
+        if self._auth:
             app.add_middleware(
                 cast(type, AuthMiddleware),
                 auth_provider=self._auth,
             )
             logger.debug("AuthMiddleware added to application")
 
-        # Add CORS middleware LAST so it runs FIRST (handles OPTIONS preflight)
-        if self._auth:
+            # Add CORS middleware when auth is enabled (handles OPTIONS preflight)
+            # Note: allow_credentials=False because allow_origins=["*"] - browsers reject the combination
             app.add_middleware(
                 CORSMiddleware,
                 allow_origins=["*"],
-                allow_credentials=True,
+                allow_credentials=False,
                 allow_methods=["GET", "POST", "OPTIONS"],
                 allow_headers=["*"],
                 expose_headers=["WWW-Authenticate"],

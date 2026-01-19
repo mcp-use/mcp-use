@@ -1,13 +1,20 @@
 """Unit tests for AuthMiddleware."""
 
 import pytest
+
+# Skip entire module if TestClient can't be imported (httpx version compatibility)
+try:
+    from starlette.testclient import TestClient
+except (ImportError, AttributeError):
+    pytest.skip("starlette.testclient requires newer httpx version", allow_module_level=True)
+
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
-from starlette.testclient import TestClient
 
-from mcp_use.server.auth import AccessToken, AuthMiddleware, BearerAuthProvider, get_access_token, set_access_token
+from mcp_use.server.auth import AccessToken, AuthMiddleware, BearerAuthProvider, get_access_token
+from mcp_use.server.auth.dependencies import set_access_token
 
 
 class MockAuthProvider(BearerAuthProvider):

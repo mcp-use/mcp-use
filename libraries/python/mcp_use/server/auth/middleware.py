@@ -90,7 +90,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
                 if access_token is not None:
                     set_access_token(access_token)
-                    logger.debug(f"Authenticated request from {access_token.claims.get('email', 'unknown')}")
+                    logger.debug("Authenticated request")
                 else:
                     # Token validation failed
                     set_access_token(None)
@@ -105,8 +105,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
                             headers={"WWW-Authenticate": "Bearer"},
                         )
 
-            except Exception as e:
-                logger.exception(f"Error validating token: {e}")
+            except Exception:
+                # Catch exceptions from user-implemented verify_token()
+                # Log for debugging but return 401 to avoid leaking error details
+                logger.warning("Token validation raised an exception", exc_info=True)
                 set_access_token(None)
                 if is_protected:
                     return JSONResponse(

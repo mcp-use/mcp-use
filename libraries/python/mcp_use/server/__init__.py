@@ -1,4 +1,4 @@
-from .auth import AccessToken, AuthMiddleware, BearerAuthProvider, get_access_token, require_auth
+from .auth import AccessToken, AuthenticationError, AuthMiddleware, BearerAuthProvider, get_access_token, require_auth
 from .context import Context
 from .middleware import Middleware, TelemetryMiddleware
 from .router import MCPRouter
@@ -18,6 +18,7 @@ __all__ = [
     "BearerAuthProvider",
     "AccessToken",
     "AuthMiddleware",
+    "AuthenticationError",
     "get_access_token",
     "require_auth",
 ]

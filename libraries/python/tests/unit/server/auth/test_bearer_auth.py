@@ -2,7 +2,14 @@
 
 import pytest
 
-from mcp_use.server.auth import AccessToken, BearerAuthProvider, get_access_token, require_auth, set_access_token
+from mcp_use.server.auth import (
+    AccessToken,
+    AuthenticationError,
+    BearerAuthProvider,
+    get_access_token,
+    require_auth,
+)
+from mcp_use.server.auth.dependencies import set_access_token
 
 
 class TestAccessToken:
@@ -132,10 +139,10 @@ class TestContextDependencies:
         set_access_token(None)
 
     def test_require_auth_raises_when_not_authenticated(self):
-        """require_auth raises ValueError when not authenticated."""
+        """require_auth raises AuthenticationError when not authenticated."""
         set_access_token(None)
 
-        with pytest.raises(ValueError, match="Authentication required"):
+        with pytest.raises(AuthenticationError, match="Authentication required"):
             require_auth()
 
     def test_require_auth_returns_token_when_authenticated(self):
