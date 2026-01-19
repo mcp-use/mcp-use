@@ -38,6 +38,14 @@ export interface UIResourceServer {
   readonly serverBaseUrl?: string;
   /** Storage for widget definitions, used to inject metadata into tool responses */
   widgetDefinitions: Map<string, Record<string, unknown>>;
+  /** Registrations storage for checking existing registrations (for HMR updates) */
+  registrations?: {
+    tools: Map<string, any>;
+    resources: Map<string, any>;
+    resourceTemplates: Map<string, any>;
+  };
+  /** Active sessions for sending notifications (for HMR updates) */
+  sessions?: Map<string, { server?: { sendToolListChanged?: () => void } }>;
   resource: (
     definition: ResourceDefinition | ResourceDefinitionWithoutCallback,
     callback?: any
@@ -95,6 +103,9 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 ): T {
   const displayName = definition.title || definition.name;
 
+  // Check if this widget was already registered (for HMR updates)
+  const isUpdate = server.widgetDefinitions.has(definition.name);
+
   // Store widget definition for use by tools with returnsWidget option
   if (definition.type === "appsSdk" && definition._meta) {
     server.widgetDefinitions.set(
@@ -138,71 +149,74 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     buildId: server.buildId,
   };
 
-  // Register the resource
-  server.resource({
-    name: definition.name,
-    uri: resourceUri,
-    title: definition.title,
-    description: definition.description,
-    mimeType,
-    _meta: definition._meta,
-    annotations: definition.annotations,
-    readCallback: async () => {
-      // For externalUrl type, use default props. For others, use empty params
-      const params =
-        definition.type === "externalUrl"
-          ? applyDefaultProps(definition.props)
-          : {};
-
-      const uiResource = await createWidgetUIResource(
-        definition,
-        params,
-        serverConfig
-      );
-
-      // Ensure the resource content URI matches the registered URI (with build ID)
-      uiResource.resource.uri = resourceUri;
-
-      return {
-        contents: [uiResource.resource],
-      };
-    },
-  });
-
-  // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
-  if (definition.type === "appsSdk") {
-    // Build URI template with build ID if available
-    const buildIdPart = server.buildId ? `-${server.buildId}` : "";
-    const uriTemplate = `ui://widget/${definition.name}${buildIdPart}-{id}.html`;
-
-    server.resourceTemplate({
-      name: `${definition.name}-dynamic`,
-      resourceTemplate: {
-        uriTemplate,
-        name: definition.title || definition.name,
-        description: definition.description,
-        mimeType,
-      },
-      _meta: definition._meta,
+  // Skip resource registration if this is an update (resources don't change, only metadata)
+  if (!isUpdate) {
+    // Register the resource
+    server.resource({
+      name: definition.name,
+      uri: resourceUri,
       title: definition.title,
       description: definition.description,
+      mimeType,
+      _meta: definition._meta,
       annotations: definition.annotations,
-      readCallback: async (uri: URL, params: Record<string, string>) => {
-        // Use empty params for Apps SDK since structuredContent is passed separately
+      readCallback: async () => {
+        // For externalUrl type, use default props. For others, use empty params
+        const params =
+          definition.type === "externalUrl"
+            ? applyDefaultProps(definition.props)
+            : {};
+
         const uiResource = await createWidgetUIResource(
           definition,
-          {},
+          params,
           serverConfig
         );
 
-        // Ensure the resource content URI matches the template URI (with build ID)
-        uiResource.resource.uri = uri.toString();
+        // Ensure the resource content URI matches the registered URI (with build ID)
+        uiResource.resource.uri = resourceUri;
 
         return {
           contents: [uiResource.resource],
         };
       },
     });
+
+    // For Apps SDK, also register a resource template to handle dynamic URIs with random IDs
+    if (definition.type === "appsSdk") {
+      // Build URI template with build ID if available
+      const buildIdPart = server.buildId ? `-${server.buildId}` : "";
+      const uriTemplate = `ui://widget/${definition.name}${buildIdPart}-{id}.html`;
+
+      server.resourceTemplate({
+        name: `${definition.name}-dynamic`,
+        resourceTemplate: {
+          uriTemplate,
+          name: definition.title || definition.name,
+          description: definition.description,
+          mimeType,
+        },
+        _meta: definition._meta,
+        title: definition.title,
+        description: definition.description,
+        annotations: definition.annotations,
+        readCallback: async (uri: URL, params: Record<string, string>) => {
+          // Use empty params for Apps SDK since structuredContent is passed separately
+          const uiResource = await createWidgetUIResource(
+            definition,
+            {},
+            serverConfig
+          );
+
+          // Ensure the resource content URI matches the template URI (with build ID)
+          uiResource.resource.uri = uri.toString();
+
+          return {
+            contents: [uiResource.resource],
+          };
+        },
+      });
+    }
   }
 
   // Check if tool should be registered (defaults to true for backward compatibility)
@@ -317,7 +331,8 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       );
     }
 
-    server.tool(toolDefinition, async (params: Record<string, unknown>) => {
+    // Tool callback function (used for both new registration and updates)
+    const toolCallback = async (params: Record<string, unknown>) => {
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         definition,
@@ -386,7 +401,66 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           uiResource,
         ],
       };
-    });
+    };
+
+    if (isUpdate && server.registrations?.tools) {
+      // HMR update: update existing tool registration directly
+      const existingTool = server.registrations.tools.get(definition.name);
+      if (existingTool) {
+        // Update the tool config with new metadata
+        existingTool.config = {
+          ...existingTool.config,
+          title: toolDefinition.title,
+          description: toolDefinition.description,
+          annotations: toolDefinition.annotations,
+          _meta: toolDefinition._meta,
+          inputs: toolDefinition.inputs,
+          schema: toolDefinition.schema,
+        };
+        existingTool.handler = toolCallback as any;
+
+        // Notify active sessions about the tool list change
+        if (server.sessions) {
+          for (const [, session] of server.sessions) {
+            if (session.server?.sendToolListChanged) {
+              try {
+                session.server.sendToolListChanged();
+              } catch {
+                // Session may be disconnected, ignore errors
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // Initial registration - use addWidgetTool to ensure immediate visibility
+      console.log(`[UI Registration] Registering new tool: ${definition.name}`);
+
+      // Check if server has addWidgetTool method (for direct session state updates)
+      if (typeof (server as any).addWidgetTool === "function") {
+        (server as any).addWidgetTool(toolDefinition, toolCallback);
+      } else {
+        // Fallback to regular tool registration
+        server.tool(toolDefinition, toolCallback);
+
+        // Send notifications after a delay
+        setTimeout(() => {
+          if (server.sessions) {
+            for (const [sessionId, session] of server.sessions) {
+              if (session.server?.sendToolListChanged) {
+                try {
+                  session.server.sendToolListChanged();
+                } catch (error) {
+                  console.debug(
+                    `Failed to send notification to session ${sessionId}`
+                  );
+                }
+              }
+            }
+          }
+        }, 50);
+      }
+    }
   }
 
   return server;

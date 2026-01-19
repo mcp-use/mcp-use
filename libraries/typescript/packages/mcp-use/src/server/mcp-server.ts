@@ -358,6 +358,239 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Add a new widget tool directly to all active sessions (for HMR)
+   *
+   * This method adds a widget tool to all active sessions' internal state
+   * immediately, ensuring the tool is queryable before notifications are sent.
+   * This prevents race conditions where clients fetch tools before registration completes.
+   *
+   * @param toolDefinition - The tool definition
+   * @param toolCallback - The tool callback function
+   * @internal
+   */
+  public addWidgetTool(toolDefinition: any, toolCallback: any): void {
+    console.log(
+      `[MCP-Server] Adding widget tool directly to sessions: ${toolDefinition.name}`
+    );
+
+    // First register normally to update wrapper's registrations
+    (this.tool as any)(toolDefinition, toolCallback);
+
+    // Then immediately add to each session's native _registeredTools
+    // This ensures the tool is queryable before notifications are sent
+    for (const [sessionId, session] of this.sessions) {
+      if (!session.server) continue;
+      const nativeServer = session.server as any;
+
+      // Get the registered tool from wrapper (which has the converted schema)
+      const registration = this.registrations.tools.get(toolDefinition.name);
+      if (!registration) {
+        console.warn(
+          `[MCP-Server] Tool ${toolDefinition.name} not found in wrapper registrations!`
+        );
+        continue;
+      }
+
+      // Convert schema to inputSchema if needed
+      let inputSchema: Record<string, unknown> | undefined;
+      if (registration.config.schema) {
+        try {
+          inputSchema = this.convertZodSchemaToParams(
+            registration.config.schema as any
+          );
+        } catch (e) {
+          console.warn(
+            `[MCP-Server] Failed to convert schema for ${toolDefinition.name}`
+          );
+        }
+      }
+
+      // Add directly to SDK's _registeredTools for this session
+      if (nativeServer._registeredTools) {
+        nativeServer._registeredTools[toolDefinition.name] = {
+          description: registration.config.description,
+          inputSchema: inputSchema || registration.config.inputs,
+        };
+        console.log(
+          `[MCP-Server] Added tool ${toolDefinition.name} to session ${sessionId}'s _registeredTools`
+        );
+      }
+    }
+
+    // Send notifications AFTER adding to all sessions
+    for (const [sessionId, session] of this.sessions) {
+      if (session.server?.sendToolListChanged) {
+        try {
+          session.server.sendToolListChanged();
+          console.log(`[MCP-Server] Sent notification to session ${sessionId}`);
+        } catch (e) {
+          console.debug(
+            `[MCP-Server] Session ${sessionId}: Failed to send notification`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Update a widget tool's configuration in place (for HMR)
+   *
+   * This method updates a widget tool's metadata (description, schema) without
+   * re-registering it. It updates both the wrapper's registrations and the SDK's
+   * internal state, then sends notifications to all connected clients.
+   *
+   * @param toolName - The name of the tool to update
+   * @param updates - The updated tool configuration
+   * @internal
+   */
+  public updateWidgetToolInPlace(
+    toolName: string,
+    updates: {
+      description?: string;
+      schema?: unknown; // Raw Zod schema - will be converted internally
+      _meta?: Record<string, unknown>;
+    }
+  ): void {
+    // Convert Zod schema to input schema if provided
+    let inputSchema: Record<string, unknown> | undefined;
+    if (updates.schema) {
+      try {
+        inputSchema = this.convertZodSchemaToParams(updates.schema as any);
+      } catch (e) {
+        console.warn(
+          `[WIDGET-HMR] Failed to convert schema for ${toolName}:`,
+          e instanceof Error ? e.message : String(e)
+        );
+      }
+    }
+
+    // Update our wrapper's registration
+    const registration = this.registrations.tools.get(toolName);
+    if (registration) {
+      if (updates.description !== undefined) {
+        registration.config.description = updates.description;
+      }
+      if (updates._meta !== undefined) {
+        registration.config._meta = updates._meta;
+      }
+      if (updates.schema !== undefined) {
+        registration.config.schema = updates.schema as any;
+      }
+    }
+
+    // Update the SDK's internal _registeredTools for all sessions
+    for (const [, session] of this.sessions) {
+      if (!session.server) continue;
+      const nativeServer = session.server as any;
+      const toolEntry = nativeServer._registeredTools?.[toolName];
+      if (toolEntry) {
+        if (updates.description !== undefined) {
+          toolEntry.description = updates.description;
+        }
+        if (inputSchema !== undefined) {
+          toolEntry.inputSchema = inputSchema;
+        }
+      }
+    }
+
+    // Send tool list changed notification to all sessions
+    for (const [sessionId, session] of this.sessions) {
+      if (session.server?.sendToolListChanged) {
+        try {
+          session.server.sendToolListChanged();
+        } catch (e) {
+          console.debug(
+            `[WIDGET-HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove a widget tool and its associated resources (for HMR)
+   *
+   * This method removes a widget's tool and resource registrations when
+   * the widget is deleted or renamed. It updates both the wrapper's
+   * registrations and the SDK's internal state, then sends notifications.
+   *
+   * @param toolName - The name of the tool/widget to remove
+   * @internal
+   */
+  public removeWidgetTool(toolName: string): void {
+    // Remove from widget definitions
+    this.widgetDefinitions.delete(toolName);
+
+    // Remove from our wrapper's registrations
+    this.registrations.tools.delete(toolName);
+    this.registrations.resources.delete(`ui://widget/${toolName}.html`);
+    this.registrations.resourceTemplates.delete(
+      `ui://widget/${toolName}/{props}.html`
+    );
+
+    // Remove from SDK's internal state for all sessions
+    for (const [, session] of this.sessions) {
+      if (!session.server) continue;
+      const nativeServer = session.server as any;
+
+      // Remove tool
+      if (nativeServer._registeredTools?.[toolName]) {
+        delete nativeServer._registeredTools[toolName];
+      }
+
+      // Remove resource
+      const resourceUri = `ui://widget/${toolName}.html`;
+      if (nativeServer._registeredResources?.[resourceUri]) {
+        delete nativeServer._registeredResources[resourceUri];
+      }
+
+      // Remove resource template
+      if (nativeServer._registeredResourceTemplates) {
+        // Resource templates are stored differently - need to find and remove
+        for (const [key] of Object.entries(
+          nativeServer._registeredResourceTemplates
+        )) {
+          if (key.includes(toolName)) {
+            delete nativeServer._registeredResourceTemplates[key];
+          }
+        }
+      }
+    }
+
+    // Remove from sessionRegisteredRefs
+    for (const [, refs] of this.sessionRegisteredRefs) {
+      refs.tools.delete(toolName);
+      refs.resources.delete(`ui://widget/${toolName}.html`);
+      refs.resourceTemplates.delete(`ui://widget/${toolName}/{props}.html`);
+    }
+
+    // Send notifications to all sessions
+    for (const [sessionId, session] of this.sessions) {
+      if (session.server?.sendToolListChanged) {
+        try {
+          session.server.sendToolListChanged();
+        } catch (e) {
+          console.debug(
+            `[WIDGET-HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+      }
+      if (session.server?.sendResourceListChanged) {
+        try {
+          session.server.sendResourceListChanged();
+        } catch (e) {
+          console.debug(
+            `[WIDGET-HMR] Session ${sessionId}: Failed to send resources/list_changed:`,
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Sync registrations from another MCPServer instance (for hot reload)
    *
    * This method compares the current registrations with another server instance's
@@ -871,6 +1104,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       },
     });
     this.registrations.resourceTemplates = templatesResult.updatedRegistrations;
+
+    // Sync widget definitions (for widget() helper metadata)
+    this.widgetDefinitions = new Map(other.widgetDefinitions);
 
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());

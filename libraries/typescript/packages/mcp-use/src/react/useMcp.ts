@@ -706,15 +706,24 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Wire up notification handler BEFORE initializing
         // This ensures the handler is registered before setupNotificationHandler() is called during connect()
         session.on("notification", (notification) => {
+          console.log(
+            "[useMcp] Notification received:",
+            notification.method,
+            notification
+          );
           // Call user's callback first
           onNotification?.(notification);
 
           // Auto-refresh lists on list_changed notifications
           if (notification.method === "notifications/tools/list_changed") {
-            addLog("info", "Tools list changed, auto-refreshing...");
-            refreshTools().catch((err) =>
-              addLog("warn", "Auto-refresh tools failed:", err)
+            console.log(
+              "[useMcp] Tools list changed notification - triggering refresh"
             );
+            addLog("info", "Tools list changed, auto-refreshing...");
+            refreshTools().catch((err) => {
+              console.error("[useMcp] Auto-refresh tools failed:", err);
+              addLog("warn", "Auto-refresh tools failed:", err);
+            });
           } else if (
             notification.method === "notifications/resources/list_changed"
           ) {
@@ -1583,22 +1592,36 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    */
   const refreshTools = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
+      console.log(
+        "[useMcp] Cannot refresh tools - client not ready. State:",
+        stateRef.current
+      );
       addLog("debug", "Cannot refresh tools - client not ready");
       return;
     }
+    console.log("[useMcp] Starting tools refresh...");
     addLog("debug", "Refreshing tools list");
     try {
       const serverName = "inspector-server";
       const session = clientRef.current.getSession(serverName);
       if (!session) {
+        console.log("[useMcp] No active session found for tools refresh");
         addLog("warn", "No active session found for tools refresh");
         return;
       }
       // Re-fetch tools from the server
+      console.log("[useMcp] Calling listTools...");
       const toolsResult = await session.connector.listTools();
+      console.log("[useMcp] listTools returned:", toolsResult?.length, "tools");
       setTools(toolsResult || []);
+      console.log(
+        "[useMcp] setTools called with",
+        toolsResult?.length,
+        "tools"
+      );
       addLog("info", "Tools list refreshed successfully");
     } catch (err) {
+      console.error("[useMcp] Failed to refresh tools:", err);
       addLog("warn", "Failed to refresh tools:", err);
     }
   }, [addLog]);

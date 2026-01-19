@@ -61,6 +61,8 @@ export {
   type ServerConfig,
   type MountWidgetsOptions,
   type RegisterWidgetCallback,
+  type UpdateWidgetToolCallback,
+  type RemoveWidgetToolCallback,
 } from "./widget-types.js";
 
 /**
@@ -95,6 +97,23 @@ export async function mountWidgets(
     server.uiResource(widgetDef);
   };
 
+  // Update callback for HMR - directly updates tool config without re-registering
+  const updateWidgetTool = (
+    toolName: string,
+    updates: {
+      description?: string;
+      schema?: unknown;
+      _meta?: Record<string, unknown>;
+    }
+  ) => {
+    (server as any).updateWidgetToolInPlace(toolName, updates);
+  };
+
+  // Remove callback for HMR - removes tool and resources when widget is deleted/renamed
+  const removeWidgetTool = (toolName: string) => {
+    (server as any).removeWidgetTool(toolName);
+  };
+
   const app = server.app;
 
   if (isProductionMode() || isDeno) {
@@ -104,6 +123,13 @@ export async function mountWidgets(
     await mountWidgetsProduction(app, serverConfig, registerWidget, options);
   } else {
     console.log("[WIDGETS] Mounting widgets in development mode");
-    await mountWidgetsDev(app, serverConfig, registerWidget, options);
+    await mountWidgetsDev(
+      app,
+      serverConfig,
+      registerWidget,
+      updateWidgetTool,
+      removeWidgetTool,
+      options
+    );
   }
 }
