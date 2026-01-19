@@ -126,7 +126,7 @@ def get_user_data() -> dict:
 
 @server.tool()
 def admin_action() -> str:
-    token = require_auth()  # Raises ValueError if not authenticated
+    token = require_auth()  # Raises AuthenticationError if not authenticated
     if "admin" not in token.scopes:
         return "Admin scope required"
     return "Done"

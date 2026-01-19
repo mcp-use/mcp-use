@@ -91,5 +91,5 @@ if __name__ == "__main__":
 
     if args.transport == "streamable-http":
         mcp.run(transport="streamable-http", host="127.0.0.1", port=args.port)
-    elif args.transport == "sse":
-        mcp.run(transport="sse", host="127.0.0.1", port=args.port)
+    elif args.transport == "stdio":
+        mcp.run(transport="stdio")
