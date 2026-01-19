@@ -251,13 +251,37 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   for (const code of generatedCodes) {
     const lines = code.split("\n");
     let bodyStartIndex = 0;
+    let inImport = false;
+    const currentImportLines: string[] = [];
 
-    // Find where imports end and body begins
+    // Find where imports end and body begins, handling multi-line imports
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]?.trim() ?? "";
-      if (line.startsWith("import ")) {
-        importLines.add(lines[i] ?? "");
-      } else if (line && !line.startsWith("//")) {
+      const line = lines[i] ?? "";
+      const trimmed = line.trim();
+
+      // Check if we're starting a new import statement
+      if (trimmed.startsWith("import ")) {
+        inImport = true;
+        currentImportLines.push(line);
+
+        // Check if import is complete on the same line (ends with semicolon)
+        if (trimmed.endsWith(";")) {
+          importLines.add(currentImportLines.join("\n"));
+          currentImportLines.length = 0;
+          inImport = false;
+        }
+      } else if (inImport) {
+        // Continue collecting lines for a multi-line import
+        currentImportLines.push(line);
+
+        // Check if import is complete (ends with semicolon)
+        if (trimmed.endsWith(";")) {
+          importLines.add(currentImportLines.join("\n"));
+          currentImportLines.length = 0;
+          inImport = false;
+        }
+      } else if (trimmed && !trimmed.startsWith("//")) {
+        // Found first non-import, non-comment, non-empty line
         bodyStartIndex = i;
         break;
       }
