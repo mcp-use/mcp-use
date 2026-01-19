@@ -56,6 +56,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.2.0",
+    "@toon-format/toon": "^2.1.0",
     "clipboardy": "^5.0.2",
     "commander": "^14.0.2",
     "mcp-use": "workspace:*",

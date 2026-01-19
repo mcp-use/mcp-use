@@ -43,6 +43,21 @@
         "serverLifecycle": { "type": "string", "enum": ["suite", "test"] },
         "additionalInstructions": { "type": "string" }
       }
+    },
+    "generator": {
+      "type": "object",
+      "description": "Settings for eval test generation",
+      "additionalProperties": false,
+      "properties": {
+        "useToon": {
+          "type": "boolean",
+          "description": "Use TOON format for schema serialization (default: true)"
+        },
+        "thinking": {
+          "type": "boolean",
+          "description": "Enable extended thinking/reasoning mode for planner (default: false)"
+        }
+      }
     }
   }
 }

@@ -349,6 +349,9 @@ importers:
       '@inquirer/prompts':
         specifier: ^8.2.0
         version: 8.2.0(@types/node@25.0.2)
+      '@toon-format/toon':
+        specifier: ^2.1.0
+        version: 2.1.0
       clipboardy:
         specifier: ^5.0.2
         version: 5.0.2
@@ -2890,6 +2893,9 @@ packages:
     resolution: {integrity: sha512-graRZspg7EoEaw0a8faiUASCyJrqjKPdqJ9EwuDRUF9mEYJ1YPczI9H+/agJ0mOJkPCJDk0lsz5QTrLZ/jQ2rg==}
     peerDependencies:
       react: ^19.2.0
+
+  '@toon-format/toon@2.1.0':
+    resolution: {integrity: sha512-JwWptdF5eOA0HaQxbKAzkpQtR4wSWTEfDlEy/y3/4okmOAX1qwnpLZMmtEWr+ncAhTTY1raCKH0kteHhSXnQqg==}
 
   '@ts-morph/common@0.28.1':
     resolution: {integrity: sha512-W74iWf7ILp1ZKNYXY5qbddNaml7e9Sedv5lvU1V8lftlitkc9Pq1A+jlH23ltDgWYeZFFEqGCD1Ies9hqu3O+g==}
@@ -9069,6 +9075,8 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.90.12
       react: 19.2.3
+
+  '@toon-format/toon@2.1.0': {}
 
   '@ts-morph/common@0.28.1':
     dependencies:

@@ -29,6 +29,17 @@ export const EvalDefaultsSchema = z.object({
 });
 
 /**
+ * Zod schema for generator settings in eval.config.json.
+ * Defines settings for eval test generation.
+ */
+export const GeneratorSettingsSchema = z.object({
+  /** Use TOON format for schema serialization (default: true) */
+  useToon: z.boolean().optional(),
+  /** Enable extended thinking/reasoning mode for planner (default: false) */
+  thinking: z.boolean().optional(),
+});
+
+/**
  * Zod schema for the complete eval configuration file.
  * Validates the structure of eval.config.json.
  */
@@ -46,6 +57,8 @@ export const EvalConfigSchema = z.object({
   servers: z.record(z.string(), z.unknown()),
   /** Default settings for test execution */
   defaults: EvalDefaultsSchema,
+  /** Settings for eval test generation */
+  generator: GeneratorSettingsSchema.optional(),
 });
 
 /**
@@ -89,3 +102,9 @@ export type AgentConfig = z.infer<typeof AgentConfigSchema>;
  * Inferred from EvalDefaultsSchema.
  */
 export type EvalDefaults = z.infer<typeof EvalDefaultsSchema>;
+
+/**
+ * TypeScript type for generator settings.
+ * Inferred from GeneratorSettingsSchema.
+ */
+export type GeneratorSettings = z.infer<typeof GeneratorSettingsSchema>;

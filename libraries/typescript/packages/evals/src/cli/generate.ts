@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { inspectServers } from "../generator/inspectServers.js";
 import { planTests } from "../generator/planTests.js";
 import { EvalCodeGenerator } from "../generator/codegen.js";
+import { loadEvalConfig } from "../runtime/loadEvalConfig.js";
 import type { ServerSchema } from "../generator/inspectServers.js";
 import {
   selectOutputFormat,
@@ -18,10 +19,12 @@ import {
 } from "../shared/errors.js";
 
 export interface GenerateOptions {
-  planner: string;
+  planner?: string;
   config: string;
   output?: string;
   plannerBaseUrl?: string;
+  useToon?: boolean;
+  thinking?: boolean;
 }
 
 function log(message: string): void {
@@ -101,7 +104,9 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   log("📡 Reading eval.config.json...");
 
   let schemas: ServerSchema[];
+  let config: Awaited<ReturnType<typeof loadEvalConfig>>;
   try {
+    config = await loadEvalConfig(options.config);
     schemas = await inspectServers({ configPath: options.config });
   } catch (error) {
     if (error instanceof EvalConfigError) {
@@ -141,7 +146,52 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     selections
   );
 
-  const { provider, model } = parsePlanner(options.planner);
+  // Determine planner model: CLI flag > config default agent > fallback
+  let provider: "openai" | "anthropic";
+  let model: string;
+
+  if (options.planner) {
+    // CLI flag provided - use it
+    const parsed = parsePlanner(options.planner);
+    provider = parsed.provider;
+    model = parsed.model;
+  } else {
+    // Use default agent from config
+    const defaultAgentKey = config.default.runAgent;
+    const agentConfig = config.agents[defaultAgentKey];
+
+    if (!agentConfig) {
+      throw new CliExitError(
+        `Default agent "${defaultAgentKey}" not found in config.agents`,
+        2
+      );
+    }
+
+    if (
+      agentConfig.provider !== "openai" &&
+      agentConfig.provider !== "anthropic"
+    ) {
+      throw new CliExitError(
+        `Unsupported provider "${agentConfig.provider}" for agent "${defaultAgentKey}"`,
+        2
+      );
+    }
+
+    provider = agentConfig.provider;
+    model = agentConfig.model;
+  }
+
+  // Merge config generator settings with CLI options (CLI takes precedence)
+  const useToon = options.useToon ?? config.generator?.useToon ?? true;
+  const thinking = options.thinking ?? config.generator?.thinking ?? false;
+
+  log(
+    `\n🤖 Generating test plan with ${provider}:${model}${thinking ? " (thinking mode enabled)" : ""}...`
+  );
+  if (useToon) {
+    log("📦 Using TOON format for schema serialization (saves ~30-40% tokens)");
+  }
+  log("⏳ This may take 10-30 seconds depending on the model...\n");
 
   let plans: Awaited<ReturnType<typeof planTests>>;
   try {
@@ -149,6 +199,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       provider,
       model,
       baseUrl: options.plannerBaseUrl,
+      useToon,
+      thinking,
     });
   } catch (error) {
     if (error instanceof PlannerError) {
@@ -164,12 +216,15 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
     if (action === "yes") {
       accepted = true;
     } else if (action === "regenerate") {
-      log("🤖 Regenerating plan...");
+      log("\n🤖 Regenerating plan...");
+      log("⏳ This may take 10-30 seconds depending on the model...\n");
       try {
         plans = await planTests(filteredSchemas, {
           provider,
           model,
           baseUrl: options.plannerBaseUrl,
+          useToon,
+          thinking,
         });
       } catch (error) {
         if (error instanceof PlannerError) {
@@ -232,10 +287,15 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 export function generateCommand(): Command {
   return new Command("generate")
     .description("Generate eval tests by inspecting MCP servers")
-    .option("--planner <model>", "LLM for test planning", "openai:gpt-4o-mini")
+    .option(
+      "--planner <model>",
+      "LLM for test planning (e.g., openai:gpt-4o-mini). Defaults to config's default.runAgent"
+    )
     .option("--planner-base-url <url>", "Base URL for planner provider")
     .option("--config <path>", "Path to eval.config.json", "./eval.config.json")
     .option("--output <file>", "Output file path")
+    .option("--no-toon", "Disable TOON format (use JSON instead)")
+    .option("--thinking", "Enable extended thinking/reasoning mode")
     .action(async (options: GenerateOptions) => {
       try {
         await runGenerate(options);

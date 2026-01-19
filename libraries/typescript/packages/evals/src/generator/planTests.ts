@@ -1,5 +1,6 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
+import { encode as encodeToon } from "@toon-format/toon";
 import { PlannerError } from "../shared/errors.js";
 import { extractPlannerJson, validatePlan } from "./planValidation.js";
 import type { ServerSchema } from "./inspectServers.js";
@@ -48,30 +49,37 @@ expect(judgeResult.score).toBeGreaterThan(0.7);
 - **Prompt style**: "Use [tool] with [exact parameters]", "Call [tool] to [specific action]"
 - **Assertions**: Use expectedToolCall with exact input parameters
 - **Example**: "List all tasks with status 'done'" → expectedToolCall: {"status": "done"}
+- **REQUIRED**: Generate EXACTLY 3-5 tests per tool with DIFFERENT parameter combinations
 
 ### Indirect Tests  
 - **Purpose**: Test natural language understanding and intent inference
-- **Prompt style**: Natural conversational requests without mentioning tool names
+- **Prompt style**: Natural conversational requests WITHOUT mentioning tool names
 - **Assertions**: Use judgeExpectation for behavioral validation (NOT expectedToolCall)
 - **Example**: "Show me completed work" → judgeExpectation: "Agent retrieves and displays completed tasks"
 - **Why**: LLMs may interpret requests differently (completed = done? in_progress today?), judge validates behavior not exact params
+- **REQUIRED**: Generate EXACTLY 3-5 tests per tool with VARIED phrasings
+- **CRITICAL**: These must be ACTION requests, NOT questions about how to use the tool
 
 ### Negative Tests
 - **Purpose**: Verify tool is NOT called when inappropriate
-- **Prompt style**: Clearly unrelated requests or questions about the tool (not asking to use it)
+- **Prompt style**: Clearly unrelated requests or questions ABOUT the tool (not asking to USE it)
 - **Assertions**: expectNotUsed: true
 - **Example**: "What is the weather?" for a task management tool
+- **Example**: "How do I use this tool?" or "What does this tool do?"
 - **Avoid**: Ambiguous prompts that could reasonably trigger the tool
+- **REQUIRED**: Generate EXACTLY 2-3 tests per tool
 
 ### Error Tests
 - **Purpose**: Verify graceful error handling with invalid/missing required parameters
 - **Prompt style**: Explicitly request invalid operations or omit required fields
 - **Assertions**: expectFailure: true
 - **Example**: "Create a task without any title or description" (if title is required)
+- **Example**: "Delete a task without providing an ID"
 - **Note**: Don't rely on LLM to "fail to provide" - explicitly instruct invalid usage
+- **REQUIRED**: Generate EXACTLY 2-3 tests per tool with DIFFERENT types of errors
 
 ## Output Format
-Return a VALID JSON object (not JavaScript):
+Return a VALID JSON object (not JavaScript). Follow this structure EXACTLY:
 
 {
   "tools": [
@@ -81,10 +89,13 @@ Return a VALID JSON object (not JavaScript):
         {
           "category": "direct|indirect|negative|error",
           "prompt": "The user prompt to test",
-          "expectedToolCall": { "name": "tool_name", "input": { ... } },  // ONLY for direct tests
+          "expectedToolCall": {
+            "name": "tool_name",
+            "input": { "param1": "value1", "param2": "value2" }
+          },
           "expectFailure": false,
           "expectNotUsed": false,
-          "judgeExpectation": "Behavioral assertion"  // PREFER for indirect tests
+          "judgeExpectation": "Behavioral assertion"
         }
       ]
     }
@@ -104,6 +115,24 @@ Return a VALID JSON object (not JavaScript):
   ]
 }
 
+### CRITICAL JSON FORMATTING RULES:
+
+1. **expectedToolCall.input MUST be an object {}, NEVER a string**
+   ❌ WRONG: "input": "some string"
+   ❌ WRONG: "input": "param1=value1"
+   ✅ CORRECT: "input": { "param1": "value1", "param2": "value2" }
+   ✅ CORRECT: "input": {} (for tools with no parameters)
+
+2. **Field usage by category:**
+   - **direct**: Include expectedToolCall with exact input object
+   - **indirect**: Include judgeExpectation, MAY include expectedToolCall if tool is expected
+   - **negative**: Set expectNotUsed: true, DO NOT include expectedToolCall
+   - **error**: Set expectFailure: true, MAY include expectedToolCall with invalid input
+
+3. **Do not include null or undefined fields** - simply omit fields that don't apply
+
+4. **Ensure valid JSON** - use double quotes, proper escaping, no trailing commas
+
 ## Critical Guidelines
 
 1. **For indirect tests**: Use judgeExpectation instead of expectedToolCall (LLMs interpret naturally, not literally)
@@ -112,7 +141,37 @@ Return a VALID JSON object (not JavaScript):
 4. **Parameter specificity**: Only include expectedToolCall when parameters are explicitly stated in prompt
 5. **Use null for omitted fields**: Do not include fields like expectedToolCall if not applicable
 
-Generate 3-5 tests per category with varied complexity and clear intent.
+## MANDATORY Test Coverage Requirements
+
+YOU MUST generate comprehensive test coverage for EVERY tool following these EXACT requirements:
+
+### For EACH tool, generate:
+1. **Direct tests**: MINIMUM 3, MAXIMUM 5 tests
+   - Each test MUST use different parameter values or combinations
+   - Test different scenarios and edge cases within valid usage
+   
+2. **Indirect tests**: MINIMUM 3, MAXIMUM 5 tests
+   - Each test MUST use different natural language phrasing
+   - These MUST be ACTION requests (e.g., "Show me...", "Get the...", "Find...")
+   - NEVER generate questions ABOUT the tool (e.g., "How do I...?", "What does...?")
+   
+3. **Negative tests**: MINIMUM 2, MAXIMUM 3 tests
+   - Prompts that are clearly unrelated to the tool's purpose
+   - Questions ABOUT the tool (e.g., "How does X work?", "What is X?")
+   - Ensure these prompts should NOT trigger the tool
+   
+4. **Error tests**: MINIMUM 2, MAXIMUM 3 tests
+   - Each test MUST test a DIFFERENT error condition
+   - Examples: missing required field, invalid value type, out of range value
+   - Be specific about which requirement is violated
+
+### Validation Rules:
+- Count your tests for each category before submitting
+- If any category has fewer than the minimum, ADD MORE TESTS
+- If any test in indirect category asks "How" or "What is", MOVE IT to negative tests
+- Each tool MUST have AT LEAST 10 total tests (3+3+2+2)
+
+DO NOT SKIP ANY TOOLS. DO NOT GENERATE FEWER TESTS THAN THE MINIMUM.
 `;
 
 /**
@@ -125,6 +184,10 @@ export interface PlannerOptions {
   model: string;
   /** Optional base URL for OpenAI-compatible providers */
   baseUrl?: string;
+  /** Use TOON format for schema serialization (default: true) */
+  useToon?: boolean;
+  /** Enable extended thinking/reasoning mode (for compatible models) */
+  thinking?: boolean;
 }
 
 /**
@@ -141,23 +204,45 @@ function createPlanner(options: PlannerOptions) {
     if (!apiKey) {
       throw new PlannerError("OPENAI_API_KEY is required for planner");
     }
-    return new ChatOpenAI({
+
+    const config: Record<string, unknown> = {
       model: options.model,
       openAIApiKey: apiKey,
       configuration: options.baseUrl ? { baseURL: options.baseUrl } : undefined,
-      temperature: 0.7,
-    });
+    };
+
+    // Enable extended thinking for reasoning models (o1, o3 series)
+    if (options.thinking) {
+      config.temperature = undefined;
+    } else {
+      config.temperature = 0.7;
+    }
+
+    return new ChatOpenAI(config);
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
     throw new PlannerError("ANTHROPIC_API_KEY is required for planner");
   }
-  return new ChatAnthropic({
+
+  const config: Record<string, unknown> = {
     model: options.model,
     anthropicApiKey: anthropicKey,
-    temperature: 0.7,
-  });
+  };
+
+  // Enable extended thinking for Claude with thinking parameter
+  if (options.thinking) {
+    // Anthropic extended thinking via model parameters
+    config.modelKwargs = {
+      thinking: { type: "enabled", budget_tokens: 10000 },
+    };
+    config.temperature = undefined;
+  } else {
+    config.temperature = 0.7;
+  }
+
+  return new ChatAnthropic(config);
 }
 
 /**
@@ -188,17 +273,27 @@ export async function planTests(
 ): Promise<TestPlan[]> {
   const llm = createPlanner(options);
   const plans: TestPlan[] = [];
+  const useToon = options.useToon ?? true;
 
   for (const server of schemas) {
+    // Serialize schemas based on format preference
+    const toolsContent = useToon
+      ? `\`\`\`toon\n${encodeToon(server.tools)}\n\`\`\``
+      : JSON.stringify(server.tools, null, 2);
+
+    const resourcesContent = useToon
+      ? `\`\`\`toon\n${encodeToon(server.resources)}\n\`\`\``
+      : JSON.stringify(server.resources, null, 2);
+
     const userMessage = `Generate a test plan for the following MCP server:
 
 Server: ${server.name}
 
 Tools:
-${JSON.stringify(server.tools, null, 2)}
+${toolsContent}
 
 Resources:
-${JSON.stringify(server.resources, null, 2)}
+${resourcesContent}
 `;
 
     const response = await llm.invoke([
