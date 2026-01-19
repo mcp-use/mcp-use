@@ -14,164 +14,75 @@ import type { TestPlan } from "./planSchema.js";
  * @internal
  */
 const PLANNER_SYSTEM_PROMPT = `
-You are a test planning assistant for MCP (Model Context Protocol) agent evaluations.
+You are a test planner for MCP agent evaluations.
 
-Your task is to generate comprehensive test plans for MCP tools and resources.
+## CRITICAL RULES
 
-## Available Testing Capabilities
+### 1. Use EXACT Parameter Names from Schema
+Look at the inputSchema.properties for each tool - use those exact property names.
+- WRONG: { "status": "done" } if schema has "newStatus"
+- RIGHT: { "newStatus": "done" } matching schema exactly
 
-### Exact Matchers (for structural/precise assertions)
-- toHaveUsedTool(toolName) - verify a tool was called
-- toHaveToolCallCount(toolName, count) - verify exact number of calls
-- toHaveToolCallWith(toolName, input) - verify specific input (partial match)
-- toHaveToolCallResult(toolName, output) - verify specific output content
-- toHaveCalledToolsInOrder(...toolNames) - verify call sequence
-- toHaveUsedResource(resourceName) - verify resource access
-- toHaveOutputContaining(text) - verify agent output contains text
-- toHaveCompletedWithinMs(ms) - verify execution time
-- toHaveUsedLessThanTokens(count) - verify token usage
-- toHaveFailed() - verify agent failed
-- toHaveFailedWith(text) - verify error message contains text
-- toHaveToolCallFailed(toolName) - verify tool failure
-- toHaveToolCallFailedWith(toolName, text) - verify tool error message
+### 2. Judge Expectations Must Be Behavioral (Not Exact Output)
+Keep judge expectations simple and behavioral:
+- BAD: "All returned tasks have status 'todo' and counts reflect filtered view"
+- GOOD: "Agent filters and shows task list"
+- BAD: "Returns exactly {success: true, message: 'Done'}"
+- GOOD: "Agent confirms the action completed"
 
-### Semantic Judge (for behavioral/meaning assertions)
-Use judge(output, expectation) for complex behavioral validation.
+### 3. Negative Tests Must Be TRULY Unrelated
+Use completely different domains - weather, math, jokes, geography:
+- BAD: "Explain what a Kanban board is" (still related)
+- BAD: "What does listTasks do?" (asks about the tool)
+- GOOD: "What's the capital of France?"
+- GOOD: "Calculate 15% of 80"
+- GOOD: "Tell me a joke"
 
-Generated code:
-const judgeResult = await judge(result.output, "expectation");
-expect(judgeResult.score).toBeGreaterThan(0.7);
+### 4. Skip Flaky Error Tests
+LLMs often fix invalid inputs. Only include error tests for:
+- Missing REQUIRED parameters (clearly stated in prompt)
+- Use fake IDs like "does-not-exist" for not-found errors
+- Do NOT test: empty strings, boundary values (LLM will fix)
 
-## Test Categories & Best Practices
+## Test Categories (per tool: 4-5 direct, 3-4 indirect, 2 negative, 1-2 error)
 
 ### Direct Tests
-- **Purpose**: Verify tool is called with explicit, unambiguous instructions
-- **Prompt style**: "Use [tool] with [exact parameters]", "Call [tool] to [specific action]"
-- **Assertions**: Use expectedToolCall with exact input parameters
-- **Example**: "List all tasks with status 'done'" → expectedToolCall: {"status": "done"}
-- **REQUIRED**: Generate EXACTLY 3-5 tests per tool with DIFFERENT parameter combinations
+- Prompt: "Use [tool] with [exactParamName]=value"
+- Include: expectedToolCall.input with EXACT param names from schema
 
-### Indirect Tests  
-- **Purpose**: Test natural language understanding and intent inference
-- **Prompt style**: Natural conversational requests WITHOUT mentioning tool names
-- **Assertions**: Use judgeExpectation for behavioral validation (NOT expectedToolCall)
-- **Example**: "Show me completed work" → judgeExpectation: "Agent retrieves and displays completed tasks"
-- **Why**: LLMs may interpret requests differently (completed = done? in_progress today?), judge validates behavior not exact params
-- **REQUIRED**: Generate EXACTLY 3-5 tests per tool with VARIED phrasings
-- **CRITICAL**: These must be ACTION requests, NOT questions about how to use the tool
+### Indirect Tests
+- Prompt: Natural language action (no tool names)
+- Include: expectedToolCall.name + judgeExpectation
 
 ### Negative Tests
-- **Purpose**: Verify tool is NOT called when inappropriate
-- **Prompt style**: Clearly unrelated requests or questions ABOUT the tool (not asking to USE it)
-- **Assertions**: expectNotUsed: true
-- **Example**: "What is the weather?" for a task management tool
-- **Example**: "How do I use this tool?" or "What does this tool do?"
-- **Avoid**: Ambiguous prompts that could reasonably trigger the tool
-- **REQUIRED**: Generate EXACTLY 2-3 tests per tool
+- Prompt: COMPLETELY unrelated domain
+- Include: expectNotUsed: true
 
-### Error Tests
-- **Purpose**: Verify graceful error handling with invalid/missing required parameters
-- **Prompt style**: Explicitly request invalid operations or omit required fields
-- **Assertions**: expectFailure: true
-- **Example**: "Create a task without any title or description" (if title is required)
-- **Example**: "Delete a task without providing an ID"
-- **Note**: Don't rely on LLM to "fail to provide" - explicitly instruct invalid usage
-- **REQUIRED**: Generate EXACTLY 2-3 tests per tool with DIFFERENT types of errors
+### Error Tests (optional)
+- Prompt: Missing required param or non-existent ID
+- Include: expectFailure: true
 
 ## Output Format
-Return a VALID JSON object (not JavaScript). Follow this structure EXACTLY:
 
 {
-  "tools": [
-    {
-      "name": "tool_name",
-      "tests": [
-        {
-          "category": "direct|indirect|negative|error",
-          "prompt": "The user prompt to test",
-          "expectedToolCall": {
-            "name": "tool_name",
-            "input": { "param1": "value1", "param2": "value2" }
-          },
-          "expectFailure": false,
-          "expectNotUsed": false,
-          "judgeExpectation": "Behavioral assertion"
-        }
-      ]
-    }
-  ],
-  "resources": [
-    {
-      "name": "resource_name",
-      "tests": [
-        {
-          "category": "direct|indirect|negative",
-          "prompt": "The user prompt to test",
-          "expectNotUsed": false,
-          "judgeExpectation": "Optional: semantic assertion"
-        }
-      ]
-    }
-  ]
+  "tools": [{
+    "name": "tool_name",
+    "tests": [{
+      "category": "direct",
+      "prompt": "Use tool_name with exactParam=value",
+      "description": "basic usage",
+      "expectedToolCall": { "name": "tool_name", "input": { "exactParam": "value" } },
+      "judgeExpectation": "Agent completes action"
+    }]
+  }],
+  "resources": []
 }
 
-### CRITICAL JSON FORMATTING RULES:
-
-1. **expectedToolCall.input MUST be an object {}, NEVER a string**
-   ❌ WRONG: "input": "some string"
-   ❌ WRONG: "input": "param1=value1"
-   ✅ CORRECT: "input": { "param1": "value1", "param2": "value2" }
-   ✅ CORRECT: "input": {} (for tools with no parameters)
-
-2. **Field usage by category:**
-   - **direct**: Include expectedToolCall with exact input object
-   - **indirect**: Include judgeExpectation, MAY include expectedToolCall if tool is expected
-   - **negative**: Set expectNotUsed: true, DO NOT include expectedToolCall
-   - **error**: Set expectFailure: true, MAY include expectedToolCall with invalid input
-
-3. **Do not include null or undefined fields** - simply omit fields that don't apply
-
-4. **Ensure valid JSON** - use double quotes, proper escaping, no trailing commas
-
-## Critical Guidelines
-
-1. **For indirect tests**: Use judgeExpectation instead of expectedToolCall (LLMs interpret naturally, not literally)
-2. **For negative tests**: Make prompts obviously wrong/unrelated, not ambiguous edge cases
-3. **For error tests**: Explicitly instruct invalid usage, don't rely on LLM failing to infer
-4. **Parameter specificity**: Only include expectedToolCall when parameters are explicitly stated in prompt
-5. **Use null for omitted fields**: Do not include fields like expectedToolCall if not applicable
-
-## MANDATORY Test Coverage Requirements
-
-YOU MUST generate comprehensive test coverage for EVERY tool following these EXACT requirements:
-
-### For EACH tool, generate:
-1. **Direct tests**: MINIMUM 3, MAXIMUM 5 tests
-   - Each test MUST use different parameter values or combinations
-   - Test different scenarios and edge cases within valid usage
-   
-2. **Indirect tests**: MINIMUM 3, MAXIMUM 5 tests
-   - Each test MUST use different natural language phrasing
-   - These MUST be ACTION requests (e.g., "Show me...", "Get the...", "Find...")
-   - NEVER generate questions ABOUT the tool (e.g., "How do I...?", "What does...?")
-   
-3. **Negative tests**: MINIMUM 2, MAXIMUM 3 tests
-   - Prompts that are clearly unrelated to the tool's purpose
-   - Questions ABOUT the tool (e.g., "How does X work?", "What is X?")
-   - Ensure these prompts should NOT trigger the tool
-   
-4. **Error tests**: MINIMUM 2, MAXIMUM 3 tests
-   - Each test MUST test a DIFFERENT error condition
-   - Examples: missing required field, invalid value type, out of range value
-   - Be specific about which requirement is violated
-
-### Validation Rules:
-- Count your tests for each category before submitting
-- If any category has fewer than the minimum, ADD MORE TESTS
-- If any test in indirect category asks "How" or "What is", MOVE IT to negative tests
-- Each tool MUST have AT LEAST 10 total tests (3+3+2+2)
-
-DO NOT SKIP ANY TOOLS. DO NOT GENERATE FEWER TESTS THAN THE MINIMUM.
+## Rules
+- Parameter names: Use EXACT names from inputSchema.properties
+- Tool names: Use exact name, no prefixes like "functions."
+- expectedToolCall.input: object {}, never string
+- judgeExpectation: Simple behavioral check
 `;
 
 /**

@@ -3,29 +3,70 @@ import { z } from "zod";
 /**
  * Zod schema for a tool test case.
  * Defines a single test scenario for an MCP tool.
+ * Enforces dual assertion pattern: deterministic + probabilistic.
  */
-export const ToolTestCaseSchema = z.object({
-  /** Test category: direct (explicit), indirect (implicit), negative (shouldn't use), or error (should fail) */
-  category: z.enum(["direct", "indirect", "negative", "error"]),
-  /** User prompt to send to the agent */
-  prompt: z.string().min(1),
-  /** Expected tool call with name and input parameters (for direct tests) */
-  expectedToolCall: z
-    .object({
-      name: z.string().min(1),
-      input: z.record(z.string(), z.unknown()).optional(),
-    })
-    .nullable()
-    .optional(),
-  /** Whether the test expects a failure/error */
-  expectFailure: z.boolean().optional(),
-  /** Whether the tool should NOT be used (for negative tests) */
-  expectNotUsed: z.boolean().optional(),
-  /** Optional human-readable description of what this test validates */
-  description: z.string().optional(),
-  /** Semantic assertion using judge() for behavioral validation */
-  judgeExpectation: z.string().nullable().optional(),
-});
+export const ToolTestCaseSchema = z
+  .object({
+    /** Test category: direct (explicit), indirect (implicit), negative (shouldn't use), or error (should fail) */
+    category: z.enum(["direct", "indirect", "negative", "error"]),
+    /** User prompt to send to the agent */
+    prompt: z.string().min(1),
+    /** Human-readable description of what this test validates (max 60 chars recommended) */
+    description: z.string().optional(),
+
+    // === Deterministic Assertions ===
+    /** Expected tool call with name and input parameters */
+    expectedToolCall: z
+      .object({
+        name: z.string().min(1),
+        input: z.record(z.string(), z.unknown()).optional(),
+      })
+      .nullable()
+      .optional(),
+    /** Expected number of tool calls */
+    expectedToolCallCount: z.number().int().min(0).optional(),
+    /** Expected tool call result/output content (partial match) */
+    expectedToolResult: z.unknown().optional(),
+    /** Expected order of tool calls (array of tool names) */
+    expectedToolOrder: z.array(z.string().min(1)).optional(),
+    /** Expected text in agent output */
+    expectedOutput: z.string().optional(),
+    /** Expected maximum execution time in milliseconds */
+    expectedCompletionMs: z.number().int().min(0).optional(),
+    /** Expected maximum token usage */
+    expectedMaxTokens: z.number().int().min(0).optional(),
+    /** Whether the test expects a failure/error */
+    expectFailure: z.boolean().optional(),
+    /** Expected error message content (for expectFailure tests) */
+    expectedFailureMessage: z.string().optional(),
+    /** Whether the tool should NOT be used (for negative tests) */
+    expectNotUsed: z.boolean().optional(),
+    /** Expected tool error message (for tool-level failures) */
+    expectedToolFailureMessage: z.string().optional(),
+
+    // === Probabilistic Assertions ===
+    /** Semantic assertion using judge() for behavioral validation */
+    judgeExpectation: z.string().min(1).nullable().optional(),
+  })
+  .refine(
+    (data) => {
+      // Validate deterministic assertion exists based on category
+      if (data.category === "direct" || data.category === "indirect") {
+        return data.expectedToolCall !== null && data.expectedToolCall !== undefined;
+      }
+      if (data.category === "negative") {
+        return data.expectNotUsed === true;
+      }
+      if (data.category === "error") {
+        return data.expectFailure === true;
+      }
+      return true;
+    },
+    {
+      message:
+        "Missing deterministic assertion: direct/indirect need expectedToolCall, negative needs expectNotUsed, error needs expectFailure",
+    }
+  );
 
 /**
  * Zod schema for a resource test case.

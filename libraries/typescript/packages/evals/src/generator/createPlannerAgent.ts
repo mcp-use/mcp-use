@@ -1,149 +1,414 @@
 import { MCPAgent, MCPClient } from "mcp-use";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { PlannerError } from "../shared/errors.js";
-import type { ServerSchema } from "./inspectServers.js";
+import type { ServerSchema, ToolSchema } from "./inspectServers.js";
 import type { TestPlan } from "./planSchema.js";
-import { TestPlanSchema } from "./planSchema.js";
 import type { PlannerOptions } from "./planTests.js";
 
 /**
- * System prompt for the exploratory planner agent.
- * Instructs the agent to test tools and generate comprehensive test plans.
+ * Schema for tool exploration summary.
+ * Captures key findings from exploring a single tool.
  */
-const EXPLORATORY_PLANNER_SYSTEM_PROMPT = `
-You are a test planning assistant for MCP (Model Context Protocol) agent evaluations.
+const ToolExplorationSummarySchema = z.object({
+  toolName: z.string(),
+  description: z.string(),
+  /** Actual parameter names from tool schema - CRITICAL for correct test generation */
+  parameterNames: z.array(z.string()),
+  /** Required parameters that must be provided */
+  requiredParams: z.array(z.string()),
+  sampleInputs: z.array(
+    z.object({
+      input: z.record(z.string(), z.unknown()),
+      output: z.string(),
+      success: z.boolean(),
+    })
+  ),
+  errorCases: z.array(
+    z.object({
+      input: z.record(z.string(), z.unknown()),
+      errorMessage: z.string(),
+    })
+  ),
+  notes: z.string().optional(),
+});
 
-Your task is to EXPLORE MCP tools by making sample calls, then generate comprehensive test plans.
+type ToolExplorationSummary = z.infer<typeof ToolExplorationSummarySchema>;
 
-## Your Workflow
+/**
+ * System prompt for Phase 1: Tool Exploration.
+ * Agent explores ONE tool and submits a structured summary.
+ */
+const EXPLORATION_SYSTEM_PROMPT = `
+You are exploring an MCP tool to understand its behavior.
 
-1. **EXPLORE TOOLS**: For each available tool, make 1-2 sample calls with typical inputs to understand:
-   - What parameters the tool expects
-   - What outputs it returns
-   - How it handles edge cases
-   - What errors it produces for invalid inputs
+## CRITICAL: Parameter Names
+When you submit your exploration summary, you MUST include:
+- parameterNames: The EXACT parameter names from the tool schema (e.g., ["taskId", "newStatus"] NOT ["taskId", "status"])
+- requiredParams: Which parameters are required
 
-2. **GENERATE TEST PLAN**: After exploring, call the submit_test_plan tool with your comprehensive test plan.
+Look at the tool schema provided - use the EXACT property names, not synonyms.
 
-## Test Categories
+## Workflow
+1. Note the exact parameter names from the schema
+2. Make 1-2 sample calls with valid inputs
+3. Make 1 call with invalid input to see error behavior
+4. Submit structured summary with correct parameter names
 
-### Direct Tests (3-5 per tool)
-- Purpose: Verify tool is called with explicit, unambiguous instructions
-- Prompt style: "Use [tool] with [exact parameters]", "Call [tool] to [specific action]"
-- Use the REAL outputs you observed during exploration
-- REQUIRED: Generate 3-5 tests with DIFFERENT parameter combinations
-
-### Indirect Tests (3-5 per tool)
-- Purpose: Test natural language understanding without mentioning tool names
-- Prompt style: Natural conversational requests (e.g., "Show me...", "Get the...")
-- Use judgeExpectation for behavioral validation (NOT exact outputs)
-- REQUIRED: Generate 3-5 tests with VARIED natural phrasings
-- CRITICAL: These must be ACTION requests, NOT questions about the tool
-
-### Negative Tests (2-3 per tool)
-- Purpose: Verify tool is NOT called when inappropriate
-- Prompt style: Clearly unrelated requests or questions ABOUT the tool
-- Example: "What is the weather?" or "How do I use this tool?"
-- REQUIRED: Generate 2-3 tests
-
-### Error Tests (2-3 per tool)
-- Purpose: Verify graceful error handling
-- Based on errors you observed during exploration
-- Test missing required fields, invalid values, etc.
-- REQUIRED: Generate 2-3 tests with DIFFERENT error conditions
-
-## Critical Guidelines
-
-1. **Explore first, plan second**: Make sample calls to understand real behavior
-2. **Use real data**: Base expectedToolCall on actual inputs/outputs you observed
-3. **Test comprehensively**: Each tool needs at least 10 tests total (3+3+2+2 minimum)
-4. **Submit once**: Call submit_test_plan only AFTER exploring all tools
-
-## Available Testing Capabilities
-
-### Exact Matchers (for structural/precise assertions)
-- toHaveUsedTool(toolName) - verify a tool was called
-- toHaveToolCallCount(toolName, count) - verify exact number of calls
-- toHaveToolCallWith(toolName, input) - verify specific input (partial match)
-- toHaveToolCallResult(toolName, output) - verify specific output content
-- toHaveCalledToolsInOrder(...toolNames) - verify call sequence
-- toHaveUsedResource(resourceName) - verify resource access
-- toHaveOutputContaining(text) - verify agent output contains text
-- toHaveCompletedWithinMs(ms) - verify execution time
-- toHaveUsedLessThanTokens(count) - verify token usage
-- toHaveFailed() - verify agent failed
-- toHaveFailedWith(text) - verify error message contains text
-- toHaveToolCallFailed(toolName) - verify tool failure
-- toHaveToolCallFailedWith(toolName, text) - verify tool error message
-
-### Semantic Judge (for behavioral/meaning assertions)
-Use judge(output, expectation) for complex behavioral validation in indirect tests.
-
-Remember: Explore the tools thoroughly, then submit a complete test plan!
+Be efficient - submit immediately after gathering findings.
 `;
 
 /**
- * Create a submit_test_plan tool that validates and captures the test plan.
+ * System prompt for Phase 2: Test Plan Generation.
+ * Takes exploration summaries and generates comprehensive test plan.
  */
-function createSubmitTestPlanTool(
-  serverName: string,
-  capturedPlan: { plan: TestPlan | null }
+const PLANNING_SYSTEM_PROMPT = `
+You are generating a test plan from tool exploration summaries.
+
+## CRITICAL RULES
+
+### 1. Use EXACT Parameter Names
+Each tool summary includes parameterNames array - use EXACTLY those names.
+- WRONG: { "status": "done" } when param is "newStatus"
+- RIGHT: { "newStatus": "done" } matching the schema
+
+### 2. Judge Expectations Must Be Behavioral (Not Exact Output)
+- BAD: "All returned tasks have status 'todo' and counts reflect filtered view"
+- GOOD: "Agent filters and shows task list"
+- BAD: "Agent returns success true and message 'Task deleted'"
+- GOOD: "Agent confirms deletion"
+
+### 3. Negative Tests Must Be TRULY Unrelated
+Use completely different domains - weather, math, jokes, recipes:
+- BAD: "Explain what a Kanban board is" (still related to the tool domain)
+- BAD: "What does listTasks do?" (asks about the tool)
+- GOOD: "What's the capital of France?"
+- GOOD: "Tell me a joke about cats"
+- GOOD: "Calculate 15% of 80"
+
+### 4. Avoid Hardcoded IDs From Exploration
+IDs created during exploration won't exist at test time.
+- BAD: "Delete task-1768845107063-abc123"
+- GOOD: "List all tasks" (uses no specific ID)
+- GOOD: "Create a new task called 'Test'" (creates fresh)
+- If ID is needed, use obviously fake: "task-does-not-exist" for error tests
+
+### 5. Skip Flaky Error Tests
+LLMs often fix invalid inputs. Only include error tests for:
+- Missing REQUIRED parameters (LLM can't infer)
+- Clearly invalid types the server rejects
+- Do NOT test: empty strings, boundary values (LLM will fix)
+
+## Test Categories (per tool: 4-5 direct, 3-4 indirect, 2 negative, 1-2 error)
+
+### Direct Tests
+- Prompt: "Use [tool] with [exactParamName]=value"
+- Include: expectedToolCall.input with EXACT param names + judgeExpectation
+
+### Indirect Tests  
+- Prompt: Natural language action request (no tool names)
+- Include: expectedToolCall.name + judgeExpectation
+
+### Negative Tests
+- Prompt: COMPLETELY unrelated (different domain entirely)
+- Include: expectNotUsed: true + judgeExpectation
+
+### Error Tests (optional, only if reliable)
+- Prompt: Missing required param or calling with non-existent ID
+- Include: expectFailure: true + judgeExpectation
+
+## Output Format
+
+{
+  "tools": [{
+    "name": "toolName",
+    "tests": [
+      {
+        "category": "direct",
+        "prompt": "Use toolName with exactParamName=value",
+        "description": "basic usage",
+        "expectedToolCall": { "name": "toolName", "input": { "exactParamName": "value" } },
+        "judgeExpectation": "Agent completes the action"
+      },
+      {
+        "category": "indirect",
+        "prompt": "Natural language request",
+        "description": "infers correct tool",
+        "expectedToolCall": { "name": "toolName" },
+        "judgeExpectation": "Agent uses tool appropriately"
+      },
+      {
+        "category": "negative",
+        "prompt": "What's 25 times 4?",
+        "description": "unrelated math question",
+        "expectNotUsed": true,
+        "judgeExpectation": "Agent answers without using tool"
+      }
+    ]
+  }],
+  "resources": []
+}
+`;
+
+/**
+ * Create a submit_exploration tool for capturing tool exploration summary.
+ */
+function createSubmitExplorationTool(
+  toolName: string,
+  capturedSummary: { summary: ToolExplorationSummary | null }
 ): DynamicStructuredTool {
   return new DynamicStructuredTool({
-    name: "submit_test_plan",
-    description: `Submit the comprehensive test plan for the ${serverName} server after you have finished exploring all tools. This tool accepts the complete test plan with test cases for all tools and resources.`,
-    schema: TestPlanSchema,
-    func: async (plan: TestPlan) => {
-      // Validate the plan structure
-      const validated = TestPlanSchema.parse(plan);
-
-      // Capture the plan for extraction
-      capturedPlan.plan = validated;
-
-      return `Test plan submitted successfully! Generated ${validated.tools.length} tool test plans and ${validated.resources.length} resource test plans.`;
+    name: "submit_exploration",
+    description: `Submit your exploration summary for the ${toolName} tool. Call this after you have explored the tool behavior.`,
+    schema: ToolExplorationSummarySchema,
+    func: async (summary: ToolExplorationSummary) => {
+      const validated = ToolExplorationSummarySchema.parse(summary);
+      capturedSummary.summary = validated;
+      return `Exploration summary for ${toolName} submitted successfully!`;
     },
   });
 }
 
 /**
- * Create an exploratory planner agent that can test MCP tools before generating test plans.
+ * Create LLM instance from options.
+ */
+function createLLM(options: PlannerOptions) {
+  return options.provider === "openai"
+    ? new ChatOpenAI({
+        model: options.model,
+        openAIApiKey: process.env.OPENAI_API_KEY,
+        configuration: options.baseUrl
+          ? { baseURL: options.baseUrl }
+          : undefined,
+        temperature: options.thinking ? undefined : 0.7,
+      })
+    : new ChatAnthropic({
+        model: options.model,
+        anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+        temperature: options.thinking ? undefined : 0.7,
+        ...(options.thinking && {
+          modelKwargs: {
+            thinking: { type: "enabled", budget_tokens: 10000 },
+          },
+        }),
+      });
+}
+
+/**
+ * Phase 1: Explore a single tool and return structured summary.
+ * Uses a fresh agent context per tool to avoid context accumulation.
+ */
+async function exploreTool(
+  tool: ToolSchema,
+  client: MCPClient,
+  options: PlannerOptions
+): Promise<ToolExplorationSummary> {
+  const llm = createLLM(options);
+
+  const capturedSummary: { summary: ToolExplorationSummary | null } = {
+    summary: null,
+  };
+  const submitTool = createSubmitExplorationTool(tool.name, capturedSummary);
+
+  const agent = new MCPAgent({
+    llm,
+    client,
+    maxSteps: 10, // Limited steps per tool
+    memoryEnabled: false,
+    autoInitialize: false,
+    additionalTools: [submitTool],
+    systemPrompt: EXPLORATION_SYSTEM_PROMPT,
+  });
+
+  // Extract parameter names from tool schema
+  const parameterNames = Object.keys(tool.inputSchema.properties || {});
+  const requiredParams = tool.inputSchema.required || [];
+
+  try {
+    await agent.initialize();
+
+    const prompt = `Explore the "${tool.name}" tool.
+
+## Tool Schema
+${JSON.stringify(tool, null, 2)}
+
+## IMPORTANT: Parameter Names
+The EXACT parameter names are: ${JSON.stringify(parameterNames)}
+Required parameters: ${JSON.stringify(requiredParams)}
+
+You MUST include these exact names in your submit_exploration call.
+
+## Instructions
+1. Note the exact parameter names above
+2. Make 1-2 sample calls with valid inputs
+3. Make 1 call with invalid input to see error behavior
+4. Call submit_exploration with parameterNames=${JSON.stringify(parameterNames)} and requiredParams=${JSON.stringify(requiredParams)}
+
+Start now!`;
+
+    await agent.run({ prompt, maxSteps: 10 });
+
+    if (!capturedSummary.summary) {
+      // If agent didn't submit, create a basic summary from schema
+      return {
+        toolName: tool.name,
+        description: tool.description || "No description",
+        parameterNames,
+        requiredParams,
+        sampleInputs: [],
+        errorCases: [],
+        notes: "Exploration incomplete - using schema only",
+      };
+    }
+
+    // Ensure parameter names are correct even if agent got them wrong
+    return {
+      ...capturedSummary.summary,
+      parameterNames,
+      requiredParams,
+    };
+  } finally {
+    await agent.close();
+  }
+}
+
+/**
+ * Phase 2: Generate test plan from exploration summaries.
+ * Uses LLM calls with self-correction: validates output and retries with error feedback.
+ */
+async function generatePlanFromSummaries(
+  serverName: string,
+  summaries: ToolExplorationSummary[],
+  resources: ServerSchema["resources"],
+  options: PlannerOptions
+): Promise<TestPlan> {
+  const llm = createLLM(options);
+  const MAX_RETRIES = 3;
+
+  // Compact the summaries for the prompt - emphasize parameter names
+  const summaryText = summaries
+    .map(
+      (s) => `
+## ${s.toolName}
+Description: ${s.description}
+**EXACT Parameter Names**: ${JSON.stringify(s.parameterNames)} (use these exactly!)
+Required: ${JSON.stringify(s.requiredParams)}
+Sample inputs: ${JSON.stringify(s.sampleInputs.slice(0, 2))}
+Error cases: ${JSON.stringify(s.errorCases.slice(0, 2))}
+${s.notes ? `Notes: ${s.notes}` : ""}`
+    )
+    .join("\n");
+
+  const resourceText =
+    resources.length > 0
+      ? `\n\nResources:\n${resources.map((r) => `- ${r.name}: ${r.description || "No description"}`).join("\n")}`
+      : "";
+
+  const userPrompt = `Generate a comprehensive test plan for the "${serverName}" server.
+
+## Tool Exploration Summaries
+${summaryText}
+${resourceText}
+
+Generate the test plan as a JSON object following the TestPlan schema.
+Return ONLY valid JSON, no markdown code fences.`;
+
+  // Import validation utilities
+  const { extractPlannerJson } = await import("./planValidation.js");
+  const { TestPlanSchema } = await import("./planSchema.js");
+
+  // Build conversation for potential retries
+  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: PLANNING_SYSTEM_PROMPT },
+    { role: "user", content: userPrompt },
+  ];
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    console.log(`  📝 Generating plan (attempt ${attempt}/${MAX_RETRIES})...`);
+
+    const response = await llm.invoke(messages);
+    const content = String(response.content ?? "");
+
+    try {
+      // Extract and validate JSON
+      const data = extractPlannerJson(content);
+      const parsed = TestPlanSchema.safeParse(data);
+
+      if (parsed.success) {
+        console.log(`  ✅ Plan validated successfully!`);
+        return {
+          server: serverName,
+          tools: parsed.data.tools,
+          resources: parsed.data.resources,
+        };
+      }
+
+      // Validation failed - format errors for retry
+      const errors = parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      }));
+
+      console.log(`  ⚠️ Validation failed with ${errors.length} errors, asking LLM to fix...`);
+
+      // Add assistant response and error feedback to conversation
+      messages.push({ role: "assistant", content });
+      messages.push({
+        role: "user",
+        content: `Your JSON has validation errors. Please fix them and return the corrected JSON only.
+
+## Validation Errors:
+${errors.map((err) => `- ${err.path}: ${err.message}`).join("\n")}
+
+## Reminder of required structure per test:
+- direct/indirect tests MUST have: expectedToolCall: { name: "toolName", input: {...} }
+- negative tests MUST have: expectNotUsed: true
+- error tests MUST have: expectFailure: true
+- ALL tests should have: judgeExpectation for probabilistic validation
+
+Return the FIXED JSON only, no explanation.`,
+      });
+    } catch (error) {
+      // JSON parsing/extraction failed
+      console.log(`  ⚠️ JSON extraction failed, asking LLM to fix...`);
+
+      messages.push({ role: "assistant", content });
+      messages.push({
+        role: "user",
+        content: `Your response could not be parsed as JSON. Error: ${error instanceof Error ? error.message : String(error)}
+
+Please return ONLY valid JSON with no markdown code fences or extra text.`,
+      });
+    }
+  }
+
+  throw new PlannerError(
+    `Failed to generate valid test plan after ${MAX_RETRIES} attempts`
+  );
+}
+
+/**
+ * Create an exploratory test plan using Two-Phase Architecture.
+ *
+ * Phase 1: Explore each tool individually (fresh context per tool)
+ * Phase 2: Generate test plan from exploration summaries
+ *
+ * This architecture keeps context bounded regardless of tool count.
  *
  * @param schema - Server schema with tools and resources
  * @param evalConfigPath - Path to eval.config.json for server connections
  * @param options - Planner configuration
  * @returns Test plan generated through exploration
- * @throws {PlannerError} If agent fails to explore or submit plan
+ * @throws {PlannerError} If exploration or planning fails
  */
 export async function createExploratoryTestPlan(
   schema: ServerSchema,
   evalConfigPath: string,
   options: PlannerOptions
 ): Promise<TestPlan> {
-  // Create LLM for the agent
-  const llm =
-    options.provider === "openai"
-      ? new ChatOpenAI({
-          model: options.model,
-          openAIApiKey: process.env.OPENAI_API_KEY,
-          configuration: options.baseUrl
-            ? { baseURL: options.baseUrl }
-            : undefined,
-          temperature: options.thinking ? undefined : 0.7,
-        })
-      : new ChatAnthropic({
-          model: options.model,
-          anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-          temperature: options.thinking ? undefined : 0.7,
-          ...(options.thinking && {
-            modelKwargs: {
-              thinking: { type: "enabled", budget_tokens: 10000 },
-            },
-          }),
-        });
-
-  // Create MCP client and connect to the server
+  // Load config and create client
   const { loadEvalConfig } = await import("../runtime/loadEvalConfig.js");
   const config = await loadEvalConfig(evalConfigPath);
 
@@ -167,56 +432,66 @@ export async function createExploratoryTestPlan(
     );
   }
 
-  // Create the submit_test_plan tool
-  const capturedPlan: { plan: TestPlan | null } = { plan: null };
-  const submitTestPlanTool = createSubmitTestPlanTool(
-    schema.name,
-    capturedPlan
-  );
-
-  // Create the agent with access to MCP tools AND submit_test_plan
-  const agent = new MCPAgent({
-    llm,
-    client,
-    maxSteps: 15, // Limit steps to reduce token usage
-    memoryEnabled: false, // Disable memory to reduce context size
-    autoInitialize: false,
-    additionalTools: [submitTestPlanTool],
-    systemPrompt: EXPLORATORY_PLANNER_SYSTEM_PROMPT,
-  });
-
   try {
-    await agent.initialize();
+    // Phase 1: Explore tools in parallel with concurrency limit
+    const CONCURRENCY_LIMIT = 3; // Limit parallel explorations to avoid rate limits
+    console.log(
+      `📊 Phase 1: Exploring ${schema.tools.length} tools (${CONCURRENCY_LIMIT} in parallel)...`
+    );
 
-    // Prompt the agent to explore and create test plan
-    // Keep prompt concise to reduce token usage
-    const explorationPrompt = `Generate a comprehensive test plan for the "${schema.name}" server.
+    // Helper to explore a tool with error handling
+    const exploreWithFallback = async (
+      tool: ToolSchema
+    ): Promise<ToolExplorationSummary> => {
+      console.log(`  🔍 Exploring: ${tool.name}`);
+      try {
+        const summary = await exploreTool(tool, client, options);
+        console.log(
+          `  ✅ ${tool.name}: ${summary.sampleInputs.length} samples, ${summary.errorCases.length} errors`
+        );
+        return summary;
+      } catch (error) {
+        console.log(`  ⚠️ ${tool.name}: exploration failed, using schema only`);
+        // Extract parameter names from schema for fallback
+        const parameterNames = Object.keys(tool.inputSchema.properties || {});
+        const requiredParams = tool.inputSchema.required || [];
+        return {
+          toolName: tool.name,
+          description: tool.description || "No description",
+          parameterNames,
+          requiredParams,
+          sampleInputs: [],
+          errorCases: [],
+          notes: `Exploration failed: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    };
 
-Available: ${schema.tools.length} tools${schema.resources.length > 0 ? `, ${schema.resources.length} resources` : ""}
-
-Instructions:
-1. Make 1-2 quick sample calls per tool to understand behavior
-2. Generate test cases (direct, indirect, negative, error) based on observations
-3. Call submit_test_plan with your complete plan
-
-Focus on efficiency - test minimally but plan comprehensively. Start now!`;
-
-    await agent.run({ prompt: explorationPrompt });
-
-    // Check if the plan was captured
-    if (!capturedPlan.plan) {
-      throw new PlannerError(
-        "Agent did not call submit_test_plan. The test plan was not generated."
+    // Process tools in batches with concurrency limit
+    const summaries: ToolExplorationSummary[] = [];
+    for (let i = 0; i < schema.tools.length; i += CONCURRENCY_LIMIT) {
+      const batch = schema.tools.slice(i, i + CONCURRENCY_LIMIT);
+      const batchResults = await Promise.all(
+        batch.map((tool) => exploreWithFallback(tool))
       );
+      summaries.push(...batchResults);
     }
 
-    // Add server name to the plan
-    return {
-      ...capturedPlan.plan,
-      server: schema.name,
-    };
+    // Phase 2: Generate test plan from summaries
+    console.log(`\n📝 Phase 2: Generating test plan from summaries...`);
+    const plan = await generatePlanFromSummaries(
+      schema.name,
+      summaries,
+      schema.resources,
+      options
+    );
+
+    console.log(
+      `✅ Generated ${plan.tools.length} tool test plans, ${plan.resources.length} resource test plans`
+    );
+
+    return plan;
   } finally {
-    await agent.close();
     await client.closeAllSessions();
   }
 }

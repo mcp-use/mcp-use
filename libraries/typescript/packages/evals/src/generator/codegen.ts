@@ -178,23 +178,39 @@ export class EvalCodeGenerator {
     writer: any,
     test: {
       prompt: string;
+      description?: string;
       expectFailure?: boolean;
       expectNotUsed?: boolean;
       expectedToolCall?: {
         name?: string;
         input?: Record<string, unknown>;
       } | null;
+      expectedToolCallCount?: number;
+      expectedToolResult?: unknown;
+      expectedToolOrder?: string[];
+      expectedOutput?: string;
+      expectedCompletionMs?: number;
+      expectedMaxTokens?: number;
+      expectedFailureMessage?: string;
+      expectedToolFailureMessage?: string;
       judgeExpectation?: string | null;
     },
     toolName: string
   ): void {
     const action = test.expectNotUsed ? "NOT " : "";
-    const description = `should ${action}call ${toolName}: '${truncate(test.prompt, 50)}'`;
+    // Use provided description or fallback to truncated prompt
+    const description =
+      test.description ||
+      `should ${action}call ${toolName}: '${truncate(test.prompt, 50)}'`;
     const escapedPrompt = escapeString(test.prompt);
 
     writer.writeLine(`it("${escapeString(description)}", async () => {`);
     writer.indent(() => {
       writer.writeLine(`const result = await agent.run("${escapedPrompt}");`);
+
+      // === Deterministic Assertions ===
+
+      // Tool usage assertions
       if (test.expectNotUsed) {
         writer.writeLine(
           `expect(result).not.toHaveUsedTool("${escapeString(toolName)}");`
@@ -203,6 +219,11 @@ export class EvalCodeGenerator {
         writer.writeLine(
           `expect(result).toHaveToolCallFailed("${escapeString(toolName)}");`
         );
+        if (test.expectedToolFailureMessage) {
+          writer.writeLine(
+            `expect(result).toHaveToolCallFailedWith("${escapeString(toolName)}", "${escapeString(test.expectedToolFailureMessage)}");`
+          );
+        }
       } else {
         writer.writeLine(
           `expect(result).toHaveUsedTool("${escapeString(toolName)}");`
@@ -216,7 +237,56 @@ export class EvalCodeGenerator {
         }
       }
 
-      // Add judge assertion if specified
+      // Tool call count assertion
+      if (test.expectedToolCallCount !== undefined) {
+        writer.writeLine(
+          `expect(result).toHaveToolCallCount(${test.expectedToolCallCount});`
+        );
+      }
+
+      // Tool result assertion
+      if (test.expectedToolResult !== undefined) {
+        writer.writeLine(
+          `expect(result).toHaveToolCallResult("${escapeString(toolName)}", ${JSON.stringify(test.expectedToolResult)});`
+        );
+      }
+
+      // Tool order assertion
+      if (test.expectedToolOrder && test.expectedToolOrder.length > 0) {
+        writer.writeLine(
+          `expect(result).toHaveCalledToolsInOrder(${JSON.stringify(test.expectedToolOrder)});`
+        );
+      }
+
+      // Agent output assertion
+      if (test.expectedOutput) {
+        writer.writeLine(
+          `expect(result).toHaveOutputContaining("${escapeString(test.expectedOutput)}");`
+        );
+      }
+
+      // Completion time assertion
+      if (test.expectedCompletionMs !== undefined) {
+        writer.writeLine(
+          `expect(result).toHaveCompletedWithinMs(${test.expectedCompletionMs});`
+        );
+      }
+
+      // Token usage assertion
+      if (test.expectedMaxTokens !== undefined) {
+        writer.writeLine(
+          `expect(result).toHaveUsedLessThanTokens(${test.expectedMaxTokens});`
+        );
+      }
+
+      // Agent-level failure assertion
+      if (test.expectedFailureMessage) {
+        writer.writeLine(
+          `expect(result).toHaveFailedWith("${escapeString(test.expectedFailureMessage)}");`
+        );
+      }
+
+      // === Probabilistic Assertions ===
       if (test.judgeExpectation) {
         writer.writeLine(
           `const judgeResult = await judge(result.output, "${escapeString(test.judgeExpectation)}");`
@@ -240,13 +310,17 @@ export class EvalCodeGenerator {
     writer: any,
     test: {
       prompt: string;
+      description?: string;
       expectNotUsed?: boolean;
       judgeExpectation?: string | null;
     },
     resourceName: string
   ): void {
     const action = test.expectNotUsed ? "NOT " : "";
-    const description = `should ${action}access ${resourceName}: '${truncate(test.prompt, 50)}'`;
+    // Use provided description or fallback to truncated prompt
+    const description =
+      test.description ||
+      `should ${action}access ${resourceName}: '${truncate(test.prompt, 50)}'`;
     const escapedPrompt = escapeString(test.prompt);
 
     writer.writeLine(`it("${escapeString(description)}", async () => {`);
