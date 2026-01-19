@@ -153,6 +153,12 @@ npx @mcp-use/evals generate --config path/to/eval.config.json
 
 # Custom output file
 npx @mcp-use/evals generate --output tests/my-server.eval.test.ts
+
+# Enable exploratory mode (agent tests tools before generating tests)
+npx @mcp-use/evals generate --explore
+
+# Use efficient model for exploration
+npx @mcp-use/evals generate --planner openai:gpt-4o-mini --explore
 ```
 
 ### Writing Manual Tests
@@ -366,6 +372,46 @@ Configure test behavior:
 - `retries`: Number of retry attempts for flaky tests
 - `serverLifecycle`: `"suite"` (start once) or `"test"` (restart per test)
 - `additionalInstructions`: Custom prompt instructions for the agent
+
+### Generator Settings
+
+Configure test generation behavior:
+
+```json
+{
+  "generator": {
+    "useToon": true,
+    "thinking": false,
+    "explore": false
+  }
+}
+```
+
+**Options:**
+- `useToon`: Use TOON format for schema serialization (default: `true`) - saves 30-40% tokens
+- `thinking`: Enable extended thinking/reasoning mode for planner models (default: `false`)
+- `explore`: Enable exploratory mode where agent tests tools before generating plans (default: `false`)
+
+**Exploratory Mode (`explore: true`):**
+
+When enabled, the planner agent connects to your MCP server and makes sample tool calls before generating test plans. This produces more accurate tests with real observed outputs, but uses more tokens and takes longer.
+
+**Recommendations:**
+- Use `explore: false` (default) for fast generation with static schemas
+- Use `explore: true` with `gpt-4o-mini` or similar efficient models
+- Exploratory mode is best for complex tools where behavior isn't obvious from schema alone
+
+**CLI Overrides:**
+```bash
+# Enable exploration
+npx @mcp-use/evals generate --explore
+
+# Disable exploration  
+npx @mcp-use/evals generate --no-explore
+
+# Use efficient model for exploration
+npx @mcp-use/evals generate --planner openai:gpt-4o-mini --explore
+```
 
 ---
 
