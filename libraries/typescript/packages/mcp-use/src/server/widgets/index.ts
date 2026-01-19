@@ -37,6 +37,7 @@ export {
 
 export {
   generateWidgetUri,
+  slugifyWidgetName,
   convertPropsToInputs,
   applyDefaultProps,
   readBuildManifest,

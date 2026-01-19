@@ -186,10 +186,14 @@ export async function mountWidgetsDev(
     };
   });
 
+  // Import slugifyWidgetName for URL-safe directory names
+  const { slugifyWidgetName } = await import("./widget-helpers.js");
+
   // Create entry files for each widget
   for (const widget of widgets) {
-    // Create temp entry and HTML files for this widget
-    const widgetTempDir = pathHelpers.join(tempDir, widget.name);
+    // Use slugified name for temp directory to match URL routing
+    const slugifiedName = slugifyWidgetName(widget.name);
+    const widgetTempDir = pathHelpers.join(tempDir, slugifiedName);
     await fs.mkdir(widgetTempDir, { recursive: true });
 
     // Create a CSS file with Tailwind and @source directives to scan resources
@@ -242,7 +246,7 @@ if (container && Component) {
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${widget.name}/entry.tsx"></script>
+    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 
@@ -315,6 +319,7 @@ if (container && Component) {
       server.watcher.on("unlink", async (filePath: string) => {
         // Check if the deleted file is a widget file
         const relativePath = pathHelpers.relative(resourcesPath, filePath);
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
 
         // Single file widget (e.g., widget-name.tsx)
         if (
@@ -322,7 +327,8 @@ if (container && Component) {
           !relativePath.includes("/")
         ) {
           const widgetName = relativePath.replace(/\.tsx?$/, "");
-          const widgetDir = pathHelpers.join(tempDir, widgetName);
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const widgetDir = pathHelpers.join(tempDir, slugifiedName);
 
           // Remove from widgets array
           const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
@@ -348,7 +354,8 @@ if (container && Component) {
           const parts = relativePath.split("/");
           if (parts.length === 2) {
             const widgetName = parts[0];
-            const widgetDir = pathHelpers.join(tempDir, widgetName);
+            const slugifiedName = slugifyWidgetName(widgetName);
+            const widgetDir = pathHelpers.join(tempDir, slugifiedName);
 
             // Remove from widgets array
             const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
@@ -375,11 +382,13 @@ if (container && Component) {
       // Watch for directory deletions (folder-based widgets)
       server.watcher.on("unlinkDir", async (dirPath: string) => {
         const relativePath = pathHelpers.relative(resourcesPath, dirPath);
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
 
         // Check if this is a top-level directory in resources/
         if (relativePath && !relativePath.includes("/")) {
           const widgetName = relativePath;
-          const widgetDir = pathHelpers.join(tempDir, widgetName);
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const widgetDir = pathHelpers.join(tempDir, slugifiedName);
 
           // Remove from widgets array
           const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
@@ -407,7 +416,10 @@ if (container && Component) {
         widgetName: string,
         entryPath: string
       ) => {
-        const widgetTempDir = pathHelpers.join(tempDir, widgetName);
+        // Use slugified name for temp directory to match URL routing
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+        const slugifiedName = slugifyWidgetName(widgetName);
+        const widgetTempDir = pathHelpers.join(tempDir, slugifiedName);
         await fs.mkdir(widgetTempDir, { recursive: true });
 
         // Create a CSS file with Tailwind and @source directives to scan resources
@@ -463,7 +475,7 @@ if (container && Component) {
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${widgetName}/entry.tsx"></script>
+    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 
@@ -547,9 +559,12 @@ if (container && Component) {
         }
 
         // Full registration for new widgets
+        // Use slugified name for temp directory path
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+        const slugifiedName = slugifyWidgetName(widgetName);
         await registerWidgetFromTemplate(
           widgetName,
-          pathHelpers.join(tempDir, widgetName, "index.html"),
+          pathHelpers.join(tempDir, slugifiedName, "index.html"),
           (metadata.description
             ? metadata
             : { ...metadata, description: `Widget: ${widgetName}` }) as Record<
@@ -783,19 +798,24 @@ export default PostHog;
     const widgetMatch = pathname.replace(baseRoute, "").match(/^\/([^/]+)/);
 
     if (widgetMatch) {
-      const widgetName = widgetMatch[1];
-      const widget = widgets.find((w) => w.name === widgetName);
+      // URL contains slugified widget name, need to find original widget name
+      const slugifiedNameFromUrl = widgetMatch[1];
+      const { slugifyWidgetName } = await import("./widget-helpers.js");
+      const widget = widgets.find(
+        (w) => slugifyWidgetName(w.name) === slugifiedNameFromUrl
+      );
 
       if (widget) {
         // If requesting the root of a widget, serve its index.html
+        // Use slugified name for URL paths
         const relativePath = pathname.replace(baseRoute, "");
         if (
-          relativePath === `/${widgetName}` ||
-          relativePath === `/${widgetName}/`
+          relativePath === `/${slugifiedNameFromUrl}` ||
+          relativePath === `/${slugifiedNameFromUrl}/`
         ) {
           // Rewrite the URL for Vite by creating a new request with modified URL
           const newUrl = new URL(c.req.url);
-          newUrl.pathname = `${baseRoute}/${widgetName}/index.html`;
+          newUrl.pathname = `${baseRoute}/${slugifiedNameFromUrl}/index.html`;
           // Create a new request with modified URL and update the context
           const newRequest = new Request(newUrl.toString(), c.req.raw);
           // Update the request in the context by creating a new context-like object
@@ -844,8 +864,10 @@ export default PostHog;
   });
 
   widgets.forEach((widget) => {
+    // Use slugified name for URL display
+    const slugifiedName = slugifyWidgetName(widget.name);
     console.log(
-      `[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`
+      `[WIDGET] ${widget.name} mounted at ${baseRoute}/${slugifiedName}`
     );
   });
 

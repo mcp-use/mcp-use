@@ -30,6 +30,7 @@ import {
   toolRegistration,
 } from "./tools/index.js";
 import { mountWidgets, uiResourceRegistration } from "./widgets/index.js";
+import { slugifyWidgetName } from "./widgets/widget-helpers.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -364,6 +365,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * immediately, ensuring the tool is queryable before notifications are sent.
    * This prevents race conditions where clients fetch tools before registration completes.
    *
+   * Also registers the associated widget resources (static and template) for Apps SDK widgets.
+   *
    * @param toolDefinition - The tool definition
    * @param toolCallback - The tool callback function
    * @internal
@@ -376,8 +379,25 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // First register normally to update wrapper's registrations
     (this.tool as any)(toolDefinition, toolCallback);
 
-    // Then immediately add to each session's native _registeredTools
-    // This ensures the tool is queryable before notifications are sent
+    const widgetName = toolDefinition.name;
+    const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+
+    // Slugify widget name for URI compliance (RFC 3986)
+    const slugifiedName = slugifyWidgetName(widgetName);
+
+    // Get resource registrations for this widget
+    // Resources are stored with key format "name:uri"
+    // URIs use slugified names to ensure RFC 3986 compliance
+    const resourceUri = `ui://widget/${slugifiedName}${buildIdPart}.html`;
+    const resourceTemplateUri = `ui://widget/${slugifiedName}${buildIdPart}-{id}.html`;
+    const resourceKey = `${widgetName}:${resourceUri}`;
+    const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
+    const resourceReg = this.registrations.resources.get(resourceKey);
+    const resourceTemplateReg =
+      this.registrations.resourceTemplates.get(resourceTemplateKey);
+
+    // Then immediately add to each session's native _registeredTools and _registeredResources
+    // This ensures the tool and resources are queryable before notifications are sent
     for (const [sessionId, session] of this.sessions) {
       if (!session.server) continue;
       const nativeServer = session.server as any;
@@ -405,27 +425,118 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       }
 
+      // Create a proper tool entry with all required fields including the handler
+      const toolEntry = {
+        title: registration.config.title,
+        description: registration.config.description ?? "",
+        inputSchema: inputSchema || registration.config.inputs,
+        outputSchema: undefined,
+        annotations: registration.config.annotations,
+        execution: { taskSupport: "forbidden" as const },
+        _meta: registration.config._meta,
+        handler: registration.handler,
+        enabled: true,
+        disable: function (this: any) {
+          this.enabled = false;
+        },
+        enable: function (this: any) {
+          this.enabled = true;
+        },
+        remove: () => {
+          delete nativeServer._registeredTools[toolDefinition.name];
+        },
+        update: function (this: any, updates: Record<string, unknown>) {
+          Object.assign(this, updates);
+        },
+      };
+
       // Add directly to SDK's _registeredTools for this session
       if (nativeServer._registeredTools) {
-        nativeServer._registeredTools[toolDefinition.name] = {
-          description: registration.config.description,
-          inputSchema: inputSchema || registration.config.inputs,
-        };
+        nativeServer._registeredTools[toolDefinition.name] = toolEntry;
         console.log(
           `[MCP-Server] Added tool ${toolDefinition.name} to session ${sessionId}'s _registeredTools`
         );
+      }
+
+      // Add widget resources to this session
+      if (resourceReg && session.server) {
+        try {
+          const _registeredResource = session.server.registerResource(
+            resourceReg.config.name,
+            resourceReg.config.uri,
+            {
+              title: resourceReg.config.title,
+              description: resourceReg.config.description,
+              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+            } as any,
+            resourceReg.handler as any
+          );
+          console.log(
+            `[MCP-Server] Added resource ${resourceUri} to session ${sessionId}`
+          );
+        } catch (e) {
+          console.warn(
+            `[MCP-Server] Failed to register resource ${resourceUri} for session ${sessionId}:`,
+            e
+          );
+        }
+      }
+
+      // Add widget resource template to this session (for Apps SDK)
+      if (resourceTemplateReg && session.server) {
+        try {
+          const _registeredTemplate = session.server.registerResource(
+            resourceTemplateReg.config.name,
+            resourceTemplateReg.config.resourceTemplate.uriTemplate,
+            {
+              title: resourceTemplateReg.config.title,
+              description: resourceTemplateReg.config.description,
+              mimeType:
+                resourceTemplateReg.config.resourceTemplate.mimeType ||
+                "text/html+skybridge",
+            } as any,
+            resourceTemplateReg.handler as any
+          );
+          console.log(
+            `[MCP-Server] Added resource template ${resourceTemplateUri} to session ${sessionId}`
+          );
+        } catch (e) {
+          console.warn(
+            `[MCP-Server] Failed to register resource template ${resourceTemplateUri} for session ${sessionId}:`,
+            e
+          );
+        }
       }
     }
 
     // Send notifications AFTER adding to all sessions
     for (const [sessionId, session] of this.sessions) {
+      // Send tool list changed notification
       if (session.server?.sendToolListChanged) {
         try {
           session.server.sendToolListChanged();
-          console.log(`[MCP-Server] Sent notification to session ${sessionId}`);
+          console.log(
+            `[MCP-Server] Sent tools notification to session ${sessionId}`
+          );
         } catch (e) {
           console.debug(
-            `[MCP-Server] Session ${sessionId}: Failed to send notification`
+            `[MCP-Server] Session ${sessionId}: Failed to send tools notification`
+          );
+        }
+      }
+      // Send resource list changed notification if resources were added
+      if (
+        (resourceReg || resourceTemplateReg) &&
+        session.server?.sendResourceListChanged
+      ) {
+        try {
+          session.server.sendResourceListChanged();
+          console.log(
+            `[MCP-Server] Sent resources notification to session ${sessionId}`
+          );
+        } catch (e) {
+          console.debug(
+            `[MCP-Server] Session ${sessionId}: Failed to send resources notification`
           );
         }
       }
@@ -519,14 +630,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @internal
    */
   public removeWidgetTool(toolName: string): void {
+    // Slugify widget name for URI compliance (RFC 3986)
+    const slugifiedName = slugifyWidgetName(toolName);
+    const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+
     // Remove from widget definitions
     this.widgetDefinitions.delete(toolName);
 
     // Remove from our wrapper's registrations
+    // Resources are keyed as "name:uri" where URI uses slugified name
+    const resourceUri = `ui://widget/${slugifiedName}${buildIdPart}.html`;
+    const resourceTemplateUri = `ui://widget/${slugifiedName}${buildIdPart}-{id}.html`;
     this.registrations.tools.delete(toolName);
-    this.registrations.resources.delete(`ui://widget/${toolName}.html`);
+    this.registrations.resources.delete(`${toolName}:${resourceUri}`);
     this.registrations.resourceTemplates.delete(
-      `ui://widget/${toolName}/{props}.html`
+      `${toolName}-dynamic:${resourceTemplateUri}`
     );
 
     // Remove from SDK's internal state for all sessions
@@ -539,30 +657,22 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         delete nativeServer._registeredTools[toolName];
       }
 
-      // Remove resource
-      const resourceUri = `ui://widget/${toolName}.html`;
+      // Remove resource (using slugified URI)
       if (nativeServer._registeredResources?.[resourceUri]) {
         delete nativeServer._registeredResources[resourceUri];
       }
 
-      // Remove resource template
-      if (nativeServer._registeredResourceTemplates) {
-        // Resource templates are stored differently - need to find and remove
-        for (const [key] of Object.entries(
-          nativeServer._registeredResourceTemplates
-        )) {
-          if (key.includes(toolName)) {
-            delete nativeServer._registeredResourceTemplates[key];
-          }
-        }
+      // Remove resource template (using slugified URI)
+      if (nativeServer._registeredResources?.[resourceTemplateUri]) {
+        delete nativeServer._registeredResources[resourceTemplateUri];
       }
     }
 
-    // Remove from sessionRegisteredRefs
+    // Remove from sessionRegisteredRefs (using slugified URIs)
     for (const [, refs] of this.sessionRegisteredRefs) {
       refs.tools.delete(toolName);
-      refs.resources.delete(`ui://widget/${toolName}.html`);
-      refs.resourceTemplates.delete(`ui://widget/${toolName}/{props}.html`);
+      refs.resources.delete(resourceUri);
+      refs.resourceTemplates.delete(resourceTemplateUri);
     }
 
     // Send notifications to all sessions
