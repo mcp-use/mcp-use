@@ -1,6 +1,5 @@
-import type { BaseMessage } from "mcp-use";
-import type { MCPAgent } from "mcp-use";
-import type { MCPClient } from "mcp-use";
+import type { MCPAgent, MCPClient } from "mcp-use";
+import type { BaseMessage } from "mcp-use/agent";
 import { attachToolResults } from "./toolResultCapture.js";
 import { attachResourceTracking } from "./resourceTracking.js";
 import type { EvalResult, ToolCall, TokenUsage } from "./types.js";

@@ -1,4 +1,4 @@
-import type { BaseMessage } from "mcp-use";
+import type { BaseMessage } from "mcp-use/agent";
 import type { ToolCall, ToolCallError, ToolCallOutput } from "./types.js";
 
 /**
