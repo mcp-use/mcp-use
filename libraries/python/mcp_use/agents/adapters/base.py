@@ -4,7 +4,9 @@ Base adapter interface for MCP tools.
 This module provides the abstract base class that all MCP tool adapters should inherit from.
 """
 
+import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Coroutine
 from typing import Any, Generic, TypeVar
 
 from mcp.types import Prompt, Resource, Tool
@@ -36,16 +38,140 @@ class BaseAdapter(Generic[T], ABC):
         """
         self.disallowed_tools = disallowed_tools or []
 
-        # Three maps to optimize and cache only what is needed
-        self._connector_tool_map: dict[BaseConnector, list[T]] = {}
-        self._connector_resource_map: dict[BaseConnector, list[T]] = {}
-        self._connector_prompt_map: dict[BaseConnector, list[T]] = {}
+        # Initialize executor and connector maps (can be overridden by subclasses)
+        self._init_executor_maps()
 
+        # Initialize tool/resource/prompt lists
         self.tools: list[T] = []
         self.resources: list[T] = []
         self.prompts: list[T] = []
 
         self._record_telemetry = True
+
+    def _init_executor_maps(self) -> None:
+        """Initialize executor and connector maps.
+
+        Subclasses that use executors (Anthropic, OpenAI, Google) should
+        override to add tool_executors map.
+        """
+        self._connector_tool_map: dict[BaseConnector, list[T]] = {}
+        self._connector_resource_map: dict[BaseConnector, list[T]] = {}
+        self._connector_prompt_map: dict[BaseConnector, list[T]] = {}
+
+    # ============================================================
+    # COMMON UTILITY METHODS - Used by most adapters
+    # ============================================================
+
+    @staticmethod
+    def sanitize_tool_name(name: str, max_length: int = 64) -> str:
+        """Sanitize a string to be a valid tool name.
+
+        Most LLM providers (OpenAI, Anthropic, Google) require tool names to:
+        - Contain only alphanumeric characters and underscores
+        - Have a maximum length (typically 64 characters)
+
+        Args:
+            name: The name to sanitize
+            max_length: Maximum allowed length (default: 64)
+
+        Returns:
+            Sanitized tool name
+        """
+        return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:max_length]
+
+    def _create_tool_executor(
+        self, connector: BaseConnector, tool_name: str
+    ) -> Callable[..., Coroutine[Any, Any, Any]]:
+        """Create a lambda executor for calling MCP tools.
+
+        Args:
+            connector: The connector to use for tool execution
+            tool_name: Name of the tool to execute
+
+        Returns:
+            Async callable that executes the tool
+        """
+        return lambda **kwargs: connector.call_tool(tool_name, kwargs)
+
+    def _create_resource_executor(
+        self, connector: BaseConnector, resource_uri: str
+    ) -> Callable[..., Coroutine[Any, Any, Any]]:
+        """Create a lambda executor for reading MCP resources.
+
+        Args:
+            connector: The connector to use for resource reading
+            resource_uri: URI of the resource to read
+
+        Returns:
+            Async callable that reads the resource
+        """
+        return lambda **kwargs: connector.read_resource(resource_uri)
+
+    def _create_prompt_executor(
+        self, connector: BaseConnector, prompt_name: str
+    ) -> Callable[..., Coroutine[Any, Any, Any]]:
+        """Create a lambda executor for getting MCP prompts.
+
+        Args:
+            connector: The connector to use for prompt retrieval
+            prompt_name: Name of the prompt to retrieve
+
+        Returns:
+            Async callable that gets the prompt
+        """
+        return lambda **kwargs: connector.get_prompt(prompt_name, kwargs)
+
+    def _build_prompt_parameters_schema(self, mcp_prompt: Prompt) -> dict[str, Any]:
+        """Build a JSON schema for prompt arguments.
+
+        Converts MCP prompt arguments into a standardized JSON schema format
+        that can be used by various LLM providers.
+
+        Args:
+            mcp_prompt: The MCP prompt with argument definitions
+
+        Returns:
+            JSON schema dictionary with properties and required fields
+        """
+        properties = {}
+        required_args = []
+
+        if mcp_prompt.arguments:
+            for arg in mcp_prompt.arguments:
+                prop = {"type": "string"}
+                if arg.description:
+                    prop["description"] = arg.description
+                properties[arg.name] = prop
+                if arg.required:
+                    required_args.append(arg.name)
+
+        parameters_schema = {"type": "object", "properties": properties}
+        if required_args:
+            parameters_schema["required"] = required_args
+
+        return parameters_schema
+
+    def _is_tool_allowed(self, tool_name: str) -> bool:
+        """Check if a tool is allowed (not in disallowed list).
+
+        Args:
+            tool_name: Name of the tool to check
+
+        Returns:
+            True if tool is allowed, False if disallowed
+        """
+        return tool_name not in self.disallowed_tools
+
+    def _get_resource_tool_name(self, mcp_resource: Resource) -> str:
+        """Generate a standardized tool name for a resource.
+
+        Args:
+            mcp_resource: The MCP resource
+
+        Returns:
+            Sanitized tool name in format 'resource_{name}'
+        """
+        return self.sanitize_tool_name(f"resource_{mcp_resource.name}")
 
     def parse_result(self, tool_result: Any) -> str:
         """Parse the result from any MCP operation (tool, resource, or prompt) into a string.
