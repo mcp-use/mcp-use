@@ -32,6 +32,13 @@ from mcp_use.server.middleware import (
 from mcp_use.server.middleware.server_session import MiddlewareServerSession
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
+
+# Import auth components (optional)
+try:
+    from mcp_use.server.auth import AuthMiddleware, BearerAuthProvider
+except ImportError:
+    BearerAuthProvider = None  # type: ignore
+    AuthMiddleware = None  # type: ignore
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
@@ -59,6 +66,7 @@ class MCPServer(FastMCP):
         name: str | None = None,
         version: str | None = None,
         instructions: str | None = None,
+        auth: BearerAuthProvider | None = None,
         middleware: list[Middleware] | None = None,
         debug: bool = False,
         mcp_path: str = "/mcp",
@@ -73,6 +81,9 @@ class MCPServer(FastMCP):
 
         if version:
             self._mcp_server.version = version
+
+        # Store auth provider
+        self._auth = auth
 
         # Set debug level: DEBUG env var takes precedence, then debug parameter
         env_debug_level = self._parse_debug_level()
@@ -226,6 +237,8 @@ class MCPServer(FastMCP):
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
+        from starlette.middleware.cors import CORSMiddleware
+
         app = super().streamable_http_app()
 
         # Add MCP logging middleware (cast to satisfy type checker)
@@ -235,6 +248,25 @@ class MCPServer(FastMCP):
             mcp_path=self.mcp_path,
             pretty_print_jsonrpc=self.pretty_print_jsonrpc,
         )
+
+        # Add auth middleware if provider is configured
+        if self._auth and AuthMiddleware:
+            app.add_middleware(
+                cast(type, AuthMiddleware),
+                auth_provider=self._auth,
+            )
+            logger.debug("AuthMiddleware added to application")
+
+        # Add CORS middleware LAST so it runs FIRST (handles OPTIONS preflight)
+        if self._auth:
+            app.add_middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_credentials=True,
+                allow_methods=["GET", "POST", "OPTIONS"],
+                allow_headers=["*"],
+                expose_headers=["WWW-Authenticate"],
+            )
 
         return app
 

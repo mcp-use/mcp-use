@@ -137,6 +137,13 @@
                       "python/server/notifications"
                     ]
                   },
+                  {
+                    "group": "Authentication",
+                    "icon": "shield",
+                    "pages": [
+                      "python/server/auth/bearer"
+                    ]
+                  },
                   "python/server/middleware",
                   "python/server/router",
                   "python/server/inspector",

@@ -1,0 +1,162 @@
+---
+title: Bearer Token
+description: Protect your MCP server with bearer token authentication
+icon: key
+---
+
+Protect your MCP server with bearer token authentication. Invalid tokens return HTTP 401 responses before reaching your MCP handlers.
+
+## Quick Start
+
+```python
+from mcp_use.server import MCPServer, BearerAuthProvider, AccessToken, get_access_token
+
+API_KEYS = {
+    "sk-abc123": {"email": "alice@example.com"},
+    "sk-def456": {"email": "bob@example.com"},
+}
+
+
+class MyAuthProvider(BearerAuthProvider):
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token not in API_KEYS:
+            return None
+        return AccessToken(token=token, claims=API_KEYS[token])
+
+
+server = MCPServer(name="my-server", auth=MyAuthProvider())
+
+
+@server.tool()
+def whoami() -> str:
+    """Get current user info."""
+    token = get_access_token()
+    return f"Hello {token.claims.get('email')}" if token else "Not authenticated"
+```
+
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AuthMiddleware
+    participant BearerAuthProvider
+    participant Tool
+
+    Client->>AuthMiddleware: Request + Authorization: Bearer <token>
+    AuthMiddleware->>BearerAuthProvider: verify_token(token)
+
+    alt Valid token
+        BearerAuthProvider-->>AuthMiddleware: AccessToken
+        AuthMiddleware->>Tool: Request proceeds
+        Tool-->>Client: 200 Response
+    else Invalid/missing token
+        BearerAuthProvider-->>AuthMiddleware: None
+        AuthMiddleware-->>Client: 401 Unauthorized
+    end
+```
+
+## BearerAuthProvider
+
+Extend this class and implement `verify_token()`:
+
+```python
+from mcp_use.server import BearerAuthProvider, AccessToken
+
+
+class MyAuthProvider(BearerAuthProvider):
+    async def verify_token(self, token: str) -> AccessToken | None:
+        # Return AccessToken if valid, None if invalid
+        ...
+```
+
+## AccessToken
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `token` | `str` | The original bearer token |
+| `claims` | `dict[str, Any]` | User info dictionary |
+| `scopes` | `list[str]` | Permission list (default: `[]`) |
+
+### claims
+
+Store any user information you need in your tools:
+
+```python
+AccessToken(
+    token=token,
+    claims={
+        "sub": "user-123",           # User ID
+        "email": "alice@example.com",
+        "name": "Alice",
+        "plan": "pro",               # Custom fields
+    },
+)
+```
+
+Access in tools via `token.claims.get("email")`.
+
+### scopes
+
+Use for permission checks in your tools:
+
+```python
+AccessToken(
+    token=token,
+    claims={"email": "alice@example.com"},
+    scopes=["read", "write", "admin"],
+)
+```
+
+Check in tools via `"admin" in token.scopes`.
+
+## Accessing Auth in Tools
+
+```python
+from mcp_use.server import get_access_token, require_auth
+
+
+@server.tool()
+def get_user_data() -> dict:
+    token = get_access_token()  # Returns None if not authenticated
+    if not token:
+        return {"error": "Not authenticated"}
+    return {"email": token.claims.get("email")}
+
+
+@server.tool()
+def admin_action() -> str:
+    token = require_auth()  # Raises ValueError if not authenticated
+    if "admin" not in token.scopes:
+        return "Admin scope required"
+    return "Done"
+```
+
+## Client Configuration
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-key"
+      }
+    }
+  }
+}
+```
+
+## HTTP Responses
+
+| Scenario | Status | Response |
+|----------|--------|----------|
+| No token | 401 | `{"error": "unauthorized", "error_description": "Authentication required"}` |
+| Invalid token | 401 | `{"error": "invalid_token", "error_description": "Token is invalid or expired"}` |
+| Valid token | 200 | Request proceeds |
+
+All 401 responses include the `WWW-Authenticate: Bearer` header.
+
+<Note>
+Only `/mcp` endpoints require authentication. Paths like `/docs`, `/inspector`, and `/health` are excluded.
+</Note>
