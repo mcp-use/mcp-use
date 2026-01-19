@@ -25,6 +25,7 @@ export interface GenerateOptions {
   plannerBaseUrl?: string;
   useToon?: boolean;
   thinking?: boolean;
+  explore?: boolean;
 }
 
 function log(message: string): void {
@@ -184,12 +185,17 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
   // Merge config generator settings with CLI options (CLI takes precedence)
   const useToon = options.useToon ?? config.generator?.useToon ?? true;
   const thinking = options.thinking ?? config.generator?.thinking ?? false;
+  const explore = options.explore ?? config.generator?.explore ?? false;
 
   log(
-    `\n🤖 Generating test plan with ${provider}:${model}${thinking ? " (thinking mode enabled)" : ""}...`
+    `\n🤖 Generating test plan with ${provider}:${model}${thinking ? " (thinking mode enabled)" : ""}${explore ? " (exploratory mode enabled)" : ""}...`
   );
-  if (useToon) {
+  if (useToon && !explore) {
     log("📦 Using TOON format for schema serialization (saves ~30-40% tokens)");
+  }
+  if (explore) {
+    log("🔍 Exploratory mode: Agent will test tools before generating plans");
+    log("⚠️  This will take longer but produce more accurate tests");
   }
   log("⏳ This may take 10-30 seconds depending on the model...\n");
 
@@ -201,6 +207,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       baseUrl: options.plannerBaseUrl,
       useToon,
       thinking,
+      explore,
+      configPath: options.config,
     });
   } catch (error) {
     if (error instanceof PlannerError) {
@@ -225,6 +233,8 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
           baseUrl: options.plannerBaseUrl,
           useToon,
           thinking,
+          explore,
+          configPath: options.config,
         });
       } catch (error) {
         if (error instanceof PlannerError) {
@@ -320,6 +330,14 @@ export function generateCommand(): Command {
     .option("--output <file>", "Output file path")
     .option("--no-toon", "Disable TOON format (use JSON instead)")
     .option("--thinking", "Enable extended thinking/reasoning mode")
+    .option(
+      "--explore",
+      "Enable exploratory mode where agent tests tools before generating plans"
+    )
+    .option(
+      "--no-explore",
+      "Disable exploratory mode (use static schema-only planning)"
+    )
     .action(async (options: GenerateOptions) => {
       try {
         await runGenerate(options);

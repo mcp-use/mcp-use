@@ -1,6 +1,7 @@
 /**
  * Escape special characters in a string for safe use in generated code.
  * Handles backslashes, quotes, newlines, template literals, etc.
+ * Only escapes double quotes since generated code uses double-quoted strings.
  *
  * @param value - String to escape
  * @returns Escaped string safe for code generation
@@ -14,7 +15,6 @@ export function escapeString(value: string): string {
   return value
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
-    .replace(/'/g, "\\'")
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
     .replace(/\t/g, "\\t")

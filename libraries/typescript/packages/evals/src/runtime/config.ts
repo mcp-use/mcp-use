@@ -37,6 +37,8 @@ export const GeneratorSettingsSchema = z.object({
   useToon: z.boolean().optional(),
   /** Enable extended thinking/reasoning mode for planner (default: false) */
   thinking: z.boolean().optional(),
+  /** Enable exploratory mode where the agent tests tools before generating plans (default: false) */
+  explore: z.boolean().optional(),
 });
 
 /**

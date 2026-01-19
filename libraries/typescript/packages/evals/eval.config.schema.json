@@ -56,6 +56,10 @@
         "thinking": {
           "type": "boolean",
           "description": "Enable extended thinking/reasoning mode for planner (default: false)"
+        },
+        "explore": {
+          "type": "boolean",
+          "description": "Enable exploratory mode where the agent tests tools before generating plans (default: false)"
         }
       }
     }

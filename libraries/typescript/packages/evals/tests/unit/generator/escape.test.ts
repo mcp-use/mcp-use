@@ -59,9 +59,9 @@ describe("escapeString", () => {
     expect(escapeString(input)).toBe(expected);
   });
 
-  it("should escape single quotes", () => {
+  it("should NOT escape single quotes (unnecessary in double-quoted strings)", () => {
     const input = "It's a test";
-    const expected = "It\\'s a test";
+    const expected = "It's a test";
     expect(escapeString(input)).toBe(expected);
   });
 
@@ -82,7 +82,7 @@ describe("escapeString", () => {
     // eslint-disable-next-line no-template-curly-in-string
     const input = "`${\"test\"}` with 'quotes' and\nnewlines";
     // eslint-disable-next-line no-template-curly-in-string
-    const expected = "\\`\\${\\\"test\\\"}\\` with \\'quotes\\' and\\nnewlines";
+    const expected = "\\`\\${\\\"test\\\"}\\` with 'quotes' and\\nnewlines";
     expect(escapeString(input)).toBe(expected);
   });
 });

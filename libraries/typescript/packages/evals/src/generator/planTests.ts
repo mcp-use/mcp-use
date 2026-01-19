@@ -188,6 +188,10 @@ export interface PlannerOptions {
   useToon?: boolean;
   /** Enable extended thinking/reasoning mode (for compatible models) */
   thinking?: boolean;
+  /** Enable exploratory mode where agent tests tools before generating plans (default: false) */
+  explore?: boolean;
+  /** Path to eval config file (required for exploratory mode) */
+  configPath?: string;
 }
 
 /**
@@ -271,6 +275,33 @@ export async function planTests(
   schemas: ServerSchema[],
   options: PlannerOptions
 ): Promise<TestPlan[]> {
+  const explore = options.explore ?? false;
+
+  // Use exploratory mode if enabled
+  if (explore) {
+    if (!options.configPath) {
+      throw new PlannerError(
+        "configPath is required when explore mode is enabled"
+      );
+    }
+
+    // Import the exploratory planner
+    const { createExploratoryTestPlan } =
+      await import("./createPlannerAgent.js");
+
+    const plans: TestPlan[] = [];
+    for (const schema of schemas) {
+      const plan = await createExploratoryTestPlan(
+        schema,
+        options.configPath,
+        options
+      );
+      plans.push(plan);
+    }
+    return plans;
+  }
+
+  // Original static schema approach
   const llm = createPlanner(options);
   const plans: TestPlan[] = [];
   const useToon = options.useToon ?? true;
