@@ -1,5 +1,66 @@
 # @mcp-use/inspector
 
+## 0.15.3
+
+### Patch Changes
+
+- Updated dependencies [b65d05d]
+  - mcp-use@1.13.5
+
+## 0.15.3-canary.0
+
+### Patch Changes
+
+- mcp-use@1.13.5-canary.0
+
+## 0.15.2
+
+### Patch Changes
+
+- Updated dependencies [dd8d07d]
+  - mcp-use@1.13.4
+
+## 0.15.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5c65df2]
+  - mcp-use@1.13.4-canary.0
+
+## 0.15.1
+
+### Patch Changes
+
+- 294d17d: feat(inspector): add localStorage clearing functionality to enhance user experience
+- 294d17d: fix(telemetry): enhance localStorage checks for availability and functionality
+- 294d17d: feat(inspector): allow urls with no protocol dafaulting to https
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - mcp-use@1.13.3
+
+## 0.15.1-canary.2
+
+### Patch Changes
+
+- b06fa78: feat(inspector): add localStorage clearing functionality to enhance user experience
+- Updated dependencies [b06fa78]
+  - mcp-use@1.13.3-canary.2
+
+## 0.15.1-canary.1
+
+### Patch Changes
+
+- c3f2ebf: feat(inspector): allow urls with no protocol dafaulting to https
+  - mcp-use@1.13.3-canary.1
+
+## 0.15.1-canary.0
+
+### Patch Changes
+
+- d446ee5: fix(telemetry): enhance localStorage checks for availability and functionality
+- Updated dependencies [d446ee5]
+  - mcp-use@1.13.3-canary.0
+
 ## 0.15.0
 
 ### Minor Changes

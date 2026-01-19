@@ -1,5 +1,76 @@
 # mcp-use
 
+## 1.13.5
+
+### Patch Changes
+
+- b65d05d: refactor(auth): improve OAuth proxy URL handling and clarify connection URL logic
+- Updated dependencies [b65d05d]
+  - @mcp-use/cli@2.10.3
+  - @mcp-use/inspector@0.15.3
+
+## 1.13.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [de5f030]
+  - @mcp-use/cli@2.10.3-canary.0
+  - @mcp-use/inspector@0.15.3-canary.0
+
+## 1.13.4
+
+### Patch Changes
+
+- dd8d07d: refactor(auth): improve OAuth proxy URL handling and clarify connection URL logic
+  - @mcp-use/cli@2.10.2
+  - @mcp-use/inspector@0.15.2
+
+## 1.13.4-canary.0
+
+### Patch Changes
+
+- 5c65df2: refactor(auth): improve OAuth proxy URL handling and clarify connection URL logic
+  - @mcp-use/cli@2.10.2-canary.0
+  - @mcp-use/inspector@0.15.2-canary.0
+
+## 1.13.3
+
+### Patch Changes
+
+- 294d17d: feat(inspector): add localStorage clearing functionality to enhance user experience
+- 294d17d: fix(telemetry): enhance localStorage checks for availability and functionality
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - @mcp-use/inspector@0.15.1
+  - @mcp-use/cli@2.10.1
+
+## 1.13.3-canary.2
+
+### Patch Changes
+
+- b06fa78: feat(inspector): add localStorage clearing functionality to enhance user experience
+- Updated dependencies [b06fa78]
+  - @mcp-use/inspector@0.15.1-canary.2
+  - @mcp-use/cli@2.10.1-canary.2
+
+## 1.13.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3f2ebf]
+  - @mcp-use/inspector@0.15.1-canary.1
+  - @mcp-use/cli@2.10.1-canary.1
+
+## 1.13.3-canary.0
+
+### Patch Changes
+
+- d446ee5: fix(telemetry): enhance localStorage checks for availability and functionality
+- Updated dependencies [d446ee5]
+  - @mcp-use/inspector@0.15.1-canary.0
+  - @mcp-use/cli@2.10.1-canary.0
+
 ## 1.13.2
 
 ### Patch Changes

@@ -238,67 +238,6 @@ Demonstrates making authenticated API calls to WorkOS:
 }
 ```
 
-## Testing with Claude Desktop
-
-1. **Build this example**:
-
-   ```bash
-   pnpm build
-   ```
-
-2. **Add to your Claude Desktop config** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
-   ```json
-   {
-     "mcpServers": {
-       "workos-oauth": {
-         "command": "node",
-         "args": [
-           "/absolute/path/to/examples/typescript/server/workos-oauth/dist/server.js"
-         ],
-         "env": {
-           "WORKOS_CLIENT_ID": "client_01KB5DRXBDDY1VGCBKY108SKJW",
-           "WORKOS_API_KEY": "sk_test_...",
-           "WORKOS_SUBDOMAIN": "imaginative-palm-54-staging"
-         }
-       }
-     }
-   }
-   ```
-
-3. **Restart Claude Desktop**
-
-4. **Use a tool**: When you first try to use a tool, Claude will prompt you to authenticate via WorkOS
-
-## Testing with MCP Inspector
-
-The MCP Inspector provides a web UI for testing OAuth flows:
-
-```bash
-# Install globally
-npm install -g @modelcontextprotocol/inspector
-
-# Run the inspector
-mcp-inspector node dist/server.js
-```
-
-Then open http://localhost:5173 in your browser.
-
-## Configuration Options
-
-### Development Mode
-
-To disable JWT verification during development (NOT RECOMMENDED for production):
-
-```typescript
-oauth: oauthWorkOSProvider({
-  subdomain: WORKOS_SUBDOMAIN,
-  clientId: WORKOS_CLIENT_ID,
-  apiKey: WORKOS_API_KEY,
-  verifyJwt: false, // ⚠️ Development only!
-});
-```
-
 ### Custom OAuth Endpoints
 
 The provider automatically configures endpoints based on your subdomain:

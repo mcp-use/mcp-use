@@ -535,8 +535,7 @@ MIT © [MCP-Use Contributors](https://github.com/mcp-use/mcp-use/graphs/contribu
 
 We love contributions! Check out our contributing guidelines:
 
-- [Python Contributing Guide](./libraries/python/CONTRIBUTING.md)
-- [TypeScript Contributing Guide](./libraries/typescript/README.md#-contributing)
+[CONTRIBUTING.md](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md)
 
 ---
 

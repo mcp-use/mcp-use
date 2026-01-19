@@ -1,5 +1,72 @@
 # @mcp-use/cli
 
+## 2.10.3
+
+### Patch Changes
+
+- b65d05d: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+- Updated dependencies [b65d05d]
+  - mcp-use@1.13.5
+  - @mcp-use/inspector@0.15.3
+
+## 2.10.3-canary.0
+
+### Patch Changes
+
+- de5f030: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+  - mcp-use@1.13.5-canary.0
+  - @mcp-use/inspector@0.15.3-canary.0
+
+## 2.10.2
+
+### Patch Changes
+
+- Updated dependencies [dd8d07d]
+  - mcp-use@1.13.4
+  - @mcp-use/inspector@0.15.2
+
+## 2.10.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5c65df2]
+  - mcp-use@1.13.4-canary.0
+  - @mcp-use/inspector@0.15.2-canary.0
+
+## 2.10.1
+
+### Patch Changes
+
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - @mcp-use/inspector@0.15.1
+  - mcp-use@1.13.3
+
+## 2.10.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b06fa78]
+  - @mcp-use/inspector@0.15.1-canary.2
+  - mcp-use@1.13.3-canary.2
+
+## 2.10.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3f2ebf]
+  - @mcp-use/inspector@0.15.1-canary.1
+  - mcp-use@1.13.3-canary.1
+
+## 2.10.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d446ee5]
+  - @mcp-use/inspector@0.15.1-canary.0
+  - mcp-use@1.13.3-canary.0
+
 ## 2.10.0
 
 ### Minor Changes

@@ -96,9 +96,10 @@ export function ServerConnectionModal({
   const handleConnect = () => {
     if (!url.trim()) return;
 
-    // Validate URL format before attempting connection
+    // Validate URL format and auto-add https:// if protocol is missing
+    let normalizedUrl = url.trim();
     try {
-      const parsedUrl = new URL(url.trim());
+      const parsedUrl = new URL(normalizedUrl);
       const isValid =
         parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
@@ -107,8 +108,23 @@ export function ServerConnectionModal({
         return;
       }
     } catch (error) {
-      toast.error("Invalid URL format. Please enter a valid URL.");
-      return;
+      // If parsing fails, try adding https:// prefix
+      try {
+        const urlWithHttps = `https://${normalizedUrl}`;
+        const parsedUrl = new URL(urlWithHttps);
+        const isValid =
+          parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+
+        if (!isValid) {
+          toast.error("Invalid URL protocol. Please use http:// or https://");
+          return;
+        }
+        // Use the normalized URL with https://
+        normalizedUrl = urlWithHttps;
+      } catch (retryError) {
+        toast.error("Invalid URL format. Please enter a valid URL.");
+        return;
+      }
     }
 
     // Prepare proxy configuration if "Via Proxy" is selected
@@ -142,7 +158,7 @@ export function ServerConnectionModal({
     const actualTransportType = "http";
 
     onConnect({
-      url,
+      url: normalizedUrl,
       name: connection?.name,
       transportType: actualTransportType,
       proxyConfig,

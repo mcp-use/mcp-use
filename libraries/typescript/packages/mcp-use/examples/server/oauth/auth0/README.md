@@ -36,6 +36,7 @@ auth0 login --scopes "read:client_grants,create:client_grants,delete:client_gran
 #### Enable Resource Parameter Compatibility Profile
 
 In the [Auth0 Dashboard](https://manage.auth0.com/dashboard/):
+
 1. Navigate to **Settings** → **Advanced**
 2. Enable **Resource Parameter Compatibility Profile** toggle
 
@@ -57,7 +58,7 @@ Create an API in Auth0 with scopes for tool access:
 
 ```bash
 auth0 api post resource-servers --data '{
-  "identifier": "http://localhost:3001/",
+  "identifier": "http://localhost:3000/",
   "name": "MCP Tools API",
   "signing_alg": "RS256",
   "token_dialect": "rfc9068_profile_authz",
@@ -83,8 +84,8 @@ auth0 roles create --name "Tool Administrator" --description "Access to all MCP 
 auth0 roles create --name "Tool User" --description "Access to basic MCP tools"
 
 # Assign permissions to roles (use role IDs from previous commands)
-auth0 roles permissions add YOUR_ADMIN_ROLE_ID --api-id "http://localhost:3001/" --permissions "tool:whoami,tool:greet"
-auth0 roles permissions add YOUR_USER_ROLE_ID --api-id "http://localhost:3001/" --permissions "tool:whoami"
+auth0 roles permissions add YOUR_ADMIN_ROLE_ID --api-id "http://localhost:3000/" --permissions "tool:whoami,tool:greet"
+auth0 roles permissions add YOUR_USER_ROLE_ID --api-id "http://localhost:3000/" --permissions "tool:whoami"
 
 # Assign roles to users
 auth0 users search --query "email:\"user@example.com\""
@@ -101,13 +102,13 @@ DOMAIN=$(auth0 tenants list --json | jq -r '.[] | select(.active == true) | .nam
 export MCP_USE_OAUTH_AUTH0_DOMAIN="${DOMAIN}"
 
 # Required: API audience (must match the API identifier above)
-export MCP_USE_OAUTH_AUTH0_AUDIENCE="http://localhost:3001/"
+export MCP_USE_OAUTH_AUTH0_AUDIENCE="http://localhost:3000/"
 
-# Optional: Server port (defaults to 3001)
-export PORT=3001
+# Optional: Server port (defaults to 3000)
+export PORT=3000
 
 # Optional: Base URL for OAuth redirects
-export BASE_URL="http://localhost:3001"
+export BASE_URL="http://localhost:3000"
 
 # Optional: Enable/disable JWT verification (defaults to true)
 export VERIFY_JWT=true
@@ -132,15 +133,16 @@ yarn dev
 ```
 
 This will start:
-- MCP server on port **3001**
-- MCP Inspector at http://localhost:3001/inspector
+
+- MCP server on port **3000**
+- MCP Inspector at http://localhost:3000/inspector
 
 ## Usage
 
 ### Testing with MCP Inspector
 
-1. Open http://localhost:3001/inspector
-2. Connect to the MCP server at `http://localhost:3001/mcp`
+1. Open http://localhost:3000/inspector
+2. Connect to the MCP server at `http://localhost:3000/mcp`
 3. You'll be prompted to authenticate via OAuth
 4. Complete the Auth0 login flow
 5. Once authenticated, try the available tools based on your permissions:
@@ -165,10 +167,10 @@ The server implements the complete OAuth 2.1 flow:
 
 ### OAuth Endpoints
 
-- **Authorization**: `http://localhost:3001/authorize`
-- **Token Exchange**: `http://localhost:3001/token`
-- **Server Metadata**: `http://localhost:3001/.well-known/oauth-authorization-server`
-- **Resource Metadata**: `http://localhost:3001/.well-known/oauth-protected-resource/mcp`
+- **Authorization**: `http://localhost:3000/authorize`
+- **Token Exchange**: `http://localhost:3000/token`
+- **Server Metadata**: `http://localhost:3000/.well-known/oauth-authorization-server`
+- **Resource Metadata**: `http://localhost:3000/.well-known/oauth-protected-resource/mcp`
 
 ## Available Tools
 
@@ -184,7 +186,7 @@ Validates the current access token and displays its claims including permissions
   "valid": true,
   "issuer": "https://your-tenant.us.auth0.com/",
   "subject": "auth0|123456789",
-  "audience": "http://localhost:3001/",
+  "audience": "http://localhost:3000/",
   "permissions": ["tool:whoami", "tool:greet"],
   "expiresAt": "2024-01-01T12:00:00.000Z",
   "expiresInSeconds": 3600,
@@ -222,6 +224,7 @@ Fetches the complete user profile from Auth0's userinfo endpoint using the acces
 Returns a personalized greeting based on the authenticated user.
 
 **Parameters**:
+
 - `style` (optional): "formal", "casual", or "enthusiastic"
 
 ## Project Structure
@@ -308,7 +311,7 @@ auth0 api patch resource-servers/YOUR_API_ID --data '{
 2. Assign the scope to roles:
 
 ```bash
-auth0 roles permissions add ROLE_ID --api-id "http://localhost:3001/" --permissions "tool:custom"
+auth0 roles permissions add ROLE_ID --api-id "http://localhost:3000/" --permissions "tool:custom"
 ```
 
 3. Add permission check in your tool:
@@ -320,7 +323,10 @@ server.tool({
   cb: async (_args: any, context: any) => {
     const payload = context?.get?.("payload");
     if (!hasPermissions(payload, ["tool:custom"])) {
-      return { content: [{ type: "text", text: "Insufficient permissions" }], isError: true };
+      return {
+        content: [{ type: "text", text: "Insufficient permissions" }],
+        isError: true,
+      };
     }
     // ... tool implementation
   },
@@ -334,7 +340,7 @@ Implement refresh token handling for long-lived sessions:
 ```typescript
 server.post("/token", async (c) => {
   const body = await c.req.parseBody();
-  
+
   if (body.grant_type === "refresh_token") {
     // Forward refresh token request to Auth0
   }
@@ -376,6 +382,7 @@ export VERIFY_JWT=false
 ### "JWT verification failed"
 
 Common causes:
+
 - **Wrong audience**: Ensure `MCP_USE_OAUTH_AUTH0_AUDIENCE` matches your API identifier exactly (including trailing slash)
 - **Wrong issuer**: Verify `MCP_USE_OAUTH_AUTH0_DOMAIN` is correct (without `https://` prefix)
 - **Expired token**: Access tokens expire after a configured time (default 1 hour)
@@ -384,6 +391,7 @@ Common causes:
 ### "Insufficient permissions"
 
 The user's token doesn't have the required scope:
+
 1. Check token permissions: Call the `verify-token` tool
 2. Verify the scope is defined in your Auth0 API
 3. Ensure the user's role includes the required permission
@@ -392,6 +400,7 @@ The user's token doesn't have the required scope:
 ### "Invalid Authorization header"
 
 Ensure the client is sending the token in the correct format:
+
 ```
 Authorization: Bearer <access_token>
 ```
@@ -399,13 +408,15 @@ Authorization: Bearer <access_token>
 ### "Token expired"
 
 Access tokens have a limited lifetime. Solutions:
+
 - Implement refresh token flow
 - Re-authenticate the user
 - Adjust token lifetime in Auth0 dashboard (not recommended for security)
 
 ### Port Already in Use
 
-If port 3001 is in use, change it:
+If port 3000 is in use, change it:
+
 ```bash
 export PORT=3002
 ```
@@ -422,11 +433,13 @@ server.use("*", cors());
 ## Learn More
 
 ### Auth0 MCP Documentation
+
 - [Authorization for Your MCP Server](https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server) - Official setup guide
 - [Call Your APIs on a User's Behalf](https://auth0.com/ai/docs/mcp/get-started/call-your-apis-on-users-behalf) - Custom token exchange
 - [Testing Your MCP Server](https://auth0.com/ai/docs/mcp/guides/test-your-mcp-server-with-mcp-inspector) - Testing guide
 
 ### General Documentation
+
 - [Auth0 Documentation](https://auth0.com/docs)
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [RFC 9068: JWT Profile for OAuth 2.0 Access Tokens](https://datatracker.ietf.org/doc/html/rfc9068)
@@ -435,10 +448,10 @@ server.use("*", cors());
 - [PKCE Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce)
 
 ### Sample Applications
+
 - [auth0-task-vantage](https://github.com/auth0-samples/auth0-task-vantage) - Full-featured Auth0 MCP example
 - [auth0-ai-samples](https://github.com/auth0-samples/auth0-ai-samples) - Official Auth0 AI/MCP samples
 
 ## License
 
 MIT
-
