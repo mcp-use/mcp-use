@@ -1,0 +1,76 @@
+---
+title: "Models"
+description: "Authentication models for mcp-use server API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/auth/models.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/auth/models.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/auth/models.py</a>
+</Callout>
+
+Authentication models for mcp-use server.
+
+## AccessToken
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> AccessToken</div>
+
+Validated access token with user claims.
+
+    Attributes:
+        token: The original bearer token
+        claims: User information (email, sub, name, etc.)
+        scopes: Optional list of permissions/scopes
+
+    Example:
+        ```python
+        from mcp_use.server import get_access_token
+
+        @server.tool()
+        def whoami() -> str:
+            token = get_access_token()
+            if token:
+                return f"Hello \{token.claims.get('email')\}"
+            return "Not authenticated"
+        ```
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.auth.models import AccessToken
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="token" type="str" required="True" >   String value </ParamField>
+<ParamField body="claims" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+<ParamField body="scopes" type="list[str]" required="True" >   List of items </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+Create a new model by parsing and validating input data from keyword arguments.
+
+        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+        validated to form a valid model.
+
+        `self` is explicitly positional-only to allow `self` as a field name.
+
+**Parameters**
+><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(data: Any):
+```
+
+</Card>
+</div>
