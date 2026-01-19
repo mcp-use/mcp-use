@@ -464,10 +464,10 @@ export function ResourcesTab({
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel defaultSize={25}>
         <ResizablePanelGroup
-          direction="vertical"
+          orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
@@ -572,7 +572,7 @@ export function ResourcesTab({
       <ResizableHandle />
 
       <ResizablePanel defaultSize={50}>
-        <ResizablePanelGroup direction="vertical">
+        <ResizablePanelGroup orientation="vertical">
           <ResizablePanel defaultSize={70}>
             <div
               ref={resourceDisplayRef}

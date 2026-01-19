@@ -899,7 +899,7 @@ export function ToolsTab({
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel
         ref={leftPanelRef}
         defaultSize={33}
@@ -907,7 +907,7 @@ export function ToolsTab({
         className="flex flex-col h-full relative"
       >
         <ResizablePanelGroup
-          direction="vertical"
+          orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
@@ -1031,7 +1031,7 @@ export function ToolsTab({
       <ResizableHandle withHandle />
 
       <ResizablePanel defaultSize={67}>
-        <ResizablePanelGroup direction="vertical">
+        <ResizablePanelGroup orientation="vertical">
           <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
             <ToolExecutionPanel
               selectedTool={selectedTool}
