@@ -1,6 +1,6 @@
 export { PROMPTS } from "./prompts/index.js";
 export { BaseAgent } from "./base.js";
-export { MCPAgent } from "./mcp_agent.js";
+export { MCPAgent, type AgentStep } from "./mcp_agent.js";
 export { RemoteAgent } from "./remote.js";
 export type {
   BaseMessage,

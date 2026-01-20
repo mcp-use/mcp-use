@@ -1,0 +1,37 @@
+{
+  "default": {
+    "runAgent": "gpt",
+    "judgeAgent": "gpt"
+  },
+  "agents": {
+    "gpt": {
+      "provider": "openai",
+      "model": "gpt-5.2"
+    },
+    "claude": {
+      "provider": "anthropic",
+      "model": "claude-3-5-sonnet-20241022"
+    }
+  },
+  "servers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    },
+    "example-http": {
+      "type": "http",
+      "url": "https://your-mcp-server.com/mcp"
+    }
+  },
+  "defaults": {
+    "timeout": 30000,
+    "retries": 0,
+    "serverLifecycle": "suite",
+    "additionalInstructions": "IMPORTANT: Only use tools when the user explicitly requests an action or needs to retrieve specific data. Do not use tools for general questions or hypothetical scenarios. If you're unsure whether a tool is needed, ask for clarification rather than making assumptions."
+  },
+  "generator": {
+    "useToon": true,
+    "thinking": false
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcp-use.dev/schemas/eval.config.schema.json",
+  "title": "mcp-use eval configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["default", "agents", "servers", "defaults"],
+  "properties": {
+    "default": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runAgent", "judgeAgent"],
+      "properties": {
+        "runAgent": { "type": "string", "minLength": 1 },
+        "judgeAgent": { "type": "string", "minLength": 1 }
+      }
+    },
+    "agents": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "model"],
+        "properties": {
+          "provider": { "type": "string", "minLength": 1 },
+          "model": { "type": "string", "minLength": 1 },
+          "baseUrl": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "servers": {
+      "type": "object",
+      "description": "Server definitions compatible with mcp-use MCPClient server configs.",
+      "additionalProperties": true
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timeout", "retries", "serverLifecycle"],
+      "properties": {
+        "timeout": { "type": "integer", "minimum": 0 },
+        "retries": { "type": "integer", "minimum": 0 },
+        "serverLifecycle": { "type": "string", "enum": ["suite", "test"] },
+        "additionalInstructions": { "type": "string" }
+      }
+    },
+    "generator": {
+      "type": "object",
+      "description": "Settings for eval test generation",
+      "additionalProperties": false,
+      "properties": {
+        "useToon": {
+          "type": "boolean",
+          "description": "Use TOON format for schema serialization (default: true)"
+        },
+        "thinking": {
+          "type": "boolean",
+          "description": "Enable extended thinking/reasoning mode for planner (default: false)"
+        },
+        "explore": {
+          "type": "boolean",
+          "description": "Enable exploratory mode where the agent tests tools before generating plans (default: false)"
+        }
+      }
+    }
+  }
+}
