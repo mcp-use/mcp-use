@@ -167,6 +167,7 @@ This command will create a new MCP server with:
 - A complete TypeScript MCP server project structure.
 - Example MCP Tools and Resources to get you started.
 - Example UI Widgets React components in `resources/` folder exposed as tools and resources in Apps SDK for ChatGPT and MCP-UI format.
+- Pre-configured server metadata (title, icons, websiteUrl) with your project name.
 - Hot Module Reloading (HMR) - modify tools/prompts/resources without restarting or dropping connections.
 - Automatically launches an MCP Inspector in your browser to test your server.
 
@@ -178,7 +179,10 @@ After creation, your project will have this structure:
 my-mcp-server/
 ├── resources/
 │   └── component.tsx  # React widgets for Apps SDK and MCP-UI
-├── index.ts           # MCP server entry point, you can add tools and rest endpoints here
+├── public/            # Static assets (icons, favicon, etc.)
+│   ├── icon.svg       # Server icon (mcp-use branding by default)
+│   └── favicon.ico    # Browser favicon
+├── index.ts           # MCP server entry point with serverInfo configured
 ├── package.json
 ├── tsconfig.json
 └── README.md

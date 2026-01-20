@@ -1051,11 +1051,29 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.serverBaseUrl = config.baseUrl;
     this.favicon = config.favicon;
 
+    // Helper to convert relative icon paths to absolute URLs
+    const processIconUrls = (
+      icons: ServerConfig["icons"],
+      baseUrl?: string
+    ) => {
+      if (!icons || !baseUrl) return icons;
+      return icons.map((icon) => ({
+        ...icon,
+        src: icon.src.startsWith("http")
+          ? icon.src
+          : `${baseUrl}/mcp-use/public/${icon.src}`,
+      }));
+    };
+
     // Create native SDK server instance with capabilities
     this.nativeServer = new OfficialMcpServer(
       {
         name: config.name,
         version: config.version,
+        description: config.description,
+        title: config.title,
+        websiteUrl: config.websiteUrl,
+        icons: processIconUrls(config.icons, config.baseUrl),
       },
       {
         capabilities: {
@@ -1258,10 +1276,28 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param sessionId - Optional session ID to store registered refs for hot reload support
    */
   public getServerForSession(sessionId?: string): OfficialMcpServer {
+    // Helper to convert relative icon paths to absolute URLs
+    const processIconUrls = (
+      icons: ServerConfig["icons"],
+      baseUrl?: string
+    ) => {
+      if (!icons || !baseUrl) return icons;
+      return icons.map((icon) => ({
+        ...icon,
+        src: icon.src.startsWith("http")
+          ? icon.src
+          : `${baseUrl}/mcp-use/public/${icon.src}`,
+      }));
+    };
+
     const newServer = new OfficialMcpServer(
       {
         name: this.config.name,
         version: this.config.version,
+        description: this.config.description,
+        title: this.config.title,
+        websiteUrl: this.config.websiteUrl,
+        icons: processIconUrls(this.config.icons, this.serverBaseUrl),
       },
       {
         capabilities: {

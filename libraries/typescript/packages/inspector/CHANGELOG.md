@@ -1,5 +1,23 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.1
+
+### Patch Changes
+
+- 199199d: feat(inspector): add copy functionality for RPC messages in Prompts, Resources, and Tools tabs
+  - mcp-use@1.14.0-canary.1
+
+## 0.16.0-canary.0
+
+### Minor Changes
+
+- 53fdb48: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+
+### Patch Changes
+
+- Updated dependencies [53fdb48]
+  - mcp-use@1.14.0-canary.0
+
 ## 0.15.3
 
 ### Patch Changes

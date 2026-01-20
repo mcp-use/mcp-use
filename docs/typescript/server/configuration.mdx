@@ -19,10 +19,20 @@ import { MCPServer } from 'mcp-use/server'
 
 const server = new MCPServer({
   name: 'my-server',
+  title: 'My Server', // display name - shown in Inspector and MCP clients
   version: '1.0.0',              // Semantic version
   description: 'Server purpose',  // Human-readable description
   host: 'localhost',             // Hostname (defaults to 'localhost')
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // MCP Server production URL (needed for UI Widgets to work correctly)
+  websiteUrl: 'https://mcp-use.com', // Website URL (can be customized)
+  favicon: 'favicon.ico',        // Favicon relative to public/ folder
+  icons: [                       // Server icons for branding
+    {
+      src: 'icon.svg',           // Relative paths converted to absolute URLs
+      mimeType: 'image/svg+xml',
+      sizes: ['512x512']
+    }
+  ],
   allowedOrigins: process.env.NODE_ENV === 'production' 
     ? ['https://myapp.com']      // Production: explicit origins
     : undefined,                 // Development: allows all origins
@@ -30,6 +40,8 @@ const server = new MCPServer({
   autoCreateSessionOnInvalidId: true  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 })
 ```
+
+**Note:** When using `create-mcp-use-app`, these metadata fields (title, websiteUrl, favicon, icons) are automatically configured with your project name and mcp-use branding.
 
 ### Environment Variables
 

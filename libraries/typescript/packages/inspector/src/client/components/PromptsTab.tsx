@@ -10,7 +10,7 @@ import { useInspector } from "@/client/context/InspectorContext";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, Copy, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -90,8 +90,9 @@ export function PromptsTab({
   const [isMaximized, setIsMaximized] = useState(false);
   const rpcPanelRef = usePanelRef();
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const leftPanelRef = usePanelRef();
-  const promptParamsPanelRef = usePanelRef();
+  const exportRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
+  const leftPanelRef = useRef<ImperativePanelHandle>(null);
+  const topPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -743,30 +744,47 @@ export function PromptsTab({
                 }
               }}
             >
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-medium">RPC Messages</h3>
-                {rpcMessageCount > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
-                  >
-                    {rpcMessageCount}
-                  </Badge>
-                )}
+              <div className="flex items-center justify-between gap-2 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium">RPC Messages</h3>
+                  {rpcMessageCount > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
+                    >
+                      {rpcMessageCount}
+                    </Badge>
+                  )}
+                </div>
                 {rpcMessageCount > 0 && !rpcPanelCollapsed && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      clearRpcMessagesRef.current?.();
-                    }}
-                    className="h-6 w-6 p-0"
-                    title="Clear all messages"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        exportRpcMessagesRef.current?.();
+                      }}
+                      className="h-6 w-6 p-0"
+                      title="Copy all messages to clipboard"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        clearRpcMessagesRef.current?.();
+                      }}
+                      className="h-6 w-6 p-0"
+                      title="Clear all messages"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 )}
               </div>
               <ChevronDown
@@ -782,6 +800,7 @@ export function PromptsTab({
                 serverIds={[serverId]}
                 onCountChange={setRpcMessageCount}
                 onClearRef={clearRpcMessagesRef}
+                onExportRef={exportRpcMessagesRef}
               />
             </div>
           </ResizablePanel>
