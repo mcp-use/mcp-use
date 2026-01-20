@@ -175,9 +175,10 @@ class BaseAdapter(Generic[T], ABC):
             mcp_resource: The MCP resource
 
         Returns:
-            Sanitized tool name in format 'resource_{name}'
+            Sanitized tool name in format 'resource_{name}' or 'resource_{uri}' if name is None
         """
-        return self.sanitize_tool_name(f"resource_{mcp_resource.name}")
+        resource_name = mcp_resource.name or f"resource_{mcp_resource.uri}"
+        return self.sanitize_tool_name(resource_name)
 
     def parse_result(self, tool_result: Any) -> str:
         """Parse the result from any MCP operation (tool, resource, or prompt) into a string.
