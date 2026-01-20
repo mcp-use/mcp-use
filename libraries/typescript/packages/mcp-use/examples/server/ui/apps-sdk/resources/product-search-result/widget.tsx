@@ -44,7 +44,7 @@ const ProductSearchResult: React.FC = () => {
               <h5 className="text-secondary mb-1">Apps SDK Template</h5>
               <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
               <p className="text-md">
-                Start building your ChatGPT widget this this mcp-use template.
+                Start building your ChatGPT widget with this mcp-use template.
                 It features the openai apps sdk ui components, dark/light theme
                 support, actions like callTool and sendFollowUpMessage, and
                 more.
