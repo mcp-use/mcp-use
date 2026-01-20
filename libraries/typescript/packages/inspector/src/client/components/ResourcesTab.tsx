@@ -1,4 +1,3 @@
-import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import {
   ResizableHandle,
@@ -9,7 +8,7 @@ import { useInspector } from "@/client/context/InspectorContext";
 import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronLeft, Copy, Trash2 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -18,14 +17,13 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ImperativePanelHandle } from "react-resizable-panels";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import type { ResourceResult } from "./resources";
 import {
   ResourceResultDisplay,
   ResourcesList,
   ResourcesTabHeader,
 } from "./resources";
+import { RpcPanel } from "./shared";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -75,11 +73,6 @@ export function ResourcesTab({
   const resourceDisplayRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
-  const [rpcMessageCount, setRpcMessageCount] = useState(0);
-  const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
-  const rpcPanelRef = useRef<ImperativePanelHandle>(null);
-  const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const exportRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Detect mobile screen size
   useEffect(() => {
@@ -465,13 +458,13 @@ export function ResourcesTab({
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
-      <ResizablePanel defaultSize={25}>
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
+      <ResizablePanel defaultSize="33%">
         <ResizablePanelGroup
-          direction="vertical"
+          orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
+          <ResizablePanel minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
               <ResourcesTabHeader
                 activeTab={activeTab}
@@ -498,120 +491,30 @@ export function ResourcesTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel
-            ref={rpcPanelRef}
-            defaultSize={0}
-            collapsible
-            minSize={5}
-            collapsedSize={5}
-            style={{
-              minHeight: 45,
-            }}
-            onCollapse={() => setRpcPanelCollapsed(true)}
-            onExpand={() => setRpcPanelCollapsed(false)}
-            className="flex flex-col border-t dark:border-zinc-700"
-          >
-            <div
-              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (rpcPanelCollapsed) {
-                  rpcPanelRef.current?.resize(25);
-                  setRpcPanelCollapsed(false);
-                } else {
-                  rpcPanelRef.current?.resize(5);
-                  setRpcPanelCollapsed(true);
-                }
-              }}
-            >
-              <div className="flex items-center justify-between gap-2 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-medium">RPC Messages</h3>
-                  {rpcMessageCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
-                    >
-                      {rpcMessageCount}
-                    </Badge>
-                  )}
-                </div>
-                {rpcMessageCount > 0 && !rpcPanelCollapsed && (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        exportRpcMessagesRef.current?.();
-                      }}
-                      className="h-6 w-6 p-0"
-                      title="Copy all messages to clipboard"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        clearRpcMessagesRef.current?.();
-                      }}
-                      className="h-6 w-6 p-0"
-                      title="Clear all messages"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  rpcPanelCollapsed ? "" : "rotate-180"
-                }`}
-              />
-            </div>
-            <div
-              className={`flex-1 overflow-hidden min-h-0 ${rpcPanelCollapsed ? "hidden" : ""}`}
-            >
-              <JsonRpcLoggerView
-                serverIds={[serverId]}
-                onCountChange={setRpcMessageCount}
-                onClearRef={clearRpcMessagesRef}
-                onExportRef={exportRpcMessagesRef}
-              />
-            </div>
-          </ResizablePanel>
+          <RpcPanel serverId={serverId} />
         </ResizablePanelGroup>
       </ResizablePanel>
 
       <ResizableHandle />
 
-      <ResizablePanel defaultSize={50}>
-        <ResizablePanelGroup direction="vertical">
-          <ResizablePanel defaultSize={70}>
-            <div
-              ref={resourceDisplayRef}
-              className="h-full bg-white dark:bg-zinc-900"
-            >
-              <ResourceResultDisplay
-                result={currentResult}
-                isLoading={isLoading}
-                previewMode={previewMode}
-                serverId={serverId}
-                readResource={readResource}
-                onTogglePreview={() => setPreviewMode(!previewMode)}
-                onCopy={handleCopy}
-                onDownload={handleDownload}
-                onFullscreen={handleFullscreen}
-                isCopied={isCopied}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+      <ResizablePanel defaultSize="67%">
+        <div
+          ref={resourceDisplayRef}
+          className="h-full bg-white dark:bg-zinc-900"
+        >
+          <ResourceResultDisplay
+            result={currentResult}
+            isLoading={isLoading}
+            previewMode={previewMode}
+            serverId={serverId}
+            readResource={readResource}
+            onTogglePreview={() => setPreviewMode(!previewMode)}
+            onCopy={handleCopy}
+            onDownload={handleDownload}
+            onFullscreen={handleFullscreen}
+            isCopied={isCopied}
+          />
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   );

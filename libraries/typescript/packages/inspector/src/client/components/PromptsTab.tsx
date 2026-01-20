@@ -1,15 +1,15 @@
-import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronLeft, Copy, Trash2 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -18,8 +18,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ImperativePanelHandle } from "react-resizable-panels";
-import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import type { PromptResult, SavedPrompt } from "./prompts";
 import {
   PromptExecutionPanel,
@@ -28,6 +26,7 @@ import {
   PromptsTabHeader,
   SavedPromptsList,
 } from "./prompts";
+import { RpcPanel } from "./shared";
 
 export interface PromptsTabRef {
   focusSearch: () => void;
@@ -85,15 +84,10 @@ export function PromptsTab({
   const [mobileView, setMobileView] = useState<"list" | "detail" | "response">(
     "list"
   );
-  const [rpcMessageCount, setRpcMessageCount] = useState(0);
-  const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
   const [isMaximized, setIsMaximized] = useState(false);
-  const rpcPanelRef = useRef<ImperativePanelHandle>(null);
-  const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const exportRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
-  const topPanelRef = useRef<ImperativePanelHandle>(null);
 
+  const leftPanelRef = usePanelRef();
+  const toolParamsPanelRef = usePanelRef();
   // Detect mobile screen size
   useEffect(() => {
     const checkMobile = () => {
@@ -475,25 +469,25 @@ export function PromptsTab({
 
   const handleMaximize = useCallback(() => {
     if (!isMaximized) {
-      // Maximize: collapse left panel and top panel
+      // Maximize: collapse left panel and prompt params panel
       if (leftPanelRef.current) {
         leftPanelRef.current.collapse();
       }
-      if (topPanelRef.current) {
-        topPanelRef.current.collapse();
+      if (toolParamsPanelRef.current) {
+        toolParamsPanelRef.current.collapse();
       }
       setIsMaximized(true);
     } else {
-      // Restore: expand left panel and top panel
+      // Restore: expand left panel and prompt params panel
       if (leftPanelRef.current) {
         leftPanelRef.current.expand();
       }
-      if (topPanelRef.current) {
-        topPanelRef.current.expand();
+      if (toolParamsPanelRef.current) {
+        toolParamsPanelRef.current.expand();
       }
       setIsMaximized(false);
     }
-  }, [isMaximized]);
+  }, [isMaximized, leftPanelRef, toolParamsPanelRef]);
 
   const openSaveDialog = useCallback(() => {
     if (!selectedPrompt) return;
@@ -664,18 +658,19 @@ export function PromptsTab({
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel
-        ref={leftPanelRef}
-        defaultSize={33}
+        id="left-panel"
+        panelRef={leftPanelRef}
+        defaultSize="33%"
         collapsible
         className="flex flex-col h-full relative"
       >
         <ResizablePanelGroup
-          direction="vertical"
+          orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
+          <ResizablePanel defaultSize="75%" minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
               <PromptsTabHeader
                 activeTab={activeTab}
@@ -715,101 +710,19 @@ export function PromptsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel
-            ref={rpcPanelRef}
-            defaultSize={0}
-            collapsible
-            minSize={5}
-            collapsedSize={5}
-            style={{
-              minHeight: 45,
-            }}
-            onCollapse={() => setRpcPanelCollapsed(true)}
-            onExpand={() => setRpcPanelCollapsed(false)}
-            className="flex flex-col border-t dark:border-zinc-700"
-          >
-            <div
-              className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (rpcPanelCollapsed) {
-                  rpcPanelRef.current?.resize(25);
-                  setRpcPanelCollapsed(false);
-                } else {
-                  rpcPanelRef.current?.resize(5);
-                  setRpcPanelCollapsed(true);
-                }
-              }}
-            >
-              <div className="flex items-center justify-between gap-2 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-medium">RPC Messages</h3>
-                  {rpcMessageCount > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
-                    >
-                      {rpcMessageCount}
-                    </Badge>
-                  )}
-                </div>
-                {rpcMessageCount > 0 && !rpcPanelCollapsed && (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        exportRpcMessagesRef.current?.();
-                      }}
-                      className="h-6 w-6 p-0"
-                      title="Copy all messages to clipboard"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        clearRpcMessagesRef.current?.();
-                      }}
-                      className="h-6 w-6 p-0"
-                      title="Clear all messages"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${
-                  !rpcPanelCollapsed ? "" : "rotate-180"
-                }`}
-              />
-            </div>
-            <div
-              className={`flex-1 overflow-hidden min-h-0 ${rpcPanelCollapsed ? "hidden" : ""}`}
-            >
-              <JsonRpcLoggerView
-                serverIds={[serverId]}
-                onCountChange={setRpcMessageCount}
-                onClearRef={clearRpcMessagesRef}
-                onExportRef={exportRpcMessagesRef}
-              />
-            </div>
-          </ResizablePanel>
+          <RpcPanel serverId={serverId} />
         </ResizablePanelGroup>
       </ResizablePanel>
 
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize={67}>
-        <ResizablePanelGroup direction="vertical">
-          <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
+      <ResizablePanel defaultSize="67%">
+        <ResizablePanelGroup orientation="vertical">
+          <ResizablePanel
+            panelRef={toolParamsPanelRef}
+            defaultSize="40%"
+            collapsible
+          >
             <PromptExecutionPanel
               selectedPrompt={selectedPrompt}
               promptArgs={promptArgs}
@@ -823,7 +736,7 @@ export function PromptsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={50}>
+          <ResizablePanel defaultSize="60%">
             <div className="flex flex-col h-full">
               <PromptResultDisplay
                 results={results}

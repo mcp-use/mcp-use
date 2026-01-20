@@ -347,11 +347,16 @@ export function InspectorDashboard() {
         );
       }
 
-      // Extract customHeaders from stored config (which has the original proxyConfig)
+      // Extract headers from stored config (which has the original proxyConfig)
+      // Check both 'headers' and 'customHeaders' for backwards compatibility
       const customHeaders =
+        storedConfig?.proxyConfig?.headers ||
         storedConfig?.proxyConfig?.customHeaders ||
+        storedConfig?.headers ||
         storedConfig?.customHeaders ||
+        connection.proxyConfig?.headers ||
         connection.proxyConfig?.customHeaders ||
+        connection.headers ||
         connection.customHeaders ||
         {};
 

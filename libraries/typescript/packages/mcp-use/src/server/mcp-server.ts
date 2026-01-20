@@ -30,7 +30,7 @@ import {
   toolRegistration,
 } from "./tools/index.js";
 import { mountWidgets, uiResourceRegistration } from "./widgets/index.js";
-import { slugifyWidgetName } from "./widgets/widget-helpers.js";
+import { generateWidgetUri } from "./widgets/widget-helpers.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -97,6 +97,17 @@ import {
   rewriteSupabaseRequest,
   startServer,
 } from "./utils/index.js";
+
+/**
+ * Validates that a key is safe to use as a property name to prevent prototype pollution.
+ * Returns true if the key is safe, false if it could lead to prototype pollution.
+ *
+ * @param key - The property key to validate
+ * @returns true if the key is safe to use, false otherwise
+ */
+function isSafePropertyKey(key: string): boolean {
+  return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+}
 
 /**
  * MCP Server class
@@ -372,6 +383,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @internal
    */
   public addWidgetTool(toolDefinition: any, toolCallback: any): void {
+    // Guard against prototype pollution
+    if (!isSafePropertyKey(toolDefinition.name)) {
+      console.warn(
+        `[MCP-Server] Rejected potentially malicious tool name: ${toolDefinition.name}`
+      );
+      return;
+    }
+
     console.log(
       `[MCP-Server] Adding widget tool directly to sessions: ${toolDefinition.name}`
     );
@@ -380,16 +399,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     (this.tool as any)(toolDefinition, toolCallback);
 
     const widgetName = toolDefinition.name;
-    const buildIdPart = this.buildId ? `-${this.buildId}` : "";
-
-    // Slugify widget name for URI compliance (RFC 3986)
-    const slugifiedName = slugifyWidgetName(widgetName);
 
     // Get resource registrations for this widget
     // Resources are stored with key format "name:uri"
-    // URIs use slugified names to ensure RFC 3986 compliance
-    const resourceUri = `ui://widget/${slugifiedName}${buildIdPart}.html`;
-    const resourceTemplateUri = `ui://widget/${slugifiedName}${buildIdPart}-{id}.html`;
+    const resourceUri = generateWidgetUri(widgetName, this.buildId, ".html");
+    const resourceTemplateUri = generateWidgetUri(
+      widgetName,
+      this.buildId,
+      ".html",
+      "{id}"
+    );
     const resourceKey = `${widgetName}:${resourceUri}`;
     const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
     const resourceReg = this.registrations.resources.get(resourceKey);
@@ -453,6 +472,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           this.enabled = true;
         },
         remove: () => {
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(toolDefinition.name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious tool name in remove: ${toolDefinition.name}`
+            );
+            return;
+          }
           delete nativeServer._registeredTools[toolDefinition.name];
         },
         update: function (this: any, updates: Record<string, unknown>) {
@@ -579,6 +605,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       _meta?: Record<string, unknown>;
     }
   ): void {
+    // Guard against prototype pollution
+    if (!isSafePropertyKey(toolName)) {
+      console.warn(
+        `[MCP-Server] Rejected potentially malicious tool name: ${toolName}`
+      );
+      return;
+    }
+
     // Convert Zod schema to input schema if provided
     let inputSchema: Record<string, unknown> | undefined;
     if ("schema" in updates) {
@@ -655,17 +689,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @internal
    */
   public removeWidgetTool(toolName: string): void {
-    // Slugify widget name for URI compliance (RFC 3986)
-    const slugifiedName = slugifyWidgetName(toolName);
-    const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+    // Guard against prototype pollution
+    if (!isSafePropertyKey(toolName)) {
+      console.warn(
+        `[MCP-Server] Rejected potentially malicious tool name: ${toolName}`
+      );
+      return;
+    }
 
     // Remove from widget definitions
     this.widgetDefinitions.delete(toolName);
 
     // Remove from our wrapper's registrations
-    // Resources are keyed as "name:uri" where URI uses slugified name
-    const resourceUri = `ui://widget/${slugifiedName}${buildIdPart}.html`;
-    const resourceTemplateUri = `ui://widget/${slugifiedName}${buildIdPart}-{id}.html`;
+    // Resources are keyed as "name:uri"
+    const resourceUri = generateWidgetUri(toolName, this.buildId, ".html");
+    const resourceTemplateUri = generateWidgetUri(
+      toolName,
+      this.buildId,
+      ".html",
+      "{id}"
+    );
     this.registrations.tools.delete(toolName);
     this.registrations.resources.delete(`${toolName}:${resourceUri}`);
     this.registrations.resourceTemplates.delete(
@@ -788,6 +831,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           this.enabled = true;
         },
         remove: () => {
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious tool name in remove: ${name}`
+            );
+            return;
+          }
           delete nativeServer._registeredTools[name];
         },
         update: function (
@@ -809,6 +859,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.tools,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious tool name: ${name}`
+            );
+            return null;
+          }
           const nativeServer = session.server as any;
           const toolEntry = createToolEntry(
             name,
@@ -827,6 +884,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious tool name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Rebuild _registeredTools object with new name in same position
@@ -866,6 +930,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious tool name: ${key}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Update in place to preserve order
@@ -919,6 +990,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.prompts,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious prompt name: ${name}`
+            );
+            return null;
+          }
           return registerPromptOnSession(
             session.server,
             name,
@@ -934,6 +1012,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious prompt name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Rebuild _registeredPrompts object with new name in same position
@@ -972,6 +1057,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       },
       // Order-preserving update for prompts - use SDK's update method
       onUpdate: (sessionCtx, key, config, handler) => {
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious prompt name: ${key}`
+          );
+          return;
+        }
         const { refs } = sessionContexts.find(
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
@@ -1024,6 +1116,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.resources,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious resource name: ${name}`
+            );
+            return null;
+          }
           return registerResourceOnSession(
             session.server,
             name,
@@ -1039,6 +1138,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Rebuild _registeredResources object with new key in same position
@@ -1076,6 +1182,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       },
       // Order-preserving update for resources - use SDK's update method
       onUpdate: (sessionCtx, key, config, handler) => {
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource name: ${key}`
+          );
+          return;
+        }
         const { refs } = sessionContexts.find(
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
@@ -1142,6 +1255,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.resourceTemplates as Map<string, any> | undefined,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious resource template name: ${name}`
+            );
+            return null;
+          }
           return registerTemplateOnSession(
             session.server,
             name,
@@ -1157,6 +1277,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource template name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Resource templates are stored in _registeredResources with URI as key
@@ -1195,6 +1322,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Order-preserving update for resource templates - need full re-registration
       // since templates are complex, but we rebuild the object to preserve order
       onUpdate: (sessionCtx, key, config, handler) => {
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource template name: ${key}`
+          );
+          return;
+        }
         const { session, refs } = sessionContexts.find(
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
