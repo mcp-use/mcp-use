@@ -1,9 +1,11 @@
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
+import { Button } from "@/client/components/ui/button";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ChevronDown,
   ChevronRight,
+  Copy,
 } from "lucide-react";
 import {
   clearRpcLogs,
@@ -12,6 +14,7 @@ import {
   type RpcLogEntry,
 } from "mcp-use/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface RenderableRpcItem {
   id: string;
@@ -26,6 +29,7 @@ interface JsonRpcLoggerViewProps {
   serverIds?: string[]; // Optional filter for specific server IDs
   onCountChange?: (count: number) => void; // Callback when message count changes
   onClearRef?: React.MutableRefObject<(() => Promise<void>) | null>; // Ref to expose clearMessages function
+  onExportRef?: React.MutableRefObject<(() => Promise<void>) | null>; // Ref to expose exportAllMessages function
 }
 
 /**
@@ -43,6 +47,7 @@ export function JsonRpcLoggerView({
   serverIds,
   onCountChange,
   onClearRef,
+  onExportRef,
 }: JsonRpcLoggerViewProps = {}) {
   const [items, setItems] = useState<RenderableRpcItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -72,6 +77,30 @@ export function JsonRpcLoggerView({
     }
   };
 
+  const copyToClipboard = async (payload: unknown) => {
+    try {
+      const jsonString = JSON.stringify(payload, null, 2);
+      await navigator.clipboard.writeText(jsonString);
+      toast.success("Message copied to clipboard");
+    } catch (error) {
+      console.error("Failed to copy message:", error);
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
+  const exportAllMessages = async () => {
+    try {
+      const jsonString = JSON.stringify(filteredItems, null, 2);
+      await navigator.clipboard.writeText(jsonString);
+      toast.success(
+        `All messages copied to clipboard (${filteredItems.length})`
+      );
+    } catch (error) {
+      console.error("Failed to copy all messages:", error);
+      toast.error("Failed to copy to clipboard");
+    }
+  };
+
   // Normalize serverIds to a stable string for dependency comparison
   const serverIdsKey = useMemo(() => {
     if (!serverIds || serverIds.length === 0) return "";
@@ -89,6 +118,18 @@ export function JsonRpcLoggerView({
       }
     };
   }, [onClearRef, clearMessages]);
+
+  // Expose exportAllMessages via ref if provided
+  useEffect(() => {
+    if (onExportRef) {
+      onExportRef.current = exportAllMessages;
+    }
+    return () => {
+      if (onExportRef) {
+        onExportRef.current = null;
+      }
+    };
+  }, [onExportRef, exportAllMessages]);
 
   // Notify parent of initial count
   useEffect(() => {
@@ -269,6 +310,24 @@ export function JsonRpcLoggerView({
                 {isExpanded && (
                   <div className="border-t bg-muted/20">
                     <div className="p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">
+                          Message Payload
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(it.payload);
+                          }}
+                          className="h-6 px-2"
+                          title="Copy message to clipboard"
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          <span className="text-xs">Copy</span>
+                        </Button>
+                      </div>
                       <div className="max-h-[40vh] overflow-auto rounded-sm bg-background/60 p-2">
                         <JSONDisplay data={it.payload} />
                       </div>
