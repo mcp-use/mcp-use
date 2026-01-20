@@ -526,11 +526,6 @@ function McpServerWrapper({
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
-    console.log(`[McpServerWrapper ${id}] Tools fingerprint updated:`, {
-      toolCount: mcp.tools.length,
-      toolNames: mcp.tools.map((t) => t.name),
-      fingerprint: fingerprint.substring(0, 100) + "...",
-    });
     return fingerprint;
   }, [mcp.tools, id]);
   const resourcesFingerprint = useMemo(
@@ -599,14 +594,6 @@ function McpServerWrapper({
       prevFingerprints.resources !== resourcesFingerprint;
     const promptsChanged = prevFingerprints.prompts !== promptsFingerprint;
 
-    console.log(`[McpServerWrapper ${id}] Checking for updates:`, {
-      toolsChanged,
-      resourcesChanged,
-      promptsChanged,
-      currentToolCount: server.tools.length,
-      prevToolCount: prevServer?.tools.length,
-    });
-
     if (
       !prevServer ||
       prevServer.state !== server.state ||
@@ -625,9 +612,6 @@ function McpServerWrapper({
         server.pendingElicitationRequests.length ||
       !prevServer.client
     ) {
-      console.log(
-        `[McpServerWrapper ${id}] Calling onUpdate with updated server`
-      );
       prevServerRef.current = server;
       prevFingerprintsRef.current = {
         tools: toolsFingerprint,
