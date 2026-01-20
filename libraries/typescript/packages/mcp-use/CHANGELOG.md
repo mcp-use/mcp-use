@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.14.0-canary.8
+
+### Patch Changes
+
+- e96063a: feat(mcp-server): add additional configuration options for MCP server
+  - @mcp-use/cli@2.11.0-canary.8
+  - @mcp-use/inspector@0.16.0-canary.8
+
 ## 1.14.0-canary.7
 
 ### Patch Changes
