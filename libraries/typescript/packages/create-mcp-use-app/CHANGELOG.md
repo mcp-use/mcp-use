@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.11.0-canary.1
+
+### Minor Changes
+
+- ad66391: fix: improved HMR support for widgets
+
 ## 0.11.0-canary.0
 
 ### Minor Changes
