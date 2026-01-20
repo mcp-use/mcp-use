@@ -18,7 +18,7 @@ interface UseMCPPromptsProps {
 }
 
 /**
- * Manages prompt selection, execution, and results for MCP servers.
+ * Manages prompt selection, execution, and results for an MCP server.
  * Provides filtered prompts, execution state, and result management.
  */
 export function useMCPPrompts({
