@@ -187,7 +187,7 @@ type PostHogNodeClient = {
     properties?: Record<string, any>;
   }) => void;
   flush: () => void;
-  shutdown: () => void;
+  shutdown: () => Promise<void>;
 };
 
 /**
@@ -789,10 +789,10 @@ export class Telemetry {
   /**
    * Shutdown the telemetry client (Node.js only)
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     if (this._posthogNodeClient) {
       try {
-        this._posthogNodeClient.shutdown();
+        await this._posthogNodeClient.shutdown();
         logger.debug("PostHog client shutdown successfully");
       } catch (e) {
         logger.debug(`Error shutting down PostHog client: ${e}`);
