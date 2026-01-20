@@ -323,9 +323,8 @@ async function buildWidgets(
     // No package.json or no mcpUse config, that's fine
   }
 
-  const builtWidgets: Array<{ name: string; metadata: any }> = [];
-
-  for (const entry of entries) {
+  // Helper function to build a single widget
+  const buildSingleWidget = async (entry: { name: string; path: string }) => {
     const widgetName = entry.name;
     const entryPath = entry.path.replace(/\\/g, "/");
 
@@ -726,15 +725,23 @@ export default {
         }
       }
 
-      builtWidgets.push({
-        name: widgetName,
-        metadata: widgetMetadata,
-      });
       console.log(chalk.green(`    ✓ Built ${widgetName}`));
+      return { name: widgetName, metadata: widgetMetadata };
     } catch (error) {
       console.error(chalk.red(`    ✗ Failed to build ${widgetName}:`), error);
+      return null;
     }
-  }
+  };
+
+  // Build all widgets in parallel
+  const buildResults = await Promise.all(
+    entries.map((entry) => buildSingleWidget(entry))
+  );
+
+  // Filter out failed builds (null results)
+  const builtWidgets = buildResults.filter(
+    (result): result is { name: string; metadata: any } => result !== null
+  );
 
   return builtWidgets;
 }

@@ -57,9 +57,29 @@ const server = new MCPServer({
     'https://app.myapp.com'
   ]
 })
+
+// With server metadata (title, icons, website)
+const server = new MCPServer({
+  name: 'my-server',
+  title: 'My Server', // display name
+  version: '1.0.0',
+  description: 'My awesome MCP server',
+  baseUrl: process.env.MCP_URL || 'http://localhost:3000',
+  websiteUrl: 'https://mcp-use.com',
+  favicon: 'favicon.ico',
+  icons: [
+    {
+      src: 'icon.svg',
+      mimeType: 'image/svg+xml',
+      sizes: ['512x512']
+    }
+  ]
+})
 ```
 
 **Note:** The `createMCPServer()` factory function is still available for backward compatibility, but the class constructor is recommended for new code.
+
+**Server Metadata:** When you use `create-mcp-use-app`, these fields are automatically configured with your project name and mcp-use branding icons. The `icons[].src` paths are automatically converted to absolute URLs using your `baseUrl`.
 
 ## Server Configuration
 
@@ -69,13 +89,22 @@ Configuration object for server initialization.
 
 ```typescript
 interface ServerConfig {
-  name: string        // Server name
-  version: string     // Server version (semver format)
-  description?: string // Optional description
-  host?: string       // Hostname for widget URLs and server endpoints (defaults to 'localhost')
-  baseUrl?: string    // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+  name: string              // Server identifier (e.g., 'my-server')
+  version: string           // Server version (semver format)
+  description?: string      // Server description
+  title?: string            // display name - Human-readable title shown in MCP clients and Inspector
+  websiteUrl?: string       // Website URL for documentation/homepage
+  icons?: Array<{           // Server icons for branding (displayed in Inspector and clients)
+    src: string             // Icon URL or relative path (e.g., 'icon.svg')
+    mimeType?: string       // MIME type (e.g., 'image/svg+xml', 'image/png')
+    sizes?: string[]        // Icon sizes (e.g., ['512x512', '256x256'])
+    theme?: 'light' | 'dark' // Icon theme variant
+  }>
+  favicon?: string          // Favicon path relative to public/ directory (e.g., 'favicon.ico')
+  host?: string             // Hostname for widget URLs and server endpoints (defaults to 'localhost')
+  baseUrl?: string          // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
   allowedOrigins?: string[] // Allowed origins for DNS rebinding protection
-  sessionIdleTimeoutMs?: number // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+  sessionIdleTimeoutMs?: number     // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
   autoCreateSessionOnInvalidId?: boolean // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 }
 ```

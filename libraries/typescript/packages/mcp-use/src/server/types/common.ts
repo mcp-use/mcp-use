@@ -265,6 +265,70 @@ export interface ServerConfig {
    * ```
    */
   favicon?: string;
+  /**
+   * Display name for the server
+   *
+   * A human-readable title that will be shown in MCP clients and inspector UI.
+   * If not provided, the `name` field will be used as the display name.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-mcp-server',
+   *   title: 'My Awesome MCP Server', // display name
+   *   version: '1.0.0'
+   * });
+   * ```
+   */
+  title?: string; // display name
+  /**
+   * Website URL for the server
+   *
+   * Optional URL to the server's website or documentation.
+   * This will be included in the server info displayed to clients.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   websiteUrl: 'https://myserver.com'
+   * });
+   * ```
+   */
+  websiteUrl?: string;
+  /**
+   * Array of server icons
+   *
+   * Icons that represent the server in various sizes and formats.
+   * Used by MCP clients and inspector UI to display server branding.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   icons: [
+   *     {
+   *       src: 'icon.svg',
+   *       mimeType: 'image/svg+xml',
+   *       sizes: ['512x512', '256x256']
+   *     },
+   *     {
+   *       src: 'icon-192.png',
+   *       mimeType: 'image/png',
+   *       sizes: ['192x192']
+   *     }
+   *   ]
+   * });
+   * ```
+   */
+  icons?: Array<{
+    src: string;
+    mimeType?: string;
+    sizes?: string[];
+    theme?: "light" | "dark";
+  }>;
 }
 
 export interface InputDefinition {

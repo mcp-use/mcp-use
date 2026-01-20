@@ -161,6 +161,25 @@ const UserProfile: React.FC = () => {
 export default UserProfile;
 ```
 
+<Warning>
+**Important: Handle Widget Loading State**
+
+The example above doesn't handle the loading state. In production, widgets render **before** the tool execution completes. On first render, `props` will be empty `{}` and `isPending` will be `true`. Always check `isPending` to avoid accessing undefined properties:
+
+```tsx
+const { props, theme, isPending } = useWidget<UserProfileProps>();
+
+if (isPending) {
+  return <div className="animate-pulse">Loading profile...</div>;
+}
+
+const { name, email, avatar, role, bio } = props;
+// Now safe to access props
+```
+
+See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete patterns.
+</Warning>
+
 ### How Automatic Registration Works
 
 When you call `server.listen()`, the framework:
@@ -411,14 +430,20 @@ const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white";
 const textColor = theme === "dark" ? "text-white" : "text-gray-900";
 ```
 
-### 3. Error Handling
+### 3. Loading States and Error Handling
 
-Handle missing or invalid props gracefully:
+Always handle the loading state first, then check for missing or invalid data:
 
 ```tsx
 const MyWidget: React.FC = () => {
-  const { props } = useWidget<MyProps>();
+  const { props, isPending } = useWidget<MyProps>();
 
+  // First, handle loading state
+  if (isPending) {
+    return <div className="animate-pulse">Loading...</div>;
+  }
+
+  // Then, validate required data
   if (!props.requiredField) {
     return <div>Required data missing</div>;
   }
@@ -466,10 +491,18 @@ export const widgetMetadata: WidgetMetadata = {
 **Problem**: Component receives empty props
 
 **Solutions**:
+- **Check `isPending` first**: Widgets render before tool execution completes. Props are empty `{}` when `isPending` is `true`
 - Use `useWidget()` hook (not React props)
 - Ensure `widgetMetadata.props` is a valid Zod schema
 - Verify tool parameters match schema
 - Check Apps SDK is injecting `window.openai.toolInput`
+
+```tsx
+// Always check isPending
+const { props, isPending } = useWidget<MyProps>();
+if (isPending) return <div>Loading...</div>;
+// Now props are available
+```
 
 ### CSP Errors
 

@@ -3,11 +3,20 @@ import { z } from "zod";
 
 // Create MCP server instance
 const server = new MCPServer({
-  name: "my-mcp-server",
+  name: "{{PROJECT_NAME}}",
+  title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
   description: "My first MCP server with all features",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
-  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
+  favicon: "favicon.ico",
+  websiteUrl: "https://mcp-use.com", // Can be customized later
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"],
+    },
+  ],
 });
 
 /**

@@ -5,23 +5,61 @@
  * and prop handling.
  */
 
-import type { Hono as HonoType, Context } from "hono";
+import type { Context, Hono as HonoType } from "hono";
 import type {
+  InputDefinition,
   UIResourceContent,
   UIResourceDefinition,
-  InputDefinition,
   WidgetProps,
 } from "../types/index.js";
+import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./mcp-ui-adapter.js";
-import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+
+/**
+ * Slugify a widget name to make it URI-safe
+ *
+ * Converts widget names to valid URI components by:
+ * - Converting to lowercase
+ * - Replacing spaces and invalid characters with dashes
+ * - Removing consecutive dashes
+ * - Trimming dashes from start/end
+ *
+ * @param name - Widget name to slugify
+ * @returns URI-safe slugified name
+ *
+ * @example
+ * ```typescript
+ * slugifyWidgetName('My Awesome Widget')
+ * // Returns: 'my-awesome-widget'
+ *
+ * slugifyWidgetName('Product Search Results 2')
+ * // Returns: 'product-search-results-2'
+ * ```
+ */
+export function slugifyWidgetName(name: string): string {
+  // Prevent ReDoS by limiting input length
+  const MAX_LENGTH = 300;
+  if (name.length > MAX_LENGTH) {
+    name = name.substring(0, MAX_LENGTH);
+  }
+
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-_.]/g, "-") // Replace invalid chars with dash
+    .replace(/-+/g, "-") // Replace multiple consecutive dashes with single dash
+    .replace(/^-+/, "") // Trim dashes from start
+    .replace(/-+$/, ""); // Trim dashes from end
+}
 
 /**
  * Generate a widget URI with optional build ID for cache busting
  *
- * @param widgetName - Widget name/identifier
+ * The widget name is automatically slugified to ensure URI compliance.
+ *
+ * @param widgetName - Widget name/identifier (will be slugified)
  * @param buildId - Optional build ID for cache busting
  * @param extension - Optional file extension (e.g., '.html')
  * @param suffix - Optional suffix (e.g., random ID for dynamic URIs)
@@ -31,6 +69,9 @@ import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
  * ```typescript
  * generateWidgetUri('kanban-board', 'abc123', '.html')
  * // Returns: 'ui://widget/kanban-board-abc123.html'
+ *
+ * generateWidgetUri('My Widget', 'abc123', '.html')
+ * // Returns: 'ui://widget/my-widget-abc123.html'
  * ```
  */
 export function generateWidgetUri(
@@ -39,7 +80,9 @@ export function generateWidgetUri(
   extension: string = "",
   suffix: string = ""
 ): string {
-  const parts = [widgetName];
+  // Slugify the widget name to ensure URI compliance
+  const slugifiedName = slugifyWidgetName(widgetName);
+  const parts = [slugifiedName];
 
   // Add build ID if available (for cache busting)
   if (buildId) {
@@ -314,9 +357,11 @@ export function processWidgetHtml(
     );
 
     // Add window.__getFile and window.__mcpPublicUrl to head
+    // Use slugified name for URL routing
+    const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widgetName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
     );
   }
 
@@ -385,6 +430,9 @@ export function createWidgetRegistration(
     ? new URL(serverConfig.serverBaseUrl || "").origin
     : null;
 
+  // Get slugified name for URL routing
+  const slugifiedName = slugifyWidgetName(widgetName);
+
   return {
     name: widgetName,
     title: title as string,
@@ -394,6 +442,7 @@ export function createWidgetRegistration(
     _meta: {
       "mcp-use/widget": {
         name: widgetName,
+        slugifiedName: slugifiedName, // URL-safe slug for dev routing
         title: title,
         description: description,
         type: "appsSdk",
