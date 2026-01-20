@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.1
+
+### Patch Changes
+
+- 199199d: feat(inspector): add copy functionality for RPC messages in Prompts, Resources, and Tools tabs
+  - mcp-use@1.14.0-canary.1
+
 ## 0.16.0-canary.0
 
 ### Minor Changes
