@@ -5,18 +5,18 @@
  * and prop handling.
  */
 
-import type { Hono as HonoType, Context } from "hono";
+import type { Context, Hono as HonoType } from "hono";
 import type {
+  InputDefinition,
   UIResourceContent,
   UIResourceDefinition,
-  InputDefinition,
   WidgetProps,
 } from "../types/index.js";
+import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./mcp-ui-adapter.js";
-import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
 
 /**
  * Slugify a widget name to make it URI-safe
@@ -40,11 +40,18 @@ import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
  * ```
  */
 export function slugifyWidgetName(name: string): string {
+  // Prevent ReDoS by limiting input length
+  const MAX_LENGTH = 300;
+  if (name.length > MAX_LENGTH) {
+    name = name.substring(0, MAX_LENGTH);
+  }
+
   return name
     .toLowerCase()
     .replace(/[^a-z0-9-_.]/g, "-") // Replace invalid chars with dash
     .replace(/-+/g, "-") // Replace multiple consecutive dashes with single dash
-    .replace(/^-+|-+$/g, ""); // Trim dashes from start/end
+    .replace(/^-+/, "") // Trim dashes from start
+    .replace(/-+$/, ""); // Trim dashes from end
 }
 
 /**
