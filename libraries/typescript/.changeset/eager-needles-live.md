@@ -5,4 +5,4 @@
 "@mcp-use/cli": minor
 ---
 
-fix: improved HMR support for widgets
+feat: improved HMR support for widgets
