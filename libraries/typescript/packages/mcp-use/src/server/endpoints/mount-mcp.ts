@@ -98,6 +98,12 @@ export async function mountMcp(
     if (useStatelessMode) {
       // STATELESS MODE: New server instance per request
       // Used for: Deno/edge runtimes, k6 load testing, curl, clients without SSE
+
+      // Handle HEAD requests for health checks (no session to maintain)
+      if (c.req.method === "HEAD") {
+        return new Response(null, { status: 200 });
+      }
+
       const server = mcpServerInstance.getServerForSession();
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // No session tracking
