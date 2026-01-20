@@ -165,35 +165,21 @@ export function ToolsTab({
   }, []);
 
   const handleMaximize = useCallback(() => {
-    console.log("[handleMaximize] isMaximized:", isMaximized);
-    console.log("[handleMaximize] leftPanelRef:", leftPanelRef);
-    console.log("[handleMaximize] toolParamsPanelRef:", toolParamsPanelRef);
-
     if (!isMaximized) {
       // Maximize: collapse left panel and top panel
       if (leftPanelRef.current) {
-        console.log("[handleMaximize] Collapsing left panel");
         leftPanelRef.current.collapse();
       }
       if (toolParamsPanelRef.current) {
-        console.log("[handleMaximize] Collapsing top panel");
         toolParamsPanelRef.current.collapse();
       }
       setIsMaximized(true);
     } else {
       // Restore: expand left panel and top panel
       if (leftPanelRef.current) {
-        console.log(
-          "[handleMaximize] Expanding left panel, isCollapsed:",
-          leftPanelRef.current.isCollapsed()
-        );
         leftPanelRef.current.expand();
       }
       if (toolParamsPanelRef.current) {
-        console.log(
-          "[handleMaximize] Expanding top panel, isCollapsed:",
-          toolParamsPanelRef.current.isCollapsed()
-        );
         toolParamsPanelRef.current.expand();
       }
       setIsMaximized(false);
