@@ -4,6 +4,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
@@ -18,7 +19,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ImperativePanelHandle } from "react-resizable-panels";
 import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import type { ResourceResult } from "./resources";
 import {
@@ -77,7 +77,7 @@ export function ResourcesTab({
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const [rpcMessageCount, setRpcMessageCount] = useState(0);
   const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
-  const rpcPanelRef = useRef<ImperativePanelHandle>(null);
+  const rpcPanelRef = usePanelRef();
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Detect mobile screen size
@@ -465,12 +465,13 @@ export function ResourcesTab({
 
   return (
     <ResizablePanelGroup orientation="horizontal" className="h-full">
-      <ResizablePanel defaultSize={25}>
+      <ResizablePanel defaultSize="33%">
         <ResizablePanelGroup
+          disabled={rpcPanelCollapsed}
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
+          <ResizablePanel minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
               <ResourcesTabHeader
                 activeTab={activeTab}
@@ -498,16 +499,11 @@ export function ResourcesTab({
           <ResizableHandle withHandle />
 
           <ResizablePanel
-            ref={rpcPanelRef}
-            defaultSize={0}
+            panelRef={rpcPanelRef}
+            defaultSize={38}
             collapsible
-            minSize={5}
-            collapsedSize={5}
-            style={{
-              minHeight: 45,
-            }}
-            onCollapse={() => setRpcPanelCollapsed(true)}
-            onExpand={() => setRpcPanelCollapsed(false)}
+            minSize={46}
+            collapsedSize={46}
             className="flex flex-col border-t dark:border-zinc-700"
           >
             <div
@@ -516,11 +512,16 @@ export function ResourcesTab({
                 e.preventDefault();
                 e.stopPropagation();
                 if (rpcPanelCollapsed) {
-                  rpcPanelRef.current?.resize(25);
                   setRpcPanelCollapsed(false);
+                  setTimeout(() => {
+                    rpcPanelRef.current?.resize("50%");
+                  }, 100);
                 } else {
-                  rpcPanelRef.current?.resize(5);
-                  setRpcPanelCollapsed(true);
+                  rpcPanelRef.current?.resize(38);
+
+                  setTimeout(() => {
+                    setRpcPanelCollapsed(true);
+                  }, 100);
                 }
               }}
             >
@@ -571,28 +572,24 @@ export function ResourcesTab({
 
       <ResizableHandle />
 
-      <ResizablePanel defaultSize={50}>
-        <ResizablePanelGroup orientation="vertical">
-          <ResizablePanel defaultSize={70}>
-            <div
-              ref={resourceDisplayRef}
-              className="h-full bg-white dark:bg-zinc-900"
-            >
-              <ResourceResultDisplay
-                result={currentResult}
-                isLoading={isLoading}
-                previewMode={previewMode}
-                serverId={serverId}
-                readResource={readResource}
-                onTogglePreview={() => setPreviewMode(!previewMode)}
-                onCopy={handleCopy}
-                onDownload={handleDownload}
-                onFullscreen={handleFullscreen}
-                isCopied={isCopied}
-              />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+      <ResizablePanel defaultSize="67%">
+        <div
+          ref={resourceDisplayRef}
+          className="h-full bg-white dark:bg-zinc-900"
+        >
+          <ResourceResultDisplay
+            result={currentResult}
+            isLoading={isLoading}
+            previewMode={previewMode}
+            serverId={serverId}
+            readResource={readResource}
+            onTogglePreview={() => setPreviewMode(!previewMode)}
+            onCopy={handleCopy}
+            onDownload={handleDownload}
+            onFullscreen={handleFullscreen}
+            isCopied={isCopied}
+          />
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   );

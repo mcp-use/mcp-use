@@ -17,6 +17,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import {
@@ -24,7 +25,6 @@ import {
   MCPToolSavedEvent,
   Telemetry,
 } from "@/client/telemetry";
-import type { ImperativePanelHandle } from "react-resizable-panels";
 import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import {
   SavedRequestsList,
@@ -111,11 +111,9 @@ export function ToolsTab({
     undefined
   );
 
-  // Refs for resizable panels
-  const leftPanelRef = useRef<any>(null);
-  const topPanelRef = useRef<any>(null);
-  const bottomPanelRef = useRef<any>(null);
-  const rpcPanelRef = useRef<ImperativePanelHandle>(null);
+  const rpcPanelRef = usePanelRef();
+  const leftPanelRef = usePanelRef();
+  const toolParamsPanelRef = usePanelRef();
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
 
   // Detect mobile screen size
@@ -174,6 +172,42 @@ export function ToolsTab({
       console.error("[ToolsTab] Failed to load saved requests:", error);
     }
   }, []);
+
+  const handleMaximize = useCallback(() => {
+    console.log("[handleMaximize] isMaximized:", isMaximized);
+    console.log("[handleMaximize] leftPanelRef:", leftPanelRef);
+    console.log("[handleMaximize] toolParamsPanelRef:", toolParamsPanelRef);
+
+    if (!isMaximized) {
+      // Maximize: collapse left panel and top panel
+      if (leftPanelRef.current) {
+        console.log("[handleMaximize] Collapsing left panel");
+        leftPanelRef.current.collapse();
+      }
+      if (toolParamsPanelRef.current) {
+        console.log("[handleMaximize] Collapsing top panel");
+        toolParamsPanelRef.current.collapse();
+      }
+      setIsMaximized(true);
+    } else {
+      // Restore: expand left panel and top panel
+      if (leftPanelRef.current) {
+        console.log(
+          "[handleMaximize] Expanding left panel, isCollapsed:",
+          leftPanelRef.current.isCollapsed()
+        );
+        leftPanelRef.current.expand();
+      }
+      if (toolParamsPanelRef.current) {
+        console.log(
+          "[handleMaximize] Expanding top panel, isCollapsed:",
+          toolParamsPanelRef.current.isCollapsed()
+        );
+        toolParamsPanelRef.current.expand();
+      }
+      setIsMaximized(false);
+    }
+  }, [isMaximized, leftPanelRef, toolParamsPanelRef]);
 
   // Save to localStorage whenever savedRequests changes
   const saveSavedRequests = useCallback((requests: SavedRequest[]) => {
@@ -654,28 +688,6 @@ export function ToolsTab({
     [results]
   );
 
-  const handleMaximize = useCallback(() => {
-    if (!isMaximized) {
-      // Maximize: collapse left panel and top panel
-      if (leftPanelRef.current) {
-        leftPanelRef.current.collapse();
-      }
-      if (topPanelRef.current) {
-        topPanelRef.current.collapse();
-      }
-      setIsMaximized(true);
-    } else {
-      // Restore: expand left panel and top panel
-      if (leftPanelRef.current) {
-        leftPanelRef.current.expand();
-      }
-      if (topPanelRef.current) {
-        topPanelRef.current.expand();
-      }
-      setIsMaximized(false);
-    }
-  }, [isMaximized]);
-
   const openSaveDialog = useCallback(() => {
     if (!selectedTool) return;
     setRequestName("");
@@ -901,16 +913,19 @@ export function ToolsTab({
   return (
     <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel
-        ref={leftPanelRef}
-        defaultSize={33}
+        id="left-panel"
+        defaultSize="33%"
+        minSize="20%"
         collapsible
         className="flex flex-col h-full relative"
+        panelRef={leftPanelRef}
       >
         <ResizablePanelGroup
+          disabled={rpcPanelCollapsed}
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
+          <ResizablePanel minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
               <ToolsTabHeader
                 activeTab={activeTab}
@@ -951,20 +966,11 @@ export function ToolsTab({
           <ResizableHandle withHandle />
 
           <ResizablePanel
-            ref={rpcPanelRef}
-            defaultSize={0}
+            panelRef={rpcPanelRef}
+            defaultSize={38}
             collapsible
-            minSize={5}
-            collapsedSize={5}
-            style={{
-              minHeight: 45,
-            }}
-            onCollapse={() => {
-              setRpcPanelCollapsed(true);
-            }}
-            onExpand={() => {
-              setRpcPanelCollapsed(false);
-            }}
+            minSize={46}
+            collapsedSize={46}
             className="flex flex-col border-t dark:border-zinc-700"
           >
             <div
@@ -973,13 +979,16 @@ export function ToolsTab({
                 e.preventDefault();
                 e.stopPropagation();
                 if (rpcPanelCollapsed) {
-                  // Expand to 25% of parent height
-                  rpcPanelRef.current?.resize(25);
                   setRpcPanelCollapsed(false);
+                  setTimeout(() => {
+                    rpcPanelRef.current?.resize("50%");
+                  }, 100);
                 } else {
-                  // Collapse to minimum size
-                  rpcPanelRef.current?.resize(5);
-                  setRpcPanelCollapsed(true);
+                  rpcPanelRef.current?.resize(38);
+
+                  setTimeout(() => {
+                    setRpcPanelCollapsed(true);
+                  }, 100);
                 }
               }}
             >
@@ -1030,9 +1039,13 @@ export function ToolsTab({
 
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize={67}>
+      <ResizablePanel defaultSize="67%">
         <ResizablePanelGroup orientation="vertical">
-          <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
+          <ResizablePanel
+            defaultSize="40%"
+            collapsible
+            panelRef={toolParamsPanelRef}
+          >
             <ToolExecutionPanel
               selectedTool={selectedTool}
               toolArgs={toolArgs}
@@ -1051,7 +1064,7 @@ export function ToolsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel ref={bottomPanelRef} defaultSize={60}>
+          <ResizablePanel defaultSize="60%">
             <div className="flex flex-col h-full">
               <ToolResultDisplay
                 results={filteredResults}

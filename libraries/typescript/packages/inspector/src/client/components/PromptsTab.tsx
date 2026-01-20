@@ -4,6 +4,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
@@ -18,7 +19,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ImperativePanelHandle } from "react-resizable-panels";
 import { JsonRpcLoggerView } from "./logging/JsonRpcLoggerView";
 import type { PromptResult, SavedPrompt } from "./prompts";
 import {
@@ -88,10 +88,10 @@ export function PromptsTab({
   const [rpcMessageCount, setRpcMessageCount] = useState(0);
   const [rpcPanelCollapsed, setRpcPanelCollapsed] = useState(true);
   const [isMaximized, setIsMaximized] = useState(false);
-  const rpcPanelRef = useRef<ImperativePanelHandle>(null);
+  const rpcPanelRef = usePanelRef();
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
-  const topPanelRef = useRef<ImperativePanelHandle>(null);
+  const leftPanelRef = usePanelRef();
+  const promptParamsPanelRef = usePanelRef();
 
   // Detect mobile screen size
   useEffect(() => {
@@ -474,25 +474,25 @@ export function PromptsTab({
 
   const handleMaximize = useCallback(() => {
     if (!isMaximized) {
-      // Maximize: collapse left panel and top panel
+      // Maximize: collapse left panel and prompt params panel
       if (leftPanelRef.current) {
         leftPanelRef.current.collapse();
       }
-      if (topPanelRef.current) {
-        topPanelRef.current.collapse();
+      if (promptParamsPanelRef.current) {
+        promptParamsPanelRef.current.collapse();
       }
       setIsMaximized(true);
     } else {
-      // Restore: expand left panel and top panel
+      // Restore: expand left panel and prompt params panel
       if (leftPanelRef.current) {
         leftPanelRef.current.expand();
       }
-      if (topPanelRef.current) {
-        topPanelRef.current.expand();
+      if (promptParamsPanelRef.current) {
+        promptParamsPanelRef.current.expand();
       }
       setIsMaximized(false);
     }
-  }, [isMaximized]);
+  }, [isMaximized, leftPanelRef, promptParamsPanelRef]);
 
   const openSaveDialog = useCallback(() => {
     if (!selectedPrompt) return;
@@ -665,16 +665,18 @@ export function PromptsTab({
   return (
     <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel
-        ref={leftPanelRef}
-        defaultSize={33}
+        id="left-panel"
+        panelRef={leftPanelRef}
+        defaultSize="33%"
         collapsible
         className="flex flex-col h-full relative"
       >
         <ResizablePanelGroup
+          disabled={rpcPanelCollapsed}
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
+          <ResizablePanel defaultSize="75%" minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
               <PromptsTabHeader
                 activeTab={activeTab}
@@ -715,16 +717,11 @@ export function PromptsTab({
           <ResizableHandle withHandle />
 
           <ResizablePanel
-            ref={rpcPanelRef}
-            defaultSize={0}
+            panelRef={rpcPanelRef}
+            defaultSize={38}
             collapsible
-            minSize={5}
-            collapsedSize={5}
-            style={{
-              minHeight: 45,
-            }}
-            onCollapse={() => setRpcPanelCollapsed(true)}
-            onExpand={() => setRpcPanelCollapsed(false)}
+            minSize={46}
+            collapsedSize={46}
             className="flex flex-col border-t dark:border-zinc-700"
           >
             <div
@@ -733,11 +730,16 @@ export function PromptsTab({
                 e.preventDefault();
                 e.stopPropagation();
                 if (rpcPanelCollapsed) {
-                  rpcPanelRef.current?.resize(25);
                   setRpcPanelCollapsed(false);
+                  setTimeout(() => {
+                    rpcPanelRef.current?.resize("50%");
+                  }, 100);
                 } else {
-                  rpcPanelRef.current?.resize(5);
-                  setRpcPanelCollapsed(true);
+                  rpcPanelRef.current?.resize(38);
+
+                  setTimeout(() => {
+                    setRpcPanelCollapsed(true);
+                  }, 100);
                 }
               }}
             >
@@ -788,9 +790,13 @@ export function PromptsTab({
 
       <ResizableHandle withHandle />
 
-      <ResizablePanel defaultSize={67}>
+      <ResizablePanel defaultSize="67%">
         <ResizablePanelGroup orientation="vertical">
-          <ResizablePanel ref={topPanelRef} defaultSize={40} collapsible>
+          <ResizablePanel
+            panelRef={promptParamsPanelRef}
+            defaultSize="40%"
+            collapsible
+          >
             <PromptExecutionPanel
               selectedPrompt={selectedPrompt}
               promptArgs={promptArgs}
@@ -804,7 +810,7 @@ export function PromptsTab({
 
           <ResizableHandle withHandle />
 
-          <ResizablePanel defaultSize={50}>
+          <ResizablePanel defaultSize="60%">
             <div className="flex flex-col h-full">
               <PromptResultDisplay
                 results={results}
