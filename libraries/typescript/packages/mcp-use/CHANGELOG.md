@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.14.0-canary.4
+
+### Patch Changes
+
+- 3a94755: fix: codeql vulnerability in slugifyWidgetName
+  - @mcp-use/cli@2.11.0-canary.4
+  - @mcp-use/inspector@0.16.0-canary.4
+
 ## 1.14.0-canary.3
 
 ### Minor Changes
