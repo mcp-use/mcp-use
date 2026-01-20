@@ -30,6 +30,7 @@ import {
   toolRegistration,
 } from "./tools/index.js";
 import { mountWidgets, uiResourceRegistration } from "./widgets/index.js";
+import { generateWidgetUri } from "./widgets/widget-helpers.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -96,6 +97,17 @@ import {
   rewriteSupabaseRequest,
   startServer,
 } from "./utils/index.js";
+
+/**
+ * Validates that a key is safe to use as a property name to prevent prototype pollution.
+ * Returns true if the key is safe, false if it could lead to prototype pollution.
+ *
+ * @param key - The property key to validate
+ * @returns true if the key is safe to use, false otherwise
+ */
+function isSafePropertyKey(key: string): boolean {
+  return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+}
 
 /**
  * MCP Server class
@@ -358,6 +370,405 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Add a new widget tool directly to all active sessions (for HMR)
+   *
+   * This method adds a widget tool to all active sessions' internal state
+   * immediately, ensuring the tool is queryable before notifications are sent.
+   * This prevents race conditions where clients fetch tools before registration completes.
+   *
+   * Also registers the associated widget resources (static and template) for Apps SDK widgets.
+   *
+   * @param toolDefinition - The tool definition
+   * @param toolCallback - The tool callback function
+   * @internal
+   */
+  public addWidgetTool(toolDefinition: any, toolCallback: any): void {
+    // Guard against prototype pollution
+    if (!isSafePropertyKey(toolDefinition.name)) {
+      console.warn(
+        `[MCP-Server] Rejected potentially malicious tool name: ${toolDefinition.name}`
+      );
+      return;
+    }
+
+    console.log(
+      `[MCP-Server] Adding widget tool directly to sessions: ${toolDefinition.name}`
+    );
+
+    // First register normally to update wrapper's registrations
+    (this.tool as any)(toolDefinition, toolCallback);
+
+    const widgetName = toolDefinition.name;
+
+    // Get resource registrations for this widget
+    // Resources are stored with key format "name:uri"
+    const resourceUri = generateWidgetUri(widgetName, this.buildId, ".html");
+    const resourceTemplateUri = generateWidgetUri(
+      widgetName,
+      this.buildId,
+      ".html",
+      "{id}"
+    );
+    const resourceKey = `${widgetName}:${resourceUri}`;
+    const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
+    const resourceReg = this.registrations.resources.get(resourceKey);
+    const resourceTemplateReg =
+      this.registrations.resourceTemplates.get(resourceTemplateKey);
+
+    // Then immediately add to each session's native _registeredTools and _registeredResources
+    // This ensures the tool and resources are queryable before notifications are sent
+    for (const [sessionId, session] of this.sessions) {
+      if (!session.server) continue;
+      const nativeServer = session.server as any;
+
+      // Get the registered tool from wrapper (which has the converted schema)
+      const registration = this.registrations.tools.get(toolDefinition.name);
+      if (!registration) {
+        console.warn(
+          `[MCP-Server] Tool ${toolDefinition.name} not found in wrapper registrations!`
+        );
+        continue;
+      }
+
+      // Convert schema to inputSchema if needed
+      let inputSchema: Record<string, unknown>;
+      if (registration.config.schema) {
+        try {
+          inputSchema = this.convertZodSchemaToParams(
+            registration.config.schema as any
+          );
+        } catch (e) {
+          console.warn(
+            `[MCP-Server] Failed to convert schema for ${toolDefinition.name}`
+          );
+          inputSchema = {};
+        }
+      } else if (
+        registration.config.inputs &&
+        registration.config.inputs.length > 0
+      ) {
+        inputSchema = this.createParamsSchema(
+          registration.config.inputs as any
+        );
+      } else {
+        inputSchema = {};
+      }
+
+      // Create a proper tool entry with all required fields including the handler
+      const toolEntry = {
+        title: registration.config.title,
+        description: registration.config.description ?? "",
+        inputSchema: inputSchema,
+        outputSchema: undefined,
+        annotations: registration.config.annotations,
+        execution: { taskSupport: "forbidden" as const },
+        _meta: registration.config._meta,
+        handler: registration.handler,
+        enabled: true,
+        disable: function (this: any) {
+          this.enabled = false;
+        },
+        enable: function (this: any) {
+          this.enabled = true;
+        },
+        remove: () => {
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(toolDefinition.name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious tool name in remove: ${toolDefinition.name}`
+            );
+            return;
+          }
+          delete nativeServer._registeredTools[toolDefinition.name];
+        },
+        update: function (this: any, updates: Record<string, unknown>) {
+          Object.assign(this, updates);
+        },
+      };
+
+      // Add directly to SDK's _registeredTools for this session
+      if (nativeServer._registeredTools) {
+        nativeServer._registeredTools[toolDefinition.name] = toolEntry;
+        console.log(
+          `[MCP-Server] Added tool ${toolDefinition.name} to session ${sessionId}'s _registeredTools`
+        );
+      }
+
+      // Add widget resources to this session
+      if (resourceReg && session.server) {
+        try {
+          const _registeredResource = session.server.registerResource(
+            resourceReg.config.name,
+            resourceReg.config.uri,
+            {
+              title: resourceReg.config.title,
+              description: resourceReg.config.description,
+              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+            } as any,
+            resourceReg.handler as any
+          );
+          console.log(
+            `[MCP-Server] Added resource ${resourceUri} to session ${sessionId}`
+          );
+        } catch (e) {
+          console.warn(
+            `[MCP-Server] Failed to register resource ${resourceUri} for session ${sessionId}:`,
+            e
+          );
+        }
+      }
+
+      // Add widget resource template to this session (for Apps SDK)
+      if (resourceTemplateReg && session.server) {
+        try {
+          const uriTemplate =
+            resourceTemplateReg.config.resourceTemplate.uriTemplate;
+          const template = new ResourceTemplate(uriTemplate, {
+            list: undefined,
+            complete: undefined,
+          });
+
+          const _registeredTemplate = session.server.registerResource(
+            resourceTemplateReg.config.name,
+            template,
+            {
+              title: resourceTemplateReg.config.title,
+              description: resourceTemplateReg.config.description,
+              mimeType:
+                resourceTemplateReg.config.resourceTemplate.mimeType ||
+                "text/html+skybridge",
+            } as any,
+            resourceTemplateReg.handler as any
+          );
+          console.log(
+            `[MCP-Server] Added resource template ${resourceTemplateUri} to session ${sessionId}`
+          );
+        } catch (e) {
+          console.warn(
+            `[MCP-Server] Failed to register resource template ${resourceTemplateUri} for session ${sessionId}:`,
+            e
+          );
+        }
+      }
+    }
+
+    // Send notifications AFTER adding to all sessions
+    for (const [sessionId, session] of this.sessions) {
+      // Send tool list changed notification
+      if (session.server?.sendToolListChanged) {
+        try {
+          session.server.sendToolListChanged();
+          console.log(
+            `[MCP-Server] Sent tools notification to session ${sessionId}`
+          );
+        } catch (e) {
+          console.debug(
+            `[MCP-Server] Session ${sessionId}: Failed to send tools notification`
+          );
+        }
+      }
+      // Send resource list changed notification if resources were added
+      if (
+        (resourceReg || resourceTemplateReg) &&
+        session.server?.sendResourceListChanged
+      ) {
+        try {
+          session.server.sendResourceListChanged();
+          console.log(
+            `[MCP-Server] Sent resources notification to session ${sessionId}`
+          );
+        } catch (e) {
+          console.debug(
+            `[MCP-Server] Session ${sessionId}: Failed to send resources notification`
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Update a widget tool's configuration in place (for HMR)
+   *
+   * This method updates a widget tool's metadata (description, schema) without
+   * re-registering it. It updates both the wrapper's registrations and the SDK's
+   * internal state, then sends notifications to all connected clients.
+   *
+   * @param toolName - The name of the tool to update
+   * @param updates - The updated tool configuration
+   * @internal
+   */
+  public updateWidgetToolInPlace(
+    toolName: string,
+    updates: {
+      description?: string;
+      schema?: unknown; // Raw Zod schema - will be converted internally
+      _meta?: Record<string, unknown>;
+    }
+  ): void {
+    // Guard against prototype pollution
+    if (!isSafePropertyKey(toolName)) {
+      console.warn(
+        `[MCP-Server] Rejected potentially malicious tool name: ${toolName}`
+      );
+      return;
+    }
+
+    // Convert Zod schema to input schema if provided
+    let inputSchema: Record<string, unknown> | undefined;
+    if ("schema" in updates) {
+      try {
+        inputSchema = this.convertZodSchemaToParams(updates.schema as any);
+      } catch (e) {
+        console.warn(
+          `[WIDGET-HMR] Failed to convert schema for ${toolName}:`,
+          e instanceof Error ? e.message : String(e)
+        );
+      }
+    }
+
+    // Update our wrapper's registration
+    const registration = this.registrations.tools.get(toolName);
+    if (registration) {
+      if (updates.description !== undefined) {
+        registration.config.description = updates.description;
+      }
+      if (updates._meta !== undefined) {
+        registration.config._meta = updates._meta;
+      }
+      if ("schema" in updates) {
+        registration.config.schema = updates.schema as any;
+      }
+    }
+
+    // Update the SDK's internal _registeredTools for all sessions
+    for (const [, session] of this.sessions) {
+      if (!session.server) continue;
+      const nativeServer = session.server as any;
+      const toolEntry = nativeServer._registeredTools?.[toolName];
+      if (toolEntry) {
+        if (updates.description !== undefined) {
+          toolEntry.description = updates.description;
+        }
+        if (updates._meta !== undefined) {
+          toolEntry._meta = updates._meta;
+        }
+        if ("schema" in updates) {
+          if (inputSchema !== undefined) {
+            toolEntry.inputSchema = inputSchema;
+          } else {
+            // Explicit schema removal
+            delete toolEntry.inputSchema;
+          }
+        }
+      }
+    }
+
+    // Send tool list changed notification to all sessions
+    for (const [sessionId, session] of this.sessions) {
+      if (session.server?.sendToolListChanged) {
+        try {
+          session.server.sendToolListChanged();
+        } catch (e) {
+          console.debug(
+            `[WIDGET-HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove a widget tool and its associated resources (for HMR)
+   *
+   * This method removes a widget's tool and resource registrations when
+   * the widget is deleted or renamed. It updates both the wrapper's
+   * registrations and the SDK's internal state, then sends notifications.
+   *
+   * @param toolName - The name of the tool/widget to remove
+   * @internal
+   */
+  public removeWidgetTool(toolName: string): void {
+    // Guard against prototype pollution
+    if (!isSafePropertyKey(toolName)) {
+      console.warn(
+        `[MCP-Server] Rejected potentially malicious tool name: ${toolName}`
+      );
+      return;
+    }
+
+    // Remove from widget definitions
+    this.widgetDefinitions.delete(toolName);
+
+    // Remove from our wrapper's registrations
+    // Resources are keyed as "name:uri"
+    const resourceUri = generateWidgetUri(toolName, this.buildId, ".html");
+    const resourceTemplateUri = generateWidgetUri(
+      toolName,
+      this.buildId,
+      ".html",
+      "{id}"
+    );
+    this.registrations.tools.delete(toolName);
+    this.registrations.resources.delete(`${toolName}:${resourceUri}`);
+    this.registrations.resourceTemplates.delete(
+      `${toolName}-dynamic:${resourceTemplateUri}`
+    );
+
+    // Remove from SDK's internal state for all sessions
+    for (const [, session] of this.sessions) {
+      if (!session.server) continue;
+      const nativeServer = session.server as any;
+
+      // Remove tool
+      if (nativeServer._registeredTools?.[toolName]) {
+        delete nativeServer._registeredTools[toolName];
+      }
+
+      // Remove resource (using slugified URI)
+      if (nativeServer._registeredResources?.[resourceUri]) {
+        delete nativeServer._registeredResources[resourceUri];
+      }
+
+      // Remove resource template (using slugified URI)
+      if (nativeServer._registeredResources?.[resourceTemplateUri]) {
+        delete nativeServer._registeredResources[resourceTemplateUri];
+      }
+    }
+
+    // Remove from sessionRegisteredRefs (using slugified URIs)
+    for (const [, refs] of this.sessionRegisteredRefs) {
+      refs.tools.delete(toolName);
+      refs.resources.delete(resourceUri);
+      refs.resourceTemplates.delete(resourceTemplateUri);
+    }
+
+    // Send notifications to all sessions
+    for (const [sessionId, session] of this.sessions) {
+      if (session.server?.sendToolListChanged) {
+        try {
+          session.server.sendToolListChanged();
+        } catch (e) {
+          console.debug(
+            `[WIDGET-HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+      }
+      if (session.server?.sendResourceListChanged) {
+        try {
+          session.server.sendResourceListChanged();
+        } catch (e) {
+          console.debug(
+            `[WIDGET-HMR] Session ${sessionId}: Failed to send resources/list_changed:`,
+            e instanceof Error ? e.message : String(e)
+          );
+        }
+      }
+    }
+  }
+
+  /**
    * Sync registrations from another MCPServer instance (for hot reload)
    *
    * This method compares the current registrations with another server instance's
@@ -420,6 +831,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           this.enabled = true;
         },
         remove: () => {
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious tool name in remove: ${name}`
+            );
+            return;
+          }
           delete nativeServer._registeredTools[name];
         },
         update: function (
@@ -441,6 +859,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.tools,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious tool name: ${name}`
+            );
+            return null;
+          }
           const nativeServer = session.server as any;
           const toolEntry = createToolEntry(
             name,
@@ -459,6 +884,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious tool name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Rebuild _registeredTools object with new name in same position
@@ -498,6 +930,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious tool name: ${key}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Update in place to preserve order
@@ -551,6 +990,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.prompts,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious prompt name: ${name}`
+            );
+            return null;
+          }
           return registerPromptOnSession(
             session.server,
             name,
@@ -566,6 +1012,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious prompt name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Rebuild _registeredPrompts object with new name in same position
@@ -604,6 +1057,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       },
       // Order-preserving update for prompts - use SDK's update method
       onUpdate: (sessionCtx, key, config, handler) => {
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious prompt name: ${key}`
+          );
+          return;
+        }
         const { refs } = sessionContexts.find(
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
@@ -656,6 +1116,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.resources,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious resource name: ${name}`
+            );
+            return null;
+          }
           return registerResourceOnSession(
             session.server,
             name,
@@ -671,6 +1138,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Rebuild _registeredResources object with new key in same position
@@ -708,6 +1182,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       },
       // Order-preserving update for resources - use SDK's update method
       onUpdate: (sessionCtx, key, config, handler) => {
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource name: ${key}`
+          );
+          return;
+        }
         const { refs } = sessionContexts.find(
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
@@ -774,6 +1255,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         getRefs: () => refs?.resourceTemplates as Map<string, any> | undefined,
         register: (name, config, handler) => {
           if (!session.server) return null;
+          // Guard against prototype pollution
+          if (!isSafePropertyKey(name)) {
+            console.warn(
+              `[MCP-Server] Rejected potentially malicious resource template name: ${name}`
+            );
+            return null;
+          }
           return registerTemplateOnSession(
             session.server,
             name,
@@ -789,6 +1277,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(oldKey) || !isSafePropertyKey(newKey)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource template name in rename: ${oldKey} -> ${newKey}`
+          );
+          return;
+        }
         const nativeServer = session.server as any;
 
         // Resource templates are stored in _registeredResources with URI as key
@@ -827,6 +1322,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Order-preserving update for resource templates - need full re-registration
       // since templates are complex, but we rebuild the object to preserve order
       onUpdate: (sessionCtx, key, config, handler) => {
+        // Guard against prototype pollution
+        if (!isSafePropertyKey(key)) {
+          console.warn(
+            `[MCP-Server] Rejected potentially malicious resource template name: ${key}`
+          );
+          return;
+        }
         const { session, refs } = sessionContexts.find(
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
