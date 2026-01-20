@@ -47,6 +47,46 @@ This command will:
 Check out [UI Widgets](/typescript/server/ui-widgets) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
 </Tip>
 
+### Server Metadata
+
+The generated project includes pre-configured server metadata that is visible in MCP Inspector and MCP clients:
+
+- **Name & Title**: Both set to your project name (customizable in `index.ts`)
+- **Icons**: mcp-use branding icons included in `public/` folder
+- **Website URL**: Defaults to https://mcp-use.com (customizable)
+- **Favicon**: Included for browser display
+
+These settings appear in:
+- MCP Inspector UI (server dropdown and "View server info" modal)
+- MCP clients that support server metadata
+- ChatGPT when using your server as an app
+
+**Customizing Server Metadata:**
+
+Open `index.ts` in your project to customize:
+
+```typescript
+const server = new MCPServer({
+  name: 'my-project',          // Set by create-mcp-use-app
+  title: 'My Custom Title',    // display name - shown in clients
+  version: '1.0.0',
+  description: 'My awesome server',
+  websiteUrl: 'https://my-site.com',  // Your website or docs
+  favicon: 'favicon.ico',      // Already in public/ folder
+  icons: [
+    {
+      src: 'my-icon.svg',      // Add custom icon to public/ folder
+      mimeType: 'image/svg+xml',
+      sizes: ['512x512']
+    }
+  ]
+})
+```
+
+**Note:** Icon paths (like `icon.svg`) are automatically converted to absolute URLs (e.g., `http://localhost:3000/mcp-use/public/icon.svg`) when `baseUrl` is configured.
+
+---
+
 You can also install mcp-use as a library and build your own MCP server from scratch.
 <CodeGroup>
 ```bash npm
@@ -68,8 +108,18 @@ import { z } from "zod";
 
 const server = new MCPServer({
   name: "my-server",
+  title: "My Server", // display name
   version: "1.0.0",
   description: "My custom MCP server",
+  websiteUrl: "https://mcp-use.com",
+  favicon: "favicon.ico",
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"]
+    }
+  ]
 });
 
 // Define a tool

@@ -3,11 +3,20 @@ import type { RawHtmlUIResource, RemoteDomUIResource } from "mcp-use/server";
 
 // Create an MCP server with MCP-UI UIResource support
 const server = new MCPServer({
-  name: "uiresource-mcp-server",
+  name: "{{PROJECT_NAME}}",
+  title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
   description: "MCP server demonstrating all UIResource types",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
-  // favicon: "favicon.ico", // Uncomment and add your favicon to public/ folder
+  favicon: "favicon.ico",
+  websiteUrl: "https://mcp-use.com", // Can be customized later
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"],
+    },
+  ],
 });
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

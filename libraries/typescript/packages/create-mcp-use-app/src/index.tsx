@@ -458,6 +458,9 @@ program
         // Update package.json with project name
         updatePackageJson(projectPath, sanitizedProjectName);
 
+        // Update index.ts with project name
+        updateIndexTs(projectPath, sanitizedProjectName);
+
         // Determine which package manager to use
         let usedPackageManager = "npm";
 
@@ -1026,6 +1029,21 @@ function updatePackageJson(projectPath: string, projectName: string) {
   packageJsonContent.description = `MCP server: ${projectName}`;
 
   writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2));
+}
+
+function updateIndexTs(projectPath: string, projectName: string) {
+  const indexPath = join(projectPath, "index.ts");
+
+  if (!existsSync(indexPath)) {
+    return; // index.ts doesn't exist, skip
+  }
+
+  let content = readFileSync(indexPath, "utf-8");
+
+  // Replace {{PROJECT_NAME}} placeholders with actual project name
+  content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+
+  writeFileSync(indexPath, content);
 }
 
 // Ink component for project name input
