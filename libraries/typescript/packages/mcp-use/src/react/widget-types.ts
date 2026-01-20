@@ -125,7 +125,7 @@ export interface UseWidgetResult<
   TToolInput extends UnknownObject = UnknownObject,
 > {
   // Props and state
-  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model). Empty object {} when isPending is true. */
+  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model). May be partial/empty while isPending; defaultProps may populate values. */
   props: Partial<TProps>;
   /** Original tool input arguments */
   toolInput: TToolInput;
