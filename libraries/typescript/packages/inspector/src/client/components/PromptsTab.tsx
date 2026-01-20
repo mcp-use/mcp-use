@@ -6,7 +6,6 @@ import {
   usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
-import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
@@ -14,11 +13,10 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo,
   useRef,
   useState,
 } from "react";
-import type { PromptResult, SavedPrompt } from "./prompts";
+import type { SavedPrompt } from "./prompts";
 import {
   PromptExecutionPanel,
   PromptResultDisplay,
@@ -26,6 +24,7 @@ import {
   PromptsTabHeader,
   SavedPromptsList,
 } from "./prompts";
+import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { RpcPanel } from "./shared";
 
 export interface PromptsTabRef {
@@ -64,15 +63,10 @@ export function PromptsTab({
   isConnected,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
   // State
-  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [selectedSavedPrompt, setSelectedSavedPrompt] =
     useState<SavedPrompt | null>(null);
   const { selectedPromptName, setSelectedPromptName } = useInspector();
-  const [promptArgs, setPromptArgs] = useState<Record<string, unknown>>({});
-  const [results, setResults] = useState<PromptResult[]>([]);
-  const [isExecuting, setIsExecuting] = useState(false);
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"prompts" | "saved">("prompts");
   const [savedPrompts, setSavedPrompts] = useState<SavedPrompt[]>([]);
   const [_saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -86,8 +80,25 @@ export function PromptsTab({
   );
   const [isMaximized, setIsMaximized] = useState(false);
 
+  const {
+    filteredPrompts,
+    selectedPrompt,
+    setSelectedPrompt,
+    results,
+    handleDeleteResult,
+    promptArgs,
+    setPromptArgs,
+    isExecuting,
+    handlePromptSelect,
+    handleArgChange,
+    executePrompt,
+    searchQuery,
+    setSearchQuery,
+  } = useMCPPrompts({ prompts, callPrompt, serverId });
+
   const leftPanelRef = usePanelRef();
   const toolParamsPanelRef = usePanelRef();
+
   // Detect mobile screen size
   useEffect(() => {
     const checkMobile = () => {
@@ -168,31 +179,6 @@ export function PromptsTab({
     }
   }, [searchQuery]);
 
-  // Filter prompts based on search query
-  const filteredPrompts = useMemo(() => {
-    if (!searchQuery.trim()) return prompts;
-
-    const query = searchQuery.toLowerCase();
-    return prompts.filter(
-      (prompt) =>
-        prompt.name.toLowerCase().includes(query) ||
-        prompt.description?.toLowerCase().includes(query)
-    );
-  }, [prompts, searchQuery]);
-
-  const handlePromptSelect = useCallback((prompt: Prompt) => {
-    setSelectedPrompt(prompt);
-    // Initialize args with default values based on prompt input schema
-    const initialArgs: Record<string, unknown> = {};
-    if (prompt.arguments) {
-      // Handle MCP SDK structure: arguments is an array of PromptArgument objects
-      prompt.arguments.forEach((arg) => {
-        initialArgs[arg.name] = "";
-      });
-    }
-    setPromptArgs(initialArgs);
-  }, []);
-
   const loadSavedPrompt = useCallback(
     (prompt: SavedPrompt) => {
       const promptObj = prompts.find((p) => p.name === prompt.promptName);
@@ -202,7 +188,7 @@ export function PromptsTab({
         setSelectedSavedPrompt(prompt);
       }
     },
-    [prompts]
+    [prompts, setSelectedPrompt, setPromptArgs]
   );
 
   // Reset focused index when filtered prompts change
@@ -328,96 +314,6 @@ export function PromptsTab({
     setSelectedPromptName,
   ]);
 
-  // Sync selectedPrompt with updated prompts list (for HMR support)
-  // When prompts change via HMR, update selectedPrompt to the new object reference
-  useEffect(() => {
-    if (selectedPrompt) {
-      const updatedPrompt = prompts.find((p) => p.name === selectedPrompt.name);
-      if (updatedPrompt && updatedPrompt !== selectedPrompt) {
-        // Prompt definition changed - update the reference
-        const hasChanges =
-          JSON.stringify(updatedPrompt.arguments) !==
-            JSON.stringify(selectedPrompt.arguments) ||
-          updatedPrompt.description !== selectedPrompt.description;
-        if (hasChanges) {
-          setSelectedPrompt(updatedPrompt);
-        }
-      }
-    }
-  }, [prompts, selectedPrompt]);
-
-  const handleArgChange = useCallback((key: string, value: any) => {
-    setPromptArgs((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
-  const executePrompt = useCallback(async () => {
-    if (!selectedPrompt || isExecuting) return;
-
-    setIsExecuting(true);
-    const startTime = Date.now();
-
-    try {
-      const result = await callPrompt(selectedPrompt.name, promptArgs);
-      const duration = Date.now() - startTime;
-
-      // Track successful prompt call
-      const telemetry = Telemetry.getInstance();
-      telemetry
-        .capture(
-          new MCPPromptCallEvent({
-            promptName: selectedPrompt.name,
-            serverId,
-            success: true,
-          })
-        )
-        .catch(() => {
-          // Silently fail - telemetry should not break the application
-        });
-
-      setResults((prev) => [
-        {
-          promptName: selectedPrompt.name,
-          args: promptArgs,
-          result,
-          timestamp: startTime,
-          duration,
-        },
-        ...prev,
-      ]);
-    } catch (error) {
-      // Track failed prompt call
-      const telemetry = Telemetry.getInstance();
-      telemetry
-        .capture(
-          new MCPPromptCallEvent({
-            promptName: selectedPrompt.name,
-            serverId,
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-          })
-        )
-        .catch(() => {
-          // Silently fail - telemetry should not break the application
-        });
-
-      const errorResult = {
-        promptName: selectedPrompt.name,
-        args: promptArgs,
-        result: null,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: startTime,
-        duration: Date.now() - startTime,
-      };
-
-      setResults((prev) => [
-        ...prev,
-        { ...errorResult, result: { messages: [] } },
-      ]);
-    } finally {
-      setIsExecuting(false);
-    }
-  }, [selectedPrompt, promptArgs, isExecuting, callPrompt, serverId]);
-
   const handleCopyResult = useCallback(async (index: number, result: any) => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
@@ -426,10 +322,6 @@ export function PromptsTab({
     } catch (error) {
       console.error("[PromptsTab] Failed to copy result:", error);
     }
-  }, []);
-
-  const handleDeleteResult = useCallback((index: number) => {
-    setResults((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const handleFullscreen = useCallback(

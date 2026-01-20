@@ -20,15 +20,7 @@ import { NotFound } from "../ui/not-found";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { PromptMessageCard } from "./PromptMessageCard";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-
-export interface PromptResult {
-  promptName: string;
-  args: Record<string, unknown>;
-  result: GetPromptResult | { error?: string; isError?: boolean };
-  error?: string;
-  timestamp: number;
-  duration?: number;
-}
+import type { PromptResult } from "../../hooks/useMCPPrompts";
 
 interface PromptResultDisplayProps {
   results: PromptResult[];
