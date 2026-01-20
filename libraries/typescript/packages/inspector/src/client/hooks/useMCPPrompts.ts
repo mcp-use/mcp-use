@@ -1,5 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type { Prompt, GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  Prompt,
+  GetPromptResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 
 export interface PromptResult {
@@ -13,7 +16,10 @@ export interface PromptResult {
 
 interface UseMCPPromptsProps {
   prompts: Prompt[];
-  callPrompt: (name: string, args?: Record<string, unknown>) => Promise<GetPromptResult>;
+  callPrompt: (
+    name: string,
+    args?: Record<string, unknown>
+  ) => Promise<GetPromptResult>;
   serverId: string;
 }
 
@@ -56,7 +62,6 @@ export function useMCPPrompts({
     }
     setPromptArgs(initialArgs);
   }, []);
-
 
   const handleArgChange = useCallback((key: string, value: any) => {
     setPromptArgs((prev) => ({ ...prev, [key]: value }));
@@ -143,7 +148,7 @@ export function useMCPPrompts({
         // Prompt definition changed - update the reference
         const hasChanges =
           JSON.stringify(updatedPrompt.arguments) !==
-          JSON.stringify(selectedPrompt.arguments) ||
+            JSON.stringify(selectedPrompt.arguments) ||
           updatedPrompt.description !== selectedPrompt.description;
         if (hasChanges) {
           setSelectedPrompt(updatedPrompt);
@@ -166,6 +171,5 @@ export function useMCPPrompts({
     executePrompt,
     searchQuery,
     setSearchQuery,
-  }
-
-};
+  };
+}

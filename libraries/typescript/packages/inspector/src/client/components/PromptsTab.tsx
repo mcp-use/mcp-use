@@ -659,8 +659,9 @@ export function PromptsTab({
                 )}
               </div>
               <ChevronDown
-                className={`h-4 w-4 text-muted-foreground transition-transform ${!rpcPanelCollapsed ? "" : "rotate-180"
-                  }`}
+                className={`h-4 w-4 text-muted-foreground transition-transform ${
+                  !rpcPanelCollapsed ? "" : "rotate-180"
+                }`}
               />
             </div>
             <div
