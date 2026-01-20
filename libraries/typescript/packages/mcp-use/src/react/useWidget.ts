@@ -332,7 +332,7 @@ export function useWidget<
  */
 export function useWidgetProps<TProps extends UnknownObject = UnknownObject>(
   defaultProps?: TProps
-): TProps {
+): Partial<TProps> {
   const { props } = useWidget<TProps>(defaultProps);
   return props;
 }

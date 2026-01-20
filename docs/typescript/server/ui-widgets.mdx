@@ -113,7 +113,23 @@ const ProductSearchResult: React.FC = () => {
 export default ProductSearchResult;
 ```
 
+<Warning>
+**Important: Widget Lifecycle**
 
+Widgets render **before** the tool execution completes. On first render, `props` will be an empty object `{}` and `isPending` will be `true`. Always check `isPending` or use optional chaining when accessing props to avoid runtime errors.
+
+```tsx
+const { props, isPending } = useWidget<MyProps>();
+
+if (isPending) {
+  return <LoadingSpinner />;
+}
+
+// Now safe to access props.city, props.temperature, etc.
+```
+
+See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete details and patterns.
+</Warning>
 
 ## Widget Metadata 
 
@@ -275,6 +291,75 @@ export const widgetMetadata: WidgetMetadata = {
 const ProductSearchResult: React.FC = () => {
   const { props } = useWidget();
   return <div>Query: {props.query}</div>;
+};
+```
+
+### Widget Lifecycle and Loading States
+
+Widgets render **before** the tool execution completes. This allows you to show loading states while data is being fetched.
+
+**The `isPending` flag indicates when the tool is still executing:**
+
+- `isPending = true`: Widget just mounted, `props` is empty `{}`
+- `isPending = false`: Tool completed, `props` contains actual data
+
+**Pattern 1: Early return with loading state**
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<MyWidgetProps>();
+  
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
+  }
+  
+  // Safe to access props.city, props.temperature, etc.
+  return (
+    <div>
+      <h1>{props.city}</h1>
+      <p>{props.temperature}°C</p>
+    </div>
+  );
+};
+```
+
+**Pattern 2: Conditional rendering**
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<MyWidgetProps>();
+  
+  return (
+    <div>
+      {isPending ? (
+        <LoadingSpinner />
+      ) : (
+        <div>
+          <h1>{props.city}</h1>
+          <p>{props.temperature}°C</p>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+**Pattern 3: Using optional chaining** (when you want to show partial UI)
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props } = useWidget<MyWidgetProps>();
+  
+  return (
+    <div>
+      <h1>{props.city ?? 'Loading...'}</h1>
+      <p>{props.temperature ? `${props.temperature}°C` : 'Loading...'}</p>
+    </div>
+  );
 };
 ```
 

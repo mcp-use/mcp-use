@@ -116,8 +116,15 @@ interface MyProps {
 }
 
 const MyWidget: React.FC = () => {
-  const { props, theme } = useWidget<MyProps>();
+  const { props, theme, isPending } = useWidget<MyProps>();
 
+  // IMPORTANT: Widgets render before tool execution completes
+  // Always check isPending to handle the loading state
+  if (isPending) {
+    return <div>Loading...</div>;
+  }
+
+  // Now props are safely available
   // props are validated and typed based on your schema
   // theme is automatically set by ChatGPT
 
@@ -129,6 +136,8 @@ const MyWidget: React.FC = () => {
   );
 };
 ```
+
+> **Note**: Widgets render before the tool execution completes. On first render, `props` will be empty `{}` and `isPending` will be `true`. Always check `isPending` before accessing props. See the [Widget Lifecycle documentation](https://mcp-use.com/docs/typescript/server/widget-components/usewidget#widget-lifecycle) for more details.
 
 ### Defining Widget Metadata
 

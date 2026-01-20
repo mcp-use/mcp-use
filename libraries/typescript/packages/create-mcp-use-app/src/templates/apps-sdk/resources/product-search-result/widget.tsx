@@ -17,7 +17,7 @@ export const widgetMetadata: WidgetMetadata = {
 };
 
 const ProductSearchResult: React.FC = () => {
-  const { props, mcp_url } = useWidget<ProductSearchResultProps>();
+  const { props, mcp_url, isPending } = useWidget<ProductSearchResultProps>();
 
   console.log(props); // the widget props
 
@@ -32,19 +32,28 @@ const ProductSearchResult: React.FC = () => {
   return (
     <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>
-        <div className="relative bg-surface-elevated border border-default rounded-3xl">
-          <div className="p-8">
-            <h5 className="text-secondary mb-1">Apps SDK Template</h5>
-            <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
-            <p className="text-md">
-              Start building your ChatGPT widget this this mcp-use template. It
-              features the openai apps sdk ui components, dark/light theme
-              support, actions like callTool and sendFollowUpMessage, and more.
-            </p>
+        {isPending ? (
+          <div className="relative bg-surface-elevated border border-default rounded-3xl p-8">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
+            </div>
           </div>
-          <Carousel mcpUrl={mcp_url} />
-          <Accordion items={accordionItems} />
-        </div>
+        ) : (
+          <div className="relative bg-surface-elevated border border-default rounded-3xl">
+            <div className="p-8">
+              <h5 className="text-secondary mb-1">Apps SDK Template</h5>
+              <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
+              <p className="text-md">
+                Start building your ChatGPT widget this this mcp-use template.
+                It features the openai apps sdk ui components, dark/light theme
+                support, actions like callTool and sendFollowUpMessage, and
+                more.
+              </p>
+            </div>
+            <Carousel mcpUrl={mcp_url} />
+            <Accordion items={accordionItems} />
+          </div>
+        )}
       </AppsSDKUIProvider>
     </McpUseProvider>
   );
