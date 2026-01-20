@@ -412,7 +412,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
 
       // Convert schema to inputSchema if needed
-      let inputSchema: Record<string, unknown> | undefined;
+      let inputSchema: Record<string, unknown>;
       if (registration.config.schema) {
         try {
           inputSchema = this.convertZodSchemaToParams(
@@ -422,14 +422,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           console.warn(
             `[MCP-Server] Failed to convert schema for ${toolDefinition.name}`
           );
+          inputSchema = {};
         }
+      } else if (
+        registration.config.inputs &&
+        registration.config.inputs.length > 0
+      ) {
+        inputSchema = this.createParamsSchema(
+          registration.config.inputs as any
+        );
+      } else {
+        inputSchema = {};
       }
 
       // Create a proper tool entry with all required fields including the handler
       const toolEntry = {
         title: registration.config.title,
         description: registration.config.description ?? "",
-        inputSchema: inputSchema || registration.config.inputs,
+        inputSchema: inputSchema,
         outputSchema: undefined,
         annotations: registration.config.annotations,
         execution: { taskSupport: "forbidden" as const },
@@ -485,9 +495,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Add widget resource template to this session (for Apps SDK)
       if (resourceTemplateReg && session.server) {
         try {
+          const uriTemplate =
+            resourceTemplateReg.config.resourceTemplate.uriTemplate;
+          const template = new ResourceTemplate(uriTemplate, {
+            list: undefined,
+            complete: undefined,
+          });
+
           const _registeredTemplate = session.server.registerResource(
             resourceTemplateReg.config.name,
-            resourceTemplateReg.config.resourceTemplate.uriTemplate,
+            template,
             {
               title: resourceTemplateReg.config.title,
               description: resourceTemplateReg.config.description,
@@ -564,7 +581,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   ): void {
     // Convert Zod schema to input schema if provided
     let inputSchema: Record<string, unknown> | undefined;
-    if (updates.schema) {
+    if ("schema" in updates) {
       try {
         inputSchema = this.convertZodSchemaToParams(updates.schema as any);
       } catch (e) {
@@ -584,7 +601,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       if (updates._meta !== undefined) {
         registration.config._meta = updates._meta;
       }
-      if (updates.schema !== undefined) {
+      if ("schema" in updates) {
         registration.config.schema = updates.schema as any;
       }
     }
@@ -598,8 +615,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         if (updates.description !== undefined) {
           toolEntry.description = updates.description;
         }
-        if (inputSchema !== undefined) {
-          toolEntry.inputSchema = inputSchema;
+        if (updates._meta !== undefined) {
+          toolEntry._meta = updates._meta;
+        }
+        if ("schema" in updates) {
+          if (inputSchema !== undefined) {
+            toolEntry.inputSchema = inputSchema;
+          } else {
+            // Explicit schema removal
+            delete toolEntry.inputSchema;
+          }
         }
       }
     }
