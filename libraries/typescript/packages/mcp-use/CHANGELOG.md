@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.14.0-canary.0
+
+### Minor Changes
+
+- 53fdb48: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+
+### Patch Changes
+
+- Updated dependencies [53fdb48]
+  - @mcp-use/inspector@0.16.0-canary.0
+  - @mcp-use/cli@2.11.0-canary.0
+
 ## 1.13.5
 
 ### Patch Changes

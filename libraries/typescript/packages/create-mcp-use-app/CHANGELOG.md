@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.11.0-canary.0
+
+### Minor Changes
+
+- 53fdb48: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+
 ## 0.10.3
 
 ### Patch Changes
