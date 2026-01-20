@@ -72,4 +72,5 @@ export {
   InferPromptInput,
   EnhancedPromptContext,
   GetPromptResult,
+  PromptResult,
 } from "./prompt.js";
