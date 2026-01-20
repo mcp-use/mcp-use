@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.7
+
+### Patch Changes
+
+- 4652707: Refactor: Extract prompt logic from PromptsTab into useMCPPrompts hook
+- Updated dependencies [0cfeb1d]
+  - mcp-use@1.14.0-canary.7
+
 ## 0.16.0-canary.6
 
 ### Patch Changes
