@@ -51,3 +51,24 @@ export type RegisterWidgetCallback = (widgetDefinition: {
   htmlTemplate: string;
   appsSdkMetadata: import("../types/resource.js").AppsSdkMetadata;
 }) => void;
+
+/**
+ * Widget tool update callback function type
+ *
+ * Used to update widget tool metadata during HMR without re-registering.
+ */
+export type UpdateWidgetToolCallback = (
+  toolName: string,
+  updates: {
+    description?: string;
+    schema?: unknown; // Raw Zod schema - will be converted by the server
+    _meta?: Record<string, unknown>;
+  }
+) => void;
+
+/**
+ * Widget tool removal callback function type
+ *
+ * Used to remove widget tool and resources during HMR (e.g., when widget is renamed/deleted).
+ */
+export type RemoveWidgetToolCallback = (toolName: string) => void;

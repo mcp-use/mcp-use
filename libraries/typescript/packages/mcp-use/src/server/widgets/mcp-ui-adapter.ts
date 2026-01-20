@@ -12,11 +12,12 @@
 import { createUIResource, type AdaptersConfig } from "@mcp-ui/server";
 
 import type {
+  AppsSdkMetadata,
+  UIEncoding,
   UIResourceContent,
   UIResourceDefinition,
-  UIEncoding,
-  AppsSdkMetadata,
 } from "../types/resource.js";
+import { slugifyWidgetName } from "./widget-helpers.js";
 
 /**
  * Configuration for building widget URLs
@@ -30,7 +31,9 @@ export interface UrlConfig {
 /**
  * Build the full URL for a widget including query parameters
  *
- * @param widget - Widget identifier
+ * Widget names are slugified to ensure URL compliance.
+ *
+ * @param widget - Widget identifier (will be slugified for URL)
  * @param props - Parameters to pass as a single JSON-encoded props param
  * @param config - URL configuration (baseUrl and port)
  * @returns Complete widget URL with encoded parameters
@@ -40,8 +43,12 @@ export function buildWidgetUrl(
   props: Record<string, any> | undefined,
   config: UrlConfig
 ): string {
+  // Import slugifyWidgetName to ensure URL-safe widget routes
+  // This must be imported dynamically to avoid circular dependencies
+  const slugifiedWidget = slugifyWidgetName(widget);
+
   const url = new URL(
-    `/mcp-use/widgets/${widget}`,
+    `/mcp-use/widgets/${slugifiedWidget}`,
     `${config.baseUrl}:${config.port}`
   );
 

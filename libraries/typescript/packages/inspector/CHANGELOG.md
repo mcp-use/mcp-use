@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.2
+
+### Minor Changes
+
+- ad66391: fix: improved HMR support for widgets
+
+### Patch Changes
+
+- Updated dependencies [ad66391]
+  - mcp-use@1.14.0-canary.2
+
 ## 0.16.0-canary.1
 
 ### Patch Changes

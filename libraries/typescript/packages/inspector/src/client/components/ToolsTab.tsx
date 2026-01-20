@@ -385,10 +385,15 @@ export function ToolsTab({
 
   // Sync selectedTool with updated tools list (for HMR support)
   // When tools change via HMR, update selectedTool to the new object reference
+  // or clear it if the tool was removed
   useEffect(() => {
     if (selectedTool) {
       const updatedTool = tools.find((t) => t.name === selectedTool.name);
-      if (updatedTool && updatedTool !== selectedTool) {
+      if (!updatedTool) {
+        // Tool was removed - clear selection
+        setSelectedTool(null);
+        setSelectedToolName(null);
+      } else if (updatedTool !== selectedTool) {
         // Tool definition changed - update the reference
         // We compare by reference to detect if it's a different object
         const hasChanges =
@@ -400,7 +405,7 @@ export function ToolsTab({
         }
       }
     }
-  }, [tools, selectedTool]);
+  }, [tools, selectedTool, setSelectedToolName]);
 
   const handleArgChange = useCallback(
     (key: string, value: string) => {

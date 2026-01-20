@@ -516,19 +516,23 @@ function McpServerWrapper({
 
   // Create stable fingerprints for tools/resources/prompts that detect ANY content changes
   // This catches renames, schema changes, description updates, etc.
-  const toolsFingerprint = useMemo(
-    () =>
-      JSON.stringify(
-        mcp.tools
-          .map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: t.inputSchema,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name))
-      ),
-    [mcp.tools]
-  );
+  const toolsFingerprint = useMemo(() => {
+    const fingerprint = JSON.stringify(
+      mcp.tools
+        .map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    console.log(`[McpServerWrapper ${id}] Tools fingerprint updated:`, {
+      toolCount: mcp.tools.length,
+      toolNames: mcp.tools.map((t) => t.name),
+      fingerprint: fingerprint.substring(0, 100) + "...",
+    });
+    return fingerprint;
+  }, [mcp.tools, id]);
   const resourcesFingerprint = useMemo(
     () =>
       JSON.stringify(
@@ -595,6 +599,14 @@ function McpServerWrapper({
       prevFingerprints.resources !== resourcesFingerprint;
     const promptsChanged = prevFingerprints.prompts !== promptsFingerprint;
 
+    console.log(`[McpServerWrapper ${id}] Checking for updates:`, {
+      toolsChanged,
+      resourcesChanged,
+      promptsChanged,
+      currentToolCount: server.tools.length,
+      prevToolCount: prevServer?.tools.length,
+    });
+
     if (
       !prevServer ||
       prevServer.state !== server.state ||
@@ -613,6 +625,9 @@ function McpServerWrapper({
         server.pendingElicitationRequests.length ||
       !prevServer.client
     ) {
+      console.log(
+        `[McpServerWrapper ${id}] Calling onUpdate with updated server`
+      );
       prevServerRef.current = server;
       prevFingerprintsRef.current = {
         tools: toolsFingerprint,
@@ -620,6 +635,10 @@ function McpServerWrapper({
         prompts: promptsFingerprint,
       };
       onUpdateRef.current(server);
+    } else {
+      console.log(
+        `[McpServerWrapper ${id}] No meaningful changes detected, skipping onUpdate`
+      );
     }
   }, [
     id,
@@ -999,11 +1018,22 @@ export function McpClientProvider({
 
   const handleServerUpdate = useCallback(
     (updatedServer: McpServer) => {
+      console.log(
+        `[McpClientProvider] handleServerUpdate called for server ${updatedServer.id}`,
+        {
+          toolCount: updatedServer.tools.length,
+          state: updatedServer.state,
+        }
+      );
+
       setServers((prev) => {
         const index = prev.findIndex((s) => s.id === updatedServer.id);
         const isNewServer = index === -1;
 
         if (isNewServer) {
+          console.log(
+            `[McpClientProvider] Adding new server ${updatedServer.id} to state`
+          );
           // New server - call onServerAdded callback
           onServerAdded?.(updatedServer.id, updatedServer);
           return [...prev, updatedServer];
@@ -1014,6 +1044,16 @@ export function McpClientProvider({
         const stateChanged = current.state !== updatedServer.state;
         const serverInfoChanged =
           current.serverInfo !== updatedServer.serverInfo;
+
+        console.log(
+          `[McpClientProvider] Comparing server ${updatedServer.id}:`,
+          {
+            toolsChanged: current.tools !== updatedServer.tools,
+            currentToolCount: current.tools.length,
+            updatedToolCount: updatedServer.tools.length,
+            stateChanged,
+          }
+        );
 
         if (
           current.state === updatedServer.state &&
@@ -1031,8 +1071,15 @@ export function McpClientProvider({
           current.pendingElicitationRequests.length ===
             updatedServer.pendingElicitationRequests.length
         ) {
+          console.log(
+            `[McpClientProvider] No changes detected for server ${updatedServer.id}, skipping update`
+          );
           return prev;
         }
+
+        console.log(
+          `[McpClientProvider] Updating server ${updatedServer.id} in state`
+        );
 
         // State changed - call callback
         if (stateChanged) {

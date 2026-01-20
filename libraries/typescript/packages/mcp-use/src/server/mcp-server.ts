@@ -1374,6 +1374,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     });
     this.registrations.resourceTemplates = templatesResult.updatedRegistrations;
 
+    // Sync widget definitions (for widget() helper metadata)
+    this.widgetDefinitions = new Map(other.widgetDefinitions);
+
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
