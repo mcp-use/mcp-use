@@ -53,7 +53,7 @@ useWidget<
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `props` | `TProps` | Widget props (mapped from `toolInput` for MCP compatibility) |
+| `props` | `Partial<TProps>` | Widget props (mapped from widget-only data). Empty `{}` when `isPending` is true |
 | `output` | `TOutput \| null` | Tool output from the last execution |
 | `metadata` | `TMetadata \| null` | Response metadata from the tool |
 | `state` | `TState \| null` | Persisted widget state |
@@ -86,6 +86,7 @@ useWidget<
 | Property | Type | Description |
 |----------|------|-------------|
 | `isAvailable` | `boolean` | Whether the `window.openai` API is available |
+| `isPending` | `boolean` | Whether the tool is currently executing. When `true`, props will be empty `{}` |
 
 ## Complete Example
 
@@ -148,6 +149,54 @@ const ProductWidget: React.FC = () => {
       <p>${props.price}</p>
       <button onClick={handleAddToFavorites}>Add to Favorites</button>
       <button onClick={handleGetReviews}>Get Reviews</button>
+    </div>
+  );
+};
+```
+
+## Widget Lifecycle
+
+Widgets render **before** the tool execution completes. This means:
+
+1. **First render** (`isPending = true`):
+   - Widget mounts immediately when tool is called
+   - `props` is `{}` (empty object)
+   - `output` and `metadata` are `null`
+   - This allows showing loading states
+
+2. **After tool completes** (`isPending = false`):
+   - `props` contains the actual widget data
+   - `output` and `metadata` are available
+   - Widget re-renders with full data
+
+**Example:**
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<MyWidgetProps>();
+  
+  if (isPending) {
+    return <LoadingSpinner />;
+  }
+  
+  // Safe to access props now
+  return <div>{props.city} - {props.temperature}°C</div>;
+};
+```
+
+**Alternative: Using optional chaining**
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<MyWidgetProps>();
+  
+  return (
+    <div>
+      {isPending ? (
+        <LoadingSpinner />
+      ) : (
+        <div>{props.city} - {props.temperature}°C</div>
+      )}
     </div>
   );
 };
