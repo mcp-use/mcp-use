@@ -184,6 +184,9 @@ function OpenAIComponentRendererBase({
         setUseDevMode(computedUseDevMode || false);
 
         const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
+        // Get slugified name for URL routing (falls back to original name if not provided)
+        const slugifiedName =
+          metaForWidget?.["mcp-use/widget"]?.slugifiedName || widgetName;
 
         // Prepare widget data with optional dev URLs
         const widgetDataToStore: any = {
@@ -200,9 +203,10 @@ function OpenAIComponentRendererBase({
           theme: currentResolvedTheme, // Pass the current theme to prevent flash
         };
 
-        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
+        if (computedUseDevMode && slugifiedName && currentServerBaseUrl) {
           const devServerBaseUrl = new URL(currentServerBaseUrl).origin;
-          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}`;
+          // Use slugified name for URL routing
+          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
         }

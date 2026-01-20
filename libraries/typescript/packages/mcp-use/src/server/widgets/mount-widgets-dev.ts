@@ -19,6 +19,8 @@ import type {
   ServerConfig,
   MountWidgetsOptions,
   RegisterWidgetCallback,
+  UpdateWidgetToolCallback,
+  RemoveWidgetToolCallback,
 } from "./widget-types.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
@@ -36,6 +38,8 @@ export type MountWidgetsDevOptions = MountWidgetsOptions;
  * @param app - Hono application instance to mount middleware and routes onto
  * @param serverConfig - Server configuration (base URL, port, CSP, favicon, etc.) used to configure routes and Vite origin
  * @param registerWidget - Callback invoked to register each discovered widget with the running server
+ * @param updateWidgetTool - Callback invoked to update widget tool metadata during HMR
+ * @param removeWidgetTool - Callback invoked to remove widget tool when widget is deleted/renamed
  * @param options - Optional overrides: `baseRoute` to change the mount path (default: `/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
  * @returns Nothing.
  */
@@ -43,6 +47,8 @@ export async function mountWidgetsDev(
   app: HonoType,
   serverConfig: ServerConfig,
   registerWidget: RegisterWidgetCallback,
+  updateWidgetTool: UpdateWidgetToolCallback,
+  removeWidgetTool: RemoveWidgetToolCallback,
   options?: MountWidgetsDevOptions
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
@@ -180,10 +186,14 @@ export async function mountWidgetsDev(
     };
   });
 
+  // Import slugifyWidgetName for URL-safe directory names
+  const { slugifyWidgetName } = await import("./widget-helpers.js");
+
   // Create entry files for each widget
   for (const widget of widgets) {
-    // Create temp entry and HTML files for this widget
-    const widgetTempDir = pathHelpers.join(tempDir, widget.name);
+    // Use slugified name for temp directory to match URL routing
+    const slugifiedName = slugifyWidgetName(widget.name);
+    const widgetTempDir = pathHelpers.join(tempDir, slugifiedName);
     await fs.mkdir(widgetTempDir, { recursive: true });
 
     // Create a CSS file with Tailwind and @source directives to scan resources
@@ -236,7 +246,7 @@ if (container && Component) {
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${widget.name}/entry.tsx"></script>
+    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 
@@ -309,6 +319,7 @@ if (container && Component) {
       server.watcher.on("unlink", async (filePath: string) => {
         // Check if the deleted file is a widget file
         const relativePath = pathHelpers.relative(resourcesPath, filePath);
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
 
         // Single file widget (e.g., widget-name.tsx)
         if (
@@ -316,13 +327,23 @@ if (container && Component) {
           !relativePath.includes("/")
         ) {
           const widgetName = relativePath.replace(/\.tsx?$/, "");
-          const widgetDir = pathHelpers.join(tempDir, widgetName);
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const widgetDir = pathHelpers.join(tempDir, slugifiedName);
+
+          // Remove from widgets array
+          const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
+          if (widgetIdx !== -1) {
+            widgets.splice(widgetIdx, 1);
+          }
+
+          // Remove MCP registrations
+          removeWidgetTool(widgetName);
 
           try {
             await fs.access(widgetDir);
             await fs.rm(widgetDir, { recursive: true, force: true });
             console.log(
-              `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+              `[WIDGETS] Removed widget (file deleted): ${widgetName}`
             );
           } catch {
             // Widget directory doesn't exist, nothing to clean up
@@ -333,13 +354,23 @@ if (container && Component) {
           const parts = relativePath.split("/");
           if (parts.length === 2) {
             const widgetName = parts[0];
-            const widgetDir = pathHelpers.join(tempDir, widgetName);
+            const slugifiedName = slugifyWidgetName(widgetName);
+            const widgetDir = pathHelpers.join(tempDir, slugifiedName);
+
+            // Remove from widgets array
+            const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
+            if (widgetIdx !== -1) {
+              widgets.splice(widgetIdx, 1);
+            }
+
+            // Remove MCP registrations
+            removeWidgetTool(widgetName);
 
             try {
               await fs.access(widgetDir);
               await fs.rm(widgetDir, { recursive: true, force: true });
               console.log(
-                `[WIDGETS] Cleaned up stale widget (file removed): ${widgetName}`
+                `[WIDGETS] Removed widget (file deleted): ${widgetName}`
               );
             } catch {
               // Widget directory doesn't exist, nothing to clean up
@@ -351,20 +382,319 @@ if (container && Component) {
       // Watch for directory deletions (folder-based widgets)
       server.watcher.on("unlinkDir", async (dirPath: string) => {
         const relativePath = pathHelpers.relative(resourcesPath, dirPath);
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
 
         // Check if this is a top-level directory in resources/
         if (relativePath && !relativePath.includes("/")) {
           const widgetName = relativePath;
-          const widgetDir = pathHelpers.join(tempDir, widgetName);
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const widgetDir = pathHelpers.join(tempDir, slugifiedName);
+
+          // Remove from widgets array
+          const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
+          if (widgetIdx !== -1) {
+            widgets.splice(widgetIdx, 1);
+          }
+
+          // Remove MCP registrations
+          removeWidgetTool(widgetName);
 
           try {
             await fs.access(widgetDir);
             await fs.rm(widgetDir, { recursive: true, force: true });
             console.log(
-              `[WIDGETS] Cleaned up stale widget (directory removed): ${widgetName}`
+              `[WIDGETS] Removed widget (directory deleted): ${widgetName}`
             );
           } catch {
             // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+      });
+
+      // Helper: Create temp entry/HTML files for a widget
+      const createWidgetTempFiles = async (
+        widgetName: string,
+        entryPath: string
+      ) => {
+        // Use slugified name for temp directory to match URL routing
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+        const slugifiedName = slugifyWidgetName(widgetName);
+        const widgetTempDir = pathHelpers.join(tempDir, slugifiedName);
+        await fs.mkdir(widgetTempDir, { recursive: true });
+
+        // Create a CSS file with Tailwind and @source directives to scan resources
+        const relativeResourcesPath = pathHelpers
+          .relative(widgetTempDir, resourcesPath)
+          .replace(/\\/g, "/");
+
+        // Calculate relative path to mcp-use package dynamically
+        const mcpUsePath = pathHelpers.join(
+          getCwd(),
+          "node_modules",
+          "mcp-use"
+        );
+        const relativeMcpUsePath = pathHelpers
+          .relative(widgetTempDir, mcpUsePath)
+          .replace(/\\/g, "/");
+
+        const cssContent = `@import "tailwindcss";
+
+/* Configure Tailwind to scan the resources directory and mcp-use package */
+@source "${relativeResourcesPath}";
+@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
+`;
+        await fs.writeFile(
+          pathHelpers.join(widgetTempDir, "styles.css"),
+          cssContent,
+          "utf8"
+        );
+
+        const entryContent = `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles.css'
+import Component from '${entryPath}'
+
+const container = document.getElementById('widget-root')
+if (container && Component) {
+  const root = createRoot(container)
+  root.render(<Component />)
+}
+`;
+
+        const htmlContent = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${widgetName} Widget</title>${
+      serverConfig.favicon
+        ? `
+    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+        : ""
+    }
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
+  </body>
+</html>`;
+
+        await fs.writeFile(
+          pathHelpers.join(widgetTempDir, "entry.tsx"),
+          entryContent,
+          "utf8"
+        );
+        await fs.writeFile(
+          pathHelpers.join(widgetTempDir, "index.html"),
+          htmlContent,
+          "utf8"
+        );
+      };
+
+      // Helper: Extract metadata and register/update widget
+      const extractAndRegisterWidget = async (
+        widgetName: string,
+        entryPath: string,
+        changedFilePath?: string,
+        isHmrUpdate: boolean = false
+      ) => {
+        // Invalidate the changed file in Vite's module graph
+        // This propagates invalidation to importers (e.g., widget.tsx when types.ts changes)
+        if (changedFilePath) {
+          server.moduleGraph.onFileChange(changedFilePath);
+        }
+
+        // Also explicitly invalidate the widget entry module
+        const entryMod = server.moduleGraph.getModuleById(entryPath);
+        if (entryMod) {
+          server.moduleGraph.invalidateModule(entryMod);
+        }
+
+        // Load module with fresh exports
+        const mod = await server.ssrLoadModule(entryPath);
+
+        // Extract metadata
+        let metadata: WidgetMetadata = {};
+        if (mod.widgetMetadata) {
+          metadata = mod.widgetMetadata;
+
+          // Handle props field (preferred) or inputs field (deprecated) for Zod schema
+          const schemaField = metadata.props || metadata.inputs;
+          if (schemaField) {
+            try {
+              // Pass the full Zod schema object directly (don't extract .shape)
+              // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+              // and raw shapes, so we preserve the full schema here
+              metadata.props = schemaField;
+              // Also set inputs as alias for backward compatibility
+              if (!metadata.inputs) {
+                metadata.inputs = schemaField;
+              }
+            } catch (error) {
+              console.warn(
+                `[WIDGET] Failed to extract schema for ${widgetName}:`,
+                error
+              );
+            }
+          }
+        }
+
+        // For HMR updates, use the direct update path to avoid re-registration issues
+        if (isHmrUpdate) {
+          const schemaField = metadata.props || metadata.inputs;
+
+          // Use the update callback to update tool in place
+          // Pass the raw Zod schema - the server will convert it internally
+          updateWidgetTool(widgetName, {
+            description: metadata.description || `Widget: ${widgetName}`,
+            schema: schemaField,
+            _meta: {
+              "mcp-use/widget": {
+                description: metadata.description,
+                props: metadata.props,
+              },
+            },
+          });
+          return;
+        }
+
+        // Full registration for new widgets
+        // Use slugified name for temp directory path
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+        const slugifiedName = slugifyWidgetName(widgetName);
+        await registerWidgetFromTemplate(
+          widgetName,
+          pathHelpers.join(tempDir, slugifiedName, "index.html"),
+          (metadata.description
+            ? metadata
+            : { ...metadata, description: `Widget: ${widgetName}` }) as Record<
+            string,
+            unknown
+          >,
+          serverConfig,
+          registerWidget,
+          true // isDev
+        );
+      };
+
+      // Watch for widget file changes and re-extract metadata
+      server.watcher.on("change", async (filePath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Check if this is a widget-related file
+        let isWidgetFile = false;
+        let widgetName = "";
+
+        // Single file widget (e.g., widget-name.tsx at root)
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          isWidgetFile = true;
+          widgetName = relativePath.replace(/\.tsx?$/, "");
+        }
+        // Any file inside a widget folder (e.g., widget-name/types.ts, widget-name/components/foo.tsx)
+        else if (relativePath.includes("/")) {
+          const parts = relativePath.split("/");
+          const potentialWidgetName = parts[0];
+          // Check if this folder is a registered widget
+          const widget = widgets.find((w) => w.name === potentialWidgetName);
+          if (widget) {
+            isWidgetFile = true;
+            widgetName = potentialWidgetName;
+          }
+        }
+
+        if (isWidgetFile) {
+          const widget = widgets.find((w) => w.name === widgetName);
+          if (widget) {
+            try {
+              // Pass isHmrUpdate=true for existing widgets to use the update path
+              await extractAndRegisterWidget(
+                widget.name,
+                widget.entry,
+                filePath,
+                true // isHmrUpdate
+              );
+              console.log(`[WIDGETS] Reloaded metadata for ${widget.name}`);
+            } catch (error) {
+              console.warn(
+                `[WIDGET] Failed to reload metadata for ${widget.name}:`,
+                error
+              );
+            }
+          }
+        }
+      });
+
+      // Watch for new widget files/folders being added
+      server.watcher.on("add", async (filePath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Single file widget at root (e.g., "new-widget.tsx")
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          const widgetName = relativePath.replace(/\.tsx?$/, "");
+
+          // Check if already registered
+          if (!widgets.find((w) => w.name === widgetName)) {
+            try {
+              // Add to widgets array
+              widgets.push({
+                name: widgetName,
+                description: `Widget: ${widgetName}`,
+                entry: filePath,
+              });
+
+              // Create temp files and register widget
+              await createWidgetTempFiles(widgetName, filePath);
+              await extractAndRegisterWidget(widgetName, filePath);
+
+              console.log(`[WIDGETS] New widget added: ${widgetName}`);
+            } catch (error) {
+              console.warn(
+                `[WIDGET] Failed to add new widget ${widgetName}:`,
+                error
+              );
+              // Remove from widgets array if registration failed
+              const idx = widgets.findIndex((w) => w.name === widgetName);
+              if (idx !== -1) widgets.splice(idx, 1);
+            }
+          }
+        }
+        // New widget.tsx inside a folder (e.g., "new-widget/widget.tsx")
+        else if (relativePath.endsWith("widget.tsx")) {
+          const parts = relativePath.split("/");
+          if (parts.length === 2) {
+            const widgetName = parts[0];
+
+            // Check if already registered
+            if (!widgets.find((w) => w.name === widgetName)) {
+              try {
+                // Add to widgets array
+                widgets.push({
+                  name: widgetName,
+                  description: `Widget: ${widgetName}`,
+                  entry: filePath,
+                });
+
+                // Create temp files and register widget
+                await createWidgetTempFiles(widgetName, filePath);
+                await extractAndRegisterWidget(widgetName, filePath);
+
+                console.log(`[WIDGETS] New widget added: ${widgetName}`);
+              } catch (error) {
+                console.warn(
+                  `[WIDGET] Failed to add new widget ${widgetName}:`,
+                  error
+                );
+                // Remove from widgets array if registration failed
+                const idx = widgets.findIndex((w) => w.name === widgetName);
+                if (idx !== -1) widgets.splice(idx, 1);
+              }
+            }
           }
         }
       });
@@ -468,19 +798,24 @@ export default PostHog;
     const widgetMatch = pathname.replace(baseRoute, "").match(/^\/([^/]+)/);
 
     if (widgetMatch) {
-      const widgetName = widgetMatch[1];
-      const widget = widgets.find((w) => w.name === widgetName);
+      // URL contains slugified widget name, need to find original widget name
+      const slugifiedNameFromUrl = widgetMatch[1];
+      const { slugifyWidgetName } = await import("./widget-helpers.js");
+      const widget = widgets.find(
+        (w) => slugifyWidgetName(w.name) === slugifiedNameFromUrl
+      );
 
       if (widget) {
         // If requesting the root of a widget, serve its index.html
+        // Use slugified name for URL paths
         const relativePath = pathname.replace(baseRoute, "");
         if (
-          relativePath === `/${widgetName}` ||
-          relativePath === `/${widgetName}/`
+          relativePath === `/${slugifiedNameFromUrl}` ||
+          relativePath === `/${slugifiedNameFromUrl}/`
         ) {
           // Rewrite the URL for Vite by creating a new request with modified URL
           const newUrl = new URL(c.req.url);
-          newUrl.pathname = `${baseRoute}/${widgetName}/index.html`;
+          newUrl.pathname = `${baseRoute}/${slugifiedNameFromUrl}/index.html`;
           // Create a new request with modified URL and update the context
           const newRequest = new Request(newUrl.toString(), c.req.raw);
           // Update the request in the context by creating a new context-like object
@@ -529,8 +864,10 @@ export default PostHog;
   });
 
   widgets.forEach((widget) => {
+    // Use slugified name for URL display
+    const slugifiedName = slugifyWidgetName(widget.name);
     console.log(
-      `[WIDGET] ${widget.name} mounted at ${baseRoute}/${widget.name}`
+      `[WIDGET] ${widget.name} mounted at ${baseRoute}/${slugifiedName}`
     );
   });
 
