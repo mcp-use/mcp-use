@@ -320,7 +320,10 @@ Return ONLY valid JSON, no markdown code fences.`;
   const { TestPlanSchema } = await import("./planSchema.js");
 
   // Build conversation for potential retries
-  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+  const messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }> = [
     { role: "system", content: PLANNING_SYSTEM_PROMPT },
     { role: "user", content: userPrompt },
   ];
@@ -351,7 +354,9 @@ Return ONLY valid JSON, no markdown code fences.`;
         message: issue.message,
       }));
 
-      console.log(`  ⚠️ Validation failed with ${errors.length} errors, asking LLM to fix...`);
+      console.log(
+        `  ⚠️ Validation failed with ${errors.length} errors, asking LLM to fix...`
+      );
 
       // Add assistant response and error feedback to conversation
       messages.push({ role: "assistant", content });

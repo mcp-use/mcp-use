@@ -52,7 +52,9 @@ export const ToolTestCaseSchema = z
     (data) => {
       // Validate deterministic assertion exists based on category
       if (data.category === "direct" || data.category === "indirect") {
-        return data.expectedToolCall !== null && data.expectedToolCall !== undefined;
+        return (
+          data.expectedToolCall !== null && data.expectedToolCall !== undefined
+        );
       }
       if (data.category === "negative") {
         return data.expectNotUsed === true;
