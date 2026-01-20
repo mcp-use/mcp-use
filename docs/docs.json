@@ -133,6 +133,7 @@
                       "python/server/prompts",
                       "python/server/sampling",
                       "python/server/elicitation",
+                      "python/server/roots",
                       "python/server/notifications"
                     ]
                   },
@@ -174,11 +175,21 @@
                       "python/client/middleware",
                       "python/client/sampling",
                       "python/client/elicitation",
+                      "python/client/roots",
                       "python/client/notifications",
                       "python/client/logging"
                     ]
                   },
-                  "python/client/authentication",
+                  {
+                    "group": "Authentication",
+                    "icon": "key",
+                    "pages": [
+                      "python/client/authentication/index",
+                      "python/client/authentication/oauth",
+                      "python/client/authentication/bearer",
+                      "python/client/authentication/custom"
+                    ]
+                  },
                   "python/client/code-mode"
                 ]
               },
@@ -376,7 +387,14 @@
                       "python/api-reference/mcp_use_server_logging_state"
                     ]
                   },
-                  "python/api-reference/mcp_use_server_middleware_middleware",
+                  {
+                    "group": "Middleware",
+                    "icon": "layers",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_middleware_middleware",
+                      "python/api-reference/mcp_use_server_middleware_server_session"
+                    ]
+                  },
                   "python/api-reference/mcp_use_server_router",
                   "python/api-reference/mcp_use_server_runner",
                   "python/api-reference/mcp_use_server_server",
@@ -388,7 +406,6 @@
                       "python/api-reference/mcp_use_server_utils_inspector",
                       "python/api-reference/mcp_use_server_utils_openmcp",
                       "python/api-reference/mcp_use_server_utils_routes",
-                      "python/api-reference/mcp_use_server_utils_signals",
                       "python/api-reference/mcp_use_server_utils_utils"
                     ]
                   }
@@ -409,6 +426,7 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_5_2",
                   "python/changelog/1_5_0",
                   "python/changelog/1_4_1",
                   "python/changelog/1_4_0",
@@ -427,18 +445,6 @@
                 "group": "Community",
                 "pages": [
                   "python/community/showcase"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Blog",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Blog",
-                "pages": [
-                  "python/blog/middleware"
                 ]
               }
             ]
@@ -652,6 +658,29 @@
             ]
           }
         ]
+      },
+      {
+        "product": "Inspector",
+        "description": "Debug and test MCP Apps & Servers",
+        "icon": "/images/inspector-logo.svg",
+        "groups": [
+          {
+            "group": "Inspector",
+            "pages": [
+              "inspector/index",
+              "inspector/cli",
+              "inspector/connection-settings",
+              "inspector/keyboard-shortcuts",
+              "inspector/command-palette",
+              "inspector/rpc-logging",
+              "inspector/integration",
+              "inspector/debugging-chatgpt-apps",
+              "inspector/self-hosting",
+              "inspector/development",
+              "inspector/changelog"
+            ]
+          }
+        ]
       }
     ]
   },
@@ -668,7 +697,7 @@
   "logo": {
     "light": "/logo/light.svg",
     "dark": "/logo/dark.svg",
-    "href": "https://mcp-use.com"
+    "href": "https://mcp-use.com/docs"
   },
   "navbar": {
     "links": [
@@ -711,10 +740,6 @@
           {
             "label": "Website",
             "href": "https://mcp-use.com"
-          },
-          {
-            "label": "Cloud Chat",
-            "href": "https://chat.mcp-use.com"
           },
           {
             "label": "GitHub",

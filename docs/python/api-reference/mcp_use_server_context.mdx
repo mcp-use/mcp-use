@@ -55,6 +55,35 @@ def get_http_request():
 </Card>
 
 <Card type="info">
+### `method` list_roots
+
+Request the list of roots from the client.
+
+        Roots represent directories or files that the client has access to
+        and wants to make available to the server.
+
+        Example:
+            ```python
+            @mcp.tool()
+            async def analyze_workspace(ctx: Context) -> str:
+                roots = await ctx.list_roots()
+                if not roots:
+                    return "No roots provided by client"
+                return f"Client has \{len(roots)\} root(s): \{[str(r.uri) for r in roots]\}"
+            ```
+
+
+**Returns**
+><ResponseField name="returns" type="list[Root]" >A list of Root objects, each with a 'uri' (file:// URI) and optional 'name' field.</ResponseField>
+
+**Signature**
+```python wrap
+def list_roots():
+```
+
+</Card>
+
+<Card type="info">
 ### `method` sample
 
 Request a client-side LLM sampling invocation.

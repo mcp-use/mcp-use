@@ -63,4 +63,4 @@ git push
 
 ---
 
-For detailed documentation, see [CONTRIBUTING.md](../../CONTRIBUTING.md#typescript-releases) in the project root.
+For detailed documentation, see [CONTRIBUTING.md](../../../CONTRIBUTING.md#typescript-releases) in the project root.

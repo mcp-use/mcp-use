@@ -4,7 +4,7 @@ description: "Clean, configurable logging system designed specifically for MCP s
 icon: "activity"
 ---
 
-<Card title="" img="./images/Logging.jpg" horizontal="true"/>
+<Card title="" img="https://cdn.mcp-use.com/docs/python/Logging.jpg" horizontal="true"/>
 
 <Info>
 mcp-use provides clean, informative logging about MCP operations, making it easy to understand server activity and debug issues in both production and development.
@@ -198,7 +198,7 @@ MCP:  127.0.0.1:58478 - "POST /mcp [tools/list] HTTP/1.1" 200
 
 ### Pretty Print JSON-RPC (`pretty_print_jsonrpc`)
 
-When using `DEBUG=2`, JSON-RPC requests and responses are logged. By default, they appear as single-line text. Enable pretty printing for formatted Rich panels:
+Enable pretty printing to display JSON-RPC requests and responses as formatted Rich panels:
 
 ```python
 # Plain text JSON-RPC logs (default)
@@ -235,7 +235,7 @@ server = MCPServer(
     name="my-server",
     debug=True,
     show_inspector_logs=False,    # Hide inspector noise
-    pretty_print_jsonrpc=True,    # Pretty JSON-RPC in DEBUG=2
+    pretty_print_jsonrpc=True,    # Pretty-printed JSON-RPC panels
 )
 server.run(transport="streamable-http")
 ```

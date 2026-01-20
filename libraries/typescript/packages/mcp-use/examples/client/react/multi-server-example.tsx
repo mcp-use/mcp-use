@@ -27,9 +27,17 @@ const ServerManager: React.FC = () => {
       // User must click "Authenticate" button when server requires OAuth
     });
 
+    addServer("supabase", {
+      url: "https://mcp.supabase.com/mcp?project_ref={PROJECT_REF}&features=database%2Cdebugging",
+      name: "Supabase (OAuth proxy, requires special proxying)",
+      timeout: 30000,
+      preventAutoAuth: true, // is the default
+      // User must click "Authenticate" button when server requires OAuth
+    });
+
     addServer("no api key needed", {
       url: "https://apps-sdk-starter.mcp-use.run",
-      name: "No API Key (MCP Use)",
+      name: "No API Key Needed (MCP Use)",
     });
   }, [addServer]);
 
@@ -155,11 +163,14 @@ const ServerManager: React.FC = () => {
                 )}
 
                 {/* Authentication Actions */}
-                {server.state === "pending_auth" && (
+                {server.state === "pending_auth" && server.authUrl && (
                   <div style={{ marginTop: "10px" }}>
-                    <button
-                      onClick={() => server.authenticate()}
+                    <a
+                      href={server.authUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
+                        display: "inline-block",
                         padding: "10px 20px",
                         marginRight: "10px",
                         backgroundColor: "#28a745",
@@ -167,33 +178,11 @@ const ServerManager: React.FC = () => {
                         border: "none",
                         borderRadius: "4px",
                         cursor: "pointer",
+                        textDecoration: "none",
                       }}
                     >
                       Start Authentication
-                    </button>
-
-                    {server.authUrl && (
-                      <div
-                        style={{
-                          marginTop: "10px",
-                          padding: "10px",
-                          backgroundColor: "#fff3cd",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        <p style={{ margin: "0 0 10px 0" }}>
-                          <strong>Popup blocked?</strong> Click the link below
-                          to authenticate manually:
-                        </p>
-                        <a
-                          href={server.authUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open Authentication Page
-                        </a>
-                      </div>
-                    )}
+                    </a>
                   </div>
                 )}
 
@@ -228,24 +217,8 @@ const ServerManager: React.FC = () => {
                   >
                     <strong>⏳ Authenticating...</strong>
                     <p style={{ margin: "10px 0 0 0" }}>
-                      Please complete the authentication in the popup window. If
-                      you don't see a popup, check if your browser blocked it.
+                      Please complete the authentication in the popup window.
                     </p>
-                    {server.authUrl && (
-                      <div style={{ marginTop: "10px" }}>
-                        <p style={{ margin: "0 0 10px 0" }}>
-                          <strong>Popup blocked?</strong> Click the link below
-                          to authenticate manually:
-                        </p>
-                        <a
-                          href={server.authUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open Authentication Page
-                        </a>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

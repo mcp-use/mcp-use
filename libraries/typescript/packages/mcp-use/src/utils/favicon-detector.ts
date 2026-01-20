@@ -4,6 +4,19 @@
  */
 
 /**
+ * Response from favicon.tools.mcp-use.com API when requesting JSON format
+ */
+interface FaviconApiResponse {
+  url: string;
+  sourceUrl: string;
+  width: number;
+  height: number;
+  format: string;
+  bytes: number;
+  source: "default" | "link-tag" | string;
+}
+
+/**
  * Determine whether a domain refers to a local or private server.
  *
  * @param domain - Hostname or IPv4 address to evaluate
@@ -21,17 +34,23 @@ export function isLocalServer(domain: string): boolean {
 }
 
 /**
- * Returns the base domain composed of the last two hostname labels (e.g., "api.github.com" → "github.com").
+ * Generate all subdomain levels from most specific to least specific.
+ * For example: "mcp.supabase.com" → ["mcp.supabase.com", "supabase.com"]
+ * Note: Excludes TLDs (single-part domains like "com", "run", etc.)
  *
- * @param hostname - Full hostname to extract the base domain from
- * @returns The base domain consisting of the last two labels, or the original `hostname` if it has two or fewer labels
+ * @param hostname - Full hostname to generate subdomain levels from
+ * @returns Array of domain levels from most specific to least specific (minimum 2 parts)
  */
-function getBaseDomain(hostname: string): string {
+function getSubdomainLevels(hostname: string): string[] {
   const parts = hostname.split(".");
-  if (parts.length <= 2) {
-    return hostname;
+  const levels: string[] = [];
+
+  // Only include domains with at least 2 parts (e.g., "example.com" yes, "com" no)
+  for (let i = 0; i < parts.length - 1; i++) {
+    levels.push(parts.slice(i).join("."));
   }
-  return parts.slice(parts.length - 2).join(".");
+
+  return levels;
 }
 
 /**
@@ -82,19 +101,16 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
       return null;
     }
 
-    // Try full domain first, then base domain as fallback
-    const baseDomain = getBaseDomain(domain);
-    const domainsToTry =
-      domain !== baseDomain ? [domain, baseDomain] : [domain];
+    // Get all subdomain levels to try (from most specific to least specific)
+    const domainsToTry = getSubdomainLevels(domain);
     console.debug("[favicon-detector] Domains to try:", domainsToTry);
 
     for (const currentDomain of domainsToTry) {
       try {
-        // Use favicon.tools.mcp-use.com API to get the favicon as base64
-        // Request the image directly (not JSON) so we get the actual image bytes
-        const faviconApiUrl = `https://favicon.tools.mcp-use.com/${currentDomain}`;
+        // Use favicon.tools.mcp-use.com API with JSON response to check if it's a default
+        const faviconApiUrl = `https://favicon.tools.mcp-use.com/${currentDomain}?response=json`;
         console.debug(
-          "[favicon-detector] Attempting to fetch favicon for:",
+          "[favicon-detector] Attempting to fetch favicon metadata for:",
           currentDomain,
           "from:",
           faviconApiUrl
@@ -120,17 +136,51 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
             continue;
           }
 
-          // Convert the response to base64 directly (no CORS issues since we're fetching from favicon.tools)
-          const blob = await response.blob();
-          const base64Image = await blobToBase64(blob);
+          const data: FaviconApiResponse = await response.json();
           console.debug(
-            "[favicon-detector] Successfully retrieved favicon for:",
+            "[favicon-detector] Retrieved favicon metadata for:",
             currentDomain,
+            "source:",
+            data.source
+          );
+
+          // Fetch the actual image from the URL in the response
+          // Normalize http:// to https:// to avoid CORS and mixed content issues
+          const imageUrl = data.url.replace(/^http:\/\//, "https://");
+          const imageResponse = await fetch(imageUrl);
+          if (!imageResponse.ok) {
+            console.debug(
+              "[favicon-detector] Failed to fetch favicon image for",
+              currentDomain,
+              "status:",
+              imageResponse.status
+            );
+            continue;
+          }
+
+          const blob = await imageResponse.blob();
+          const base64Image = await blobToBase64(blob);
+
+          if (data.source === "default") {
+            // This is a default favicon, skip it and continue looking for a non-default
+            console.debug(
+              "[favicon-detector] Found default favicon for:",
+              currentDomain,
+              "skipping and continuing to search for non-default"
+            );
+            continue;
+          }
+
+          // Found a non-default favicon, return immediately
+          console.debug(
+            "[favicon-detector] Successfully retrieved non-default favicon for:",
+            currentDomain,
+            "source:",
+            data.source,
             "size:",
             blob.size,
             "bytes"
           );
-
           return base64Image;
         } catch (err) {
           clearTimeout(timeoutId);
@@ -155,8 +205,12 @@ export async function detectFavicon(serverUrl: string): Promise<string | null> {
       }
     }
 
-    // All attempts failed
-    console.debug("[favicon-detector] All attempts failed for:", serverUrl);
+    // All attempts failed to find a non-default favicon
+    console.debug(
+      "[favicon-detector] No non-default favicon found for:",
+      serverUrl,
+      "returning null to show gradient fallback"
+    );
     return null;
   } catch (error) {
     console.warn("[favicon-detector] Error detecting favicon:", error);

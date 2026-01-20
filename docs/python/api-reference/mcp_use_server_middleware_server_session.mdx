@@ -1,0 +1,66 @@
+---
+title: "Server Session"
+description: "Server Session API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/middleware/server_session.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/middleware/server_session.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/middleware/server_session.py</a>
+</Callout>
+
+## MiddlewareServerSession
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MiddlewareServerSession</div>
+
+Extended ServerSession that routes initialize requests through middleware.
+
+    This class intercepts the MCP initialize handshake at the protocol layer,
+    allowing middleware to:
+    - Validate client capabilities or metadata during connection
+    - Log connection attempts and protocol versions
+    - Reject connections early based on initialization parameters
+
+    The class is injected via monkey-patching of ``mcp.server.session.ServerSession``
+    to intercept session creation within the MCP SDK.
+
+    Note:
+        This implementation uses class attributes for middleware injection,
+        which means only ONE MCPServer instance is supported per process.
+        This is compatible with standard deployment patterns (e.g., uvicorn workers
+        run in separate processes), but multiple MCPServer instances in the
+        same process will share/override each other's middleware configuration.
+
+    Attributes:
+        _middleware_manager: The middleware manager to process initialize requests.
+            Injected by MCPServer during initialization.
+        _transport_type: The transport type (e.g., "stdio", "streamable-http").
+            Injected by MCPServer during initialization.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.middleware.server_session import MiddlewareServerSession
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="read_stream" type="anyio.streams.memory.MemoryObjectReceiveStream" required="True" >   String value </ParamField>
+><ParamField body="write_stream" type="anyio.streams.memory.MemoryObjectSendStream" required="True" >   String value </ParamField>
+><ParamField body="init_options" type="mcp.server.models.InitializationOptions" required="True" >   Parameter value </ParamField>
+><ParamField body="stateless" type="bool" default="False" >   Boolean flag </ParamField>
+
+**Signature**
+```python wrap
+def __init__(read_stream: anyio.streams.memory.MemoryObjectReceiveStream, write_stream: anyio.streams.memory.MemoryObjectSendStream, init_options: mcp.server.models.InitializationOptions, stateless: bool = False):
+```
+
+</Card>
+</div>

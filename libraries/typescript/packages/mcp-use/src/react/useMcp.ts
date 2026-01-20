@@ -246,7 +246,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ResourceTemplate[]
   >([]);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>();
+  const [serverInfo, setServerInfo] = useState<UseMcpResult["serverInfo"]>(
+    // Only use cached metadata if it has at least a name
+    options._initialServerInfo?.name
+      ? (options._initialServerInfo as UseMcpResult["serverInfo"])
+      : undefined
+  );
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
@@ -515,6 +520,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       `Connecting attempt #${connectAttemptRef.current} to ${url}...`
     );
 
+    // NOTE: We intentionally do NOT clear OAuth storage before connecting.
+    // The clearStorage() function clears tokens and client_info which should
+    // persist across connections. Clearing them would force re-authentication
+    // even when valid tokens exist from a previous OAuth flow.
+    //
+    // Stale state/verifier items are cleaned up:
+    // - By the callback handler after successful token exchange
+    // - By the unmount cleanup when OAuth flow is interrupted
+    // - By the state expiry check in the callback handler
+
     if (!authProviderRef.current) {
       // Determine OAuth proxy URL based on gateway configuration
       // If a proxy is configured, use the same base URL with /oauth path
@@ -541,6 +556,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preventAutoAuth,
           useRedirectFlow,
           oauthProxyUrl,
+          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
           onPopupWindow,
         }
       );
@@ -1291,11 +1307,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
         assert(url, "Server URL is required for authentication");
 
-        // NOTE: We no longer clear state here. The existing state from the initial
-        // discovery is valid and should be preserved. If auth() creates new state,
-        // that's fine - old state will be cleaned up on successful auth or clearStorage().
-        // Clearing state prematurely caused issues when auth() failed to create new state.
-        addLog("info", "Initiating OAuth flow (preserving existing state)...");
+        // Clear OAuth storage to ensure fresh authentication flow
+        const clearedCount = authProviderRef.current.clearStorage();
+        addLog(
+          "info",
+          `Cleared ${clearedCount} OAuth storage item(s) for fresh authentication`
+        );
 
         // Update state to authenticating before redirect
         setState("authenticating");
@@ -1321,6 +1338,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false, // ← Allow OAuth to proceed
             useRedirectFlow,
             oauthProxyUrl,
+            connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
             onPopupWindow,
           }
         );
@@ -1808,6 +1826,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           preventAutoAuth,
           useRedirectFlow,
           oauthProxyUrl,
+          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
           onPopupWindow,
         }
       );

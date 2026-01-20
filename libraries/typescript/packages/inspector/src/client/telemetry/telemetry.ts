@@ -49,6 +49,18 @@ function getCacheKey(key: string): string {
   return `mcp_inspector_telemetry_${key}`;
 }
 
+/**
+ * Check if localStorage is available and functional.
+ * Node.js 25+ has an experimental localStorage that exists but doesn't implement methods properly.
+ */
+function isLocalStorageFunctional(): boolean {
+  return (
+    typeof localStorage !== "undefined" &&
+    typeof localStorage.getItem === "function" &&
+    typeof localStorage.setItem === "function"
+  );
+}
+
 export class Telemetry {
   private static instance: Telemetry | null = null;
 
@@ -104,7 +116,7 @@ export class Telemetry {
 
   private isTelemetryDisabled(): boolean {
     // Check localStorage
-    if (typeof localStorage !== "undefined") {
+    if (isLocalStorageFunctional()) {
       const stored = localStorage.getItem(getCacheKey("disabled"));
       if (stored === "true") return true;
     }
@@ -119,7 +131,7 @@ export class Telemetry {
   }
 
   private getStoredSource(): string | null {
-    if (typeof localStorage !== "undefined") {
+    if (isLocalStorageFunctional()) {
       return localStorage.getItem(getCacheKey("source"));
     }
     return null;
@@ -139,7 +151,7 @@ export class Telemetry {
    */
   setSource(source: string): void {
     this._source = source;
-    if (typeof localStorage !== "undefined") {
+    if (isLocalStorageFunctional()) {
       localStorage.setItem(getCacheKey("source"), source);
     }
   }
@@ -163,6 +175,11 @@ export class Telemetry {
     }
 
     try {
+      // Check if localStorage is functional
+      if (!isLocalStorageFunctional()) {
+        throw new Error("localStorage is not available or not functional");
+      }
+
       // Check localStorage for existing user ID
       const storedUserId = localStorage.getItem(getCacheKey("user_id"));
 
@@ -280,6 +297,11 @@ export class Telemetry {
     }
 
     try {
+      // Check if localStorage is functional
+      if (!isLocalStorageFunctional()) {
+        throw new Error("localStorage is not available or not functional");
+      }
+
       const currentVersion = getPackageVersion();
       let shouldTrack = false;
       let firstDownload = false;

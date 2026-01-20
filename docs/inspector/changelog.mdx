@@ -6,9 +6,158 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.15.3" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Enhancement**: Updated mcp-use dependency to latest version
+</Update>
+
+<Update label="v0.15.2" description="January 2026">
+  ## OAuth Proxy URL Handling Improvements
+  Patch release with improved OAuth proxy URL handling and connection logic.
+
+- **Enhancement**: Improved OAuth proxy URL derivation from callback URLs
+- **Enhancement**: Better handling of root path callbacks in OAuth flow
+- **Enhancement**: Clearer separation between OAuth proxy URLs and connection URLs
+- **Fix**: Maintains valid OAuth tokens across sessions by not clearing OAuth storage before connecting
+</Update>
+
+<Update label="v0.15.1" description="January 2026">
+  ## URL Validation & LocalStorage Enhancements
+  Patch release with URL validation improvements and localStorage functionality.
+
+- **Enhancement**: Automatically prepends "https://" to URLs without protocol for better user experience
+- **Enhancement**: Improved URL validation logic in InspectorDashboard and ServerConnectionModal
+- **Enhancement**: Added localStorage clearing functionality for MCP-related items to help with troubleshooting
+- **Fix**: Enhanced localStorage checks to verify both existence and functional methods before usage
+- **Fix**: Clear stale OAuth storage before connecting to ensure fresh authentication flow
+</Update>
+
+<Update label="v0.15.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.15.0&title=Chat%20Stop%20Functionality&date=2026-01&lang=inspector" alt="Release 0.15.0" />
+  </Frame>
+  ## Chat Stop Functionality
+  Minor release adding the ability to stop ongoing chat responses in the inspector.
+
+### Chat Functionality
+
+- **New**: Stop functionality for chat responses - users can now abort streaming responses
+- **New**: Export stop function from `useChatMessagesClientSide` hook connected to `abortControllerRef`
+- **New**: `abortControllerRef` added to `useChatMessages` hook for proper abort control
+- **Enhancement**: Stop button connected to abort streaming responses for better user control
+
+### UI & Authentication
+
+- **Enhancement**: Simplified authentication button logic in InspectorDashboard
+- **Enhancement**: Updated multi-server example to link directly to authentication URL
+- **Fix**: Updated dependency `hono` to 4.11.4
+</Update>
+
+<Update label="v0.14.6" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Enhancement**: Updated mcp-use dependency to latest version
+</Update>
+
+<Update label="v0.14.5" description="January 2026">
+  ## OAuth & Metadata Enhancements
+  Minor release with OAuth proxy support, metadata caching, and favicon improvements.
+
+### OAuth & Client Info
+
+- **Enhancement**: Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+- **Enhancement**: Client info support with branding displayed on OAuth consent pages
+- **Enhancement**: Server metadata caching for immediate display on reconnect - improves UX by showing server info instantly
+- **Enhancement**: Improved logging middleware for API routes with better debugging visibility
+- **Enhancement**: Enabled OAuth proxy logging for better flow visibility
+
+### Favicon Detection
+
+- **Enhancement**: Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com → com)
+- **Enhancement**: Detection of default vs custom favicons using JSON API response
+- **Enhancement**: Prefer non-default favicons when available
+
+### Bug Fixes
+
+- **Fix**: Remove import from "mcp-use" which causes langchain import in server
+- **Enhancement**: Enhanced synchronization for tools, prompts, and resources during HMR
+</Update>
+
+<Update label="v0.14.4" description="January 2026">
+  ## Connection Fix
+  Patch release fixing autoconnect configuration parsing.
+
+- **Fix**: Autoconnect now correctly parses config objects in addition to string URLs
+</Update>
+
+<Update label="v0.14.3" description="January 2026">
+  ## Security Fixes & OAuth Improvements
+  Patch release addressing multiple security vulnerabilities and fixing OAuth flow issues.
+
+### Security Fixes
+
+- **Security**: Fixed 13 vulnerabilities (3 moderate, 10 high)
+- **Security**: Updated `langchain` to 1.2.3 (fixes serialization injection vulnerability)
+- **Security**: Updated `@langchain/core` to 1.1.8 (fixes serialization injection vulnerability)
+- **Security**: Updated `react-router` to 7.12.0 (fixes XSS and CSRF vulnerabilities)
+- **Security**: Added overrides for `qs` and `preact` vulnerabilities
+
+### OAuth & Connection Improvements
+
+- **Fix**: Resolved OAuth flow looping issue by removing duplicate fallback logic
+- **Enhancement**: Simplified connection handling with consolidated state management
+- **Enhancement**: Enhanced OAuth authentication flow with improved connection settings
+- **Enhancement**: Improved auto-connect functionality with better proxy handling and error management
+- **Enhancement**: Enhanced theme toggling with dropdown menu for better UX and accessibility
+- **Enhancement**: Updated OAuth flow management in browser provider and callback handling
+</Update>
+
+<Update label="v0.14.2" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.14.2&title=Automatic%20Proxy%20Fallback%20%26%20Reconnect&date=2026-01&lang=inspector" alt="Release 0.14.2" />
+  </Frame>
+  ## Automatic Proxy Fallback & Reconnect
+  Minor release with automatic proxy fallback, OAuth proxy support, and reconnect functionality.
+
+### Breaking Changes (with Deprecation Warnings)
+
+- **Breaking**: Renamed `customHeaders` to `headers` across all APIs. Old name still works but shows deprecation warnings.
+- **Breaking**: Renamed `samplingCallback` to `onSampling` for consistency. Old name still works but shows deprecation warnings.
+
+### New Features
+
+- **New**: Reconnect functionality for failed connections - reconnect button in InspectorDashboard UI
+- **New**: Reconnect option in dropdown menu for failed connections
+- **New**: Configurable clientInfo support for MCP connection initialization with full metadata
+- **New**: Automatic Proxy Fallback - automatically retries failed connections through proxy
+- **New**: OAuth Proxy Support with oauthProxyUrl configuration
+
+### Improvements
+
+- **Enhancement**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+- **Enhancement**: OAuth provider uses original target URL for discovery, not proxy URL
+- **Enhancement**: HttpConnector automatic reconnection disabled, shifting responsibility to higher-level logic for better control
+
+### Bug Fixes
+
+- **Fix**: Custom headers now correctly included when copying connection configuration from saved tiles
+- **Fix**: Headers correctly read from localStorage where stored in proxyConfig.customHeaders
+</Update>
+
+<Update label="v0.14.1" description="January 2026">
+  ## Security Update
+  Patch release with security fixes and build improvements.
+
+- **Security**: Updated `@modelcontextprotocol/sdk` to 1.25.2 (fixes ReDoS vulnerability in UriTemplate regex patterns)
+- **Fix**: Updated building script to correctly export types for inspector/client components
+</Update>
+
 <Update label="v0.14.0" description="January 2026">
   ## Multi-Server Support & Browser Compatibility
-  Major release with multi-server management, improved UI responsiveness, and enhanced browser compatibility.
+  Release with multi-server management, improved UI responsiveness, and enhanced browser compatibility.
 
 ### Breaking Changes
 
@@ -59,7 +208,7 @@ tag: "New"
 
 <Update label="v0.13.0" description="December 2025">
   ## Session Management & Architecture Improvements
-  Major release aligned with mcp-use v1.11.0, featuring session management architecture and improved inspector capabilities.
+  Release aligned with mcp-use v1.11.0, featuring session management architecture and improved inspector capabilities.
 
 ### Breaking Changes
 
@@ -119,7 +268,7 @@ tag: "New"
 
 <Update label="v0.12.0" description="December 2025">
   ## Elicitation Support & API Improvements
-  Major release aligned with mcp-use v1.10.0, featuring elicitation support and enhanced inspector capabilities.
+  Release aligned with mcp-use v1.10.0, featuring elicitation support and enhanced inspector capabilities.
 
 ### Breaking Changes
 
@@ -174,7 +323,7 @@ tag: "New"
 
 <Update label="v0.9.0" description="November 2025">
   ## OAuth Authentication System
-  Major release with complete OAuth 2.0 support and enhanced inspector capabilities.
+  Release with complete OAuth 2.0 support and enhanced inspector capabilities.
 
 ### New Features
 
@@ -226,7 +375,7 @@ tag: "New"
 
 <Update label="v0.8.0" description="October 2025">
   ## Notifications, Sampling & OpenAI Apps SDK Integration
-  Major release with bidirectional notifications, LLM sampling, and comprehensive OpenAI Apps SDK support.
+  Release with bidirectional notifications, LLM sampling, and comprehensive OpenAI Apps SDK support.
 
 ### New Features
 

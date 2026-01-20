@@ -1,16 +1,31 @@
+import { logger } from "../logging.js";
 import type {
   BaseTelemetryEvent,
-  MCPAgentExecutionEventData,
-  ServerInitializeEventData,
-  ServerToolCallEventData,
-  ServerResourceCallEventData,
-  ServerPromptCallEventData,
-  ServerContextEventData,
-  MCPClientInitEventData,
   ConnectorInitEventData,
+  MCPAgentExecutionEventData,
+  MCPClientInitEventData,
   MCPServerTelemetryInfo,
+  ServerContextEventData,
+  ServerInitializeEventData,
+  ServerPromptCallEventData,
+  ServerResourceCallEventData,
+  ServerToolCallEventData,
 } from "./events.js";
-import { logger } from "../logging.js";
+import {
+  ClientAddServerEvent,
+  ClientRemoveServerEvent,
+  ConnectorInitEvent,
+  createServerRunEventData,
+  MCPAgentExecutionEvent,
+  MCPClientInitEvent,
+  ServerContextEvent,
+  ServerInitializeEvent,
+  ServerPromptCallEvent,
+  ServerResourceCallEvent,
+  ServerRunEvent,
+  ServerToolCallEvent,
+} from "./events.js";
+import { getPackageVersion } from "./utils.js";
 
 /**
  * Generate a UUID-like identifier suitable for browser and similar runtimes.
@@ -46,21 +61,6 @@ function generateUUID(): string {
   // This should rarely be reached in modern browsers
   return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${Math.random().toString(36).substring(2, 15)}`;
 }
-import {
-  MCPAgentExecutionEvent,
-  ServerRunEvent,
-  ServerInitializeEvent,
-  ServerToolCallEvent,
-  ServerResourceCallEvent,
-  ServerPromptCallEvent,
-  ServerContextEvent,
-  MCPClientInitEvent,
-  ConnectorInitEvent,
-  ClientAddServerEvent,
-  ClientRemoveServerEvent,
-  createServerRunEventData,
-} from "./events.js";
-import { getPackageVersion } from "./utils.js";
 
 /**
  * Generate a short random string suitable for session or user identifiers in browser environments.
@@ -102,6 +102,19 @@ type StorageCapability = "localStorage" | "session-only";
 const USER_ID_STORAGE_KEY = "mcp_use_user_id";
 
 /**
+ * Check if localStorage is available and functional.
+ * Node.js 25+ has an experimental localStorage that exists but doesn't implement methods properly.
+ */
+function isLocalStorageFunctional(): boolean {
+  return (
+    typeof localStorage !== "undefined" &&
+    typeof localStorage.getItem === "function" &&
+    typeof localStorage.setItem === "function" &&
+    typeof localStorage.removeItem === "function"
+  );
+}
+
+/**
  * Determine whether the current runtime is a browser environment.
  *
  * @returns The runtime environment: `"browser"` if running in a browser, `"unknown"` otherwise.
@@ -128,7 +141,7 @@ function getStorageCapability(env: RuntimeEnvironment): StorageCapability {
   if (env === "browser") {
     // Check if localStorage is actually available (might be disabled)
     try {
-      if (typeof localStorage !== "undefined") {
+      if (isLocalStorageFunctional()) {
         localStorage.setItem("__mcp_use_test__", "1");
         localStorage.removeItem("__mcp_use_test__");
         return "localStorage";
@@ -231,7 +244,7 @@ export class Telemetry {
 
   private _getSourceFromLocalStorage(): string | null {
     try {
-      if (typeof localStorage !== "undefined") {
+      if (isLocalStorageFunctional()) {
         return localStorage.getItem("MCP_USE_TELEMETRY_SOURCE");
       }
     } catch {
@@ -243,7 +256,7 @@ export class Telemetry {
   private _checkTelemetryDisabled(): boolean {
     // Check localStorage (Browser)
     if (
-      typeof localStorage !== "undefined" &&
+      isLocalStorageFunctional() &&
       localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false"
     ) {
       return true;
@@ -316,7 +329,7 @@ export class Telemetry {
     this._source = source;
     // Also save to localStorage for persistence
     try {
-      if (typeof localStorage !== "undefined") {
+      if (isLocalStorageFunctional()) {
         localStorage.setItem("MCP_USE_TELEMETRY_SOURCE", source);
       }
     } catch {
@@ -373,17 +386,13 @@ export class Telemetry {
   private _getUserIdFromLocalStorage(): string {
     try {
       // Check if localStorage is actually available and accessible
-      if (typeof localStorage === "undefined") {
-        throw new Error("localStorage is not available");
+      if (!isLocalStorageFunctional()) {
+        throw new Error("localStorage is not available or not functional");
       }
 
       // Test write access (localStorage might throw in private browsing mode)
-      try {
-        localStorage.setItem("__mcp_use_test__", "1");
-        localStorage.removeItem("__mcp_use_test__");
-      } catch (testError) {
-        throw new Error(`localStorage is not writable: ${testError}`);
-      }
+      localStorage.setItem("__mcp_use_test__", "1");
+      localStorage.removeItem("__mcp_use_test__");
 
       let userId = localStorage.getItem(USER_ID_STORAGE_KEY);
 

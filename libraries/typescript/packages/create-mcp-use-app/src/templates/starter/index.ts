@@ -24,12 +24,12 @@ const server = new MCPServer({
  * - server.resource('ui://widget/kanban-board')
  * - server.resource('ui://widget/display-weather')
  *
- * Docs: https://docs.mcp-use.com/typescript/server/ui-widgets
+ * Docs: https://mcp-use.com/docs/typescript/server/ui-widgets
  */
 
 /*
  * Define MCP tools
- * Docs: https://docs.mcp-use.com/typescript/server/tools
+ * Docs: https://mcp-use.com/docs/typescript/server/tools
  */
 server.tool(
   {
@@ -56,7 +56,7 @@ server.tool(
 
 /*
  * Define MCP resources
- * Docs: https://docs.mcp-use.com/typescript/server/resources
+ * Docs: https://mcp-use.com/docs/typescript/server/resources
  */
 server.resource({
   name: "config",
@@ -79,7 +79,7 @@ server.resource({
 
 /*
  * Define MCP prompts
- * Docs: https://docs.mcp-use.com/typescript/server/prompts
+ * Docs: https://mcp-use.com/docs/typescript/server/prompts
  */
 server.prompt(
   {

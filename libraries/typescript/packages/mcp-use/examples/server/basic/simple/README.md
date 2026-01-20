@@ -62,4 +62,4 @@ simple-example/
 ## Learn More
 
 - [MCP Documentation](https://modelcontextprotocol.io)
-- [mcp-use Documentation](https://docs.mcp-use.io)
+- [mcp-use Documentation](https://mcp-use.com/docs)

@@ -6,13 +6,182 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.13.5" description="January 2026">
+  ## CLI Documentation Enhancement
+  Patch release adding comprehensive CLI documentation.
+
+- **Enhancement**: Added `.gitignore` file to CLI package to exclude `.mcp-use` directory from version control
+- **Enhancement**: Added `CLAUDE.md` to CLI package with comprehensive guidance on usage, development commands, architecture details, and deployment instructions
+- **Enhancement**: Improved CSRF protection in authentication flow
+- **Enhancement**: Enhanced error handling for GitHub integration in deploy command
+</Update>
+
+<Update label="v1.13.4" description="January 2026">
+  ## OAuth Proxy URL Handling Improvements
+  Patch release improving OAuth proxy URL handling and connection logic.
+
+- **Refactor**: Changed `connectionUrl` from `let` to `const` to enforce immutability
+- **Enhancement**: Enhanced logic for deriving `oauthProxyUrl` from callback URL, including handling cases where callback is at root path
+- **Enhancement**: Updated comments to clarify distinction between `oauthProxyUrl` and `connectionUrl`
+- **Fix**: Removed clearing of OAuth storage before connecting to maintain valid tokens across sessions
+</Update>
+
+<Update label="v1.13.3" description="January 2026">
+  ## Telemetry & Inspector Enhancements
+  Patch release with telemetry improvements and inspector URL validation enhancements.
+
+- **Fix**: Enhanced localStorage checks in Telemetry class to verify both existence and functional methods (getItem, setItem, removeItem)
+- **Enhancement**: Added error handling to throw exception if localStorage is not available or functional
+- **Enhancement**: Inspector now automatically prepends "https://" to URLs without protocol for better user experience
+- **Enhancement**: Improved error handling for invalid URLs in Inspector dashboard and server connection modal
+- **Enhancement**: Added localStorage clearing functionality in Inspector for troubleshooting
+</Update>
+
+<Update label="v1.13.2" description="January 2026">
+  ## Dependency Updates & CLI Enhancements
+  Minor release with dependency updates and CLI improvements for deployment workflows.
+
+- **Fix**: Updated dependency `hono` to 4.11.4
+- **Enhancement**: CLI login command with improved error handling and user feedback
+- **Enhancement**: CLI deployment command now prompts for login if not authenticated
+- **Enhancement**: Added git uncommitted changes check before deployment
+- **Fix**: Removed `fromSource` option from CLI deployment command
+- **Enhancement**: Simplified authentication UI in Inspector
+</Update>
+
+<Update label="v1.13.1" description="January 2026">
+  ## Edge Runtime Fix
+  Patch release improving edge runtime compatibility.
+
+- **Fix**: Enable JSON response in stateless mode for edge runtimes (Deno, Cloudflare Workers)
+- **Enhancement**: Improved reliability of API in various deployment scenarios
+</Update>
+
+<Update label="v1.13.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.13.0&title=Hot%20Module%20Reloading%20%26%20OAuth%20Enhancements&date=2026-01&lang=typescript" alt="Release 1.13.0" />
+  </Frame>
+  ## Hot Module Reloading & OAuth Enhancements
+  Release introducing Hot Module Reloading for development and enhanced OAuth capabilities.
+
+### Hot Module Reloading (HMR)
+
+- **New**: HMR support for `mcp-use dev` command - tools, prompts, and resources update instantly without server restart
+- **New**: Connected clients receive `list_changed` notifications and auto-refresh
+- **New**: Syntax errors during reload caught gracefully without crashing server
+- **New**: Comprehensive test suite for HMR functionality with integration tests
+- **Enhancement**: CLI uses `chokidar` to watch file changes with automatic module re-import
+- **Enhancement**: Session persistence during HMR - no client disconnections
+
+### OAuth & Client Info
+
+- **New**: Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+- **New**: `clientInfo` configuration prop for OAuth registration with client metadata (name, version, icons, website)
+- **New**: Server metadata caching with `CachedServerMetadata` interface for instant display on reconnect
+- **Enhancement**: OAuth metadata URL rewriting from gateway URLs to actual server URLs
+- **Enhancement**: Client info displayed on OAuth consent pages
+- **Enhancement**: Extended `StorageProvider` interface with metadata methods
+
+### Inspector & Favicon
+
+- **Enhancement**: Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com)
+- **Enhancement**: Detection of default vs custom favicons using JSON API response
+- **Enhancement**: Improved logging middleware for API routes
+- **Enhancement**: X-Forwarded-Host support for proxy URL construction in dev
+
+### Bug Fixes
+
+- **Fix**: Remove import from "mcp-use" which causes langchain import in server
+- **Fix**: Enhanced synchronization for tools, prompts, and resources during HMR
+</Update>
+
+<Update label="v1.12.4" description="January 2026">
+  ## Connection Fix
+  Patch release fixing autoconnect configuration parsing.
+
+- **Fix**: Autoconnect now correctly parses config objects in addition to string URLs
+</Update>
+
+<Update label="v1.12.3" description="January 2026">
+  ## Security Fixes & OAuth Improvements
+  Patch release addressing multiple security vulnerabilities and fixing OAuth flow issues.
+
+### Security Fixes
+
+- **Security**: Fixed 13 vulnerabilities (3 moderate, 10 high)
+- **Security**: Updated `langchain` to 1.2.3 (fixes serialization injection vulnerability)
+- **Security**: Updated `@langchain/core` to 1.1.8 (fixes serialization injection vulnerability)
+- **Security**: Updated `react-router` to 7.12.0 (fixes XSS and CSRF vulnerabilities)
+- **Security**: Added override for `qs` to >=6.14.1 (fixes DoS vulnerability)
+- **Security**: Added override for `preact` to >=10.28.2 (fixes JSON VNode injection)
+
+### OAuth & Connection Improvements
+
+- **Fix**: Resolved OAuth flow looping issue by removing duplicate fallback logic
+- **Enhancement**: Simplified connection handling with consolidated state management
+- **Enhancement**: Enhanced OAuth authentication flow with improved connection settings
+- **Enhancement**: Improved auto-connect functionality with better proxy handling and error management
+- **Enhancement**: Enhanced theme toggling with dropdown menu for better UX and accessibility
+</Update>
+
+<Update label="v1.12.2" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.12.2&title=Automatic%20Proxy%20Fallback%20%26%20API%20Improvements&date=2026-01&lang=typescript" alt="Release 1.12.2" />
+  </Frame>
+  ## Automatic Proxy Fallback & API Improvements
+  Release with automatic proxy fallback, OAuth proxy support, and API naming improvements.
+
+### Breaking Changes (with Deprecation Warnings)
+
+- **Breaking**: Renamed `customHeaders` to `headers` across all APIs for consistency. Old name still works but shows deprecation warnings.
+- **Breaking**: Renamed `samplingCallback` to `onSampling` for consistency with event handler patterns. Old name still works but shows deprecation warnings.
+- **Deprecated**: `clientConfig` option in favor of deriving configuration from `clientInfo`
+
+### New Features
+
+- **New**: Automatic Proxy Fallback - `autoProxyFallback` option automatically retries failed connections through proxy on CORS/4xx errors
+- **New**: Provider-level proxy defaults with `defaultProxyConfig` and `defaultAutoProxyFallback` props in `McpClientProvider`
+- **New**: OAuth Proxy Support - `oauthProxyUrl` configuration to route OAuth discovery and token requests through backend proxy
+- **New**: Configurable `clientInfo` for MCP connection initialization with full metadata (name, title, version, description, icons, website URL)
+- **New**: Reconnect functionality for failed connections with reconnect button in Inspector UI
+
+### Improvements
+
+- **Enhancement**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+- **Enhancement**: OAuth provider uses original target URL for discovery, not proxy URL
+- **Enhancement**: Improved session cleanup to avoid noisy warning logs
+- **Enhancement**: Type safety with deprecation notices in TypeScript types
+- **Enhancement**: Proxy header support - `proxyConfig` now accepts a `headers` field for custom headers
+
+### Bug Fixes
+
+- **Fix**: Custom headers now correctly included when copying connection configuration from saved tiles
+- **Fix**: HttpConnector automatic reconnection disabled, shifting responsibility to higher-level logic
+
+### Refactoring
+
+- **Refactor**: Removed `oauth-helper.ts` (521 lines), consolidated into `browser-provider.ts`
+- **Refactor**: Major `useMcp` hook refactor with automatic retry, better error handling, and proxy fallback support
+</Update>
+
+<Update label="v1.12.1" description="January 2026">
+  ## Security Update
+  Patch release with security fixes and build improvements.
+
+- **Security**: Updated `@modelcontextprotocol/sdk` to 1.25.2 (fixes ReDoS vulnerability in UriTemplate regex patterns)
+- **Fix**: Updated building script to correctly export types for inspector/client components
+</Update>
+
 <Update label="v1.12.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.12.0&title=Browser%20Compatibility%20%26%20Multi-Server%20Support&date=2026-01&lang=typescript" alt="Release 1.12.0" />
+  </Frame>
   ## Browser Compatibility & Multi-Server Support
   Release focusing on browser compatibility, multi-server management, and improved React architecture.
 
 ### Breaking Changes
 
-- **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments.
+- **Breaking**: Removed `winston` dependency. The logging system now uses a simple console logger that works in both browser and Node.js environments. See [Server Logging](/typescript/server/logging#migration-from-winston) for migration guide.
 
 ### Browser Runtime Support
 
@@ -51,12 +220,12 @@ tag: "New"
 
 ### RPC Logging
 
-- **New**: Enhanced RPC logging with new `rpc-logger` module and filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams)
+- **New**: Enhanced RPC logging with new `rpc-logger` module and filtering capabilities to reduce noisy endpoint logging (telemetry, RPC streams). See [Client Logging](/typescript/client/logging) for usage.
 
 ### Architecture Improvements
 
 - **Refactor**: Separated telemetry into `telemetry-browser.ts` (browser) and `telemetry-node.ts` (Node.js) for better environment-specific implementations
-- **Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments
+- **Refactor**: Replaced Winston with `SimpleConsoleLogger` that works across all environments. See [Server Logging](/typescript/server/logging#built-in-logging-system) for configuration details.
 - **Refactor**: Updated `tsup.config.ts` to exclude Node.js-specific dependencies (`winston`, `posthog-node`) from browser builds
 - **Refactor**: Updated components across inspector for cleaner architecture and imports
 
@@ -88,8 +257,11 @@ tag: "New"
 </Update>
 
 <Update label="v1.11.0" description="December 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.11.0&title=Session%20Management%20Architecture%20%26%20CLI%20Client&date=2025-12&lang=typescript" alt="Release 1.11.0" />
+  </Frame>
   ## Session Management Architecture & CLI Client
-  Major release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
+  Release introducing distributed session management with Redis support and a full-featured CLI client for terminal usage.
 
 ### Breaking Changes
 
@@ -185,6 +357,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.10.0" description="December 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.10.0&title=API%20Improvements%20%26%20Session%20Management&date=2025-12&lang=typescript" alt="Release 1.10.0" />
+  </Frame>
   ## API Improvements & Session Management
   Enhanced APIs with better type safety and improved session management capabilities.
 
@@ -224,6 +399,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.9.0" description="December 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.9.0&title=Elicitation%20Support&date=2025-12&lang=typescript" alt="Release 1.9.0" />
+  </Frame>
   ## Elicitation Support
   Added comprehensive elicitation support following MCP specification, enabling servers to request user input through clients.
 
@@ -238,6 +416,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.8.0" description="November 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.8.0&title=Sampling%20Support&date=2025-11&lang=typescript" alt="Release 1.8.0" />
+  </Frame>
   ## Sampling Support
   Added sampling support in inspector with improved timeout handling for long-running requests.
 
@@ -247,6 +428,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.7.0" description="November 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.7.0&title=OAuth%20Authentication%20System&date=2025-11&lang=typescript" alt="Release 1.7.0" />
+  </Frame>
   ## OAuth Authentication System
   Complete OAuth 2.0 support with built-in providers and enhanced server capabilities.
 
@@ -265,6 +449,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.6.0" description="November 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.6.0&title=Notifications%20%26%20Sampling&date=2025-11&lang=typescript" alt="Release 1.6.0" />
+  </Frame>
   ## Notifications & Sampling
   Bidirectional notification support and LLM sampling capabilities.
 
@@ -283,8 +470,11 @@ tag: "New"
 </Update>
 
 <Update label="v1.5.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.5.0&title=OpenAI%20Apps%20SDK%20Integration&date=2025-10&lang=typescript" alt="Release 1.5.0" />
+  </Frame>
   ## OpenAI Apps SDK Integration
-  Major release with comprehensive OpenAI Apps SDK support and widget system.
+  Release with comprehensive OpenAI Apps SDK support and widget system.
 
 - **New**: McpUseProvider component combining React setup (StrictMode, ThemeProvider, BrowserRouter, ErrorBoundary)
 - **New**: WidgetControls component with debug overlay and view controls (fullscreen, PIP)
@@ -305,6 +495,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.4.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.4.0&title=Code%20Mode&date=2025-10&lang=typescript" alt="Release 1.4.0" />
+  </Frame>
   ## Code Mode
   Introduced code execution capabilities for agents.
 
@@ -317,6 +510,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.3.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.3.0&title=Edge%20Runtime%20Support&date=2025-10&lang=typescript" alt="Release 1.3.0" />
+  </Frame>
   ## Edge Runtime Support
   Migrated to Hono framework for edge runtime compatibility.
 
@@ -332,6 +528,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.2.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.2.0&title=LangChain%201.0.0%20Support&date=2025-10&lang=typescript" alt="Release 1.2.0" />
+  </Frame>
   ## LangChain 1.0.0 Support
   Updated to support LangChain 1.0.0 with improved compatibility.
 
@@ -342,6 +541,9 @@ tag: "New"
 </Update>
 
 <Update label="v1.1.0" description="October 2025">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.1.0&title=Apps%20SDK%20Initial%20Integration&date=2025-10&lang=typescript" alt="Release 1.1.0" />
+  </Frame>
   ## Apps SDK Initial Integration
   First integration of OpenAI Apps SDK support.
 

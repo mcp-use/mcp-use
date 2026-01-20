@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import crypto from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -43,7 +44,8 @@ async function findAvailablePort(startPort: number = 8765): Promise<number> {
  * Start local server to receive OAuth callback
  */
 async function startCallbackServer(
-  port: number
+  port: number,
+  expectedState: string
 ): Promise<{ server: any; token: Promise<string> }> {
   return new Promise((resolve, reject) => {
     let tokenResolver: ((value: string) => void) | null = null;
@@ -55,6 +57,51 @@ async function startCallbackServer(
       if (req.url?.startsWith("/callback")) {
         const url = new URL(req.url, `http://localhost:${port}`);
         const token = url.searchParams.get("token");
+        const state = url.searchParams.get("state");
+
+        // Validate state parameter for CSRF protection
+        if (state !== expectedState) {
+          res.writeHead(400, { "Content-Type": "text/html" });
+          res.end(`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <title>Security Error</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <style>
+                    body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      display: flex;
+                      justify-content: center;
+                      align-items: center;
+                      min-height: 100vh;
+                      background: #000;
+                      padding: 1rem;
+                      margin: 0;
+                    }
+                    .container {
+                      max-width: 28rem;
+                      padding: 3rem;
+                      text-align: center;
+                      background: rgba(255, 255, 255, 0.1);
+                      backdrop-filter: blur(40px);
+                      border: 1px solid rgba(255, 255, 255, 0.2);
+                      border-radius: 1.5rem;
+                    }
+                    h1 { color: #fff; font-size: 2rem; margin-bottom: 1rem; }
+                    p { color: rgba(255, 255, 255, 0.8); font-size: 1rem; }
+                  </style>
+                </head>
+                <body>
+                  <div class="container">
+                    <h1>Security Error</h1>
+                    <p>Invalid state parameter. Please try logging in again.</p>
+                  </div>
+                </body>
+              </html>
+            `);
+          return;
+        }
 
         if (token && tokenResolver) {
           // Send success response
@@ -252,19 +299,27 @@ async function startCallbackServer(
 /**
  * Login command - opens browser for OAuth flow
  */
-export async function loginCommand(): Promise<void> {
+export async function loginCommand(options?: {
+  silent?: boolean;
+}): Promise<void> {
   try {
     // Check if already logged in
     if (await isLoggedIn()) {
-      console.log(
-        chalk.yellow(
-          "⚠️  You are already logged in. Run 'mcp-use logout' first if you want to login with a different account."
-        )
-      );
+      // Only show message if not in silent mode
+      if (!options?.silent) {
+        console.log(
+          chalk.yellow(
+            "⚠️  You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account."
+          )
+        );
+      }
       return;
     }
 
     console.log(chalk.cyan.bold("🔐 Logging in to mcp-use cloud...\n"));
+
+    // Generate state for CSRF protection
+    const state = crypto.randomBytes(32).toString("hex");
 
     // Find available port
     const port = await findAvailablePort();
@@ -273,11 +328,11 @@ export async function loginCommand(): Promise<void> {
     console.log(chalk.gray(`Starting local server on port ${port}...`));
 
     // Start callback server
-    const { server, token } = await startCallbackServer(port);
+    const { server, token } = await startCallbackServer(port, state);
 
     // Get the web URL (respects NEXT_PUBLIC_API_URL)
     const webUrl = await getWebUrl();
-    const loginUrl = `${webUrl}/auth/cli?redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const loginUrl = `${webUrl}/auth/cli?redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
 
     console.log(chalk.gray(`Opening browser to ${webUrl}/auth/cli...\n`));
     console.log(
@@ -322,26 +377,46 @@ export async function loginCommand(): Promise<void> {
     });
 
     console.log(chalk.green.bold("\n✓ Successfully logged in!"));
+
+    // Show user info card (same as whoami)
+    try {
+      const api = await McpUseAPI.create();
+      const authInfo = await api.testAuth();
+
+      console.log(chalk.cyan.bold("\n👤 Current user:\n"));
+      console.log(chalk.white("Email:   ") + chalk.cyan(authInfo.email));
+      console.log(chalk.white("User ID: ") + chalk.gray(authInfo.user_id));
+
+      const apiKey = await getApiKey();
+      if (apiKey) {
+        const masked = apiKey.substring(0, 6) + "...";
+        console.log(chalk.white("API Key: ") + chalk.gray(masked));
+      }
+    } catch (error) {
+      // If fetching user info fails, just skip it
+      console.log(
+        chalk.gray(
+          `\nYour API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
+        )
+      );
+    }
+
     console.log(
       chalk.gray(
-        `\nYour API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
+        "\nYou can now deploy your MCP servers with " +
+          chalk.white("npx mcp-use deploy")
       )
     );
     console.log(
-      chalk.gray(
-        "You can now deploy your MCP servers with " +
-          chalk.white("mcp-use deploy")
-      )
+      chalk.gray("To logout later, run " + chalk.white("npx mcp-use logout"))
     );
 
-    // Exit successfully
-    process.exit(0);
+    // Return successfully (no process.exit so it can be reused by other commands)
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Login failed:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
+    // Throw error instead of exiting so calling code can handle it
+    throw new Error(
+      `Login failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
-    process.exit(1);
   }
 }
 
@@ -389,7 +464,9 @@ export async function whoamiCommand(): Promise<void> {
     if (!(await isLoggedIn())) {
       console.log(chalk.yellow("⚠️  You are not logged in."));
       console.log(
-        chalk.gray("Run " + chalk.white("mcp-use login") + " to get started.")
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
       );
       return;
     }

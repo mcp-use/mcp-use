@@ -418,29 +418,25 @@ export function Layout({ children }: LayoutProps) {
   // Sync URL query params with selected server state
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    const decodedServerId = serverParam
-      ? decodeURIComponent(serverParam)
-      : null;
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverId = searchParams.get("server");
 
     // Update selected server if changed
-    if (decodedServerId !== selectedServerId) {
-      setSelectedServerId(decodedServerId);
+    if (serverId !== selectedServerId) {
+      setSelectedServerId(serverId);
     }
   }, [location.search, selectedServerId, setSelectedServerId]);
 
   // Handle failed server connections - redirect to home
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    if (!serverParam) {
+    const serverId = searchParams.get("server");
+    if (!serverId) {
       return;
     }
 
-    const decodedServerId = decodeURIComponent(serverParam);
-    const serverConnection = connections.find(
-      (conn) => conn.id === decodedServerId
-    );
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverConnection = connections.find((conn) => conn.id === serverId);
 
     // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {
@@ -556,6 +552,44 @@ export function Layout({ children }: LayoutProps) {
             {children}
           </LayoutContent>
         </main>
+
+        {/* Footer Helper */}
+        {!isEmbedded && (
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 px-2">
+            Having trouble connecting?{" "}
+            <button
+              onClick={() => {
+                // Clear all mcp-related localStorage keys
+                const keysToRemove: string[] = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                  const key = localStorage.key(i);
+                  if (
+                    key &&
+                    (key.startsWith("mcp:auth") ||
+                      key.startsWith("mcp-inspector"))
+                  ) {
+                    keysToRemove.push(key);
+                  }
+                }
+
+                keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+                toast.success(
+                  `Cleared ${keysToRemove.length} localStorage item(s). Refreshing page...`,
+                  { duration: 2000 }
+                );
+
+                // Refresh the page after a brief delay to show the toast
+                setTimeout(() => {
+                  window.location.reload();
+                }, 500);
+              }}
+              className="text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:underline"
+            >
+              Clear localStorage
+            </button>
+          </div>
+        )}
 
         {/* Command Palette */}
         <CommandPalette

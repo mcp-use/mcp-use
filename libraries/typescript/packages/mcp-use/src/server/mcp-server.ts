@@ -1,6 +1,10 @@
 import {
   McpServer as OfficialMcpServer,
   ResourceTemplate,
+  type RegisteredPrompt,
+  type RegisteredResource,
+  type RegisteredResourceTemplate,
+  type RegisteredTool,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type {
   CreateMessageRequest,
@@ -12,6 +16,7 @@ import { z } from "zod";
 import { Telemetry } from "../telemetry/index.js";
 import { getPackageVersion } from "../version.js";
 
+import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
 import { mountInspectorUI } from "./inspector/index.js";
 import { registerPrompt } from "./prompts/index.js";
 import {
@@ -92,38 +97,178 @@ import {
   startServer,
 } from "./utils/index.js";
 
+/**
+ * MCP Server class
+ *
+ * MCPServerClass provides a complete MCP (Model Context Protocol) server implementation
+ * built on top of the Hono web framework. It combines MCP protocol handling with HTTP
+ * server capabilities, making it easy to build tools, resources, and prompts that can
+ * be accessed by MCP clients.
+ * The server can be run as a standalone HTTP server or integrated into existing
+ * applications (Cloudflare Workers, Vercel Edge Functions, etc.) using {@link getHandler}.
+ *
+ * @typeParam HasOAuth - Type parameter indicating if OAuth is configured
+ *
+ * @example
+ * ```typescript
+ * // Basic server setup
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0'
+ * });
+ *
+ * // Register a tool
+ * server.tool({
+ *   name: 'add',
+ *   description: 'Add two numbers',
+ *   schema: z.object({
+ *     a: z.number(),
+ *     b: z.number()
+ *   })
+ * }, async ({ a, b }) => {
+ *   return { content: [{ type: 'text', text: String(a + b) }] };
+ * });
+ *
+ * // Start the server
+ * await server.listen(3000);
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // With OAuth authentication
+ * const server = new MCPServer({
+ *   name: 'secure-server',
+ *   version: '1.0.0',
+ *   oauth: oauthAuth0Provider({
+ *     clientId: process.env.AUTH0_CLIENT_ID!,
+ *     clientSecret: process.env.AUTH0_CLIENT_SECRET!,
+ *     domain: process.env.AUTH0_DOMAIN!
+ *   })
+ * });
+ *
+ * server.tool({
+ *   name: 'protected-action',
+ *   description: 'Requires authentication'
+ * }, async (params, ctx) => {
+ *   const auth = ctx.auth; // OAuth user info available
+ *   return text(`Hello, ${auth.user.email}`);
+ * });
+ * ```
+ *
+ * @see {@link MCPClient} for connecting to MCP servers
+ * @see {@link tool} for registering tools
+ * @see {@link resource} for serving resources
+ * @see {@link prompt} for defining prompts
+ */
 class MCPServerClass<HasOAuth extends boolean = false> {
   /**
-   * Get the mcp-use package version.
-   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   * Gets the mcp-use package version.
+   *
+   * @returns The package version string (e.g., "1.13.2")
+   *
+   * @example
+   * ```typescript
+   * console.log(`Server version: ${MCPServer.getPackageVersion()}`);
+   * ```
    */
   public static getPackageVersion(): string {
     return getPackageVersion();
   }
 
   /**
-   * Native MCP server instance from @modelcontextprotocol/sdk
-   * Exposed publicly for advanced use cases
+   * Native MCP server instance from the official SDK.
+   *
+   * This is the underlying server from `@modelcontextprotocol/sdk` that handles
+   * the MCP protocol. Exposed publicly for advanced use cases that need direct
+   * access to SDK functionality.
+   *
+   * @example
+   * ```typescript
+   * // Access native SDK methods
+   * server.nativeServer.server.setRequestHandler(...);
+   * ```
    */
   public readonly nativeServer: OfficialMcpServer;
 
-  /** @deprecated Use nativeServer instead - kept for backward compatibility */
+  /**
+   * @deprecated Use {@link nativeServer} instead.
+   * Kept for backward compatibility with older code.
+   */
   public get server(): OfficialMcpServer {
     return this.nativeServer;
   }
 
+  /**
+   * Server configuration including name, version, OAuth settings, etc.
+   */
   public config: ServerConfig;
+
+  /**
+   * Hono application instance.
+   *
+   * The underlying Hono app that handles HTTP routing and middleware.
+   * Can be used to add custom routes and middleware alongside MCP endpoints.
+   *
+   * @example
+   * ```typescript
+   * // Add custom HTTP endpoint
+   * server.app.get('/health', (c) => c.json({ status: 'ok' }));
+   * ```
+   */
   public app: HonoType;
+
+  /** @internal Whether MCP endpoints have been mounted */
   private mcpMounted = false;
+
+  /** @internal Whether inspector UI has been mounted */
   private inspectorMounted = false;
+
+  /**
+   * Port number the server is listening on (set after calling {@link listen}).
+   */
   public serverPort?: number;
+
+  /**
+   * Hostname the server is bound to (default: "localhost").
+   */
   public serverHost: string;
+
+  /**
+   * Full base URL for the server (e.g., "https://example.com").
+   * Used for generating widget URLs and OAuth callbacks.
+   */
   public serverBaseUrl?: string;
+
+  /**
+   * Optional favicon URL to display in inspector and documentation.
+   */
   public favicon?: string;
+
+  /**
+   * List of registered tool names.
+   */
   public registeredTools: string[] = [];
+
+  /**
+   * List of registered prompt names.
+   */
   public registeredPrompts: string[] = [];
+
+  /**
+   * List of registered resource URIs.
+   */
   public registeredResources: string[] = [];
+
+  /**
+   * Optional build identifier for cache busting widget URLs.
+   * @internal
+   */
   public buildId?: string;
+
+  /**
+   * Map of active client sessions.
+   * Each session represents a connected MCP client with its own server instance.
+   */
   public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
   private oauthSetupState = {
@@ -167,6 +312,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public widgetDefinitions = new Map<string, Record<string, unknown>>();
 
   /**
+   * Storage for SDK-registered tool/prompt/resource references per session.
+   * These refs have update() and remove() methods for hot reloading.
+   * @internal Used for HMR in development mode
+   */
+  public sessionRegisteredRefs = new Map<
+    string,
+    {
+      tools: Map<string, RegisteredTool>;
+      prompts: Map<string, RegisteredPrompt>;
+      resources: Map<string, RegisteredResource>;
+      resourceTemplates: Map<string, RegisteredResourceTemplate>;
+    }
+  >();
+
+  /**
    * Resource subscription manager for tracking and notifying resource updates
    */
   private subscriptionManager = new ResourceSubscriptionManager();
@@ -185,17 +345,699 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
-   * Creates a new MCP server instance with Hono integration
+   * Clean up registered refs for a closed session
    *
-   * Initializes the server with the provided configuration, sets up CORS headers,
-   * configures widget serving routes, and creates a proxy that allows direct
-   * access to Hono methods while preserving MCP server functionality.
+   * This method is called automatically when a session is closed to remove
+   * all registered tool/prompt/resource refs associated with that session.
    *
-   * @param config - Server configuration including name, version, and description
-   * @returns A proxied MCPServer instance that supports both MCP and Hono methods
+   * @param sessionId - The session ID to clean up
+   * @internal
+   */
+  public cleanupSessionRefs(sessionId: string): void {
+    this.sessionRegisteredRefs.delete(sessionId);
+  }
+
+  /**
+   * Sync registrations from another MCPServer instance (for hot reload)
+   *
+   * This method compares the current registrations with another server instance's
+   * registrations and updates existing sessions accordingly:
+   * - Removes tools/prompts/resources that no longer exist
+   * - Adds new tools/prompts/resources
+   * - Updates changed tools/prompts/resources
+   *
+   * After syncing, sends list_changed notifications to all connected clients.
+   *
+   * @param other - Another MCPServer instance with updated registrations
+   *
+   * @example
+   * ```typescript
+   * // In CLI dev mode, after re-importing the server module
+   * const newServer = await import('./server.ts?t=' + Date.now());
+   * runningServer.syncRegistrationsFrom(newServer.server);
+   * ```
+   */
+  public syncRegistrationsFrom(other: MCPServerClass<boolean>): void {
+    // Build session contexts array (shared across all primitives)
+    const sessionContexts = Array.from(this.sessions.entries()).map(
+      ([sessionId, session]) => ({
+        sessionId,
+        session,
+        refs: this.sessionRegisteredRefs.get(sessionId),
+      })
+    );
+
+    // Helper to create tool entry for SDK
+    const createToolEntry = (
+      name: string,
+      config: ToolDefinition,
+      handler: unknown,
+      nativeServer: any
+    ): RegisteredTool => {
+      let inputSchema: Record<string, any>;
+      if (config.schema) {
+        inputSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.inputs && config.inputs.length > 0) {
+        inputSchema = this.createParamsSchema(config.inputs);
+      } else {
+        inputSchema = {};
+      }
+
+      return {
+        title: config.title,
+        description: config.description ?? "",
+        inputSchema,
+        outputSchema: undefined,
+        annotations: config.annotations,
+        execution: { taskSupport: "forbidden" },
+        _meta: config._meta,
+        handler: handler,
+        enabled: true,
+        disable: function (this: RegisteredTool) {
+          this.enabled = false;
+        },
+        enable: function (this: RegisteredTool) {
+          this.enabled = true;
+        },
+        remove: () => {
+          delete nativeServer._registeredTools[name];
+        },
+        update: function (
+          this: RegisteredTool,
+          updates: Record<string, unknown>
+        ) {
+          Object.assign(this, updates);
+        },
+      } as RegisteredTool;
+    };
+
+    // --- TOOLS ---
+    const toolsResult = syncPrimitive({
+      primitiveName: "Tools",
+      currentRegistrations: this.registrations.tools,
+      newRegistrations: other.registrations.tools,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.tools,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          const nativeServer = session.server as any;
+          const toolEntry = createToolEntry(
+            name,
+            config as ToolDefinition,
+            handler,
+            nativeServer
+          );
+          nativeServer._registeredTools[name] = toolEntry;
+          return toolEntry;
+        },
+      })),
+      supportsInPlaceUpdate: true,
+      // Order-preserving rename for tools
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Rebuild _registeredTools object with new name in same position
+        const oldTools = nativeServer._registeredTools;
+        const newTools: Record<string, any> = {};
+        for (const key of Object.keys(oldTools)) {
+          if (key === oldKey) {
+            newTools[newKey] = createToolEntry(
+              newKey,
+              config as ToolDefinition,
+              handler,
+              nativeServer
+            );
+          } else {
+            newTools[key] = oldTools[key];
+          }
+        }
+        nativeServer._registeredTools = newTools;
+
+        // Update refs map preserving order
+        if (refs?.tools) {
+          const newRefs = new Map<string, RegisteredTool>();
+          for (const [k, v] of refs.tools) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newTools[newKey]);
+            } else {
+              newRefs.set(k, v);
+            }
+          }
+          refs.tools.clear();
+          for (const [k, v] of newRefs) refs.tools.set(k, v);
+        }
+      },
+      // Order-preserving update for tools (schema/description changes)
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Update in place to preserve order
+        if (nativeServer._registeredTools?.[key]) {
+          const newEntry = createToolEntry(
+            key,
+            config as ToolDefinition,
+            handler,
+            nativeServer
+          );
+          nativeServer._registeredTools[key] = newEntry;
+          if (refs?.tools) {
+            refs.tools.set(key, newEntry);
+          }
+        }
+      },
+    });
+    this.registrations.tools = toolsResult.updatedRegistrations;
+
+    // Helper to register prompt on session
+    const registerPromptOnSession = (
+      server: OfficialMcpServer,
+      name: string,
+      config: PromptDefinition,
+      handler: unknown
+    ): RegisteredPrompt => {
+      let argsSchema: Record<string, any> | undefined;
+      if (config.schema) {
+        argsSchema = this.convertZodSchemaToParams(config.schema);
+      } else if (config.args && config.args.length > 0) {
+        argsSchema = this.createParamsSchema(config.args);
+      }
+      return server.registerPrompt(
+        name,
+        {
+          title: config.title,
+          description: config.description ?? "",
+          argsSchema: argsSchema as any,
+        },
+        handler as any
+      );
+    };
+
+    // --- PROMPTS ---
+    const promptsResult = syncPrimitive({
+      primitiveName: "Prompts",
+      currentRegistrations: this.registrations.prompts,
+      newRegistrations: other.registrations.prompts,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.prompts,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          return registerPromptOnSession(
+            session.server,
+            name,
+            config as PromptDefinition,
+            handler
+          );
+        },
+      })),
+      supportsInPlaceUpdate: true,
+      // Order-preserving rename for prompts
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Rebuild _registeredPrompts object with new name in same position
+        const oldPrompts = nativeServer._registeredPrompts || {};
+        const newPrompts: Record<string, any> = {};
+        for (const key of Object.keys(oldPrompts)) {
+          if (key === oldKey) {
+            // Register new prompt to get proper entry, then move to correct position
+            const registered = registerPromptOnSession(
+              session.server,
+              newKey,
+              config as PromptDefinition,
+              handler
+            );
+            delete nativeServer._registeredPrompts[newKey]; // Remove from end
+            newPrompts[newKey] = registered;
+          } else {
+            newPrompts[key] = oldPrompts[key];
+          }
+        }
+        nativeServer._registeredPrompts = newPrompts;
+
+        // Update refs map preserving order
+        if (refs?.prompts) {
+          const newRefs = new Map<string, RegisteredPrompt>();
+          for (const [k, v] of refs.prompts) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newPrompts[newKey]);
+            } else {
+              newRefs.set(k, v);
+            }
+          }
+          refs.prompts.clear();
+          for (const [k, v] of newRefs) refs.prompts.set(k, v);
+        }
+      },
+      // Order-preserving update for prompts - use SDK's update method
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        const promptRef = refs?.prompts.get(key);
+        if (promptRef) {
+          const newReg = config as PromptDefinition;
+          let argsSchema: Record<string, any> | undefined;
+          if (newReg.schema) {
+            argsSchema = this.convertZodSchemaToParams(newReg.schema);
+          } else if (newReg.args && newReg.args.length > 0) {
+            argsSchema = this.createParamsSchema(newReg.args);
+          }
+          promptRef.update({
+            title: newReg.title,
+            description: newReg.description,
+            argsSchema: argsSchema as any,
+            callback: handler as any,
+          });
+        }
+      },
+    });
+    this.registrations.prompts = promptsResult.updatedRegistrations;
+
+    // Helper to register resource on session
+    const registerResourceOnSession = (
+      server: OfficialMcpServer,
+      name: string,
+      config: ResourceDefinition,
+      handler: unknown
+    ): RegisteredResource => {
+      return server.registerResource(
+        config.name || name,
+        config.uri,
+        {
+          title: config.title,
+          description: config.description,
+          mimeType: config.mimeType || "text/plain",
+        },
+        handler as any
+      );
+    };
+
+    // --- RESOURCES ---
+    const resourcesResult = syncPrimitive({
+      primitiveName: "Resources",
+      currentRegistrations: this.registrations.resources,
+      newRegistrations: other.registrations.resources,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.resources,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          return registerResourceOnSession(
+            session.server,
+            name,
+            config as ResourceDefinition,
+            handler
+          );
+        },
+      })),
+      supportsInPlaceUpdate: true,
+      // Order-preserving rename for resources
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Rebuild _registeredResources object with new key in same position
+        const oldResources = nativeServer._registeredResources || {};
+        const newResources: Record<string, any> = {};
+        for (const key of Object.keys(oldResources)) {
+          if (key === oldKey) {
+            const registered = registerResourceOnSession(
+              session.server,
+              newKey,
+              config as ResourceDefinition,
+              handler
+            );
+            delete nativeServer._registeredResources[newKey]; // Remove from end
+            newResources[newKey] = registered;
+          } else {
+            newResources[key] = oldResources[key];
+          }
+        }
+        nativeServer._registeredResources = newResources;
+
+        // Update refs map preserving order
+        if (refs?.resources) {
+          const newRefs = new Map<string, RegisteredResource>();
+          for (const [k, v] of refs.resources) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newResources[newKey]);
+            } else {
+              newRefs.set(k, v);
+            }
+          }
+          refs.resources.clear();
+          for (const [k, v] of newRefs) refs.resources.set(k, v);
+        }
+      },
+      // Order-preserving update for resources - use SDK's update method
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        const resourceRef = refs?.resources.get(key);
+        if (resourceRef) {
+          const newReg = config as ResourceDefinition;
+          resourceRef.update({
+            metadata: {
+              title: newReg.title,
+              description: newReg.description,
+              mimeType: newReg.mimeType || "text/plain",
+            },
+            callback: handler as any,
+          });
+        }
+      },
+    });
+    this.registrations.resources = resourcesResult.updatedRegistrations;
+
+    // Helper to register resource template on session
+    const registerTemplateOnSession = (
+      server: OfficialMcpServer,
+      name: string,
+      config: ResourceTemplateDefinition,
+      handler: unknown
+    ): RegisteredResourceTemplate => {
+      const isFlatStructure = "uriTemplate" in config;
+      const uriTemplate = isFlatStructure
+        ? (config as any).uriTemplate
+        : config.resourceTemplate.uriTemplate;
+      const mimeType = isFlatStructure
+        ? (config as any).mimeType
+        : config.resourceTemplate.mimeType;
+      const templateDescription = isFlatStructure
+        ? undefined
+        : config.resourceTemplate.description;
+
+      const template = new ResourceTemplate(uriTemplate, {
+        list: undefined,
+        complete: undefined,
+      });
+      const metadata: Record<string, unknown> = {};
+      if (config.title) metadata.title = config.title;
+      if (config.description || templateDescription)
+        metadata.description = config.description || templateDescription;
+      if (mimeType) metadata.mimeType = mimeType;
+      if (config.annotations) metadata.annotations = config.annotations;
+
+      return server.registerResource(
+        name,
+        template,
+        metadata as any,
+        handler as any
+      ) as unknown as RegisteredResourceTemplate;
+    };
+
+    // --- RESOURCE TEMPLATES ---
+    const templatesResult = syncPrimitive({
+      primitiveName: "Resource Templates",
+      currentRegistrations: this.registrations.resourceTemplates,
+      newRegistrations: other.registrations.resourceTemplates,
+      sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
+        sessionId,
+        getRefs: () => refs?.resourceTemplates as Map<string, any> | undefined,
+        register: (name, config, handler) => {
+          if (!session.server) return null;
+          return registerTemplateOnSession(
+            session.server,
+            name,
+            config as ResourceTemplateDefinition,
+            handler
+          );
+        },
+      })),
+      supportsInPlaceUpdate: false, // Templates require full re-registration
+      // Order-preserving rename for resource templates
+      onRename: (sessionCtx, oldKey, newKey, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Resource templates are stored in _registeredResources with URI as key
+        const oldResources = nativeServer._registeredResources || {};
+        const newResources: Record<string, any> = {};
+        for (const key of Object.keys(oldResources)) {
+          if (key === oldKey) {
+            const registered = registerTemplateOnSession(
+              session.server,
+              newKey,
+              config as ResourceTemplateDefinition,
+              handler
+            );
+            delete nativeServer._registeredResources[newKey]; // Remove from end
+            newResources[newKey] = registered;
+          } else {
+            newResources[key] = oldResources[key];
+          }
+        }
+        nativeServer._registeredResources = newResources;
+
+        // Update refs map preserving order
+        if (refs?.resourceTemplates) {
+          const newRefs = new Map<string, RegisteredResourceTemplate>();
+          for (const [k, v] of refs.resourceTemplates) {
+            if (k === oldKey) {
+              newRefs.set(newKey, newResources[newKey]);
+            } else {
+              newRefs.set(k, v);
+            }
+          }
+          refs.resourceTemplates.clear();
+          for (const [k, v] of newRefs) refs.resourceTemplates.set(k, v);
+        }
+      },
+      // Order-preserving update for resource templates - need full re-registration
+      // since templates are complex, but we rebuild the object to preserve order
+      onUpdate: (sessionCtx, key, config, handler) => {
+        const { session, refs } = sessionContexts.find(
+          (s) => s.sessionId === sessionCtx.sessionId
+        )!;
+        if (!session.server) return;
+        const nativeServer = session.server as any;
+
+        // Get original keys order
+        const originalKeys = Object.keys(
+          nativeServer._registeredResources || {}
+        );
+
+        // Remove old and register new
+        const oldRef = refs?.resourceTemplates.get(key);
+        if (oldRef) oldRef.remove();
+
+        const registered = registerTemplateOnSession(
+          session.server,
+          key,
+          config as ResourceTemplateDefinition,
+          handler
+        );
+
+        // Rebuild to preserve original order
+        const current = nativeServer._registeredResources || {};
+        const newResources: Record<string, any> = {};
+        for (const k of originalKeys) {
+          if (current[k]) {
+            newResources[k] = current[k];
+          }
+        }
+        // Add any new keys that weren't in original
+        for (const k of Object.keys(current)) {
+          if (!newResources[k]) {
+            newResources[k] = current[k];
+          }
+        }
+        nativeServer._registeredResources = newResources;
+
+        if (refs?.resourceTemplates && registered) {
+          refs.resourceTemplates.set(key, registered);
+        }
+      },
+    });
+    this.registrations.resourceTemplates = templatesResult.updatedRegistrations;
+
+    // Update tracking arrays
+    this.registeredTools = Array.from(this.registrations.tools.keys());
+    this.registeredPrompts = Array.from(this.registrations.prompts.keys());
+    this.registeredResources = Array.from(this.registrations.resources.keys());
+
+    // Log all changes
+    const allChanges = [
+      toolsResult.changes,
+      promptsResult.changes,
+      resourcesResult.changes,
+      templatesResult.changes,
+    ];
+    const totalChanges = countChanges(...allChanges);
+
+    if (totalChanges > 0) {
+      console.log("[HMR] Registration changes:");
+      logChanges("Tools", toolsResult.changes);
+      logChanges("Prompts", promptsResult.changes);
+      logChanges("Resources", resourcesResult.changes);
+      logChanges("Resource Templates", templatesResult.changes);
+
+      // Send list_changed notifications to all sessions
+      for (const [sessionId, session] of this.sessions) {
+        if (session.server) {
+          try {
+            if (
+              toolsResult.changes.added.length ||
+              toolsResult.changes.updated.length
+            ) {
+              session.server.sendToolListChanged();
+            }
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send tools/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
+          }
+          try {
+            if (
+              promptsResult.changes.added.length ||
+              promptsResult.changes.updated.length
+            ) {
+              session.server.sendPromptListChanged();
+            }
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send prompts/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
+          }
+          try {
+            if (
+              resourcesResult.changes.added.length ||
+              resourcesResult.changes.updated.length ||
+              templatesResult.changes.added.length ||
+              templatesResult.changes.updated.length
+            ) {
+              session.server.sendResourceListChanged();
+            }
+          } catch (e) {
+            console.debug(
+              `[HMR] Session ${sessionId}: Failed to send resources/list_changed:`,
+              e instanceof Error ? e.message : String(e)
+            );
+          }
+        }
+      }
+    } else {
+      console.log("[HMR] No registration changes detected");
+    }
+  }
+
+  /**
+   * Get the most recently created MCPServer instance.
+   * Used by CLI dev mode for hot reload support.
+   * Uses globalThis to work across ESM module boundaries.
+   * @internal
+   */
+  public static getLastCreatedInstance(): MCPServerClass<any> | null {
+    return (globalThis as any).__mcpUseLastServer || null;
+  }
+
+  /**
+   * Creates a new MCP server instance with Hono integration.
+   *
+   * Initializes the server with the provided configuration, sets up the native MCP
+   * server from the official SDK, creates a Hono application for HTTP handling,
+   * and configures the environment for serving MCP protocol over HTTP.
+   *
+   * The constructor automatically:
+   * - Creates the native MCP server with protocol capabilities
+   * - Initializes the Hono web framework
+   * - Sets up OAuth if configured
+   * - Configures session management (stateful or stateless)
+   * - Wraps registration methods for multi-session support
+   * - Returns a proxy that supports both MCP and Hono methods
+   *
+   * @param config - Server configuration object
+   * @param config.name - Server name (displayed to clients)
+   * @param config.version - Server version string (default: "1.0.0")
+   * @param config.description - Optional server description
+   * @param config.host - Hostname for URLs (default: "localhost")
+   * @param config.baseUrl - Full base URL (overrides host:port for public URLs)
+   * @param config.favicon - Optional favicon URL
+   * @param config.oauth - Optional OAuth provider configuration
+   * @param config.stateless - Whether to use stateless mode (auto-detected for Deno)
+   * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 300000 = 5 min)
+   * @param config.allowedOrigins - Allowed CORS origins (see {@link ServerConfig.allowedOrigins})
+   *
+   * @returns Proxied server instance supporting both MCP and Hono methods
+   *
+   * @example
+   * ```typescript
+   * // Minimal configuration
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0'
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // With custom host and description
+   * const server = new MCPServer({
+   *   name: 'api-server',
+   *   version: '2.0.0',
+   *   description: 'API integration server',
+   *   host: '0.0.0.0', // Listen on all interfaces
+   *   baseUrl: 'https://api.example.com' // Public URL
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // With OAuth authentication
+   * const server = new MCPServer({
+   *   name: 'secure-server',
+   *   version: '1.0.0',
+   *   oauth: oauthWorkOSProvider({
+   *     clientId: process.env.WORKOS_CLIENT_ID!,
+   *     clientSecret: process.env.WORKOS_CLIENT_SECRET!,
+   *     apiKey: process.env.WORKOS_API_KEY!
+   *   })
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Stateless mode (for serverless platforms)
+   * const server = new MCPServer({
+   *   name: 'edge-server',
+   *   version: '1.0.0',
+   *   stateless: true // No session storage
+   * });
+   * ```
+   *
+   * @see {@link ServerConfig} for detailed configuration options
+   * @see {@link listen} for starting the HTTP server
+   * @see {@link getHandler} for serverless deployment
    */
   constructor(config: ServerConfig) {
     this.config = config;
+
+    // Track this instance for HMR support (CLI dev mode uses this to find the server)
+    // Uses globalThis to work across ESM module boundaries with cache-busting imports
+    (globalThis as any).__mcpUseLastServer = this;
 
     // Auto-detect stateless mode: Deno = stateless, Node.js = stateful
     if (this.config.stateless === undefined) {
@@ -218,6 +1060,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       {
         capabilities: {
           logging: {},
+          tools: {
+            listChanged: true,
+          },
+          prompts: {
+            listChanged: true,
+          },
           resources: {
             subscribe: true,
             listChanged: true,
@@ -406,8 +1254,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   /**
    * Create a new server instance for a session following official SDK pattern.
    * This is called for each initialize request to create an isolated server.
+   *
+   * @param sessionId - Optional session ID to store registered refs for hot reload support
    */
-  public getServerForSession(): OfficialMcpServer {
+  public getServerForSession(sessionId?: string): OfficialMcpServer {
     const newServer = new OfficialMcpServer(
       {
         name: this.config.name,
@@ -416,9 +1266,27 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       {
         capabilities: {
           logging: {},
+          tools: {
+            listChanged: true,
+          },
+          prompts: {
+            listChanged: true,
+          },
+          resources: {
+            subscribe: true,
+            listChanged: true,
+          },
         },
       }
     );
+
+    // Initialize refs storage for this session (for hot reload support)
+    const sessionRefs = {
+      tools: new Map<string, RegisteredTool>(),
+      prompts: new Map<string, RegisteredPrompt>(),
+      resources: new Map<string, RegisteredResource>(),
+      resourceTemplates: new Map<string, RegisteredResourceTemplate>(),
+    };
 
     // Replay all registrations on the new server
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
@@ -540,7 +1408,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       };
 
-      newServer.registerTool(
+      const registeredTool = newServer.registerTool(
         name,
         {
           title: config.title,
@@ -551,6 +1419,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         },
         wrappedHandler as any
       );
+
+      // Store ref for hot reload support
+      sessionRefs.tools.set(name, registeredTool);
     }
 
     // Prompts
@@ -604,7 +1475,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       };
 
-      newServer.registerPrompt(
+      const registeredPrompt = newServer.registerPrompt(
         name,
         {
           title: config.title,
@@ -613,6 +1484,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         },
         wrappedHandler as any
       );
+
+      // Store ref for hot reload support
+      sessionRefs.prompts.set(name, registeredPrompt);
     }
 
     // Resources
@@ -662,7 +1536,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       };
 
-      newServer.registerResource(
+      const registeredResource = newServer.registerResource(
         config.name,
         config.uri,
         {
@@ -672,6 +1546,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         } as any,
         wrappedHandler as any
       );
+
+      // Store ref for hot reload support (use same key as registrations.resources)
+      const resourceKey = `${config.name}:${config.uri}`;
+      sessionRefs.resources.set(resourceKey, registeredResource);
     }
 
     // Resource Templates
@@ -715,7 +1593,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         metadata.annotations = config.annotations;
       }
 
-      newServer.registerResource(
+      const registeredResourceTemplate = newServer.registerResource(
         config.name,
         template,
         metadata as any,
@@ -766,6 +1644,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               );
           }
         }
+      );
+
+      // Store ref for hot reload support
+      // Note: registerResource returns RegisteredResourceTemplate when given a template
+      sessionRefs.resourceTemplates.set(
+        config.name,
+        registeredResourceTemplate as unknown as RegisteredResourceTemplate
       );
     }
 
@@ -830,6 +1715,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Register resource subscription handlers
     this.subscriptionManager.registerHandlers(newServer, this.sessions);
 
+    // Store refs for hot reload support (if sessionId provided)
+    if (sessionId) {
+      this.sessionRegisteredRefs.set(sessionId, sessionRefs);
+    }
+
     return newServer;
   }
 
@@ -845,26 +1735,182 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
   }
 
-  // Tool registration helper - type is set in wrapRegistrationMethods
+  /**
+   * Registers a tool that can be called by MCP clients.
+   *
+   * Tools are executable functions that clients can invoke to perform actions
+   * like reading files, making API calls, running commands, etc. Each tool has
+   * a name, description, input schema, and callback function.
+   *
+   * @param toolDefinition - Tool configuration object
+   * @param toolDefinition.name - Unique tool name (used by clients to call it)
+   * @param toolDefinition.description - Human-readable description of what the tool does
+   * @param toolDefinition.schema - Zod schema for validating input parameters
+   * @param toolDefinition.cb - Optional callback function (can also be second parameter)
+   * @param callback - Optional callback function (alternative to toolDefinition.cb)
+   * @returns This server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Basic tool
+   * server.tool({
+   *   name: 'get-time',
+   *   description: 'Get current time'
+   * }, async () => {
+   *   return text(new Date().toISOString());
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Tool with parameters
+   * server.tool({
+   *   name: 'add',
+   *   description: 'Add two numbers',
+   *   schema: z.object({
+   *     a: z.number(),
+   *     b: z.number()
+   *   })
+   * }, async ({ a, b }) => {
+   *   return text(String(a + b));
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Tool with context (for OAuth)
+   * server.tool({
+   *   name: 'user-info',
+   *   description: 'Get user information'
+   * }, async (params, ctx) => {
+   *   if (!ctx.auth) {
+   *     return error('Not authenticated');
+   *   }
+   *   return text(`User: ${ctx.auth.user.email}`);
+   * });
+   * ```
+   *
+   * @see {@link ToolDefinition} for all configuration options
+   * @see {@link ToolCallback} for callback signature
+   */
   public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
     toolDefinition: T,
     callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
   ) => this;
 
-  // Schema conversion helpers (used by tool registration)
+  /**
+   * Converts a Zod schema to MCP parameter format.
+   * @internal Used internally by tool registration
+   */
   public convertZodSchemaToParams = convertZodSchemaToParams;
+
+  /**
+   * Creates parameter schema from input definitions.
+   * @internal Used internally by tool registration
+   */
   public createParamsSchema = createParamsSchema;
 
-  // Template URI parsing helper (used by resource templates)
+  /**
+   * Parses URI parameters from resource template URIs.
+   * @internal Used internally by resource templates
+   */
   public parseTemplateUri = parseTemplateUriHelper;
 
-  // Resource registration helpers - types are set in wrapRegistrationMethods
+  /**
+   * Registers a resource that can be read by MCP clients.
+   *
+   * Resources represent data or content that clients can access, such as
+   * files, database records, API responses, etc. Each resource has a unique
+   * URI and returns content when read.
+   *
+   * @param resourceDefinition - Resource configuration object
+   * @param resourceDefinition.name - Resource display name
+   * @param resourceDefinition.uri - Unique resource URI (e.g., "file:///path/to/file")
+   * @param resourceDefinition.description - Human-readable description
+   * @param resourceDefinition.mimeType - MIME type of content (default: "text/plain")
+   * @param callback - Callback function that returns resource content
+   * @returns This server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Static resource
+   * server.resource({
+   *   name: 'config',
+   *   uri: 'app://config',
+   *   description: 'Application configuration'
+   * }, async () => {
+   *   return text(JSON.stringify(config, null, 2));
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Dynamic resource
+   * server.resource({
+   *   name: 'system-status',
+   *   uri: 'system://status',
+   *   mimeType: 'application/json'
+   * }, async () => {
+   *   const status = await getSystemStatus();
+   *   return text(JSON.stringify(status));
+   * });
+   * ```
+   *
+   * @see {@link ResourceDefinition} for all configuration options
+   * @see {@link resourceTemplate} for parameterized resources
+   */
   public resource!: (
     resourceDefinition:
       | ResourceDefinition<HasOAuth>
       | import("./types/index.js").ResourceDefinitionWithoutCallback,
     callback?: ReadResourceCallback<HasOAuth>
   ) => this;
+
+  /**
+   * Registers a resource template for parameterized resources.
+   *
+   * Resource templates allow clients to read resources with dynamic URIs
+   * by providing a URI template with parameters (e.g., "file:///{path}").
+   * When a client reads a URI matching the template, the parameters are
+   * extracted and passed to the callback.
+   *
+   * @param templateDefinition - Resource template configuration
+   * @param templateDefinition.name - Template display name
+   * @param templateDefinition.uriTemplate - URI template with parameters (e.g., "files:///{id}")
+   * @param templateDefinition.description - Human-readable description
+   * @param templateDefinition.mimeType - MIME type of content
+   * @param callback - Callback receiving URI and extracted parameters
+   * @returns This server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // File resource template
+   * server.resourceTemplate({
+   *   name: 'files',
+   *   uriTemplate: 'file:///{path}',
+   *   description: 'Read files by path'
+   * }, async (uri, params) => {
+   *   const content = await fs.readFile(params.path, 'utf-8');
+   *   return text(content);
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Database record template
+   * server.resourceTemplate({
+   *   name: 'users',
+   *   uriTemplate: 'db://users/{id}',
+   *   mimeType: 'application/json'
+   * }, async (uri, params) => {
+   *   const user = await db.users.get(params.id);
+   *   return text(JSON.stringify(user));
+   * });
+   * ```
+   *
+   * @see {@link ResourceTemplateDefinition} for all configuration options
+   * @see {@link resource} for static resources
+   */
   public resourceTemplate!: (
     templateDefinition:
       | ResourceTemplateDefinition<HasOAuth>
@@ -874,7 +1920,62 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     callback?: ReadResourceTemplateCallback<HasOAuth>
   ) => this;
 
-  // Prompt registration helper - type is set in wrapRegistrationMethods
+  /**
+   * Registers a prompt template that clients can use.
+   *
+   * Prompts are reusable templates that help structure conversations with
+   * language models. They can accept parameters and return formatted messages
+   * ready to send to an LLM.
+   *
+   * @param promptDefinition - Prompt configuration object
+   * @param promptDefinition.name - Unique prompt name
+   * @param promptDefinition.description - Human-readable description
+   * @param promptDefinition.schema - Zod schema for prompt arguments
+   * @param callback - Callback that returns prompt messages
+   * @returns This server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Simple prompt
+   * server.prompt({
+   *   name: 'greeting',
+   *   description: 'Generate a greeting message'
+   * }, async () => {
+   *   return {
+   *     messages: [
+   *       { role: 'user', content: { type: 'text', text: 'Hello!' } }
+   *     ]
+   *   };
+   * });
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Parameterized prompt
+   * server.prompt({
+   *   name: 'code-review',
+   *   description: 'Review code with specific focus',
+   *   schema: z.object({
+   *     code: z.string(),
+   *     focus: z.enum(['security', 'performance', 'style'])
+   *   })
+   * }, async ({ code, focus }) => {
+   *   return {
+   *     messages: [
+   *       {
+   *         role: 'user',
+   *         content: {
+   *           type: 'text',
+   *           text: `Review this code focusing on ${focus}:\n\n${code}`
+   *         }
+   *       }
+   *     ]
+   *   };
+   * });
+   * ```
+   *
+   * @see {@link PromptDefinition} for all configuration options
+   */
   public prompt!: (
     promptDefinition:
       | PromptDefinition<any, HasOAuth>
@@ -882,12 +1983,80 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     callback?: PromptCallback<any, HasOAuth>
   ) => this;
 
-  // Notification helpers
+  /**
+   * Gets all active client sessions.
+   *
+   * @returns Array of active session IDs
+   *
+   * @example
+   * ```typescript
+   * const sessions = server.getActiveSessions();
+   * console.log(`Active sessions: ${sessions.length}`);
+   * ```
+   */
   public getActiveSessions = getActiveSessions;
+
+  /**
+   * Sends a notification to all connected clients.
+   *
+   * @param method - Notification method name
+   * @param params - Notification parameters
+   *
+   * @example
+   * ```typescript
+   * await server.sendNotification('custom/event', { data: 'value' });
+   * ```
+   */
   public sendNotification = sendNotification;
+
+  /**
+   * Sends a notification to a specific client session.
+   *
+   * @param sessionId - Target session ID
+   * @param method - Notification method name
+   * @param params - Notification parameters
+   *
+   * @example
+   * ```typescript
+   * await server.sendNotificationToSession('session-123', 'custom/event', { data: 'value' });
+   * ```
+   */
   public sendNotificationToSession = sendNotificationToSession;
+
+  /**
+   * Notifies all clients that the tools list has changed.
+   * Clients should refresh their tools list.
+   *
+   * @example
+   * ```typescript
+   * server.tool({ name: 'new-tool', description: 'New tool' }, handler);
+   * await server.sendToolsListChanged();
+   * ```
+   */
   public sendToolsListChanged = sendToolsListChanged;
+
+  /**
+   * Notifies all clients that the resources list has changed.
+   * Clients should refresh their resources list.
+   *
+   * @example
+   * ```typescript
+   * server.resource({ name: 'new-resource', uri: 'new://' }, handler);
+   * await server.sendResourcesListChanged();
+   * ```
+   */
   public sendResourcesListChanged = sendResourcesListChanged;
+
+  /**
+   * Notifies all clients that the prompts list has changed.
+   * Clients should refresh their prompts list.
+   *
+   * @example
+   * ```typescript
+   * server.prompt({ name: 'new-prompt', description: 'New prompt' }, handler);
+   * await server.sendPromptsListChanged();
+   * ```
+   */
   public sendPromptsListChanged = sendPromptsListChanged;
 
   /**
@@ -909,6 +2078,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     return this.subscriptionManager.notifyResourceUpdated(uri, this.sessions);
   }
 
+  /**
+   * Registers a UI resource for interactive widgets.
+   *
+   * UI resources allow serving interactive components that can be displayed
+   * in compatible MCP clients (like ChatGPT with Apps SDK).
+   *
+   * @param definition - UI resource definition
+   * @returns This server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * server.uiResource({
+   *   name: 'chart-viewer',
+   *   uri: 'ui://chart',
+   *   html: '<div>Chart goes here</div>'
+   * });
+   * ```
+   *
+   * @see {@link UIResourceDefinition} for configuration options
+   */
   public uiResource = (
     definition: Parameters<typeof uiResourceRegistration>[1]
   ) => {
@@ -949,28 +2138,77 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
-   * Start the Hono server with MCP endpoints
+   * Starts the HTTP server and begins listening for connections.
    *
-   * Initiates the server startup process by mounting MCP endpoints, configuring
-   * the inspector UI (if available), and starting the server to listen
-   * for incoming connections. This is the main entry point for running the server.
+   * This method is the primary way to run an MCP server as a standalone HTTP service.
+   * It performs the following initialization:
+   * 1. Mounts MCP protocol endpoints at `/mcp` and `/sse`
+   * 2. Mounts inspector UI at `/inspector` (if available)
+   * 3. Mounts widget serving routes
+   * 4. Sets up OAuth routes (if configured)
+   * 5. Starts the HTTP server on the specified port
    *
-   * The server will be accessible at the specified port with MCP endpoints at /mcp and /sse
-   * and inspector UI at /inspector (if the inspector package is installed).
+   * Port resolution (in order of priority):
+   * 1. `port` parameter
+   * 2. `--port` CLI argument
+   * 3. `PORT` environment variable
+   * 4. Default: 3000
    *
-   * @param port - Port number to listen on (defaults to 3000 if not specified)
-   * @returns Promise that resolves when the server is successfully listening
+   * Host configuration:
+   * - Uses `config.host` or `HOST` environment variable
+   * - Defaults to "localhost"
+   *
+   * Base URL:
+   * - Uses `config.baseUrl` or `MCP_URL` environment variable
+   * - Falls back to `http://${host}:${port}`
+   *
+   * @param port - Optional port number to listen on
+   * @returns Promise that resolves when the server is listening
    *
    * @example
    * ```typescript
-   * await server.listen(8080)
-   * // Server now running at http://localhost:8080 (or configured host)
-   * // MCP endpoints: http://localhost:8080/mcp and http://localhost:8080/sse
-   * // Inspector UI: http://localhost:8080/inspector
+   * // Basic usage
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
+   * server.tool({ name: 'hello', description: 'Say hello' }, async () => {
+   *   return text('Hello, world!');
+   * });
+   * await server.listen(3000);
+   * // Server running at: http://localhost:3000
+   * // MCP endpoint: http://localhost:3000/mcp
+   * // Inspector UI: http://localhost:3000/inspector
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Using environment variables
+   * // PORT=8080 HOST=0.0.0.0 node server.js
+   * await server.listen(); // Listens on 0.0.0.0:8080
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // With custom base URL (e.g., behind reverse proxy)
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   baseUrl: 'https://api.example.com'
+   * });
+   * await server.listen(3000);
+   * // Server listens on port 3000 but generates URLs with https://api.example.com
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Command-line usage
+   * // node server.js --port 8080
+   * await server.listen(); // Uses port from CLI argument
+   * ```
+   *
+   * @see {@link getHandler} for serverless deployment without listen()
    */
   /**
-   * Log registered tools, prompts, and resources to console
+   * Logs registered tools, prompts, and resources to console.
+   * @internal
    */
   private logRegisteredItems(): void {
     logRegisteredItemsHelper(
@@ -980,17 +2218,52 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
   }
 
+  /**
+   * Gets the build identifier for cache busting.
+   *
+   * @returns Build ID string or undefined
+   * @internal
+   */
   public getBuildId() {
     return this.buildId;
   }
 
+  /**
+   * Gets the port number the server is listening on.
+   *
+   * @returns Port number (defaults to 3000 if not yet listening)
+   *
+   * @example
+   * ```typescript
+   * await server.listen(8080);
+   * console.log(`Server port: ${server.getServerPort()}`); // 8080
+   * ```
+   */
   public getServerPort() {
     return this.serverPort || 3000;
   }
 
   /**
-   * Create a message for sampling (calling the LLM)
-   * Delegates to the native SDK server
+   * Creates a message using sampling (LLM completion).
+   *
+   * This method delegates to the native SDK server to handle sampling requests.
+   * Sampling allows tools to ask the LLM to generate responses, enabling
+   * agent-like behavior where tools can request LLM assistance.
+   *
+   * @param params - Message creation parameters
+   * @param options - Optional request options
+   * @returns Message creation result from the LLM
+   *
+   * @example
+   * ```typescript
+   * // In a tool callback with sampling capability
+   * const result = await server.createMessage({
+   *   messages: [
+   *     { role: 'user', content: { type: 'text', text: 'Explain MCP' } }
+   *   ],
+   *   maxTokens: 100
+   * });
+   * ```
    */
   public async createMessage(
     params: CreateMessageRequest["params"],
@@ -1000,6 +2273,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   async listen(port?: number): Promise<void> {
+    // During HMR reload, skip listen() - CLI manages the server lifecycle
+    if ((globalThis as any).__mcpUseHmrMode) {
+      return;
+    }
+
     // Priority: parameter > --port CLI arg > PORT env var > default (3000)
     const portEnv = getEnv("PORT");
 
@@ -1158,8 +2436,35 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     };
   }
 
-  // Roots registration helpers
+  /**
+   * Registers a callback for when client roots change.
+   *
+   * Roots represent directories or files that the client has access to.
+   * This callback is invoked when a client updates its root list.
+   *
+   * @param callback - Function to call when roots change
+   *
+   * @example
+   * ```typescript
+   * server.onRootsChanged((roots) => {
+   *   console.log(`Client roots updated: ${roots.length} roots`);
+   *   roots.forEach(root => console.log(`  - ${root.uri}`));
+   * });
+   * ```
+   */
   onRootsChanged = onRootsChanged.bind(this);
+
+  /**
+   * Lists the current roots from connected clients.
+   *
+   * @returns Promise resolving to array of Root objects
+   *
+   * @example
+   * ```typescript
+   * const roots = await server.listRoots();
+   * console.log(`Current roots: ${roots.map(r => r.uri).join(', ')}`);
+   * ```
+   */
   listRoots = listRoots.bind(this);
 
   /**

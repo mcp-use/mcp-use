@@ -280,7 +280,7 @@ server.include_router(db_router, prefix="db")
 server.include_router(files_router, prefix="fs")
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", run_debug=True)
+    server.run(transport="streamable-http", debug=True)
 ```
 
 Output:

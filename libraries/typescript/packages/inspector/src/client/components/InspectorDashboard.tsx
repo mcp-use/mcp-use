@@ -215,19 +215,35 @@ export function InspectorDashboard() {
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
 
-    // Validate URL format
+    // Validate URL format and auto-add https:// if protocol is missing
+    let normalizedUrl = url.trim();
     try {
-      const parsedUrl = new URL(url.trim());
+      const parsedUrl = new URL(normalizedUrl);
       const isValid =
         parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
       if (!isValid) {
-        toast.error("Invalid URL protocol. Please use http://, https://");
+        toast.error("Invalid URL protocol. Please use http:// or https://");
         return;
       }
     } catch (error) {
-      toast.error("Invalid URL format. Please enter a valid URL.");
-      return;
+      // If parsing fails, try adding https:// prefix
+      try {
+        const urlWithHttps = `https://${normalizedUrl}`;
+        const parsedUrl = new URL(urlWithHttps);
+        const isValid =
+          parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+
+        if (!isValid) {
+          toast.error("Invalid URL protocol. Please use http:// or https://");
+          return;
+        }
+        // Use the normalized URL with https://
+        normalizedUrl = urlWithHttps;
+      } catch (retryError) {
+        toast.error("Invalid URL format. Please enter a valid URL.");
+        return;
+      }
     }
 
     // Convert custom headers array to object
@@ -252,8 +268,8 @@ export function InspectorDashboard() {
 
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
-      url: url.trim(),
-      name: url.trim(),
+      url: normalizedUrl,
+      name: normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       ...(proxyConfig
@@ -270,7 +286,7 @@ export function InspectorDashboard() {
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
-    addServer(url.trim(), serverConfig);
+    addServer(normalizedUrl, serverConfig);
 
     // Track server added
     const telemetry = Telemetry.getInstance();
@@ -802,40 +818,33 @@ export function InspectorDashboard() {
                   {(connection.state === "pending_auth" ||
                     connection.state === "authenticating") && (
                     <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                      <Button
-                        size="sm"
-                        className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
-                        variant="outline"
-                        onClick={(e) =>
-                          handleActionClick(e, connection.authenticate)
-                        }
-                        disabled={connection.state === "authenticating"}
-                      >
-                        {connection.state === "authenticating" ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Authenticating...
-                          </>
-                        ) : (
-                          "Authenticate"
-                        )}
-                      </Button>
-                      {connection.authUrl &&
-                        connection.state === "pending_auth" && (
-                          <>
-                            {" "}
-                            or{" "}
-                            <a
-                              href={connection.authUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              open auth page
-                            </a>
-                          </>
-                        )}
+                      {connection.state === "authenticating" ? (
+                        <Button
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          disabled
+                        >
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Authenticating...
+                        </Button>
+                      ) : connection.authUrl ? (
+                        <Button
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          asChild
+                        >
+                          <a
+                            href={connection.authUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Authenticate
+                          </a>
+                        </Button>
+                      ) : null}
                     </div>
                   )}
                 </div>

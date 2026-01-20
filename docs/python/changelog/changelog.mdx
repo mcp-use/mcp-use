@@ -4,7 +4,26 @@ description: "New updates and improvements"
 icon:  "history"
 ---
 
+import { Contributors } from '/snippets/contributors.jsx'
+
+<Update label="v1.5.2 - 2025‑01‑12">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.5.2&title=Roots%20support%20and%20OAuth%202.1&date=2025-01-12" alt="Release 1.5.2" />
+  </Frame>
+  ## Roots & OAuth 2.1
+  - **New**: Roots support in MCPClient and MCPServer for hierarchical resource organization ([#751](https://github.com/mcp-use/mcp-use/pull/751))
+  - **New**: OAuth 2.1 adaptation from new MCP spec with improved security practices ([#518](https://github.com/mcp-use/mcp-use/pull/518))
+  - **New**: CLAUDE.md files for AI-assisted development guidance ([#775](https://github.com/mcp-use/mcp-use/pull/775))
+  - **Fix**: Inspector CDN path and error fallback handling ([#773](https://github.com/mcp-use/mcp-use/pull/773))
+  - **Fix**: Documentation updates and improvements ([#774](https://github.com/mcp-use/mcp-use/pull/774))
+
+  <Contributors users="Pederzh,renvins,pietrozullo" />
+</Update>
+
 <Update label="v1.5.0 - 2025‑12‑01">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.5.0&title=Complete%20MCP%20Server%20SDK&date=2025-12-01" alt="Release 1.5.0" />
+  </Frame>
   ## Complete MCP Server SDK
   - **Major**: Complete MCP Server SDK with MCPServer class, routing, and production features
   - **New**: MCPRouter for modular server organization (similar to FastAPI's APIRouter)
@@ -19,9 +38,14 @@ icon:  "history"
   - **Enhancement**: Refactored test suite using MCPServer instead of external servers
   - **Enhancement**: Type checking with ty and pre-commit hooks with prek
   - **Enhancement**: Moved Ruff configuration to pyproject.toml for better organization
+
+  <Contributors users="pietrozullo,vkrasnoselskikh,renvins,tonxxd" />
 </Update>
 
 <Update label="v1.4.1 - 2025‑11‑20">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.4.1&title=Code%20Mode%20and%20Pretty%20Display&date=2025-11-20" alt="Release 1.4.1" />
+  </Frame>
   ## Code Mode & Pretty Display
   - **New**: Code Mode integration for direct code execution through MCP servers with isolated environments
   - **New**: Pretty Display system with rich, colorful terminal output for agent interactions
@@ -30,10 +54,14 @@ icon:  "history"
   - **Enhancement**: Enhanced schema handling for complex data structures with improved list support
   - **Fix**: Recursion limit configuration in MCPAgent to prevent stack overflow errors
   - **Fix**: Client info property in base connector for proper metadata reporting
+
+  <Contributors users="pietrozullo,renvins,tonxxd" />
 </Update>
 
-
 <Update label="v1.4.0 - 2025‑10‑27">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.4.0&title=LangChain%201.0%20and%20Provider%20Adapters&date=2025-10-27" alt="Release 1.4.0" />
+  </Frame>
   ## LangChain 1.0 & Provider Adapters
   - **Major**: Upgraded to LangChain 1.0.0 for improved performance and simplified agent patterns
   - **New**: Direct provider adapters for OpenAI, Anthropic, and Google - use MCP tools without MCPAgent
@@ -43,6 +71,8 @@ icon:  "history"
   - **Enhancement**: Remote mode query streaming delegation
   - **Fix**: Improved streaming output reliability with proper null checking
   - **Fix**: Automatic ToolMessage filtering from conversation history
+
+  <Contributors users="pietrozullo,renvins" />
 </Update>
 
 <Update label="v1.3.13 - 2025‑10‑18">
@@ -54,6 +84,9 @@ icon:  "history"
 </Update>
 
 <Update label="v1.3.12 - 2025‑10‑02">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.3.12&title=Middleware%20and%20Documentation&date=2025-10-02" alt="Release 1.3.12" />
+  </Frame>
   ## Middleware & Documentation
   - **New**: Comprehensive middleware system for request/response interception ([#269](https://github.com/mcp-use/mcp-use/pull/269))
   - **New**: Automatic API documentation generation ([#301](https://github.com/mcp-use/mcp-use/pull/301))
@@ -62,9 +95,14 @@ icon:  "history"
   - Fix: Agent memory handling to prevent duplicate queries ([#187](https://github.com/mcp-use/mcp-use/pull/187))
   - Enhancement: Middleware metrics collection for better observability ([#299](https://github.com/mcp-use/mcp-use/pull/299))
   - Fix: Test server execution with proper executable paths ([#298](https://github.com/mcp-use/mcp-use/pull/298))
+
+  <Contributors users="pietrozullo,renvins" />
 </Update>
 
 <Update label="v1.3.11 - 2025‑09‑29">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.3.11&title=Auth%20Revolution&date=2025-09-29" alt="Release 1.3.11" />
+  </Frame>
   ## Auth Revolution
   - **New**: Complete OAuth2 and Bearer token authentication framework ([#149](https://github.com/pietrozullo/mcp-use/pull/149))
   - Fix: HTTP connector error handling with better diagnostics ([#279](https://github.com/pietrozullo/mcp-use/pull/279))
@@ -73,6 +111,8 @@ icon:  "history"
   - Fix: Documentation typo (astream → stream) ([#266](https://github.com/pietrozullo/mcp-use/pull/266))
   - Enhancement: MCPAgent execution tracking with success status ([#254](https://github.com/pietrozullo/mcp-use/pull/254))
   - Fix: Subprocess cleanup for multiple MCP clients to prevent memory leaks ([#231](https://github.com/pietrozullo/mcp-use/pull/231))
+
+  <Contributors users="pietrozullo,renvins,Amrithesh-Kakkoth,hetsaraiya,lorenss-m" />
 </Update>
 
 <Update label="v1.3.3 - 2025‑06‑19">

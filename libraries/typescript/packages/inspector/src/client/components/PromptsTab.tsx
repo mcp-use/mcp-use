@@ -333,6 +333,24 @@ export function PromptsTab({
     setSelectedPromptName,
   ]);
 
+  // Sync selectedPrompt with updated prompts list (for HMR support)
+  // When prompts change via HMR, update selectedPrompt to the new object reference
+  useEffect(() => {
+    if (selectedPrompt) {
+      const updatedPrompt = prompts.find((p) => p.name === selectedPrompt.name);
+      if (updatedPrompt && updatedPrompt !== selectedPrompt) {
+        // Prompt definition changed - update the reference
+        const hasChanges =
+          JSON.stringify(updatedPrompt.arguments) !==
+            JSON.stringify(selectedPrompt.arguments) ||
+          updatedPrompt.description !== selectedPrompt.description;
+        if (hasChanges) {
+          setSelectedPrompt(updatedPrompt);
+        }
+      }
+    }
+  }, [prompts, selectedPrompt]);
+
   const handleArgChange = useCallback((key: string, value: any) => {
     setPromptArgs((prev) => ({ ...prev, [key]: value }));
   }, []);

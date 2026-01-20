@@ -84,10 +84,21 @@ def start():
 
 Stop the connection manager and close the connection.
 
+        This method ensures graceful shutdown by waiting for the connection task
+        to complete and cleanup to finish. If operations exceed the timeout,
+        forced cleanup is performed to prevent resource leaks.
+
+        Note:
+            This method does not raise exceptions and guarantees graceful shutdown
+            even if cleanup times out.
+
+
+**Parameters**
+><ParamField body="timeout" type="float | None" default="30.0" >   Maximum time to wait for cleanup in seconds (default: 30.0). </ParamField>
 
 **Signature**
 ```python wrap
-def stop():
+def stop(timeout: float | None = 30.0):
 ```
 
 </Card>

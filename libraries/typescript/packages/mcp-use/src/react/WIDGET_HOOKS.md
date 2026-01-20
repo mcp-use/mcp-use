@@ -322,5 +322,5 @@ The `useWidget` hook is designed to work seamlessly with MCP-use's widget system
 3. **Build system** handles bundling and deployment
 4. **Type safety** is maintained throughout the entire stack
 
-See the [MCP-use documentation](https://mcp-use.github.io) for more information on building and deploying widgets.
+See the [MCP-use documentation](https://mcp-use.com/docs) for more information on building and deploying widgets.
 

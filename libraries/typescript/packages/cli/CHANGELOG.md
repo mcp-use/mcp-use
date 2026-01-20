@@ -1,5 +1,371 @@
 # @mcp-use/cli
 
+## 2.10.3
+
+### Patch Changes
+
+- b65d05d: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+- Updated dependencies [b65d05d]
+  - mcp-use@1.13.5
+  - @mcp-use/inspector@0.15.3
+
+## 2.10.3-canary.0
+
+### Patch Changes
+
+- de5f030: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+  - mcp-use@1.13.5-canary.0
+  - @mcp-use/inspector@0.15.3-canary.0
+
+## 2.10.2
+
+### Patch Changes
+
+- Updated dependencies [dd8d07d]
+  - mcp-use@1.13.4
+  - @mcp-use/inspector@0.15.2
+
+## 2.10.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5c65df2]
+  - mcp-use@1.13.4-canary.0
+  - @mcp-use/inspector@0.15.2-canary.0
+
+## 2.10.1
+
+### Patch Changes
+
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - @mcp-use/inspector@0.15.1
+  - mcp-use@1.13.3
+
+## 2.10.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b06fa78]
+  - @mcp-use/inspector@0.15.1-canary.2
+  - mcp-use@1.13.3-canary.2
+
+## 2.10.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3f2ebf]
+  - @mcp-use/inspector@0.15.1-canary.1
+  - mcp-use@1.13.3-canary.1
+
+## 2.10.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d446ee5]
+  - @mcp-use/inspector@0.15.1-canary.0
+  - mcp-use@1.13.3-canary.0
+
+## 2.10.0
+
+### Minor Changes
+
+- 0144a31: feat(cli): enhance login and deployment commands
+  - Updated the login command to handle errors gracefully
+  - Modified the deployment command to prompt users for login if not authenticated
+  - Removed the `fromSource` option from the deployment command
+  - Added checks for uncommitted changes in the git repository before deployment
+  - Updated various commands to consistently use `npx mcp-use login` for login instructions
+
+  refactor(inspector, multi-server-example): authentication UI and logic
+  - Simplified the authentication button logic in InspectorDashboard
+  - Updated the multi-server example to directly link to the authentication URL
+
+### Patch Changes
+
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+  - @mcp-use/inspector@0.15.0
+  - mcp-use@1.13.2
+
+## 2.10.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [7b137c2]
+  - mcp-use@1.13.2-canary.1
+  - @mcp-use/inspector@0.15.0-canary.1
+
+## 2.10.0-canary.0
+
+### Minor Changes
+
+- 450ab65: feat(cli): enhance login and deployment commands
+  - Updated the login command to handle errors gracefully
+  - Modified the deployment command to prompt users for login if not authenticated
+  - Removed the `fromSource` option from the deployment command
+  - Added checks for uncommitted changes in the git repository before deployment
+  - Updated various commands to consistently use `npx mcp-use login` for login instructions
+
+  refactor(inspector, multi-server-example): authentication UI and logic
+  - Simplified the authentication button logic in InspectorDashboard
+  - Updated the multi-server example to directly link to the authentication URL
+
+### Patch Changes
+
+- Updated dependencies [52be97c]
+- Updated dependencies [c9bde52]
+- Updated dependencies [450ab65]
+  - @mcp-use/inspector@0.15.0-canary.0
+  - mcp-use@1.13.2-canary.0
+
+## 2.9.1
+
+### Patch Changes
+
+- b8626dc: chore: update mcp-use version
+- Updated dependencies [b8626dc]
+- Updated dependencies [b8626dc]
+  - mcp-use@1.13.1
+  - @mcp-use/inspector@0.14.6
+
+## 2.9.1-canary.1
+
+### Patch Changes
+
+- 727df09: chore: update mcp-use version
+- Updated dependencies [727df09]
+  - @mcp-use/inspector@0.14.6-canary.1
+  - mcp-use@1.13.1-canary.1
+
+## 2.9.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [548206f]
+  - mcp-use@1.13.1-canary.0
+  - @mcp-use/inspector@0.14.6-canary.0
+
+## 2.9.0
+
+### Minor Changes
+
+- bcdecd4: feat: Hot Module Reloading (HMR) for MCP server development
+
+  Added HMR support to the `mcp-use dev` command. When you modify your server file (add/remove/update tools, prompts, or resources), changes are applied instantly without restarting the server or dropping client connections.
+
+  **Features:**
+  - Tools, prompts, and resources can be added, removed, or updated on-the-fly
+  - Connected clients (like the inspector) receive `list_changed` notifications and auto-refresh
+  - No changes required to user code - existing server files work as-is
+  - Syntax errors during reload are caught gracefully without crashing the server
+
+  **How it works:**
+  - CLI uses `chokidar` to watch `src/` directory and root `.ts`/`.tsx` files
+  - On file change, the module is re-imported with cache-busting
+  - `syncRegistrationsFrom()` diffs registrations and uses the SDK's native `RegisteredTool.update()` and `remove()` methods
+  - `list_changed` notifications are sent to all connected sessions
+
+  **Usage:**
+
+  ```bash
+  mcp-use dev  # HMR enabled by default
+  mcp-use dev --no-hmr  # Disable HMR, use tsx watch instead
+  ```
+
+- bcdecd4: feat(cli): enhance hot module reloading and server management
+  - Improved hot module reloading (HMR) support by allowing local `tsx` usage, falling back to `npx` if not found
+  - Updated server command execution to handle TypeScript imports more effectively
+  - Enhanced file watching capabilities to include `.ts` and `.tsx` files while ignoring unnecessary patterns
+  - Streamlined tool, prompt, and resource registration during HMR to directly inject into active sessions without removal, preserving existing configurations
+  - Added detailed logging for file changes and watcher readiness to improve developer experience
+
+### Patch Changes
+
+- bcdecd4: Add comprehensive test suite for Hot Module Replacement (HMR) functionality
+
+  **Testing Approach:**
+
+  Tests use minimal mocking, focusing on:
+  - Real `MCPServer` instances
+  - Actual console logs (the developer experience)
+  - Direct registration state inspection
+  - Light session mocking only for injection tests
+
+  This approach is more robust and less brittle than heavy mocking, as tests verify real behavior and won't break when SDK internals change.
+
+  **Test Coverage:**
+
+  **Unit Tests** (`tests/unit/server/hmr.test.ts` - 15 tests):
+  - Tool registration (add, update, inject)
+  - Prompt registration (add, inject)
+  - Resource registration (add, inject)
+  - Notification sending (tools/list_changed, prompts/list_changed, resources/list_changed)
+  - Entry methods (enable, disable, remove, update)
+  - Error handling for injection failures
+  - Graceful notification error handling
+
+  **Integration Tests** (`tests/integration/hmr-cli.test.ts`):
+  - End-to-end file change detection
+  - Tool addition via HMR
+  - Tool description updates
+  - Syntax error handling and recovery
+  - Connection persistence during HMR
+
+  **CLI Tests** (`packages/cli/tests/tsx-resolution.test.ts`):
+  - tsx binary resolution from package.json bin field
+  - Handling string and object bin formats
+  - Graceful error handling for missing bin field
+  - Preference for 'tsx' entry in object form
+
+  All tests include proper setup/teardown, mocking, and comprehensive assertions.
+
+- bcdecd4: fix: remove import from "mcp-use" which causes langchain import in server
+- bcdecd4: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+  - mcp-use@1.13.0
+  - @mcp-use/inspector@0.14.5
+
+## 2.9.0-canary.3
+
+### Patch Changes
+
+- e962a16: fix: remove import from "mcp-use" which causes langchain import in server
+- Updated dependencies [e962a16]
+  - @mcp-use/inspector@0.14.5-canary.3
+  - mcp-use@1.13.0-canary.3
+
+## 2.9.0-canary.2
+
+### Patch Changes
+
+- 118cb30: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+- Updated dependencies [118cb30]
+  - @mcp-use/inspector@0.14.5-canary.2
+  - mcp-use@1.13.0-canary.2
+
+## 2.9.0-canary.1
+
+### Minor Changes
+
+- 7359d66: feat(cli): enhance hot module reloading and server management
+  - Improved hot module reloading (HMR) support by allowing local `tsx` usage, falling back to `npx` if not found
+  - Updated server command execution to handle TypeScript imports more effectively
+  - Enhanced file watching capabilities to include `.ts` and `.tsx` files while ignoring unnecessary patterns
+  - Streamlined tool, prompt, and resource registration during HMR to directly inject into active sessions without removal, preserving existing configurations
+  - Added detailed logging for file changes and watcher readiness to improve developer experience
+
+### Patch Changes
+
+- 7359d66: Add comprehensive test suite for Hot Module Replacement (HMR) functionality
+
+  **Testing Approach:**
+
+  Tests use minimal mocking, focusing on:
+  - Real `MCPServer` instances
+  - Actual console logs (the developer experience)
+  - Direct registration state inspection
+  - Light session mocking only for injection tests
+
+  This approach is more robust and less brittle than heavy mocking, as tests verify real behavior and won't break when SDK internals change.
+
+  **Test Coverage:**
+
+  **Unit Tests** (`tests/unit/server/hmr.test.ts` - 15 tests):
+  - Tool registration (add, update, inject)
+  - Prompt registration (add, inject)
+  - Resource registration (add, inject)
+  - Notification sending (tools/list_changed, prompts/list_changed, resources/list_changed)
+  - Entry methods (enable, disable, remove, update)
+  - Error handling for injection failures
+  - Graceful notification error handling
+
+  **Integration Tests** (`tests/integration/hmr-cli.test.ts`):
+  - End-to-end file change detection
+  - Tool addition via HMR
+  - Tool description updates
+  - Syntax error handling and recovery
+  - Connection persistence during HMR
+
+  **CLI Tests** (`packages/cli/tests/tsx-resolution.test.ts`):
+  - tsx binary resolution from package.json bin field
+  - Handling string and object bin formats
+  - Graceful error handling for missing bin field
+  - Preference for 'tsx' entry in object form
+
+  All tests include proper setup/teardown, mocking, and comprehensive assertions.
+
+- Updated dependencies [7359d66]
+  - mcp-use@1.13.0-canary.1
+  - @mcp-use/inspector@0.14.5-canary.1
+
+## 2.9.0-canary.0
+
+### Minor Changes
+
+- 0be9ed8: feat: Hot Module Reloading (HMR) for MCP server development
+
+  Added HMR support to the `mcp-use dev` command. When you modify your server file (add/remove/update tools, prompts, or resources), changes are applied instantly without restarting the server or dropping client connections.
+
+  **Features:**
+  - Tools, prompts, and resources can be added, removed, or updated on-the-fly
+  - Connected clients (like the inspector) receive `list_changed` notifications and auto-refresh
+  - No changes required to user code - existing server files work as-is
+  - Syntax errors during reload are caught gracefully without crashing the server
+
+  **How it works:**
+  - CLI uses `chokidar` to watch `src/` directory and root `.ts`/`.tsx` files
+  - On file change, the module is re-imported with cache-busting
+  - `syncRegistrationsFrom()` diffs registrations and uses the SDK's native `RegisteredTool.update()` and `remove()` methods
+  - `list_changed` notifications are sent to all connected sessions
+
+  **Usage:**
+
+  ```bash
+  mcp-use dev  # HMR enabled by default
+  mcp-use dev --no-hmr  # Disable HMR, use tsx watch instead
+  ```
+
+### Patch Changes
+
+- Updated dependencies [dfb30a6]
+- Updated dependencies [0be9ed8]
+  - @mcp-use/inspector@0.14.5-canary.0
+  - mcp-use@1.13.0-canary.0
+
+## 2.8.4
+
+### Patch Changes
+
+- Updated dependencies [5161914]
+  - @mcp-use/inspector@0.14.4
+  - mcp-use@1.12.4
+
+## 2.8.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a308b3f]
+  - @mcp-use/inspector@0.14.4-canary.0
+  - mcp-use@1.12.4-canary.0
+
 ## 2.8.3
 
 ### Patch Changes

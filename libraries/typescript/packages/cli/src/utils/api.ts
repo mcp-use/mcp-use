@@ -68,6 +68,8 @@ export interface Deployment {
   gitCommitSha?: string;
   gitBranch?: string;
   gitCommitMessage?: string;
+  serverId?: string;
+  serverSlug?: string; // Computed field from backend
 }
 
 export interface UpdateDeploymentRequest {
@@ -87,6 +89,45 @@ export interface LogsResponse {
   data: {
     logs: string;
   };
+}
+
+export interface GitHubInstallation {
+  id: string;
+  installation_id: string;
+}
+
+export interface GitHubConnectionStatus {
+  is_connected: boolean;
+  installations?: GitHubInstallation[];
+}
+
+export interface GitHubAppNameResponse {
+  app_name: string;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  owner: {
+    login: string;
+  };
+  branches?: Array<{
+    name: string;
+    commit: {
+      sha: string;
+    };
+  }>;
+}
+
+export interface GitHubReposResponse {
+  user: {
+    login: string;
+    id: number;
+    avatar_url: string;
+  };
+  repos: GitHubRepo[];
 }
 
 /**
@@ -445,5 +486,30 @@ export class McpUseAPI {
       { timeout: 60000 } // 60 second timeout for logs
     );
     return response.data.logs;
+  }
+
+  /**
+   * Get GitHub connection status
+   */
+  async getGitHubConnectionStatus(): Promise<GitHubConnectionStatus> {
+    return this.request<GitHubConnectionStatus>("/github/connection");
+  }
+
+  /**
+   * Get GitHub app name
+   */
+  async getGitHubAppName(): Promise<string> {
+    const response =
+      await this.request<GitHubAppNameResponse>("/github/appname");
+    return response.app_name;
+  }
+
+  /**
+   * Get accessible GitHub repositories
+   */
+  async getGitHubRepos(refresh: boolean = false): Promise<GitHubReposResponse> {
+    return this.request<GitHubReposResponse>(
+      `/github/repos${refresh ? "?refresh=true" : ""}`
+    );
   }
 }
