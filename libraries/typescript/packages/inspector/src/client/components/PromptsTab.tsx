@@ -91,9 +91,9 @@ export function PromptsTab({
   const rpcPanelRef = usePanelRef();
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
   const exportRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
-  const leftPanelRef = useRef<ImperativePanelHandle>(null);
-  const topPanelRef = useRef<ImperativePanelHandle>(null);
 
+  const leftPanelRef = usePanelRef();
+  const toolParamsPanelRef = usePanelRef();
   // Detect mobile screen size
   useEffect(() => {
     const checkMobile = () => {
@@ -479,8 +479,8 @@ export function PromptsTab({
       if (leftPanelRef.current) {
         leftPanelRef.current.collapse();
       }
-      if (promptParamsPanelRef.current) {
-        promptParamsPanelRef.current.collapse();
+      if (toolParamsPanelRef.current) {
+        toolParamsPanelRef.current.collapse();
       }
       setIsMaximized(true);
     } else {
@@ -488,12 +488,12 @@ export function PromptsTab({
       if (leftPanelRef.current) {
         leftPanelRef.current.expand();
       }
-      if (promptParamsPanelRef.current) {
-        promptParamsPanelRef.current.expand();
+      if (toolParamsPanelRef.current) {
+        toolParamsPanelRef.current.expand();
       }
       setIsMaximized(false);
     }
-  }, [isMaximized, leftPanelRef, promptParamsPanelRef]);
+  }, [isMaximized, leftPanelRef, toolParamsPanelRef]);
 
   const openSaveDialog = useCallback(() => {
     if (!selectedPrompt) return;
@@ -812,7 +812,7 @@ export function PromptsTab({
       <ResizablePanel defaultSize="67%">
         <ResizablePanelGroup orientation="vertical">
           <ResizablePanel
-            panelRef={promptParamsPanelRef}
+            panelRef={toolParamsPanelRef}
             defaultSize="40%"
             collapsible
           >
