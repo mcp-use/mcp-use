@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.11.0-canary.3
+
+### Minor Changes
+
+- 1fb5e5e: docs(widget-lifecycle): add guidance on handling loading states in widgets
+
 ## 0.11.0-canary.2
 
 ### Minor Changes

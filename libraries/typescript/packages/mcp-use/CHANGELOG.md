@@ -1,5 +1,18 @@
 # mcp-use
 
+## 1.14.0-canary.6
+
+### Minor Changes
+
+- 1fb5e5e: docs(widget-lifecycle): add guidance on handling loading states in widgets
+
+### Patch Changes
+
+- 948e0ae: fix(inspector): resolve Anthropic tool_use.id required error
+- Updated dependencies [948e0ae]
+  - @mcp-use/inspector@0.16.0-canary.6
+  - @mcp-use/cli@2.11.0-canary.6
+
 ## 1.14.0-canary.5
 
 ### Patch Changes

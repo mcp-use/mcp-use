@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.6
+
+### Patch Changes
+
+- 948e0ae: fix(inspector): resolve Anthropic tool_use.id required error
+- Updated dependencies [1fb5e5e]
+- Updated dependencies [948e0ae]
+  - mcp-use@1.14.0-canary.6
+
 ## 0.16.0-canary.5
 
 ### Patch Changes
