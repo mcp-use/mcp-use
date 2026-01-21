@@ -20,7 +20,7 @@ def get_access_token() -> AccessToken | None:
 
     Example:
         ```python
-        from mcp_use.server import get_access_token
+        from mcp_use.server.auth import get_access_token
 
         @server.tool()
         def whoami() -> str:
@@ -43,7 +43,7 @@ def require_auth() -> AccessToken:
 
     Example:
         ```python
-        from mcp_use.server import require_auth
+        from mcp_use.server.auth import require_auth
 
         @server.tool()
         def admin_action() -> str:

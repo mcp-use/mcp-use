@@ -23,7 +23,7 @@ class AccessToken(BaseModel):
 
     Example:
         ```python
-        from mcp_use.server import get_access_token
+        from mcp_use.server.auth import get_access_token
 
         @server.tool()
         def whoami() -> str:

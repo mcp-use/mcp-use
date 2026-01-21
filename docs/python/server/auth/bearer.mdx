@@ -19,7 +19,8 @@ No additional code is needed in individual tools. The middleware validates the t
 ## Quick Start
 
 ```python
-from mcp_use.server import MCPServer, BearerAuthProvider, AccessToken, get_access_token
+from mcp_use.server import MCPServer
+from mcp_use.server.auth import BearerAuthProvider, AccessToken, get_access_token
 
 API_KEYS = {
     "sk-abc123": {"email": "alice@example.com"},
@@ -71,7 +72,7 @@ sequenceDiagram
 Extend this class and implement `verify_token()`:
 
 ```python
-from mcp_use.server import BearerAuthProvider, AccessToken
+from mcp_use.server.auth import BearerAuthProvider, AccessToken
 
 
 class MyAuthProvider(BearerAuthProvider):
@@ -148,7 +149,7 @@ Since the middleware already validates authentication, these helpers are for **a
 | `require_auth()` | Returns `AccessToken` or raises `AuthenticationError`. Use as a safeguard. |
 
 ```python
-from mcp_use.server import get_access_token, require_auth
+from mcp_use.server.auth import get_access_token, require_auth
 
 
 @server.tool()

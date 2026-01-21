@@ -24,7 +24,7 @@ Get the current authenticated user's access token.
 
     Example:
         ```python
-        from mcp_use.server import get_access_token
+        from mcp_use.server.auth import get_access_token
 
         @server.tool()
         def whoami() -> str:
@@ -57,7 +57,7 @@ Get the access token or raise AuthenticationError if not authenticated.
 
     Example:
         ```python
-        from mcp_use.server import require_auth
+        from mcp_use.server.auth import require_auth
 
         @server.tool()
         def admin_action() -> str:

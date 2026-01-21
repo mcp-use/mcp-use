@@ -17,7 +17,8 @@ class BearerAuthProvider(ABC):
 
     Example:
         ```python
-        from mcp_use.server import MCPServer, BearerAuthProvider, AccessToken
+        from mcp_use.server import MCPServer
+        from mcp_use.server.auth import BearerAuthProvider, AccessToken
 
         class MyAuthProvider(BearerAuthProvider):
             async def verify_token(self, token: str) -> AccessToken | None:
