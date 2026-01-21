@@ -27,10 +27,22 @@ tag: "New"
 - **Enhancement**: ReDoS attack prevention in widget name slugification with input length validation
 - **Enhancement**: Improved widget lifecycle documentation with loading state guidance
 
+### CLI Improvements
+
+- **New**: `MCP_URL` environment variable automatically set in server process for easy access to server URL
+- **Enhancement**: Server process environment now includes `MCP_URL` in both development and production modes
+
 ### API & Protocol
 
 - **New**: HEAD request support in `mountMcp` function
 - **Enhancement**: Improved input schema handling in tool registration with better defaults
+
+### MCP Proxy Middleware
+
+- **Enhancement**: Improved error logging with better context for debugging
+- **Enhancement**: Connection refused errors now logged as warnings instead of errors
+- **Enhancement**: Error responses include target URL to help identify failing proxy requests
+- **Enhancement**: More detailed error messages for proxy request failures
 
 ### Bug Fixes
 
