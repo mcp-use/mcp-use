@@ -445,6 +445,7 @@ export interface WidgetData {
   widgetCSP?: {
     connect_domains?: string[];
     resource_domains?: string[];
+    frame_domains?: string[];
   };
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
@@ -878,6 +879,7 @@ export function getWidgetSecurityHeaders(
   widgetCSP?: {
     connect_domains?: string[];
     resource_domains?: string[];
+    frame_domains?: string[];
   },
   devServerBaseUrl?: string
 ): Record<string, string> {
@@ -936,12 +938,21 @@ export function getWidgetSecurityHeaders(
     connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
   }
 
+  // Build frame-src for embedding iframes (e.g., Cal.com embed)
+  // Use frame_domains if specified (per OpenAI spec), fall back to resource_domains for backwards compatibility
+  let frameSrc = "'self' blob:";
+  const frameDomains = widgetCSP?.frame_domains || widgetCSP?.resource_domains;
+  if (frameDomains && frameDomains.length > 0) {
+    frameSrc = `'self' blob: ${frameDomains.join(" ")}`;
+  }
+
   const headers: Record<string, string> = {
     "Content-Security-Policy": [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${resourceDomainsStr}`,
       "worker-src 'self' blob:",
-      "child-src 'self' blob:",
+      `child-src 'self' blob: ${frameDomains?.join(" ") || ""}`.trim(),
+      `frame-src ${frameSrc}`,
       `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
       `img-src ${imgSrc}`,
       `media-src ${mediaSrc}`,
@@ -960,11 +971,19 @@ export function getWidgetSecurityHeaders(
   // This will warn about resources that would fail in production
   if (devServerOrigin) {
     const prodConnectSrc = "'self' https: wss: ws:";
+    // Build production frame-src (use frame_domains if specified, fall back to resource_domains)
+    let prodFrameSrc = "'self' blob:";
+    const prodFrameDomains =
+      widgetCSP?.frame_domains || widgetCSP?.resource_domains;
+    if (prodFrameDomains && prodFrameDomains.length > 0) {
+      prodFrameSrc = `'self' blob: ${prodFrameDomains.join(" ")}`;
+    }
     headers["Content-Security-Policy-Report-Only"] = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${prodResourceDomainsStr}`,
       "worker-src 'self' blob:",
-      "child-src 'self' blob:",
+      `child-src 'self' blob: ${prodFrameDomains?.join(" ") || ""}`.trim(),
+      `frame-src ${prodFrameSrc}`,
       `style-src 'self' 'unsafe-inline' ${prodResourceDomainsStr}`,
       "img-src 'self' data: https: blob:",
       "media-src 'self' data: https: blob:",
