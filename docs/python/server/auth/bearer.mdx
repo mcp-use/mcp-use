@@ -80,21 +80,39 @@ class MyAuthProvider(BearerAuthProvider):
 
 ### claims
 
-Store any user information you need in your tools:
+The `claims` dictionary stores user information that your tools can access during request handling. You decide what to include based on your application's needs.
+
+**Common fields:**
+- `sub` - User ID (standard JWT claim)
+- `email` - User's email address
+- `name` - Display name
+- Custom fields like `plan`, `org_id`, `role`, etc.
 
 ```python
 AccessToken(
     token=token,
     claims={
-        "sub": "user-123",           # User ID
+        "sub": "user-123",
         "email": "alice@example.com",
         "name": "Alice",
-        "plan": "pro",               # Custom fields
+        "plan": "pro",
     },
 )
 ```
 
-Access in tools via `token.claims.get("email")`.
+**Accessing claims in tools:**
+
+```python
+@server.tool()
+def get_user_plan() -> str:
+    token = get_access_token()
+    if not token:
+        return "Not authenticated"
+
+    email = token.claims.get("email", "unknown")
+    plan = token.claims.get("plan", "free")
+    return f"{email} is on the {plan} plan"
+```
 
 ### scopes
 

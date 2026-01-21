@@ -274,7 +274,7 @@ class MCPServer(FastMCP):
         # Add auth middleware if provider is configured
         if self._auth:
             app.add_middleware(
-                cast(type, AuthMiddleware),
+                AuthMiddleware,
                 auth_provider=self._auth,
             )
             logger.debug("AuthMiddleware added to application")

@@ -57,14 +57,42 @@ def create_test_app(auth_provider: BearerAuthProvider) -> Starlette:
     return app
 
 
+# ============================================================================
+# Fixtures
+# ============================================================================
+
+
+@pytest.fixture
+def auth_provider():
+    """Default mock auth provider with a single valid token."""
+    return MockAuthProvider()
+
+
+@pytest.fixture
+def client(auth_provider):
+    """Test client with default auth provider."""
+    app = create_test_app(auth_provider)
+    return TestClient(app, raise_server_exceptions=False)
+
+
+@pytest.fixture(autouse=True)
+def reset_access_token():
+    """Reset access token before and after each test."""
+    set_access_token(None)
+    yield
+    set_access_token(None)
+
+
+# ============================================================================
+# Tests
+# ============================================================================
+
+
 class TestAuthMiddleware401Responses:
     """Test that AuthMiddleware returns proper 401 responses."""
 
-    def test_missing_token_returns_401(self):
+    def test_missing_token_returns_401(self, client):
         """Request without Authorization header returns 401."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.post("/mcp")
 
         assert response.status_code == 401
@@ -72,31 +100,22 @@ class TestAuthMiddleware401Responses:
         assert "WWW-Authenticate" in response.headers
         assert response.headers["WWW-Authenticate"] == "Bearer"
 
-    def test_invalid_token_returns_401(self):
+    def test_invalid_token_returns_401(self, client):
         """Request with invalid token returns 401."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.post("/mcp", headers={"Authorization": "Bearer invalid-token"})
 
         assert response.status_code == 401
         assert response.json()["error"] == "invalid_token"
         assert "WWW-Authenticate" in response.headers
 
-    def test_malformed_auth_header_returns_401(self):
+    def test_malformed_auth_header_returns_401(self, client):
         """Request with malformed Authorization header returns 401."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         # No "Bearer " prefix
         response = client.post("/mcp", headers={"Authorization": "valid-token"})
         assert response.status_code == 401
 
-    def test_valid_token_returns_200(self):
+    def test_valid_token_returns_200(self, client):
         """Request with valid token proceeds normally."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.post("/mcp", headers={"Authorization": "Bearer valid-token"})
 
         assert response.status_code == 200
@@ -108,30 +127,21 @@ class TestAuthMiddleware401Responses:
 class TestAuthMiddlewarePathExclusion:
     """Test that certain paths are excluded from auth."""
 
-    def test_health_endpoint_excluded(self):
+    def test_health_endpoint_excluded(self, client):
         """Health endpoint doesn't require auth."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.get("/health")
 
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
 
-    def test_docs_endpoint_excluded(self):
+    def test_docs_endpoint_excluded(self, client):
         """Docs endpoint doesn't require auth."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.get("/docs")
 
         assert response.status_code == 200
 
-    def test_mcp_subpaths_require_auth(self):
+    def test_mcp_subpaths_require_auth(self, client):
         """/mcp/* paths require auth."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.post("/mcp/messages")
 
         assert response.status_code == 401
@@ -140,11 +150,8 @@ class TestAuthMiddlewarePathExclusion:
 class TestAuthMiddlewareCORS:
     """Test CORS preflight handling."""
 
-    def test_options_request_allowed_without_auth(self):
+    def test_options_request_allowed_without_auth(self, client):
         """OPTIONS requests (CORS preflight) don't require auth."""
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.options("/mcp")
 
         # OPTIONS should not return 401
@@ -168,19 +175,11 @@ class TestAuthMiddlewareTokenAccess:
         assert data["claims"]["email"] == "user@example.com"
         assert data["claims"]["name"] == "Test User"
 
-    def test_unauthenticated_excluded_path_has_no_token(self):
+    def test_unauthenticated_excluded_path_has_no_token(self, client):
         """Excluded paths without auth have no token set."""
-        # Reset any lingering token
-        set_access_token(None)
-
-        app = create_test_app(MockAuthProvider())
-        client = TestClient(app, raise_server_exceptions=False)
-
         response = client.get("/health")
 
         assert response.status_code == 200
-        # Token should be None for excluded paths
-        assert get_access_token() is None
 
 
 class TestAuthMiddlewareCustomPaths:

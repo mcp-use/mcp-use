@@ -11,6 +11,29 @@ from mcp_use.server.auth import (
 )
 from mcp_use.server.auth.dependencies import set_access_token
 
+# ============================================================================
+# Fixtures
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def reset_access_token():
+    """Reset access token before and after each test."""
+    set_access_token(None)
+    yield
+    set_access_token(None)
+
+
+@pytest.fixture
+def sample_token():
+    """A sample access token for testing."""
+    return AccessToken(token="test", claims={"email": "test@example.com"})
+
+
+# ============================================================================
+# Tests
+# ============================================================================
+
 
 class TestAccessToken:
     """Tests for AccessToken model."""
@@ -122,44 +145,32 @@ class TestContextDependencies:
 
     def test_get_access_token_returns_none_when_not_set(self):
         """get_access_token returns None when no token is set."""
-        set_access_token(None)
         assert get_access_token() is None
 
-    def test_get_access_token_returns_token_when_set(self):
+    def test_get_access_token_returns_token_when_set(self, sample_token):
         """get_access_token returns the token when set."""
-        token = AccessToken(token="test", claims={"email": "test@example.com"})
-        set_access_token(token)
+        set_access_token(sample_token)
 
         result = get_access_token()
         assert result is not None
         assert result.token == "test"
         assert result.claims["email"] == "test@example.com"
 
-        # Cleanup
-        set_access_token(None)
-
     def test_require_auth_raises_when_not_authenticated(self):
         """require_auth raises AuthenticationError when not authenticated."""
-        set_access_token(None)
-
         with pytest.raises(AuthenticationError, match="Authentication required"):
             require_auth()
 
-    def test_require_auth_returns_token_when_authenticated(self):
+    def test_require_auth_returns_token_when_authenticated(self, sample_token):
         """require_auth returns token when authenticated."""
-        token = AccessToken(token="test", claims={"email": "test@example.com"})
-        set_access_token(token)
+        set_access_token(sample_token)
 
         result = require_auth()
         assert result.token == "test"
 
-        # Cleanup
-        set_access_token(None)
-
-    def test_set_access_token_can_clear_token(self):
+    def test_set_access_token_can_clear_token(self, sample_token):
         """set_access_token(None) clears the token."""
-        token = AccessToken(token="test", claims={})
-        set_access_token(token)
+        set_access_token(sample_token)
         assert get_access_token() is not None
 
         set_access_token(None)
