@@ -27,6 +27,41 @@ program
   .description("Create and run MCP servers with ui resources widgets")
   .version(packageVersion);
 
+// Helper to display all package versions
+function displayPackageVersions() {
+  const packages = [
+    { name: "@mcp-use/cli", path: "../package.json" },
+    { name: "@mcp-use/inspector", path: "../../inspector/package.json" },
+    {
+      name: "create-mcp-use-app",
+      path: "../../create-mcp-use-app/package.json",
+    },
+    { name: "mcp-use", path: "../../mcp-use/package.json", highlight: true },
+  ];
+
+  console.log(chalk.gray("mcp-use packages:"));
+
+  for (const pkg of packages) {
+    try {
+      const pkgPath = path.join(__dirname, pkg.path);
+      const pkgContent = readFileSync(pkgPath, "utf-8");
+      const pkgJson = JSON.parse(pkgContent);
+      const version = pkgJson.version || "unknown";
+      const paddedName = pkg.name.padEnd(22);
+
+      if (pkg.highlight) {
+        console.log(
+          `  ${chalk.cyan.bold(paddedName)} ${chalk.cyan.bold(`v${version}`)}`
+        );
+      } else {
+        console.log(chalk.gray(`  ${paddedName} v${version}`));
+      }
+    } catch (error) {
+      // Silently skip if package.json not found
+    }
+  }
+}
+
 // Helper to check if port is available
 async function isPortAvailable(
   port: number,
@@ -756,7 +791,7 @@ program
       const projectPath = path.resolve(options.path);
       const { promises: fs } = await import("node:fs");
 
-      console.log(chalk.cyan.bold(`mcp-use v${packageJson.version}`));
+      displayPackageVersions();
 
       // Build widgets first (this generates schemas)
       const builtWidgets = await buildWidgets(projectPath);
@@ -854,7 +889,7 @@ program
       const host = options.host;
       const useHmr = options.hmr !== false;
 
-      console.log(chalk.cyan.bold(`mcp-use v${packageJson.version}`));
+      displayPackageVersions();
 
       // Check if port is available, find alternative if needed
       if (!(await isPortAvailable(port, host))) {
