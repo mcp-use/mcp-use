@@ -6,6 +6,16 @@ icon: key
 
 Protect your MCP server with bearer token authentication. Invalid tokens return HTTP 401 responses before reaching your MCP handlers.
 
+## What Gets Protected
+
+When you configure `auth=MyAuthProvider()`, **all MCP endpoints are automatically protected**:
+
+- All tools
+- All resources
+- All prompts
+
+No additional code is needed in individual tools. The middleware validates the token at the HTTP layer and rejects invalid requests with 401 before your code runs.
+
 ## Quick Start
 
 ```python
@@ -128,7 +138,14 @@ AccessToken(
 
 Check in tools via `"admin" in token.scopes`.
 
-## Accessing Auth in Tools
+## Accessing Token Data in Tools
+
+Since the middleware already validates authentication, these helpers are for **accessing user information** from the token - not for protection.
+
+| Function | Purpose |
+|----------|---------|
+| `get_access_token()` | Returns `AccessToken` or `None`. Use when auth is optional or to access claims. |
+| `require_auth()` | Returns `AccessToken` or raises `AuthenticationError`. Use as a safeguard. |
 
 ```python
 from mcp_use.server import get_access_token, require_auth
@@ -136,15 +153,17 @@ from mcp_use.server import get_access_token, require_auth
 
 @server.tool()
 def get_user_data() -> dict:
-    token = get_access_token()  # Returns None if not authenticated
-    if not token:
-        return {"error": "Not authenticated"}
+    # User is already authenticated (middleware validated the token)
+    # We're just accessing their info here
+    token = get_access_token()
     return {"email": token.claims.get("email")}
 
 
 @server.tool()
 def admin_action() -> str:
-    token = require_auth()  # Raises AuthenticationError if not authenticated
+    # require_auth() is a safeguard - useful if you want to be explicit
+    # or if the endpoint might be called from an excluded path
+    token = require_auth()
     if "admin" not in token.scopes:
         return "Admin scope required"
     return "Done"
@@ -176,5 +195,5 @@ def admin_action() -> str:
 All 401 responses include the `WWW-Authenticate: Bearer` header.
 
 <Note>
-Only `/mcp` endpoints require authentication. Paths like `/docs`, `/inspector`, `/health`, and `/openmcp.json` are excluded by default.
+All MCP protocol traffic (`/mcp/*`) requires authentication - this includes all tools, resources, and prompts. Debug paths like `/docs`, `/inspector`, `/health`, and `/openmcp.json` are excluded by default.
 </Note>
