@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.16.0-canary.12",
+  "version": "0.16.0-canary.13",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",

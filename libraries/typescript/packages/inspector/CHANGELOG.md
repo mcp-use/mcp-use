@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.13
+
+### Patch Changes
+
+- 453661d: fix: openai does not support temperature
+  - mcp-use@1.14.0-canary.13
+
 ## 0.16.0-canary.12
 
 ### Patch Changes
