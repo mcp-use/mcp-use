@@ -62,17 +62,18 @@ function getRelativeTime(timestamp: number): string {
 }
 
 // Helper function to extract error message from result with isError: true
-function extractErrorMessage(
-  result:
-    | import("@modelcontextprotocol/sdk/types.js").CallToolResult
-    | { error?: string; isError?: boolean }
-): string | null {
+function extractErrorMessage(result: {
+  isError?: boolean;
+  error?: string;
+  content?: unknown;
+}): string | null {
   if (!result?.isError) {
     return null;
   }
 
-  if (result.content && Array.isArray(result.content)) {
-    const textContents = result.content
+  const content = result.content;
+  if (Array.isArray(content)) {
+    const textContents = content
       .filter((item: any) => item.type === "text")
       .map((item: any) => item.text)
       .filter(Boolean);
@@ -418,9 +419,9 @@ export function ToolResultDisplay({
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
       <div className="flex-1 overflow-y-auto h-full">
-        <div className="space-y-0 flex-1 h-full flex flex-col">
+        <div className="space-y-0 flex flex-col">
           <div
-            className={`flex items-center gap-2 px-4 pt-2 ${
+            className={`sticky top-0 z-20 flex items-center gap-2 px-4 pt-2 backdrop-blur-xs bg-white/50 dark:bg-black/50 ${
               hasMcpUIResources || hasAppsSdkResource || isNonUIResult
                 ? "border-b border-gray-200 dark:border-zinc-600 pb-2"
                 : ""
