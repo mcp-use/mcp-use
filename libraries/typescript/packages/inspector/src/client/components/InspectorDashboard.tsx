@@ -167,6 +167,9 @@ export function InspectorDashboard() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const [_connectingServers, setConnectingServers] = useState<Set<string>>(
+    new Set()
+  );
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null
   );
