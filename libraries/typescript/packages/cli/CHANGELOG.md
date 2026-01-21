@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.11.0-canary.9
+
+### Patch Changes
+
+- 782bb3e: feat(cli): enhance CLI to display package versions during dev and build commands
+  - mcp-use@1.14.0-canary.9
+  - @mcp-use/inspector@0.16.0-canary.9
+
 ## 2.11.0-canary.8
 
 ### Patch Changes
