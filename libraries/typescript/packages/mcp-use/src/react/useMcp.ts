@@ -218,14 +218,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const hasTriedProxyFallbackRef = useRef(false);
   const [effectiveProxyConfig, setEffectiveProxyConfig] = useState(proxyConfig);
 
+  // Sync effectiveProxyConfig with proxyConfig prop changes
+  useEffect(() => {
+    setEffectiveProxyConfig(proxyConfig);
+  }, [proxyConfig]);
+
   // Extract gateway URL and headers from proxy configuration
+  // Use proxyConfig directly (not effectiveProxyConfig) to ensure we always
+  // have the latest headers, even before the sync useEffect runs
   const { gatewayUrl, proxyHeaders } = useMemo(() => {
-    const result = applyProxyConfig(url || "", effectiveProxyConfig);
+    const result = applyProxyConfig(url || "", proxyConfig);
     return {
-      gatewayUrl: effectiveProxyConfig?.proxyAddress,
+      gatewayUrl: proxyConfig?.proxyAddress,
       proxyHeaders: result.headers,
     };
-  }, [url, effectiveProxyConfig]);
+  }, [url, proxyConfig]);
 
   // OAuth provider should ALWAYS use the original target URL for OAuth discovery,
   // not the proxy URL. The proxy is only used for making the actual HTTP requests.
@@ -1041,6 +1048,22 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           failConnection(
             "Authentication failed (HTTP 401). Server does not support OAuth. " +
               "Check your Authorization header value is correct."
+          );
+          return "failed";
+        }
+
+        // If OAuth discovery failed without custom headers, the server likely requires
+        // authentication but doesn't support OAuth discovery
+        // This handles cases where the server returns 401 but the error message shows "404"
+        // from the OAuth endpoint attempts
+        if (
+          oauthDiscoveryFailed &&
+          (!headers || Object.keys(headers).length === 0)
+        ) {
+          failConnection(
+            "Authentication required (HTTP 401). Server does not support OAuth. " +
+              "Add an Authorization header in the Custom Headers section " +
+              "(e.g., Authorization: Bearer YOUR_API_KEY)."
           );
           return "failed";
         }
@@ -1917,6 +1940,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useRedirectFlow,
     mergedClientInfo,
     effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL
+    proxyConfig, // Triggers reconnection when proxy config (including headers) changes
   ]);
 
   /**
