@@ -117,19 +117,18 @@ export function useMCPPrompts({
           // Silently fail - telemetry should not break the application
         });
 
-      const errorResult = {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorResult: PromptResult = {
         promptName: selectedPrompt.name,
         args: promptArgs,
-        result: null,
-        error: error instanceof Error ? error.message : String(error),
+        result: { error: errorMessage, isError: true },
+        error: errorMessage,
         timestamp: startTime,
         duration: Date.now() - startTime,
       };
 
-      setResults((prev) => [
-        ...prev,
-        { ...errorResult, result: { messages: [] } },
-      ]);
+      setResults((prev) => [errorResult, ...prev]);
     } finally {
       setIsExecuting(false);
     }
