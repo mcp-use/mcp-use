@@ -5,6 +5,7 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import open from "open";
 import { toJSONSchema } from "zod";
@@ -27,27 +28,58 @@ program
   .description("Create and run MCP servers with ui resources widgets")
   .version(packageVersion);
 
-// Helper to display all package versions
-function displayPackageVersions() {
+/**
+ * Helper to display all package versions
+ *
+ * @param projectPath - Optional path to user's project directory.
+ *                      When provided, resolves packages from the project's node_modules (standalone installation).
+ *                      When omitted, falls back to relative paths (monorepo development).
+ */
+function displayPackageVersions(projectPath?: string) {
   const packages = [
-    { name: "@mcp-use/cli", path: "../package.json" },
-    { name: "@mcp-use/inspector", path: "../../inspector/package.json" },
+    { name: "@mcp-use/cli", relativePath: "../package.json" },
+    {
+      name: "@mcp-use/inspector",
+      relativePath: "../../inspector/package.json",
+    },
     {
       name: "create-mcp-use-app",
-      path: "../../create-mcp-use-app/package.json",
+      relativePath: "../../create-mcp-use-app/package.json",
     },
-    { name: "mcp-use", path: "../../mcp-use/package.json", highlight: true },
+    {
+      name: "mcp-use",
+      relativePath: "../../mcp-use/package.json",
+      highlight: true,
+    },
   ];
 
   console.log(chalk.gray("mcp-use packages:"));
 
   for (const pkg of packages) {
+    const paddedName = pkg.name.padEnd(22);
+
     try {
-      const pkgPath = path.join(__dirname, pkg.path);
+      let pkgPath: string;
+
+      if (projectPath) {
+        // Standalone installation: Try to resolve from user's project node_modules
+        try {
+          const projectRequire = createRequire(
+            path.join(projectPath, "package.json")
+          );
+          pkgPath = projectRequire.resolve(`${pkg.name}/package.json`);
+        } catch (resolveError) {
+          // Package not found in project node_modules, try relative path as fallback
+          pkgPath = path.join(__dirname, pkg.relativePath);
+        }
+      } else {
+        // Monorepo development: Use relative paths
+        pkgPath = path.join(__dirname, pkg.relativePath);
+      }
+
       const pkgContent = readFileSync(pkgPath, "utf-8");
       const pkgJson = JSON.parse(pkgContent);
       const version = pkgJson.version || "unknown";
-      const paddedName = pkg.name.padEnd(22);
 
       if (pkg.highlight) {
         console.log(
@@ -57,7 +89,10 @@ function displayPackageVersions() {
         console.log(chalk.gray(`  ${paddedName} v${version}`));
       }
     } catch (error) {
-      // Silently skip if package.json not found
+      // Log debug message when package is not found (aids troubleshooting)
+      if (process.env.DEBUG || process.env.VERBOSE) {
+        console.log(chalk.dim(`  ${paddedName} (not found)`));
+      }
     }
   }
 }
@@ -791,7 +826,7 @@ program
       const projectPath = path.resolve(options.path);
       const { promises: fs } = await import("node:fs");
 
-      displayPackageVersions();
+      displayPackageVersions(projectPath);
 
       // Build widgets first (this generates schemas)
       const builtWidgets = await buildWidgets(projectPath);
@@ -889,7 +924,7 @@ program
       const host = options.host;
       const useHmr = options.hmr !== false;
 
-      displayPackageVersions();
+      displayPackageVersions(projectPath);
 
       // Check if port is available, find alternative if needed
       if (!(await isPortAvailable(port, host))) {
