@@ -419,7 +419,7 @@ export function ToolResultDisplay({
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
       <div className="flex-1 overflow-y-auto h-full">
-        <div className="space-y-0 flex flex-col">
+        <div className="space-y-0 flex flex-col flex-1 h-full">
           <div
             className={`sticky top-0 z-20 flex items-center gap-2 px-4 pt-2 backdrop-blur-xs bg-white/50 dark:bg-black/50 ${
               hasMcpUIResources || hasAppsSdkResource || isNonUIResult
