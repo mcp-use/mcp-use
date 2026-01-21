@@ -37,6 +37,10 @@ export interface AppsSdkMetadata extends Record<string, unknown> {
     connect_domains?: string[];
     /** Domains the widget can load resources from (scripts, styles, images, fonts) */
     resource_domains?: string[];
+    /** Domains allowed for iframe embeds (optional - by default widgets cannot render subframes) */
+    frame_domains?: string[];
+    /** Domains that can receive openExternal redirects without the safe-link modal (optional) */
+    redirect_domains?: string[];
   };
 
   /** Whether the widget prefers a border in card layout */

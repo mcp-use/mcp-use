@@ -90,7 +90,7 @@ export function InspectorDashboard() {
         name?: string;
         proxyConfig?: {
           proxyAddress?: string;
-          customHeaders?: Record<string, string>;
+          headers?: Record<string, string>;
         };
         transportType?: "http" | "sse";
       }
@@ -167,7 +167,7 @@ export function InspectorDashboard() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const [connectingServers, setConnectingServers] = useState<Set<string>>(
+  const [_connectingServers, setConnectingServers] = useState<Set<string>>(
     new Set()
   );
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
@@ -401,7 +401,7 @@ export function InspectorDashboard() {
       transportType: "http" | "sse";
       proxyConfig?: {
         proxyAddress?: string;
-        customHeaders?: Record<string, string>;
+        headers?: Record<string, string>;
       };
     }) => {
       if (!editingConnectionId) return;
@@ -438,15 +438,8 @@ export function InspectorDashboard() {
   );
 
   const handleServerClick = (connection: any) => {
-    // If failed, try to reconnect the server
+    // Don't allow clicking failed connections - use the reload button instead
     if (connection.state === "failed") {
-      console.warn(
-        "[InspectorDashboard] Connecting server and setting pending navigation:",
-        connection.id
-      );
-      setConnectingServers((prev) => new Set(prev).add(connection.id));
-      setPendingNavigation(connection.id);
-      connectServer(connection.id);
       return;
     }
 
@@ -465,22 +458,36 @@ export function InspectorDashboard() {
     navigate(`/?${params.toString()}`);
   };
 
+  const handleReconnect = (connection: any) => {
+    console.log("[InspectorDashboard] Reconnecting server:", connection.id);
+    if (connection.retry) {
+      connection.retry();
+    } else {
+      console.warn(
+        "[InspectorDashboard] No retry method available, using connectServer fallback"
+      );
+      connectServer(connection.id);
+    }
+  };
+
   // Monitor connecting servers and remove them from the set when they connect or fail
   useEffect(() => {
-    connectingServers.forEach((serverId) => {
-      const connection = connections.find((c) => c.id === serverId);
-      if (
-        connection &&
-        (connection.state === "ready" || connection.state === "failed")
-      ) {
-        setConnectingServers((prev) => {
-          const next = new Set(prev);
+    setConnectingServers((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      prev.forEach((serverId) => {
+        const connection = connections.find((c) => c.id === serverId);
+        if (
+          connection &&
+          (connection.state === "ready" || connection.state === "failed")
+        ) {
           next.delete(serverId);
-          return next;
-        });
-      }
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
     });
-  }, [connections, connectingServers]);
+  }, [connections]);
 
   // Monitor pending navigation and navigate when server becomes ready
   useEffect(() => {
@@ -583,7 +590,11 @@ export function InspectorDashboard() {
                 <div
                   key={connection.id}
                   onClick={() => handleServerClick(connection)}
-                  className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
+                  className={`group rounded-lg bg-zinc-100 dark:bg-white/10 p-4 transition-colors ${
+                    connection.state === "ready"
+                      ? "hover:bg-zinc-200 dark:hover:bg-white/15 cursor-pointer"
+                      : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -595,7 +606,7 @@ export function InspectorDashboard() {
                             connection.name}
                         </h4>
                         <div className="flex items-center gap-2">
-                          {connectingServers.has(connection.id) ? (
+                          {updatingConnections.has(connection.id) ? (
                             <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
                           ) : connection.error &&
                             connection.state !== "ready" ? (
@@ -607,7 +618,17 @@ export function InspectorDashboard() {
                                     e.stopPropagation();
                                     handleCopyError(connection.error!);
                                   }}
-                                  className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                                  className={`w-2 h-2 rounded-full transition-colors ${
+                                    (connection.error.includes("401") ||
+                                      connection.error.includes(
+                                        "Unauthorized"
+                                      )) &&
+                                    connection.error.includes(
+                                      "does not support OAuth"
+                                    )
+                                      ? "bg-yellow-500 animate-status-pulse-yellow hover:bg-yellow-600"
+                                      : "bg-rose-500 animate-status-pulse-red hover:bg-rose-600"
+                                  }`}
                                   title="Click to copy error message"
                                   aria-label="Copy error message to clipboard"
                                 />
@@ -733,14 +754,17 @@ export function InspectorDashboard() {
                           <p>Remove connection</p>
                         </TooltipContent>
                       </Tooltip>
-                      {connection.state === "ready" && (
+                      {(connection.state === "ready" ||
+                        connection.state === "failed") && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="secondary"
                               size="sm"
                               onClick={(e) =>
-                                handleActionClick(e, connection.retry)
+                                handleActionClick(e, () =>
+                                  handleReconnect(connection)
+                                )
                               }
                               className="h-8 w-8 p-0"
                             >
@@ -748,7 +772,11 @@ export function InspectorDashboard() {
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Resync connection</p>
+                            <p>
+                              {connection.state === "failed"
+                                ? "Retry connection"
+                                : "Resync connection"}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -795,15 +823,18 @@ export function InspectorDashboard() {
                             <Settings className="h-4 w-4 mr-2" />
                             Edit connection settings
                           </DropdownMenuItem>
-                          {connection.state === "ready" && (
+                          {(connection.state === "ready" ||
+                            connection.state === "failed") && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                connection.retry();
+                                handleReconnect(connection);
                               }}
                             >
                               <RotateCcw className="h-4 w-4 mr-2" />
-                              Resync connection
+                              {connection.state === "failed"
+                                ? "Retry connection"
+                                : "Resync connection"}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
@@ -852,6 +883,15 @@ export function InspectorDashboard() {
                       ) : null}
                     </div>
                   )}
+                  {connection.state === "failed" &&
+                    connection.error &&
+                    (connection.error.includes("401") ||
+                      connection.error.includes("Unauthorized")) &&
+                    connection.error.includes("does not support OAuth") && (
+                      <div className="text-sm mt-2 p-2 bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/20 dark:border-yellow-400/20 rounded text-yellow-800 dark:text-yellow-400">
+                        {connection.error}
+                      </div>
+                    )}
                 </div>
               ))}
             </div>

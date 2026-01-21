@@ -23,7 +23,7 @@ interface ServerConnectionModalProps {
     transportType: "http" | "sse";
     proxyConfig?: {
       proxyAddress?: string;
-      customHeaders?: Record<string, string>;
+      headers?: Record<string, string>;
     };
   }) => void;
 }
@@ -162,7 +162,7 @@ export function ServerConnectionModal({
       connectionType === "Via Proxy" && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
-            customHeaders: customHeaders.reduce(
+            headers: customHeaders.reduce(
               (acc, header) => {
                 if (header.name && header.value) {
                   acc[header.name] = header.value;
@@ -173,7 +173,7 @@ export function ServerConnectionModal({
             ),
           }
         : {
-            customHeaders: customHeaders.reduce(
+            headers: customHeaders.reduce(
               (acc, header) => {
                 if (header.name && header.value) {
                   acc[header.name] = header.value;

@@ -140,14 +140,18 @@ function OpenAIComponentRendererBase({
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await currentReadResource(componentUrl);
 
-        // Extract CSP metadata from tool result
-        // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
+        // Extract CSP metadata - check tool result first, then resource (where appsSdkMetadata lives)
+        // The CSP is typically in the resource's _meta (set via appsSdkMetadata), not the tool result's _meta
         let widgetCSP = null;
-        const metaSource =
-          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
-        if (metaSource?.["openai/widgetCSP"]) {
-          widgetCSP = metaSource["openai/widgetCSP"];
+        if (currentToolResult?._meta?.["openai/widgetCSP"]) {
+          widgetCSP = currentToolResult._meta["openai/widgetCSP"];
+        } else if (resourceData?.contents?.[0]?._meta?.["openai/widgetCSP"]) {
+          widgetCSP = resourceData.contents[0]._meta["openai/widgetCSP"];
         }
+
+        // For other metadata, prefer tool result's _meta as it may have tool-specific overrides
+        const metaSource =
+          currentToolResult?._meta || resourceData?.contents?.[0]?._meta;
 
         // Extract widget props from _meta["mcp-use/props"]
         const widgetProps = metaSource?.["mcp-use/props"] || null;
