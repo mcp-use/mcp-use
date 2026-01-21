@@ -143,7 +143,14 @@ export function useMCPPrompts({
   useEffect(() => {
     if (selectedPrompt) {
       const updatedPrompt = prompts.find((p) => p.name === selectedPrompt.name);
-      if (updatedPrompt && updatedPrompt !== selectedPrompt) {
+
+      // If prompt no longer exists in the list, clear selection
+      if (!updatedPrompt) {
+        setSelectedPrompt(null);
+        return;
+      }
+
+      if (updatedPrompt !== selectedPrompt) {
         // Prompt definition changed - update the reference
         const hasChanges =
           JSON.stringify(updatedPrompt.arguments) !==
