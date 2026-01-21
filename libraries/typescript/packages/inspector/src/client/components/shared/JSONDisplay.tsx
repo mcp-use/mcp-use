@@ -1,8 +1,8 @@
-import { Download } from "lucide-react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { Button } from "@/client/components/ui/button";
 import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import { analyzeJSON, downloadJSON } from "@/client/utils/jsonUtils";
+import { Download } from "lucide-react";
+import { LightAsync as SyntaxHighlighter } from "react-syntax-highlighter";
 
 interface JSONDisplayProps {
   data: any;
@@ -47,13 +47,23 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
         <SyntaxHighlighter
           language="json"
           style={prismStyle}
+          wrapLongLines
+          codeTagProps={{
+            style: {
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              overflowWrap: "anywhere",
+              fontSize: "0.8rem",
+            },
+          }}
           customStyle={{
             margin: 0,
             padding: 0,
             border: "none",
             borderRadius: 0,
-            fontSize: "1rem",
+            fontSize: "0.8rem",
             background: "transparent",
+            overflowX: "hidden",
           }}
           className="text-gray-900 dark:text-gray-100"
         >
@@ -68,13 +78,22 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
       <SyntaxHighlighter
         language="json"
         style={prismStyle}
+        wrapLongLines
+        codeTagProps={{
+          style: {
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+          },
+        }}
         customStyle={{
           margin: 0,
           padding: 0,
           border: "none",
           borderRadius: 0,
-          fontSize: "1rem",
+          fontSize: "0.8rem",
           background: "transparent",
+          overflowX: "hidden",
         }}
         className="text-gray-900 dark:text-gray-100"
       >

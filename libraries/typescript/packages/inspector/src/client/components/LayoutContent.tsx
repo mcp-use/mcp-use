@@ -79,6 +79,7 @@ export function LayoutContent({
           readResource={selectedServer.readResource}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          mcpServerUrl={selectedServer.url || ""}
         />
       </div>
       <div

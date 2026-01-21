@@ -1,3 +1,9 @@
+import { Badge } from "@/client/components/ui/badge";
+import { Button } from "@/client/components/ui/button";
+import type {
+  ReadResourceResult,
+  Resource,
+} from "@modelcontextprotocol/sdk/types.js";
 import {
   Brush,
   Check,
@@ -8,13 +14,13 @@ import {
   Maximize,
   Zap,
 } from "lucide-react";
-import { Badge } from "@/client/components/ui/badge";
-import { Button } from "@/client/components/ui/button";
+import { useState } from "react";
+import type { LLMConfig } from "../chat/types";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
-import { Spinner } from "../ui/spinner";
 import { JSONDisplay } from "../shared/JSONDisplay";
-import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
+import { Spinner } from "../ui/spinner";
+import { PropsSelect } from "./PropsSelect";
 
 export interface ResourceResult {
   uri: string;
@@ -37,6 +43,8 @@ interface ResourceResultDisplayProps {
   onFullscreen: () => void;
   onUIAction?: (action: unknown) => void;
   isCopied?: boolean;
+  selectedResource?: Resource | null;
+  llmConfig?: LLMConfig | null;
 }
 
 // Helper function to extract error message from result with isError: true
@@ -81,7 +89,12 @@ export function ResourceResultDisplay({
   onDownload,
   onFullscreen,
   isCopied = false,
+  selectedResource,
+  llmConfig,
 }: ResourceResultDisplayProps) {
+  const [activeProps, setActiveProps] = useState<Record<string, string> | null>(
+    null
+  );
   // Check for OpenAI Apps SDK component
   // OpenAI metadata can be in:
   // 1. Resource annotations from the resource list (resourceAnnotations)
@@ -129,6 +142,18 @@ export function ResourceResultDisplay({
     serverId &&
     readResource
   );
+
+  // Extract complete metadata from result contents for props configuration
+  const contentMetadata =
+    result?.result &&
+    "contents" in result.result &&
+    Array.isArray(result.result.contents)
+      ? result.result.contents[0]?._meta || {}
+      : {};
+  const combinedAnnotations = {
+    ...result?.resourceAnnotations,
+    ...contentMetadata,
+  };
 
   if (isLoading) {
     return (
@@ -183,7 +208,7 @@ export function ResourceResultDisplay({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+      <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-gray-400" />
@@ -261,7 +286,21 @@ export function ResourceResultDisplay({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto relative">
+        {/* Props selector - top left of content area */}
+        {selectedResource &&
+          (hasMcpUIResources || hasOpenAIComponent) &&
+          previewMode && (
+            <div className="absolute top-2 left-2 z-10">
+              <PropsSelect
+                resource={selectedResource}
+                resourceAnnotations={combinedAnnotations}
+                llmConfig={llmConfig || null}
+                onPropsChange={setActiveProps}
+              />
+            </div>
+          )}
+
         {(() => {
           // Handle OpenAI Apps SDK components
           if (
@@ -282,6 +321,7 @@ export function ResourceResultDisplay({
                     serverId={serverId}
                     readResource={readResource}
                     className="w-full h-full relative flex p-4"
+                    customProps={activeProps || undefined}
                   />
                 </div>
               );
@@ -315,6 +355,7 @@ export function ResourceResultDisplay({
                           resource={resource}
                           // onUIAction={handleUIAction}
                           className="w-full h-full"
+                          customProps={activeProps || undefined}
                         />
                       </div>
                     </div>

@@ -19,6 +19,7 @@ interface OpenAIComponentRendererProps {
   className?: string;
   noWrapper?: boolean;
   showConsole?: boolean;
+  customProps?: Record<string, string>;
 }
 
 function Wrapper({
@@ -68,6 +69,7 @@ function OpenAIComponentRendererBase({
   className,
   noWrapper = false,
   showConsole = true,
+  customProps,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<InstanceType<
     typeof window.HTMLIFrameElement
@@ -108,6 +110,7 @@ function OpenAIComponentRendererBase({
   const readResourceRef = useRef(readResource);
   const serverBaseUrlRef = useRef(serverBaseUrl);
   const resolvedThemeRef = useRef(resolvedTheme);
+  const customPropsRef = useRef(customProps);
 
   // Keep refs updated with latest values
   useEffect(() => {
@@ -116,6 +119,7 @@ function OpenAIComponentRendererBase({
     readResourceRef.current = readResource;
     serverBaseUrlRef.current = serverBaseUrl;
     resolvedThemeRef.current = resolvedTheme;
+    customPropsRef.current = customProps;
   });
 
   // Store widget data and set up iframe URL
@@ -127,6 +131,7 @@ function OpenAIComponentRendererBase({
       const currentReadResource = readResourceRef.current;
       const currentServerBaseUrl = serverBaseUrlRef.current;
       const currentResolvedTheme = resolvedThemeRef.current;
+      const currentCustomProps = customPropsRef.current;
 
       try {
         // Extract structured content from tool result (the actual tool parameters)
@@ -147,11 +152,21 @@ function OpenAIComponentRendererBase({
         // Extract widget props from _meta["mcp-use/props"]
         const widgetProps = metaSource?.["mcp-use/props"] || null;
 
+        // Merge widget props with custom props (custom props take precedence)
+        const mergedProps = {
+          ...(widgetProps || {}),
+          ...(currentCustomProps || {}),
+        };
+        const finalWidgetProps =
+          Object.keys(mergedProps).length > 0 ? mergedProps : null;
+
         // Debug logging
         console.log("[OpenAIComponentRenderer] Widget data extraction:", {
           hasMetaSource: !!metaSource,
           hasMcpUseProps: !!metaSource?.["mcp-use/props"],
           widgetProps,
+          customProps: currentCustomProps,
+          finalWidgetProps,
           toolArgs: currentToolArgs,
           structuredContent,
           metaKeys: metaSource ? Object.keys(metaSource) : [],
@@ -194,9 +209,9 @@ function OpenAIComponentRendererBase({
           uri: componentUrl,
           toolInput: finalToolInput, // Original tool call arguments
           toolOutput: structuredContent, // Tool output (structured data)
-          toolResponseMetadata: widgetProps
-            ? { "mcp-use/props": widgetProps }
-            : null, // Widget-specific props
+          toolResponseMetadata: finalWidgetProps
+            ? { "mcp-use/props": finalWidgetProps }
+            : null, // Widget-specific props (merged with custom props)
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
@@ -256,6 +271,7 @@ function OpenAIComponentRendererBase({
     componentUrl,
     serverId,
     toolId,
+    customProps, // Include customProps to re-render when props change
     // Note: toolArgs, toolResult, readResource, and serverBaseUrl are intentionally
     // excluded to prevent re-running when these references change but values are the same.
     // resolvedTheme is handled by a separate effect that updates iframe globals.

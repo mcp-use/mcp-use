@@ -20,11 +20,27 @@ tag: "New"
 - **New**: Export functionality for RPC messages
 - **Enhancement**: Improved panel management with refactored ResizablePanel components
 
+### Resource Properties Management
+
+- **New**: Custom properties support for resources - dynamically configure resource properties
+- **New**: `PropsSelect` component for intuitive property selection and management
+- **New**: `PropsConfigDialog` with AI-powered property suggestions using Claude
+- **New**: `SchemaFormField` component for rendering JSON schema-based forms
+- **New**: `usePropsLLM` hook leveraging Claude for intelligent property suggestions
+- **New**: `useResourceProps` hook for managing resource props state
+
 ### Inspector Improvements
 
 - **Enhancement**: Extracted MCP prompts logic into reusable `useMCPPrompts` hook
 - **Enhancement**: Server metadata display with website URLs and icons
 - **Enhancement**: Better tool management - cleared selected tools when removed from list
+- **Enhancement**: Enhanced `JSONDisplay` with improved line wrapping and font size for better readability
+- **Enhancement**: `ToolExecutionPanel` now includes collapsible description section
+- **Enhancement**: Integrated JSON metadata visualization in tool execution panel
+- **Enhancement**: `McpUIRenderer` and `OpenAIComponentRenderer` support `customProps` parameter
+- **Enhancement**: `ResourceResultDisplay` with dynamic property configuration UI
+- **Enhancement**: Enhanced Prism theme support for better code highlighting
+- **Enhancement**: Updated `useMcp` hook to expose `mcpServerUrl` for resource operations
 
 ### Bug Fixes
 

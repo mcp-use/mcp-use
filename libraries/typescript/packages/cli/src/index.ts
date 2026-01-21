@@ -903,19 +903,23 @@ program
       const serverFile = await findServerFile(projectPath);
 
       // Set environment variables for the server
+      const mcpUrl = `http://${host}:${port}`;
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
+      process.env.MCP_URL = mcpUrl;
 
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
 
         const processes: any[] = [];
+        const mcpUrl = `http://${host}:${port}`;
         const env: NodeJS.ProcessEnv = {
           PORT: String(port),
           HOST: host,
           NODE_ENV: "development",
+          MCP_URL: mcpUrl,
         };
 
         // Use local tsx if available, otherwise fall back to npx

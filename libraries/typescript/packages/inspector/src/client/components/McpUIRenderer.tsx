@@ -12,6 +12,7 @@ interface McpUIRendererProps {
   resource: Resource;
   onUIAction?: (action: any) => void;
   className?: string;
+  customProps?: Record<string, string>;
 }
 
 /**
@@ -48,6 +49,7 @@ export function McpUIRenderer({
   resource,
   onUIAction,
   className,
+  customProps,
 }: McpUIRendererProps) {
   const handleUIAction = async (action: any) => {
     return onUIAction?.(action);
@@ -55,10 +57,19 @@ export function McpUIRenderer({
 
   const uiResource = convertToMcpUIResource(resource);
 
+  // Merge custom props into the resource if provided
+  const resourceWithProps = customProps
+    ? {
+        ...uiResource,
+        // Add custom props as data attributes or in a way the UIResourceRenderer can access
+        customProps,
+      }
+    : uiResource;
+
   return (
     <div className={className}>
       <UIResourceRenderer
-        resource={uiResource}
+        resource={resourceWithProps}
         onUIAction={handleUIAction}
         htmlProps={{
           autoResizeIframe: { width: true, height: true },
@@ -68,6 +79,12 @@ export function McpUIRenderer({
           },
           sandboxPermissions:
             "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+          // Pass custom props as data attributes
+          ...(customProps
+            ? {
+                "data-mcp-props": JSON.stringify(customProps),
+              }
+            : {}),
         }}
         remoteDomProps={{
           remoteElements: [
@@ -77,6 +94,8 @@ export function McpUIRenderer({
             remoteImageDefinition,
           ],
           library: basicComponentLibrary,
+          // Pass custom props to remote-dom components if supported
+          ...(customProps ? { customProps } : {}),
         }}
       />
     </div>
