@@ -57,7 +57,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     def _is_protected_path(self, path: str) -> bool:
         """Check if the path requires authentication."""
         for protected_path in self.protected_paths:
-            if path.startswith(protected_path):
+            if path == protected_path or path.startswith(f"{protected_path}/"):
                 return True
         return False
 
@@ -71,7 +71,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Check if path should be excluded from auth
         path = request.url.path
         for exclude_path in self.exclude_paths:
-            if path.startswith(exclude_path):
+            if path == exclude_path or path.startswith(f"{exclude_path}/"):
                 set_access_token(None)
                 return await call_next(request)
 

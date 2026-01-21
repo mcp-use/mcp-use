@@ -233,3 +233,114 @@ class TestAuthMiddlewareCustomPaths:
         # /public is excluded
         response = client.get("/public")
         assert response.status_code == 200
+
+
+class TestAuthMiddlewarePathMatchingSecurity:
+    """Test that path matching is secure against prefix attacks."""
+
+    def test_similar_prefix_does_not_bypass_excluded_path(self):
+        """Paths with similar prefixes should NOT bypass auth (e.g., /docs-secret).
+
+        This tests that /docs-secret requires auth even though /docs is excluded.
+        The fix ensures we match exact path or path + '/' prefix, not just startswith.
+        """
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"data": "secret"})
+
+        app = Starlette(
+            routes=[
+                Route("/mcp", endpoint, methods=["GET"]),
+                Route("/docs", endpoint, methods=["GET"]),
+                Route("/docs-secret", endpoint, methods=["GET"]),
+                Route("/docs/subpage", endpoint, methods=["GET"]),
+            ]
+        )
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            exclude_paths=["/docs"],
+            protected_paths=["/mcp", "/docs-secret"],  # Explicitly protect /docs-secret
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        # /docs is excluded - should work without auth
+        response = client.get("/docs")
+        assert response.status_code == 200
+
+        # /docs/subpage is also excluded (subpath of /docs)
+        response = client.get("/docs/subpage")
+        assert response.status_code == 200
+
+        # /docs-secret is NOT excluded and IS protected - should require auth
+        response = client.get("/docs-secret")
+        assert response.status_code == 401
+
+        # /mcp requires auth
+        response = client.get("/mcp")
+        assert response.status_code == 401
+
+    def test_subpath_of_excluded_path_is_also_excluded(self):
+        """Subpaths of excluded paths should also be excluded (e.g., /docs/api)."""
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"data": "ok"})
+
+        app = Starlette(
+            routes=[
+                Route("/mcp", endpoint, methods=["GET"]),
+                Route("/docs", endpoint, methods=["GET"]),
+                Route("/docs/api", endpoint, methods=["GET"]),
+            ]
+        )
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            exclude_paths=["/docs"],
+            protected_paths=["/mcp"],
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        # /docs is excluded
+        response = client.get("/docs")
+        assert response.status_code == 200
+
+        # /docs/api is also excluded (subpath)
+        response = client.get("/docs/api")
+        assert response.status_code == 200
+
+        # /mcp still requires auth
+        response = client.get("/mcp")
+        assert response.status_code == 401
+
+    def test_similar_prefix_does_not_match_protected_path(self):
+        """Paths with similar prefixes should NOT be protected (e.g., /mcpx)."""
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"data": "ok"})
+
+        app = Starlette(
+            routes=[
+                Route("/mcp", endpoint, methods=["GET"]),
+                Route("/mcp/messages", endpoint, methods=["POST"]),
+                Route("/mcpx", endpoint, methods=["GET"]),
+            ]
+        )
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            protected_paths=["/mcp"],
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        # /mcp requires auth
+        response = client.get("/mcp")
+        assert response.status_code == 401
+
+        # /mcp/messages requires auth (subpath)
+        response = client.post("/mcp/messages")
+        assert response.status_code == 401
+
+        # /mcpx does NOT require auth (different path, not a subpath)
+        response = client.get("/mcpx")
+        assert response.status_code == 200
