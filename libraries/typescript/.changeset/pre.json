@@ -10,6 +10,7 @@
   "changesets": [
     "eager-needles-live",
     "fine-pears-move",
+    "fix-display-package-versions",
     "flat-beans-kiss",
     "frank-dancers-dig",
     "huge-tables-play",

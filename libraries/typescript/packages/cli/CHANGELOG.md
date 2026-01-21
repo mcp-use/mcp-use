@@ -1,5 +1,17 @@
 # @mcp-use/cli
 
+## 2.11.0-canary.12
+
+### Patch Changes
+
+- f428514: Fix displayPackageVersions() to work in standalone installations
+  - Added optional projectPath parameter to resolve packages dynamically
+  - Uses createRequire() to find packages in user's node_modules (standalone installation)
+  - Falls back to relative paths for monorepo development
+  - Added debug logging when packages aren't found (via DEBUG or VERBOSE env vars)
+  - mcp-use@1.14.0-canary.12
+  - @mcp-use/inspector@0.16.0-canary.12
+
 ## 2.11.0-canary.11
 
 ### Patch Changes
