@@ -46,7 +46,7 @@ const WeatherWidget: React.FC = () => {
   }
 
   const { city, weather, temperature } = props;
-  const getWeatherIcon = (weatherType: string) => {
+  const getWeatherIcon = (weatherType: string | undefined) => {
     switch (weatherType?.toLowerCase()) {
       case "sunny":
         return "☀️";
@@ -61,7 +61,7 @@ const WeatherWidget: React.FC = () => {
     }
   };
 
-  const getWeatherColor = (weatherType: string) => {
+  const getWeatherColor = (weatherType: string | undefined) => {
     switch (weatherType?.toLowerCase()) {
       case "sunny":
         return "from-yellow-400 to-orange-500";
