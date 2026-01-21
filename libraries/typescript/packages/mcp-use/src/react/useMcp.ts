@@ -789,10 +789,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             }
 
             try {
-              // Try a simple operation to verify the connection is alive
-              // We use listTools as a lightweight health check
-              await session.connector.listTools();
-              lastSuccessfulCheck = Date.now();
+              // Perform a HEAD request to check if server is responsive
+              // This avoids MCP protocol overhead and is truly lightweight
+              const healthCheckUrl = gatewayUrl || url;
+              const response = await fetch(healthCheckUrl, {
+                method: "HEAD",
+                headers: allHeaders,
+                signal: AbortSignal.timeout(5000), // 5 second timeout for health check
+              });
+
+              if (response.ok || response.status < 500) {
+                // Any non-5xx response means server is reachable
+                lastSuccessfulCheck = Date.now();
+              } else {
+                throw new Error(`Server returned ${response.status}`);
+              }
             } catch (err) {
               const timeSinceLastSuccess = Date.now() - lastSuccessfulCheck;
 

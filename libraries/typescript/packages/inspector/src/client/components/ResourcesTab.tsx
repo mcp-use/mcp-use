@@ -24,6 +24,7 @@ import {
   ResourcesTabHeader,
 } from "./resources";
 import { RpcPanel } from "./shared";
+import { useConfig } from "./chat/useConfig";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -35,6 +36,7 @@ interface ResourcesTabProps {
   readResource: (uri: string) => Promise<any>;
   serverId: string;
   isConnected: boolean;
+  mcpServerUrl: string;
 }
 
 /**
@@ -53,12 +55,14 @@ export function ResourcesTab({
   readResource,
   serverId,
   isConnected,
+  mcpServerUrl,
 }: ResourcesTabProps & { ref?: React.RefObject<ResourcesTabRef | null> }) {
   // State
   const [selectedResource, setSelectedResource] = useState<Resource | null>(
     null
   );
   const { selectedResourceUri, setSelectedResourceUri } = useInspector();
+  const { llmConfig } = useConfig({ mcpServerUrl });
   const [currentResult, setCurrentResult] = useState<ResourceResult | null>(
     null
   );
@@ -447,6 +451,8 @@ export function ResourcesTab({
                     onDownload={handleDownload}
                     onFullscreen={handleFullscreen}
                     isCopied={isCopied}
+                    selectedResource={selectedResource}
+                    llmConfig={llmConfig}
                   />
                 </div>
               </motion.div>
@@ -513,6 +519,8 @@ export function ResourcesTab({
             onDownload={handleDownload}
             onFullscreen={handleFullscreen}
             isCopied={isCopied}
+            selectedResource={selectedResource}
+            llmConfig={llmConfig}
           />
         </div>
       </ResizablePanel>
