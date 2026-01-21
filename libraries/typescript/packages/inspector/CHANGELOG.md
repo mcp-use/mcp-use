@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.16.0-canary.11
+
+### Patch Changes
+
+- 805092b: fix(prompts): clear selection when prompt is removed
+  - mcp-use@1.14.0-canary.11
+
 ## 0.16.0-canary.10
 
 ### Minor Changes
