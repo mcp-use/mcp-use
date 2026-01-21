@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.11.1
+
+### Patch Changes
+
+- c64a2dd: fix(weather): update weather icon and color functions to handle undefined weather types
+
 ## 0.11.1-canary.0
 
 ### Patch Changes
