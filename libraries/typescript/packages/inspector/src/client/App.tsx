@@ -45,7 +45,6 @@ function App() {
           enabled: true,
           proxyAddress: `${window.location.origin}/inspector/api/proxy`,
         }}
-        defaultAutoReconnect={false}
         clientInfo={{
           name: "mcp-use Inspector",
           version: (window as any).__INSPECTOR_VERSION__,
