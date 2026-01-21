@@ -6,6 +6,46 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.14.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.14.0&title=Server%20Metadata%20%26%20Widget%20Enhancements&date=2026-01&lang=typescript" alt="Release 1.14.0" />
+  </Frame>
+  ## Server Metadata & Widget Enhancements
+  Release introducing server metadata configuration and enhanced widget development experience.
+
+### Server Metadata & Configuration
+
+- **New**: Server metadata support with `title`, `websiteUrl`, and `icons` fields in MCP server configuration
+- **New**: Inspector UI displays server website URLs and icons for better branding
+- **Deprecated**: `autoCreateSessionOnInvalidId` config option - use `sessionStore` for persistent sessions
+- **Enhancement**: Dynamic project name support in server configurations
+
+### Widget & Development Experience
+
+- **Enhancement**: HMR support for widget tool management - widgets update immediately without server restart
+- **Enhancement**: Parallel widget building for improved development performance
+- **Enhancement**: ReDoS attack prevention in widget name slugification with input length validation
+- **Enhancement**: Improved widget lifecycle documentation with loading state guidance
+
+### API & Protocol
+
+- **New**: HEAD request support in `mountMcp` function
+- **Enhancement**: Improved input schema handling in tool registration with better defaults
+
+### Bug Fixes
+
+- **Fix**: Anthropic `tool_use.id` error resolved with LangChain package updates
+- **Fix**: Telemetry shutdown method compatibility with posthog-node v5.22.0
+- **Fix**: Input schema initialization now defaults to empty object when not provided
+
+### Dependencies
+
+- **Update**: `@langchain/anthropic` to 1.3.10 (fixes tool_call ID generation)
+- **Update**: `@langchain/core` to 1.1.15
+- **Update**: `langchain` to 1.2.10
+- **Update**: `react-resizable-panels` to 4.4.1
+</Update>
+
 <Update label="v1.13.5" description="January 2026">
   ## CLI Documentation Enhancement
   Patch release adding comprehensive CLI documentation.

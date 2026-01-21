@@ -6,6 +6,40 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.16.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.16.0&title=RPC%20Message%20Management%20%26%20LangChain%20Fixes&date=2026-01&lang=inspector" alt="Release 0.16.0" />
+  </Frame>
+  ## RPC Message Management & LangChain Fixes
+  Release with enhanced RPC message handling and critical bug fixes for Anthropic integration.
+
+### RPC Message Management
+
+- **New**: Copy functionality for RPC messages in Prompts, Resources, and Tools tabs
+- **New**: Reusable `RpcPanel` component for consistent RPC message handling across tabs
+- **New**: Export functionality for RPC messages
+- **Enhancement**: Improved panel management with refactored ResizablePanel components
+
+### Inspector Improvements
+
+- **Enhancement**: Extracted MCP prompts logic into reusable `useMCPPrompts` hook
+- **Enhancement**: Server metadata display with website URLs and icons
+- **Enhancement**: Better tool management - cleared selected tools when removed from list
+
+### Bug Fixes
+
+- **Fix**: Resolved Anthropic `tool_use.id` required error with LangChain 1.3.10 update
+- **Fix**: Proper tool_call ID generation ensuring unique IDs for all tool_use blocks
+- **Fix**: Improved backward compatibility by checking both 'headers' and 'customHeaders'
+
+### Dependencies
+
+- **Update**: `@langchain/anthropic` to 1.3.10
+- **Update**: `@langchain/core` to 1.1.15
+- **Update**: `langchain` to 1.2.10
+- **Update**: `react-resizable-panels` to 4.4.1
+</Update>
+
 <Update label="v0.15.3" description="January 2026">
   ## Dependency Update
   Patch release with dependency updates.
