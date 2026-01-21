@@ -443,6 +443,7 @@ export function ConnectionSettingsForm({
               <DialogTitle>Custom Headers</DialogTitle>
             </DialogHeader>
             <CustomHeadersEditor
+              title={<></>}
               headers={customHeaders}
               onChange={setCustomHeaders}
               onSave={() => setHeadersDialogOpen(false)}
