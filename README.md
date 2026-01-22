@@ -1,14 +1,15 @@
 <div align="center">
+&nbsp;
 <div align="center">
   <a href="https://mcp-use.com">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
       <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
-      <img alt="mcp use logo" src="./static/logo_black.svg" width="70%" >
+      <img alt="mcp use logo" src="./static/logo_black.svg" width="50%" >
     </picture>
   </a>
 </div>
-
+&nbsp;
 <p align="center" style="max-width:600px; margin-bottom:40px">
   <b>mcp-use</b> provides everything you need to build with <a href="https://modelcontextprotocol.io">Model Context Protocol</a> <br/> MCP servers, MCP clients and AI agents in 6 lines of code, in both <b>Python</b> and <b>TypeScript</b>.</p>
 <p align="center">
