@@ -78,6 +78,12 @@ export interface UpdateDeploymentRequest {
   env?: Record<string, string>;
   status?: "running" | "stopped";
 }
+export interface RedeploymentConfig {
+  buildCommand?: string;
+  startCommand?: string;
+  port?: number;
+  env?: Record<string, string>;
+}
 
 export interface DeploymentListResponse {
   deployments: Deployment[];
@@ -416,12 +422,19 @@ export class McpUseAPI {
 
   /**
    * Redeploy deployment
+   *
+   * @param deploymentId - The deployment ID to redeploy
+   * @param configOrFilePath - Either a RedeploymentConfig object with updated settings,
+   *                           or a file path string for source code upload
    */
   async redeployDeployment(
     deploymentId: string,
-    filePath?: string
+    configOrFilePath?: RedeploymentConfig | string
   ): Promise<Deployment> {
-    if (filePath) {
+    // If it's a string, treat it as a file path (backward compatibility)
+    if (typeof configOrFilePath === "string") {
+      const filePath = configOrFilePath;
+
       // Redeploy with file upload (for local source)
       const { readFile } = await import("node:fs/promises");
       const { basename } = await import("node:path");
@@ -458,12 +471,15 @@ export class McpUseAPI {
         throw new Error(`Redeploy failed: ${error}`);
       }
       return response.json();
-    } else {
-      // Redeploy GitHub source
-      return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
-        method: "POST",
-      });
     }
+
+    // If it's a config object or undefined, use JSON body
+    const config = configOrFilePath as RedeploymentConfig | undefined;
+
+    return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
+      method: "POST",
+      body: config ? JSON.stringify(config) : undefined,
+    });
   }
 
   /**
