@@ -1,10 +1,10 @@
 <div align="center">
-<div align="center" style="margin: 0 auto; max-width: 100%;">
+<div align="center" style="margin: 0 auto; max-width: 70%;">
   <a href="https://mcp-use.com">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
       <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
-      <img alt="mcp use logo" src="./static/logo_black.svg" width="100%" style="margin: 20px auto;">
+      <img alt="mcp use logo" src="./static/logo_black.svg" style="margin: 20px auto;">
     </picture>
   </a>
 </div>
