@@ -1,0 +1,50 @@
+{
+  "name": "mcp-use server",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server with dual host support (OpenAI Apps SDK + MCP Apps)",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "uiresource",
+    "ui",
+    "react",
+    "widgets",
+    "ai",
+    "tools",
+    "apps-sdk",
+    "mcp-apps"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^0.3.1",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "mcp-use": "workspace:*",
+    "node-mocks-http": "^1.17.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router": "^7.12.0",
+    "tailwindcss": "^4.1.18",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^25.0.2",
+    "@vitejs/plugin-react": "^5.1.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  },
+  "overrides": {
+    "sugarss": "^5.0.1"
+  }
+}
