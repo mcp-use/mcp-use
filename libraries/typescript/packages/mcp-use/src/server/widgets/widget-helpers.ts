@@ -460,6 +460,7 @@ export function createWidgetRegistration(
       "openai/toolInvocation/invoked": `${widgetName} ready`,
       "openai/widgetAccessible": true,
       "openai/resultCanProduceWidget": true,
+      "openai/widgetDomain": "https://chatgpt.com", // Default domain (required for app submission)
       ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
         {}),
       "openai/widgetCSP": {
