@@ -4,7 +4,7 @@
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
       <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
-      <img alt="mcp use logo" src="./static/logo_black.svg" width="50%" style="margin: 20px auto;">
+      <img alt="mcp use logo" src="./static/logo_black.svg" width="50%" style="margin: 40px auto;">
     </picture>
   </a>
 </div>
