@@ -1091,10 +1091,11 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           );
 
           // Build updated deployment config
+          // Only include port if explicitly provided to avoid overriding existing custom ports
           const redeploymentConfig = {
             buildCommand,
             startCommand,
-            port,
+            ...(options.port !== undefined ? { port: options.port } : {}),
             env: Object.keys(envVars).length > 0 ? envVars : undefined,
           };
 
