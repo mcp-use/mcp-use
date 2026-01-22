@@ -480,6 +480,24 @@ export function createWidgetRegistration(
           ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
             ?.resource_domains as string[]) || []),
         ],
+        // frame_domains for iframe embeds (optional per OpenAI spec)
+        ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+          ?.frame_domains
+          ? {
+              frame_domains: (metadata.appsSdkMetadata as any)?.[
+                "openai/widgetCSP"
+              ]?.frame_domains as string[],
+            }
+          : {}),
+        // redirect_domains for openExternal redirects (optional per OpenAI spec)
+        ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+          ?.redirect_domains
+          ? {
+              redirect_domains: (metadata.appsSdkMetadata as any)?.[
+                "openai/widgetCSP"
+              ]?.redirect_domains as string[],
+            }
+          : {}),
       },
     },
   };

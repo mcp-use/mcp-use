@@ -73,7 +73,7 @@ export interface ServerConfig {
    * ```
    */
   allowedOrigins?: string[];
-  sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+  sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
   /**
    * @deprecated This option is deprecated and will be removed in a future version.
    *

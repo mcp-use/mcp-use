@@ -40,7 +40,7 @@ export async function mountMcp(
   const { WebStandardStreamableHTTPServerTransport } =
     await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
 
-  const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
+  const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 86400000; // Default: 1 day
 
   // Initialize session store (pluggable - can be Redis, Postgres, etc.)
   // Stores ONLY serializable metadata (client capabilities, log level, timestamps)
@@ -152,6 +152,11 @@ export async function mountMcp(
           if (session) {
             session.lastAccessedAt = Date.now();
             await sessionStore.set(sessionId, session);
+          }
+          // Also update in-memory sessions map for idle cleanup
+          const sessionData = sessions.get(sessionId);
+          if (sessionData) {
+            sessionData.lastAccessedAt = Date.now();
           }
         }
         return new Response(null, { status: 200 });

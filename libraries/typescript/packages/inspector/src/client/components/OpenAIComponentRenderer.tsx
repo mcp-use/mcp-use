@@ -253,11 +253,13 @@ function OpenAIComponentRendererBase({
 
         if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
-          const proxyUrl = `/inspector/api/dev-widget/${toolId}`;
+          // Add timestamp to force iframe reload when widget data changes (e.g., props)
+          const proxyUrl = `/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
-          const prodUrl = `/inspector/api/resources/widget/${toolId}`;
+          // Add timestamp to force iframe reload when widget data changes (e.g., props)
+          const prodUrl = `/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);
