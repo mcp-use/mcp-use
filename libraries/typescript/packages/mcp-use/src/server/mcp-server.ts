@@ -633,7 +633,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         registration.config.description = updates.description;
       }
       if (updates._meta !== undefined) {
-        registration.config._meta = updates._meta;
+        // Merge _meta to preserve existing fields like openai/outputTemplate
+        registration.config._meta = {
+          ...registration.config._meta,
+          ...updates._meta,
+        };
       }
       if ("schema" in updates) {
         registration.config.schema = updates.schema as any;
@@ -650,7 +654,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           toolEntry.description = updates.description;
         }
         if (updates._meta !== undefined) {
-          toolEntry._meta = updates._meta;
+          // Merge _meta to preserve existing fields like openai/outputTemplate
+          toolEntry._meta = {
+            ...toolEntry._meta,
+            ...updates._meta,
+          };
         }
         if ("schema" in updates) {
           if (inputSchema !== undefined) {
@@ -1483,7 +1491,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.favicon - Optional favicon URL
    * @param config.oauth - Optional OAuth provider configuration
    * @param config.stateless - Whether to use stateless mode (auto-detected for Deno)
-   * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 300000 = 5 min)
+   * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 86400000 = 1 day)
    * @param config.allowedOrigins - Allowed CORS origins (see {@link ServerConfig.allowedOrigins})
    *
    * @returns Proxied server instance supporting both MCP and Hono methods
@@ -3083,7 +3091,7 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  *   - **Development mode** (NODE_ENV !== "production"): If not set, all origins are allowed
  *   - **Production mode** (NODE_ENV === "production"): Only uses explicitly configured origins
  *   - See {@link ServerConfig.allowedOrigins} for detailed documentation
- * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+ * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
  * @returns McpServerInstance with both MCP and Hono methods
  *
  * @example

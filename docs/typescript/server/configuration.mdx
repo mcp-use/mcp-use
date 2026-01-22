@@ -36,7 +36,7 @@ const server = new MCPServer({
   allowedOrigins: process.env.NODE_ENV === 'production' 
     ? ['https://myapp.com']      // Production: explicit origins
     : undefined,                 // Development: allows all origins
-  sessionIdleTimeoutMs: 300000,  // Session idle timeout (default: 5 minutes)
+  sessionIdleTimeoutMs: 86400000,  // Session idle timeout (default: 1 day)
   autoCreateSessionOnInvalidId: true  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 })
 ```
@@ -329,7 +329,7 @@ The server manages client sessions to maintain state across multiple requests. S
 
 **Session Configuration Options:**
 
-- **`sessionIdleTimeoutMs`**: Controls how long a session remains active when idle (default: 5 minutes)
+- **`sessionIdleTimeoutMs`**: Controls how long a session remains active when idle (default: 1 day)
 - **`autoCreateSessionOnInvalidId`**: Controls behavior when a client sends a request with an invalid or expired session ID
 
 **Session Reconnection Behavior:**
@@ -379,7 +379,7 @@ const specCompliantServer = new MCPServer({
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  sessionIdleTimeoutMs: 300000,  // 5 minutes
+  sessionIdleTimeoutMs: 3600000,  // 1 hour (default is 1 day)
   autoCreateSessionOnInvalidId: true  // Auto-create on invalid session
 })
 

@@ -104,7 +104,7 @@ interface ServerConfig {
   host?: string             // Hostname for widget URLs and server endpoints (defaults to 'localhost')
   baseUrl?: string          // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
   allowedOrigins?: string[] // Allowed origins for DNS rebinding protection
-  sessionIdleTimeoutMs?: number     // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+  sessionIdleTimeoutMs?: number     // Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
   autoCreateSessionOnInvalidId?: boolean // @deprecated Will be removed in a future version. Use sessionStore for persistent sessions.
 }
 ```
