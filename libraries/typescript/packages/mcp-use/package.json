@@ -189,9 +189,6 @@
     "@langchain/openai": {
       "optional": true
     },
-    "ai": {
-      "optional": true
-    },
     "langchain": {
       "optional": true
     },
