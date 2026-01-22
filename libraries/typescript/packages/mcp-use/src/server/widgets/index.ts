@@ -92,6 +92,7 @@ export async function mountWidgets(
     cspUrls: getCSPUrls(),
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,
+    publicRoutesMode: (server as any).publicRoutesMode,
   };
 
   const registerWidget: RegisterWidgetCallback = (widgetDef) => {
@@ -121,6 +122,7 @@ export async function mountWidgets(
     console.log("[WIDGETS] Mounting widgets in production mode");
     // Setup routes first for production
     setupWidgetRoutes(app, serverConfig);
+    (server as any).publicRoutesMode = "production";
     await mountWidgetsProduction(app, serverConfig, registerWidget, options);
   } else {
     console.log("[WIDGETS] Mounting widgets in development mode");
@@ -132,5 +134,9 @@ export async function mountWidgets(
       removeWidgetTool,
       options
     );
+    // Mark routes as set up if they weren't already (mountWidgetsDev may have set them up)
+    if (!serverConfig.publicRoutesMode) {
+      (server as any).publicRoutesMode = "dev";
+    }
   }
 }
