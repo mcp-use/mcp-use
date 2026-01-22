@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.14.2-canary.4
+
+### Patch Changes
+
+- f1171de: feat(server): enhance favicon handling and public route setup
+  - @mcp-use/cli@2.11.2-canary.4
+  - @mcp-use/inspector@0.16.2-canary.4
+
 ## 1.14.2-canary.3
 
 ### Patch Changes
