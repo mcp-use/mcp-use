@@ -1,5 +1,5 @@
 <div align="center">
-<div align="center" style="max-width: 100%; margin: 40px auto;">
+<div align="center">
   <a href="https://mcp-use.com">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
