@@ -1,5 +1,37 @@
 # mcp-use
 
+## 1.14.2
+
+### Patch Changes
+
+- 8326a66: fix(inspector): enhance widget security headers with frame domain support
+- 8326a66: fix(inspector): standardize proxy configuration and enhance connection handling
+  - Renamed `customHeaders` to `headers` in `InspectorDashboard` and `ServerConnectionModal` for consistency.
+  - Removed unused state management for connecting servers in `InspectorDashboard`.
+  - Improved server connection handling by introducing a `handleReconnect` function to manage reconnection attempts.
+  - Updated UI elements to reflect connection states more accurately, including hover effects and error displays.
+  - Enhanced error handling for unauthorized connections, providing clearer user feedback.
+
+  These changes aim to streamline the connection management process and improve the overall user experience in the inspector interface.
+
+- 8326a66: feat(server): enhance favicon handling and public route setup
+- 8326a66: fix: improve widget rendering and session management
+  - Fix widget iframe reload by adding timestamp query parameter to force refresh when widget data changes
+  - Add retry logic with exponential backoff for dev widget fetching to handle Vite dev server cold starts
+  - Fix default session idle timeout from 5 minutes to 1 day to prevent premature session expiration
+  - Fix session lastAccessedAt tracking to update both persistent store and in-memory map
+  - Fix \_meta merging to preserve existing fields (e.g., openai/outputTemplate) when updating tools and widgets
+  - Add support for frame_domains and redirect_domains in widget CSP metadata
+
+- 8326a66: fix: add default widget domain for openai
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+  - @mcp-use/inspector@0.16.2
+  - @mcp-use/cli@2.11.2
+
 ## 1.14.2-canary.4
 
 ### Patch Changes

@@ -1,5 +1,22 @@
 # @mcp-use/cli
 
+## 2.11.2
+
+### Patch Changes
+
+- 8326a66: fix: pass environment variables and deployment config during redeployment
+
+  When redeploying an existing deployment, the CLI now properly passes environment variables, build command, start command, and port configuration to the redeployment API endpoint. Previously, redeployments would not include these updated settings.
+
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+  - @mcp-use/inspector@0.16.2
+  - mcp-use@1.14.2
+
 ## 2.11.2-canary.4
 
 ### Patch Changes
