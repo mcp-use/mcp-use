@@ -794,7 +794,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           const originalOnError = transport.onerror;
 
           // Set up close handler
-          transport.onclose = () => {
+          transport.onclose = async () => {
             addLog(
               "warn",
               "Transport closed unexpectedly, attempting to reconnect..."
@@ -815,15 +815,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                 signal: AbortSignal.timeout(5000), // 5 second timeout for health check
               });
 
-              if (response.ok || response.status < 500) {
-                // Any non-5xx response means server is reachable
-                lastSuccessfulCheck = Date.now();
-              } else {
+              if (!response.ok && response.status >= 500) {
                 throw new Error(`Server returned ${response.status}`);
               }
+              // Server is reachable
             } catch (err) {
-              const timeSinceLastSuccess = Date.now() - lastSuccessfulCheck;
-
               // Trigger reconnection if autoReconnect is enabled
               if (
                 autoReconnectRef.current &&
@@ -833,20 +829,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                 setState("discovering");
                 addLog("info", "Auto-reconnecting to MCP server...");
 
-              // Small delay before reconnecting
-              setTimeout(
-                () => {
-                  if (
-                    isMountedRef.current &&
-                    stateRef.current === "discovering"
-                  ) {
-                    connect();
-                  }
-                },
-                typeof autoReconnectRef.current === "number"
-                  ? autoReconnectRef.current
-                  : DEFAULT_RECONNECT_DELAY
-              );
+                // Small delay before reconnecting
+                setTimeout(
+                  () => {
+                    if (
+                      isMountedRef.current &&
+                      stateRef.current === "discovering"
+                    ) {
+                      connect();
+                    }
+                  },
+                  typeof autoReconnectRef.current === "number"
+                    ? autoReconnectRef.current
+                    : DEFAULT_RECONNECT_DELAY
+                );
+              }
             }
           };
 
