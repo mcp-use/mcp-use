@@ -6,6 +6,35 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.14.2" description="January 2026">
+  ## Widget Rendering & Session Management Improvements
+  Patch release with widget rendering fixes, session timeout adjustments, and CLI deployment enhancements.
+
+### Widget Rendering & Session Management
+
+- **Fix**: Widget iframe reload by adding timestamp query parameter to force refresh when widget data changes
+- **Fix**: Retry logic with exponential backoff for dev widget fetching to handle Vite dev server cold starts
+- **Fix**: Default session idle timeout changed from 5 minutes to 1 day (86400000ms) to prevent premature session expiration
+- **Fix**: Session lastAccessedAt tracking now updates both persistent store and in-memory map
+- **Fix**: _meta merging now preserves existing fields (e.g., openai/outputTemplate) when updating tools and widgets
+- **Enhancement**: Support for frame_domains and redirect_domains in widget CSP metadata
+
+### CLI Improvements
+
+- **Fix**: Environment variables, build command, start command, and port configuration now properly passed during redeployment
+
+### Documentation
+
+- **Fix**: Updated sessionIdleTimeoutMs default value documentation from 5 minutes to 1 day across multiple files
+</Update>
+
+<Update label="v1.14.1" description="January 2026">
+  ## Dependency Updates
+  Patch release with dependency updates.
+
+- **Update**: Updated dependencies to @mcp-use/inspector v0.16.1 and @mcp-use/cli v2.11.1
+</Update>
+
 <Update label="v1.14.0" description="January 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.14.0&title=Server%20Metadata%20%26%20Widget%20Enhancements&date=2026-01&lang=typescript" alt="Release 1.14.0" />

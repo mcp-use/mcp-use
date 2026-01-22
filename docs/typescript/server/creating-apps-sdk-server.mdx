@@ -232,6 +232,7 @@ server.uiResource({
   htmlTemplate: `<!DOCTYPE html>...`, // Your HTML
   appsSdkMetadata: {
     "openai/widgetDescription": "Interactive data visualization",
+    // "openai/widgetDomain" defaults to "https://chatgpt.com" - override if needed
     "openai/widgetCSP": {
       connect_domains: ["https://api.example.com"],
       resource_domains: ["https://cdn.example.com"],
@@ -244,7 +245,7 @@ server.uiResource({
 });
 ```
 
-However, with automatic registration, metadata is generated automatically based on your `widgetMetadata`.
+However, with automatic registration, metadata is generated automatically based on your `widgetMetadata`, including the default `"openai/widgetDomain": "https://chatgpt.com"` which is required for app submission.
 
 ## Step 6: Testing Your Server
 

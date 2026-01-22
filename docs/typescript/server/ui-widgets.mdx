@@ -166,6 +166,30 @@ export const widgetMetadata: WidgetMetadata = {
 The `inputs` field expects a Zod schema that defines the shape of the parameters passed to your widget. This schema is used to generate the tool's input validation and to type-check the props in your widget component via `useWidget<T>()`.
 </Note>
 
+**Apps SDK Metadata Defaults:**
+
+Widget templates automatically receive default Apps SDK metadata values:
+
+- `openai/widgetDescription`: Generated from your widget's description
+- `openai/widgetDomain`: Defaults to `"https://chatgpt.com"` (required for app submission)
+- `openai/widgetAccessible`: Allows component-initiated tool calls
+- `openai/widgetCSP`: Content Security Policy with default trusted domains
+- `openai/toolInvocation/invoking`: Loading state text (e.g., "Loading MyWidget...")
+- `openai/toolInvocation/invoked`: Ready state text (e.g., "MyWidget ready")
+
+You can customize any of these in your widget's `appsSdkMetadata` export:
+
+```typescript
+export const appsSdkMetadata = {
+  "openai/widgetDomain": "https://custom-domain.com", // Override default
+  "openai/widgetPrefersBorder": true,
+  "openai/widgetCSP": {
+    connect_domains: ["https://api.example.com"],
+    resource_domains: ["https://cdn.example.com"],
+  },
+};
+```
+
 **Widget Exposure Modes:**
 
 By default, widgets are automatically registered as both MCP tools and resources (`exposeAsTool: true`). You can control this behavior:

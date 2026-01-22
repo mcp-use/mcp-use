@@ -6,6 +6,42 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.16.2" description="January 2026">
+  ## UI Enhancements & Connection Handling
+  Patch release with improved UI components, widget security enhancements, and better connection management.
+
+### UI Enhancements
+
+- **Enhancement**: CustomHeadersEditor with improved focus management and title prop support
+- **Enhancement**: Standardized proxy configuration - renamed `customHeaders` to `headers` in InspectorDashboard and ServerConnectionModal for consistency
+
+### Widget Security
+
+- **Enhancement**: Widget security headers with frame domain support
+- **Enhancement**: Added `frame_domains` to widgetCSP interface for iframe embed control
+- **Enhancement**: Updated getWidgetSecurityHeaders to include frame_domains in CSP for OpenAI compatibility
+- **Enhancement**: CSP handling in OpenAIComponentRenderer prioritizes metadata from tool results and resources
+
+### Connection Handling
+
+- **Enhancement**: Improved server connection handling with new handleReconnect function
+- **Enhancement**: UI elements reflect connection states more accurately with better hover effects and error displays
+- **Enhancement**: Enhanced error handling for unauthorized connections with clearer user feedback
+- **Enhancement**: State management for connecting servers in InspectorDashboard
+
+### Dependencies
+
+- **Update**: Aligned with mcp-use v1.14.2 improvements
+</Update>
+
+<Update label="v0.16.1" description="January 2026">
+  ## Tool Output Display Fix
+  Patch release with tool output display improvement.
+
+- **Fix**: Inspector tool output now displays at full height for better content visibility
+- **Update**: Aligned with mcp-use v1.14.1
+</Update>
+
 <Update label="v0.16.0" description="January 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=0.16.0&title=RPC%20Message%20Management%20%26%20LangChain%20Fixes&date=2026-01&lang=inspector" alt="Release 0.16.0" />
