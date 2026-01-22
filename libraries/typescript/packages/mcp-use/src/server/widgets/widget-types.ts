@@ -22,6 +22,8 @@ export interface ServerConfig {
   buildId?: string;
   /** Path to favicon file relative to public directory (optional) */
   favicon?: string;
+  /** Whether public routes have been set up and in what mode (optional) */
+  publicRoutesMode?: "dev" | "production" | null;
 }
 
 /**

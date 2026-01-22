@@ -29,7 +29,12 @@ import {
   createParamsSchema,
   toolRegistration,
 } from "./tools/index.js";
-import { mountWidgets, uiResourceRegistration } from "./widgets/index.js";
+import {
+  mountWidgets,
+  setupFaviconRoute,
+  setupPublicRoutes,
+  uiResourceRegistration,
+} from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
 
 // Import and re-export tool context types for public API
@@ -107,6 +112,41 @@ import {
  */
 function isSafePropertyKey(key: string): boolean {
   return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+}
+
+/**
+ * Auto-selects a favicon from the icons array based on priority.
+ *
+ * Priority order:
+ * 1. .ico files (native favicon format)
+ * 2. Small PNG files (16x16, 32x32) - typical favicon sizes
+ * 3. Any PNG file
+ * 4. First icon in the array (fallback)
+ *
+ * @param icons - Array of icon definitions from ServerConfig
+ * @returns The src path of the selected icon
+ */
+function selectFaviconFromIcons(
+  icons: Array<{ src: string; mimeType?: string; sizes?: string[] }>
+): string {
+  // Priority 1: .ico files
+  const icoIcon = icons.find((icon) => icon.src.endsWith(".ico"));
+  if (icoIcon) return icoIcon.src;
+
+  // Priority 2: Small PNG files (16x16, 32x32)
+  const smallPng = icons.find(
+    (icon) =>
+      icon.src.endsWith(".png") &&
+      icon.sizes?.some((size) => size === "16x16" || size === "32x32")
+  );
+  if (smallPng) return smallPng.src;
+
+  // Priority 3: Any PNG
+  const pngIcon = icons.find((icon) => icon.src.endsWith(".png"));
+  if (pngIcon) return pngIcon.src;
+
+  // Fallback: First icon
+  return icons[0].src;
 }
 
 /**
@@ -234,6 +274,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
   /** @internal Whether inspector UI has been mounted */
   private inspectorMounted = false;
+
+  /** @internal Whether public routes have been set up and in what mode */
+  private publicRoutesMode: "dev" | "production" | null = null;
 
   /**
    * Port number the server is listening on (set after calling {@link listen}).
@@ -1562,7 +1605,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
-    this.favicon = config.favicon;
+
+    // Auto-select favicon from icons array if not explicitly provided
+    if (config.favicon) {
+      this.favicon = config.favicon;
+    } else if (config.icons && config.icons.length > 0) {
+      this.favicon = selectFaviconFromIcons(config.icons);
+      console.log(`[MCP] Auto-selected favicon from icons: ${this.favicon}`);
+    }
 
     // Helper to convert relative icon paths to absolute URLs
     const processIconUrls = (
@@ -1607,6 +1657,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
+
+    // Setup public routes immediately if icons/favicon are configured
+    // This ensures icons are served even before listen() or getHandler() is called
+    // Only set up dev routes if not in production mode - production routes will be set up later
+    if (
+      (this.favicon || this.config.icons) &&
+      !isProductionModeHelper() &&
+      !isDeno
+    ) {
+      setupPublicRoutes(this.app, false); // Dev mode (public/)
+      setupFaviconRoute(this.app, this.favicon, false);
+      this.publicRoutesMode = "dev";
+    }
 
     this.oauthProvider = config.oauth;
 
