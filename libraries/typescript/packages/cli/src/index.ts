@@ -735,6 +735,11 @@ export default {
         build: {
           outDir,
           emptyOutDir: true,
+          // Disable source maps to avoid CSP eval violations
+          // Source maps can use eval-based mappings which break strict CSP policies
+          sourcemap: false,
+          // Minify for smaller bundle size
+          minify: "esbuild",
           rollupOptions: {
             input: path.join(tempDir, "index.html"),
             external: (id) => {

@@ -36,6 +36,7 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
+import { McpAppsAdapter, AppsSdkAdapter } from "./widgets/adapters/index.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -1712,17 +1713,75 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const buildIdPart = self.buildId ? `-${self.buildId}` : "";
         const outputTemplate = `ui://widget/${widgetName}${buildIdPart}.html`;
 
-        toolDefinition._meta = {
-          ...toolDefinition._meta,
-          "openai/outputTemplate": outputTemplate,
-          "openai/toolInvocation/invoking":
-            widgetConfig.invoking ?? `Loading ${widgetName}...`,
-          "openai/toolInvocation/invoked":
-            widgetConfig.invoked ?? `${widgetName} ready`,
-          "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
-          "openai/resultCanProduceWidget":
-            widgetConfig.resultCanProduceWidget ?? true,
-        };
+        // Look up widget type to determine if dual-protocol metadata is needed
+        const widgetDef = self.widgetDefinitions.get(widgetName);
+        const widgetType = widgetDef?.["mcp-use/widgetType"] as
+          | string
+          | undefined;
+
+        if (widgetType === "mcpApps") {
+          // Generate dual-protocol metadata for mcpApps widgets
+          const mcpAppsAdapter = new McpAppsAdapter();
+          const appsSdkAdapter = new AppsSdkAdapter();
+
+          // Create a definition for adapter calls with metadata field
+          const adapterDef = {
+            type: "mcpApps" as const,
+            name: widgetName,
+            _meta: widgetDef,
+            metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
+          };
+
+          // Build both tool and resource metadata
+          const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
+            adapterDef as any,
+            outputTemplate
+          );
+          const mcpAppsResourceMeta = mcpAppsAdapter.buildResourceMetadata(
+            adapterDef as any
+          );
+          const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
+            adapterDef as any,
+            outputTemplate
+          );
+          const appsSdkResourceMeta = appsSdkAdapter.buildResourceMetadata(
+            adapterDef as any
+          );
+
+          // Deep merge the ui metadata
+          const mergedUiMeta = {
+            ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
+            ...(mcpAppsResourceMeta._meta?.ui || {}),
+          };
+
+          toolDefinition._meta = {
+            ...toolDefinition._meta,
+            ...mcpAppsToolMeta,
+            ...appsSdkToolMeta,
+            ...(appsSdkResourceMeta._meta || {}),
+            ui: mergedUiMeta,
+            "openai/toolInvocation/invoking":
+              widgetConfig.invoking ?? `Loading ${widgetName}...`,
+            "openai/toolInvocation/invoked":
+              widgetConfig.invoked ?? `${widgetName} ready`,
+            "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
+            "openai/resultCanProduceWidget":
+              widgetConfig.resultCanProduceWidget ?? true,
+          };
+        } else {
+          // Legacy Apps SDK only metadata
+          toolDefinition._meta = {
+            ...toolDefinition._meta,
+            "openai/outputTemplate": outputTemplate,
+            "openai/toolInvocation/invoking":
+              widgetConfig.invoking ?? `Loading ${widgetName}...`,
+            "openai/toolInvocation/invoked":
+              widgetConfig.invoked ?? `${widgetName} ready`,
+            "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
+            "openai/resultCanProduceWidget":
+              widgetConfig.resultCanProduceWidget ?? true,
+          };
+        }
       }
 
       let actualCallback = callback || toolDefinition.cb;
@@ -1735,6 +1794,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
           // Look up the widget definition and inject its metadata into the response
           const widgetDef = self.widgetDefinitions.get(widgetName);
+          const widgetType = widgetDef?.["mcp-use/widgetType"] as
+            | string
+            | undefined;
 
           if (result && typeof result === "object") {
             // Generate unique URI for this invocation
@@ -1742,18 +1804,74 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             const buildIdPart = self.buildId ? `-${self.buildId}` : "";
             const uniqueUri = `ui://widget/${widgetName}${buildIdPart}-${randomId}.html`;
 
-            // Build response metadata
-            const responseMeta: Record<string, unknown> = {
-              ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
-              "openai/outputTemplate": uniqueUri,
-              "openai/toolInvocation/invoking":
-                widgetConfig.invoking ?? `Loading ${widgetName}...`,
-              "openai/toolInvocation/invoked":
-                widgetConfig.invoked ?? `${widgetName} ready`,
-              "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
-              "openai/resultCanProduceWidget":
-                widgetConfig.resultCanProduceWidget ?? true,
-            };
+            // Build response metadata based on widget type
+            let responseMeta: Record<string, unknown>;
+
+            if (widgetType === "mcpApps") {
+              // Generate dual-protocol metadata for mcpApps widgets
+              const mcpAppsAdapter = new McpAppsAdapter();
+              const appsSdkAdapter = new AppsSdkAdapter();
+
+              // Create a definition for adapter calls with metadata field
+              const adapterDef = {
+                type: "mcpApps" as const,
+                name: widgetName,
+                _meta: widgetDef,
+                metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
+              };
+
+              // Build both tool and resource metadata
+              const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
+                adapterDef as any,
+                uniqueUri
+              );
+              const mcpAppsResourceMeta = mcpAppsAdapter.buildResourceMetadata(
+                adapterDef as any
+              );
+              const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
+                adapterDef as any,
+                uniqueUri
+              );
+              const appsSdkResourceMeta = appsSdkAdapter.buildResourceMetadata(
+                adapterDef as any
+              );
+
+              // Deep merge the ui metadata
+              const mergedUiMeta = {
+                ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
+                ...(mcpAppsResourceMeta._meta?.ui || {}),
+              };
+
+              responseMeta = {
+                ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
+                ...mcpAppsToolMeta,
+                ...appsSdkToolMeta,
+                ...(appsSdkResourceMeta._meta || {}),
+                ui: mergedUiMeta,
+                "openai/toolInvocation/invoking":
+                  widgetConfig.invoking ?? `Loading ${widgetName}...`,
+                "openai/toolInvocation/invoked":
+                  widgetConfig.invoked ?? `${widgetName} ready`,
+                "openai/widgetAccessible":
+                  widgetConfig.widgetAccessible ?? true,
+                "openai/resultCanProduceWidget":
+                  widgetConfig.resultCanProduceWidget ?? true,
+              };
+            } else {
+              // Legacy Apps SDK only metadata
+              responseMeta = {
+                ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
+                "openai/outputTemplate": uniqueUri,
+                "openai/toolInvocation/invoking":
+                  widgetConfig.invoking ?? `Loading ${widgetName}...`,
+                "openai/toolInvocation/invoked":
+                  widgetConfig.invoked ?? `${widgetName} ready`,
+                "openai/widgetAccessible":
+                  widgetConfig.widgetAccessible ?? true,
+                "openai/resultCanProduceWidget":
+                  widgetConfig.resultCanProduceWidget ?? true,
+              };
+            }
 
             // Set _meta on the result, merging with any existing _meta (e.g., from widget() helper)
             (result as any)._meta = {

@@ -205,6 +205,101 @@ export function createAppsSdkResource(
 }
 
 /**
+ * Create a UIResource for MCP Apps Extension (SEP-1865)
+ *
+ * This creates a resource compatible with the official MCP Apps Extension
+ * using the text/html;profile=mcp-app mime type. The HTML template should
+ * contain the component code with embedded JS/CSS.
+ *
+ * The MCP Apps pattern:
+ * - Uses mime type text/html;profile=mcp-app
+ * - Tool's output gets passed to the widget via MCP protocol
+ * - Supports MCP Apps metadata (CSP, prefersBorder, autoResize, etc.)
+ *
+ * @param uri - Resource URI (must start with ui://)
+ * @param htmlTemplate - HTML template with embedded component code
+ * @param metadata - MCP Apps metadata (CSP, description, preferences, etc.)
+ * @returns UIResourceContent object
+ *
+ * @see https://github.com/modelcontextprotocol/ext-apps
+ * @see https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/
+ *
+ * @example
+ * ```typescript
+ * const resource = createMcpAppsResource(
+ *   'ui://widget/kanban-board.html',
+ *   `
+ *     <div id="kanban-root"></div>
+ *     <style>${kanbanCSS}</style>
+ *     <script type="module">${kanbanJS}</script>
+ *   `,
+ *   {
+ *     description: 'Displays an interactive kanban board',
+ *     csp: {
+ *       connectDomains: [],
+ *       resourceDomains: ['https://cdn.example.com']
+ *     },
+ *     prefersBorder: true,
+ *     autoResize: true
+ *   }
+ * )
+ * ```
+ */
+export function createMcpAppsResource(
+  uri: string,
+  htmlTemplate: string,
+  metadata?: {
+    description?: string;
+    csp?: {
+      connectDomains?: string[];
+      resourceDomains?: string[];
+      frameDomains?: string[];
+    };
+    prefersBorder?: boolean;
+    autoResize?: boolean;
+    domain?: string;
+  }
+): UIResourceContent {
+  // For MCP Apps, we create the resource structure following the official pattern
+  // from https://github.com/modelcontextprotocol/ext-apps
+  const resource: any = {
+    uri,
+    mimeType: "text/html;profile=mcp-app",
+    text: htmlTemplate,
+  };
+
+  // Build _meta.ui metadata if provided
+  if (metadata && Object.keys(metadata).length > 0) {
+    const uiMeta: Record<string, unknown> = {};
+
+    if (metadata.csp && Object.keys(metadata.csp).length > 0) {
+      uiMeta.csp = metadata.csp;
+    }
+
+    if (metadata.prefersBorder !== undefined) {
+      uiMeta.prefersBorder = metadata.prefersBorder;
+    }
+
+    if (metadata.autoResize !== undefined) {
+      uiMeta.autoResize = metadata.autoResize;
+    }
+
+    if (metadata.domain) {
+      uiMeta.domain = metadata.domain;
+    }
+
+    if (Object.keys(uiMeta).length > 0) {
+      resource._meta = { ui: uiMeta };
+    }
+  }
+
+  return {
+    type: "resource",
+    resource,
+  };
+}
+
+/**
  * Create a UIResource from a high-level definition
  *
  * This is the main function that routes to the appropriate resource creator
@@ -223,7 +318,7 @@ export async function createUIResourceFromDefinition(
   // Generate URI with build ID if available (for cache busting)
   const buildIdPart = config.buildId ? `-${config.buildId}` : "";
   const uri =
-    definition.type === "appsSdk"
+    definition.type === "appsSdk" || definition.type === "mcpApps"
       ? (`ui://widget/${definition.name}${buildIdPart}.html` as `ui://${string}`)
       : (`ui://widget/${definition.name}${buildIdPart}` as `ui://${string}`);
   const encoding = definition.encoding || "text";
@@ -267,6 +362,14 @@ export async function createUIResourceFromDefinition(
         uri,
         definition.htmlTemplate,
         definition.appsSdkMetadata
+      );
+    }
+
+    case "mcpApps": {
+      return createMcpAppsResource(
+        uri,
+        definition.htmlTemplate,
+        definition.metadata
       );
     }
 

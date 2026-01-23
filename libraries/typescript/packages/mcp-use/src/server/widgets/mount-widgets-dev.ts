@@ -747,6 +747,13 @@ export default PostHog;
         "@": pathHelpers.join(getCwd(), resourcesDir),
       },
     },
+    build: {
+      // Disable source maps to avoid CSP eval violations
+      // Source maps can use eval-based mappings which violate strict CSP
+      sourcemap: false,
+      // Minify for production builds
+      minify: "esbuild",
+    },
     server: {
       middlewareMode: true,
       origin: serverOrigin,
