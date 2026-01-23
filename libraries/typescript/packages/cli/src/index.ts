@@ -966,7 +966,11 @@ program
   .description("Run development server with auto-reload and inspector")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
   .option("--port <port>", "Server port", "3000")
-  .option("--host <host>", "Server host", "localhost")
+  .option(
+    "--host <host>",
+    "Server host (use 0.0.0.0 to listen on all interfaces)",
+    "0.0.0.0"
+  )
   .option("--no-open", "Do not auto-open inspector")
   .option("--no-hmr", "Disable hot module reloading (use tsx watch instead)")
   // .option('--tunnel', 'Expose server through a tunnel')

@@ -10,6 +10,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import type {
   CallToolResponse,
   DisplayMode,
@@ -22,7 +23,6 @@ import type {
   UseWidgetResult,
 } from "./widget-types.js";
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
-import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 
 /**
  * Hook to subscribe to a single value from window.openai globals
@@ -198,6 +198,7 @@ export function useWidget<
     });
 
     const unsubHostContext = bridge.onHostContextChange((context) => {
+      console.log("[useWidget] Host context change received:", context);
       setMcpAppsHostContext(context);
     });
 
@@ -334,6 +335,19 @@ export function useWidget<
     return undefined;
   }, [provider, openaiMaxHeight, mcpAppsHostContext]);
 
+  const maxWidth = useMemo(() => {
+    if (provider === "openai") {
+      // ChatGPT Apps SDK doesn't expose maxWidth
+      return undefined;
+    }
+    if (provider === "mcp-apps" && mcpAppsHostContext?.containerDimensions) {
+      return mcpAppsHostContext.containerDimensions.maxWidth as
+        | number
+        | undefined;
+    }
+    return undefined;
+  }, [provider, mcpAppsHostContext]);
+
   const userAgent = useMemo(() => {
     if (provider === "openai") return openaiUserAgent;
     if (provider === "mcp-apps" && mcpAppsHostContext) {
@@ -360,6 +374,19 @@ export function useWidget<
     }
     return undefined;
   }, [provider, openaiLocale, mcpAppsHostContext]);
+
+  const timeZone = useMemo(() => {
+    if (provider === "openai") {
+      // ChatGPT Apps SDK doesn't expose timeZone, use browser default
+      return typeof window !== "undefined"
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : undefined;
+    }
+    if (provider === "mcp-apps" && mcpAppsHostContext) {
+      return mcpAppsHostContext.timeZone as string | undefined;
+    }
+    return undefined;
+  }, [provider, mcpAppsHostContext]);
 
   // Compute MCP server base URL from window.__mcpPublicUrl
   const mcp_url = useMemo(() => {
@@ -509,11 +536,17 @@ export function useWidget<
     displayMode: displayMode || "inline",
     safeArea: safeArea || { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
     maxHeight: maxHeight || 600,
+    maxWidth: maxWidth,
     userAgent: userAgent || {
       device: { type: "desktop" },
       capabilities: { hover: true, touch: false },
     },
     locale: locale || "en",
+    timeZone:
+      timeZone ||
+      (typeof window !== "undefined"
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : "UTC"),
     mcp_url,
 
     // Actions

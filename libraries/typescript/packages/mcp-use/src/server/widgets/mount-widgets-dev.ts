@@ -9,7 +9,7 @@
 import type { Hono as HonoType, Context, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
-import { pathHelpers, getCwd } from "../utils/runtime.js";
+import { pathHelpers, getCwd, fsHelpers } from "../utils/runtime.js";
 import {
   setupPublicRoutes,
   setupFaviconRoute,
@@ -232,6 +232,9 @@ if (container && Component) {
 }
 `;
 
+    // Include Vite client and React refresh preamble explicitly
+    // This is needed when loading in sandboxed iframes where auto-injection may not work
+    // Use full paths to the widget's Vite instance (not root Vite)
     const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -243,6 +246,14 @@ if (container && Component) {
     <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
+    <script type="module" src="${baseRoute}/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '${baseRoute}/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
   </head>
   <body>
     <div id="widget-root"></div>
@@ -543,16 +554,59 @@ if (container && Component) {
         if (isHmrUpdate) {
           const schemaField = metadata.props || metadata.inputs;
 
-          // Use the update callback to update tool in place
+          // Import helpers for widget registration
+          const { slugifyWidgetName, processWidgetHtml } =
+            await import("./widget-helpers.js");
+
+          // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
+          const widgetType = metadata.metadata ? "mcpApps" : "appsSdk";
+          const slugifiedName = slugifyWidgetName(widgetName);
+
+          // Debug logging
+          console.log(
+            `[WIDGET-HMR] ${widgetName} - Type: ${widgetType}, Has metadata: ${!!metadata.metadata}`
+          );
+
+          // Re-read and process HTML for the update
+          const htmlPath = pathHelpers.join(
+            tempDir,
+            slugifiedName,
+            "index.html"
+          );
+          let html = "";
+          try {
+            html = await fsHelpers.readFileSync(htmlPath);
+            html = processWidgetHtml(
+              html,
+              widgetName,
+              serverConfig.serverBaseUrl
+            );
+          } catch (e) {
+            console.warn(
+              `[WIDGET-HMR] Failed to read HTML for ${widgetName}:`,
+              e
+            );
+          }
+
+          // Use the update callback to update tool in place with complete metadata
           // Pass the raw Zod schema - the server will convert it internally
           updateWidgetTool(widgetName, {
             description: metadata.description || `Widget: ${widgetName}`,
             schema: schemaField,
             _meta: {
               "mcp-use/widget": {
+                name: widgetName,
+                slugifiedName: slugifiedName,
+                title: metadata.title || widgetName,
                 description: metadata.description,
-                props: metadata.props,
+                type: widgetType,
+                props: schemaField,
+                html: html,
+                dev: true,
+                exposeAsTool: metadata.exposeAsTool ?? true,
               },
+              // Include unified metadata for dual-protocol support (MCP Apps)
+              ...(metadata.metadata ? { ui: metadata.metadata } : {}),
             },
           });
           return;

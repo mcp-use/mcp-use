@@ -399,7 +399,16 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       );
 
       // Merge both protocol metadata for maximum compatibility
+      // Deep merge the ui object to preserve CSP and other settings from HMR
+      const existingUi = toolMetadata.ui as Record<string, unknown> | undefined;
+      const mcpAppsUi = mcpAppsMeta.ui as Record<string, unknown> | undefined;
+
       Object.assign(toolMetadata, mcpAppsMeta, appsSdkMeta);
+
+      // Deep merge ui field to preserve CSP, prefersBorder, autoResize from HMR
+      if (existingUi && mcpAppsUi) {
+        toolMetadata.ui = { ...existingUi, ...mcpAppsUi };
+      }
     }
 
     // Determine the input schema - check if props is a Zod schema
@@ -482,6 +491,18 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
     // Tool callback function (used for both new registration and updates)
     const toolCallback = async (params: Record<string, unknown>) => {
+      // For HMR updates, read metadata from the tool registration config to get latest values
+      // This ensures we use updated metadata after HMR instead of the closed-over initial value
+      const currentToolMeta =
+        server.registrations?.tools?.get(enrichedDefinition.name)?.config
+          ?._meta || toolMetadata;
+
+      // Debug logging
+      console.log(
+        `[TOOL CALLBACK] ${enrichedDefinition.name} - currentToolMeta.ui:`,
+        currentToolMeta.ui ? "present" : "missing"
+      );
+
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         enrichedDefinition,
@@ -502,7 +523,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
         // Update toolMetadata with the unique URI and widget props
         const uniqueToolMetadata = {
-          ...toolMetadata,
+          ...currentToolMeta,
           "openai/outputTemplate": uniqueUri,
           "mcp-use/props": params, // Pass params as widget props
         };
@@ -554,12 +575,34 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         const mcpAppsAdapter = new McpAppsAdapter();
         const appsSdkAdapter = new AppsSdkAdapter();
 
-        const uniqueToolMetadata = {
-          ...toolMetadata,
-          ...mcpAppsAdapter.buildToolMetadata(enrichedDefinition, uniqueUri),
-          ...appsSdkAdapter.buildToolMetadata(enrichedDefinition, uniqueUri),
+        const mcpAppsUniqueMeta = mcpAppsAdapter.buildToolMetadata(
+          enrichedDefinition,
+          uniqueUri
+        );
+        const appsSdkUniqueMeta = appsSdkAdapter.buildToolMetadata(
+          enrichedDefinition,
+          uniqueUri
+        );
+
+        // Deep merge to preserve ui.csp and other nested fields from current tool metadata
+        const existingUi = currentToolMeta.ui as
+          | Record<string, unknown>
+          | undefined;
+        const mcpAppsUi = mcpAppsUniqueMeta.ui as
+          | Record<string, unknown>
+          | undefined;
+
+        const uniqueToolMetadata: Record<string, unknown> = {
+          ...currentToolMeta,
+          ...mcpAppsUniqueMeta,
+          ...appsSdkUniqueMeta,
           "mcp-use/props": params, // Pass params as widget props
         };
+
+        // Deep merge ui field to preserve CSP, prefersBorder, autoResize
+        if (existingUi && mcpAppsUi) {
+          uniqueToolMetadata.ui = { ...existingUi, ...mcpAppsUi };
+        }
 
         // Generate tool output (what the model sees)
         let toolOutputResult;

@@ -33,6 +33,8 @@ import {
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
 import { SandboxedIframe } from "./ui/SandboxedIframe";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
+import { IframeConsole } from "./IframeConsole";
+import { consoleLogBus } from "../console-log-bus";
 import {
   AppBridge,
   type McpUiHostContext,
@@ -126,7 +128,10 @@ export function MCPAppsRenderer({
       locale: playground.locale,
       timeZone: playground.timeZone,
       platform: deviceType === "mobile" ? "mobile" : "web",
-      userAgent: navigator.userAgent,
+      userAgent: {
+        device: { type: deviceType },
+        capabilities: playground.capabilities,
+      } as any,
       deviceCapabilities: playground.capabilities,
       safeAreaInsets: playground.safeAreaInsets,
       styles: { variables: {} as any },
@@ -166,7 +171,27 @@ export function MCPAppsRenderer({
         const mcpAppsCsp = resourceMeta?.ui?.csp;
         const mcpAppsPermissions = resourceMeta?.ui?.permissions;
 
-        // Store widget data
+        // Detect dev mode from widget metadata (same logic as Apps SDK)
+        const widgetMeta = resourceMeta?.["mcp-use/widget"];
+        const computedUseDevMode = widgetMeta?.html && widgetMeta?.dev;
+        const widgetName = widgetMeta?.name;
+        const slugifiedName = widgetMeta?.slugifiedName || widgetName;
+
+        // Calculate dev widget URL if in dev mode
+        let devWidgetUrl: string | undefined;
+        let devServerBaseUrl: string | undefined;
+
+        if (computedUseDevMode && slugifiedName) {
+          // Extract server base URL from serverId (may include /mcp suffix)
+          const serverBaseUrl = serverId.replace(/\/mcp$/, "");
+          devServerBaseUrl = new URL(serverBaseUrl).origin;
+
+          // Normalize 0.0.0.0 to localhost for browser compatibility
+          devServerBaseUrl = devServerBaseUrl.replace("0.0.0.0", "localhost");
+          devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
+        }
+
+        // Store widget data including dev URLs
         const storeResponse = await fetch(
           "/inspector/api/mcp-apps/widget/store",
           {
@@ -186,6 +211,8 @@ export function MCPAppsRenderer({
               mimeType: resourceMimeType,
               mcpAppsCsp,
               mcpAppsPermissions,
+              devWidgetUrl, // Store dev URL for HMR
+              devServerBaseUrl, // Store dev base URL
             }),
           }
         );
@@ -196,9 +223,14 @@ export function MCPAppsRenderer({
           );
         }
 
+        // Use dev endpoint in dev mode for live HMR, otherwise use cached content
+        const contentEndpoint = computedUseDevMode
+          ? `/inspector/api/mcp-apps/dev-widget-content/${toolCallId}`
+          : `/inspector/api/mcp-apps/widget-content/${toolCallId}`;
+
         // Fetch widget content with CSP metadata
         const contentResponse = await fetch(
-          `/inspector/api/mcp-apps/widget-content/${toolCallId}?csp_mode=${cspMode}`
+          `${contentEndpoint}?csp_mode=${cspMode}`
         );
 
         if (!contentResponse.ok) {
@@ -269,6 +301,12 @@ export function MCPAppsRenderer({
       },
       async send(message: JSONRPCMessage) {
         // Send through SandboxedIframe which will relay to the proxy and then to guest
+        if (message.method === "ui/notifications/host-context-changed") {
+          console.log(
+            "[MCPAppsRenderer Transport] Sending host-context-changed:",
+            message
+          );
+        }
         sandboxRef.current?.postMessage(message);
 
         // Log sent message
@@ -366,6 +404,17 @@ export function MCPAppsRenderer({
       return {};
     };
 
+    bridge.onloggingmessage = async ({ level, logger: _logger, data }) => {
+      // Publish to console log bus (avoids postMessage issues with browser extensions)
+      consoleLogBus.publish({
+        level: level as any,
+        args: [data],
+        timestamp: new Date().toISOString(),
+        url: resourceUri,
+      });
+      return {};
+    };
+
     bridge.onsizechange = ({ width, height }) => {
       if (displayMode !== "inline") return;
       const iframeEl = iframe;
@@ -454,7 +503,7 @@ export function MCPAppsRenderer({
     cspMode,
     widgetCsp,
     widgetPermissions,
-    hostContext,
+    // hostContext removed - it's updated via separate useEffect calling setHostContext
     toolCallId,
     server,
     readResource,
@@ -468,6 +517,7 @@ export function MCPAppsRenderer({
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || !isReady) return;
+    console.log("[MCPAppsRenderer] setHostContext called with:", hostContext);
     bridge.setHostContext(hostContext);
   }, [hostContext, isReady]);
 
@@ -669,6 +719,9 @@ export function MCPAppsRenderer({
           MCP App: <code className="font-mono">{resourceUri}</code>
         </div>
       </div>
+
+      {/* Console drawer */}
+      <IframeConsole iframeId={toolCallId} enabled={true} />
     </WidgetWrapper>
   );
 }

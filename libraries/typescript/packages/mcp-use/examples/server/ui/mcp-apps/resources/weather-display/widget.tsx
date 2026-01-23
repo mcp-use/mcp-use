@@ -1,9 +1,4 @@
-import {
-  McpUseProvider,
-  useWidget,
-  useHostContext,
-  type WidgetMetadata,
-} from "mcp-use/react";
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -41,10 +36,32 @@ export const widgetMetadata: WidgetMetadata = {
 type WeatherProps = z.infer<typeof propSchema>;
 
 const WeatherDisplay: React.FC = () => {
-  const { props, isPending, theme } = useWidget<WeatherProps>();
-  const hostContext = useHostContext();
+  const {
+    props,
+    isPending,
+    theme,
+    locale,
+    timeZone,
+    maxWidth,
+    maxHeight,
+    userAgent,
+    safeArea,
+  } = useWidget<WeatherProps>();
 
   const isDark = theme === "dark";
+
+  // Test console logging
+  console.log("[Weather Widget] Rendering with props:", props);
+  console.warn("[Weather Widget] Theme is", theme);
+  console.error("[Weather Widget] Test error message for console drawer");
+
+  // Extract values for display
+  const platform = userAgent?.device?.type || "unknown";
+  const hasTouch = userAgent?.capabilities?.touch || false;
+  const safeAreaTop = safeArea?.insets?.top || 0;
+  const safeAreaRight = safeArea?.insets?.right || 0;
+  const safeAreaBottom = safeArea?.insets?.bottom || 0;
+  const safeAreaLeft = safeArea?.insets?.left || 0;
 
   return (
     <McpUseProvider debugger viewControls>
@@ -167,7 +184,7 @@ const WeatherDisplay: React.FC = () => {
                   Device:
                 </span>{" "}
                 <span className={isDark ? "text-gray-300" : "text-gray-800"}>
-                  {hostContext?.platform || "unknown"}
+                  {platform}
                 </span>
               </div>
               <div>
@@ -175,7 +192,7 @@ const WeatherDisplay: React.FC = () => {
                   Locale:
                 </span>{" "}
                 <span className={isDark ? "text-gray-300" : "text-gray-800"}>
-                  {hostContext?.locale || "unknown"}
+                  {locale}
                 </span>
               </div>
               <div>
@@ -183,7 +200,7 @@ const WeatherDisplay: React.FC = () => {
                   Timezone:
                 </span>{" "}
                 <span className={isDark ? "text-gray-300" : "text-gray-800"}>
-                  {hostContext?.timeZone || "unknown"}
+                  {timeZone}
                 </span>
               </div>
               <div>
@@ -191,7 +208,7 @@ const WeatherDisplay: React.FC = () => {
                   Touch:
                 </span>{" "}
                 <span className={isDark ? "text-gray-300" : "text-gray-800"}>
-                  {hostContext?.deviceCapabilities?.hasTouch ? "Yes" : "No"}
+                  {hasTouch ? "Yes" : "No"}
                 </span>
               </div>
               <div>
@@ -199,8 +216,7 @@ const WeatherDisplay: React.FC = () => {
                   Viewport:
                 </span>{" "}
                 <span className={isDark ? "text-gray-300" : "text-gray-800"}>
-                  {hostContext?.containerDimensions?.maxWidth || "auto"}x
-                  {hostContext?.containerDimensions?.maxHeight || "auto"}
+                  {maxWidth || "auto"}x{maxHeight}
                 </span>
               </div>
               <div>
@@ -208,10 +224,7 @@ const WeatherDisplay: React.FC = () => {
                   Safe Area:
                 </span>{" "}
                 <span className={isDark ? "text-gray-300" : "text-gray-800"}>
-                  {hostContext?.safeAreaInsets?.top || 0}/
-                  {hostContext?.safeAreaInsets?.right || 0}/
-                  {hostContext?.safeAreaInsets?.bottom || 0}/
-                  {hostContext?.safeAreaInsets?.left || 0}
+                  {safeAreaTop}/{safeAreaRight}/{safeAreaBottom}/{safeAreaLeft}
                 </span>
               </div>
             </div>
@@ -228,8 +241,8 @@ const WeatherDisplay: React.FC = () => {
                 isDark ? "text-gray-400" : "text-gray-600"
               }`}
             >
-              ✨ <strong>MCP Apps Widget</strong> - Works with both ChatGPT and
-              MCP Apps clients
+              ✅ <strong>METADATA PRESERVED!</strong> - Deep merge ensures MCP
+              Apps type persists
             </p>
           </div>
         </div>

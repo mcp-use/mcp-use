@@ -149,10 +149,14 @@ export interface UseWidgetResult<
   safeArea: SafeArea;
   /** Maximum height available */
   maxHeight: number;
+  /** Maximum width available (MCP Apps only) */
+  maxWidth?: number;
   /** User agent information */
   userAgent: UserAgent;
   /** Current locale */
   locale: string;
+  /** Current timezone (IANA timezone identifier) */
+  timeZone: string;
   /** MCP server base URL for making API requests */
   mcp_url: string;
 

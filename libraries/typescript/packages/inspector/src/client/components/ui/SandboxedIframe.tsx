@@ -104,11 +104,10 @@ export const SandboxedIframe = forwardRef<
 
     let sandboxHost: string;
 
-    // Priority 2: Local development - swap localhost <-> 127.0.0.1
-    if (currentHost === "localhost") {
-      sandboxHost = "127.0.0.1";
-    } else if (currentHost === "127.0.0.1") {
-      sandboxHost = "localhost";
+    // Priority 2: Local development - use same origin (localhost or 127.0.0.1)
+    // Sandbox attributes provide sufficient isolation without cross-origin enforcement
+    if (currentHost === "localhost" || currentHost === "127.0.0.1") {
+      sandboxHost = currentHost; // Keep same origin
     } else {
       // Priority 3: Production - use convention: sandbox-{hostname}
       // e.g., inspector.mcp-use.com -> sandbox-inspector.mcp-use.com

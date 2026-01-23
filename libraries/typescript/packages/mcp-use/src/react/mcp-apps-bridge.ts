@@ -147,6 +147,64 @@ class McpAppsBridge {
 
     window.addEventListener("message", handleMessage);
     this.listeners.add(handleMessage);
+
+    // Intercept console methods to send logs to host
+    this.interceptConsole();
+  }
+
+  /**
+   * Intercept console methods and proxy to MCP Apps host
+   */
+  private interceptConsole(): void {
+    if (typeof window === "undefined" || typeof console === "undefined") return;
+
+    // Save original console methods
+    const originalConsole = {
+      log: console.log.bind(console),
+      warn: console.warn.bind(console),
+      error: console.error.bind(console),
+      info: console.info.bind(console),
+      debug: console.debug.bind(console),
+    };
+
+    // Helper to send logging notification
+    const sendLog = (
+      level: "log" | "warn" | "error" | "info" | "debug",
+      args: any[]
+    ) => {
+      // Send notification to host
+      this.sendNotification("notifications/message", {
+        level,
+        logger: "console",
+        data: args.length === 1 ? args[0] : args,
+      });
+    };
+
+    // Wrap console methods
+    console.log = (...args: any[]) => {
+      sendLog("log", args);
+      originalConsole.log(...args);
+    };
+
+    console.warn = (...args: any[]) => {
+      sendLog("warn", args);
+      originalConsole.warn(...args);
+    };
+
+    console.error = (...args: any[]) => {
+      sendLog("error", args);
+      originalConsole.error(...args);
+    };
+
+    console.info = (...args: any[]) => {
+      sendLog("info", args);
+      originalConsole.info(...args);
+    };
+
+    console.debug = (...args: any[]) => {
+      sendLog("debug", args);
+      originalConsole.debug(...args);
+    };
   }
 
   private handleNotification(notification: JSONRPCNotification) {
@@ -176,8 +234,14 @@ class McpAppsBridge {
       }
       case "ui/notifications/host-context-changed": {
         const context = notification.params as HostContext;
+        console.log("[MCP Apps Bridge] Host context changed:", context);
         // Merge partial updates with existing context
         this.hostContext = { ...this.hostContext, ...context };
+        console.log("[MCP Apps Bridge] Merged hostContext:", this.hostContext);
+        console.log(
+          "[MCP Apps Bridge] Calling handlers:",
+          this.hostContextHandlers.size
+        );
         this.hostContextHandlers.forEach((handler) =>
           handler(this.hostContext!)
         );
