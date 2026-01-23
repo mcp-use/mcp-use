@@ -1,4 +1,9 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import {
+  McpUseProvider,
+  useWidget,
+  useHostContext,
+  type WidgetMetadata,
+} from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -37,6 +42,7 @@ type WeatherProps = z.infer<typeof propSchema>;
 
 const WeatherDisplay: React.FC = () => {
   const { props, isPending, theme } = useWidget<WeatherProps>();
+  const hostContext = useHostContext();
 
   const isDark = theme === "dark";
 
@@ -142,10 +148,79 @@ const WeatherDisplay: React.FC = () => {
             </div>
           </div>
 
-          {/* Info Badge */}
+          {/* Host Context Debug Info */}
           <div
             className={`mt-6 p-4 rounded-xl ${
               isDark ? "bg-black/20" : "bg-white/50"
+            }`}
+          >
+            <p
+              className={`text-xs font-semibold mb-3 ${
+                isDark ? "text-gray-300" : "text-gray-700"
+              }`}
+            >
+              Host Context Settings
+            </p>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className={isDark ? "text-gray-500" : "text-gray-600"}>
+                  Device:
+                </span>{" "}
+                <span className={isDark ? "text-gray-300" : "text-gray-800"}>
+                  {hostContext?.platform || "unknown"}
+                </span>
+              </div>
+              <div>
+                <span className={isDark ? "text-gray-500" : "text-gray-600"}>
+                  Locale:
+                </span>{" "}
+                <span className={isDark ? "text-gray-300" : "text-gray-800"}>
+                  {hostContext?.locale || "unknown"}
+                </span>
+              </div>
+              <div>
+                <span className={isDark ? "text-gray-500" : "text-gray-600"}>
+                  Timezone:
+                </span>{" "}
+                <span className={isDark ? "text-gray-300" : "text-gray-800"}>
+                  {hostContext?.timeZone || "unknown"}
+                </span>
+              </div>
+              <div>
+                <span className={isDark ? "text-gray-500" : "text-gray-600"}>
+                  Touch:
+                </span>{" "}
+                <span className={isDark ? "text-gray-300" : "text-gray-800"}>
+                  {hostContext?.deviceCapabilities?.hasTouch ? "Yes" : "No"}
+                </span>
+              </div>
+              <div>
+                <span className={isDark ? "text-gray-500" : "text-gray-600"}>
+                  Viewport:
+                </span>{" "}
+                <span className={isDark ? "text-gray-300" : "text-gray-800"}>
+                  {hostContext?.containerDimensions?.maxWidth || "auto"}x
+                  {hostContext?.containerDimensions?.maxHeight || "auto"}
+                </span>
+              </div>
+              <div>
+                <span className={isDark ? "text-gray-500" : "text-gray-600"}>
+                  Safe Area:
+                </span>{" "}
+                <span className={isDark ? "text-gray-300" : "text-gray-800"}>
+                  {hostContext?.safeAreaInsets?.top || 0}/
+                  {hostContext?.safeAreaInsets?.right || 0}/
+                  {hostContext?.safeAreaInsets?.bottom || 0}/
+                  {hostContext?.safeAreaInsets?.left || 0}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Info Badge */}
+          <div
+            className={`mt-4 p-3 rounded-xl ${
+              isDark ? "bg-purple-950/30" : "bg-purple-50/50"
             }`}
           >
             <p

@@ -14,6 +14,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
 import { InspectorProvider } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { WidgetDebugProvider } from "./context/WidgetDebugContext";
 
 /**
  * Root React component that configures application providers, routing, and toast-based handlers for sampling and elicitation requests in the inspector UI.
@@ -38,115 +39,123 @@ function App() {
 
   return (
     <ThemeProvider>
-      <McpClientProvider
-        storageProvider={storageProvider}
-        enableRpcLogging={true}
-        defaultAutoProxyFallback={{
-          enabled: true,
-          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-        }}
-        clientInfo={{
-          name: "mcp-use Inspector",
-          version: (window as any).__INSPECTOR_VERSION__,
-          websiteUrl: "https://mcp-use.com",
-          icons: [{ src: "https://mcp-use.com/logo.png" }],
-        }}
-        onServerAdded={(id: string, server: McpServer) => {
-          console.log("[Inspector] Server added:", id, server.state);
-        }}
-        onServerRemoved={(id: string) => {
-          console.log("[Inspector] Server removed:", id);
-        }}
-        onServerStateChange={(id: string, state: McpServer["state"]) => {
-          console.log("[Inspector] Server state changed:", id, state);
-        }}
-        onSamplingRequest={(request, serverId, serverName, approve, reject) => {
-          const toastId = toast(
-            <SamplingRequestToast
-              requestId={request.id}
-              serverName={serverName}
-              onViewDetails={() => {
-                const event = new CustomEvent("navigate-to-sampling", {
-                  detail: { requestId: request.id },
-                });
-                window.dispatchEvent(event);
-                toast.dismiss(toastId);
-              }}
-              onApprove={(defaultResponse) => {
-                approve(request.id, defaultResponse);
-                toast.success("Sampling request approved");
-                toast.dismiss(toastId);
-              }}
-              onDeny={() => {
-                reject(request.id, "User denied from toast");
-                toast.dismiss(toastId);
-              }}
-            />,
-            { duration: Infinity }
-          );
-        }}
-        onElicitationRequest={(
-          request,
-          serverId,
-          serverName,
-          approve,
-          reject
-        ) => {
-          const mode = request.request.mode || "form";
-          const message = request.request.message;
-          const url =
-            mode === "url" && "url" in request.request
-              ? request.request.url
-              : undefined;
+      <WidgetDebugProvider>
+        <McpClientProvider
+          storageProvider={storageProvider}
+          enableRpcLogging={true}
+          defaultAutoProxyFallback={{
+            enabled: true,
+            proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+          }}
+          clientInfo={{
+            name: "mcp-use Inspector",
+            version: (window as any).__INSPECTOR_VERSION__,
+            websiteUrl: "https://mcp-use.com",
+            icons: [{ src: "https://mcp-use.com/logo.png" }],
+          }}
+          onServerAdded={(id: string, server: McpServer) => {
+            console.log("[Inspector] Server added:", id, server.state);
+          }}
+          onServerRemoved={(id: string) => {
+            console.log("[Inspector] Server removed:", id);
+          }}
+          onServerStateChange={(id: string, state: McpServer["state"]) => {
+            console.log("[Inspector] Server state changed:", id, state);
+          }}
+          onSamplingRequest={(
+            request,
+            serverId,
+            serverName,
+            approve,
+            reject
+          ) => {
+            const toastId = toast(
+              <SamplingRequestToast
+                requestId={request.id}
+                serverName={serverName}
+                onViewDetails={() => {
+                  const event = new CustomEvent("navigate-to-sampling", {
+                    detail: { requestId: request.id },
+                  });
+                  window.dispatchEvent(event);
+                  toast.dismiss(toastId);
+                }}
+                onApprove={(defaultResponse) => {
+                  approve(request.id, defaultResponse);
+                  toast.success("Sampling request approved");
+                  toast.dismiss(toastId);
+                }}
+                onDeny={() => {
+                  reject(request.id, "User denied from toast");
+                  toast.dismiss(toastId);
+                }}
+              />,
+              { duration: Infinity }
+            );
+          }}
+          onElicitationRequest={(
+            request,
+            serverId,
+            serverName,
+            approve,
+            reject
+          ) => {
+            const mode = request.request.mode || "form";
+            const message = request.request.message;
+            const url =
+              mode === "url" && "url" in request.request
+                ? request.request.url
+                : undefined;
 
-          const toastId = toast(
-            <ElicitationRequestToast
-              requestId={request.id}
-              serverName={serverName}
-              mode={mode}
-              message={message}
-              url={url}
-              onViewDetails={() => {
-                const event = new CustomEvent("navigate-to-elicitation", {
-                  detail: { requestId: request.id },
-                });
-                window.dispatchEvent(event);
-                toast.dismiss(toastId);
-              }}
-              onOpenUrl={
-                mode === "url" && url
-                  ? () => {
-                      window.open(url, "_blank");
-                      toast.dismiss(toastId);
-                    }
-                  : undefined
-              }
-              onCancel={() => {
-                reject(request.id, "User cancelled from toast");
-                toast.dismiss(toastId);
-              }}
-            />,
-            { duration: Infinity }
-          );
-        }}
-      >
-        <InspectorProvider>
-          <Router basename="/inspector">
-            <Routes>
-              <Route path="/oauth/callback" element={<OAuthCallback />} />
-              <Route
-                path="/"
-                element={
-                  <Layout>
-                    <InspectorDashboard />
-                  </Layout>
+            const toastId = toast(
+              <ElicitationRequestToast
+                requestId={request.id}
+                serverName={serverName}
+                mode={mode}
+                message={message}
+                url={url}
+                onViewDetails={() => {
+                  const event = new CustomEvent("navigate-to-elicitation", {
+                    detail: { requestId: request.id },
+                  });
+                  window.dispatchEvent(event);
+                  toast.dismiss(toastId);
+                }}
+                onOpenUrl={
+                  mode === "url" && url
+                    ? () => {
+                        window.open(url, "_blank");
+                        toast.dismiss(toastId);
+                      }
+                    : undefined
                 }
-              />
-            </Routes>
-          </Router>
-          <Toaster position="top-center" />
-        </InspectorProvider>
-      </McpClientProvider>
+                onCancel={() => {
+                  reject(request.id, "User cancelled from toast");
+                  toast.dismiss(toastId);
+                }}
+              />,
+              { duration: Infinity }
+            );
+          }}
+        >
+          <InspectorProvider>
+            <Router basename="/inspector">
+              <Routes>
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
+                <Route
+                  path="/"
+                  element={
+                    <Layout>
+                      <InspectorDashboard />
+                    </Layout>
+                  }
+                />
+              </Routes>
+            </Router>
+            <Toaster position="top-center" />
+          </InspectorProvider>
+        </McpClientProvider>
+      </WidgetDebugProvider>
     </ThemeProvider>
   );
 }

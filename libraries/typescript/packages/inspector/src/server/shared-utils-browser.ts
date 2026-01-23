@@ -417,6 +417,22 @@ export interface WidgetData {
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
   theme?: "light" | "dark";
+  // MCP Apps (SEP-1865) support
+  protocol?: "mcp-apps" | "chatgpt-app";
+  toolName?: string;
+  mimeType?: string;
+  mcpAppsCsp?: {
+    connectDomains?: string[];
+    resourceDomains?: string[];
+    frameDomains?: string[];
+    baseUriDomains?: string[];
+  };
+  mcpAppsPermissions?: {
+    camera?: Record<string, never>;
+    microphone?: Record<string, never>;
+    geolocation?: Record<string, never>;
+    clipboardWrite?: Record<string, never>;
+  };
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -922,6 +938,49 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   console.log("[Widget Content] Generated HTML length:", modifiedHtml.length);
 
   return { html: modifiedHtml };
+}
+
+/**
+ * Transform MCP Apps camelCase CSP to snake_case for existing header builder
+ *
+ * MCP Apps (SEP-1865) uses camelCase (connectDomains, resourceDomains)
+ * ChatGPT Apps SDK uses snake_case (connect_domains, resource_domains)
+ *
+ * @param mcpAppsCsp - MCP Apps CSP configuration with camelCase keys
+ * @returns ChatGPT-compatible CSP configuration with snake_case keys
+ */
+export function transformMcpAppsCspToSnakeCase(mcpAppsCsp?: {
+  connectDomains?: string[];
+  resourceDomains?: string[];
+  frameDomains?: string[];
+  baseUriDomains?: string[];
+}):
+  | {
+      connect_domains?: string[];
+      resource_domains?: string[];
+      frame_domains?: string[];
+    }
+  | undefined {
+  if (!mcpAppsCsp) return undefined;
+
+  const result: {
+    connect_domains?: string[];
+    resource_domains?: string[];
+    frame_domains?: string[];
+  } = {};
+
+  if (mcpAppsCsp.connectDomains) {
+    result.connect_domains = mcpAppsCsp.connectDomains;
+  }
+  if (mcpAppsCsp.resourceDomains) {
+    result.resource_domains = mcpAppsCsp.resourceDomains;
+  }
+  if (mcpAppsCsp.frameDomains) {
+    result.frame_domains = mcpAppsCsp.frameDomains;
+  }
+  // Note: baseUriDomains is MCP Apps-specific, not in ChatGPT CSP
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 /**
