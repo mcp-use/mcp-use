@@ -732,10 +732,51 @@ export default PostHog;
     },
   };
 
+  // Plugin to patch Zod's JIT compilation to prevent CSP eval violations
+  // This is needed because Zod 4.x uses new Function() for JIT compilation
+  // which violates strict CSP in sandboxed iframes (MCP Apps hosts)
+  // See: https://github.com/colinhacks/zod/issues/4461
+  const zodJitlessPlugin = {
+    name: "zod-jitless",
+    enforce: "pre" as const,
+    transform(code: string, id: string) {
+      // Only transform Zod core files
+      if (!id.includes("zod") || !id.includes("core")) {
+        return null;
+      }
+
+      // Patch globalConfig = {} to globalConfig = { jitless: true }
+      // In non-minified source, the pattern is straightforward
+      const zodConfigPatterns = [
+        /export\s+const\s+globalConfig\s*=\s*\{\s*\}/g,
+        /const\s+globalConfig\s*=\s*\{\s*\}/g,
+      ];
+
+      let transformed = code;
+      let patched = false;
+
+      for (const pattern of zodConfigPatterns) {
+        // Reset lastIndex for global regex before test
+        pattern.lastIndex = 0;
+        if (pattern.test(transformed)) {
+          // Reset again before replace
+          pattern.lastIndex = 0;
+          transformed = transformed.replace(pattern, (match) =>
+            match.replace(/=\s*\{\s*\}/, "={ jitless: true }")
+          );
+          patched = true;
+        }
+      }
+
+      return patched ? transformed : null;
+    },
+  };
+
   const viteServer = await createServer({
     root: tempDir,
     base: baseRoute + "/",
     plugins: [
+      zodJitlessPlugin,
       nodeStubsPlugin,
       ssrCssPlugin,
       watchResourcesPlugin,

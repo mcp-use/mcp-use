@@ -750,6 +750,54 @@ export default {
         },
       });
 
+      // Post-process JS bundles to patch Zod's JIT compilation
+      // This prevents CSP eval violations in sandboxed iframes (MCP Apps hosts)
+      // See: https://github.com/colinhacks/zod/issues/4461
+      try {
+        const assetsDir = path.join(outDir, "assets");
+        const assetFiles = await fs.readdir(assetsDir);
+        const jsFiles = assetFiles.filter((f) => f.endsWith(".js"));
+
+        for (const jsFile of jsFiles) {
+          const jsPath = path.join(assetsDir, jsFile);
+          let content = await fs.readFile(jsPath, "utf8");
+
+          // Patch Zod's globalConfig to disable JIT compilation
+          // Zod 4.x uses: const globalConfig={};function config(o){return globalConfig}
+          // After minification: const X={};function Y(o){return X}
+          // We match the pattern where an empty object const is followed by a function returning it
+          const zodConfigPatterns = [
+            // Non-minified: export const globalConfig = {}
+            /export\s+const\s+globalConfig\s*=\s*\{\s*\}/g,
+            // Minified pattern: ZodEncodeError"}}const X={};function followed by return X
+            // This is the unique signature of Zod's globalConfig
+            /ZodEncodeError[^}]*\}\}const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\{\s*\}/g,
+          ];
+
+          let patched = false;
+          for (const pattern of zodConfigPatterns) {
+            if (pattern.test(content)) {
+              // Reset lastIndex for global regex
+              pattern.lastIndex = 0;
+              content = content.replace(pattern, (match) => {
+                return match.replace(/=\s*\{\s*\}/, "={jitless:true}");
+              });
+              patched = true;
+            }
+          }
+
+          if (patched) {
+            await fs.writeFile(jsPath, content, "utf8");
+            console.log(chalk.gray(`    → Patched Zod JIT in ${jsFile}`));
+          }
+        }
+      } catch (error) {
+        // Assets directory might not exist for some builds, that's okay
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          console.warn(chalk.yellow(`    ⚠ Failed to patch Zod JIT: ${error}`));
+        }
+      }
+
       // Post-process HTML for static deployments (e.g., Supabase)
       // If MCP_SERVER_URL is set, inject window globals at build time
       const mcpServerUrl = process.env.MCP_SERVER_URL;
