@@ -118,22 +118,24 @@ export function useMCPPrompts({
             // Silently fail - telemetry should not break the application
           });
 
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorResult: PromptResult = {
-        promptName: prompt.name,
-        args: args,
-        result: { error: errorMessage, isError: true },
-        error: errorMessage,
-        timestamp: startTime,
-        duration: Date.now() - startTime,
-      };
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorResult: PromptResult = {
+          promptName: prompt.name,
+          args: args,
+          result: { error: errorMessage, isError: true },
+          error: errorMessage,
+          timestamp: startTime,
+          duration: Date.now() - startTime,
+        };
 
-      setResults((prev) => [errorResult, ...prev]);
-    } finally {
-      setIsExecuting(false);
-    }
-  }, [isExecuting, callPrompt, serverId]);
+        setResults((prev) => [errorResult, ...prev]);
+      } finally {
+        setIsExecuting(false);
+      }
+    },
+    [isExecuting, callPrompt, serverId]
+  );
 
   const handleDeleteResult = useCallback((index: number) => {
     setResults((prev) => prev.filter((_, i) => i !== index));
