@@ -534,13 +534,18 @@ export function ToolResultDisplay({
   useEffect(() => {
     if (availableViews.length === 0) return;
 
-    // Always initialize if null, or fix if current mode isn't available
     const isCurrentModeAvailable =
       viewMode && availableViews.some((v) => v.mode === viewMode);
+    const firstComponentView = availableViews.find((v) => v.mode !== "json");
 
-    if (!viewMode || !isCurrentModeAvailable) {
-      // Default to first available component view, or JSON if no components
-      const firstComponentView = availableViews.find((v) => v.mode !== "json");
+    // Initialize if null, fix if current mode isn't available,
+    // OR switch from JSON to component when component first becomes available
+    // (handles async resource loading where JSON was the only option initially)
+    if (
+      !viewMode ||
+      !isCurrentModeAvailable ||
+      (viewMode === "json" && firstComponentView)
+    ) {
       if (firstComponentView) {
         setViewMode(firstComponentView.mode);
       } else {

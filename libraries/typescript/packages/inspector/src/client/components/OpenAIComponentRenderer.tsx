@@ -135,12 +135,6 @@ function OpenAIComponentRendererBase({
     customPropsRef.current = customProps;
   });
 
-  // Ref to hold playground settings to avoid stale closures
-  const playgroundRef = useRef(playground);
-  useEffect(() => {
-    playgroundRef.current = playground;
-  });
-
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
@@ -151,7 +145,16 @@ function OpenAIComponentRendererBase({
       const currentServerBaseUrl = serverBaseUrlRef.current;
       const currentResolvedTheme = resolvedThemeRef.current;
       const currentCustomProps = customPropsRef.current;
-      const currentPlayground = playgroundRef.current;
+      // Capture playground from closure at effect run time
+      const currentPlayground = playground;
+
+      console.log(
+        "[OpenAIComponentRenderer] Storing widget data with playground:",
+        {
+          locale: currentPlayground.locale,
+          deviceType: currentPlayground.deviceType,
+        }
+      );
 
       try {
         // Extract structured content from tool result (the actual tool parameters)
@@ -304,10 +307,11 @@ function OpenAIComponentRendererBase({
     componentUrl,
     serverId,
     toolId,
-    customProps, // Include customProps to re-render when props change
-    // Note: toolArgs, toolResult, readResource, and serverBaseUrl are intentionally
+    customProps,
+    // Note: toolArgs, toolResult, readResource, serverBaseUrl, playground are intentionally
     // excluded to prevent re-running when these references change but values are the same.
-    // resolvedTheme is handled by a separate effect that updates iframe globals.
+    // resolvedTheme and playground are captured at mount time for initialization, then
+    // updated dynamically via updateIframeGlobals() without reloading the widget.
   ]);
 
   // Helper to update window.openai globals inside iframe
