@@ -1,11 +1,12 @@
+import { cn } from "@/client/lib/utils";
 import { TerminalIcon, TrashIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/client/lib/utils";
-import { Button } from "./ui/button";
 import {
   useIframeConsole,
   type ConsoleLogEntry,
 } from "../hooks/useIframeConsole";
+import { Button } from "./ui/button";
+import { Label } from "./ui/label";
 import {
   Sheet,
   SheetContent,
@@ -14,7 +15,6 @@ import {
   SheetTrigger,
 } from "./ui/sheet";
 import { Switch } from "./ui/switch";
-import { Label } from "./ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface IframeConsoleProps {
@@ -119,12 +119,12 @@ export function IframeConsole({
 }: IframeConsoleProps) {
   // Load proxy toggle state from localStorage
   const [proxyToPageConsole, setProxyToPageConsole] = useState(() => {
-    if (typeof window === "undefined") return false;
+    if (typeof window === "undefined") return true;
     try {
       const stored = localStorage.getItem(PROXY_TOGGLE_KEY);
       return stored === "true";
     } catch {
-      return false;
+      return true;
     }
   });
 

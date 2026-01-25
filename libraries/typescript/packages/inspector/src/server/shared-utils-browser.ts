@@ -417,6 +417,18 @@ export interface WidgetData {
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
   theme?: "light" | "dark";
+  // Playground settings for initializing window.openai
+  playground?: {
+    locale?: string;
+    deviceType?: "mobile" | "tablet" | "desktop";
+    capabilities?: { hover: boolean; touch: boolean };
+    safeAreaInsets?: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    };
+  };
   // MCP Apps (SEP-1865) support
   protocol?: "mcp-apps" | "chatgpt-app";
   toolName?: string;
@@ -585,6 +597,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     toolId,
     devServerBaseUrl,
     theme,
+    playground,
   } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
@@ -639,6 +652,28 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   // Safely serialize theme, defaulting to 'light' if not provided
   const safeTheme = JSON.stringify(theme === "dark" ? "dark" : "light");
 
+  // Use playground values with fallbacks to defaults
+  const locale = playground?.locale || "en-US";
+  const deviceType = playground?.deviceType || "desktop";
+  const capabilities = playground?.capabilities || {
+    hover: true,
+    touch: false,
+  };
+  const safeAreaInsets = playground?.safeAreaInsets || {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  };
+
+  // Serialize playground values for injection
+  const safeLocale = JSON.stringify(locale);
+  const safeUserAgent = JSON.stringify({
+    device: { type: deviceType },
+    capabilities,
+  });
+  const safeSafeArea = JSON.stringify({ insets: safeAreaInsets });
+
   // Inject window.openai API script
   const apiScript = `
     <script>
@@ -664,9 +699,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},
-          locale: 'en-US',
-          safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
-          userAgent: {},
+          locale: ${safeLocale},
+          safeArea: ${safeSafeArea},
+          userAgent: ${safeUserAgent},
           widgetState: null,
 
           async setWidgetState(state) {

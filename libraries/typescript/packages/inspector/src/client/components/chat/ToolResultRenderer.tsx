@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
+import { useWidgetDebug } from "../../context/WidgetDebugContext";
+import {
+  detectWidgetProtocol,
+  getResourceUriForProtocol,
+  hasBothProtocols,
+} from "../../utils/widget-detection";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
-import { MCPUIResource } from "./MCPUIResource";
+import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
+import { ProtocolToggle } from "../ui/ProtocolToggle";
 import { Spinner } from "../ui/spinner";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
+import { MCPUIResource } from "./MCPUIResource";
 
 interface ToolResultRendererProps {
   toolName: string;
@@ -25,6 +31,7 @@ export function ToolResultRenderer({
   readResource,
   toolMeta,
 }: ToolResultRendererProps) {
+  const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
 
   // Debug logging to understand the data flow
@@ -58,17 +65,38 @@ export function ToolResultRenderer({
     [toolMeta, parsedResult]
   );
 
-  // Check if this is an MCP Apps tool
-  const isMcpAppsTool = useMemo(
-    () => widgetProtocol === "mcp-apps",
-    [widgetProtocol]
+  // Detect if tool supports both protocols
+  const supportsBothProtocols = useMemo(
+    () => hasBothProtocols(toolMeta),
+    [toolMeta]
   );
 
-  // Check if this is an OpenAI Apps SDK tool by checking tool metadata
-  // (The tool definition has openai/outputTemplate in its _meta)
+  // Determine active protocol based on toggle state
+  const activeProtocol = useMemo(() => {
+    if (!widgetProtocol) return null;
+
+    if (widgetProtocol === "both") {
+      // User has selected a protocol via toggle
+      if (playground.selectedProtocol) {
+        return playground.selectedProtocol;
+      }
+      // Default to MCP Apps when both exist (same as current priority)
+      return "mcp-apps";
+    }
+
+    return widgetProtocol;
+  }, [widgetProtocol, playground.selectedProtocol]);
+
+  // Check if this is an MCP Apps tool
+  const isMcpAppsTool = useMemo(
+    () => activeProtocol === "mcp-apps",
+    [activeProtocol]
+  );
+
+  // Check if this is an OpenAI Apps SDK tool
   const isAppsSdkTool = useMemo(
-    () => !!toolMeta?.["openai/outputTemplate"],
-    [toolMeta]
+    () => activeProtocol === "chatgpt-app",
+    [activeProtocol]
   );
 
   // Check if the result content has the Apps SDK resource embedded
@@ -109,19 +137,23 @@ export function ToolResultRenderer({
       return;
     }
 
-    // Fetch resource for MCP Apps or Apps SDK tools
-    const resourceUri = isMcpAppsTool
-      ? toolMeta?.ui?.resourceUri
-      : isAppsSdkTool
-        ? toolMeta?.["openai/outputTemplate"]
-        : null;
+    // Fetch resource based on active protocol
+    let resourceUri: string | null = null;
+
+    if (supportsBothProtocols && activeProtocol) {
+      resourceUri = getResourceUriForProtocol(activeProtocol as any, toolMeta);
+    } else if (isMcpAppsTool) {
+      resourceUri = toolMeta?.ui?.resourceUri || null;
+    } else if (isAppsSdkTool) {
+      resourceUri = toolMeta?.["openai/outputTemplate"] || null;
+    }
 
     if (resourceUri && toolMeta && readResource) {
       console.log(
         "[ToolResultRenderer] Fetching resource for widget:",
         resourceUri,
         "protocol:",
-        widgetProtocol
+        activeProtocol
       );
 
       readResource(resourceUri)
@@ -152,10 +184,47 @@ export function ToolResultRenderer({
     extractedResource,
     isMcpAppsTool,
     isAppsSdkTool,
+    supportsBothProtocols,
+    activeProtocol,
     toolMeta,
     readResource,
-    widgetProtocol,
   ]);
+
+  // Render toggle when both protocols are supported
+  if (supportsBothProtocols && resourceData && serverId && readResource) {
+    return (
+      <div className="space-y-4 my-4">
+        <ProtocolToggle />
+
+        {/* Render based on active protocol */}
+        {activeProtocol === "mcp-apps" && (
+          <MCPAppsRenderer
+            serverId={serverId}
+            toolCallId={`chat-tool-${toolName}-${Date.now()}`}
+            toolName={toolName}
+            toolInput={toolArgs}
+            toolOutput={parsedResult}
+            toolMetadata={toolMeta}
+            resourceUri={resourceData.uri}
+            readResource={readResource}
+          />
+        )}
+
+        {activeProtocol === "chatgpt-app" && (
+          <OpenAIComponentRenderer
+            componentUrl={resourceData.uri}
+            toolName={toolName}
+            toolArgs={toolArgs}
+            toolResult={parsedResult}
+            serverId={serverId}
+            readResource={readResource}
+            noWrapper={true}
+            showConsole={false}
+          />
+        )}
+      </div>
+    );
+  }
 
   // Render MCP Apps component (Priority 1)
   if (isMcpAppsTool && resourceData && serverId && readResource) {

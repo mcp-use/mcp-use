@@ -99,6 +99,41 @@ export function generateVSCodeDeepLink(
 }
 
 /**
+ * Build a VS Code Insiders deep link that installs an MCP server configuration.
+ *
+ * If `headers` are provided, each header name is mapped to a placeholder value of the form `your-<ENVVAR>-value`.
+ *
+ * @param url - The server URL to include in the configuration
+ * @param name - The display name for the server; it will be sanitized for use in the config
+ * @param headers - Optional map of HTTP header names to values; header names are converted to environment-variable-style placeholders in the generated config
+ * @returns A VS Code Insiders deep link (`vscode-insiders:mcp/install?...`) containing the URL-encoded JSON configuration
+ */
+export function generateVSCodeInsidersDeepLink(
+  url: string,
+  name: string,
+  headers?: Record<string, string>
+): string {
+  const config: Record<string, any> = {
+    url,
+    name: sanitizeServerName(name),
+    type: "http",
+  };
+
+  if (headers && Object.keys(headers).length > 0) {
+    const headersWithPlaceholder: Record<string, string> = {};
+    for (const [key] of Object.entries(headers)) {
+      const envVar = headerToEnvVar(key);
+      headersWithPlaceholder[key] = `your-${envVar}-value`;
+    }
+    config.headers = headersWithPlaceholder;
+  }
+
+  const configJson = JSON.stringify(config);
+  const urlEncodedConfig = encodeURIComponent(configJson);
+  return `vscode-insiders:mcp/install?${urlEncodedConfig}`;
+}
+
+/**
  * Builds a .mcpb configuration object for an MCP server.
  *
  * @param url - The server URL to include in the configuration

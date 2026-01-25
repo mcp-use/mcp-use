@@ -5,7 +5,29 @@
  * Priority: MCP Apps → ChatGPT Apps SDK → MCP-UI → None
  */
 
-export type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui" | null;
+export type WidgetProtocol =
+  | "mcp-apps"
+  | "chatgpt-app"
+  | "mcp-ui"
+  | "both" // Tool supports both MCP Apps and ChatGPT Apps SDK
+  | null;
+
+/**
+ * Detect if a tool supports BOTH MCP Apps and ChatGPT Apps SDK
+ *
+ * @param toolMeta - Tool metadata from tool definition (_meta field)
+ * @returns True if tool has both protocols
+ */
+export function hasBothProtocols(toolMeta?: Record<string, any>): boolean {
+  const hasMcpApps =
+    toolMeta?.ui?.resourceUri && typeof toolMeta.ui.resourceUri === "string";
+
+  const hasChatGptApp =
+    toolMeta?.["openai/outputTemplate"] &&
+    typeof toolMeta["openai/outputTemplate"] === "string";
+
+  return hasMcpApps && hasChatGptApp;
+}
 
 /**
  * Detect which widget protocol to use for rendering
@@ -18,6 +40,11 @@ export function detectWidgetProtocol(
   toolMeta?: Record<string, any>,
   toolResult?: any
 ): WidgetProtocol {
+  // Priority 0: Check for both protocols first
+  if (hasBothProtocols(toolMeta)) {
+    return "both";
+  }
+
   // Priority 1: MCP Apps (SEP-1865)
   // Check for ui.resourceUri in tool metadata
   if (
@@ -112,5 +139,25 @@ export function extractWidgetResourceUri(
     return resource?.resource?.uri || null;
   }
 
+  return null;
+}
+
+/**
+ * Extract resource URI for a specific protocol (used when toggling between protocols)
+ *
+ * @param protocol - The specific protocol to get URI for
+ * @param toolMeta - Tool metadata from tool definition (_meta field)
+ * @returns The resource URI or null
+ */
+export function getResourceUriForProtocol(
+  protocol: "mcp-apps" | "chatgpt-app",
+  toolMeta?: Record<string, any>
+): string | null {
+  if (protocol === "mcp-apps") {
+    return toolMeta?.ui?.resourceUri || null;
+  }
+  if (protocol === "chatgpt-app") {
+    return toolMeta?.["openai/outputTemplate"] || null;
+  }
   return null;
 }

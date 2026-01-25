@@ -151,6 +151,12 @@ async function waitForServer(
   return false;
 }
 
+// Helper to normalize host for browser connections
+// 0.0.0.0 is valid for server binding but browsers cannot connect to it
+function normalizeBrowserHost(host: string): string {
+  return host === "0.0.0.0" ? "localhost" : host;
+}
+
 // Helper to run a command
 function runCommand(
   command: string,
@@ -1057,12 +1063,15 @@ program
           const startTime = Date.now();
           const ready = await waitForServer(port, host);
           if (ready) {
-            const mcpEndpoint = `http://${host}:${port}/mcp`;
-            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const browserHost = normalizeBrowserHost(host);
+            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(
+              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+            );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
@@ -1184,12 +1193,15 @@ program
         if (options.open !== false) {
           const ready = await waitForServer(port, host);
           if (ready) {
-            const mcpEndpoint = `http://${host}:${port}/mcp`;
-            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const browserHost = normalizeBrowserHost(host);
+            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(
+              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+            );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));

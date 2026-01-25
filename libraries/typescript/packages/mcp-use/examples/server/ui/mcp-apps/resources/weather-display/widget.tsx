@@ -64,7 +64,7 @@ const WeatherDisplay: React.FC = () => {
   const safeAreaLeft = safeArea?.insets?.left || 0;
 
   return (
-    <McpUseProvider debugger viewControls>
+    <McpUseProvider debugger viewControls autoSize>
       {isPending ? (
         <div
           className={`relative rounded-3xl p-8 ${

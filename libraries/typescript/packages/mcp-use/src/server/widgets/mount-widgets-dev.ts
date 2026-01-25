@@ -234,7 +234,9 @@ if (container && Component) {
 
     // Include Vite client and React refresh preamble explicitly
     // This is needed when loading in sandboxed iframes where auto-injection may not work
-    // Use full paths to the widget's Vite instance (not root Vite)
+    // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
+    // when trying to resolve these paths as file paths during HTML analysis
+    const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
     const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -246,9 +248,9 @@ if (container && Component) {
     <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
-    <script type="module" src="${baseRoute}/@vite/client"></script>
+    <script type="module" src="${fullBaseUrl}/@vite/client"></script>
     <script type="module">
-      import RefreshRuntime from '${baseRoute}/@react-refresh';
+      import RefreshRuntime from '${fullBaseUrl}/@react-refresh';
       RefreshRuntime.injectIntoGlobalHook(window);
       window.$RefreshReg$ = () => {};
       window.$RefreshSig$ = () => (type) => type;
@@ -257,7 +259,7 @@ if (container && Component) {
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
+    <script type="module" src="${fullBaseUrl}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 
@@ -472,6 +474,8 @@ if (container && Component) {
 }
 `;
 
+        // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
+        const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
         const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -483,10 +487,18 @@ if (container && Component) {
     <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
+    <script type="module" src="${fullBaseUrl}/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '${fullBaseUrl}/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
+    <script type="module" src="${fullBaseUrl}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 

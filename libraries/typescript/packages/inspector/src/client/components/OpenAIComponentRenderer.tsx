@@ -4,11 +4,11 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpClient } from "mcp-use/react";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
+import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
-import { IframeConsole } from "./IframeConsole";
+import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
 import { Spinner } from "./ui/spinner";
-import { WidgetInspectorControls } from "./WidgetInspectorControls";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -21,6 +21,16 @@ interface OpenAIComponentRendererProps {
   noWrapper?: boolean;
   showConsole?: boolean;
   customProps?: Record<string, string>;
+  onUpdateGlobals?: (updates: {
+    displayMode?: "inline" | "pip" | "fullscreen";
+    theme?: "light" | "dark";
+    maxHeight?: number;
+    locale?: string;
+    safeArea?: {
+      insets: { top: number; bottom: number; left: number; right: number };
+    };
+    userAgent?: any;
+  }) => void;
 }
 
 function Wrapper({
@@ -71,6 +81,7 @@ function OpenAIComponentRendererBase({
   noWrapper = false,
   showConsole = true,
   customProps,
+  onUpdateGlobals,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<InstanceType<
     typeof window.HTMLIFrameElement
@@ -91,7 +102,7 @@ function OpenAIComponentRendererBase({
   const [isPipHovered, setIsPipHovered] = useState<boolean>(false);
   const [useDevMode, setUseDevMode] = useState<boolean>(false);
   const [widgetToolInput, setWidgetToolInput] = useState<any>(null);
-  const [widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
+  const [_widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -103,6 +114,7 @@ function OpenAIComponentRendererBase({
   const server = servers.find((connection) => connection.id === serverId);
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
+  const { playground } = useWidgetDebug();
 
   // Refs to hold latest values without triggering effect re-runs
   // This prevents infinite loops caused by object/function reference changes
@@ -123,6 +135,12 @@ function OpenAIComponentRendererBase({
     customPropsRef.current = customProps;
   });
 
+  // Ref to hold playground settings to avoid stale closures
+  const playgroundRef = useRef(playground);
+  useEffect(() => {
+    playgroundRef.current = playground;
+  });
+
   // Store widget data and set up iframe URL
   useEffect(() => {
     const storeAndSetUrl = async () => {
@@ -133,6 +151,7 @@ function OpenAIComponentRendererBase({
       const currentServerBaseUrl = serverBaseUrlRef.current;
       const currentResolvedTheme = resolvedThemeRef.current;
       const currentCustomProps = customPropsRef.current;
+      const currentPlayground = playgroundRef.current;
 
       try {
         // Extract structured content from tool result (the actual tool parameters)
@@ -221,6 +240,13 @@ function OpenAIComponentRendererBase({
           toolId,
           widgetCSP, // Pass the CSP metadata
           theme: currentResolvedTheme, // Pass the current theme to prevent flash
+          // Include current playground settings for window.openai initialization
+          playground: {
+            locale: currentPlayground.locale,
+            deviceType: currentPlayground.deviceType,
+            capabilities: currentPlayground.capabilities,
+            safeAreaInsets: currentPlayground.safeAreaInsets,
+          },
         };
 
         if (computedUseDevMode && slugifiedName && currentServerBaseUrl) {
@@ -369,8 +395,13 @@ function OpenAIComponentRendererBase({
           );
         }
       }
+
+      // Notify parent component of globals updates
+      if (onUpdateGlobals) {
+        onUpdateGlobals(updates);
+      }
     },
-    []
+    [onUpdateGlobals]
   );
 
   // Handle display mode changes with native Fullscreen API
@@ -856,16 +887,20 @@ function OpenAIComponentRendererBase({
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-            <IframeConsole iframeId={toolId} enabled={true} />
-            {/* Always show debug controls in inspector */}
-            <WidgetInspectorControls
+            {/* Use advanced debug controls for Apps SDK (same as MCP Apps) */}
+            <MCPAppsDebugControls
               displayMode={displayMode}
               onDisplayModeChange={handleDisplayModeChange}
-              toolInput={widgetToolInput}
-              toolOutput={widgetToolOutput}
-              toolResult={toolResult}
-              iframeRef={iframeRef}
-              toolId={toolId}
+              toolCallId={toolId}
+              propsContext="tool"
+              resourceUri={componentUrl}
+              toolInput={widgetToolInput as Record<string, unknown>}
+              resourceAnnotations={undefined}
+              llmConfig={null}
+              resource={null}
+              onPropsChange={undefined}
+              protocol="apps-sdk"
+              onUpdateGlobals={updateIframeGlobals}
             />
           </div>
         )}

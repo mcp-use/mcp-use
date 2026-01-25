@@ -94,7 +94,6 @@ export function ToolsTab({
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [requestName, setRequestName] = useState("");
-  const [previewMode, setPreviewMode] = useState(true);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -871,13 +870,11 @@ export function ToolsTab({
                 <ToolResultDisplay
                   results={filteredResults}
                   copiedResult={copiedResult}
-                  previewMode={previewMode}
                   serverId={serverId}
                   readResource={readResource}
                   onCopy={handleCopyResult}
                   onDelete={handleDeleteResult}
                   onFullscreen={handleFullscreen}
-                  onTogglePreview={() => setPreviewMode(!previewMode)}
                 />
               </motion.div>
             )}
@@ -986,13 +983,11 @@ export function ToolsTab({
               <ToolResultDisplay
                 results={filteredResults}
                 copiedResult={copiedResult}
-                previewMode={previewMode}
                 serverId={serverId}
                 readResource={readResource}
                 onCopy={handleCopyResult}
                 onDelete={handleDeleteResult}
                 onFullscreen={handleFullscreen}
-                onTogglePreview={() => setPreviewMode(!previewMode)}
                 onMaximize={handleMaximize}
                 isMaximized={isMaximized}
               />

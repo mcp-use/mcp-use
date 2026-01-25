@@ -7,14 +7,20 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { Check, Copy, History, Maximize, Minimize, Zap } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useWidgetDebug } from "../../context/WidgetDebugContext";
+import {
+  detectWidgetProtocol,
+  getResourceUriForProtocol,
+  hasBothProtocols,
+} from "../../utils/widget-detection";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
+import { Spinner } from "../ui/spinner";
 
 export interface ToolResult {
   toolName: string;
@@ -34,16 +40,20 @@ export interface ToolResult {
   };
 }
 
+type ViewMode =
+  | "chatgpt-app" // Component (Apps SDK)
+  | "mcp-apps" // Component (MCP Apps)
+  | "mcp-ui" // Component (MCP-UI)
+  | "json"; // Raw JSON
+
 interface ToolResultDisplayProps {
   results: ToolResult[];
   copiedResult: number | null;
-  previewMode: boolean;
   serverId: string;
   readResource: (uri: string) => Promise<any>;
   onCopy: (index: number, result: any) => void;
   onDelete: (index: number) => void;
   onFullscreen: (index: number) => void;
-  onTogglePreview: () => void;
   onMaximize?: () => void;
   isMaximized?: boolean;
 }
@@ -317,17 +327,22 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
 export function ToolResultDisplay({
   results,
   copiedResult,
-  previewMode,
   serverId,
   readResource,
   onCopy,
-  onTogglePreview,
   onMaximize,
   isMaximized = false,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [relativeTime, setRelativeTime] = useState<string>("");
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
+  const [viewMode, setViewMode] = useState<ViewMode | null>(null); // Let effect initialize
+  const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
+    "inline" | "pip" | "fullscreen"
+  >("inline");
+  const [activeProps, setActiveProps] = useState<Record<string, string> | null>(
+    null
+  );
 
   // Get the most recent result to determine which tool we're viewing
   const currentResult = results[0];
@@ -381,6 +396,160 @@ export function ToolResultDisplay({
     [readResource]
   );
 
+  // Get widget debug context for protocol selection
+  const { playground } = useWidgetDebug();
+
+  // Detect widget protocol (Priority: MCP Apps → ChatGPT Apps → MCP-UI)
+  // IMPORTANT: These hooks must be called before any early returns
+  const widgetProtocol = useMemo(
+    () =>
+      result ? detectWidgetProtocol(result.toolMeta, result.result) : null,
+    [result]
+  );
+
+  // Detect if tool supports both protocols
+  const supportsBothProtocols = useMemo(
+    () => (result ? hasBothProtocols(result.toolMeta) : false),
+    [result]
+  );
+
+  // Determine active protocol based on toggle state
+  const activeProtocol = useMemo(() => {
+    if (!widgetProtocol) return null;
+
+    if (widgetProtocol === "both") {
+      // User has selected a protocol via toggle
+      if (playground.selectedProtocol) {
+        return playground.selectedProtocol;
+      }
+      // Default to MCP Apps when both exist
+      return "mcp-apps";
+    }
+
+    return widgetProtocol;
+  }, [widgetProtocol, playground.selectedProtocol]);
+
+  // Check for MCP Apps (SEP-1865) - BEFORE early return
+  const mcpAppsResourceUri = useMemo(() => {
+    if (!result) return null;
+    return supportsBothProtocols
+      ? getResourceUriForProtocol("mcp-apps", result.toolMeta)
+      : result.toolMeta?.ui?.resourceUri;
+  }, [result, supportsBothProtocols]);
+
+  const hasMcpAppsResource = useMemo(
+    () =>
+      (activeProtocol === "mcp-apps" || supportsBothProtocols) &&
+      !!mcpAppsResourceUri,
+    [activeProtocol, supportsBothProtocols, mcpAppsResourceUri]
+  );
+
+  // Check tool metadata for Apps SDK component (from tool definition) - BEFORE early return
+  const openaiOutputTemplate = useMemo(() => {
+    if (!result) return null;
+    return supportsBothProtocols
+      ? getResourceUriForProtocol("chatgpt-app", result.toolMeta)
+      : result.toolMeta?.["openai/outputTemplate"];
+  }, [result, supportsBothProtocols]);
+
+  const hasAppsSdkResource = useMemo(
+    () =>
+      !!(
+        (activeProtocol === "chatgpt-app" || supportsBothProtocols) &&
+        openaiOutputTemplate &&
+        typeof openaiOutputTemplate === "string" &&
+        result?.appsSdkResource
+      ),
+    [activeProtocol, supportsBothProtocols, openaiOutputTemplate, result]
+  );
+
+  const appsSdkUri = openaiOutputTemplate;
+
+  // Check if result contains MCP UI resources - BEFORE early return
+  const content = useMemo(() => result?.result?.content || [], [result]);
+  const mcpUIResources = useMemo(
+    () =>
+      content.filter(
+        (item: any) =>
+          item.type === "resource" && isMcpUIResource(item.resource)
+      ),
+    [content]
+  );
+  const hasMcpUIResources = mcpUIResources.length > 0;
+
+  // Check if result has content or structuredContent (for formatted/raw toggle)
+  const hasContentOrStructured = useMemo(
+    () =>
+      !!((content && content.length > 0) || result?.result?.structuredContent),
+    [content, result]
+  );
+
+  const isNonUIResult = useMemo(
+    () =>
+      !hasMcpAppsResource &&
+      !hasMcpUIResources &&
+      !hasAppsSdkResource &&
+      hasContentOrStructured,
+    [
+      hasMcpAppsResource,
+      hasMcpUIResources,
+      hasAppsSdkResource,
+      hasContentOrStructured,
+    ]
+  );
+
+  // Build available view options based on detected protocols - BEFORE early return
+  const availableViews = useMemo(() => {
+    const views: Array<{ mode: ViewMode; label: string }> = [];
+
+    // Check for ChatGPT Apps SDK
+    if (hasAppsSdkResource || (supportsBothProtocols && openaiOutputTemplate)) {
+      views.push({ mode: "chatgpt-app", label: "Component (Apps SDK)" });
+    }
+
+    // Check for MCP Apps (SEP-1865)
+    if (hasMcpAppsResource || (supportsBothProtocols && mcpAppsResourceUri)) {
+      views.push({ mode: "mcp-apps", label: "Component (MCP Apps)" });
+    }
+
+    // Check for MCP-UI
+    if (hasMcpUIResources) {
+      views.push({ mode: "mcp-ui", label: "Component (MCP-UI)" });
+    }
+
+    // Always show Raw JSON
+    views.push({ mode: "json", label: "Raw JSON" });
+
+    return views;
+  }, [
+    hasAppsSdkResource,
+    hasMcpAppsResource,
+    hasMcpUIResources,
+    supportsBothProtocols,
+    openaiOutputTemplate,
+    mcpAppsResourceUri,
+  ]);
+
+  // Initialize view mode when result changes or available views change - BEFORE early return
+  useEffect(() => {
+    if (availableViews.length === 0) return;
+
+    // Always initialize if null, or fix if current mode isn't available
+    const isCurrentModeAvailable =
+      viewMode && availableViews.some((v) => v.mode === viewMode);
+
+    if (!viewMode || !isCurrentModeAvailable) {
+      // Default to first available component view, or JSON if no components
+      const firstComponentView = availableViews.find((v) => v.mode !== "json");
+      if (firstComponentView) {
+        setViewMode(firstComponentView.mode);
+      } else {
+        setViewMode("json");
+      }
+    }
+  }, [availableViews, viewMode]);
+
+  // Early return AFTER all hooks are called
   if (results.length === 0) {
     return (
       <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
@@ -394,41 +563,6 @@ export function ToolResultDisplay({
       </div>
     );
   }
-
-  // Detect widget protocol (Priority: MCP Apps → ChatGPT Apps → MCP-UI)
-  const widgetProtocol = detectWidgetProtocol(result.toolMeta, result.result);
-
-  // Check for MCP Apps (SEP-1865)
-  const mcpAppsResourceUri = result.toolMeta?.ui?.resourceUri;
-  const hasMcpAppsResource =
-    widgetProtocol === "mcp-apps" && !!mcpAppsResourceUri;
-
-  // Check tool metadata for Apps SDK component (from tool definition)
-  const openaiOutputTemplate = result.toolMeta?.["openai/outputTemplate"];
-  const hasAppsSdkResource = !!(
-    openaiOutputTemplate &&
-    typeof openaiOutputTemplate === "string" &&
-    result.appsSdkResource
-  );
-  const appsSdkUri = openaiOutputTemplate;
-
-  // Check if result contains MCP UI resources
-  const content = result.result?.content || [];
-  const mcpUIResources = content.filter(
-    (item: any) => item.type === "resource" && isMcpUIResource(item.resource)
-  );
-  const hasMcpUIResources = mcpUIResources.length > 0;
-
-  // Check if result has content or structuredContent (for formatted/raw toggle)
-  const hasContentOrStructured = !!(
-    (content && content.length > 0) ||
-    result.result?.structuredContent
-  );
-  const isNonUIResult =
-    !hasMcpAppsResource &&
-    !hasMcpUIResources &&
-    !hasAppsSdkResource &&
-    hasContentOrStructured;
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
@@ -455,69 +589,46 @@ export function ToolResultDisplay({
               </div>
             )}
 
-            {hasAppsSdkResource && (
+            {/* Unified header for all widget types */}
+            {(hasAppsSdkResource ||
+              hasMcpAppsResource ||
+              hasMcpUIResources) && (
               <div className="flex items-center gap-4 sm:ml-4">
-                <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
-                  URI: {appsSdkUri || "No URI"}
-                </span>
+                {/* Show URI if available */}
+                {(appsSdkUri ||
+                  mcpAppsResourceUri ||
+                  mcpUIResources[0]?.resource?.uri) && (
+                  <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
+                    URI:{" "}
+                    {appsSdkUri ||
+                      mcpAppsResourceUri ||
+                      mcpUIResources[0]?.resource?.uri ||
+                      "No URI"}
+                  </span>
+                )}
+
+                {/* Dynamic view mode buttons */}
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onTogglePreview()}
-                    className={`text-xs font-medium ${
-                      previewMode
-                        ? "text-black dark:text-white"
-                        : "text-zinc-500 dark:text-zinc-400"
-                    }`}
-                  >
-                    Component
-                  </button>
-                  <span className="text-xs text-zinc-400">|</span>
-                  <button
-                    onClick={() => onTogglePreview()}
-                    className={`text-xs font-medium ${
-                      !previewMode
-                        ? "text-black dark:text-white"
-                        : "text-zinc-500 dark:text-zinc-400"
-                    }`}
-                  >
-                    Raw JSON
-                  </button>
+                  {availableViews.map((view, index) => (
+                    <React.Fragment key={view.mode}>
+                      {index > 0 && (
+                        <span className="text-xs text-zinc-400">|</span>
+                      )}
+                      <button
+                        onClick={() => setViewMode(view.mode)}
+                        className={`text-xs font-medium ${
+                          viewMode === view.mode
+                            ? "text-black dark:text-white"
+                            : "text-zinc-500 dark:text-zinc-400"
+                        }`}
+                      >
+                        {view.label}
+                      </button>
+                    </React.Fragment>
+                  ))}
                 </div>
               </div>
             )}
-
-            {hasMcpUIResources &&
-              !hasAppsSdkResource &&
-              !hasMcpAppsResource && (
-                <div className="flex items-center gap-4 sm:ml-4">
-                  <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
-                    URI: {mcpUIResources[0]?.resource?.uri || "No URI"}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onTogglePreview()}
-                      className={`text-xs font-medium ${
-                        previewMode
-                          ? "text-black dark:text-white"
-                          : "text-zinc-500 dark:text-zinc-400"
-                      }`}
-                    >
-                      Preview
-                    </button>
-                    <span className="text-xs text-zinc-400">|</span>
-                    <button
-                      onClick={() => onTogglePreview()}
-                      className={`text-xs font-medium ${
-                        !previewMode
-                          ? "text-black dark:text-white"
-                          : "text-zinc-500 dark:text-zinc-400"
-                      }`}
-                    >
-                      JSON
-                    </button>
-                  </div>
-                </div>
-              )}
 
             {isNonUIResult && (
               <div className="flex items-center gap-2 sm:ml-4">
@@ -626,80 +737,55 @@ export function ToolResultDisplay({
               );
             }
 
-            // Render normal result
+            // Render based on selected view mode
             return (() => {
-              // Handle MCP Apps (SEP-1865) - Priority 1
-              if (hasMcpAppsResource) {
-                if (previewMode) {
-                  return (
-                    <div className="flex-1">
-                      <div className="relative">
-                        {/* Floating controls in top-right */}
-                        <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-                          <MCPAppsDebugControls
-                            toolCallId={`tool-${result.timestamp}`}
-                            displayMode="inline"
-                            onDisplayModeChange={(mode) => {
-                              console.log("Display mode change:", mode);
-                              // Display mode changes are handled by MCPAppsRenderer internally
-                            }}
-                          />
-                        </div>
-
-                        <MCPAppsRenderer
-                          serverId={serverId}
-                          toolCallId={`tool-${result.timestamp}`}
-                          toolName={result.toolName}
-                          toolInput={memoizedArgs}
-                          toolOutput={memoizedResult}
-                          toolMetadata={result.toolMeta}
-                          resourceUri={mcpAppsResourceUri}
-                          readResource={memoizedReadResource}
-                          className="w-full h-full relative p-4"
-                        />
-                      </div>
-                    </div>
-                  );
-                } else {
-                  // JSON mode for MCP Apps
-                  return (
-                    <div className="px-4 pt-4">
-                      <JSONDisplay
-                        data={result.result}
-                        filename={`tool-result-${result.toolName}-${Date.now()}.json`}
-                      />
-                    </div>
-                  );
-                }
+              // Show loading state while view mode is initializing
+              if (!viewMode) {
+                return (
+                  <div className="flex items-center justify-center w-full h-[200px]">
+                    <Spinner className="size-5" />
+                  </div>
+                );
               }
 
-              // Handle Apps SDK UI resources - Priority 2
-              if (hasAppsSdkResource) {
-                const appsSdk = result.appsSdkResource!;
+              switch (viewMode) {
+                case "chatgpt-app": {
+                  // ChatGPT Apps SDK Component view
+                  if (!hasAppsSdkResource || !result.appsSdkResource) {
+                    return (
+                      <div className="px-4 pt-4">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            Apps SDK resource not available
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
 
-                if (appsSdk.isLoading) {
-                  return <></>;
-                }
+                  const appsSdk = result.appsSdkResource;
 
-                if (appsSdk.error) {
-                  return (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4">
-                      <p className="text-red-800 dark:text-red-300 font-medium">
-                        Resource Error:
-                      </p>
-                      <p className="text-red-700 dark:text-red-400 text-sm">
-                        {appsSdk.error}
-                      </p>
-                    </div>
-                  );
-                }
+                  if (appsSdk.isLoading) {
+                    return <></>;
+                  }
 
-                if (previewMode) {
-                  // OpenAI Apps SDK Component mode
+                  if (appsSdk.error) {
+                    return (
+                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4">
+                        <p className="text-red-800 dark:text-red-300 font-medium">
+                          Resource Error:
+                        </p>
+                        <p className="text-red-700 dark:text-red-400 text-sm">
+                          {appsSdk.error}
+                        </p>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="flex-1">
                       <OpenAIComponentRenderer
-                        componentUrl={appsSdkUri}
+                        componentUrl={appsSdk.uri}
                         toolName={result.toolName}
                         toolArgs={memoizedArgs}
                         toolResult={memoizedResult}
@@ -709,21 +795,71 @@ export function ToolResultDisplay({
                       />
                     </div>
                   );
-                } else {
-                  // JSON mode for Apps SDK resources
+                }
+
+                case "mcp-apps": {
+                  // MCP Apps (SEP-1865) Component view
+                  if (!hasMcpAppsResource || !mcpAppsResourceUri) {
+                    return (
+                      <div className="px-4 pt-4">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            MCP Apps resource not available
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div className="px-4 pt-4">
-                      <JSONDisplay
-                        data={result.result}
-                        filename={`tool-result-${result.toolName}-${Date.now()}.json`}
+                    <div className="flex-1 relative">
+                      {/* Floating controls in top-right */}
+                      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                        <MCPAppsDebugControls
+                          toolCallId={`tool-${result.timestamp}`}
+                          displayMode={mcpAppsDisplayMode}
+                          onDisplayModeChange={setMcpAppsDisplayMode}
+                          propsContext="tool"
+                          resourceUri={mcpAppsResourceUri}
+                          toolInput={result.args}
+                          resourceAnnotations={result.toolMeta}
+                          llmConfig={null}
+                          resource={null}
+                          onPropsChange={setActiveProps}
+                        />
+                      </div>
+
+                      <MCPAppsRenderer
+                        serverId={serverId}
+                        toolCallId={`tool-${result.timestamp}`}
+                        toolName={result.toolName}
+                        toolInput={activeProps || memoizedArgs}
+                        toolOutput={memoizedResult}
+                        toolMetadata={result.toolMeta}
+                        resourceUri={mcpAppsResourceUri}
+                        readResource={memoizedReadResource}
+                        className="w-full h-full relative p-4"
+                        displayMode={mcpAppsDisplayMode}
+                        onDisplayModeChange={setMcpAppsDisplayMode}
                       />
                     </div>
                   );
                 }
-              }
 
-              if (hasMcpUIResources) {
-                if (previewMode) {
+                case "mcp-ui": {
+                  // MCP-UI Component view
+                  if (!hasMcpUIResources) {
+                    return (
+                      <div className="px-4 pt-4">
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            MCP-UI resource not available
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="space-y-0 h-full">
                       {mcpUIResources.map((item: any, idx: number) => (
@@ -760,62 +896,56 @@ export function ToolResultDisplay({
                       )}
                     </div>
                   );
-                } else {
-                  // JSON mode for MCP UI resources
+                }
+
+                case "json": {
+                  // Raw JSON view (or formatted for non-UI results)
+                  // For non-UI results, check if we should show formatted content
+                  if (isNonUIResult && formattedMode) {
+                    const structuredContent = result.result?.structuredContent;
+
+                    return (
+                      <div className="px-4 pt-4 space-y-4">
+                        {structuredContent && (
+                          <div className="space-y-2">
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                              Structured Content
+                            </div>
+                            <JSONDisplay
+                              data={structuredContent}
+                              filename={`structured-content-${result.toolName}-${Date.now()}.json`}
+                            />
+                          </div>
+                        )}
+
+                        {content && content.length > 0 && (
+                          <FormattedContentDisplay content={content} />
+                        )}
+
+                        {!structuredContent &&
+                          (!content || content.length === 0) && (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              No content to display
+                            </div>
+                          )}
+                      </div>
+                    );
+                  }
+
+                  // Raw JSON mode
                   return (
                     <div className="px-4 pt-4">
                       <JSONDisplay
                         data={result.result}
-                        filename={`tool-result-${result.toolName}-mcp-ui-${Date.now()}.json`}
+                        filename={`tool-result-${result.toolName}-${Date.now()}.json`}
                       />
                     </div>
                   );
                 }
+
+                default:
+                  return null;
               }
-
-              // Default: show JSON for non-MCP UI resources
-              // If we have content or structuredContent, show formatted/raw toggle
-              if (isNonUIResult && formattedMode) {
-                // Formatted mode: show structured content or formatted content
-                const structuredContent = result.result?.structuredContent;
-
-                return (
-                  <div className="px-4 pt-4 space-y-4">
-                    {structuredContent && (
-                      <div className="space-y-2">
-                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                          Structured Content
-                        </div>
-                        <JSONDisplay
-                          data={structuredContent}
-                          filename={`structured-content-${result.toolName}-${Date.now()}.json`}
-                        />
-                      </div>
-                    )}
-
-                    {content && content.length > 0 && (
-                      <FormattedContentDisplay content={content} />
-                    )}
-
-                    {!structuredContent &&
-                      (!content || content.length === 0) && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          No content to display
-                        </div>
-                      )}
-                  </div>
-                );
-              }
-
-              // Raw mode or no special content: show full JSON
-              return (
-                <div className="px-4 pt-4">
-                  <JSONDisplay
-                    data={result.result}
-                    filename={`tool-result-${result.toolName}-${Date.now()}.json`}
-                  />
-                </div>
-              );
             })();
           })()}
         </div>

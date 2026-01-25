@@ -10,12 +10,18 @@
  */
 
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
+import {
+  detectWidgetProtocol,
+  getResourceUriForProtocol,
+  hasBothProtocols,
+} from "../../utils/widget-detection";
 import { JsonRpcLoggerView } from "../logging/JsonRpcLoggerView";
+import { MCPAppsRenderer } from "../MCPAppsRenderer";
+import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Button } from "../ui/button";
+import { ProtocolToggle } from "../ui/ProtocolToggle";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -56,7 +62,11 @@ export function UIPlaygroundTab({
   const widgetTools = useMemo(() => {
     return tools.filter((tool) => {
       const protocol = detectWidgetProtocol(tool._meta, null);
-      return protocol === "mcp-apps" || protocol === "chatgpt-app";
+      return (
+        protocol === "mcp-apps" ||
+        protocol === "chatgpt-app" ||
+        protocol === "both"
+      );
     });
   }, [tools]);
 
@@ -69,11 +79,43 @@ export function UIPlaygroundTab({
     return detectWidgetProtocol(selectedTool._meta, toolResult);
   }, [selectedTool, toolResult]);
 
+  // Detect if tool supports both protocols
+  const supportsBothProtocols = useMemo(() => {
+    return selectedTool ? hasBothProtocols(selectedTool._meta) : false;
+  }, [selectedTool]);
+
+  // Determine active protocol based on toggle state
+  const activeProtocol = useMemo(() => {
+    if (!widgetProtocol) return null;
+
+    if (widgetProtocol === "both") {
+      // User has selected a protocol via toggle
+      if (playground.selectedProtocol) {
+        return playground.selectedProtocol;
+      }
+      // Default to MCP Apps when both exist
+      return "mcp-apps";
+    }
+
+    return widgetProtocol;
+  }, [widgetProtocol, playground.selectedProtocol]);
+
+  // Get resource URI based on active protocol
   const resourceUri = useMemo(() => {
     if (!selectedTool?._meta) return null;
     const meta = selectedTool._meta as Record<string, any>;
+
+    if (supportsBothProtocols && activeProtocol) {
+      return getResourceUriForProtocol(activeProtocol as any, meta);
+    }
+
     return meta.ui?.resourceUri || meta["openai/outputTemplate"] || null;
-  }, [selectedTool]);
+  }, [selectedTool, supportsBothProtocols, activeProtocol]);
+
+  // Reset protocol selection when tool changes
+  useEffect(() => {
+    updatePlaygroundSettings({ selectedProtocol: null });
+  }, [selectedToolName, updatePlaygroundSettings]);
 
   const handleExecuteTool = async () => {
     if (!selectedTool || !isConnected) return;
@@ -122,12 +164,20 @@ export function UIPlaygroundTab({
                 <SelectContent>
                   {widgetTools.map((tool) => {
                     const protocol = detectWidgetProtocol(tool._meta, null);
+                    const protocolLabel =
+                      protocol === "mcp-apps"
+                        ? "MCP Apps"
+                        : protocol === "chatgpt-app"
+                          ? "ChatGPT"
+                          : protocol === "both"
+                            ? "Both"
+                            : "";
                     return (
                       <SelectItem key={tool.name} value={tool.name}>
                         <div className="flex items-center gap-2">
                           <span>{tool.name}</span>
                           <span className="text-xs text-zinc-500">
-                            ({protocol === "mcp-apps" ? "MCP Apps" : "ChatGPT"})
+                            ({protocolLabel})
                           </span>
                         </div>
                       </SelectItem>
@@ -145,6 +195,16 @@ export function UIPlaygroundTab({
 
             {/* Device Emulation */}
             <DeviceEmulationControls />
+
+            {/* Protocol Toggle - only shown when tool supports both */}
+            {supportsBothProtocols && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Protocol Selection
+                </label>
+                <ProtocolToggle />
+              </div>
+            )}
 
             {/* CSP Mode */}
             <div className="space-y-2">
@@ -214,7 +274,7 @@ export function UIPlaygroundTab({
 
             <div className="flex-1 overflow-auto">
               <TabsContent value="widget" className="h-full m-0 p-4">
-                {widgetProtocol === "mcp-apps" &&
+                {activeProtocol === "mcp-apps" &&
                 resourceUri &&
                 selectedTool ? (
                   <MCPAppsRenderer
@@ -227,14 +287,27 @@ export function UIPlaygroundTab({
                     resourceUri={resourceUri}
                     readResource={readResource}
                   />
+                ) : activeProtocol === "chatgpt-app" &&
+                  resourceUri &&
+                  selectedTool ? (
+                  <OpenAIComponentRenderer
+                    componentUrl={resourceUri}
+                    toolName={selectedTool.name}
+                    toolArgs={{}}
+                    toolResult={toolResult}
+                    serverId={serverId}
+                    readResource={readResource}
+                    noWrapper={false}
+                    showConsole={true}
+                  />
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center text-zinc-500 dark:text-zinc-400">
                       <p className="text-sm">
-                        Select a tool with MCP Apps support to test widgets
+                        Select a tool with widget support to test
                       </p>
                       <p className="text-xs mt-2">
-                        ChatGPT Apps SDK widgets will also be supported here
+                        Supports MCP Apps and ChatGPT Apps SDK
                       </p>
                     </div>
                   </div>

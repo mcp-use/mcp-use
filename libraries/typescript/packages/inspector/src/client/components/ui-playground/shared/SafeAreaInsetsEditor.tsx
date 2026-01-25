@@ -1,74 +1,79 @@
 /**
- * Safe Area Insets Editor
- * Reusable component for editing safe area insets
+ * SafeAreaInsetsEditor
+ *
+ * Component for editing safe area insets (top, right, bottom, left)
+ * Used in MCP Apps debug controls to configure device safe areas
  */
 
-import { Input } from "@/client/components/ui/input";
+import { Input } from "../../ui/input";
 
-export interface SafeAreaInsets {
+interface SafeAreaInsets {
   top: number;
   right: number;
   bottom: number;
   left: number;
 }
 
-export interface SafeAreaInsetsEditorProps {
+interface SafeAreaInsetsEditorProps {
   value: SafeAreaInsets;
   onChange: (insets: SafeAreaInsets) => void;
-  className?: string;
 }
 
 export function SafeAreaInsetsEditor({
   value,
   onChange,
-  className,
 }: SafeAreaInsetsEditorProps) {
-  const handleChange = (side: keyof SafeAreaInsets, newValue: string) => {
+  const handleChange = (field: keyof SafeAreaInsets, newValue: string) => {
+    const numValue = parseInt(newValue, 10);
+    if (isNaN(numValue)) return;
+
     onChange({
       ...value,
-      [side]: parseInt(newValue) || 0,
+      [field]: numValue,
     });
   };
 
   return (
-    <div className={className}>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-muted-foreground">Top</label>
-          <Input
-            type="number"
-            value={value.top}
-            onChange={(e) => handleChange("top", e.target.value)}
-            className="h-8"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Right</label>
-          <Input
-            type="number"
-            value={value.right}
-            onChange={(e) => handleChange("right", e.target.value)}
-            className="h-8"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Bottom</label>
-          <Input
-            type="number"
-            value={value.bottom}
-            onChange={(e) => handleChange("bottom", e.target.value)}
-            className="h-8"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground">Left</label>
-          <Input
-            type="number"
-            value={value.left}
-            onChange={(e) => handleChange("left", e.target.value)}
-            className="h-8"
-          />
-        </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Top</label>
+        <Input
+          type="number"
+          min="0"
+          value={value.top}
+          onChange={(e) => handleChange("top", e.target.value)}
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Right</label>
+        <Input
+          type="number"
+          min="0"
+          value={value.right}
+          onChange={(e) => handleChange("right", e.target.value)}
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Bottom</label>
+        <Input
+          type="number"
+          min="0"
+          value={value.bottom}
+          onChange={(e) => handleChange("bottom", e.target.value)}
+          className="h-8"
+        />
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">Left</label>
+        <Input
+          type="number"
+          min="0"
+          value={value.left}
+          onChange={(e) => handleChange("left", e.target.value)}
+          className="h-8"
+        />
       </div>
     </div>
   );

@@ -37,7 +37,6 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
 import { cn } from "../lib/utils";
-import { IframeConsole } from "./IframeConsole";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
 import { SandboxedIframe } from "./ui/SandboxedIframe";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
@@ -55,6 +54,8 @@ interface MCPAppsRendererProps {
   readResource: (uri: string) => Promise<any>;
   onSendFollowUp?: (text: string) => void;
   className?: string;
+  displayMode?: DisplayMode;
+  onDisplayModeChange?: (mode: DisplayMode) => void;
 }
 
 /**
@@ -71,6 +72,8 @@ export function MCPAppsRenderer({
   readResource,
   onSendFollowUp,
   className,
+  displayMode: displayModeProp,
+  onDisplayModeChange,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -91,7 +94,12 @@ export function MCPAppsRenderer({
   const [widgetHtml, setWidgetHtml] = useState<string | null>(null);
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>("inline");
+  const [prefersBorder, setPrefersBorder] = useState<boolean>(true);
+  const [internalDisplayMode, setInternalDisplayMode] =
+    useState<DisplayMode>("inline");
+
+  // Use controlled displayMode if provided, otherwise use internal state
+  const displayMode = displayModeProp ?? internalDisplayMode;
 
   const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
 
@@ -102,6 +110,9 @@ export function MCPAppsRenderer({
 
   // Calculate dimensions based on device type
   const { maxWidth, maxHeight } = useDeviceViewport(deviceType, customViewport);
+
+  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width
+  const inlineMaxWidth = deviceType === "mobile" ? maxWidth : 768;
 
   // Build host context per SEP-1865
   const hostContext = useMcpAppsHostContext({
@@ -131,6 +142,11 @@ export function MCPAppsRenderer({
         // Extract MCP Apps metadata from resource
         const mcpAppsCsp = resourceMeta?.ui?.csp;
         const mcpAppsPermissions = resourceMeta?.ui?.permissions;
+        // Check both MCP Apps and Apps SDK (ChatGPT) metadata paths
+        const mcpAppsPrefersBorder =
+          resourceMeta?.ui?.prefersBorder ?? // MCP Apps protocol
+          resourceMeta?.["openai/widgetPrefersBorder"] ?? // Apps SDK protocol
+          true; // Default to true if not specified
 
         // Detect dev mode from widget metadata (same logic as Apps SDK)
         const widgetMeta = resourceMeta?.["mcp-use/widget"];
@@ -216,6 +232,7 @@ export function MCPAppsRenderer({
         setWidgetHtml(html);
         setWidgetCsp(csp);
         setWidgetPermissions(permissions);
+        setPrefersBorder(mcpAppsPrefersBorder);
 
         // Register widget in debug context
         addWidget(toolCallId, {
@@ -350,7 +367,11 @@ export function MCPAppsRenderer({
 
     bridge.onrequestdisplaymode = async ({ mode }) => {
       const requestedMode = mode ?? "inline";
-      setDisplayMode(requestedMode);
+      if (onDisplayModeChange) {
+        onDisplayModeChange(requestedMode);
+      } else {
+        setInternalDisplayMode(requestedMode);
+      }
       return { mode: requestedMode };
     };
 
@@ -529,7 +550,11 @@ export function MCPAppsRenderer({
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && displayMode === "fullscreen") {
-        setDisplayMode("inline");
+        if (onDisplayModeChange) {
+          onDisplayModeChange("inline");
+        } else {
+          setInternalDisplayMode("inline");
+        }
       }
     };
 
@@ -537,7 +562,7 @@ export function MCPAppsRenderer({
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
-  }, [displayMode]);
+  }, [displayMode, onDisplayModeChange]);
 
   // Handle display mode changes
   const handleDisplayModeChange = useCallback(
@@ -547,19 +572,29 @@ export function MCPAppsRenderer({
           if (containerRef) {
             await containerRef.requestFullscreen();
           }
-          setDisplayMode(mode);
         } else {
           if (document.fullscreenElement) {
             await document.exitFullscreen();
           }
-          setDisplayMode(mode);
+        }
+
+        // Call the callback if provided (controlled), otherwise update internal state
+        if (onDisplayModeChange) {
+          onDisplayModeChange(mode);
+        } else {
+          setInternalDisplayMode(mode);
         }
       } catch (err) {
         console.error("[MCPAppsRenderer] Display mode error:", err);
-        setDisplayMode(mode);
+        // Still update state even on error
+        if (onDisplayModeChange) {
+          onDisplayModeChange(mode);
+        } else {
+          setInternalDisplayMode(mode);
+        }
       }
     },
-    [containerRef]
+    [containerRef, onDisplayModeChange]
   );
 
   // Loading states
@@ -601,7 +636,7 @@ export function MCPAppsRenderer({
       ].join(" ");
     }
 
-    return "mt-3 space-y-2 relative group";
+    return "flex group flex-1 items-center justify-center";
   })();
 
   const iframeStyle: CSSProperties = {
@@ -610,7 +645,7 @@ export function MCPAppsRenderer({
         ? "100%"
         : `${MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT}px`,
     width: "100%",
-    maxWidth: "100%",
+    maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
     transition:
       isFullscreen || isPip
         ? undefined
@@ -664,23 +699,17 @@ export function MCPAppsRenderer({
             onMessage={handleSandboxMessage}
             title={`MCP App: ${toolName}`}
             className={cn(
-              displayMode === "inline" &&
-                `w-full max-w-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_WIDTH}px]`,
+              displayMode === "inline" && "w-full",
               displayMode === "fullscreen" && "w-full h-full rounded-none",
-              displayMode === "pip" && "w-full h-full rounded-lg",
-              "bg-background overflow-hidden border border-zinc-200 dark:border-zinc-700"
+              displayMode === "pip" && "w-full h-full",
+              displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
+              "overflow-hidden",
+              prefersBorder && "border border-zinc-200 dark:border-zinc-700"
             )}
             style={iframeStyle}
           />
         </div>
-
-        <div className="text-[11px] text-zinc-500 dark:text-zinc-400 px-4 pb-2">
-          MCP App: <code className="font-mono">{resourceUri}</code>
-        </div>
       </div>
-
-      {/* Console drawer */}
-      <IframeConsole iframeId={toolCallId} enabled={true} />
     </WidgetWrapper>
   );
 }

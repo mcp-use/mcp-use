@@ -1,42 +1,195 @@
+import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import {
-  ChevronDown,
+  Braces,
   Clock,
   Maximize2,
   Monitor,
+  MousePointer2,
+  Pointer,
   PictureInPicture,
+  Settings,
+  ShieldCheck,
+  ShieldOff,
   Smartphone,
+  SquareDashedMousePointer,
   Tablet,
+  Trash2,
 } from "lucide-react";
-import { TIMEZONE_OPTIONS } from "../constants/debug-options";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { LOCALE_OPTIONS, TIMEZONE_OPTIONS } from "../constants/debug-options";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { useResourceProps, type PropPreset } from "../hooks/useResourceProps";
+import type { LLMConfig } from "./chat/types";
 import { IframeConsole } from "./IframeConsole";
-import { PopoverSelect } from "./ui-playground/shared/PopoverSelect";
+import { PropsConfigDialog } from "./resources/PropsConfigDialog";
 import { SafeAreaInsetsEditor } from "./ui-playground/shared/SafeAreaInsetsEditor";
 import { Button } from "./ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "./ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface MCPAppsDebugControlsProps {
   displayMode: "inline" | "pip" | "fullscreen";
   onDisplayModeChange: (mode: "inline" | "pip" | "fullscreen") => void;
   toolCallId: string;
+  // Props selection
+  propsContext: "tool" | "resource";
+  resourceUri: string;
+  toolInput?: Record<string, unknown>;
+  resourceAnnotations?: Record<string, unknown>;
+  llmConfig?: LLMConfig | null;
+  resource?: Resource | null;
+  onPropsChange?: (props: Record<string, string> | null) => void;
+  // Dual-protocol support
+  protocol?: "apps-sdk" | "mcp-apps";
+  onUpdateGlobals?: (updates: {
+    displayMode?: "inline" | "pip" | "fullscreen";
+    theme?: "light" | "dark";
+    maxHeight?: number;
+    locale?: string;
+    safeArea?: {
+      insets: { top: number; bottom: number; left: number; right: number };
+    };
+    userAgent?: any;
+  }) => void;
 }
+
+const NO_PROPS_VALUE = "__no_props__";
+const TOOL_PROPS_VALUE = "__tool_props__";
+const CREATE_PRESET_VALUE = "__create_preset__";
 
 export function MCPAppsDebugControls({
   displayMode,
   onDisplayModeChange,
   toolCallId,
+  propsContext,
+  resourceUri,
+  toolInput,
+  resourceAnnotations,
+  llmConfig,
+  resource,
+  onPropsChange,
+  protocol = "mcp-apps",
+  onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
   const { playground, updatePlaygroundSettings } = useWidgetDebug();
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
+  const isAppsSdk = protocol === "apps-sdk";
+
+  // Props management
+  const {
+    presets,
+    activePresetId,
+    savePreset,
+    deletePreset,
+    setActivePreset,
+    getActiveProps,
+  } = useResourceProps(resourceUri);
+  const [propsDialogOpen, setPropsDialogOpen] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<PropPreset | null>(null);
+  const [deviceDialogOpen, setDeviceDialogOpen] = useState(false);
+  const [localeDialogOpen, setLocaleDialogOpen] = useState(false);
+  const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
+  const [cspDialogOpen, setCspDialogOpen] = useState(false);
+
+  // Determine default select value based on context
+  const getDefaultSelectValue = useCallback(() => {
+    if (propsContext === "tool" && toolInput) {
+      return TOOL_PROPS_VALUE;
+    }
+    return NO_PROPS_VALUE;
+  }, [propsContext, toolInput]);
+
+  const [selectValue, setSelectValue] = useState<string>(
+    getDefaultSelectValue()
+  );
+
+  // Update select value when active preset changes
+  useEffect(() => {
+    if (activePresetId) {
+      setSelectValue(activePresetId);
+    } else if (
+      selectValue !== NO_PROPS_VALUE &&
+      selectValue !== TOOL_PROPS_VALUE
+    ) {
+      // If no active preset and not a special value, reset to default
+      setSelectValue(getDefaultSelectValue());
+    }
+  }, [activePresetId, selectValue, getDefaultSelectValue]);
+
+  // Notify parent of props changes
+  useEffect(() => {
+    if (!onPropsChange) return;
+
+    if (selectValue === NO_PROPS_VALUE) {
+      onPropsChange(null);
+    } else if (selectValue === TOOL_PROPS_VALUE && toolInput) {
+      // Convert toolInput to string props
+      const stringProps: Record<string, string> = {};
+      Object.entries(toolInput).forEach(([key, value]) => {
+        stringProps[key] = String(value);
+      });
+      onPropsChange(stringProps);
+    } else if (activePresetId) {
+      const props = getActiveProps();
+      onPropsChange(props);
+    }
+  }, [selectValue, activePresetId, toolInput, getActiveProps, onPropsChange]);
+
+  const handleValueChange = (value: string) => {
+    if (value === CREATE_PRESET_VALUE) {
+      setEditingPreset(null);
+      setPropsDialogOpen(true);
+      return;
+    }
+
+    if (value === NO_PROPS_VALUE || value === TOOL_PROPS_VALUE) {
+      setActivePreset(null);
+      setSelectValue(value);
+    } else {
+      setActivePreset(value);
+      setSelectValue(value);
+    }
+  };
+
+  const handleSavePreset = (preset: PropPreset) => {
+    savePreset(preset);
+    setActivePreset(preset.id);
+    setSelectValue(preset.id);
+  };
+
+  const handleDeletePreset = (presetId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const preset = presets.find((p) => p.id === presetId);
+    if (preset) {
+      deletePreset(presetId);
+      toast.success("Preset deleted", {
+        description: `Preset "${preset.name}" has been deleted.`,
+      });
+    }
+  };
+
+  const handleEditPreset = (preset: PropPreset, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingPreset(preset);
+    setPropsDialogOpen(true);
+  };
 
   const getDeviceIcon = () => {
     switch (playground.deviceType) {
@@ -85,187 +238,313 @@ export function MCPAppsDebugControls({
       )}
 
       {/* Device Emulation */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 gap-1"
-          >
-            {getDeviceIcon()}
-            <span className="text-xs">{playground.deviceType}</span>
-            <ChevronDown className="size-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-2">
+      <Dialog open={deviceDialogOpen} onOpenChange={setDeviceDialogOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              >
+                {getDeviceIcon()}
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Device: {playground.deviceType}</TooltipContent>
+        </Tooltip>
+        <DialogContent className="sm:max-w-[300px]">
+          <DialogHeader>
+            <DialogTitle>Device Type</DialogTitle>
+          </DialogHeader>
           <div className="space-y-2">
-            <label className="text-xs font-medium">Device Type</label>
-            <Select
-              value={playground.deviceType}
-              onValueChange={(value: any) =>
-                updatePlaygroundSettings({ deviceType: value })
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="desktop">Desktop</SelectItem>
-                <SelectItem value="mobile">Mobile</SelectItem>
-                <SelectItem value="tablet">Tablet</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
+            {[
+              { value: "desktop", label: "Desktop", icon: Monitor },
+              { value: "mobile", label: "Mobile", icon: Smartphone },
+              { value: "tablet", label: "Tablet", icon: Tablet },
+            ].map((device) => {
+              const Icon = device.icon;
+              return (
+                <Button
+                  key={device.value}
+                  variant={
+                    playground.deviceType === device.value
+                      ? "default"
+                      : "outline"
+                  }
+                  className="w-full justify-start"
+                  onClick={() => {
+                    updatePlaygroundSettings({
+                      deviceType: device.value as any,
+                    });
+                    // Update Apps SDK userAgent.device.type
+                    if (isAppsSdk && onUpdateGlobals) {
+                      onUpdateGlobals({
+                        userAgent: {
+                          device: { type: device.value },
+                          capabilities: playground.capabilities,
+                        },
+                      });
+                    }
+                    setDeviceDialogOpen(false);
+                  }}
+                >
+                  <Icon className="size-4 mr-2" />
+                  {device.label}
+                </Button>
+              );
+            })}
           </div>
-        </PopoverContent>
-      </Popover>
+        </DialogContent>
+      </Dialog>
 
       {/* Locale */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-          >
-            <span className="text-xs">{playground.locale}</span>
-            <ChevronDown className="size-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-48 p-2">
-          <div className="space-y-2">
-            <label className="text-xs font-medium">Locale</label>
-            <Select
-              value={playground.locale}
-              onValueChange={(value) =>
-                updatePlaygroundSettings({ locale: value })
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en-US">English (US)</SelectItem>
-                <SelectItem value="en-GB">English (GB)</SelectItem>
-                <SelectItem value="fr-FR">French</SelectItem>
-                <SelectItem value="de-DE">German</SelectItem>
-                <SelectItem value="ja-JP">Japanese</SelectItem>
-                <SelectItem value="zh-CN">Chinese</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </PopoverContent>
-      </Popover>
+      <Dialog open={localeDialogOpen} onOpenChange={setLocaleDialogOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              >
+                <span className="text-xs font-mono">{playground.locale}</span>
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Locale</TooltipContent>
+        </Tooltip>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Select Locale</DialogTitle>
+          </DialogHeader>
+          <Command>
+            <CommandInput placeholder="Search locales..." />
+            <CommandList>
+              <CommandEmpty>No locale found.</CommandEmpty>
+              <CommandGroup>
+                {LOCALE_OPTIONS.map((locale) => (
+                  <CommandItem
+                    key={locale.value}
+                    value={locale.value}
+                    onSelect={() => {
+                      updatePlaygroundSettings({ locale: locale.value });
+                      // Update Apps SDK locale
+                      if (isAppsSdk && onUpdateGlobals) {
+                        onUpdateGlobals({ locale: locale.value });
+                      }
+                      setLocaleDialogOpen(false);
+                    }}
+                  >
+                    {locale.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </DialogContent>
+      </Dialog>
 
-      {/* Timezone */}
-      <PopoverSelect
-        label="Timezone"
-        value={playground.timeZone}
-        options={TIMEZONE_OPTIONS}
-        onChange={(value) => updatePlaygroundSettings({ timeZone: value })}
-        icon={<Clock className="size-3.5" />}
-      />
+      {/* Timezone - only for MCP Apps (not supported by Apps SDK) */}
+      {!isAppsSdk && (
+        <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                >
+                  <Clock className="size-3.5" />
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
+          </Tooltip>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Select Timezone</DialogTitle>
+            </DialogHeader>
+            <Command>
+              <CommandInput placeholder="Search timezones..." />
+              <CommandList>
+                <CommandEmpty>No timezone found.</CommandEmpty>
+                <CommandGroup>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <CommandItem
+                      key={tz.value}
+                      value={tz.value}
+                      onSelect={() => {
+                        updatePlaygroundSettings({ timeZone: tz.value });
+                        setTimezoneDialogOpen(false);
+                      }}
+                    >
+                      {tz.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* CSP Mode */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-          >
-            <span className="text-xs">
+      {/* CSP Mode - only for MCP Apps (rendering concern, not widget API) */}
+      {!isAppsSdk && (
+        <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                >
+                  {playground.cspMode === "permissive" ? (
+                    <ShieldOff className="size-3.5" />
+                  ) : (
+                    <ShieldCheck className="size-3.5" />
+                  )}
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
               CSP:{" "}
               {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
-            </span>
-            <ChevronDown className="size-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-2">
-          <div className="space-y-2">
-            <label className="text-xs font-medium">CSP Mode</label>
-            <Select
-              value={playground.cspMode}
-              onValueChange={(value: "permissive" | "widget-declared") =>
-                updatePlaygroundSettings({ cspMode: value })
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="permissive">
-                  <div className="flex flex-col items-start">
-                    <span>Permissive</span>
-                    <span className="text-xs text-zinc-500">Development</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="widget-declared">
-                  <div className="flex flex-col items-start">
-                    <span>Widget-Declared</span>
-                    <span className="text-xs text-zinc-500">Production</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </PopoverContent>
-      </Popover>
+            </TooltipContent>
+          </Tooltip>
+          <DialogContent className="sm:max-w-[300px]">
+            <DialogHeader>
+              <DialogTitle>CSP Mode</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Button
+                variant={
+                  playground.cspMode === "permissive" ? "default" : "outline"
+                }
+                className="w-full justify-start"
+                onClick={() => {
+                  updatePlaygroundSettings({ cspMode: "permissive" });
+                  setCspDialogOpen(false);
+                }}
+              >
+                <ShieldOff className="size-4 mr-2" />
+                <div className="flex flex-col items-start">
+                  <span>Permissive</span>
+                  <span className="text-xs opacity-70">Development</span>
+                </div>
+              </Button>
+              <Button
+                variant={
+                  playground.cspMode === "widget-declared"
+                    ? "default"
+                    : "outline"
+                }
+                className="w-full justify-start"
+                onClick={() => {
+                  updatePlaygroundSettings({ cspMode: "widget-declared" });
+                  setCspDialogOpen(false);
+                }}
+              >
+                <ShieldCheck className="size-4 mr-2" />
+                <div className="flex flex-col items-start">
+                  <span>Widget-Declared</span>
+                  <span className="text-xs opacity-70">Production</span>
+                </div>
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* Capabilities (Touch/Cursor) */}
-      <Popover>
-        <PopoverTrigger asChild>
+      {/* Capabilities - Touch */}
+      <Tooltip>
+        <TooltipTrigger asChild>
           <Button
             variant="outline"
             size="sm"
-            className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+            className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
+              playground.capabilities.touch
+                ? "border-blue-500 dark:border-blue-400"
+                : ""
+            }`}
+            onClick={() => {
+              const newCapabilities = {
+                ...playground.capabilities,
+                touch: !playground.capabilities.touch,
+              };
+              updatePlaygroundSettings({
+                capabilities: newCapabilities,
+              });
+              // Update Apps SDK userAgent.capabilities
+              if (isAppsSdk && onUpdateGlobals) {
+                onUpdateGlobals({
+                  userAgent: {
+                    device: { type: playground.deviceType },
+                    capabilities: newCapabilities,
+                  },
+                });
+              }
+            }}
           >
-            <span className="text-xs">
-              {playground.capabilities.touch ? "Touch" : "Cursor"}
-            </span>
-            <ChevronDown className="size-3" />
+            <Pointer
+              className={`size-3.5 ${
+                playground.capabilities.touch
+                  ? "text-blue-600 dark:text-blue-400"
+                  : ""
+              }`}
+            />
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-3">
-          <div className="space-y-3">
-            <label className="text-xs font-medium">Capabilities</label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={playground.capabilities.touch}
-                  onChange={(e) =>
-                    updatePlaygroundSettings({
-                      capabilities: {
-                        ...playground.capabilities,
-                        touch: e.target.checked,
-                      },
-                    })
-                  }
-                  className="rounded"
-                />
-                Touch Support
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={playground.capabilities.hover}
-                  onChange={(e) =>
-                    updatePlaygroundSettings({
-                      capabilities: {
-                        ...playground.capabilities,
-                        hover: e.target.checked,
-                      },
-                    })
-                  }
-                  className="rounded"
-                />
-                Hover Support
-              </label>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
+        </TooltipTrigger>
+        <TooltipContent>
+          Touch: {playground.capabilities.touch ? "Enabled" : "Disabled"}
+        </TooltipContent>
+      </Tooltip>
+
+      {/* Capabilities - Hover */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
+              playground.capabilities.hover
+                ? "border-blue-500 dark:border-blue-400"
+                : ""
+            }`}
+            onClick={() => {
+              const newCapabilities = {
+                ...playground.capabilities,
+                hover: !playground.capabilities.hover,
+              };
+              updatePlaygroundSettings({
+                capabilities: newCapabilities,
+              });
+              // Update Apps SDK userAgent.capabilities
+              if (isAppsSdk && onUpdateGlobals) {
+                onUpdateGlobals({
+                  userAgent: {
+                    device: { type: playground.deviceType },
+                    capabilities: newCapabilities,
+                  },
+                });
+              }
+            }}
+          >
+            <MousePointer2
+              className={`size-3.5 ${
+                playground.capabilities.hover
+                  ? "text-blue-600 dark:text-blue-400"
+                  : ""
+              }`}
+            />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          Hover: {playground.capabilities.hover ? "Enabled" : "Disabled"}
+        </TooltipContent>
+      </Tooltip>
 
       {/* Safe Area */}
       <Popover>
@@ -273,10 +552,9 @@ export function MCPAppsDebugControls({
           <Button
             variant="outline"
             size="sm"
-            className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+            className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
           >
-            <span className="text-xs">Safe Area</span>
-            <ChevronDown className="size-3" />
+            <SquareDashedMousePointer className="size-3.5" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-64 p-3">
@@ -284,16 +562,122 @@ export function MCPAppsDebugControls({
             <label className="text-xs font-medium">Safe Area Insets</label>
             <SafeAreaInsetsEditor
               value={playground.safeAreaInsets}
-              onChange={(insets) =>
-                updatePlaygroundSettings({ safeAreaInsets: insets })
-              }
+              onChange={(insets) => {
+                updatePlaygroundSettings({ safeAreaInsets: insets });
+                // Update Apps SDK safeArea
+                if (isAppsSdk && onUpdateGlobals) {
+                  onUpdateGlobals({ safeArea: { insets } });
+                }
+              }}
             />
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {/* Props Selection */}
+      <Popover>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              >
+                <Braces className="size-3.5" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            Props:{" "}
+            {selectValue === NO_PROPS_VALUE
+              ? "No Props"
+              : selectValue === TOOL_PROPS_VALUE
+                ? "Tool Props"
+                : presets.find((p) => p.id === selectValue)?.name || "Custom"}
+          </TooltipContent>
+        </Tooltip>
+        <PopoverContent className="w-64 p-2">
+          <div className="space-y-1">
+            <Button
+              variant={selectValue === NO_PROPS_VALUE ? "default" : "ghost"}
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => handleValueChange(NO_PROPS_VALUE)}
+            >
+              No Props
+            </Button>
+
+            {propsContext === "tool" && toolInput && (
+              <Button
+                variant={selectValue === TOOL_PROPS_VALUE ? "default" : "ghost"}
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => handleValueChange(TOOL_PROPS_VALUE)}
+              >
+                Props from Tool
+              </Button>
+            )}
+
+            {presets.map((preset) => (
+              <div key={preset.id} className="relative group flex items-center">
+                <Button
+                  variant={selectValue === preset.id ? "default" : "ghost"}
+                  size="sm"
+                  className="w-full justify-start pr-14"
+                  onClick={() => handleValueChange(preset.id)}
+                >
+                  {preset.name}
+                </Button>
+                <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => handleEditPreset(preset, e)}
+                  >
+                    <Settings className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => handleDeletePreset(preset.id, e)}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-primary"
+              onClick={() => handleValueChange(CREATE_PRESET_VALUE)}
+            >
+              + Create Preset...
+            </Button>
           </div>
         </PopoverContent>
       </Popover>
 
       {/* Console - uses IframeConsole drawer like Apps SDK */}
       <IframeConsole iframeId={toolCallId} enabled={true} />
+
+      {/* Props Config Dialog */}
+      {resource && (
+        <PropsConfigDialog
+          open={propsDialogOpen}
+          onOpenChange={setPropsDialogOpen}
+          onSave={handleSavePreset}
+          existingPresets={presets}
+          resource={resource}
+          resourceAnnotations={resourceAnnotations}
+          llmConfig={llmConfig || null}
+          editingPreset={editingPreset}
+        />
+      )}
     </div>
   );
 }

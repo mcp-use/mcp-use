@@ -17,12 +17,12 @@ import {
 import { useState } from "react";
 import { detectWidgetProtocol } from "../../utils/widget-detection";
 import type { LLMConfig } from "../chat/types";
+import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { Spinner } from "../ui/spinner";
-import { PropsSelect } from "./PropsSelect";
 
 export interface ResourceResult {
   uri: string;
@@ -333,20 +333,6 @@ export function ResourceResultDisplay({
       </div>
 
       <div className="flex-1 overflow-y-auto relative">
-        {/* Props selector - top left of content area */}
-        {selectedResource &&
-          (hasMcpAppsResource || hasMcpUIResources || hasOpenAIComponent) &&
-          previewMode && (
-            <div className="absolute top-2 left-2 z-10">
-              <PropsSelect
-                resource={selectedResource}
-                resourceAnnotations={combinedAnnotations}
-                llmConfig={llmConfig || null}
-                onPropsChange={setActiveProps}
-              />
-            </div>
-          )}
-
         {(() => {
           // Priority 1: Handle MCP Apps (SEP-1865)
           if (
@@ -358,7 +344,25 @@ export function ResourceResultDisplay({
             if (previewMode) {
               // MCP Apps mode
               return (
-                <div className="flex-1 h-full">
+                <div className="flex-1 h-full relative">
+                  {/* Floating controls in top-right */}
+                  <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                    <MCPAppsDebugControls
+                      toolCallId={`resource-${result.timestamp}`}
+                      displayMode="inline"
+                      onDisplayModeChange={(mode) => {
+                        console.log("Display mode change:", mode);
+                        // Display mode changes are handled by MCPAppsRenderer internally
+                      }}
+                      propsContext="resource"
+                      resourceUri={result.uri}
+                      resourceAnnotations={combinedAnnotations}
+                      llmConfig={llmConfig || null}
+                      resource={selectedResource || null}
+                      onPropsChange={setActiveProps}
+                    />
+                  </div>
+
                   <MCPAppsRenderer
                     serverId={serverId}
                     toolCallId={`resource-${result.timestamp}`}

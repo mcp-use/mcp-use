@@ -3,16 +3,16 @@
  * Handles JSON-RPC communication between widget iframe and MCP Apps host
  */
 
-import type { Theme, DisplayMode } from "./widget-types.js";
 import {
   createNotification,
   createRequest,
+  type JsonRpcError,
+  type JsonRpcNotification,
   type JsonRpcRequest,
   type JsonRpcResponse,
-  type JsonRpcNotification,
-  type JsonRpcError,
 } from "../server/utils/jsonrpc-helpers.js";
 import { MCP_APPS_BRIDGE_CONFIG } from "./constants.js";
+import type { DisplayMode, Theme } from "./widget-types.js";
 
 // JSON-RPC message types (using imported types with compatible names)
 type JSONRPCRequest = JsonRpcRequest;
@@ -439,6 +439,14 @@ class McpAppsBridge {
   async requestDisplayMode(mode: DisplayMode): Promise<{ mode: DisplayMode }> {
     const result = await this.sendRequest("ui/request-display-mode", { mode });
     return result as { mode: DisplayMode };
+  }
+
+  /**
+   * Notify host about size changes for auto-sizing
+   * Sends ui/notifications/size-changed notification per SEP-1865
+   */
+  sendSizeChanged(params: { width?: number; height?: number }): void {
+    this.sendNotification("ui/notifications/size-changed", params);
   }
 
   /**

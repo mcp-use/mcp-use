@@ -43,6 +43,8 @@ export interface PlaygroundSettings {
   safeAreaInsets: { top: number; right: number; bottom: number; left: number };
   locale: string;
   timeZone: string;
+  // Protocol selection for dual-protocol tools
+  selectedProtocol: "mcp-apps" | "chatgpt-app" | null; // null = use default (MCP Apps priority)
 }
 
 interface WidgetDebugState {
@@ -83,6 +85,7 @@ const DEFAULT_PLAYGROUND_SETTINGS: PlaygroundSettings = {
   safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
   locale: "en-US",
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  selectedProtocol: null, // Default to priority-based selection
 };
 
 /**
