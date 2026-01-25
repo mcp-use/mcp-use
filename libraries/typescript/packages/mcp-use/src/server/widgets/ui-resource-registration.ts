@@ -5,25 +5,30 @@
  * in the MCP server. It creates a unified interface for MCP-UI compatible widgets.
  */
 
+import z from "zod";
 import type {
-  UIResourceDefinition,
+  FlatResourceTemplateDefinition,
+  FlatResourceTemplateDefinitionWithoutCallback,
   ResourceDefinition,
   ResourceDefinitionWithoutCallback,
   ResourceTemplateDefinition,
   ResourceTemplateDefinitionWithoutCallback,
-  FlatResourceTemplateDefinition,
-  FlatResourceTemplateDefinitionWithoutCallback,
   ToolDefinition,
+  UIResourceDefinition,
 } from "../types/index.js";
+import { AppsSdkAdapter, McpAppsAdapter } from "./adapters/index.js";
 import {
-  generateWidgetUri,
-  convertPropsToInputs,
   applyDefaultProps,
+  convertPropsToInputs,
   createWidgetUIResource,
+  generateWidgetUri,
   type WidgetServerConfig,
 } from "./widget-helpers.js";
-import { McpAppsAdapter, AppsSdkAdapter } from "./adapters/index.js";
-import z from "zod";
+import {
+  buildDualProtocolMetadata,
+  generateToolOutput,
+  getBuildIdPart,
+} from "./protocol-helpers.js";
 
 /**
  * Minimal server interface for UI resource registration
@@ -184,40 +189,15 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         const widgetConfig = (toolReg.config as any).widget;
         if (widgetConfig?.name === enrichedDefinition.name) {
           // Tool references this widget - update its metadata with dual-protocol support
-          const buildIdPart = server.buildId ? `-${server.buildId}` : "";
+          const buildIdPart = getBuildIdPart(server.buildId);
           const outputTemplate = `ui://widget/${enrichedDefinition.name}${buildIdPart}.html`;
 
-          const mcpAppsAdapter = new McpAppsAdapter();
-          const appsSdkAdapter = new AppsSdkAdapter();
-
-          // Build both tool and resource metadata
-          const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
+          // Update tool metadata with dual-protocol support
+          toolReg.config._meta = buildDualProtocolMetadata(
             enrichedDefinition,
-            outputTemplate
+            outputTemplate,
+            toolReg.config._meta
           );
-          const mcpAppsResourceMeta =
-            mcpAppsAdapter.buildResourceMetadata(enrichedDefinition);
-          const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
-            enrichedDefinition,
-            outputTemplate
-          );
-          const appsSdkResourceMeta =
-            appsSdkAdapter.buildResourceMetadata(enrichedDefinition);
-
-          // Deep merge the ui metadata
-          const mergedUiMeta = {
-            ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
-            ...(mcpAppsResourceMeta._meta?.ui || {}),
-          };
-
-          // Update tool metadata with dual-protocol support including resource metadata
-          toolReg.config._meta = {
-            ...toolReg.config._meta,
-            ...mcpAppsToolMeta,
-            ...appsSdkToolMeta,
-            ...(appsSdkResourceMeta._meta || {}),
-            ui: mergedUiMeta,
-          };
         }
       }
     }
@@ -385,30 +365,11 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       }
     } else if (enrichedDefinition.type === "mcpApps") {
       // MCP Apps: Generate metadata for BOTH protocols using adapters
-      const mcpAppsAdapter = new McpAppsAdapter();
-      const appsSdkAdapter = new AppsSdkAdapter();
-
-      // Get metadata from both adapters
-      const mcpAppsMeta = mcpAppsAdapter.buildToolMetadata(
-        enrichedDefinition,
-        resourceUri
+      // Build dual-protocol metadata
+      Object.assign(
+        toolMetadata,
+        buildDualProtocolMetadata(enrichedDefinition, resourceUri, toolMetadata)
       );
-      const appsSdkMeta = appsSdkAdapter.buildToolMetadata(
-        enrichedDefinition,
-        resourceUri
-      );
-
-      // Merge both protocol metadata for maximum compatibility
-      // Deep merge the ui object to preserve CSP and other settings from HMR
-      const existingUi = toolMetadata.ui as Record<string, unknown> | undefined;
-      const mcpAppsUi = mcpAppsMeta.ui as Record<string, unknown> | undefined;
-
-      Object.assign(toolMetadata, mcpAppsMeta, appsSdkMeta);
-
-      // Deep merge ui field to preserve CSP, prefersBorder, autoResize from HMR
-      if (existingUi && mcpAppsUi) {
-        toolMetadata.ui = { ...existingUi, ...mcpAppsUi };
-      }
     }
 
     // Determine the input schema - check if props is a Zod schema
@@ -529,28 +490,15 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         };
 
         // Generate tool output (what the model sees)
-        let toolOutputResult;
-        if (enrichedDefinition.toolOutput) {
-          // Use provided toolOutput (function or static)
-          toolOutputResult =
-            typeof enrichedDefinition.toolOutput === "function"
-              ? enrichedDefinition.toolOutput(params)
-              : enrichedDefinition.toolOutput;
-        } else {
-          // Default: text summary
-          toolOutputResult = {
-            content: [
-              {
-                type: "text" as const,
-                text: `Displaying ${displayName}`,
-              },
-            ],
-          };
-        }
+        const toolOutputResult = enrichedDefinition.toolOutput
+          ? typeof enrichedDefinition.toolOutput === "function"
+            ? enrichedDefinition.toolOutput(params)
+            : enrichedDefinition.toolOutput
+          : generateToolOutput(enrichedDefinition, params, displayName);
 
         // Ensure content exists (required by CallToolResult)
         const content = toolOutputResult.content || [
-          { type: "text" as const, text: `Displaying ${displayName}` },
+          { type: "text" as const, text: displayName },
         ];
 
         return {
@@ -605,28 +553,15 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         }
 
         // Generate tool output (what the model sees)
-        let toolOutputResult;
-        if (enrichedDefinition.toolOutput) {
-          // Use provided toolOutput (function or static)
-          toolOutputResult =
-            typeof enrichedDefinition.toolOutput === "function"
-              ? enrichedDefinition.toolOutput(params)
-              : enrichedDefinition.toolOutput;
-        } else {
-          // Default: text summary
-          toolOutputResult = {
-            content: [
-              {
-                type: "text" as const,
-                text: `Displaying ${displayName}`,
-              },
-            ],
-          };
-        }
+        const toolOutputResult = enrichedDefinition.toolOutput
+          ? typeof enrichedDefinition.toolOutput === "function"
+            ? enrichedDefinition.toolOutput(params)
+            : enrichedDefinition.toolOutput
+          : generateToolOutput(enrichedDefinition, params, displayName);
 
         // Ensure content exists (required by CallToolResult)
         const content = toolOutputResult?.content || [
-          { type: "text" as const, text: `Displaying ${displayName}` },
+          { type: "text" as const, text: displayName },
         ];
 
         return {

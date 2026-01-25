@@ -21,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { IFRAME_SANDBOX_PERMISSIONS } from "../../constants/iframe";
 
 export interface SandboxedIframeHandle {
   postMessage: (data: unknown) => void;
@@ -74,7 +75,7 @@ export const SandboxedIframe = forwardRef<
 >(function SandboxedIframe(
   {
     html,
-    sandbox = "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+    sandbox = IFRAME_SANDBOX_PERMISSIONS,
     csp,
     permissions,
     permissive,

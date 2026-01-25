@@ -1,15 +1,19 @@
 import {
+  ChevronDown,
+  Clock,
   Maximize2,
-  PictureInPicture,
   Monitor,
+  PictureInPicture,
   Smartphone,
   Tablet,
-  ChevronDown,
 } from "lucide-react";
-import { Button } from "./ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { IframeConsole } from "./IframeConsole";
+import { TIMEZONE_OPTIONS } from "../constants/debug-options";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { IframeConsole } from "./IframeConsole";
+import { PopoverSelect } from "./ui-playground/shared/PopoverSelect";
+import { SafeAreaInsetsEditor } from "./ui-playground/shared/SafeAreaInsetsEditor";
+import { Button } from "./ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
   Select,
   SelectContent,
@@ -17,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface MCPAppsDebugControlsProps {
   displayMode: "inline" | "pip" | "fullscreen";
@@ -154,41 +158,13 @@ export function MCPAppsDebugControls({
       </Popover>
 
       {/* Timezone */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-          >
-            <span className="text-xs">{playground.timeZone}</span>
-            <ChevronDown className="size-3" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-2">
-          <div className="space-y-2">
-            <label className="text-xs font-medium">Timezone</label>
-            <Select
-              value={playground.timeZone}
-              onValueChange={(value) =>
-                updatePlaygroundSettings({ timeZone: value })
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="America/New_York">New York</SelectItem>
-                <SelectItem value="America/Los_Angeles">Los Angeles</SelectItem>
-                <SelectItem value="Europe/London">London</SelectItem>
-                <SelectItem value="Europe/Paris">Paris</SelectItem>
-                <SelectItem value="Asia/Tokyo">Tokyo</SelectItem>
-                <SelectItem value="UTC">UTC</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </PopoverContent>
-      </Popover>
+      <PopoverSelect
+        label="Timezone"
+        value={playground.timeZone}
+        options={TIMEZONE_OPTIONS}
+        onChange={(value) => updatePlaygroundSettings({ timeZone: value })}
+        icon={<Clock className="size-3.5" />}
+      />
 
       {/* CSP Mode */}
       <Popover>
@@ -245,7 +221,7 @@ export function MCPAppsDebugControls({
             className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
           >
             <span className="text-xs">
-              {playground.capabilities.hasTouch ? "Touch" : "Cursor"}
+              {playground.capabilities.touch ? "Touch" : "Cursor"}
             </span>
             <ChevronDown className="size-3" />
           </Button>
@@ -257,12 +233,12 @@ export function MCPAppsDebugControls({
               <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
-                  checked={playground.capabilities.hasTouch}
+                  checked={playground.capabilities.touch}
                   onChange={(e) =>
                     updatePlaygroundSettings({
                       capabilities: {
                         ...playground.capabilities,
-                        hasTouch: e.target.checked,
+                        touch: e.target.checked,
                       },
                     })
                   }
@@ -273,34 +249,18 @@ export function MCPAppsDebugControls({
               <label className="flex items-center gap-2 text-xs">
                 <input
                   type="checkbox"
-                  checked={playground.capabilities.hasKeyboard}
+                  checked={playground.capabilities.hover}
                   onChange={(e) =>
                     updatePlaygroundSettings({
                       capabilities: {
                         ...playground.capabilities,
-                        hasKeyboard: e.target.checked,
+                        hover: e.target.checked,
                       },
                     })
                   }
                   className="rounded"
                 />
-                Keyboard
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={playground.capabilities.canCopy}
-                  onChange={(e) =>
-                    updatePlaygroundSettings({
-                      capabilities: {
-                        ...playground.capabilities,
-                        canCopy: e.target.checked,
-                      },
-                    })
-                  }
-                  className="rounded"
-                />
-                Copy Support
+                Hover Support
               </label>
             </div>
           </div>
@@ -322,25 +282,12 @@ export function MCPAppsDebugControls({
         <PopoverContent className="w-64 p-3">
           <div className="space-y-2">
             <label className="text-xs font-medium">Safe Area Insets</label>
-            {(["top", "right", "bottom", "left"] as const).map((side) => (
-              <div key={side} className="flex items-center gap-2">
-                <label className="text-xs w-12">{side}</label>
-                <input
-                  type="number"
-                  value={playground.safeAreaInsets[side]}
-                  onChange={(e) =>
-                    updatePlaygroundSettings({
-                      safeAreaInsets: {
-                        ...playground.safeAreaInsets,
-                        [side]: parseInt(e.target.value) || 0,
-                      },
-                    })
-                  }
-                  className="flex-1 h-7 px-2 text-xs rounded border bg-background"
-                  min="0"
-                />
-              </div>
-            ))}
+            <SafeAreaInsetsEditor
+              value={playground.safeAreaInsets}
+              onChange={(insets) =>
+                updatePlaygroundSettings({ safeAreaInsets: insets })
+              }
+            />
           </div>
         </PopoverContent>
       </Popover>

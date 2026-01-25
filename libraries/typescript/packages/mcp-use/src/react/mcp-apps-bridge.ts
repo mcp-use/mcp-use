@@ -4,32 +4,20 @@
  */
 
 import type { Theme, DisplayMode } from "./widget-types.js";
+import {
+  createNotification,
+  createRequest,
+  type JsonRpcRequest,
+  type JsonRpcResponse,
+  type JsonRpcNotification,
+  type JsonRpcError,
+} from "../server/utils/jsonrpc-helpers.js";
+import { MCP_APPS_BRIDGE_CONFIG } from "./constants.js";
 
-// JSON-RPC message types
-interface JSONRPCRequest {
-  jsonrpc: "2.0";
-  id: number | string;
-  method: string;
-  params?: unknown;
-}
-
-interface JSONRPCResponse {
-  jsonrpc: "2.0";
-  id: number | string;
-  result?: unknown;
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
-}
-
-interface JSONRPCNotification {
-  jsonrpc: "2.0";
-  method: string;
-  params?: unknown;
-}
-
+// JSON-RPC message types (using imported types with compatible names)
+type JSONRPCRequest = JsonRpcRequest;
+type JSONRPCResponse = JsonRpcResponse | JsonRpcError;
+type JSONRPCNotification = JsonRpcNotification;
 type JSONRPCMessage = JSONRPCRequest | JSONRPCResponse | JSONRPCNotification;
 
 // Host context from ui/initialize response
@@ -127,13 +115,16 @@ class McpAppsBridge {
 
       // Handle responses
       if ("result" in message || "error" in message) {
-        const pending = this.pendingRequests.get(message.id);
-        if (pending) {
-          this.pendingRequests.delete(message.id);
-          if ("error" in message && message.error) {
-            pending.reject(new Error(message.error.message));
-          } else {
-            pending.resolve(message.result);
+        const response = message as any;
+        if (response.id !== null && response.id !== undefined) {
+          const pending = this.pendingRequests.get(response.id);
+          if (pending) {
+            this.pendingRequests.delete(response.id);
+            if ("error" in response && response.error) {
+              pending.reject(new Error(response.error.message));
+            } else {
+              pending.resolve(response.result);
+            }
           }
         }
         return;
@@ -216,7 +207,7 @@ class McpAppsBridge {
 
     switch (notification.method) {
       case "ui/notifications/tool-input": {
-        const params = notification.params as ToolInputNotification;
+        const params = notification.params as unknown as ToolInputNotification;
         console.log("[MCP Apps Bridge] Tool input received:", params.arguments);
         this.toolInput = params.arguments;
         this.toolInputHandlers.forEach((handler) => handler(params.arguments));
@@ -288,35 +279,33 @@ class McpAppsBridge {
     }
 
     const id = this.requestId++;
-    const message: JSONRPCRequest = {
-      jsonrpc: "2.0",
+    const message = createRequest(
       id,
       method,
-      params,
-    };
+      params as Record<string, unknown> | undefined
+    );
 
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { resolve, reject });
       window.parent.postMessage(message, "*");
 
-      // Timeout after 30s
+      // Timeout
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
           reject(new Error(`Request timeout: ${method}`));
         }
-      }, 30000);
+      }, MCP_APPS_BRIDGE_CONFIG.REQUEST_TIMEOUT);
     });
   }
 
   private sendNotification(method: string, params?: unknown): void {
     if (typeof window === "undefined" || !window.parent) return;
 
-    const message: JSONRPCNotification = {
-      jsonrpc: "2.0",
+    const message = createNotification(
       method,
-      params,
-    };
+      params as Record<string, unknown> | undefined
+    );
 
     window.parent.postMessage(message, "*");
   }
@@ -340,10 +329,10 @@ class McpAppsBridge {
       const result = (await this.sendRequest("ui/initialize", {
         appCapabilities: {},
         appInfo: {
-          name: "mcp-use-widget",
-          version: "1.0.0",
+          name: MCP_APPS_BRIDGE_CONFIG.APP_NAME,
+          version: MCP_APPS_BRIDGE_CONFIG.APP_VERSION,
         },
-        protocolVersion: "2025-06-18",
+        protocolVersion: MCP_APPS_BRIDGE_CONFIG.PROTOCOL_VERSION,
       })) as McpUiInitializeResult;
 
       console.log("[MCP Apps Bridge] Initialize result:", result);

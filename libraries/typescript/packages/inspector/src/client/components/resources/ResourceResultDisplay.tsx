@@ -26,7 +26,7 @@ import { PropsSelect } from "./PropsSelect";
 
 export interface ResourceResult {
   uri: string;
-  result: ReadResourceResult | { error?: string; isError?: boolean };
+  result?: ReadResourceResult | { error?: string; isError?: boolean };
   error?: string;
   timestamp: number;
   // Resource metadata from definition (includes openai/outputTemplate in annotations)
@@ -54,7 +54,7 @@ function extractErrorMessage(
   result: ReadResourceResult | { error?: string; isError?: boolean }
 ): string | null {
   // Handle direct error property
-  if ("error" in result && result.error) {
+  if ("error" in result && result.error && typeof result.error === "string") {
     return result.error;
   }
 
@@ -115,7 +115,12 @@ export function ResourceResultDisplay({
   }
 
   // Also check _meta in contents (this is where OpenAI metadata often appears)
-  if (result?.result?.contents?.[0]?._meta) {
+  if (
+    result?.result &&
+    "contents" in result.result &&
+    Array.isArray(result.result.contents) &&
+    result.result.contents[0]?._meta
+  ) {
     const contentMeta = result.result.contents[0]._meta;
     const metaKeys = Object.keys(contentMeta).filter((key) =>
       key.startsWith("openai/")
@@ -204,7 +209,8 @@ export function ResourceResultDisplay({
   }
 
   // Check for error in result.error or result.result.isError
-  const errorMessage = result.error || extractErrorMessage(result.result);
+  const errorMessage =
+    result.error || (result.result ? extractErrorMessage(result.result) : null);
 
   if (errorMessage) {
     return (
@@ -221,17 +227,22 @@ export function ResourceResultDisplay({
 
   // Check if we have MCP UI resources
   const hasMcpUIResources =
-    result?.result?.contents &&
+    result?.result &&
+    "contents" in result.result &&
     Array.isArray(result.result.contents) &&
     result.result.contents.some(
       (item: any) => item.mimeType && isMcpUIResource(item)
     );
 
-  const mcpUIResources = hasMcpUIResources
-    ? result.result.contents.filter(
-        (item: any) => item.mimeType && isMcpUIResource(item)
-      )
-    : [];
+  const mcpUIResources =
+    hasMcpUIResources &&
+    result.result &&
+    "contents" in result.result &&
+    Array.isArray(result.result.contents)
+      ? result.result.contents.filter(
+          (item: any) => item.mimeType && isMcpUIResource(item)
+        )
+      : [];
 
   return (
     <div className="flex flex-col h-full">
@@ -435,7 +446,8 @@ export function ResourceResultDisplay({
                   {/* Show JSON for non-UI content */}
                   {(() => {
                     if (
-                      result.result.contents &&
+                      result.result &&
+                      "contents" in result.result &&
                       Array.isArray(result.result.contents)
                     ) {
                       const nonUIResources = result.result.contents.filter(

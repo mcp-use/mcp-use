@@ -5,12 +5,12 @@
  * Reuses the same pattern as JsonRpcLoggerView for consistency.
  */
 
+import { AlertTriangle, Copy, Shield } from "lucide-react";
 import { useMemo } from "react";
-import { Shield, AlertTriangle, Copy } from "lucide-react";
-import { useWidgetDebug } from "../../context/WidgetDebugContext";
-import { Button } from "../ui/button";
 import { toast } from "sonner";
+import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import { JSONDisplay } from "../shared/JSONDisplay";
+import { Button } from "../ui/button";
 
 interface CspDebugPanelProps {
   widgetId: string;

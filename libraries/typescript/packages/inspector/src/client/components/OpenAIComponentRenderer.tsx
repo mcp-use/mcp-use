@@ -2,6 +2,7 @@ import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpClient } from "mcp-use/react";
+import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
@@ -928,7 +929,7 @@ function OpenAIComponentRendererBase({
                   ? "100%"
                   : `${iframeHeight}px`,
             }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
             title={`OpenAI Component: ${toolName}`}
             allow="web-share"
           />

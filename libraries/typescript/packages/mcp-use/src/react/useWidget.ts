@@ -11,6 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
+import { WIDGET_DEFAULTS } from "./constants.js";
 import type {
   CallToolResponse,
   DisplayMode,
@@ -541,7 +542,7 @@ export function useWidget<
       device: { type: "desktop" },
       capabilities: { hover: true, touch: false },
     },
-    locale: locale || "en",
+    locale: locale || WIDGET_DEFAULTS.LOCALE,
     timeZone:
       timeZone ||
       (typeof window !== "undefined"

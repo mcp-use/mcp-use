@@ -24,6 +24,15 @@ export interface JsonRpcRequest {
 }
 
 /**
+ * JSON-RPC success response object structure
+ */
+export interface JsonRpcResponse {
+  jsonrpc: "2.0";
+  id: string | number;
+  result?: unknown;
+}
+
+/**
  * JSON-RPC error response object structure
  */
 export interface JsonRpcError {
@@ -87,6 +96,30 @@ export function createRequest(
     id,
     method,
     ...(params && { params }),
+  };
+}
+
+/**
+ * Create a JSON-RPC success response object
+ *
+ * @param id - Request ID
+ * @param result - Result data (optional)
+ * @returns JSON-RPC response object
+ *
+ * @example
+ * ```typescript
+ * const response = createResponse("123", { data: "value" });
+ * const emptyResponse = createResponse("456");
+ * ```
+ */
+export function createResponse(
+  id: string | number,
+  result?: unknown
+): JsonRpcResponse {
+  return {
+    jsonrpc: "2.0" as const,
+    id,
+    ...(result !== undefined && { result }),
   };
 }
 

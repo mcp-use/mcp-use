@@ -8,13 +8,13 @@ import {
 } from "@/client/components/ui/select";
 import { Check, Copy, History, Maximize, Minimize, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { detectWidgetProtocol } from "../../utils/widget-detection";
+import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
+import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
-import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
 
 export interface ToolResult {
   toolName: string;

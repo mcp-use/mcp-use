@@ -9,15 +9,18 @@
  * - Widget state inspection
  */
 
-import { useState, useMemo } from "react";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { useMemo, useState } from "react";
+import { useWidgetDebug } from "../../context/WidgetDebugContext";
+import { detectWidgetProtocol } from "../../utils/widget-detection";
+import { MCPAppsRenderer } from "../MCPAppsRenderer";
+import { JsonRpcLoggerView } from "../logging/JsonRpcLoggerView";
+import { Button } from "../ui/button";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "../ui/resizable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Button } from "../ui/button";
 import {
   Select,
   SelectContent,
@@ -25,12 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { useWidgetDebug } from "../../context/WidgetDebugContext";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
-import { JsonRpcLoggerView } from "../logging/JsonRpcLoggerView";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { CspDebugPanel } from "./CspDebugPanel";
 import { DeviceEmulationControls } from "./DeviceEmulationControls";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
 
 interface UIPlaygroundTabProps {
   tools: Tool[];

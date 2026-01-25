@@ -6,7 +6,7 @@
  */
 
 import type { Hono } from "hono";
-import { storeWidgetData, getWidgetData } from "../shared-utils-browser.js";
+import { getWidgetData, storeWidgetData } from "../shared-utils-browser.js";
 
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 

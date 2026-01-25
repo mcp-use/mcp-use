@@ -14,37 +14,33 @@
  * - Theme context (useTheme)
  */
 
-import {
-  useRef,
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  type CSSProperties,
-} from "react";
+import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type {
+  CallToolResult,
+  JSONRPCMessage,
+} from "@modelcontextprotocol/sdk/types.js";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
-import { useTheme } from "../context/ThemeContext";
-import { cn } from "../lib/utils";
 import {
-  useWidgetDebug,
-  DEVICE_VIEWPORT_CONFIGS,
-} from "../context/WidgetDebugContext";
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { rpcLogBus } from "../../server/rpc-log-bus.js";
+import { consoleLogBus } from "../console-log-bus";
+import { IFRAME_SANDBOX_PERMISSIONS, MCP_APPS_CONFIG } from "../constants";
+import { useTheme } from "../context/ThemeContext";
+import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { useDeviceViewport } from "../hooks/useDeviceViewport";
+import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
+import { cn } from "../lib/utils";
+import { IframeConsole } from "./IframeConsole";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
 import { SandboxedIframe } from "./ui/SandboxedIframe";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
-import { IframeConsole } from "./IframeConsole";
-import { consoleLogBus } from "../console-log-bus";
-import {
-  AppBridge,
-  type McpUiHostContext,
-} from "@modelcontextprotocol/ext-apps/app-bridge";
-import type {
-  JSONRPCMessage,
-  CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { rpcLogBus } from "../../server/rpc-log-bus.js";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
 
@@ -105,57 +101,22 @@ export function MCPAppsRenderer({
   const customViewport = playground.customViewport;
 
   // Calculate dimensions based on device type
-  const { maxWidth, maxHeight } = useMemo(() => {
-    if (deviceType === "custom") {
-      return {
-        maxWidth: customViewport.width,
-        maxHeight: customViewport.height,
-      };
-    }
-    return {
-      maxWidth: DEVICE_VIEWPORT_CONFIGS[deviceType].width,
-      maxHeight: DEVICE_VIEWPORT_CONFIGS[deviceType].height,
-    };
-  }, [deviceType, customViewport]);
+  const { maxWidth, maxHeight } = useDeviceViewport(deviceType, customViewport);
 
   // Build host context per SEP-1865
-  const hostContext = useMemo<McpUiHostContext>(
-    () => ({
-      theme: resolvedTheme,
-      displayMode,
-      availableDisplayModes: ["inline", "pip", "fullscreen"],
-      containerDimensions: { maxHeight, maxWidth },
-      locale: playground.locale,
-      timeZone: playground.timeZone,
-      platform: deviceType === "mobile" ? "mobile" : "web",
-      userAgent: {
-        device: { type: deviceType },
-        capabilities: playground.capabilities,
-      } as any,
-      deviceCapabilities: playground.capabilities,
-      safeAreaInsets: playground.safeAreaInsets,
-      styles: { variables: {} as any },
-      toolInfo: {
-        id: toolCallId,
-        tool: {
-          name: toolName,
-          inputSchema: (toolMetadata?.inputSchema as any) || { type: "object" },
-          description: toolMetadata?.description as string | undefined,
-        },
-      },
-    }),
-    [
-      resolvedTheme,
-      displayMode,
-      maxHeight,
-      maxWidth,
-      playground,
-      deviceType,
-      toolCallId,
-      toolName,
-      toolMetadata,
-    ]
-  );
+  const hostContext = useMcpAppsHostContext({
+    theme: resolvedTheme,
+    displayMode,
+    maxWidth,
+    maxHeight,
+    playground,
+    deviceType,
+    toolCallId,
+    toolName,
+    toolInput,
+    toolOutput,
+    toolMetadata,
+  });
 
   // Fetch widget HTML when component mounts
   useEffect(() => {
@@ -193,7 +154,7 @@ export function MCPAppsRenderer({
 
         // Store widget data including dev URLs
         const storeResponse = await fetch(
-          "/inspector/api/mcp-apps/widget/store",
+          MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_STORE,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -225,8 +186,8 @@ export function MCPAppsRenderer({
 
         // Use dev endpoint in dev mode for live HMR, otherwise use cached content
         const contentEndpoint = computedUseDevMode
-          ? `/inspector/api/mcp-apps/dev-widget-content/${toolCallId}`
-          : `/inspector/api/mcp-apps/widget-content/${toolCallId}`;
+          ? MCP_APPS_CONFIG.API_ENDPOINTS.DEV_WIDGET_CONTENT(toolCallId)
+          : MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_CONTENT(toolCallId);
 
         // Fetch widget content with CSP metadata
         const contentResponse = await fetch(
@@ -301,12 +262,6 @@ export function MCPAppsRenderer({
       },
       async send(message: JSONRPCMessage) {
         // Send through SandboxedIframe which will relay to the proxy and then to guest
-        if (message.method === "ui/notifications/host-context-changed") {
-          console.log(
-            "[MCPAppsRenderer Transport] Sending host-context-changed:",
-            message
-          );
-        }
         sandboxRef.current?.postMessage(message);
 
         // Log sent message
@@ -369,7 +324,7 @@ export function MCPAppsRenderer({
 
       try {
         const result = await server.callTool(name, args || {}, {
-          timeout: 600000, // 10 minutes
+          timeout: MCP_APPS_CONFIG.TIMEOUTS.TOOL_CALL,
           resetTimeoutOnProgress: true,
         });
         return result as CallToolResult;
@@ -640,7 +595,7 @@ export function MCPAppsRenderer({
 
     if (isPip) {
       return [
-        "fixed bottom-6 right-6 z-50 rounded-3xl w-[768px] h-96",
+        `fixed bottom-6 right-6 z-50 rounded-3xl w-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_WIDTH}px] h-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_HEIGHT}px]`,
         "shadow-2xl border overflow-hidden",
         "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
       ].join(" ");
@@ -650,7 +605,10 @@ export function MCPAppsRenderer({
   })();
 
   const iframeStyle: CSSProperties = {
-    height: isFullscreen || isPip ? "100%" : "400px",
+    height:
+      isFullscreen || isPip
+        ? "100%"
+        : `${MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT}px`,
     width: "100%",
     maxWidth: "100%",
     transition:
@@ -699,14 +657,15 @@ export function MCPAppsRenderer({
           <SandboxedIframe
             ref={sandboxRef}
             html={widgetHtml}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
             csp={widgetCsp}
             permissions={widgetPermissions}
             permissive={cspMode === "permissive"}
             onMessage={handleSandboxMessage}
             title={`MCP App: ${toolName}`}
             className={cn(
-              displayMode === "inline" && "w-full max-w-[768px]",
+              displayMode === "inline" &&
+                `w-full max-w-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_WIDTH}px]`,
               displayMode === "fullscreen" && "w-full h-full rounded-none",
               displayMode === "pip" && "w-full h-full rounded-lg",
               "bg-background overflow-hidden border border-zinc-200 dark:border-zinc-700"

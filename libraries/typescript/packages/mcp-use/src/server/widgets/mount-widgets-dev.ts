@@ -6,21 +6,21 @@
  * React/TSX widget files with live reloading during development.
  */
 
-import type { Hono as HonoType, Context, Next } from "hono";
+import type { Context, Hono as HonoType, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
-import { pathHelpers, getCwd, fsHelpers } from "../utils/runtime.js";
+import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
 import {
-  setupPublicRoutes,
-  setupFaviconRoute,
   registerWidgetFromTemplate,
+  setupFaviconRoute,
+  setupPublicRoutes,
 } from "./widget-helpers.js";
 import type {
-  ServerConfig,
   MountWidgetsOptions,
   RegisterWidgetCallback,
-  UpdateWidgetToolCallback,
   RemoveWidgetToolCallback,
+  ServerConfig,
+  UpdateWidgetToolCallback,
 } from "./widget-types.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
