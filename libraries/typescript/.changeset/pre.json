@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.16.2",
     "mcp-use": "1.14.2"
   },
-  "changesets": []
+  "changesets": [
+    "tough-webs-sin"
+  ]
 }
