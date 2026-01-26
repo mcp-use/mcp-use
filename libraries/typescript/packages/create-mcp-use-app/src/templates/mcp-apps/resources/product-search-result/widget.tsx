@@ -31,7 +31,7 @@ const ProductSearchResult: React.FC = () => {
     {
       question: "Demo of the autosize feature",
       answer:
-        "This is a demo of the autosize feature. The widget will automatically resize to fit the content, as supported by the OpenAI apps sdk https://developers.openai.com/apps-sdk/build/mcp-server/",
+        "This is a demo of the autosize feature. The widget will automatically resize to fit the content, as supported by the mcp-apps specification",
     },
   ];
 
@@ -47,11 +47,11 @@ const ProductSearchResult: React.FC = () => {
         ) : (
           <div className="relative bg-surface-elevated border border-default rounded-3xl">
             <div className="p-8">
-              <h5 className="text-secondary mb-1">Apps SDK Template</h5>
+              <h5 className="text-secondary mb-1">MCP-Apps Template</h5>
               <h2 className="heading-xl mb-3">Lovely Little Fruit Shop</h2>
               <p className="text-md">
-                Start building your ChatGPT widget with this mcp-use template.
-                It features the openai apps sdk ui components, dark/light theme
+                Start building your MCP-Apps widget with this mcp-use template.
+                It features the mcp-apps ui components, dark/light theme
                 support, actions like callTool and sendFollowUpMessage, and
                 more.
               </p>
