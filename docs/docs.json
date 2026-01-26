@@ -45,12 +45,17 @@
         "groups": [
           {
             "group": "Welcome",
-            "pages": ["home/index"]
+            "pages": [
+              "home/index"
+            ]
           },
           {
             "group": "Libraries",
             "icon": "library",
-            "pages": ["home/redirects/python", "home/redirects/typescript"]
+            "pages": [
+              "home/redirects/python",
+              "home/redirects/typescript"
+            ]
           },
           {
             "group": "Dev Tools",
@@ -136,7 +141,9 @@
                   {
                     "group": "Authentication",
                     "icon": "shield",
-                    "pages": ["python/server/auth/bearer"]
+                    "pages": [
+                      "python/server/auth/bearer"
+                    ]
                   },
                   "python/server/middleware",
                   "python/server/router",
@@ -429,7 +436,9 @@
             "groups": [
               {
                 "group": "Changelog",
-                "pages": ["python/changelog/changelog"]
+                "pages": [
+                  "python/changelog/changelog"
+                ]
               },
               {
                 "group": "Versions",
@@ -452,7 +461,9 @@
             "groups": [
               {
                 "group": "Community",
-                "pages": ["python/community/showcase"]
+                "pages": [
+                  "python/community/showcase"
+                ]
               }
             ]
           }
@@ -616,7 +627,10 @@
               {
                 "group": "Development",
                 "icon": "folder-code",
-                "pages": ["/inspector/index", "tunneling/index"]
+                "pages": [
+                  "/inspector/index",
+                  "tunneling/index"
+                ]
               }
             ]
           },
@@ -631,7 +645,9 @@
             "groups": [
               {
                 "group": "Changelog",
-                "pages": ["typescript/changelog/changelog"]
+                "pages": [
+                  "typescript/changelog/changelog"
+                ]
               }
             ]
           },
@@ -641,7 +657,9 @@
             "groups": [
               {
                 "group": "Community",
-                "pages": ["python/community/showcase"]
+                "pages": [
+                  "python/community/showcase"
+                ]
               }
             ]
           },
