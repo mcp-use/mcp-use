@@ -94,7 +94,6 @@ export function ToolsTab({
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [requestName, setRequestName] = useState("");
-  const [previewMode, setPreviewMode] = useState(true);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
@@ -489,8 +488,11 @@ export function ToolsTab({
       const toolMeta =
         (selectedTool as any)?._meta || (selectedTool as any)?.metadata;
 
-      // Check tool metadata for Apps SDK component
+      // Check tool metadata for widget resources (MCP Apps or ChatGPT Apps)
+      const mcpAppsResourceUri = toolMeta?.ui?.resourceUri;
       const openaiOutputTemplate = toolMeta?.["openai/outputTemplate"];
+      const widgetResourceUri = mcpAppsResourceUri || openaiOutputTemplate;
+
       let appsSdkResource:
         | {
             uri: string;
@@ -500,7 +502,7 @@ export function ToolsTab({
           }
         | undefined;
 
-      if (openaiOutputTemplate && typeof openaiOutputTemplate === "string") {
+      if (widgetResourceUri && typeof widgetResourceUri === "string") {
         // Create the result entry with loading state first
         const resultEntry: ToolResult = {
           toolName: selectedTool.name,
@@ -510,18 +512,18 @@ export function ToolsTab({
           duration,
           toolMeta,
           appsSdkResource: {
-            uri: openaiOutputTemplate,
+            uri: widgetResourceUri,
             resourceData: null,
             isLoading: true,
           },
         };
 
-        // For Apps SDK components, replace results instead of appending
+        // For widget components, replace results instead of appending
         setResults([resultEntry]);
 
         // Fetch the resource in the background
         try {
-          const resourceData = await readResource(openaiOutputTemplate);
+          const resourceData = await readResource(widgetResourceUri);
 
           // Extract structured content from result
           let structuredContent = null;
@@ -544,7 +546,7 @@ export function ToolsTab({
           }
 
           appsSdkResource = {
-            uri: openaiOutputTemplate,
+            uri: widgetResourceUri,
             resourceData: {
               ...resourceData,
               structuredContent,
@@ -553,7 +555,7 @@ export function ToolsTab({
           };
         } catch (error) {
           appsSdkResource = {
-            uri: openaiOutputTemplate,
+            uri: widgetResourceUri,
             resourceData: null,
             isLoading: false,
             error: error instanceof Error ? error.message : String(error),
@@ -611,8 +613,9 @@ export function ToolsTab({
         toolMeta,
       };
 
-      const isAppsSdkTool = toolMeta?.["openai/outputTemplate"];
-      if (isAppsSdkTool) {
+      const hasWidgetResource =
+        toolMeta?.ui?.resourceUri || toolMeta?.["openai/outputTemplate"];
+      if (hasWidgetResource) {
         setResults([errorResult]);
       } else {
         setResults((prev) => [errorResult, ...prev]);
@@ -867,13 +870,11 @@ export function ToolsTab({
                 <ToolResultDisplay
                   results={filteredResults}
                   copiedResult={copiedResult}
-                  previewMode={previewMode}
                   serverId={serverId}
                   readResource={readResource}
                   onCopy={handleCopyResult}
                   onDelete={handleDeleteResult}
                   onFullscreen={handleFullscreen}
-                  onTogglePreview={() => setPreviewMode(!previewMode)}
                 />
               </motion.div>
             )}
@@ -982,13 +983,11 @@ export function ToolsTab({
               <ToolResultDisplay
                 results={filteredResults}
                 copiedResult={copiedResult}
-                previewMode={previewMode}
                 serverId={serverId}
                 readResource={readResource}
                 onCopy={handleCopyResult}
                 onDelete={handleDeleteResult}
                 onFullscreen={handleFullscreen}
-                onTogglePreview={() => setPreviewMode(!previewMode)}
                 onMaximize={handleMaximize}
                 isMaximized={isMaximized}
               />

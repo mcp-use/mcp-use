@@ -1,43 +1,48 @@
 ---
 title: "<McpUseProvider />"
-description: "Utility component to simplify the setup of your widget"
+description: "Universal provider component for MCP Apps and ChatGPT Apps SDK widgets"
 icon: "layers"
 ---
 
-The `<McpUseProvider />` is a utility component that simplifies the setup of your widget. It automatically includes StrictMode, ThemeProvider, BrowserRouter, optional WidgetControls, and ErrorBoundary, eliminating the need to manually set up these providers.
+The `<McpUseProvider />` is a universal provider component that works with **both** MCP Apps and ChatGPT Apps SDK protocols. It automatically includes StrictMode, ThemeProvider, BrowserRouter, optional WidgetControls, and ErrorBoundary, providing a consistent setup regardless of which protocol your widget is using.
+
+<Info>
+  **Protocol-Agnostic**: This component works identically whether your widget is
+  running in MCP Apps clients or ChatGPT. No conditional logic needed!
+</Info>
 
 ## Import
 
 ```typescript
-import { McpUseProvider } from 'mcp-use/react';
+import { McpUseProvider } from "mcp-use/react";
 ```
 
 ## Props
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `children` | `React.ReactNode` | **required** | The widget content to wrap |
-| `debugger` | `boolean` | `false` | Enable debug button in WidgetControls component |
-| `viewControls` | `boolean \| "pip" \| "fullscreen"` | `false` | Enable view controls (fullscreen/pip). `true` shows both, `"pip"` shows only pip, `"fullscreen"` shows only fullscreen |
-| `autoSize` | `boolean` | `false` | Automatically notify OpenAI about container height changes using ResizeObserver |
+| Prop           | Type                               | Default      | Description                                                                                                            |
+| -------------- | ---------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `children`     | `React.ReactNode`                  | **required** | The widget content to wrap                                                                                             |
+| `debugger`     | `boolean`                          | `false`      | Enable debug button in WidgetControls component                                                                        |
+| `viewControls` | `boolean \| "pip" \| "fullscreen"` | `false`      | Enable view controls (fullscreen/pip). `true` shows both, `"pip"` shows only pip, `"fullscreen"` shows only fullscreen |
+| `autoSize`     | `boolean`                          | `false`      | Automatically notify OpenAI about container height changes using ResizeObserver                                        |
 
 ## What's Included
 
 The `McpUseProvider` automatically wraps your widget with:
 
 1. **StrictMode** (outermost) - React's development mode checks
-2. **ThemeProvider** - Theme management that syncs with ChatGPT
+2. **ThemeProvider** - Protocol-aware theme management (syncs with both MCP Apps and ChatGPT)
 3. **BrowserRouter** - React Router with automatic basename calculation
-4. **WidgetControls** (conditional) - Debug and view controls if enabled
+4. **WidgetControls** (conditional) - Debug and view controls if enabled (works with both protocols)
 5. **ErrorBoundary** (innermost) - Error handling for graceful failures
-6. **Auto-sizing container** (conditional) - ResizeObserver wrapper if `autoSize={true}`
+6. **Auto-sizing container** (conditional) - ResizeObserver wrapper if `autoSize={true}` (adapts to protocol)
 
 ## Basic Usage
 
 ```tsx
-import { McpUseProvider } from 'mcp-use/react';
-import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
-import { Link } from 'react-router';
+import { McpUseProvider } from "mcp-use/react";
+import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/react";
+import { Link } from "react-router";
 
 function MyWidget() {
   return (
@@ -89,14 +94,14 @@ Enable automatic height notifications for dynamic content:
 ## Complete Example
 
 ```tsx
-import { McpUseProvider } from 'mcp-use/react';
-import { AppsSDKUIProvider } from '@openai/apps-sdk-ui/react';
-import { Link } from 'react-router';
-import { useWidget } from 'mcp-use/react';
+import { McpUseProvider } from "mcp-use/react";
+import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/react";
+import { Link } from "react-router";
+import { useWidget } from "mcp-use/react";
 
 function ProductWidget() {
   const { props } = useWidget<{ productName: string }>();
-  
+
   return (
     <div>
       <h1>{props.productName}</h1>
@@ -122,4 +127,3 @@ export default function App() {
 - [`ThemeProvider`](./themeprovider) - Theme management
 - [`ErrorBoundary`](./errorboundary) - Error handling
 - [`useWidget`](./usewidget) - Widget hook for accessing props and actions
-

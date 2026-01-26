@@ -6,17 +6,18 @@
  */
 
 import type { Context, Hono as HonoType } from "hono";
+import { join } from "node:path";
+import { Telemetry } from "../../telemetry/index.js";
+import { generateLandingPage } from "../landing.js";
 import type { SessionData } from "../sessions/index.js";
 import {
-  startIdleCleanup,
+  FileSystemSessionStore,
   InMemorySessionStore,
   InMemoryStreamManager,
-  FileSystemSessionStore,
+  startIdleCleanup,
 } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
-import { Telemetry } from "../../telemetry/index.js";
-import { join } from "node:path";
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -84,6 +85,28 @@ export async function mountMcp(
 
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
+    // Detect browser GET requests and return landing page
+    if (c.req.method === "GET") {
+      const acceptHeader = c.req.header("Accept") || "";
+      const isBrowser =
+        acceptHeader.includes("text/html") ||
+        (!acceptHeader.includes("application/json") &&
+          !acceptHeader.includes("text/event-stream"));
+
+      if (isBrowser) {
+        const landingPage = generateLandingPage(
+          config.name,
+          config.version,
+          c.req.url,
+          config.description
+        );
+        return new Response(landingPage, {
+          status: 200,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
+    }
+
     // Auto-detect mode based on Accept header
     // Per MCP spec: clients that support SSE will send Accept: text/event-stream
     // Clients that don't (k6, curl, etc.) should work in stateless mode

@@ -450,6 +450,18 @@ export interface WidgetData {
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
   theme?: "light" | "dark";
+  // Playground settings for initializing window.openai
+  playground?: {
+    locale?: string;
+    deviceType?: "mobile" | "tablet" | "desktop";
+    capabilities?: { hover: boolean; touch: boolean };
+    safeAreaInsets?: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    };
+  };
 }
 
 const widgetDataStore = new Map<string, WidgetData>();

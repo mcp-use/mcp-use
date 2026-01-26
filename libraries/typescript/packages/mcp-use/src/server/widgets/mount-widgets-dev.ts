@@ -6,21 +6,21 @@
  * React/TSX widget files with live reloading during development.
  */
 
-import type { Hono as HonoType, Context, Next } from "hono";
+import type { Context, Hono as HonoType, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
-import { pathHelpers, getCwd } from "../utils/runtime.js";
+import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
 import {
-  setupPublicRoutes,
-  setupFaviconRoute,
   registerWidgetFromTemplate,
+  setupFaviconRoute,
+  setupPublicRoutes,
 } from "./widget-helpers.js";
 import type {
-  ServerConfig,
   MountWidgetsOptions,
   RegisterWidgetCallback,
-  UpdateWidgetToolCallback,
   RemoveWidgetToolCallback,
+  ServerConfig,
+  UpdateWidgetToolCallback,
 } from "./widget-types.js";
 
 const TMP_MCP_USE_DIR = ".mcp-use";
@@ -232,6 +232,11 @@ if (container && Component) {
 }
 `;
 
+    // Include Vite client and React refresh preamble explicitly
+    // This is needed when loading in sandboxed iframes where auto-injection may not work
+    // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
+    // when trying to resolve these paths as file paths during HTML analysis
+    const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
     const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -243,10 +248,18 @@ if (container && Component) {
     <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
+    <script type="module" src="${fullBaseUrl}/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '${fullBaseUrl}/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
+    <script type="module" src="${fullBaseUrl}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 
@@ -461,6 +474,8 @@ if (container && Component) {
 }
 `;
 
+        // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
+        const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
         const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -472,10 +487,18 @@ if (container && Component) {
     <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
+    <script type="module" src="${fullBaseUrl}/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '${fullBaseUrl}/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
   </head>
   <body>
     <div id="widget-root"></div>
-    <script type="module" src="${baseRoute}/${slugifiedName}/entry.tsx"></script>
+    <script type="module" src="${fullBaseUrl}/${slugifiedName}/entry.tsx"></script>
   </body>
 </html>`;
 
@@ -543,16 +566,59 @@ if (container && Component) {
         if (isHmrUpdate) {
           const schemaField = metadata.props || metadata.inputs;
 
-          // Use the update callback to update tool in place
+          // Import helpers for widget registration
+          const { slugifyWidgetName, processWidgetHtml } =
+            await import("./widget-helpers.js");
+
+          // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
+          const widgetType = metadata.metadata ? "mcpApps" : "appsSdk";
+          const slugifiedName = slugifyWidgetName(widgetName);
+
+          // Debug logging
+          console.log(
+            `[WIDGET-HMR] ${widgetName} - Type: ${widgetType}, Has metadata: ${!!metadata.metadata}`
+          );
+
+          // Re-read and process HTML for the update
+          const htmlPath = pathHelpers.join(
+            tempDir,
+            slugifiedName,
+            "index.html"
+          );
+          let html = "";
+          try {
+            html = await fsHelpers.readFileSync(htmlPath);
+            html = processWidgetHtml(
+              html,
+              widgetName,
+              serverConfig.serverBaseUrl
+            );
+          } catch (e) {
+            console.warn(
+              `[WIDGET-HMR] Failed to read HTML for ${widgetName}:`,
+              e
+            );
+          }
+
+          // Use the update callback to update tool in place with complete metadata
           // Pass the raw Zod schema - the server will convert it internally
           updateWidgetTool(widgetName, {
             description: metadata.description || `Widget: ${widgetName}`,
             schema: schemaField,
             _meta: {
               "mcp-use/widget": {
+                name: widgetName,
+                slugifiedName: slugifiedName,
+                title: metadata.title || widgetName,
                 description: metadata.description,
-                props: metadata.props,
+                type: widgetType,
+                props: schemaField,
+                html: html,
+                dev: true,
+                exposeAsTool: metadata.exposeAsTool ?? true,
               },
+              // Include unified metadata for dual-protocol support (MCP Apps)
+              ...(metadata.metadata ? { ui: metadata.metadata } : {}),
             },
           });
           return;
@@ -732,10 +798,51 @@ export default PostHog;
     },
   };
 
+  // Plugin to patch Zod's JIT compilation to prevent CSP eval violations
+  // This is needed because Zod 4.x uses new Function() for JIT compilation
+  // which violates strict CSP in sandboxed iframes (MCP Apps hosts)
+  // See: https://github.com/colinhacks/zod/issues/4461
+  const zodJitlessPlugin = {
+    name: "zod-jitless",
+    enforce: "pre" as const,
+    transform(code: string, id: string) {
+      // Only transform Zod core files
+      if (!id.includes("zod") || !id.includes("core")) {
+        return null;
+      }
+
+      // Patch globalConfig = {} to globalConfig = { jitless: true }
+      // In non-minified source, the pattern is straightforward
+      const zodConfigPatterns = [
+        /export\s+const\s+globalConfig\s*=\s*\{\s*\}/g,
+        /const\s+globalConfig\s*=\s*\{\s*\}/g,
+      ];
+
+      let transformed = code;
+      let patched = false;
+
+      for (const pattern of zodConfigPatterns) {
+        // Reset lastIndex for global regex before test
+        pattern.lastIndex = 0;
+        if (pattern.test(transformed)) {
+          // Reset again before replace
+          pattern.lastIndex = 0;
+          transformed = transformed.replace(pattern, (match) =>
+            match.replace(/=\s*\{\s*\}/, "={ jitless: true }")
+          );
+          patched = true;
+        }
+      }
+
+      return patched ? transformed : null;
+    },
+  };
+
   const viteServer = await createServer({
     root: tempDir,
     base: baseRoute + "/",
     plugins: [
+      zodJitlessPlugin,
       nodeStubsPlugin,
       ssrCssPlugin,
       watchResourcesPlugin,
@@ -746,6 +853,13 @@ export default PostHog;
       alias: {
         "@": pathHelpers.join(getCwd(), resourcesDir),
       },
+    },
+    build: {
+      // Disable source maps to avoid CSP eval violations
+      // Source maps can use eval-based mappings which violate strict CSP
+      sourcemap: false,
+      // Minify for production builds
+      minify: "esbuild",
     },
     server: {
       middlewareMode: true,

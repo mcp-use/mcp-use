@@ -8,6 +8,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import open from "open";
+import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
@@ -149,6 +150,12 @@ async function waitForServer(
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;
+}
+
+// Helper to normalize host for browser connections
+// 0.0.0.0 is valid for server binding but browsers cannot connect to it
+function normalizeBrowserHost(host: string): string {
+  return host === "0.0.0.0" ? "localhost" : host;
 }
 
 // Helper to run a command
@@ -314,8 +321,10 @@ async function findServerFile(projectPath: string): Promise<string> {
 }
 
 async function buildWidgets(
-  projectPath: string
+  projectPath: string,
+  options: { inline?: boolean } = {}
 ): Promise<Array<{ name: string; metadata: any }>> {
+  const { inline = true } = options; // Default to true for VS Code compatibility
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
   const resourcesDir = path.join(projectPath, "resources");
@@ -376,7 +385,11 @@ async function buildWidgets(
     return [];
   }
 
-  console.log(chalk.gray(`Building ${entries.length} widget(s)...`));
+  console.log(
+    chalk.gray(
+      `Building ${entries.length} widget(s)${inline ? " (inline mode for VS Code compatibility)" : ""}...`
+    )
+  );
 
   const react = (await import("@vitejs/plugin-react")).default;
   // @ts-ignore - @tailwindcss/vite may not have type declarations
@@ -708,21 +721,39 @@ export default {
         },
       };
 
+      // Build plugins array - add viteSingleFile when inlining for VS Code compatibility
+      const buildPlugins = inline
+        ? [
+            buildNodeStubsPlugin,
+            tailwindcss(),
+            react(),
+            viteSingleFile({ removeViteModuleLoader: true }),
+          ]
+        : [buildNodeStubsPlugin, tailwindcss(), react()];
+
       await build({
         root: tempDir,
         base: baseUrl,
-        plugins: [buildNodeStubsPlugin, tailwindcss(), react()],
-        experimental: {
-          renderBuiltUrl: (filename: string, { hostType }) => {
-            if (["js", "css"].includes(hostType)) {
-              return {
-                runtime: `window.__getFile(${JSON.stringify(filename)})`,
-              };
-            } else {
-              return { relative: true };
-            }
-          },
-        },
+        plugins: buildPlugins,
+        // Only use renderBuiltUrl for non-inline builds (external assets need runtime URL resolution)
+        ...(inline
+          ? {}
+          : {
+              experimental: {
+                renderBuiltUrl: (
+                  filename: string,
+                  { hostType }: { hostType: string }
+                ) => {
+                  if (["js", "css"].includes(hostType)) {
+                    return {
+                      runtime: `window.__getFile(${JSON.stringify(filename)})`,
+                    };
+                  } else {
+                    return { relative: true };
+                  }
+                },
+              },
+            }),
         resolve: {
           alias: {
             "@": resourcesDir,
@@ -735,6 +766,18 @@ export default {
         build: {
           outDir,
           emptyOutDir: true,
+          // Disable source maps to avoid CSP eval violations
+          // Source maps can use eval-based mappings which break strict CSP policies
+          sourcemap: false,
+          // Minify for smaller bundle size
+          minify: "esbuild",
+          // For inline builds, disable CSS code splitting and inline all assets
+          ...(inline
+            ? {
+                cssCodeSplit: false,
+                assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
+              }
+            : {}),
           rollupOptions: {
             input: path.join(tempDir, "index.html"),
             external: (id) => {
@@ -744,6 +787,54 @@ export default {
           },
         },
       });
+
+      // Post-process JS bundles to patch Zod's JIT compilation
+      // This prevents CSP eval violations in sandboxed iframes (MCP Apps hosts)
+      // See: https://github.com/colinhacks/zod/issues/4461
+      try {
+        const assetsDir = path.join(outDir, "assets");
+        const assetFiles = await fs.readdir(assetsDir);
+        const jsFiles = assetFiles.filter((f) => f.endsWith(".js"));
+
+        for (const jsFile of jsFiles) {
+          const jsPath = path.join(assetsDir, jsFile);
+          let content = await fs.readFile(jsPath, "utf8");
+
+          // Patch Zod's globalConfig to disable JIT compilation
+          // Zod 4.x uses: const globalConfig={};function config(o){return globalConfig}
+          // After minification: const X={};function Y(o){return X}
+          // We match the pattern where an empty object const is followed by a function returning it
+          const zodConfigPatterns = [
+            // Non-minified: export const globalConfig = {}
+            /export\s+const\s+globalConfig\s*=\s*\{\s*\}/g,
+            // Minified pattern: ZodEncodeError"}}const X={};function followed by return X
+            // This is the unique signature of Zod's globalConfig
+            /ZodEncodeError[^}]*\}\}const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\{\s*\}/g,
+          ];
+
+          let patched = false;
+          for (const pattern of zodConfigPatterns) {
+            if (pattern.test(content)) {
+              // Reset lastIndex for global regex
+              pattern.lastIndex = 0;
+              content = content.replace(pattern, (match) => {
+                return match.replace(/=\s*\{\s*\}/, "={jitless:true}");
+              });
+              patched = true;
+            }
+          }
+
+          if (patched) {
+            await fs.writeFile(jsPath, content, "utf8");
+            console.log(chalk.gray(`    → Patched Zod JIT in ${jsFile}`));
+          }
+        }
+      } catch (error) {
+        // Assets directory might not exist for some builds, that's okay
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          console.warn(chalk.yellow(`    ⚠ Failed to patch Zod JIT: ${error}`));
+        }
+      }
 
       // Post-process HTML for static deployments (e.g., Supabase)
       // If MCP_SERVER_URL is set, inject window globals at build time
@@ -821,6 +912,11 @@ program
   .description("Build TypeScript and MCP UI widgets")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
   .option("--with-inspector", "Include inspector in production build")
+  .option(
+    "--inline",
+    "Inline all JS/CSS into HTML (required for VS Code MCP Apps)"
+  )
+  .option("--no-inline", "Keep JS/CSS as separate files (default)")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -829,7 +925,10 @@ program
       displayPackageVersions(projectPath);
 
       // Build widgets first (this generates schemas)
-      const builtWidgets = await buildWidgets(projectPath);
+      // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
+      const builtWidgets = await buildWidgets(projectPath, {
+        inline: options.inline ?? false,
+      });
 
       // Then run tsc (now schemas are available for import)
       console.log(chalk.gray("Building TypeScript..."));
@@ -913,7 +1012,11 @@ program
   .description("Run development server with auto-reload and inspector")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
   .option("--port <port>", "Server port", "3000")
-  .option("--host <host>", "Server host", "localhost")
+  .option(
+    "--host <host>",
+    "Server host (use 0.0.0.0 to listen on all interfaces)",
+    "0.0.0.0"
+  )
   .option("--no-open", "Do not auto-open inspector")
   .option("--no-hmr", "Disable hot module reloading (use tsx watch instead)")
   // .option('--tunnel', 'Expose server through a tunnel')
@@ -1000,12 +1103,15 @@ program
           const startTime = Date.now();
           const ready = await waitForServer(port, host);
           if (ready) {
-            const mcpEndpoint = `http://${host}:${port}/mcp`;
-            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const browserHost = normalizeBrowserHost(host);
+            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(
+              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+            );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
@@ -1127,12 +1233,15 @@ program
         if (options.open !== false) {
           const ready = await waitForServer(port, host);
           if (ready) {
-            const mcpEndpoint = `http://${host}:${port}/mcp`;
-            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const browserHost = normalizeBrowserHost(host);
+            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(
+              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+            );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));

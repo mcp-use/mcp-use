@@ -7,6 +7,7 @@ import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import type { McpContext } from "./context.js";
+import type { UnifiedWidgetMetadata } from "../widgets/adapters/types.js";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -418,13 +419,36 @@ export interface AppsSdkUIResource extends BaseUIResourceDefinition {
 }
 
 /**
+ * MCP Apps UI resource - Official MCP Apps Extension (SEP-1865) compatible widget
+ *
+ * This type follows the official MCP Apps Extension pattern:
+ * - Uses text/html;profile=mcp-app mime type
+ * - Dual-protocol support: works with both ChatGPT and MCP Apps clients
+ * - Unified metadata format that adapters transform to protocol-specific formats
+ * - Supports MCP Apps CSP, widget preferences, and other metadata
+ *
+ * @see https://github.com/modelcontextprotocol/ext-apps
+ * @see https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/
+ */
+export interface McpAppsUIResource extends BaseUIResourceDefinition {
+  type: "mcpApps";
+  /** HTML template content - the component that will be rendered */
+  htmlTemplate: string;
+  /** Unified metadata that works with both protocols (follows SEP-1865 + ChatGPT extensions) */
+  metadata?: UnifiedWidgetMetadata;
+  /** Optional: Apps SDK-specific metadata for advanced ChatGPT features */
+  appsSdkMetadata?: AppsSdkMetadata;
+}
+
+/**
  * Discriminated union of all UI resource types
  */
 export type UIResourceDefinition =
   | ExternalUrlUIResource
   | RawHtmlUIResource
   | RemoteDomUIResource
-  | AppsSdkUIResource;
+  | AppsSdkUIResource
+  | McpAppsUIResource;
 
 export interface WidgetConfig {
   /** Widget directory name */

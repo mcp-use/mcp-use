@@ -8,9 +8,22 @@ MCP-UI Resources enable you to build rich, interactive user interfaces that work
 
 MCP-UI resources follow the proposed MCP-UI specification [here](https://github.com/idosal/mcp-ui/blob/main/SPEC.md).
 
-<Warning>
-The MCP-UI resources are not directly related to the Apps SDK widgets, we recommend using the [Apps SDK widgets](/typescript/server/ui-widgets) instead.
-</Warning>
+## Choosing the Right Widget System
+
+mcp-use supports three widget systems. Choose based on your needs:
+
+| System                                                | Use When                       | Interactivity                      | ChatGPT Support        | MCP Apps Support  |
+| ----------------------------------------------------- | ------------------------------ | ---------------------------------- | ---------------------- | ----------------- |
+| **[MCP Apps](/typescript/server/mcp-apps)**           | You want maximum compatibility | Full React with state & tool calls | ✅ Yes (dual-protocol) | ✅ Yes (standard) |
+| **[ChatGPT Apps SDK](/typescript/server/ui-widgets)** | ChatGPT-only features needed   | Full React with state & tool calls | ✅ Yes (native)        | ❌ No             |
+| **MCP UI** (this page)                                | Simple, static content         | Limited (mostly display)           | ❌ No                  | ✅ Yes            |
+
+<Note>
+**Recommended**: For new projects with interactive widgets, use [MCP Apps](/typescript/server/mcp-apps) with `type: "mcpApps"` to get dual-protocol support. Your widgets will work in both ChatGPT and MCP Apps clients.
+
+**MCP UI is best for**: Simple content display, read-only views, or lightweight embeds where full React isn't needed.
+
+</Note>
 
 ## Resource Types
 
@@ -20,44 +33,46 @@ Iframe-based widgets served from your MCP server
 
 Check an example here [mcp-ui-example](https://github.com/idosal/mcp-ui/tree/main/examples/server/mcp-ui)
 
-
 ```typescript
 server.uiResource({
-  type: 'externalUrl',
-  name: 'dashboard',
-  widget: 'analytics-dashboard',
-  title: 'Analytics Dashboard',
-  description: 'Real-time analytics visualization',
+  type: "externalUrl",
+  name: "dashboard",
+  widget: "analytics-dashboard",
+  title: "Analytics Dashboard",
+  description: "Real-time analytics visualization",
   props: {
     timeRange: {
-      type: 'string',
-      description: 'Time range for data',
+      type: "string",
+      description: "Time range for data",
       required: false,
-      default: '7d'
+      default: "7d",
     },
     metric: {
-      type: 'string',
-      description: 'Metric to display',
+      type: "string",
+      description: "Metric to display",
       required: false,
-      default: 'revenue'
-    }
+      default: "revenue",
+    },
   },
-  size: ['800px', '600px'],
+  size: ["800px", "600px"],
   annotations: {
-    audience: ['user'],
-    priority: 0.9
-  }
-})
+    audience: ["user"],
+    priority: 0.9,
+  },
+});
 ```
 
 **Characteristics:**
+
 - Served as standalone HTML pages
 - Isolated in iframes for security
 - Can include external resources
 - Full JavaScript capabilities
 
 <Tip>
-External URLs are automatically built and configured by the `setupWidgetRoutes` function in `mcp-use/server`. Routes are generated based on your widget definitions without manual setup.
+  External URLs are automatically built and configured by the
+  `setupWidgetRoutes` function in `mcp-use/server`. Routes are generated based
+  on your widget definitions without manual setup.
 </Tip>
 
 ### 2. Raw HTML Resources
@@ -68,10 +83,10 @@ Check an example here [mcp-ui-example](https://github.com/mcp-use/mcp-use/blob/m
 
 ```typescript
 server.uiResource({
-  type: 'rawHtml',
-  name: 'simple_form',
-  title: 'Contact Form',
-  description: 'Simple contact form',
+  type: "rawHtml",
+  name: "simple_form",
+  title: "Contact Form",
+  description: "Simple contact form",
   htmlString: `
     <!DOCTYPE html>
     <html>
@@ -123,11 +138,12 @@ server.uiResource({
     </body>
     </html>
   `,
-  size: ['400px', '500px']
-})
+  size: ["400px", "500px"],
+});
 ```
 
 **Characteristics:**
+
 - Renders inline without iframe
 - Simpler but less isolated
 - Good for basic interactions
@@ -141,11 +157,11 @@ Check an example here [mcp-ui-example](https://github.com/mcp-use/mcp-use/blob/m
 
 ```typescript
 server.uiResource({
-  type: 'remoteDom',
-  name: 'interactive_chart',
-  title: 'Interactive Chart',
-  description: 'Dynamic data visualization',
-  remoteDomFramework: 'react',
+  type: "remoteDom",
+  name: "interactive_chart",
+  title: "Interactive Chart",
+  description: "Dynamic data visualization",
+  remoteDomFramework: "react",
   remoteDomCode: `
     function ChartWidget() {
       const [data, setData] = React.useState([]);
@@ -189,15 +205,16 @@ server.uiResource({
   `,
   props: {
     refreshInterval: {
-      type: 'number',
-      description: 'Refresh interval in seconds',
-      default: 60
-    }
-  }
-})
+      type: "number",
+      description: "Refresh interval in seconds",
+      default: 60,
+    },
+  },
+});
 ```
 
 **Characteristics:**
+
 - Dynamic JavaScript execution
 - React/Vue/vanilla JS support
 - Real-time updates possible
@@ -215,71 +232,70 @@ my-mcp-server/
    └── server.ts
 ```
 
-
 ### Example: Kanban Board Widget
 
 ```tsx
 // resources/kanban-board.tsx
-import React, { useState, useEffect } from 'react'
-import './kanban-board.css'
+import React, { useState, useEffect } from "react";
+import "./kanban-board.css";
 
 interface Task {
-  id: string
-  title: string
-  description: string
-  status: 'todo' | 'in-progress' | 'done'
-  priority: 'low' | 'medium' | 'high'
-  assignee?: string
+  id: string;
+  title: string;
+  description: string;
+  status: "todo" | "in-progress" | "done";
+  priority: "low" | "medium" | "high";
+  assignee?: string;
 }
 
 export default function KanbanBoard() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [draggedTask, setDraggedTask] = useState<string | null>(null)
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [draggedTask, setDraggedTask] = useState<string | null>(null);
 
   // Parse URL parameters
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const initialTasks = params.get('tasks')
+    const params = new URLSearchParams(window.location.search);
+    const initialTasks = params.get("tasks");
     if (initialTasks) {
       try {
-        setTasks(JSON.parse(initialTasks))
+        setTasks(JSON.parse(initialTasks));
       } catch (e) {
-        console.error('Failed to parse initial tasks')
+        console.error("Failed to parse initial tasks");
       }
     }
-  }, [])
+  }, []);
 
   const handleDragStart = (taskId: string) => {
-    setDraggedTask(taskId)
-  }
+    setDraggedTask(taskId);
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
+    e.preventDefault();
+  };
 
-  const handleDrop = (e: React.DragEvent, newStatus: Task['status']) => {
-    e.preventDefault()
-    if (!draggedTask) return
+  const handleDrop = (e: React.DragEvent, newStatus: Task["status"]) => {
+    e.preventDefault();
+    if (!draggedTask) return;
 
-    setTasks(tasks.map(task =>
-      task.id === draggedTask
-        ? { ...task, status: newStatus }
-        : task
-    ))
-    setDraggedTask(null)
-  }
+    setTasks(
+      tasks.map((task) =>
+        task.id === draggedTask ? { ...task, status: newStatus } : task,
+      ),
+    );
+    setDraggedTask(null);
+  };
 
-  const columns: { status: Task['status']; title: string }[] = [
-    { status: 'todo', title: 'To Do' },
-    { status: 'in-progress', title: 'In Progress' },
-    { status: 'done', title: 'Done' }
-  ]
+  const columns: { status: Task["status"]; title: string }[] = [
+    { status: "todo", title: "To Do" },
+    { status: "in-progress", title: "In Progress" },
+    { status: "done", title: "Done" },
+  ];
 
   return (
     <div className="kanban-board">
       <h1>Project Tasks</h1>
       <div className="columns">
-        {columns.map(column => (
+        {columns.map((column) => (
           <div
             key={column.status}
             className="column"
@@ -289,8 +305,8 @@ export default function KanbanBoard() {
             <h2>{column.title}</h2>
             <div className="tasks">
               {tasks
-                .filter(task => task.status === column.status)
-                .map(task => (
+                .filter((task) => task.status === column.status)
+                .map((task) => (
                   <div
                     key={task.id}
                     className={`task priority-${task.priority}`}
@@ -309,7 +325,7 @@ export default function KanbanBoard() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 ```
 
@@ -318,7 +334,7 @@ export default function KanbanBoard() {
 ```css
 /* resources/kanban-board.css */
 .kanban-board {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 20px;
   background: #f5f5f5;
   min-height: 100vh;
@@ -356,7 +372,7 @@ export default function KanbanBoard() {
 
 .task:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .task.priority-high {
@@ -381,7 +397,6 @@ export default function KanbanBoard() {
   margin-top: 8px;
 }
 ```
-
 
 ## Next Steps
 

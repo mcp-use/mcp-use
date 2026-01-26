@@ -1,4 +1,4 @@
-import { MCPServer } from "mcp-use/server";
+import { MCPServer, object, text } from "mcp-use/server";
 import { z } from "zod";
 
 // Create MCP server instance
@@ -52,14 +52,9 @@ server.tool(
     const response = await fetch(`https://wttr.in/${city}?format=j1`);
     const data: any = await response.json();
     const current = data.current_condition[0];
-    return {
-      content: [
-        {
-          type: "text",
-          text: `The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`,
-        },
-      ],
-    };
+    return text(
+      `The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`
+    );
   }
 );
 
@@ -67,24 +62,18 @@ server.tool(
  * Define MCP resources
  * Docs: https://mcp-use.com/docs/typescript/server/resources
  */
-server.resource({
-  name: "config",
-  uri: "config://settings",
-  mimeType: "application/json",
-  description: "Server configuration",
-  readCallback: async () => ({
-    contents: [
-      {
-        uri: "config://settings",
-        mimeType: "application/json",
-        text: JSON.stringify({
-          theme: "dark",
-          language: "en",
-        }),
-      },
-    ],
-  }),
-});
+server.resource(
+  {
+    name: "config",
+    uri: "config://settings",
+    description: "Server configuration",
+  },
+  async () =>
+    object({
+      theme: "dark",
+      language: "en",
+    })
+);
 
 /*
  * Define MCP prompts
@@ -94,21 +83,12 @@ server.prompt(
   {
     name: "review-code",
     description: "Review code for best practices and potential issues",
-    args: [{ name: "code", type: "string", required: true }],
+    schema: z.object({
+      code: z.string().describe("The code to review"),
+    }),
   },
-  async (params: Record<string, any>) => {
-    const { code } = params;
-    return {
-      messages: [
-        {
-          role: "user",
-          content: {
-            type: "text",
-            text: `Please review this code:\n\n${code}`,
-          },
-        },
-      ],
-    };
+  async ({ code }) => {
+    return text(`Please review this code:\n\n${code}`);
   }
 );
 

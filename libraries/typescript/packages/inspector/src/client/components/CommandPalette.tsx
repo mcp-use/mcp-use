@@ -28,6 +28,7 @@ import {
   generateCursorDeepLink,
   generateGeminiCLICommand,
   generateVSCodeDeepLink,
+  generateVSCodeInsidersDeepLink,
 } from "@/client/utils/mcpClientUtils";
 import { toast } from "sonner";
 
@@ -198,6 +199,27 @@ export function CommandPalette({
               onOpenChange(false);
             } catch (error) {
               toast.error("Failed to open in VS Code");
+            }
+          },
+        },
+        {
+          id: "open-in-vscode-insiders",
+          name: "Open in VS Code Insiders",
+          description: "Add this server to VS Code Insiders",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            try {
+              const deepLink = generateVSCodeInsidersDeepLink(
+                serverUrl!,
+                serverName,
+                serverHeaders
+              );
+              window.location.href = deepLink;
+              toast.success("Opening in VS Code Insiders...");
+              onOpenChange(false);
+            } catch (error) {
+              toast.error("Failed to open in VS Code Insiders");
             }
           },
         },

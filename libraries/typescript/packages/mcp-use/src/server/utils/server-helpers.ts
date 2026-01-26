@@ -48,7 +48,31 @@ export function createHonoApp(requestLogger: any): HonoType {
   // Request logging middleware
   app.use("*", requestLogger);
 
+  // Remove X-Frame-Options to allow cross-origin iframe embedding
+  // This is needed for MCP Apps sandboxed iframe architecture where:
+  // - The main inspector runs on localhost:PORT
+  // - The sandbox proxy runs on 127.0.0.1:PORT (different origin for security)
+  // - Widget assets need to be loadable from within the sandboxed iframe
+  app.use("*", async (c, next) => {
+    await next();
+    // Remove X-Frame-Options as it conflicts with frame-ancestors CSP
+    // and prevents legitimate cross-origin iframe embedding
+    c.res.headers.delete("X-Frame-Options");
+  });
+
   return app;
+}
+
+/**
+ * Normalize a URL by replacing 0.0.0.0 with localhost.
+ * 0.0.0.0 is valid for server binding (listen on all interfaces)
+ * but browsers cannot connect to it as a destination address.
+ *
+ * @param url - URL that may contain 0.0.0.0
+ * @returns URL with 0.0.0.0 replaced by localhost
+ */
+function normalizeUrlHost(url: string): string {
+  return url.replace(/\/\/0\.0\.0\.0(:|\/|$)/, "//localhost$1");
 }
 
 /**
@@ -64,17 +88,24 @@ export function getServerBaseUrl(
   serverHost: string,
   serverPort: number | undefined
 ): string {
+  let url: string;
+
   // First check if baseUrl was explicitly set in config
   if (serverBaseUrl) {
-    return serverBaseUrl;
+    url = serverBaseUrl;
+  } else {
+    // Then check MCP_URL environment variable
+    const mcpUrl = getEnv("MCP_URL");
+    if (mcpUrl) {
+      url = mcpUrl;
+    } else {
+      // Finally fall back to host:port
+      url = `http://${serverHost}:${serverPort}`;
+    }
   }
-  // Then check MCP_URL environment variable
-  const mcpUrl = getEnv("MCP_URL");
-  if (mcpUrl) {
-    return mcpUrl;
-  }
-  // Finally fall back to host:port
-  return `http://${serverHost}:${serverPort}`;
+
+  // Normalize 0.0.0.0 to localhost for browser-accessible URLs
+  return normalizeUrlHost(url);
 }
 
 /**
