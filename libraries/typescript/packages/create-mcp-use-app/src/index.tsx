@@ -961,10 +961,7 @@ async function copyTemplate(
       '💡 Tip: Use "starter" template for a comprehensive MCP server with all features'
     );
     console.log(
-      '💡 Tip: Use "mcp-ui" template for a MCP server with mcp-ui resources'
-    );
-    console.log(
-      '💡 Tip: Use "mcp-apps" template for a MCP server with OpenAI Apps SDK integration'
+      '💡 Tip: Use "mcp-apps" template for a MCP server that displays Widgets on ChatGPT, Claude, and other mcp-apps compatible clients'
     );
     console.log(
       '💡 Tip: Use a GitHub repo URL like "owner/repo" or "https://github.com/owner/repo" to use a custom template'
