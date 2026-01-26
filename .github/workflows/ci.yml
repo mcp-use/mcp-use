@@ -39,7 +39,7 @@ permissions:
 #    └─ create-app-tests: Matrix [3 OS × 3 PM × 3 templates × 2 flags]
 #       - Tests project creation across Ubuntu/macOS/Windows
 #       - Tests npm, yarn, pnpm package managers
-#       - Tests starter, mcp-ui, apps-sdk templates
+#       - Tests starter, mcp-ui, mcp-apps templates
 #       - Collapsed into one expandable job for clean UI
 #
 
@@ -847,7 +847,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         pm: [npm, yarn, pnpm]
-        template: [starter, mcp-ui, apps-sdk]
+        template: [starter, mcp-ui, mcp-apps]
         flag: ["", "--dev"]
         exclude:
           # Only test --dev on ubuntu with npm

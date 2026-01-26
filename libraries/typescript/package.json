@@ -34,8 +34,9 @@
     "version:check": "changeset status",
     "test_app": "pnpm test_app:starter",
     "test_app:starter": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
-    "test_app:apps-sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps-sdk && cd test_app && pnpm install && pnpm dev",
-    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev"
+    "test_app:mcp-apps": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-apps && cd test_app && pnpm install && pnpm dev",
+    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev",
+    "test_app:blank": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template blank && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",

@@ -109,7 +109,7 @@ npx create-mcp-use-app my-project
 
 ```bash
 # Use a specific template
-npx create-mcp-use-app my-project --template apps-sdk
+npx create-mcp-use-app my-project --template mcp-apps
 npx create-mcp-use-app my-project --template mcp-ui
 
 # Use a GitHub repository as a template
@@ -142,9 +142,9 @@ The starter template includes:
 
 Perfect for getting started with all available features or building full-featured MCP servers.
 
-### Apps SDK Template
+### MCP Apps Template
 
-The apps-sdk template includes:
+The mcp-apps template includes:
 
 - MCP server setup focused on OpenAI Apps SDK integration
 - OpenAI Apps SDK compatible widgets
