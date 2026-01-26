@@ -412,6 +412,15 @@ export function ToolResultDisplay({
     [readResource]
   );
 
+  // Memoize onSendFollowUp to prevent infinite re-render loop
+  // This callback is used in MCPAppsRenderer's effect dependency array
+  const memoizedOnSendFollowUp = useCallback((text: string) => {
+    toast.info("Message received", {
+      description: text,
+      duration: 5000,
+    });
+  }, []);
+
   // Get widget debug context for protocol selection
   const { playground } = useWidgetDebug();
 
@@ -871,12 +880,7 @@ export function ToolResultDisplay({
                         className="w-full h-full relative p-4"
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
-                        onSendFollowUp={(text) => {
-                          toast.info("Message received", {
-                            description: text,
-                            duration: 5000,
-                          });
-                        }}
+                        onSendFollowUp={memoizedOnSendFollowUp}
                       />
                     </div>
                   );

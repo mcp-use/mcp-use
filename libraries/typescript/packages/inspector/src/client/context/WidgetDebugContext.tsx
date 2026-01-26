@@ -8,7 +8,14 @@
  */
 
 import type { ReactNode } from "react";
-import { createContext, use, useCallback, useState } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 export type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
 
@@ -107,6 +114,10 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
   const addWidget = useCallback(
     (widgetId: string, info: Omit<WidgetInfo, "cspViolations">) => {
       setState((prev) => {
+        // Skip update if widget already exists (prevents infinite re-render loop)
+        if (prev.widgets.has(widgetId)) {
+          return prev;
+        }
         const newWidgets = new Map(prev.widgets);
         newWidgets.set(widgetId, {
           ...info,
@@ -131,11 +142,15 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Use a ref to access current state in getWidget without causing re-renders
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const getWidget = useCallback(
     (widgetId: string): WidgetInfo | undefined => {
-      return state.widgets.get(widgetId);
+      return stateRef.current.widgets.get(widgetId);
     },
-    [state.widgets]
+    [] // No dependencies - uses ref to access current state
   );
 
   const addCspViolation = useCallback(
@@ -221,19 +236,35 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const value: WidgetDebugContextType = {
-    ...state,
-    setActiveWidget,
-    addWidget,
-    removeWidget,
-    getWidget,
-    addCspViolation,
-    clearCspViolations,
-    setWidgetModelContext,
-    setWidgetState,
-    updatePlaygroundSettings,
-    clearAllWidgets,
-  };
+  // Memoize context value to prevent unnecessary re-renders of consumers
+  const value = useMemo<WidgetDebugContextType>(
+    () => ({
+      ...state,
+      setActiveWidget,
+      addWidget,
+      removeWidget,
+      getWidget,
+      addCspViolation,
+      clearCspViolations,
+      setWidgetModelContext,
+      setWidgetState,
+      updatePlaygroundSettings,
+      clearAllWidgets,
+    }),
+    [
+      state,
+      setActiveWidget,
+      addWidget,
+      removeWidget,
+      getWidget,
+      addCspViolation,
+      clearCspViolations,
+      setWidgetModelContext,
+      setWidgetState,
+      updatePlaygroundSettings,
+      clearAllWidgets,
+    ]
+  );
 
   return <WidgetDebugContext value={value}>{children}</WidgetDebugContext>;
 }

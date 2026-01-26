@@ -104,7 +104,8 @@ export function MCPAppsRenderer({
   // Use controlled displayMode if provided, otherwise use internal state
   const displayMode = displayModeProp ?? internalDisplayMode;
 
-  const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
+  // Use useRef instead of useState to avoid state updates during ref callback
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Use playground settings when available
   const cspMode = playground.cspMode;
@@ -487,17 +488,17 @@ export function MCPAppsRenderer({
   }, [
     widgetHtml,
     sandboxRef,
-    cspMode,
-    widgetCsp,
-    widgetPermissions,
-    // hostContext removed - it's updated via separate useEffect calling setHostContext
+    // cspMode,
+    // widgetCsp,
+    // widgetPermissions,
+    // // hostContext removed - it's updated via separate useEffect calling setHostContext
     toolCallId,
     server,
     readResource,
-    onSendFollowUp,
-    displayMode,
-    setWidgetModelContext,
-    removeWidget,
+    // onSendFollowUp,
+    // displayMode,
+    // setWidgetModelContext,
+    // removeWidget,
   ]);
 
   // Update host context when it changes
@@ -580,8 +581,8 @@ export function MCPAppsRenderer({
     async (mode: DisplayMode) => {
       try {
         if (mode === "fullscreen") {
-          if (containerRef) {
-            await containerRef.requestFullscreen();
+          if (containerRef.current) {
+            await containerRef.current.requestFullscreen();
           }
         } else {
           if (document.fullscreenElement) {
@@ -605,7 +606,7 @@ export function MCPAppsRenderer({
         }
       }
     },
-    [containerRef, onDisplayModeChange]
+    [onDisplayModeChange]
   );
 
   // Loading states
@@ -665,7 +666,7 @@ export function MCPAppsRenderer({
 
   return (
     <WidgetWrapper className={className} noWrapper={noWrapper}>
-      <div ref={setContainerRef} className={containerClassName}>
+      <div ref={containerRef} className={containerClassName}>
         {isFullscreen && (
           <div className="flex items-center justify-between px-4 h-14 border-b border-zinc-200 dark:border-zinc-700 bg-background shrink-0">
             <div />
