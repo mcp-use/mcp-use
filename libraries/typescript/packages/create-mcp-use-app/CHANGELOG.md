@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.0-canary.0
+
+### Minor Changes
+
+- 523d9d1: feat: changed templates to use mcp-apps and alias apps-sdk => mcp-apps
+
 ## 0.11.1
 
 ### Patch Changes
