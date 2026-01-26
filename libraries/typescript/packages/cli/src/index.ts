@@ -914,13 +914,9 @@ program
   .option("--with-inspector", "Include inspector in production build")
   .option(
     "--inline",
-    "Inline all JS/CSS into HTML (default: true, required for VS Code MCP Apps)",
-    true
+    "Inline all JS/CSS into HTML (required for VS Code MCP Apps)"
   )
-  .option(
-    "--no-inline",
-    "Keep JS/CSS as separate files (may not work with some MCP Apps hosts)"
-  )
+  .option("--no-inline", "Keep JS/CSS as separate files (default)")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -929,9 +925,9 @@ program
       displayPackageVersions(projectPath);
 
       // Build widgets first (this generates schemas)
-      // Default to inline=true for VS Code compatibility (VS Code's CSP blocks external scripts)
+      // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
       const builtWidgets = await buildWidgets(projectPath, {
-        inline: options.inline,
+        inline: options.inline ?? false,
       });
 
       // Then run tsc (now schemas are available for import)

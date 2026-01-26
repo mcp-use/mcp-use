@@ -158,6 +158,15 @@ class McpAppsBridge {
       debug: console.debug.bind(console),
     };
 
+    // Map JS console levels to RFC 5424 log levels
+    const consoleLevelToRfc5424: Record<string, string> = {
+      log: "info",
+      warn: "warning",
+      error: "error",
+      info: "info",
+      debug: "debug",
+    };
+
     // Helper to send logging notification
     const sendLog = (
       level: "log" | "warn" | "error" | "info" | "debug",
@@ -165,7 +174,7 @@ class McpAppsBridge {
     ) => {
       // Send notification to host
       this.sendNotification("notifications/message", {
-        level,
+        level: consoleLevelToRfc5424[level] || "info",
         logger: "console",
         data: args.length === 1 ? args[0] : args,
       });
