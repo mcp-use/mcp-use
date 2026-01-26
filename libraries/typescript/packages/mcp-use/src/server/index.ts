@@ -129,6 +129,9 @@ export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 
+// Landing page generator for browser requests
+export { generateLandingPage } from "./landing.js";
+
 export type {
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
