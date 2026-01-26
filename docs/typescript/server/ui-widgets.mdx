@@ -202,13 +202,26 @@ server.uiResource({
   type: "appsSdk", // ChatGPT only
   name: "weather-display",
   htmlTemplate: `...`,
-  metadata: {
-    csp: { connectDomains: ["https://api.weather.com"] },
+  appsSdkMetadata: {
+    "openai/widgetCSP": {
+      connect_domains: ["https://api.weather.com"], // snake_case
+      resource_domains: ["https://cdn.weather.com"],
+    },
+    "openai/widgetPrefersBorder": true,
+    "openai/widgetDescription": "Displays current weather",
   },
 });
 ```
 
-See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation.
+<Warning>
+**Apps SDK Format**: When using `type: "appsSdk"`, you must use the `appsSdkMetadata` field (not `metadata`) with:
+- `"openai/"` prefixed keys
+- snake_case CSP fields (`connect_domains`, `resource_domains`)
+
+For the simplified `metadata` format with camelCase, use `type: "mcpApps"` instead.
+</Warning>
+
+See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation and migration guide.
 
 ## Widget Metadata
 

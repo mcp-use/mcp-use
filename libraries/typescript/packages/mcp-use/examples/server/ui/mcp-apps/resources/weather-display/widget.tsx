@@ -20,7 +20,10 @@ export const widgetMetadata: WidgetMetadata = {
   metadata: {
     csp: {
       connectDomains: ["https://api.weather.com"],
-      resourceDomains: ["https://cdn.weather.com"],
+      resourceDomains: [
+        "https://cdn.weather.com",
+        "https://soft-amber.local.mcp-use.run",
+      ],
       scriptDirectives: ["'unsafe-eval'"], // Required for React runtime (eval in bundles)
     },
     prefersBorder: true,

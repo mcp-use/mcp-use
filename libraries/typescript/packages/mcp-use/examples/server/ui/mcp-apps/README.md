@@ -111,24 +111,43 @@ If you have existing Apps SDK widgets, you have two options:
 ### Option 1: Keep using `appsSdk` (ChatGPT only)
 ```typescript
 server.uiResource({
-  type: "appsSdk", // Still works!
-  // ... existing config
+  type: "appsSdk", // ChatGPT only
+  name: "my-widget",
+  htmlTemplate: `...`,
+  appsSdkMetadata: {
+    "openai/widgetCSP": {
+      connect_domains: ["https://api.example.com"],
+      resource_domains: ["https://cdn.example.com"],
+    },
+    "openai/widgetPrefersBorder": true,
+  },
 });
 ```
 
 ### Option 2: Migrate to `mcpApps` (Universal)
 ```typescript
 server.uiResource({
-  type: "mcpApps", // NEW! Works everywhere
+  type: "mcpApps", // Works with ChatGPT AND MCP Apps clients
+  name: "my-widget",
+  htmlTemplate: `...`,
   metadata: {
-    // Unified config for both protocols
-    csp: { ... },
+    // Unified config (note: camelCase, no openai/ prefix)
+    csp: {
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
+    },
     prefersBorder: true,
     widgetDescription: "...", // Optional ChatGPT-specific
     autoResize: true, // Optional MCP Apps-specific
   },
 });
 ```
+
+**Key changes when migrating:**
+- `appsSdkMetadata` → `metadata`
+- `"openai/widgetCSP"` → `csp`
+- `connect_domains` → `connectDomains` (snake_case → camelCase)
+- `resource_domains` → `resourceDomains`
 
 ## Benefits
 

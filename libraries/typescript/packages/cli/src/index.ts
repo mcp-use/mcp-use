@@ -8,6 +8,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import open from "open";
+import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
@@ -320,8 +321,10 @@ async function findServerFile(projectPath: string): Promise<string> {
 }
 
 async function buildWidgets(
-  projectPath: string
+  projectPath: string,
+  options: { inline?: boolean } = {}
 ): Promise<Array<{ name: string; metadata: any }>> {
+  const { inline = true } = options; // Default to true for VS Code compatibility
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
   const resourcesDir = path.join(projectPath, "resources");
@@ -382,7 +385,11 @@ async function buildWidgets(
     return [];
   }
 
-  console.log(chalk.gray(`Building ${entries.length} widget(s)...`));
+  console.log(
+    chalk.gray(
+      `Building ${entries.length} widget(s)${inline ? " (inline mode for VS Code compatibility)" : ""}...`
+    )
+  );
 
   const react = (await import("@vitejs/plugin-react")).default;
   // @ts-ignore - @tailwindcss/vite may not have type declarations
@@ -714,21 +721,39 @@ export default {
         },
       };
 
+      // Build plugins array - add viteSingleFile when inlining for VS Code compatibility
+      const buildPlugins = inline
+        ? [
+            buildNodeStubsPlugin,
+            tailwindcss(),
+            react(),
+            viteSingleFile({ removeViteModuleLoader: true }),
+          ]
+        : [buildNodeStubsPlugin, tailwindcss(), react()];
+
       await build({
         root: tempDir,
         base: baseUrl,
-        plugins: [buildNodeStubsPlugin, tailwindcss(), react()],
-        experimental: {
-          renderBuiltUrl: (filename: string, { hostType }) => {
-            if (["js", "css"].includes(hostType)) {
-              return {
-                runtime: `window.__getFile(${JSON.stringify(filename)})`,
-              };
-            } else {
-              return { relative: true };
-            }
-          },
-        },
+        plugins: buildPlugins,
+        // Only use renderBuiltUrl for non-inline builds (external assets need runtime URL resolution)
+        ...(inline
+          ? {}
+          : {
+              experimental: {
+                renderBuiltUrl: (
+                  filename: string,
+                  { hostType }: { hostType: string }
+                ) => {
+                  if (["js", "css"].includes(hostType)) {
+                    return {
+                      runtime: `window.__getFile(${JSON.stringify(filename)})`,
+                    };
+                  } else {
+                    return { relative: true };
+                  }
+                },
+              },
+            }),
         resolve: {
           alias: {
             "@": resourcesDir,
@@ -746,6 +771,13 @@ export default {
           sourcemap: false,
           // Minify for smaller bundle size
           minify: "esbuild",
+          // For inline builds, disable CSS code splitting and inline all assets
+          ...(inline
+            ? {
+                cssCodeSplit: false,
+                assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
+              }
+            : {}),
           rollupOptions: {
             input: path.join(tempDir, "index.html"),
             external: (id) => {
@@ -880,6 +912,15 @@ program
   .description("Build TypeScript and MCP UI widgets")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
   .option("--with-inspector", "Include inspector in production build")
+  .option(
+    "--inline",
+    "Inline all JS/CSS into HTML (default: true, required for VS Code MCP Apps)",
+    true
+  )
+  .option(
+    "--no-inline",
+    "Keep JS/CSS as separate files (may not work with some MCP Apps hosts)"
+  )
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -888,7 +929,10 @@ program
       displayPackageVersions(projectPath);
 
       // Build widgets first (this generates schemas)
-      const builtWidgets = await buildWidgets(projectPath);
+      // Default to inline=true for VS Code compatibility (VS Code's CSP blocks external scripts)
+      const builtWidgets = await buildWidgets(projectPath, {
+        inline: options.inline,
+      });
 
       // Then run tsc (now schemas are available for import)
       console.log(chalk.gray("Building TypeScript..."));

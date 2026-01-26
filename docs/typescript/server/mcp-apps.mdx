@@ -271,7 +271,7 @@ server.uiResource({
 
 ## Migration from Apps SDK
 
-If you have existing widgets using `type: "appsSdk"`, migration is simple:
+If you have existing widgets using `type: "appsSdk"`, you can migrate to dual-protocol support. Note that this requires updating both the type and the metadata format.
 
 ### Before (ChatGPT only):
 
@@ -280,8 +280,13 @@ server.uiResource({
   type: "appsSdk", // Only works with ChatGPT
   name: "my-widget",
   htmlTemplate: `...`,
-  metadata: {
-    csp: { connectDomains: ["https://api.example.com"] },
+  appsSdkMetadata: {
+    "openai/widgetCSP": {
+      connect_domains: ["https://api.example.com"],
+      resource_domains: ["https://cdn.example.com"],
+    },
+    "openai/widgetPrefersBorder": true,
+    "openai/widgetDescription": "My widget description",
   },
 });
 ```
@@ -294,12 +299,146 @@ server.uiResource({
   name: "my-widget",
   htmlTemplate: `...`,
   metadata: {
-    csp: { connectDomains: ["https://api.example.com"] },
+    csp: {
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
+    },
+    prefersBorder: true,
+    widgetDescription: "My widget description",
   },
 });
 ```
 
-That's it! The metadata structure is identical, and your widget code requires **no changes**.
+**Key changes:**
+- `type: "appsSdk"` → `type: "mcpApps"`
+- `appsSdkMetadata` → `metadata` (field name change)
+- `"openai/widgetCSP"` → `csp` (remove openai/ prefix)
+- `connect_domains` → `connectDomains` (snake_case → camelCase)
+- `resource_domains` → `resourceDomains` (snake_case → camelCase)
+- `"openai/widgetPrefersBorder"` → `prefersBorder` (remove openai/ prefix)
+
+Your **widget code** requires **no changes** - only the server registration changes.
+
+### Migration Options
+
+You have three options when migrating:
+
+**Option 1: Full Migration (Recommended)**
+
+Migrate completely to the new `metadata` format for maximum clarity:
+
+```typescript
+server.uiResource({
+  type: "mcpApps",
+  name: "my-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: { connectDomains: ["https://api.example.com"] },
+    prefersBorder: true,
+  },
+});
+```
+
+**Option 2: Backward Compatible Migration**
+
+Keep both formats if you need ChatGPT-specific overrides:
+
+```typescript
+server.uiResource({
+  type: "mcpApps",
+  name: "my-widget",
+  htmlTemplate: `...`,
+  // New unified format (used by both protocols)
+  metadata: {
+    csp: { connectDomains: ["https://api.example.com"] },
+    prefersBorder: true,
+  },
+  // ChatGPT-specific overrides (optional)
+  appsSdkMetadata: {
+    "openai/widgetDescription": "ChatGPT-specific description",
+  },
+});
+```
+
+**Option 3: Stay on Apps SDK**
+
+If you only need ChatGPT support, you can stay on `type: "appsSdk"`:
+
+```typescript
+server.uiResource({
+  type: "appsSdk", // ChatGPT only
+  name: "my-widget",
+  htmlTemplate: `...`,
+  appsSdkMetadata: {
+    "openai/widgetCSP": {
+      connect_domains: ["https://api.example.com"],
+    },
+  },
+});
+```
+
+### Field Mapping Reference
+
+Complete mapping from Apps SDK to MCP Apps metadata:
+
+| Apps SDK (`appsSdkMetadata`) | MCP Apps (`metadata`) | Notes |
+|---|---|---|
+| `"openai/widgetCSP"` | `csp` | CSP configuration object |
+| `connect_domains` | `connectDomains` | Array of connection domains |
+| `resource_domains` | `resourceDomains` | Array of resource domains |
+| `frame_domains` | `frameDomains` | Array of frame domains |
+| `redirect_domains` | `redirectDomains` | Array of redirect domains (ChatGPT-specific) |
+| `script_directives` | `scriptDirectives` | Array of script CSP directives |
+| `style_directives` | `styleDirectives` | Array of style CSP directives |
+| `"openai/widgetPrefersBorder"` | `prefersBorder` | Boolean |
+| `"openai/widgetDomain"` | `domain` | String (custom domain) |
+| `"openai/widgetDescription"` | `widgetDescription` | String (widget description) |
+| `"openai/widgetAccessible"` | `widgetAccessible` | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
+| `"openai/locale"` | `locale` | String (ChatGPT-specific, can stay in appsSdkMetadata) |
+
+### Migration Checklist
+
+Follow these steps to migrate:
+
+1. ✅ **Change the widget type**:
+   ```typescript
+   type: "appsSdk" → type: "mcpApps"
+   ```
+
+2. ✅ **Rename the metadata field**:
+   ```typescript
+   appsSdkMetadata: { ... } → metadata: { ... }
+   ```
+
+3. ✅ **Transform CSP configuration**:
+   ```typescript
+   // Before
+   "openai/widgetCSP": {
+     connect_domains: ["..."],
+     resource_domains: ["..."]
+   }
+   
+   // After
+   csp: {
+     connectDomains: ["..."],
+     resourceDomains: ["..."]
+   }
+   ```
+
+4. ✅ **Transform other metadata fields**:
+   - Remove `"openai/` prefix from all keys
+   - Convert remaining snake_case to camelCase
+
+5. ✅ **Test in both environments**:
+   - Test in ChatGPT (Apps SDK protocol)
+   - Test in MCP Inspector with protocol toggle
+   - Test in MCP Apps-compatible client (Claude, Goose, etc.)
+
+6. ✅ **Verify widget behavior**:
+   - Props received correctly
+   - Theme syncing works
+   - Tool calls function properly
+   - CSP allows required resources
 
 ## Comparison with MCP UI
 

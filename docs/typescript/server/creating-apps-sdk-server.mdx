@@ -277,6 +277,28 @@ server.uiResource({
 
 However, with automatic registration, metadata is generated automatically based on your `widgetMetadata`, including the default `"openai/widgetDomain": "https://chatgpt.com"` which is required for app submission.
 
+<Note>
+**ChatGPT-Only vs Dual-Protocol**: The example above uses `type: "appsSdk"` which only works with ChatGPT. For maximum compatibility with both ChatGPT and MCP Apps clients, use `type: "mcpApps"` with the `metadata` field instead:
+
+```typescript
+server.uiResource({
+  type: "mcpApps", // Works with BOTH ChatGPT and MCP Apps clients
+  name: "custom-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: {
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
+    },
+    prefersBorder: true,
+    widgetDescription: "Interactive data visualization",
+  },
+});
+```
+
+See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation.
+</Note>
+
 ## Step 6: Testing Your Server
 
 ### Start the Development Server
