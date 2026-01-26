@@ -778,7 +778,7 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
-  packages/mcp-use/examples/server/ui/apps-sdk:
+  packages/mcp-use/examples/server/ui/mcp-apps:
     dependencies:
       '@openai/apps-sdk-ui':
         specifier: ^0.2.1
@@ -816,18 +816,18 @@ importers:
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.1.18
-        version: 4.1.18(vite@7.3.0(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+        version: 4.1.18(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
       '@vitejs/plugin-react':
         specifier: ^5.1.2
-        version: 5.1.2(vite@7.3.0(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+        version: 5.1.2(vite@7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
       vite:
         specifier: ^7.3.0
-        version: 7.3.0(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+        version: 7.3.1(@types/node@25.0.9)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/mcp-use/examples/server/ui/mcp-apps:
+  packages/mcp-use/examples/server/ui/mcp-apps/apps-sdk:
     dependencies:
       '@openai/apps-sdk-ui':
         specifier: ^0.2.1
@@ -843,7 +843,7 @@ importers:
         version: 5.2.1
       mcp-use:
         specifier: workspace:*
-        version: link:../../../..
+        version: link:../../../../..
       node-mocks-http:
         specifier: ^1.17.2
         version: 1.17.2(@types/express@5.0.6)(@types/node@25.0.9)
