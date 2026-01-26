@@ -310,6 +310,7 @@ server.uiResource({
 ```
 
 **Key changes:**
+
 - `type: "appsSdk"` → `type: "mcpApps"`
 - `appsSdkMetadata` → `metadata` (field name change)
 - `"openai/widgetCSP"` → `csp` (remove openai/ prefix)
@@ -381,43 +382,46 @@ server.uiResource({
 
 Complete mapping from Apps SDK to MCP Apps metadata:
 
-| Apps SDK (`appsSdkMetadata`) | MCP Apps (`metadata`) | Notes |
-|---|---|---|
-| `"openai/widgetCSP"` | `csp` | CSP configuration object |
-| `connect_domains` | `connectDomains` | Array of connection domains |
-| `resource_domains` | `resourceDomains` | Array of resource domains |
-| `frame_domains` | `frameDomains` | Array of frame domains |
-| `redirect_domains` | `redirectDomains` | Array of redirect domains (ChatGPT-specific) |
-| `script_directives` | `scriptDirectives` | Array of script CSP directives |
-| `style_directives` | `styleDirectives` | Array of style CSP directives |
-| `"openai/widgetPrefersBorder"` | `prefersBorder` | Boolean |
-| `"openai/widgetDomain"` | `domain` | String (custom domain) |
-| `"openai/widgetDescription"` | `widgetDescription` | String (widget description) |
-| `"openai/widgetAccessible"` | `widgetAccessible` | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
-| `"openai/locale"` | `locale` | String (ChatGPT-specific, can stay in appsSdkMetadata) |
+| Apps SDK (`appsSdkMetadata`)   | MCP Apps (`metadata`) | Notes                                                   |
+| ------------------------------ | --------------------- | ------------------------------------------------------- |
+| `"openai/widgetCSP"`           | `csp`                 | CSP configuration object                                |
+| `connect_domains`              | `connectDomains`      | Array of connection domains                             |
+| `resource_domains`             | `resourceDomains`     | Array of resource domains                               |
+| `frame_domains`                | `frameDomains`        | Array of frame domains                                  |
+| `redirect_domains`             | `redirectDomains`     | Array of redirect domains (ChatGPT-specific)            |
+| `script_directives`            | `scriptDirectives`    | Array of script CSP directives                          |
+| `style_directives`             | `styleDirectives`     | Array of style CSP directives                           |
+| `"openai/widgetPrefersBorder"` | `prefersBorder`       | Boolean                                                 |
+| `"openai/widgetDomain"`        | `domain`              | String (custom domain)                                  |
+| `"openai/widgetDescription"`   | `widgetDescription`   | String (widget description)                             |
+| `"openai/widgetAccessible"`    | `widgetAccessible`    | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
+| `"openai/locale"`              | `locale`              | String (ChatGPT-specific, can stay in appsSdkMetadata)  |
 
 ### Migration Checklist
 
 Follow these steps to migrate:
 
 1. ✅ **Change the widget type**:
+
    ```typescript
    type: "appsSdk" → type: "mcpApps"
    ```
 
 2. ✅ **Rename the metadata field**:
+
    ```typescript
    appsSdkMetadata: { ... } → metadata: { ... }
    ```
 
 3. ✅ **Transform CSP configuration**:
+
    ```typescript
    // Before
    "openai/widgetCSP": {
      connect_domains: ["..."],
      resource_domains: ["..."]
    }
-   
+
    // After
    csp: {
      connectDomains: ["..."],

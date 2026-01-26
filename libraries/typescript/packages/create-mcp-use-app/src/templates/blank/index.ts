@@ -1,12 +1,11 @@
-import { MCPServer, object, text } from "mcp-use/server";
-import { z } from "zod";
+import { MCPServer } from "mcp-use/server";
 
 // Create MCP server instance
 const server = new MCPServer({
   name: "{{PROJECT_NAME}}",
   title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
-  description: "My first MCP server with all features",
+  description: "Blank mcp-use server",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com", // Can be customized later
@@ -39,7 +38,7 @@ const server = new MCPServer({
 /*
  * Define MCP tools
  * Docs: https://mcp-use.com/docs/typescript/server/tools
- */
+
 server.tool(
   {
     name: "fetch-weather",
@@ -52,33 +51,29 @@ server.tool(
     const response = await fetch(`https://wttr.in/${city}?format=j1`);
     const data: any = await response.json();
     const current = data.current_condition[0];
-    return text(
-      `The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`
-    );
+    return text(`The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`);
   }
 );
+ */
 
 /*
  * Define MCP resources
  * Docs: https://mcp-use.com/docs/typescript/server/resources
- */
-server.resource(
-  {
-    name: "config",
-    uri: "config://settings",
-    description: "Server configuration",
-  },
-  async () =>
-    object({
-      theme: "dark",
-      language: "en",
-    })
-);
+
+server.resource({
+  name: "config",
+  uri: "config://settings",
+  description: "Server configuration",
+}, async () => object({
+  theme: "dark",
+  language: "en",
+}));
+*/
 
 /*
  * Define MCP prompts
  * Docs: https://mcp-use.com/docs/typescript/server/prompts
- */
+
 server.prompt(
   {
     name: "review-code",
@@ -90,7 +85,7 @@ server.prompt(
   async ({ code }) => {
     return text(`Please review this code:\n\n${code}`);
   }
-);
+); */
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 console.log(`Server running on port ${PORT}`);

@@ -1,11 +1,10 @@
+import { useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
-import { useWidget, type WidgetMetadata } from "mcp-use/react";
 import "./styles.css";
 
 /*
- * Apps SDK widget
- * Just export widgetMetadata with description and Zod schema, and mcp-use handles the rest!
+ * mcp-apps widget
  * See docs: https://mcp-use.com/docs/typescript/server/ui-widgets
  */
 
@@ -24,6 +23,12 @@ const propSchema = z.object({
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather for a city",
   props: propSchema,
+  metadata: {
+    csp: {
+      connectDomains: [],
+      resourceDomains: [],
+    },
+  },
 };
 
 type WeatherProps = z.infer<typeof propSchema>;
@@ -86,7 +91,7 @@ const WeatherWidget: React.FC = () => {
       className={`max-w-sm mx-auto ${bgColor} rounded-xl shadow-lg overflow-hidden`}
     >
       <div
-        className={`h-32 bg-gradient-to-br ${getWeatherColor(weather)} flex items-center justify-center`}
+        className={`h-32 bg-linear-to-br ${getWeatherColor(weather)} flex items-center justify-center`}
       >
         <div className="text-6xl">{getWeatherIcon(weather)}</div>
       </div>

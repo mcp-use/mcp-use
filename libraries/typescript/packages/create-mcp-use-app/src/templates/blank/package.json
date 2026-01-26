@@ -2,19 +2,14 @@
   "name": "mcp-use server",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server with MCP-UI integration",
+  "description": "Blank mcp-use server",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
     "server",
-    "uiresource",
-    "ui",
-    "react",
-    "widgets",
-    "ai",
-    "tools",
-    "mcp-ui"
+    "blank",
+    "mcp-use"
   ],
   "main": "dist/index.js",
   "scripts": {
@@ -24,6 +19,8 @@
     "deploy": "mcp-use deploy"
   },
   "dependencies": {
+    "@openai/apps-sdk-ui": "^0.2.1",
+    "@tanstack/react-query": "^5.90.12",
     "cors": "^2.8.5",
     "express": "^5.2.1",
     "mcp-use": "workspace:*",
