@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.0-canary.2
+
+### Patch Changes
+
+- 67823ea: fix: rename template to mcp-apps
+
 ## 0.12.0-canary.1
 
 ### Patch Changes

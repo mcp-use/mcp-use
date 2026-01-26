@@ -8,6 +8,7 @@
     "mcp-use": "1.14.2"
   },
   "changesets": [
+    "brave-worms-swim",
     "strict-trains-share",
     "tough-webs-sin",
     "whole-signs-strive"
