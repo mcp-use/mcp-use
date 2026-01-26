@@ -8,6 +8,7 @@
     "mcp-use": "1.14.2"
   },
   "changesets": [
+    "strict-trains-share",
     "tough-webs-sin",
     "whole-signs-strive"
   ]
