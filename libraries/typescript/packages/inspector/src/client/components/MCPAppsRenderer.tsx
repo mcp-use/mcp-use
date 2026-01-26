@@ -25,6 +25,7 @@ import { useMcpClient } from "mcp-use/react";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -56,6 +57,7 @@ interface MCPAppsRendererProps {
   className?: string;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
+  noWrapper?: boolean;
 }
 
 /**
@@ -74,6 +76,7 @@ export function MCPAppsRenderer({
   className,
   displayMode: displayModeProp,
   onDisplayModeChange,
+  noWrapper,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -114,6 +117,13 @@ export function MCPAppsRenderer({
   // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width
   const inlineMaxWidth = deviceType === "mobile" ? maxWidth : 768;
 
+  // Get the tool definition from the server's tool list (memoized to prevent infinite re-renders)
+  // Stringify toolName to ensure stable reference if it's passed as an object
+  const tool = useMemo(() => {
+    if (!server?.tools) return undefined;
+    return server.tools.find((t) => t.name === toolName);
+  }, [server, toolName]);
+
   // Build host context per SEP-1865
   const hostContext = useMcpAppsHostContext({
     theme: resolvedTheme,
@@ -127,6 +137,7 @@ export function MCPAppsRenderer({
     toolInput,
     toolOutput,
     toolMetadata,
+    tool,
   });
 
   // Fetch widget HTML when component mounts
@@ -600,7 +611,7 @@ export function MCPAppsRenderer({
   // Loading states
   if (loadError) {
     return (
-      <WidgetWrapper className={className}>
+      <WidgetWrapper className={className} noWrapper={noWrapper}>
         <div className="border border-red-200/50 dark:border-red-800/50 bg-red-50/30 dark:bg-red-950/20 rounded-lg p-4">
           <p className="text-sm text-red-600 dark:text-red-400">
             Failed to load MCP App: {loadError}
@@ -612,7 +623,7 @@ export function MCPAppsRenderer({
 
   if (!widgetHtml) {
     return (
-      <WidgetWrapper className={className}>
+      <WidgetWrapper className={className} noWrapper={noWrapper}>
         <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Preparing MCP App widget...
         </div>
@@ -653,7 +664,7 @@ export function MCPAppsRenderer({
   };
 
   return (
-    <WidgetWrapper className={className}>
+    <WidgetWrapper className={className} noWrapper={noWrapper}>
       <div ref={setContainerRef} className={containerClassName}>
         {isFullscreen && (
           <div className="flex items-center justify-between px-4 h-14 border-b border-zinc-200 dark:border-zinc-700 bg-background shrink-0">

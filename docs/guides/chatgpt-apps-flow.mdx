@@ -1,16 +1,27 @@
 ---
 title: "Building ChatGPT Apps"
-description: "Understanding ChatGPT widget flows and how mcp-use simplifies OpenAI Apps SDK development"
+description: "Understanding ChatGPT widget flows and how mcp-use simplifies widget development"
 icon: "openai"
 ---
 
 # Building ChatGPT Apps with Widgets
 
+<Info>
+**Widget Protocol Options**: This guide focuses on **ChatGPT Apps SDK** specifically. For the broader picture:
+- [MCP Apps](/typescript/server/mcp-apps) - Standard MCP protocol with dual-protocol support (recommended)
+- [ChatGPT Apps SDK](/typescript/server/ui-widgets) - This guide's focus
+- [MCP UI](/typescript/server/mcp-ui-resources) - Alternative framework for simpler UIs
+
+**Best Practice**: Use `type: "mcpApps"` to build widgets that work with **both** ChatGPT and MCP Apps clients from a single codebase.
+
+</Info>
+
 ## Introduction
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **OpenAI Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools—all within the ChatGPT interface.
+ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools—all within the ChatGPT interface.
 
 Widgets transform static responses into interactive experiences:
+
 - Display data in tables, carousels, or custom layouts
 - Allow users to filter, sort, or manipulate results
 - Persist state across conversations
@@ -18,7 +29,14 @@ Widgets transform static responses into interactive experiences:
 
 However, building widgets with the official OpenAI Apps SDK involves significant manual setup: configuring build tools, managing React mounting, implementing custom state hooks, and handling Content Security Policy (CSP) configurations.
 
-**mcp-use simplifies this entire process** by providing zero-config widget development, automatic bundling, built-in hooks, and seamless integration with MCP servers—letting you focus on building great experiences instead of wrestling with configuration.
+**mcp-use simplifies this entire process** by providing:
+
+- Zero-config widget development with automatic bundling
+- **Dual-protocol support** - widgets work with ChatGPT AND MCP Apps clients
+- Built-in hooks that abstract protocol differences
+- Seamless integration with MCP servers
+
+This lets you focus on building great experiences instead of wrestling with configuration.
 
 ## The Official OpenAI Apps SDK Approach
 
@@ -48,7 +66,7 @@ flowchart LR
     Bundle --> CSP[Configure CSP]
     CSP --> Deploy[Deploy]
     Deploy --> ChatGPT[ChatGPT]
-    
+
     style Setup fill:#ff6b6b
     style Config fill:#ff6b6b
     style Hooks fill:#ff6b6b
@@ -79,31 +97,33 @@ app/
 **Manual Build Configuration (esbuild.config.js):**
 
 ```javascript
-const esbuild = require('esbuild');
+const esbuild = require("esbuild");
 
-esbuild.build({
-  entryPoints: ['src/component.tsx'],
-  bundle: true,
-  outfile: 'dist/component.js',
-  format: 'iife',
-  platform: 'browser',
-  target: 'es2020',
-  jsx: 'automatic',
-  external: ['react', 'react-dom'],
-  minify: true,
-}).catch(() => process.exit(1));
+esbuild
+  .build({
+    entryPoints: ["src/component.tsx"],
+    bundle: true,
+    outfile: "dist/component.js",
+    format: "iife",
+    platform: "browser",
+    target: "es2020",
+    jsx: "automatic",
+    external: ["react", "react-dom"],
+    minify: true,
+  })
+  .catch(() => process.exit(1));
 ```
 
 **Custom State Hook Implementation:**
 
 ```typescript
 // hooks.ts - Must implement this yourself
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from "react";
 
 type SetStateAction<T> = T | ((prev: T) => T);
 
 export function useWidgetState<T>(
-  defaultState: T | (() => T)
+  defaultState: T | (() => T),
 ): readonly [T, (state: SetStateAction<T>) => void] {
   // Read initial state from window.openai
   const widgetStateFromWindow = (window as any).openai?.widgetState as T;
@@ -112,8 +132,8 @@ export function useWidgetState<T>(
     if (widgetStateFromWindow != null) {
       return widgetStateFromWindow;
     }
-    return typeof defaultState === 'function' 
-      ? (defaultState as () => T)() 
+    return typeof defaultState === "function"
+      ? (defaultState as () => T)()
       : defaultState;
   });
 
@@ -125,21 +145,19 @@ export function useWidgetState<T>(
   }, [widgetStateFromWindow]);
 
   // Persist state back to ChatGPT
-  const setWidgetState = useCallback(
-    (state: SetStateAction<T>) => {
-      _setWidgetState((prevState) => {
-        const newState = typeof state === 'function' 
-          ? (state as (prev: T) => T)(prevState) 
+  const setWidgetState = useCallback((state: SetStateAction<T>) => {
+    _setWidgetState((prevState) => {
+      const newState =
+        typeof state === "function"
+          ? (state as (prev: T) => T)(prevState)
           : state;
-        
-        if ((window as any).openai?.setWidgetState) {
-          (window as any).openai.setWidgetState(newState);
-        }
-        return newState;
-      });
-    },
-    []
-  );
+
+      if ((window as any).openai?.setWidgetState) {
+        (window as any).openai.setWidgetState(newState);
+      }
+      return newState;
+    });
+  }, []);
 
   return [widgetState, setWidgetState] as const;
 }
@@ -206,7 +224,7 @@ server = Server("weather-app")
 async def get_weather(city: str):
     # Fetch weather data
     weather_data = await fetch_weather_api(city)
-    
+
     # Manually construct widget response
     return {
         "content": [
@@ -254,7 +272,7 @@ flowchart LR
     Auto --> Bundle[Auto-Bundle]
     Bundle --> Deploy[Deploy]
     Deploy --> ChatGPT[ChatGPT]
-    
+
     style Create fill:#51cf66
     style Auto fill:#51cf66
     style Bundle fill:#51cf66
@@ -279,12 +297,12 @@ my-app/
 
 ```tsx
 // resources/weather-display.tsx
-import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
-import { z } from 'zod';
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { z } from "zod";
 
 // Define widget metadata - auto-generates tool!
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Display weather information for a city',
+  description: "Display weather information for a city",
   props: z.object({
     city: z.string(),
     temperature: z.number(),
@@ -301,13 +319,13 @@ const WeatherDisplay: React.FC = () => {
 
   const handleAddFavorite = async () => {
     await setState({
-      favorites: [...(state?.favorites || []), props.city]
+      favorites: [...(state?.favorites || []), props.city],
     });
   };
 
   const handleRefresh = async () => {
-    const result = await callTool('get_weather', { city: props.city });
-    console.log('Refreshed:', result);
+    const result = await callTool("get_weather", { city: props.city });
+    console.log("Refreshed:", result);
   };
 
   return (
@@ -334,41 +352,44 @@ export default WeatherDisplay;
 
 ```typescript
 // index.ts
-import { MCPServer, widget, text } from 'mcp-use/server';
-import { z } from 'zod';
+import { MCPServer, widget, text } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
-  name: 'weather-app',
-  version: '1.0.0',
+  name: "weather-app",
+  version: "1.0.0",
 });
 
 // Tool automatically returns widget
-server.tool({
-  name: 'get-weather',
-  description: 'Get current weather for a city',
-  schema: z.object({
-    city: z.string().describe('City name')
-  }),
-  widget: {
-    name: 'weather-display',  // Matches resources/weather-display.tsx
-    invoking: 'Fetching weather...',
-    invoked: 'Weather loaded'
-  }
-}, async ({ city }) => {
-  const weatherData = await fetchWeatherAPI(city);
-  
-  // Simple helper returns both text and widget
-  return widget({
-    props: {
-      city,
-      temperature: weatherData.temp,
-      conditions: weatherData.conditions,
-      humidity: weatherData.humidity,
-      windSpeed: weatherData.windSpeed
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({
+      city: z.string().describe("City name"),
+    }),
+    widget: {
+      name: "weather-display", // Matches resources/weather-display.tsx
+      invoking: "Fetching weather...",
+      invoked: "Weather loaded",
     },
-    output: text(`Weather in ${city}: ${weatherData.temp}°C`)
-  });
-});
+  },
+  async ({ city }) => {
+    const weatherData = await fetchWeatherAPI(city);
+
+    // Simple helper returns both text and widget
+    return widget({
+      props: {
+        city,
+        temperature: weatherData.temp,
+        conditions: weatherData.conditions,
+        humidity: weatherData.humidity,
+        windSpeed: weatherData.windSpeed,
+      },
+      output: text(`Weather in ${city}: ${weatherData.temp}°C`),
+    });
+  },
+);
 
 server.start();
 ```
@@ -402,12 +423,12 @@ sequenceDiagram
     Widget->>State: Load persisted state
     State-->>Widget: favorites: ["Paris"]
     Widget-->>User: Display interactive weather card
-    
+
     User->>Widget: Click "Add to Favorites"
     Widget->>State: Save state(favorites: ["Paris", "Tokyo"])
     State-->>Widget: State saved
     Widget-->>User: Update UI
-    
+
     User->>Widget: Click "Refresh"
     Widget->>MCPServer: callTool("get-weather", {city: "Tokyo"})
     MCPServer->>Tool: Execute tool
@@ -421,6 +442,7 @@ sequenceDiagram
 #### 1. Tool Invocation → Widget Rendering
 
 When a user asks a question, ChatGPT:
+
 1. Identifies the appropriate tool based on the query
 2. Calls the MCP server's tool with parameters
 3. Receives a widget resource in the response
@@ -429,6 +451,7 @@ When a user asks a question, ChatGPT:
 #### 2. Widget State Persistence
 
 Widgets can maintain state across interactions:
+
 - State is saved to ChatGPT's localStorage
 - Survives page reloads and conversation history
 - Accessible via `useWidget()` hook
@@ -437,6 +460,7 @@ Widgets can maintain state across interactions:
 #### 3. Widget-to-Tool Communication
 
 Widgets can call tools directly:
+
 - User interacts with widget controls
 - Widget invokes `callTool()` to execute MCP server tools
 - Server processes the request and returns results
@@ -451,13 +475,13 @@ flowchart TD
     CheckState -->|No| DefaultState[Use Default State]
     LoadState --> Render[Render Widget]
     DefaultState --> Render
-    
+
     Render --> UserAction[User Interaction]
     UserAction --> Update[Update Local State]
     Update --> Persist[setState Persists to Storage]
     Persist --> Rerender[Re-render Widget]
     Rerender --> UserAction
-    
+
     UserAction --> ToolCall[Call Tool]
     ToolCall --> ToolResponse[Tool Returns Data]
     ToolResponse --> UpdateFromTool[Update State from Tool]
@@ -493,7 +517,10 @@ The Inspector connects to your local MCP server, allowing you to test widgets be
 
 **Execute tools that return widgets:**
 
-<img src="/images/inspector/chat-interaction.png" alt="Widget Execution in Inspector" />
+<img
+  src="/images/inspector/chat-interaction.png"
+  alt="Widget Execution in Inspector"
+/>
 
 When you call a tool that returns a widget, the Inspector renders it just like ChatGPT would.
 
@@ -505,7 +532,10 @@ View detailed RPC logs to understand the communication between your widget and t
 
 **Monitor server status:**
 
-<img src="/images/inspector/server-connected.png" alt="Server Connected Status" />
+<img
+  src="/images/inspector/server-connected.png"
+  alt="Server Connected Status"
+/>
 
 The Inspector shows connection status, available tools, resources, and prompts.
 
@@ -524,25 +554,25 @@ For complete Inspector documentation, see [Debugging ChatGPT Apps](/inspector/de
 
 ## OpenAI SDK vs mcp-use: Feature Comparison
 
-| Aspect | OpenAI Apps SDK | mcp-use |
-|--------|-----------------|---------|
-| **Setup** | Manual project structure with separate `server/` and `web/` directories | Single command: `npx create-mcp-use-app` |
-| **Bundling** | Manual esbuild/webpack configuration required | Automatic bundling with hot reload built-in |
-| **Widget Discovery** | Manual registration of widget URLs | Auto-discovery from `resources/` folder |
-| **State Management** | Custom `useWidgetState` hook implementation | Built-in `useWidget()` hook with state included |
-| **Tool Registration** | Manual tool-to-widget wiring | Automatic based on widget metadata |
-| **CSP Configuration** | Manual Content Security Policy setup | Automatic CSP with trusted domains |
-| **Hot Reload** | Manual setup with watch mode | Built-in development server with HMR |
-| **Asset Handling** | Manual static file serving configuration | Automatic `public/` folder serving |
-| **React Setup** | Manual ReactDOM mounting code | Automatic mounting via `McpUseProvider` |
-| **TypeScript** | Manual tsconfig and type definitions | Pre-configured with full type safety |
-| **Inspector Integration** | No built-in debugging tools | Built-in Inspector for testing |
-| **Development Server** | Need to set up separately | Integrated at `http://localhost:3000` |
-| **Widget Props** | Manual `window.openai.toolOutput` parsing | Type-safe `props` from `useWidget()` |
-| **Tool Calls from Widget** | Manual `window.openai.callTool()` | Simple `callTool()` from `useWidget()` |
-| **Display Mode Control** | Manual `window.openai.requestDisplayMode()` | Built-in `requestDisplayMode()` from hook |
-| **Error Handling** | Manual error boundary implementation | Built-in `ErrorBoundary` component |
-| **Theme Support** | Manual theme management | Built-in `ThemeProvider` with system theme |
+| Aspect                     | OpenAI Apps SDK                                                         | mcp-use                                         |
+| -------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------- |
+| **Setup**                  | Manual project structure with separate `server/` and `web/` directories | Single command: `npx create-mcp-use-app`        |
+| **Bundling**               | Manual esbuild/webpack configuration required                           | Automatic bundling with hot reload built-in     |
+| **Widget Discovery**       | Manual registration of widget URLs                                      | Auto-discovery from `resources/` folder         |
+| **State Management**       | Custom `useWidgetState` hook implementation                             | Built-in `useWidget()` hook with state included |
+| **Tool Registration**      | Manual tool-to-widget wiring                                            | Automatic based on widget metadata              |
+| **CSP Configuration**      | Manual Content Security Policy setup                                    | Automatic CSP with trusted domains              |
+| **Hot Reload**             | Manual setup with watch mode                                            | Built-in development server with HMR            |
+| **Asset Handling**         | Manual static file serving configuration                                | Automatic `public/` folder serving              |
+| **React Setup**            | Manual ReactDOM mounting code                                           | Automatic mounting via `McpUseProvider`         |
+| **TypeScript**             | Manual tsconfig and type definitions                                    | Pre-configured with full type safety            |
+| **Inspector Integration**  | No built-in debugging tools                                             | Built-in Inspector for testing                  |
+| **Development Server**     | Need to set up separately                                               | Integrated at `http://localhost:3000`           |
+| **Widget Props**           | Manual `window.openai.toolOutput` parsing                               | Type-safe `props` from `useWidget()`            |
+| **Tool Calls from Widget** | Manual `window.openai.callTool()`                                       | Simple `callTool()` from `useWidget()`          |
+| **Display Mode Control**   | Manual `window.openai.requestDisplayMode()`                             | Built-in `requestDisplayMode()` from hook       |
+| **Error Handling**         | Manual error boundary implementation                                    | Built-in `ErrorBoundary` component              |
+| **Theme Support**          | Manual theme management                                                 | Built-in `ThemeProvider` with system theme      |
 
 ## Code Comparison: Common Tasks
 
@@ -568,7 +598,7 @@ interface WeatherData {
 function WeatherWidget() {
   // Manual access to tool output
   const data = (window as any).openai?.toolOutput as WeatherData;
-  
+
   if (!data) {
     return <div>Loading...</div>;
   }
@@ -600,11 +630,11 @@ Build command: `esbuild src/weather.tsx --bundle --outfile=dist/weather.js`
 
 ```tsx
 // resources/weather.tsx - that's it, one file!
-import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
-import { z } from 'zod';
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { z } from "zod";
 
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Display weather information',
+  description: "Display weather information",
   props: z.object({
     city: z.string(),
     temperature: z.number(),
@@ -663,10 +693,10 @@ function useWidgetState<T>(defaultState: T) {
 
   const setWidgetState = useCallback((state: SetStateAction<T>) => {
     _setWidgetState((prevState) => {
-      const newState = typeof state === 'function' 
-        ? (state as (prev: T) => T)(prevState) 
+      const newState = typeof state === 'function'
+        ? (state as (prev: T) => T)(prevState)
         : state;
-      
+
       if ((window as any).openai?.setWidgetState) {
         (window as any).openai.setWidgetState(newState);
       }
@@ -680,7 +710,7 @@ function useWidgetState<T>(defaultState: T) {
 // Using the hook
 function MyWidget() {
   const [favorites, setFavorites] = useWidgetState<string[]>([]);
-  
+
   const addFavorite = (city: string) => {
     setFavorites(prev => [...prev, city]);
   };
@@ -693,15 +723,15 @@ function MyWidget() {
   <Tab title="mcp-use">
 
 ```tsx
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 
 function MyWidget() {
   // State management built-in!
   const { state, setState } = useWidget();
-  
+
   const addFavorite = async (city: string) => {
     await setState({
-      favorites: [...(state?.favorites || []), city]
+      favorites: [...(state?.favorites || []), city],
     });
   };
 
@@ -726,7 +756,7 @@ function MyWidget() {
         'refresh_data',
         { id: '123' }
       );
-      
+
       if (result.isError) {
         console.error('Tool call failed:', result);
       } else {
@@ -745,17 +775,17 @@ function MyWidget() {
   <Tab title="mcp-use">
 
 ```tsx
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 
 function MyWidget() {
   const { callTool } = useWidget();
-  
+
   const handleRefresh = async () => {
     try {
-      const result = await callTool('refresh_data', { id: '123' });
-      console.log('Success:', result.content);
+      const result = await callTool("refresh_data", { id: "123" });
+      console.log("Success:", result.content);
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
     }
   };
 
@@ -797,13 +827,13 @@ function MyWidget() {
   <Tab title="mcp-use">
 
 ```tsx
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 
 function MyWidget() {
   const { displayMode, requestDisplayMode } = useWidget();
 
   const goFullscreen = async () => {
-    await requestDisplayMode('fullscreen');
+    await requestDisplayMode("fullscreen");
   };
 
   return (
@@ -823,16 +853,33 @@ function MyWidget() {
 Now that you understand how ChatGPT Apps work and how mcp-use simplifies widget development, explore these resources:
 
 <CardGroup cols={2}>
-  <Card title="UI Widgets Guide" icon="paintbrush" href="/typescript/server/ui-widgets">
-    Complete guide to building widgets with mcp-use, including advanced patterns and best practices
+  <Card
+    title="UI Widgets Guide"
+    icon="paintbrush"
+    href="/typescript/server/ui-widgets"
+  >
+    Complete guide to building widgets with mcp-use, including advanced patterns
+    and best practices
   </Card>
-  <Card title="Creating Apps SDK Server" icon="server" href="/typescript/server/creating-apps-sdk-server">
+  <Card
+    title="Creating Apps SDK Server"
+    icon="server"
+    href="/typescript/server/creating-apps-sdk-server"
+  >
     Step-by-step tutorial for setting up an MCP server with Apps SDK widgets
   </Card>
-  <Card title="Inspector Debugging" icon="bug" href="/inspector/debugging-chatgpt-apps">
+  <Card
+    title="Inspector Debugging"
+    icon="bug"
+    href="/inspector/debugging-chatgpt-apps"
+  >
     Learn to debug and test your widgets using the MCP Inspector
   </Card>
-  <Card title="Widget Components" icon="puzzle-piece" href="/typescript/server/widget-components/mcpuseprovider">
+  <Card
+    title="Widget Components"
+    icon="puzzle-piece"
+    href="/typescript/server/widget-components/mcpuseprovider"
+  >
     Reference documentation for all widget components and hooks
   </Card>
 </CardGroup>

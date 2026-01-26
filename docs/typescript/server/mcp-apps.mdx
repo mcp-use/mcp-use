@@ -1,0 +1,395 @@
+---
+title: "MCP Apps - Standard Widget Protocol"
+description: "Build interactive widgets using the official MCP Apps protocol (SEP-1865) with cross-client compatibility"
+icon: "blocks"
+---
+
+MCP Apps is the **official standard** for interactive widgets in the Model Context Protocol ecosystem. Based on the [SEP-1865 specification](https://spec.modelcontextprotocol.io/specification/2025-11-21/extensions/apps/), MCP Apps provides a standardized way to create rich, interactive user interfaces that work across MCP-compatible clients.
+
+<Info>
+  **mcp-use Advantage**: Write your widgets once using `type: "mcpApps"` and
+  they'll work with **both** MCP Apps clients AND ChatGPT automatically. This
+  unique dual-protocol support means maximum compatibility with minimal effort.
+</Info>
+
+<video
+  alt="MCP Apps Widget Example"
+  style={{
+    maxWidth: "600px",
+    borderRadius: "8px",
+    marginBottom: "1.5rem",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+  }}
+  muted
+  autoPlay
+  loop
+>
+  <source src="/images/widget.mp4" type="video/mp4" />
+</video>
+
+## Why MCP Apps?
+
+MCP Apps is the recommended widget protocol for MCP servers because it:
+
+- **MCP-native**: Built specifically for the Model Context Protocol ecosystem
+- **Open Standard**: Based on SEP-1865, ensuring long-term compatibility
+- **Secure**: Double-iframe sandbox architecture with granular CSP control
+- **Feature-rich**: JSON-RPC 2.0 communication with full MCP integration
+- **Future-proof**: Supported by growing ecosystem of MCP clients
+
+## Quick Start
+
+Start with the MCP Apps template:
+
+```bash
+npx create-mcp-use-app my-mcp-server --template apps-sdk
+cd my-mcp-server
+npm install
+npm run dev
+```
+
+This creates a project with dual-protocol support out of the box.
+
+## MCP Apps vs ChatGPT Apps SDK
+
+While both protocols enable interactive widgets, they have key differences:
+
+| Feature             | MCP Apps (Standard)                    | ChatGPT Apps SDK               |
+| ------------------- | -------------------------------------- | ------------------------------ |
+| **Protocol**        | JSON-RPC 2.0 over `postMessage`        | `window.openai` global API     |
+| **MIME Type**       | `text/html;profile=mcp-app`            | `text/html+skybridge`          |
+| **Specification**   | SEP-1865 (open standard)               | OpenAI proprietary             |
+| **Architecture**    | Double-iframe sandbox                  | Single iframe                  |
+| **CSP Format**      | camelCase (`connectDomains`)           | snake_case (`connect_domains`) |
+| **Client Support**  | MCP Apps clients (Claude, Goose, etc.) | ChatGPT                        |
+| **mcp-use Support** | ✅ Full support                        | ✅ Full support                |
+
+<Note>
+  **Best of Both Worlds**: With mcp-use, you don't have to choose! Using `type:
+  "mcpApps"` generates metadata for **both** protocols automatically, so your
+  widgets work everywhere.
+</Note>
+
+## Creating an MCP Apps Widget
+
+### Using Dual-Protocol Type (Recommended)
+
+The `mcpApps` type enables your widgets to work with both MCP Apps clients and ChatGPT:
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+});
+
+// Register a dual-protocol widget
+server.uiResource({
+  type: "mcpApps", // 👈 Works with BOTH MCP Apps AND ChatGPT
+  name: "weather-display",
+  htmlTemplate: `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Weather Display</title>
+      </head>
+      <body>
+        <div id="root"></div>
+        <script type="module" src="/resources/weather-display.js"></script>
+      </body>
+    </html>
+  `,
+  metadata: {
+    // Unified CSP configuration - works for both protocols
+    csp: {
+      connectDomains: ["https://api.weather.com"],
+      resourceDomains: ["https://cdn.weather.com"],
+    },
+    prefersBorder: true,
+
+    // MCP Apps-specific metadata (optional)
+    autoResize: true,
+
+    // ChatGPT-specific metadata (optional)
+    widgetDescription: "Displays current weather conditions",
+  },
+});
+```
+
+This single configuration automatically generates metadata for **both protocols**:
+
+**For MCP Apps Clients:**
+
+```typescript
+{
+  mimeType: "text/html;profile=mcp-app",
+  _meta: {
+    ui: {
+      resourceUri: "ui://widget/weather-display.html",
+      csp: {
+        connectDomains: ["https://api.weather.com"],
+        resourceDomains: ["https://cdn.weather.com"]
+      },
+      prefersBorder: true,
+      autoResize: true
+    }
+  }
+}
+```
+
+**For ChatGPT (Apps SDK):**
+
+```typescript
+{
+  mimeType: "text/html+skybridge",
+  _meta: {
+    "openai/outputTemplate": "ui://widget/weather-display.html",
+    "openai/widgetCSP": {
+      connect_domains: ["https://api.weather.com"],
+      resource_domains: ["https://cdn.weather.com"]
+    },
+    "openai/widgetPrefersBorder": true,
+    "openai/widgetDescription": "Displays current weather conditions"
+  }
+}
+```
+
+## Widget Code (Protocol-Agnostic)
+
+The beauty of mcp-use is that your widget code is **identical** regardless of which protocol is used:
+
+```tsx
+// resources/weather-display.tsx
+import React from "react";
+import { useWidget, McpUseProvider, type WidgetMetadata } from "mcp-use/react";
+import { z } from "zod";
+
+const propSchema = z.object({
+  city: z.string(),
+  temperature: z.number(),
+  conditions: z.string(),
+});
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "Display weather information",
+  props: propSchema,
+};
+
+const WeatherDisplay: React.FC = () => {
+  const { props, isPending } = useWidget<z.infer<typeof propSchema>>();
+
+  if (isPending) {
+    return <div>Loading weather...</div>;
+  }
+
+  return (
+    <McpUseProvider autoSize>
+      <div className="weather-card">
+        <h2>{props.city}</h2>
+        <div className="temperature">{props.temperature}°C</div>
+        <div className="conditions">{props.conditions}</div>
+      </div>
+    </McpUseProvider>
+  );
+};
+
+export default WeatherDisplay;
+```
+
+**The same widget code works with:**
+
+- ✅ Claude Desktop (MCP Apps protocol)
+- ✅ ChatGPT (Apps SDK protocol)
+- ✅ Goose (MCP Apps protocol)
+- ✅ Any MCP Apps-compatible client
+- ✅ Future clients supporting either protocol
+
+## MCP Apps Bridge API
+
+For widgets that need direct protocol access, mcp-use provides the MCP Apps bridge:
+
+```typescript
+import { getMcpAppsBridge } from 'mcp-use/react';
+
+function MyWidget() {
+  const bridge = getMcpAppsBridge();
+
+  // The bridge automatically connects
+  // All methods return promises
+
+  // Call an MCP tool
+  const result = await bridge.callTool('search', { query: 'hello' });
+
+  // Read an MCP resource
+  const data = await bridge.readResource('file:///data.json');
+
+  // Send a message to the host
+  await bridge.sendMessage({ type: 'info', text: 'Processing...' });
+
+  // Open a link
+  await bridge.openLink('https://example.com');
+
+  // Request display mode change
+  await bridge.requestDisplayMode('fullscreen');
+
+  return <div>My Widget</div>;
+}
+```
+
+<Info>
+  Most widgets won't need the bridge directly. The `useWidget()` hook provides a
+  simplified API that works across both protocols automatically.
+</Info>
+
+## Protocol-Specific Metadata
+
+While mcp-use handles protocol differences automatically, you can provide protocol-specific metadata when needed:
+
+```typescript
+server.uiResource({
+  type: "mcpApps",
+  name: "my-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    // Shared metadata (used by both)
+    csp: { connectDomains: ["https://api.example.com"] },
+    prefersBorder: true,
+
+    // MCP Apps specific (ignored by ChatGPT)
+    autoResize: true,
+    supportsLocalStorage: true,
+
+    // ChatGPT specific (ignored by MCP Apps clients)
+    widgetDescription: "Special description for ChatGPT",
+    widgetDomain: "https://chatgpt.com",
+  },
+});
+```
+
+## Migration from Apps SDK
+
+If you have existing widgets using `type: "appsSdk"`, migration is simple:
+
+### Before (ChatGPT only):
+
+```typescript
+server.uiResource({
+  type: "appsSdk", // Only works with ChatGPT
+  name: "my-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: { connectDomains: ["https://api.example.com"] },
+  },
+});
+```
+
+### After (Universal compatibility):
+
+```typescript
+server.uiResource({
+  type: "mcpApps", // Works with ChatGPT AND MCP Apps clients
+  name: "my-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: { connectDomains: ["https://api.example.com"] },
+  },
+});
+```
+
+That's it! The metadata structure is identical, and your widget code requires **no changes**.
+
+## Comparison with MCP UI
+
+MCP Apps is designed for **interactive widgets**, while MCP UI is better for simpler, static content:
+
+| Feature              | MCP Apps                          | MCP UI                   |
+| -------------------- | --------------------------------- | ------------------------ |
+| **Use Case**         | Interactive widgets with state    | Static/simple content    |
+| **Interactivity**    | Full React components, tool calls | Limited (mostly display) |
+| **State Management** | Built-in state persistence        | No state                 |
+| **Tool Calls**       | ✅ Can call other MCP tools       | ❌ No tool access        |
+| **ChatGPT Support**  | ✅ Via dual-protocol              | ❌ Not supported         |
+| **Complexity**       | Higher (full React app)           | Lower (simple HTML)      |
+
+**When to use MCP Apps:**
+
+- Interactive dashboards
+- Forms and data entry
+- Multi-step workflows
+- Real-time updates
+- Complex visualizations
+
+**When to use MCP UI:**
+
+- Simple content display
+- Read-only views
+- Lightweight embeds
+
+See [MCP UI Resources](/typescript/server/mcp-ui-resources) for more on the alternative approach.
+
+## Testing Your Widgets
+
+### Using the Inspector
+
+The MCP Inspector fully supports both MCP Apps and ChatGPT Apps SDK protocols:
+
+1. **Start your server**: `npm run dev`
+2. **Open Inspector**: `http://localhost:3000/inspector`
+3. **Protocol Toggle**: Switch between MCP Apps and ChatGPT protocols
+4. **Debug Controls**: Test different devices, locales, CSP modes
+5. **Display Modes**: Test inline, picture-in-picture, and fullscreen
+
+See [Debugging Widgets](/inspector/debugging-chatgpt-apps) for the complete guide.
+
+### Testing in Production Clients
+
+**ChatGPT:**
+
+1. Enable Developer Mode in Settings → Connectors → Advanced
+2. Add your MCP server URL
+3. Start a conversation and trigger your tools
+
+**Claude Desktop** (upcoming MCP Apps support):
+
+1. Add your server to Claude's MCP configuration
+2. Widgets render automatically when tools return them
+
+**Goose:**
+
+1. Configure your MCP server in Goose
+2. Call tools that return widgets
+
+## Protocol Adapters (Advanced)
+
+Behind the scenes, mcp-use uses protocol adapters to transform your widget configuration:
+
+```typescript
+import { McpAppsAdapter, AppsSdkAdapter } from "mcp-use/server";
+
+// These are created automatically when you use type: "mcpApps"
+const mcpAppsAdapter = new McpAppsAdapter();
+const appsSdkAdapter = new AppsSdkAdapter();
+
+// Transform your unified metadata to each protocol
+const mcpAppsMetadata = mcpAppsAdapter.transformMetadata(yourMetadata);
+const appsSdkMetadata = appsSdkAdapter.transformMetadata(yourMetadata);
+```
+
+You rarely need to interact with adapters directly, but they're available for advanced use cases.
+
+## Next Steps
+
+- [ChatGPT Apps SDK](/typescript/server/ui-widgets) - Learn about the ChatGPT-specific protocol
+- [Widget Components](/typescript/server/widget-components/usewidget) - Explore React components and hooks
+- [Creating Apps SDK Server](/typescript/server/creating-apps-sdk-server) - Complete server setup guide
+- [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test and debug with the Inspector
+- [MCP UI Resources](/typescript/server/mcp-ui-resources) - Alternative approach for simpler UIs
+
+## Learn More
+
+- [MCP Apps Extension (SEP-1865)](https://spec.modelcontextprotocol.io/specification/2025-11-21/extensions/apps/)
+- [Official MCP Apps SDK](https://github.com/modelcontextprotocol/ext-apps)
+- [Model Context Protocol](https://modelcontextprotocol.io/)

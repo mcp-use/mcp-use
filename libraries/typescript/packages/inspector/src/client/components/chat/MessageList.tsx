@@ -33,6 +33,7 @@ interface MessageListProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   tools?: any[];
+  sendMessage?: (message: string) => Promise<void>;
 }
 
 export const MessageList = memo(
@@ -42,6 +43,7 @@ export const MessageList = memo(
     serverId,
     readResource,
     tools,
+    sendMessage,
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -181,6 +183,7 @@ export const MessageList = memo(
                               toolMeta={getToolMeta(
                                 part.toolInvocation.toolName
                               )}
+                              onSendFollowUp={sendMessage}
                             />
                           )}
                         </div>
@@ -219,6 +222,7 @@ export const MessageList = memo(
                                   serverId={serverId}
                                   readResource={readResource}
                                   toolMeta={getToolMeta(toolCall.toolName)}
+                                  onSendFollowUp={sendMessage}
                                 />
                               )}
                             </div>

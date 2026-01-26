@@ -7,7 +7,14 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { Check, Copy, History, Maximize, Minimize, Zap } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { toast } from "sonner";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
@@ -344,6 +351,9 @@ export function ToolResultDisplay({
     null
   );
 
+  // Track if we've ever seen component views available (to handle async resource loading)
+  const hasSeenComponentViewRef = useRef(false);
+
   // Get the most recent result to determine which tool we're viewing
   const currentResult = results[0];
 
@@ -364,6 +374,12 @@ export function ToolResultDisplay({
       setSelectedIndex(0);
     }
   }, [toolResults.length, selectedIndex]);
+
+  // Reset view mode tracking when tool changes
+  useEffect(() => {
+    hasSeenComponentViewRef.current = false;
+    setViewMode(null);
+  }, [currentResult?.toolName]);
 
   // Update relative time every second
   useEffect(() => {
@@ -538,17 +554,26 @@ export function ToolResultDisplay({
       viewMode && availableViews.some((v) => v.mode === viewMode);
     const firstComponentView = availableViews.find((v) => v.mode !== "json");
 
-    // Initialize if null, fix if current mode isn't available,
-    // OR switch from JSON to component when component first becomes available
-    // (handles async resource loading where JSON was the only option initially)
-    if (
-      !viewMode ||
-      !isCurrentModeAvailable ||
-      (viewMode === "json" && firstComponentView)
-    ) {
-      if (firstComponentView) {
+    // Track if component views are now available
+    if (firstComponentView) {
+      const wasComponentViewAvailable = hasSeenComponentViewRef.current;
+      hasSeenComponentViewRef.current = true;
+
+      // Initialize if null, fix if current mode isn't available,
+      // OR switch from JSON to component when component FIRST becomes available
+      // (handles async resource loading where JSON was the only option initially)
+      // Only auto-switch once - after that, respect user's choice
+      if (
+        !viewMode ||
+        !isCurrentModeAvailable ||
+        (viewMode === "json" && !wasComponentViewAvailable)
+      ) {
         setViewMode(firstComponentView.mode);
-      } else {
+        return;
+      }
+    } else {
+      // No component views available
+      if (!viewMode || !isCurrentModeAvailable) {
         setViewMode("json");
       }
     }
@@ -846,6 +871,12 @@ export function ToolResultDisplay({
                         className="w-full h-full relative p-4"
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
+                        onSendFollowUp={(text) => {
+                          toast.info("Message received", {
+                            description: text,
+                            duration: 5000,
+                          });
+                        }}
                       />
                     </div>
                   );

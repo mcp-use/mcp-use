@@ -1,25 +1,36 @@
 ---
-title: "Creating an MCP Server with Apps SDK"
-description: "Complete guide to building an MCP server with OpenAI Apps SDK widget support"
+title: "Creating an MCP Server with Widgets"
+description: "Complete guide to building an MCP server with MCP Apps and ChatGPT Apps SDK widget support"
 icon: "rocket"
 ---
 
 <iframe
   className="w-full aspect-video rounded-xl"
   src="https://www.youtube.com/embed/5L-aXEB8Yh0"
-  title="Building MCP Servers with Apps SDK Support"
+  title="Building MCP Servers with Widget Support"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
   allowFullScreen
 ></iframe>
 
-This guide walks you through creating a complete MCP server that supports OpenAI Apps SDK widgets, enabling rich interactive experiences in ChatGPT and other OpenAI-powered applications.
+This guide walks you through creating a complete MCP server with interactive widget support, enabling rich user experiences across **both** MCP Apps clients (Claude, Goose, etc.) and ChatGPT.
+
+<Info>
+**Dual-Protocol Advantage**: With mcp-use, you write your widgets once using `type: "mcpApps"` and they automatically work with both:
+- **MCP Apps** - Standard MCP protocol (Claude, Goose, MCP clients)
+- **ChatGPT** - OpenAI Apps SDK protocol
+
+This guide focuses on the recommended dual-protocol approach.
+
+</Info>
 
 ## What You'll Build
 
 By the end of this guide, you'll have:
-- A fully functional MCP server with Apps SDK support
+
+- A fully functional MCP server with dual-protocol widget support
 - Automatic widget registration from React components
+- Widgets that work in both ChatGPT and MCP Apps clients
 - Tools that return interactive widgets
 - Production-ready configuration
 
@@ -31,24 +42,29 @@ By the end of this guide, you'll have:
 
 ## Step 1: Create Your Project
 
-The easiest way to start is using the Apps SDK template:
+The easiest way to start is using the Apps SDK template (which supports both protocols):
 
 ```bash
-npx create-mcp-use-app my-apps-sdk-server --template apps-sdk
-cd my-apps-sdk-server
+npx create-mcp-use-app my-widget-server --template apps-sdk
+cd my-widget-server
 ```
 
 This creates a project structure:
 
 ```
-my-apps-sdk-server/
+my-widget-server/
 ├── resources/              # React widgets go here
-│   └── display-weather.tsx # Example widget
+│   └── display-weather.tsx # Example dual-protocol widget
 ├── index.ts               # Server entry point
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
+
+<Note>
+  The template includes example widgets that work with both MCP Apps and ChatGPT
+  out of the box using `type: "mcpApps"`.
+</Note>
 
 ## Step 2: Understanding the Server Setup
 
@@ -58,10 +74,10 @@ Let's examine the server entry point (`index.ts`):
 import { MCPServer } from "mcp-use/server";
 
 const server = new MCPServer({
-  name: "my-apps-sdk-server",
+  name: "my-widget-server",
   version: "1.0.0",
-  description: "MCP server with OpenAI Apps SDK integration",
-  // Optional: Set baseUrl for production CSP configuration
+  description: "MCP server with dual-protocol widget support",
+  // Required for production: Used for CSP configuration and widget URLs
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 
@@ -76,13 +92,14 @@ server.listen().then(() => {
 
 ### Key Configuration Options
 
-- **`baseUrl`**: Required for production. Used to configure Content Security Policy (CSP) for Apps SDK widgets
+- **`baseUrl`**: Required for production. Used to configure Content Security Policy (CSP) for both widget protocols and generate proper widget URLs
 - **`version`**: Server version for client discovery
 - **`description`**: Human-readable server description
+- **`name`**: Unique server identifier
 
-## Step 3: Create Your First Widget
+## Step 3: Create Your First Dual-Protocol Widget
 
-Widgets are React components in the `resources/` folder. They're automatically registered as both MCP tools and resources.
+Widgets are React components in the `resources/` folder. When using `type: "mcpApps"`, they're automatically registered to work with **both** MCP Apps and ChatGPT protocols.
 
 Create `resources/user-profile.tsx`:
 
@@ -142,8 +159,8 @@ const UserProfile: React.FC = () => {
             role === "admin"
               ? "bg-red-500 text-white"
               : role === "user"
-              ? "bg-blue-500 text-white"
-              : "bg-gray-500 text-white"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-500 text-white"
           }`}
         >
           {role}
@@ -178,6 +195,7 @@ const { name, email, avatar, role, bio } = props;
 ```
 
 See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete patterns.
+
 </Warning>
 
 ### How Automatic Registration Works
@@ -187,10 +205,19 @@ When you call `server.listen()`, the framework:
 1. **Scans** the `resources/` directory for `.tsx` files
 2. **Extracts** `widgetMetadata` from each component
 3. **Registers** a tool with the filename as the name (e.g., `user-profile`)
-4. **Registers** a resource at `ui://widget/user-profile.html`
-5. **Builds** the widget for Apps SDK compatibility
+4. **Creates dual-protocol metadata** automatically:
+   - MCP Apps: `text/html;profile=mcp-app` with `_meta.ui.*` fields
+   - ChatGPT: `text/html+skybridge` with `_meta.openai/*` fields
+5. **Registers** a resource at `ui://widget/user-profile.html`
+6. **Builds** the widget with dual-protocol support
 
-No manual registration needed!
+No manual registration needed! The same widget works in both ChatGPT and MCP Apps clients.
+
+<Note>
+  **Protocol Detection**: Your widget code doesn't need to know which protocol
+  is being used. The `useWidget()` hook automatically detects the environment
+  and provides a unified API.
+</Note>
 
 ## Step 4: Add Traditional MCP Tools
 
@@ -198,11 +225,13 @@ You can mix automatic widgets with traditional tools:
 
 ```typescript
 // Fetch user data from an API
-server.tool({
-  name: "get-user-data",
-  description: "Fetch user information from the database",
-  schema: z.object({ userId: z.string().describe("The user ID to fetch") }),
-}, async ({ userId }) => {
+server.tool(
+  {
+    name: "get-user-data",
+    description: "Fetch user information from the database",
+    schema: z.object({ userId: z.string().describe("The user ID to fetch") }),
+  },
+  async ({ userId }) => {
     // Simulate API call
     const userData = {
       name: "John Doe",
@@ -213,7 +242,8 @@ server.tool({
     };
 
     return text(`User data retrieved for ${userId}`);
-  });
+  },
+);
 
 // Display user profile using the widget
 // The LLM can now call 'user-profile' tool with the data
@@ -256,6 +286,7 @@ npm run dev
 ```
 
 This starts:
+
 - MCP server on port 3000
 - Widget development server with Hot Module Replacement (HMR)
 - Inspector UI at `http://localhost:3000/inspector`
@@ -353,6 +384,7 @@ npm start
 ```
 
 The build process:
+
 - Compiles TypeScript
 - Bundles React widgets for Apps SDK
 - Optimizes assets
@@ -371,6 +403,7 @@ const server = new MCPServer({
 ```
 
 This ensures:
+
 - Widget URLs use the correct domain
 - CSP includes your server domain
 - Works behind proxies and custom domains
@@ -404,14 +437,8 @@ Use descriptive Zod schemas to help LLMs understand your widgets:
 ```typescript
 // ✅ Good: Clear descriptions
 const propSchema = z.object({
-  city: z
-    .string()
-    .describe("The city name (e.g., 'New York', 'Tokyo')"),
-  temperature: z
-    .number()
-    .min(-50)
-    .max(60)
-    .describe("Temperature in Celsius"),
+  city: z.string().describe("The city name (e.g., 'New York', 'Tokyo')"),
+  temperature: z.number().min(-50).max(60).describe("Temperature in Celsius"),
 });
 
 // ❌ Bad: No descriptions
@@ -482,6 +509,7 @@ export const widgetMetadata: WidgetMetadata = {
 **Problem**: Widget file exists but tool doesn't appear
 
 **Solutions**:
+
 - Ensure file has `.tsx` extension
 - Export `widgetMetadata` object
 - Export default React component
@@ -492,6 +520,7 @@ export const widgetMetadata: WidgetMetadata = {
 **Problem**: Component receives empty props
 
 **Solutions**:
+
 - **Check `isPending` first**: Widgets render before tool execution completes. Props are empty `{}` when `isPending` is `true`
 - Use `useWidget()` hook (not React props)
 - Ensure `widgetMetadata.props` is a valid Zod schema
@@ -510,6 +539,7 @@ if (isPending) return <div>Loading...</div>;
 **Problem**: Widget loads but assets fail with CSP errors
 
 **Solutions**:
+
 - Set `baseUrl` in server config
 - Add external domains to CSP whitelist
 - Use HTTPS for all resources
@@ -525,8 +555,10 @@ appsSdkMetadata: {
 
 ## Next Steps
 
-- [UI Widgets Overview](./ui-widgets) - Deep dive into automatic widget registration
-- [Project Templates](./templates) - Explore available templates
+- [MCP Apps](./mcp-apps) - Learn about the standard MCP Apps protocol
+- [ChatGPT Apps SDK](./ui-widgets) - Deep dive into ChatGPT-specific features
+- [Widget Components](./widget-components/usewidget) - Explore React hooks and components
+- [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test with the Inspector
 - [Deployment Guide](./deployment/mcp-use) - Deploy your server to production
 
 ## Example: Complete Server
@@ -545,11 +577,15 @@ const server = new MCPServer({
 });
 
 // Traditional tool to fetch weather data
-server.tool({
-  name: "fetch-weather",
-  description: "Fetch current weather for a city",
-  schema: z.object({ city: z.string().describe("The city to fetch weather for") }),
-}, async ({ city }) => {
+server.tool(
+  {
+    name: "fetch-weather",
+    description: "Fetch current weather for a city",
+    schema: z.object({
+      city: z.string().describe("The city to fetch weather for"),
+    }),
+  },
+  async ({ city }) => {
     // Simulate API call
     const weather = {
       city,
@@ -558,11 +594,14 @@ server.tool({
       humidity: 65,
     };
 
-    return  mix(
-      text(`Weather for ${city}: ${weather.condition}, ${weather.temperature}°C`), 
-      object(weather)
+    return mix(
+      text(
+        `Weather for ${city}: ${weather.condition}, ${weather.temperature}°C`,
+      ),
+      object(weather),
     );
-  });
+  },
+);
 
 // Widgets in resources/ folder are automatically registered
 // - resources/display-weather.tsx
@@ -575,12 +614,13 @@ server.listen().then(() => {
 
 ## Summary
 
-You've learned how to:
-- ✅ Create an MCP server with Apps SDK support
-- ✅ Use automatic widget registration
-- ✅ Build React widgets with `useWidget` hook
-- ✅ Configure Apps SDK metadata
+You've learned how to build MCP servers with dual-protocol widget support:
+
+- ✅ Create an MCP server with dual-protocol widget support
+- ✅ Use automatic widget registration with `type: "mcpApps"`
+- ✅ Build React widgets that work in both MCP Apps and ChatGPT
+- ✅ Use the `useWidget()` hook for protocol-agnostic widget code
+- ✅ Configure widget metadata for both protocols
 - ✅ Test and deploy your server
 
-Your MCP server is now ready to provide rich interactive experiences in ChatGPT!
-
+Your MCP server is now ready to provide rich interactive experiences in **both** MCP Apps clients and ChatGPT!

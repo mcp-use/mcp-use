@@ -4,6 +4,7 @@
 
 import { useMemo } from "react";
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { PlaygroundSettings } from "../context/WidgetDebugContext";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
@@ -20,6 +21,7 @@ export interface HostContextParams {
   toolInput?: Record<string, unknown>;
   toolOutput?: unknown;
   toolMetadata?: Record<string, unknown>;
+  tool?: Tool; // Full Tool object from MCP SDK
 }
 
 /**
@@ -37,6 +39,7 @@ export function useMcpAppsHostContext({
   toolInput,
   toolOutput,
   toolMetadata,
+  tool,
 }: HostContextParams): McpUiHostContext {
   return useMemo<McpUiHostContext>(
     () => ({
@@ -47,20 +50,16 @@ export function useMcpAppsHostContext({
       locale: playground.locale,
       timeZone: playground.timeZone,
       platform: deviceType === "mobile" ? "mobile" : "web",
-      userAgent: {
-        device: { type: deviceType },
-        capabilities: playground.capabilities,
-      } as any,
+      userAgent: "mcp-use-inspector/0.16.2",
       deviceCapabilities: playground.capabilities,
       safeAreaInsets: playground.safeAreaInsets,
       styles: { variables: {} as any },
-      toolInfo: {
-        id: toolCallId,
-        name: toolName,
-        input: toolInput,
-        output: toolOutput,
-        metadata: toolMetadata,
-      } as any,
+      toolInfo: tool
+        ? {
+            id: toolCallId,
+            tool: tool,
+          }
+        : undefined,
     }),
     [
       theme,
@@ -77,6 +76,7 @@ export function useMcpAppsHostContext({
       toolInput,
       toolOutput,
       toolMetadata,
+      tool,
     ]
   );
 }

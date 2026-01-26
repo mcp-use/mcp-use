@@ -151,6 +151,28 @@ export function IframeConsole({
     () => logs.filter((log) => log.level === "warn").length,
     [logs]
   );
+  const infoCount = useMemo(
+    () =>
+      logs.filter(
+        (log) =>
+          log.level === "log" ||
+          log.level === "info" ||
+          log.level === "debug" ||
+          log.level === "trace"
+      ).length,
+    [logs]
+  );
+
+  // Total count for badge
+  const totalCount = logs.length;
+
+  // Determine badge color based on most severe level
+  const badgeColor = useMemo(() => {
+    if (errorCount > 0) return "bg-red-500";
+    if (warnCount > 0) return "bg-yellow-500";
+    if (infoCount > 0) return "bg-zinc-500";
+    return "bg-zinc-500";
+  }, [errorCount, warnCount, infoCount]);
 
   // Auto-scroll to bottom when logs change or console opens
   useEffect(() => {
@@ -172,20 +194,37 @@ export function IframeConsole({
               onClick={() => setIsOpen(true)}
             >
               <TerminalIcon className="size-4" />
-              {(errorCount > 0 || warnCount > 0) && (
+              {totalCount > 0 && (
                 <span
                   className={cn(
                     "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
-                    errorCount > 0 ? "bg-red-500" : "bg-yellow-500"
+                    badgeColor
                   )}
                 >
-                  {errorCount + warnCount}
+                  {totalCount}
                 </span>
               )}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{errorCount + warnCount} console logs from the iframe</p>
+            <div className="text-xs space-y-1">
+              <p className="font-semibold">
+                {totalCount} console {totalCount === 1 ? "log" : "logs"}
+              </p>
+              {errorCount > 0 && (
+                <p className="text-red-400">
+                  {errorCount} error{errorCount !== 1 ? "s" : ""}
+                </p>
+              )}
+              {warnCount > 0 && (
+                <p className="text-yellow-400">
+                  {warnCount} warning{warnCount !== 1 ? "s" : ""}
+                </p>
+              )}
+              {infoCount > 0 && (
+                <p className="text-zinc-400">{infoCount} info</p>
+              )}
+            </div>
           </TooltipContent>
         </Tooltip>
       </SheetTrigger>

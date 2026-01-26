@@ -1,16 +1,48 @@
 ---
-title: "Apps SDK Widgets"
-description: "Build ChatGPT compatible widgets using react with zero boilerplate"
+title: "ChatGPT Apps SDK Widgets"
+description: "Build ChatGPT-compatible widgets using React with the Apps SDK protocol"
 icon: "openai"
 ---
 
-UI widgets allow you to create rich, interactive user interfaces that MCP clients can display. 
-**mcp-use** supports multiple widget formats including **OpenAI Apps SDK** (this page) and [**MCP-UI**](/typescript/server/mcp-ui-resources).
+<Info>
+**Looking for the MCP Standard?** This page covers the **ChatGPT Apps SDK** protocol specifically. For the official MCP Apps protocol (recommended), see [MCP Apps](/typescript/server/mcp-apps).
 
+**Cross-Compatibility**: mcp-use uniquely allows you to write widgets once using `type: "mcpApps"` that work with **both** ChatGPT (Apps SDK) and MCP Apps clients automatically.
 
-<video alt="Apps SDK UI Widget Example" style={{maxWidth: '600px', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} muted autoPlay loop>
+</Info>
+
+The ChatGPT Apps SDK is OpenAI's proprietary protocol for interactive widgets in ChatGPT. While it's specific to OpenAI's ecosystem, **mcp-use** supports it fully alongside the standard [MCP Apps](/typescript/server/mcp-apps) protocol.
+
+<video
+  alt="Apps SDK UI Widget Example"
+  style={{
+    maxWidth: "600px",
+    borderRadius: "8px",
+    marginBottom: "1.5rem",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+  }}
+  muted
+  autoPlay
+  loop
+>
   <source src="/images/widget.mp4" type="video/mp4" />
 </video>
+
+## Protocol Choice: Apps SDK vs MCP Apps
+
+Before starting, understand your options:
+
+| Option                | Protocol                | Compatibility                      | Use When                       |
+| --------------------- | ----------------------- | ---------------------------------- | ------------------------------ |
+| **`type: "mcpApps"`** | Both MCP Apps + ChatGPT | ✅ ChatGPT<br/>✅ MCP Apps clients | You want maximum compatibility |
+| **`type: "appsSdk"`** | ChatGPT Apps SDK only   | ✅ ChatGPT<br/>❌ MCP Apps clients | ChatGPT-only features needed   |
+
+<Note>
+**Recommended**: Use `type: "mcpApps"` for new projects to support both ChatGPT and MCP Apps clients. Your widget code remains identical—only the registration differs.
+
+See [MCP Apps](/typescript/server/mcp-apps) for details on the dual-protocol approach.
+
+</Note>
 
 ## Quick Start
 
@@ -24,6 +56,7 @@ npm run dev
 ```
 
 This creates a project with:
+
 ```
 my-mcp-server/
 ├── resources/                      # 👈 Put your UI widgets here
@@ -45,7 +78,6 @@ my-mcp-server/
 ### Folder Structure
 
 Widgets can be organized in two ways: **single-file widgets** or **folder-based widgets**. Choose the organization style that best fits your widget's complexity.
-
 
 For simple widgets, a single file is sufficient:
 
@@ -77,6 +109,7 @@ resources/
 ```
 
 **Key Points:**
+
 - The folder name becomes the widget name (e.g., `product-search-result`)
 - The entry point must be named `widget.tsx` (not `index.tsx`)
 - You can organize sub-components, hooks, utilities, and types within the folder
@@ -86,20 +119,20 @@ resources/
 
 ```tsx
 // resources/product-search-result/widget.tsx
-import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
-import { Accordion } from './components/Accordion';
-import { Carousel } from './components/Carousel';
-import type { ProductSearchResultProps } from './types';
-import { propSchema } from './types';
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { Accordion } from "./components/Accordion";
+import { Carousel } from "./components/Carousel";
+import type { ProductSearchResultProps } from "./types";
+import { propSchema } from "./types";
 
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Display product search results with filtering',
+  description: "Display product search results with filtering",
   props: propSchema,
 };
 
 const ProductSearchResult: React.FC = () => {
   const { props } = useWidget<ProductSearchResultProps>();
-  
+
   return (
     <McpUseProvider autoSize>
       <div>
@@ -129,24 +162,71 @@ if (isPending) {
 ```
 
 See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete details and patterns.
+
 </Warning>
 
-## Widget Metadata 
+## Dual-Protocol Support
+
+mcp-use uniquely supports **both** ChatGPT Apps SDK and MCP Apps protocols. Choose your registration type based on compatibility needs:
+
+### Using `type: "mcpApps"` (Recommended)
+
+Works with both ChatGPT and MCP Apps clients:
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" });
+
+server.uiResource({
+  type: "mcpApps", // 👈 Dual-protocol support
+  name: "weather-display",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: { connectDomains: ["https://api.weather.com"] },
+    prefersBorder: true,
+    autoResize: true, // MCP Apps specific
+    widgetDescription: "...", // ChatGPT specific
+  },
+});
+```
+
+This generates metadata for **both protocols** automatically. Your widget code stays identical.
+
+### Using `type: "appsSdk"` (ChatGPT only)
+
+For ChatGPT-exclusive features or legacy compatibility:
+
+```typescript
+server.uiResource({
+  type: "appsSdk", // ChatGPT only
+  name: "weather-display",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: { connectDomains: ["https://api.weather.com"] },
+  },
+});
+```
+
+See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation.
+
+## Widget Metadata
 
 Contains the information that the MCP resource (and the tool that exposes it) will use when are automatically built by mcp-use.
+
 ```typescript
 import type { WidgetMetadata } from 'mcp-use/react';
 
 export const widgetMetadata: WidgetMetadata = {
   // Required: Human-readable description
   description: string,
-  
+
   // Required: Zod schema defining the widget's input parameters
   props: z.ZodObject<...>,
-  
+
   // Optional: Control automatic tool registration (defaults to true)
   exposeAsTool?: boolean,
-    
+
   // Optional: Apps SDK metadata (CSP, widget description, etc.)
   appsSdkMetadata?: {
     'openai/widgetDescription'?: string,
@@ -195,9 +275,10 @@ export const appsSdkMetadata = {
 By default, widgets are automatically registered as both MCP tools and resources (`exposeAsTool: true`). You can control this behavior:
 
 - **Auto-registered (default)**: Widget is callable as a tool directly by the model
+
   ```typescript
   export const widgetMetadata: WidgetMetadata = {
-    description: 'Display weather',
+    description: "Display weather",
     props: propSchema,
     // exposeAsTool: true (default, can be omitted)
   };
@@ -206,12 +287,11 @@ By default, widgets are automatically registered as both MCP tools and resources
 - **Custom tool only**: Widget is only accessible through custom tools you define
   ```typescript
   export const widgetMetadata: WidgetMetadata = {
-    description: 'Display weather',
+    description: "Display weather",
     props: propSchema,
-    exposeAsTool: false  // Don't auto-register as tool
+    exposeAsTool: false, // Don't auto-register as tool
   };
   ```
-
 
 **Note**: The CSP domains you specify will be merged with default trusted domains (like `*.oaistatic.com`, `*.oaiusercontent.com`, `*.openai.com`, and your server's base URL). This ensures your widget can access both your custom resources and OpenAI's required domains.
 
@@ -221,21 +301,19 @@ mcp-use provides a comprehensive set of React components and hooks for building 
 
 ### Components
 
-| Component | Description | Link |
-|-----------|-------------|------|
+| Component          | Description                                                                                                                     | Link                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | **McpUseProvider** | Unified provider that combines all common React setup (StrictMode, ThemeProvider, BrowserRouter, WidgetControls, ErrorBoundary) | [McpUseProvider →](./widget-components/mcpuseprovider) |
-| **WidgetControls** | Debug button and view controls (fullscreen/pip) with customizable positioning | [WidgetControls →](./widget-components/widgetcontrols) |
-| **ErrorBoundary** | Error boundary component for graceful error handling in widgets | [ErrorBoundary →](./widget-components/errorboundary) |
-| **Image** | Image component that handles both data URLs and public file paths | [Image →](./widget-components/image) |
-| **ThemeProvider** | Theme provider for consistent theme management across widgets | [ThemeProvider →](./widget-components/themeprovider) |
+| **WidgetControls** | Debug button and view controls (fullscreen/pip) with customizable positioning                                                   | [WidgetControls →](./widget-components/widgetcontrols) |
+| **ErrorBoundary**  | Error boundary component for graceful error handling in widgets                                                                 | [ErrorBoundary →](./widget-components/errorboundary)   |
+| **Image**          | Image component that handles both data URLs and public file paths                                                               | [Image →](./widget-components/image)                   |
+| **ThemeProvider**  | Theme provider for consistent theme management across widgets                                                                   | [ThemeProvider →](./widget-components/themeprovider)   |
 
 ### Hooks
 
-| Hook | Description | Link |
-|------|-------------|------|
+| Hook          | Description                                                                                    | Link                                         |
+| ------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | **useWidget** | Main hook providing type-safe access to all widget capabilities (props, state, theme, actions) | [useWidget →](./widget-components/usewidget) |
-
-
 
 ## Static Assets
 
@@ -263,7 +341,7 @@ In development, assets are served from `/mcp-use/public/`. In production, they'r
 **Using the Image Component:**
 
 ```tsx
-import { Image } from 'mcp-use/react';
+import { Image } from "mcp-use/react";
 
 function ProductWidget() {
   return (
@@ -289,9 +367,8 @@ const publicUrl = window.__mcpPublicUrl; // "http://localhost:3000/mcp-use/publi
 const imageUrl = `${publicUrl}/fruits/apple.png`;
 
 // Or use the helper
-const imageUrl = window.__getFile?.('fruits/apple.png');
+const imageUrl = window.__getFile?.("fruits/apple.png");
 ```
-
 
 ## Patterns
 
@@ -304,6 +381,7 @@ const { props } = useWidget();
 ```
 
 **Example:**
+
 ```typescript
 export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results with filtering',
@@ -332,7 +410,7 @@ Widgets render **before** the tool execution completes. This allows you to show 
 ```tsx
 const MyWidget: React.FC = () => {
   const { props, isPending } = useWidget<MyWidgetProps>();
-  
+
   if (isPending) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -340,7 +418,7 @@ const MyWidget: React.FC = () => {
       </div>
     );
   }
-  
+
   // Safe to access props.city, props.temperature, etc.
   return (
     <div>
@@ -356,7 +434,7 @@ const MyWidget: React.FC = () => {
 ```tsx
 const MyWidget: React.FC = () => {
   const { props, isPending } = useWidget<MyWidgetProps>();
-  
+
   return (
     <div>
       {isPending ? (
@@ -377,11 +455,11 @@ const MyWidget: React.FC = () => {
 ```tsx
 const MyWidget: React.FC = () => {
   const { props } = useWidget<MyWidgetProps>();
-  
+
   return (
     <div>
-      <h1>{props.city ?? 'Loading...'}</h1>
-      <p>{props.temperature ? `${props.temperature}°C` : 'Loading...'}</p>
+      <h1>{props.city ?? "Loading..."}</h1>
+      <p>{props.temperature ? `${props.temperature}°C` : "Loading..."}</p>
     </div>
   );
 };
@@ -395,15 +473,15 @@ Widgets can maintain state across interactions. State is persisted by the host, 
 const { state, setState } = useWidget();
 
 // Save state (persists to localStorage)
-await setState({ favoriteCity: 'Tokyo', filters: { price: '$$' } });
+await setState({ favoriteCity: "Tokyo", filters: { price: "$$" } });
 
 // State persists across widget re-renders and page reloads
 console.log(state?.favoriteCity); // 'Tokyo'
 
 // Update state with function (like React useState)
-await setState(prev => ({
+await setState((prev) => ({
   ...prev,
-  favoriteCity: 'Paris'
+  favoriteCity: "Paris",
 }));
 ```
 
@@ -416,18 +494,19 @@ const { callTool } = useWidget();
 
 const handleSearch = async () => {
   try {
-    const result = await callTool('search_cities', { 
-      query: 'tokyo' 
+    const result = await callTool("search_cities", {
+      query: "tokyo",
     });
     // result.content contains the tool response
     console.log(result.content);
   } catch (error) {
-    console.error('Tool call failed:', error);
+    console.error("Tool call failed:", error);
   }
 };
 ```
 
 **Return Format:**
+
 ```typescript
 const result: CallToolResponse = {
   content: [
@@ -446,9 +525,9 @@ Request different display modes (inline, pip, or fullscreen):
 const { requestDisplayMode, displayMode } = useWidget();
 
 const handleExpand = async () => {
-  const result = await requestDisplayMode('fullscreen');
+  const result = await requestDisplayMode("fullscreen");
   // result.mode = 'fullscreen' (may be different if request denied)
-  console.log('Display mode:', result.mode);
+  console.log("Display mode:", result.mode);
 };
 
 // Current display mode
@@ -456,14 +535,15 @@ console.log(displayMode); // 'inline' | 'pip' | 'fullscreen'
 ```
 
 **Display Modes:**
+
 - `'inline'` - Default embedded view in conversation
 - `'pip'` - Picture-in-Picture floating window
 - `'fullscreen'` - Full browser window (on mobile, PiP coerces to fullscreen)
 
-
 You can user the `<WidgetControls />` to automatically add controls to your widget.
+
 ```tsx
-import { WidgetControls } from 'mcp-use/react';
+import { WidgetControls } from "mcp-use/react";
 
 function MyWidget() {
   return (
@@ -473,9 +553,11 @@ function MyWidget() {
   );
 }
 ```
-or 
+
+or
+
 ```tsx
-import { WidgetControls } from 'mcp-use/react';
+import { WidgetControls } from "mcp-use/react";
 
 function MyWidget() {
   return (
@@ -486,10 +568,10 @@ function MyWidget() {
 }
 ```
 
-
 ## Custom Tools with Widgets
 
 You can create custom tools that return widgets instead of relying solely on automatic widget registration. This is useful when you need to:
+
 - Fetch data before displaying the widget
 - Use different tool parameters than widget props
 - Have multiple tools use the same widget
@@ -500,45 +582,52 @@ You can create custom tools that return widgets instead of relying solely on aut
 The `widget()` helper returns runtime data for a widget. You must combine it with the `widget` config on the tool definition to set up all registration-time metadata.
 
 **Important:** The widget configuration is split between two places:
+
 1. **Tool definition** (`widget: { name, invoking, ... }`) - Registration-time metadata
 2. **Helper return** (`widget({ props, output, ... })`) - Runtime data
 
 ```typescript
-import { widget, text } from 'mcp-use/server';
-import { z } from 'zod';
+import { widget, text } from "mcp-use/server";
+import { z } from "zod";
 
-server.tool({
-  name: 'get-weather',
-  description: 'Get current weather for a city',
-  schema: z.object({
-    city: z.string().describe('City name')
-  }),
-  // Widget config sets all registration-time metadata
-  widget: {
-    name: 'weather-display',      // Must match a widget in resources/
-    invoking: 'Fetching weather data...',
-    invoked: 'Weather data loaded'
-  }
-}, async ({ city }) => {
-  // Fetch weather data from API
-  const weatherData = await fetchWeatherAPI(city);
-  
-  // Return widget with runtime data only
-  return widget({
-    props: {
-      city,
-      temperature: weatherData.temp,
-      conditions: weatherData.conditions,
-      humidity: weatherData.humidity,
-      windSpeed: weatherData.windSpeed
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({
+      city: z.string().describe("City name"),
+    }),
+    // Widget config sets all registration-time metadata
+    widget: {
+      name: "weather-display", // Must match a widget in resources/
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
     },
-    output: text(`Current weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`),
-    message: `Current weather in ${city}`
-  });
-});
+  },
+  async ({ city }) => {
+    // Fetch weather data from API
+    const weatherData = await fetchWeatherAPI(city);
+
+    // Return widget with runtime data only
+    return widget({
+      props: {
+        city,
+        temperature: weatherData.temp,
+        conditions: weatherData.conditions,
+        humidity: weatherData.humidity,
+        windSpeed: weatherData.windSpeed,
+      },
+      output: text(
+        `Current weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`,
+      ),
+      message: `Current weather in ${city}`,
+    });
+  },
+);
 ```
 
 **Key Points:**
+
 - **`widget: { name, invoking, invoked, ... }`** on tool definition - Configures all widget metadata at registration time
 - **`widget({ props, output, message })`** helper - Returns runtime data only:
   - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
@@ -550,9 +639,9 @@ server.tool({
 ```tsx
 // resources/weather-display/widget.tsx
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Display weather information',
+  description: "Display weather information",
   props: propSchema,
-  exposeAsTool: false  // Only accessible via custom tools
+  exposeAsTool: false, // Only accessible via custom tools
 };
 ```
 
@@ -566,17 +655,18 @@ Set the `MCP_URL` environment variable or pass `baseUrl`:
 
 ```typescript
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  baseUrl: process.env.MCP_URL || 'https://myserver.com'
+  name: "my-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL || "https://myserver.com",
 });
 ```
 
 This ensures:
+
 - Widget URLs use the correct domain
 - Apps SDK CSP automatically includes your server
 
-Preferably set the variable at build time to have statically generated widget assets paths. 
+Preferably set the variable at build time to have statically generated widget assets paths.
 If you don't set it at build time you must set it at runtime either by passing the `baseUrl` option to the `MCPServer` constructor or by setting the `MCP_URL` environment variable.
 
 ### Environment Variables
@@ -600,8 +690,8 @@ CSP_URLS=https://myserver.com,...other domains
 **Static Deployments**: Set `MCP_URL` (for assets), `MCP_SERVER_URL` (for API calls), and `CSP_URLS` (for CSP whitelisting) when deploying to platforms like Supabase where widgets are served from static storage.
 
 **Alternative CSP Configuration**: Instead of using the global `CSP_URLS` environment variable, you can configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` (see [Apps SDK Metadata](#apps-sdk-metadata) section above).
-</Note>
 
+</Note>
 
 ## Testing
 
@@ -617,8 +707,6 @@ The MCP Inspector provides full support for testing widgets during development:
 
 See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for complete testing guide.
 
-
-
 ## Testing in ChatGPT
 
 You need to enable the Developer Mode in ChatGPT to test widgets.
@@ -628,7 +716,6 @@ You need to enable the Developer Mode in ChatGPT to test widgets.
 - **Import MCPs**: In the Connectors tab, add your remote MCP server. It will appear in the composer's "Developer Mode" tool later during conversations.
 
 - **Use connectors in conversations**: Choose Developer mode from the Plus menu and select connectors. You may need to explore different prompting techniques to call the correct tools. For example:
-
   - Be explicit: "Use the "Acme CRM" connector's "update_record" tool to …". When needed, include the server label and tool name.
   - Disallow alternatives to avoid ambiguity: "Do not use built-in browsing or other tools; only use the Acme CRM connector."
   - Disambiguate similar tools: "Prefer Calendar.create_event for meetings; do not use Reminders.create_task for scheduling."
@@ -640,7 +727,8 @@ You need to enable the Developer Mode in ChatGPT to test widgets.
 
 ## Next Steps
 
-- [Creating Apps SDK Server](./creating-apps-sdk-server) - Complete guide
-- [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) - Test widgets with Inspector
-- [Project Templates](./templates) - Explore available templates
-
+- [MCP Apps](/typescript/server/mcp-apps) - Use the standard MCP protocol with dual-protocol support
+- [Creating Apps SDK Server](./creating-apps-sdk-server) - Complete server setup guide
+- [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test widgets with the Inspector
+- [Widget Components](/typescript/server/widget-components/usewidget) - React components and hooks
+- [MCP UI Resources](/typescript/server/mcp-ui-resources) - Alternative approach for simpler UIs

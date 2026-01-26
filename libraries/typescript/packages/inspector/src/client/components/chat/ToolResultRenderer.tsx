@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
@@ -7,7 +7,6 @@ import {
 } from "../../utils/widget-detection";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
-import { ProtocolToggle } from "../ui/ProtocolToggle";
 import { Spinner } from "../ui/spinner";
 import { MCPUIResource } from "./MCPUIResource";
 
@@ -18,6 +17,7 @@ interface ToolResultRendererProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
+  onSendFollowUp?: (text: string) => void;
 }
 
 /**
@@ -30,21 +30,18 @@ export function ToolResultRenderer({
   serverId,
   readResource,
   toolMeta,
+  onSendFollowUp,
 }: ToolResultRendererProps) {
   const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
+  const fetchedUriRef = useRef<string | null>(null);
 
-  // Debug logging to understand the data flow
-  useEffect(() => {
-    console.log("[ToolResultRenderer] Rendering:", {
-      toolName,
-      hasToolMeta: !!toolMeta,
-      outputTemplate: toolMeta?.["openai/outputTemplate"],
-      hasResult: !!result,
-      hasServerId: !!serverId,
-      hasReadResource: !!readResource,
-    });
-  }, [toolName, toolMeta, result, serverId, readResource]);
+  // Generate stable toolCallId once
+  const toolCallId = useMemo(
+    () =>
+      `chat-tool-${toolName}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+    [toolName]
+  );
 
   // Parse result if it's a JSON string (memoized to prevent re-renders)
   const parsedResult = useMemo(() => {
@@ -59,16 +56,17 @@ export function ToolResultRenderer({
     return result;
   }, [result]);
 
-  // Detect widget protocol
+  // Detect widget protocol - use JSON.stringify for stable comparison
+  const toolMetaJson = useMemo(() => JSON.stringify(toolMeta), [toolMeta]);
   const widgetProtocol = useMemo(
     () => detectWidgetProtocol(toolMeta, parsedResult),
-    [toolMeta, parsedResult]
+    [toolMetaJson, parsedResult]
   );
 
   // Detect if tool supports both protocols
   const supportsBothProtocols = useMemo(
     () => hasBothProtocols(toolMeta),
-    [toolMeta]
+    [toolMetaJson]
   );
 
   // Determine active protocol based on toggle state
@@ -129,32 +127,65 @@ export function ToolResultRenderer({
     return null;
   }, [hasAppsSdkComponent, parsedResult]);
 
+  // Extract widget props from result metadata (similar to OpenAIComponentRenderer)
+  // Widget props come from the tool result's _meta, not from the original tool arguments
+  const widgetProps = useMemo(() => {
+    const props = parsedResult?._meta?.["mcp-use/props"] || null;
+    console.log("[ToolResultRenderer] Widget props extraction:", {
+      hasMetaProps: !!props,
+      widgetProps: props,
+      toolArgs,
+      willUse: props || toolArgs,
+    });
+    return props;
+  }, [parsedResult, toolArgs]);
+
+  // Calculate resource URI outside of effect for stable dependency
+  const resourceUri = useMemo(() => {
+    if (supportsBothProtocols && activeProtocol) {
+      return getResourceUriForProtocol(activeProtocol as any, toolMeta);
+    } else if (isMcpAppsTool) {
+      return toolMeta?.ui?.resourceUri || null;
+    } else if (isAppsSdkTool) {
+      return toolMeta?.["openai/outputTemplate"] || null;
+    }
+    return null;
+  }, [
+    supportsBothProtocols,
+    activeProtocol,
+    isMcpAppsTool,
+    isAppsSdkTool,
+    toolMetaJson,
+  ]);
+
   // Fetch resource for Apps SDK tools (when not embedded in result)
   useEffect(() => {
     // If resource is already embedded, use it
     if (extractedResource) {
       setResourceData(extractedResource);
+      fetchedUriRef.current = extractedResource.uri || null;
       return;
     }
 
-    // Fetch resource based on active protocol
-    let resourceUri: string | null = null;
-
-    if (supportsBothProtocols && activeProtocol) {
-      resourceUri = getResourceUriForProtocol(activeProtocol as any, toolMeta);
-    } else if (isMcpAppsTool) {
-      resourceUri = toolMeta?.ui?.resourceUri || null;
-    } else if (isAppsSdkTool) {
-      resourceUri = toolMeta?.["openai/outputTemplate"] || null;
+    // If we've already fetched this URI, skip
+    if (resourceUri && fetchedUriRef.current === resourceUri) {
+      return;
     }
 
-    if (resourceUri && toolMeta && readResource) {
+    // Reset resource data if URI changed
+    if (resourceUri !== fetchedUriRef.current) {
+      setResourceData(null);
+    }
+
+    if (resourceUri && readResource) {
       console.log(
         "[ToolResultRenderer] Fetching resource for widget:",
         resourceUri,
         "protocol:",
         activeProtocol
       );
+
+      fetchedUriRef.current = resourceUri;
 
       readResource(resourceUri)
         .then((data) => {
@@ -178,35 +209,28 @@ export function ToolResultRenderer({
             "[ToolResultRenderer] Failed to fetch resource:",
             error
           );
+          fetchedUriRef.current = null;
         });
     }
-  }, [
-    extractedResource,
-    isMcpAppsTool,
-    isAppsSdkTool,
-    supportsBothProtocols,
-    activeProtocol,
-    toolMeta,
-    readResource,
-  ]);
+  }, [extractedResource, resourceUri, activeProtocol, readResource]);
 
   // Render toggle when both protocols are supported
   if (supportsBothProtocols && resourceData && serverId && readResource) {
     return (
       <div className="space-y-4 my-4">
-        <ProtocolToggle />
-
         {/* Render based on active protocol */}
         {activeProtocol === "mcp-apps" && (
           <MCPAppsRenderer
             serverId={serverId}
-            toolCallId={`chat-tool-${toolName}-${Date.now()}`}
+            toolCallId={toolCallId}
             toolName={toolName}
-            toolInput={toolArgs}
+            toolInput={widgetProps || toolArgs}
             toolOutput={parsedResult}
             toolMetadata={toolMeta}
             resourceUri={resourceData.uri}
             readResource={readResource}
+            noWrapper={true}
+            onSendFollowUp={onSendFollowUp}
           />
         )}
 
@@ -231,14 +255,16 @@ export function ToolResultRenderer({
     return (
       <MCPAppsRenderer
         serverId={serverId}
-        toolCallId={`chat-tool-${toolName}-${Date.now()}`}
+        toolCallId={toolCallId}
         toolName={toolName}
-        toolInput={toolArgs}
+        toolInput={widgetProps || toolArgs}
         toolOutput={parsedResult}
         toolMetadata={toolMeta}
         resourceUri={resourceData.uri}
         readResource={readResource}
         className="my-4"
+        noWrapper={true}
+        onSendFollowUp={onSendFollowUp}
       />
     );
   }
