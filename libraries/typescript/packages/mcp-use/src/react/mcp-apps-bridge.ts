@@ -167,17 +167,109 @@ class McpAppsBridge {
       debug: "debug",
     };
 
+    // Helper to serialize console arguments for postMessage
+    const serializeForPostMessage = (value: any, seen = new WeakSet()): any => {
+      // Handle primitives
+      if (value === null || value === undefined) return value;
+      if (typeof value !== "object") return value;
+
+      // Handle circular references
+      if (seen.has(value)) return "[Circular]";
+
+      // Handle special object types that can't be cloned
+      if (value instanceof Response) {
+        return {
+          __type: "Response",
+          status: value.status,
+          statusText: value.statusText,
+          ok: value.ok,
+          url: value.url,
+          headers: Object.fromEntries(value.headers.entries()),
+        };
+      }
+      if (value instanceof Request) {
+        return {
+          __type: "Request",
+          method: value.method,
+          url: value.url,
+          headers: Object.fromEntries(value.headers.entries()),
+        };
+      }
+      if (value instanceof Error) {
+        return {
+          __type: "Error",
+          name: value.name,
+          message: value.message,
+          stack: value.stack,
+        };
+      }
+      if (value instanceof Event) {
+        return {
+          __type: "Event",
+          type: value.type,
+          target: value.target?.constructor?.name,
+        };
+      }
+      if (typeof HTMLElement !== "undefined" && value instanceof HTMLElement) {
+        return {
+          __type: "HTMLElement",
+          tagName: value.tagName,
+          id: value.id,
+          className: value.className,
+        };
+      }
+      if (typeof value === "function") {
+        return `[Function: ${value.name || "anonymous"}]`;
+      }
+
+      // Handle arrays
+      if (Array.isArray(value)) {
+        seen.add(value);
+        return value.map((item) => serializeForPostMessage(item, seen));
+      }
+
+      // Handle plain objects
+      try {
+        seen.add(value);
+        const serialized: any = {};
+        for (const key in value) {
+          if (Object.prototype.hasOwnProperty.call(value, key)) {
+            try {
+              serialized[key] = serializeForPostMessage(value[key], seen);
+            } catch {
+              serialized[key] = "[Unserializable]";
+            }
+          }
+        }
+        return serialized;
+      } catch {
+        return "[Object]";
+      }
+    };
+
     // Helper to send logging notification
     const sendLog = (
       level: "log" | "warn" | "error" | "info" | "debug",
       args: any[]
     ) => {
-      // Send notification to host
-      this.sendNotification("notifications/message", {
-        level: consoleLevelToRfc5424[level] || "info",
-        logger: "console",
-        data: args.length === 1 ? args[0] : args,
-      });
+      try {
+        // Serialize arguments to prevent DataCloneError
+        const serializedArgs = args.map((arg) => serializeForPostMessage(arg));
+
+        // Send notification to host
+        this.sendNotification("notifications/message", {
+          level: consoleLevelToRfc5424[level] || "info",
+          logger: "console",
+          data:
+            serializedArgs.length === 1 ? serializedArgs[0] : serializedArgs,
+        });
+      } catch (error) {
+        // If serialization fails, send error message instead
+        originalConsole.warn(
+          "[MCP Apps Bridge] Failed to forward console message:",
+          error
+        );
+      }
     };
 
     // Wrap console methods

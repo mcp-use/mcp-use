@@ -847,7 +847,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         pm: [npm, yarn, pnpm]
-        template: [starter, mcp-ui, mcp-apps]
+        template: [starter, mcp-apps, blank]
         flag: ["", "--dev"]
         exclude:
           # Only test --dev on ubuntu with npm

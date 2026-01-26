@@ -44,10 +44,10 @@ export function buildDualProtocolMetadata(
   const appsSdkResourceMeta =
     adapters.appsSdk.buildResourceMetadata(definition);
 
-  // Deep merge the ui metadata
+  // Deep merge the ui metadata (resource metadata first, tool metadata last to preserve resourceUri)
   const mergedUiMeta = {
-    ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
     ...(mcpAppsResourceMeta._meta?.ui || {}),
+    ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
   };
 
   // Combine all metadata

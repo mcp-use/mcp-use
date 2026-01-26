@@ -16,7 +16,7 @@ export const widgetMetadata: WidgetMetadata = {
   props: propSchema,
   metadata: {
     csp: {
-      connectDomains: ["https://active-teal.local.mcp-use.run"],
+      connectDomains: [],
       resourceDomains: [],
     },
   },

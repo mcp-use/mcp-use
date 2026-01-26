@@ -279,11 +279,13 @@ export function registerInspectorRoutes(
       let html = await response.text();
 
       // Create a modified widgetData with the fetched HTML as resourceData
+      // IMPORTANT: Preserve devServerBaseUrl for window.__mcpPublicUrl injection
       const modifiedWidgetData = {
         ...widgetData,
         resourceData: {
           contents: [{ text: html }],
         },
+        devServerBaseUrl: widgetData.devServerBaseUrl,
       };
 
       // Inject OpenAI wrapper using existing logic
