@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.0-canary.3
+
+### Patch Changes
+
+- e4ca98e: chore: trigger canary release
+
 ## 0.12.0-canary.2
 
 ### Patch Changes

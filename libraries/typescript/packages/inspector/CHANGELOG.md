@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.17.0-canary.2
+
+### Patch Changes
+
+- e4ca98e: chore: trigger canary release
+- Updated dependencies [e4ca98e]
+  - mcp-use@1.15.0-canary.2
+
 ## 0.17.0-canary.1
 
 ### Patch Changes
