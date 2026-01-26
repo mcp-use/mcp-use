@@ -292,10 +292,27 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
+      // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
+      let processedHtml = htmlContent;
+      if (widgetData.devServerBaseUrl) {
+        const injectionScript = `<script>window.__mcpPublicUrl = "${widgetData.devServerBaseUrl}/mcp-use/public";</script>`;
+
+        // Inject after <head> tag if present
+        if (processedHtml.includes("<head>")) {
+          processedHtml = processedHtml.replace(
+            /<head>/i,
+            `<head>\n    ${injectionScript}`
+          );
+        } else {
+          // Fallback: inject at the beginning
+          processedHtml = injectionScript + processedHtml;
+        }
+      }
+
       // Return JSON with HTML and metadata for CSP enforcement
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
-        html: htmlContent,
+        html: processedHtml,
         csp: isPermissive ? undefined : mcpAppsCsp,
         permissions: mcpAppsPermissions,
         permissive: isPermissive,
@@ -347,10 +364,27 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
+      // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
+      let processedHtml = htmlContent;
+      if (widgetData.devServerBaseUrl) {
+        const injectionScript = `<script>window.__mcpPublicUrl = "${widgetData.devServerBaseUrl}/mcp-use/public";</script>`;
+
+        // Inject after <head> tag if present
+        if (processedHtml.includes("<head>")) {
+          processedHtml = processedHtml.replace(
+            /<head>/i,
+            `<head>\n    ${injectionScript}`
+          );
+        } else {
+          // Fallback: inject at the beginning
+          processedHtml = injectionScript + processedHtml;
+        }
+      }
+
       // Return JSON with fresh HTML from Vite
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
-        html: htmlContent,
+        html: processedHtml,
         csp: isPermissive ? undefined : widgetData.mcpAppsCsp,
         permissions: widgetData.mcpAppsPermissions,
         mimeTypeValid: true, // Dev mode widgets always valid

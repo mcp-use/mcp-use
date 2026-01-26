@@ -8,20 +8,15 @@ export interface AccordionItemData {
 
 interface AccordionProps {
   items: AccordionItemData[];
-  title?: string;
 }
 
-export const Accordion: React.FC<AccordionProps> = ({
-  items,
-  title = "Can fruit be cute?",
-}) => {
+export const Accordion: React.FC<AccordionProps> = ({ items }) => {
   const [openAccordionIndex, setOpenAccordionIndex] = useState<number | null>(
     null
   );
 
   return (
     <div className="p-8 pt-4 border-t border-subtle mt-4">
-      <h3 className="heading-lg mb-4">{title}</h3>
       <div className="rounded-lg border border-default overflow-hidden">
         {items.map((item, index) => (
           <AccordionItem
