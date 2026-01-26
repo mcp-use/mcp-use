@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* Custom styles for MCP Apps template */
+
+/* Host type indicator colors */
+.host-apps-sdk {
+  background: linear-gradient(135deg, #10a37f 0%, #0a8a6c 100%);
+}
+
+.host-mcp-app {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+}
+
+.host-standalone {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .bg-surface {
+    background-color: #1a1a1a;
+  }
+
+  .text-primary {
+    color: #f5f5f5;
+  }
+
+  .text-secondary {
+    color: #a3a3a3;
+  }
+
+  .border-default {
+    border-color: #333;
+  }
+}
+
+/* Light mode */
+@media (prefers-color-scheme: light) {
+  .bg-surface {
+    background-color: #ffffff;
+  }
+
+  .text-primary {
+    color: #171717;
+  }
+
+  .text-secondary {
+    color: #737373;
+  }
+
+  .border-default {
+    border-color: #e5e5e5;
+  }
+}

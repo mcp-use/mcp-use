@@ -1,0 +1,422 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Permissive CSP so nested srcdoc content is not constrained by host CSP.
+         The actual security enforcement is done by the dynamically-generated CSP
+         injected into the inner srcdoc iframe based on widget declarations (SEP-1865).
+         This outer CSP must allow external scripts since srcdoc network requests
+         are subject to the parent document's CSP. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src * data: blob: 'unsafe-inline'; media-src * blob: data:; font-src * blob: data:; script-src * 'wasm-unsafe-eval' 'unsafe-inline' 'unsafe-eval' blob: data:; style-src * blob: data: 'unsafe-inline'; connect-src * data: blob: about:; frame-src * blob: data: http://localhost:* https://localhost:* http://127.0.0.1:* https://127.0.0.1:*;"
+    />
+    <title>MCP Apps Sandbox Proxy</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      iframe {
+        display: block;
+        background-color: transparent;
+        border: 0px none transparent;
+        padding: 0px;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+      /**
+       * MCP Apps Sandbox Proxy (SEP-1865)
+       *
+       * Double-iframe architecture for security isolation:
+       * Host Page → Sandbox Proxy (this page, different origin) → Guest UI
+       *
+       * This proxy:
+       * 1. Creates inner iframe immediately
+       * 2. Waits for HTML content via ui/notifications/sandbox-resource-ready
+       * 3. Builds CSP from metadata and injects into HTML
+       * 4. Loads HTML via srcdoc with configurable sandbox attributes
+       * 5. Forwards all non-sandbox messages between host and guest
+       *
+       * Reference: https://gist.github.com/ochafik/a9603ba2d6757d6038ce066eded4c354
+       */
+
+      /**
+       * Sanitize a domain/origin value for CSP (SEP-1865)
+       * Prevents injection attacks via malicious domain values
+       * @param {string} domain - Domain to sanitize
+       * @returns {string} Sanitized domain
+       */
+      function sanitizeDomain(domain) {
+        if (typeof domain !== "string") return "";
+        // Remove characters that could break out of CSP or HTML attributes
+        // Valid CSP sources shouldn't contain these characters
+        return domain.replace(/['"<>;]/g, "").trim();
+      }
+
+      /**
+       * Build iframe allow attribute from permissions (SEP-1865)
+       * @param {Object} permissions - Permissions metadata (camera, microphone, geolocation, clipboardWrite)
+       * @returns {string} Permission Policy allow attribute string
+       *
+       * Note: For srcdoc iframes, we use '*' allowlist since they don't have a defined origin.
+       * This allows the sandboxed content to request these permissions.
+       */
+      function buildAllowAttribute(permissions) {
+        if (!permissions) return "";
+
+        const allowList = [];
+        if (permissions.camera) allowList.push("camera *");
+        if (permissions.microphone) allowList.push("microphone *");
+        if (permissions.geolocation) allowList.push("geolocation *");
+        if (permissions.clipboardWrite) allowList.push("clipboard-write *");
+
+        return allowList.join("; ");
+      }
+
+      /**
+       * Build CSP string from metadata (SEP-1865)
+       * @param {Object} csp - CSP metadata with connectDomains, resourceDomains, frameDomains, and baseUriDomains
+       * @returns {string} CSP policy string
+       */
+      function buildCSP(csp) {
+        // Per SEP-1865: If no CSP declared, use restrictive defaults
+        // Note: 'self' doesn't work in srcdoc iframes (refers to about:srcdoc)
+        // So we use 'unsafe-inline' for scripts/styles since all widget code is inline
+        if (!csp) {
+          return [
+            "default-src 'none'",
+            "script-src 'unsafe-inline'",
+            "style-src 'unsafe-inline'",
+            "img-src data:",
+            "font-src data:",
+            "media-src data:",
+            "connect-src 'none'",
+            "frame-src 'none'",
+            "object-src 'none'",
+            "base-uri 'none'",
+          ].join("; ");
+        }
+
+        // Build CSP from declared domains (SEP-1865)
+        // Per spec: "Host MAY further restrict but MUST NOT allow undeclared domains"
+        const connectDomains = (csp.connectDomains || [])
+          .map(sanitizeDomain)
+          .filter(Boolean);
+        const resourceDomains = (csp.resourceDomains || [])
+          .map(sanitizeDomain)
+          .filter(Boolean);
+        const frameDomains = (csp.frameDomains || [])
+          .map(sanitizeDomain)
+          .filter(Boolean);
+        const baseUriDomains = (csp.baseUriDomains || [])
+          .map(sanitizeDomain)
+          .filter(Boolean);
+
+        // connect-src: Only allow declared domains, or 'none' if empty
+        const connectSrc =
+          connectDomains.length > 0 ? connectDomains.join(" ") : "'none'";
+
+        // Resource sources: data: and blob: are always allowed for inline content
+        // Only add declared resourceDomains - no forced CDNs per SEP-1865
+        const resourceSrc =
+          resourceDomains.length > 0
+            ? ["data:", "blob:", ...resourceDomains].join(" ")
+            : "data: blob:";
+
+        // frame-src: Only allow declared frame domains, or 'none' if empty
+        const frameSrc =
+          frameDomains.length > 0 ? frameDomains.join(" ") : "'none'";
+
+        // base-uri: Only allow declared base URI domains, or 'none' if empty
+        const baseUri =
+          baseUriDomains.length > 0 ? baseUriDomains.join(" ") : "'none'";
+
+        console.log("[buildCSP] Processing domains:", {
+          frameDomains,
+          frameSrc,
+          baseUriDomains,
+          baseUri,
+        });
+
+        console.log(
+          "[buildCSP] Built CSP string:",
+          [
+            "default-src 'none'",
+            "script-src 'unsafe-inline' " + resourceSrc,
+            "style-src 'unsafe-inline' " + resourceSrc,
+            "img-src " + resourceSrc,
+            "font-src " + resourceSrc,
+            "media-src " + resourceSrc,
+            "connect-src " + connectSrc,
+            "frame-src " + frameSrc,
+            "object-src 'none'",
+            "base-uri " + baseUri,
+          ].join("; ")
+        );
+
+        return [
+          "default-src 'none'",
+          "script-src 'unsafe-inline' " + resourceSrc,
+          "style-src 'unsafe-inline' " + resourceSrc,
+          "img-src " + resourceSrc,
+          "font-src " + resourceSrc,
+          "media-src " + resourceSrc,
+          "connect-src " + connectSrc,
+          "frame-src " + frameSrc,
+          "object-src 'none'",
+          "base-uri " + baseUri,
+        ].join("; ");
+      }
+
+      /**
+       * Build console interceptor script
+       * Captures console methods and forwards to parent via postMessage
+       * @returns {string} Script tag with console interceptor
+       */
+      function buildConsoleInterceptorScript() {
+        return `<script>
+(function() {
+  // Store original console methods
+  var originalConsole = {
+    log: console.log.bind(console),
+    error: console.error.bind(console),
+    warn: console.warn.bind(console),
+    info: console.info.bind(console),
+    debug: console.debug.bind(console),
+    trace: console.trace.bind(console)
+  };
+  
+  function serializeArgs(args) {
+    try {
+      return Array.from(args).map(function(arg) {
+        if (arg instanceof Error) {
+          return { type: 'Error', message: arg.message, stack: arg.stack, name: arg.name };
+        }
+        if (typeof arg === 'object' && arg !== null) {
+          try {
+            return JSON.parse(JSON.stringify(arg));
+          } catch { return String(arg); }
+        }
+        return arg;
+      });
+    } catch {
+      return [String(args)];
+    }
+  }
+  
+  // Override console methods
+  ['log', 'error', 'warn', 'info', 'debug', 'trace'].forEach(function(level) {
+    console[level] = function() {
+      originalConsole[level].apply(console, arguments);
+      try {
+        window.parent.postMessage({
+          type: 'iframe-console-log',
+          level: level,
+          args: serializeArgs(arguments),
+          timestamp: new Date().toISOString()
+        }, '*');
+      } catch (e) {
+        originalConsole.error('[Console Interceptor] Failed to send log:', e);
+      }
+    };
+  });
+  
+  // Capture unhandled errors
+  window.addEventListener('error', function(event) {
+    window.parent.postMessage({
+      type: 'iframe-console-log',
+      level: 'error',
+      args: [{
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error ? { message: event.error.message, stack: event.error.stack } : null
+      }],
+      timestamp: new Date().toISOString()
+    }, '*');
+  });
+  
+  // Capture unhandled promise rejections
+  window.addEventListener('unhandledrejection', function(event) {
+    window.parent.postMessage({
+      type: 'iframe-console-log',
+      level: 'error',
+      args: [{
+        message: 'Unhandled Promise Rejection',
+        reason: event.reason ? String(event.reason) : 'Unknown',
+        error: event.reason instanceof Error ? { message: event.reason.message, stack: event.reason.stack } : null
+      }],
+      timestamp: new Date().toISOString()
+    }, '*');
+  });
+})();
+<\/script>`;
+      }
+
+      /**
+       * Build CSP violation listener script
+       * Forwards securitypolicyviolation events to the host via postMessage
+       * @returns {string} Script tag with violation listener
+       */
+      function buildViolationListenerScript() {
+        return `<script>
+document.addEventListener('securitypolicyviolation', function(e) {
+  var violation = {
+    type: 'mcp-apps:csp-violation',
+    directive: e.violatedDirective,
+    blockedUri: e.blockedURI,
+    sourceFile: e.sourceFile || null,
+    lineNumber: e.lineNumber || null,
+    columnNumber: e.columnNumber || null,
+    effectiveDirective: e.effectiveDirective,
+    originalPolicy: e.originalPolicy,
+    disposition: e.disposition,
+    timestamp: Date.now()
+  };
+  console.warn('[MCP Apps CSP Violation]', violation.directive, ':', violation.blockedUri);
+  window.parent.postMessage(violation, '*');
+});
+<\/script>`;
+      }
+
+      /**
+       * Inject CSP meta tag, violation listener, and console interceptor into HTML
+       * @param {string} html - Original HTML content
+       * @param {string} cspValue - CSP policy string
+       * @returns {string} HTML with CSP meta tag, violation listener, and console interceptor injected
+       */
+      function injectCSP(html, cspValue) {
+        const cspMeta =
+          '<meta http-equiv="Content-Security-Policy" content="' +
+          cspValue +
+          '">';
+        const violationListener = buildViolationListenerScript();
+        const consoleInterceptor = buildConsoleInterceptorScript();
+        const injection = cspMeta + violationListener + consoleInterceptor;
+
+        if (html.includes("<head>")) {
+          return html.replace("<head>", "<head>" + injection);
+        } else if (html.includes("<HEAD>")) {
+          return html.replace("<HEAD>", "<HEAD>" + injection);
+        } else if (html.includes("<html>")) {
+          return html.replace("<html>", "<html><head>" + injection + "</head>");
+        } else if (html.includes("<HTML>")) {
+          return html.replace("<HTML>", "<HTML><head>" + injection + "</head>");
+        } else if (html.includes("<!DOCTYPE") || html.includes("<!doctype")) {
+          // Insert after doctype
+          return html.replace(
+            /(<!DOCTYPE[^>]*>|<!doctype[^>]*>)/i,
+            "$1<head>" + injection + "</head>"
+          );
+        } else {
+          // Prepend CSP meta tag and listener
+          return injection + html;
+        }
+      }
+
+      // Create inner iframe immediately (before HTML arrives)
+      const inner = document.createElement("iframe");
+      inner.style = "width:100%; height:100%; border:none;";
+      // Default minimal sandbox before HTML arrives
+      inner.setAttribute(
+        "sandbox",
+        "allow-scripts allow-same-origin allow-forms"
+      );
+      document.body.appendChild(inner);
+
+      // Handle messages from parent (host) and inner (guest UI)
+      window.addEventListener("message", async (event) => {
+        if (event.source === window.parent) {
+          // Message from host
+          if (
+            event.data &&
+            event.data.method === "ui/notifications/sandbox-resource-ready"
+          ) {
+            // Load HTML into inner iframe with CSP enforcement
+            const { html, sandbox, csp, permissions, permissive } =
+              event.data.params || {};
+
+            if (typeof sandbox === "string") {
+              inner.setAttribute("sandbox", sandbox);
+            }
+
+            // Set Permission Policy allow attribute based on requested permissions (SEP-1865)
+            const allowAttribute = buildAllowAttribute(permissions);
+            if (allowAttribute) {
+              inner.setAttribute("allow", allowAttribute);
+            }
+
+            if (typeof html === "string") {
+              if (permissive) {
+                // Permissive mode: inject maximally permissive CSP
+                // Must explicitly allow everything since srcdoc inherits parent CSP
+                const permissiveCsp = [
+                  "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem: about:",
+                  "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:",
+                  "style-src * 'unsafe-inline' data: blob:",
+                  "img-src * data: blob: https: http:",
+                  "media-src * data: blob: https: http:",
+                  "font-src * data: blob: https: http:",
+                  "connect-src * data: blob: https: http: ws: wss: about:",
+                  "frame-src * data: blob: https: http: about:",
+                  "object-src * data: blob:",
+                  "base-uri *",
+                  "form-action *",
+                ].join("; ");
+                const processedHtml = injectCSP(html, permissiveCsp);
+                inner.srcdoc = processedHtml;
+              } else {
+                // Build CSP and inject into HTML (SEP-1865)
+                const cspValue = buildCSP(csp);
+                const processedHtml = injectCSP(html, cspValue);
+                inner.srcdoc = processedHtml;
+              }
+            }
+          } else {
+            // Forward other messages to inner iframe (guest UI)
+            // Do NOT forward console logs back to widget (prevents parsing errors)
+            if (event.data?.type === "iframe-console-log") {
+              return;
+            }
+
+            if (inner && inner.contentWindow) {
+              inner.contentWindow.postMessage(event.data, "*");
+            }
+          }
+        } else if (event.source === inner.contentWindow) {
+          // Forward console logs from inner iframe to parent ONLY (not back to widget)
+          if (event.data?.type === "iframe-console-log") {
+            window.parent.postMessage(event.data, "*");
+            return;
+          }
+
+          // Relay other messages from inner (guest UI) to parent (host)
+          window.parent.postMessage(event.data, "*");
+        }
+      });
+
+      // Notify parent that sandbox is ready (per SEP-1865)
+      window.parent.postMessage(
+        {
+          jsonrpc: "2.0",
+          method: "ui/notifications/sandbox-proxy-ready",
+          params: {},
+        },
+        "*"
+      );
+    </script>
+  </body>
+</html>

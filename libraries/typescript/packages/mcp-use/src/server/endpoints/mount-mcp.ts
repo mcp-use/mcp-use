@@ -6,17 +6,17 @@
  */
 
 import type { Context, Hono as HonoType } from "hono";
+import { join } from "node:path";
+import { Telemetry } from "../../telemetry/index.js";
 import type { SessionData } from "../sessions/index.js";
 import {
-  startIdleCleanup,
+  FileSystemSessionStore,
   InMemorySessionStore,
   InMemoryStreamManager,
-  FileSystemSessionStore,
+  startIdleCleanup,
 } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
-import { Telemetry } from "../../telemetry/index.js";
-import { join } from "node:path";
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -416,7 +416,7 @@ export async function mountMcp(
   }
 
   console.log(
-    `[MCP] Server mounted at /mcp and /sse (${config.stateless ? "stateless" : "stateful"} mode)`
+    `[MCP] Server mounted at /mcp (${config.stateless ? "stateless" : "stateful"} mode)`
   );
 
   return { mcpMounted: true, idleCleanupInterval };

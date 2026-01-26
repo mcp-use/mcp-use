@@ -417,6 +417,26 @@ export interface WidgetData {
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
   theme?: "light" | "dark";
+  // MCP Apps (SEP-1865) specific fields
+  protocol?: "openai-sdk" | "mcp-apps";
+  cspMode?: "permissive" | "widget-declared";
+  html?: string;
+  csp?: {
+    connectDomains?: string[];
+    resourceDomains?: string[];
+    frameDomains?: string[];
+    baseUriDomains?: string[];
+  };
+  permissions?: {
+    camera?: boolean;
+    microphone?: boolean;
+    geolocation?: boolean;
+    clipboardWrite?: boolean;
+  };
+  prefersBorder?: boolean;
+  mimeType?: string;
+  resourceUri?: string;
+  toolName?: string;
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -454,6 +474,15 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     devWidgetUrl,
     devServerBaseUrl,
     theme,
+    protocol,
+    cspMode,
+    html,
+    csp,
+    permissions,
+    prefersBorder,
+    mimeType,
+    resourceUri,
+    toolName,
   } = data;
 
   console.log("[Widget Store] Received request for toolId:", toolId);
@@ -468,14 +497,21 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasWidgetCSP: !!widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
+    protocol,
+    cspMode,
+    hasHtml: !!html,
+    hasCsp: !!csp,
+    hasPermissions: !!permissions,
   });
 
-  if (!serverId || !uri || !toolId || !resourceData) {
+  // For MCP Apps, resourceData is optional (HTML is fetched separately)
+  // For OpenAI SDK, resourceData is required
+  const isMcpApps = protocol === "mcp-apps";
+
+  if (!serverId || !toolId) {
     const missingFields = [];
     if (!serverId) missingFields.push("serverId");
-    if (!uri) missingFields.push("uri");
     if (!toolId) missingFields.push("toolId");
-    if (!resourceData) missingFields.push("resourceData");
 
     console.error("[Widget Store] Missing required fields:", missingFields);
     return {
@@ -484,10 +520,19 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     };
   }
 
+  // For OpenAI SDK widgets, resourceData is required
+  if (!isMcpApps && !resourceData) {
+    console.error("[Widget Store] Missing resourceData for OpenAI SDK widget");
+    return {
+      success: false,
+      error: "Missing required field: resourceData",
+    };
+  }
+
   // Store widget data using toolId as key
   widgetDataStore.set(toolId, {
     serverId,
-    uri,
+    uri: uri || resourceUri || "",
     toolInput,
     toolOutput,
     toolResponseMetadata,
@@ -498,6 +543,15 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     devWidgetUrl,
     devServerBaseUrl,
     theme,
+    protocol,
+    cspMode,
+    html,
+    csp,
+    permissions,
+    prefersBorder,
+    mimeType,
+    resourceUri,
+    toolName,
   });
 
   console.log("[Widget Store] Data stored successfully for toolId:", toolId);

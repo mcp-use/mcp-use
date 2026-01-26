@@ -28,7 +28,7 @@ export type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
-// Export OpenAI Apps SDK widget hooks and types
+// Export widget hooks and types (supports apps-sdk, mcp-app, and standalone modes)
 export { ErrorBoundary } from "./ErrorBoundary.js";
 export { Image } from "./Image.js";
 export { ThemeProvider } from "./ThemeProvider.js";
@@ -37,7 +37,9 @@ export {
   useWidgetProps,
   useWidgetState,
   useWidgetTheme,
+  useWidgetHostType,
 } from "./useWidget.js";
+export type { UseWidgetResult } from "./useWidget.js";
 export type {
   API,
   CallToolResponse,
@@ -49,8 +51,23 @@ export type {
   Theme,
   UnknownObject,
   UserAgent,
-  UseWidgetResult,
 } from "./widget-types.js";
+
+// Export host adaptor types and utilities
+export {
+  createHostAdaptor,
+  detectHostType,
+  resetHostAdaptor,
+  getHostAdaptor,
+  AppsSdkAdaptor,
+  McpAppAdaptor,
+  StandaloneAdaptor,
+} from "./host/index.js";
+export type {
+  HostType,
+  WidgetHostAdaptor,
+  McpUseGlobals,
+} from "./host/index.js";
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
 
