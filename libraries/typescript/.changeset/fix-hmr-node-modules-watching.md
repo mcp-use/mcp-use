@@ -1,6 +1,10 @@
 ---
+"create-mcp-use-app": patch
+"@mcp-use/inspector": patch
+"mcp-use": patch
 "@mcp-use/cli": patch
 ---
+
 
 Fix HMR file watcher exhausting inotify limits by properly ignoring node_modules
 
