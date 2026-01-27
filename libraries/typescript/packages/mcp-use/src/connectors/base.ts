@@ -394,13 +394,26 @@ export abstract class BaseConnector {
     this.serverInfoCache = serverInfo || null;
 
     // Fetch and cache tools
-    const listToolsRes = await this.client.listTools(
-      undefined,
-      defaultRequestOptions
-    );
-    this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
+    // Gracefully handle servers that don't implement tools/list or have no tools
+    try {
+      const listToolsRes = await this.client.listTools(
+        undefined,
+        defaultRequestOptions
+      );
+      this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
+      logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
+      // If tools/list is not implemented or fails, assume no tools
+      // This commonly happens with blank servers that have no tools registered
+      if (error.code === -32601) {
+        logger.debug("Server does not implement tools/list, assuming no tools");
+      } else {
+        logger.debug("Failed to list tools, assuming empty:", error.message);
+      }
+      this.toolsCache = [];
+    }
 
-    logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
     logger.debug("Server capabilities:", capabilities);
     logger.debug("Server info:", serverInfo);
     return capabilities;
@@ -473,8 +486,15 @@ export abstract class BaseConnector {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
+    logger.debug("[listTools] Fetching fresh tools from server...");
     const result = await this.client.listTools(undefined, options);
-    return (result.tools ?? []) as Tool[];
+    // Create a new array to ensure React detects the change (avoid reference equality issues)
+    const tools = result.tools ? [...result.tools] : [];
+    logger.debug(
+      `[listTools] Returned ${tools.length} tools:`,
+      tools.map((t) => t.name)
+    );
+    return tools;
   }
 
   /**
