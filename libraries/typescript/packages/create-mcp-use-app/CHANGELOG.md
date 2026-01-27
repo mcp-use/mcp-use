@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.0-canary.4
+
+### Patch Changes
+
+- e910f64: chore: fix vulnerabilities in deps
+
 ## 0.12.0-canary.3
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.12.0-canary.3
+
+### Patch Changes
+
+- e910f64: chore: fix vulnerabilities in deps
+- Updated dependencies [e910f64]
+  - @mcp-use/inspector@0.17.0-canary.3
+  - mcp-use@1.15.0-canary.3
+
 ## 2.12.0-canary.2
 
 ### Patch Changes
