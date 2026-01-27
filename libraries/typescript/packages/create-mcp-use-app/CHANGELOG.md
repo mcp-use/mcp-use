@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.0-canary.5
+
+### Patch Changes
+
+- a078aa9: fix: mcp server landing now shows the external url instead of the internal
+
 ## 0.12.0-canary.4
 
 ### Patch Changes

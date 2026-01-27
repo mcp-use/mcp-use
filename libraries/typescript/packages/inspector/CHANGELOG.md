@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.17.0-canary.4
+
+### Patch Changes
+
+- a078aa9: fix: mcp server landing now shows the external url instead of the internal
+- Updated dependencies [a078aa9]
+  - mcp-use@1.15.0-canary.4
+
 ## 0.17.0-canary.3
 
 ### Patch Changes
