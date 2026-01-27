@@ -206,6 +206,36 @@ export function syncPrimitive<TConfig, THandler>(
     if (idx !== -1) potentiallyAdded.splice(idx, 1);
   }
 
+  // Handle truly removed items (not renames)
+  const trulyRemoved = potentiallyRemoved.filter(
+    (oldKey) => !Array.from(renames.values()).includes(oldKey)
+  );
+
+  for (const removedKey of trulyRemoved) {
+    // Remove from updatedRegistrations
+    updatedRegistrations.delete(removedKey);
+
+    // Remove from active sessions
+    for (const session of sessions) {
+      try {
+        const refs = session.getRefs();
+        const oldRef = refs?.get(removedKey);
+
+        if (oldRef) {
+          oldRef.remove();
+          refs?.delete(removedKey);
+        }
+      } catch (error) {
+        console.error(
+          `[HMR] Failed to remove ${primitiveName} "${removedKey}" in session ${session.sessionId}:`,
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    changes.removed.push(removedKey);
+  }
+
   // Handle truly new items
   for (const newKey of potentiallyAdded) {
     const newReg = newRegistrations.get(newKey)!;
