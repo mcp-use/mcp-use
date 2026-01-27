@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.12.3-canary.0
+
+### Patch Changes
+
+- 013101d: fix: hmr not working if 0 tools initially
+- Updated dependencies [013101d]
+  - mcp-use@1.15.3-canary.0
+  - @mcp-use/inspector@0.17.3-canary.0
+
 ## 2.12.2
 
 ### Patch Changes
