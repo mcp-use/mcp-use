@@ -331,6 +331,25 @@ async function prompt(
 }
 
 /**
+ * Get the MCP server URL for a deployment
+ */
+function getMcpServerUrl(deployment: Deployment): string {
+  if (deployment.customDomain) {
+    // Custom domain takes precedence
+    return `https://${deployment.customDomain}/mcp`;
+  } else if (deployment.serverSlug) {
+    // Gateway URL via haikunator slug
+    return `https://${deployment.serverSlug}.mcp-use.run/mcp`;
+  } else if (deployment.serverId) {
+    // Gateway URL via serverId (fallback if slug not available yet)
+    return `https://${deployment.serverId}.mcp-use.run/mcp`;
+  } else {
+    // Direct deployment URL (legacy deployments without server)
+    return `https://${deployment.domain}/mcp`;
+  }
+}
+
+/**
  * Display deployment progress with spinner
  */
 async function displayDeploymentProgress(
@@ -458,26 +477,14 @@ async function displayDeploymentProgress(
 
     if (finalDeployment.status === "running") {
       // Determine the MCP Server URL to display
-      let mcpServerUrl: string;
-      let dashboardUrl: string | null = null;
+      const mcpServerUrl = getMcpServerUrl(finalDeployment);
 
-      if (finalDeployment.customDomain) {
-        // Custom domain takes precedence
-        mcpServerUrl = `https://${finalDeployment.customDomain}/mcp`;
-        if (finalDeployment.serverSlug) {
-          dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverSlug}`;
-        }
-      } else if (finalDeployment.serverSlug) {
-        // Gateway URL via haikunator slug
-        mcpServerUrl = `https://${finalDeployment.serverSlug}.mcp-use.run/mcp`;
+      // Determine dashboard URL if server exists
+      let dashboardUrl: string | null = null;
+      if (finalDeployment.serverSlug) {
         dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverSlug}`;
       } else if (finalDeployment.serverId) {
-        // Gateway URL via serverId (fallback if slug not available yet)
-        mcpServerUrl = `https://${finalDeployment.serverId}.mcp-use.run/mcp`;
         dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverId}`;
-      } else {
-        // Direct deployment URL (legacy deployments without server)
-        mcpServerUrl = `https://${finalDeployment.domain}/mcp`;
       }
 
       const inspectorUrl = `https://inspector.mcp-use.com/inspector?autoConnect=${encodeURIComponent(
@@ -1075,6 +1082,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     }
 
     const existingLink = !options.new ? await getProjectLink(cwd) : null;
+    const serverId = existingLink?.serverId;
 
     if (existingLink) {
       try {
@@ -1087,7 +1095,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           console.log(chalk.green(`✓ Found linked deployment`));
           console.log(chalk.gray(`  Redeploying to maintain the same URL...`));
           console.log(
-            chalk.cyan(`  URL: https://${existingDeployment.domain}/mcp\n`)
+            chalk.cyan(`  URL: ${getMcpServerUrl(existingDeployment)}\n`)
           );
 
           // Build updated deployment config
@@ -1105,7 +1113,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
             redeploymentConfig
           );
 
-          // Update link timestamp
+          // Update link timestamp (preserve serverId if it exists)
           await saveProjectLink(cwd, {
             ...existingLink,
             linkedAt: new Date().toISOString(),
@@ -1121,16 +1129,31 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
             await open(`https://${deployment.domain}`);
           }
           return; // Exit early
+        } else {
+          // Deployment failed or not found, but we have a serverId - preserve it
+          console.log(
+            chalk.yellow(
+              `⚠️  Linked deployment not found or failed, creating new one...`
+            )
+          );
+          if (serverId) {
+            console.log(
+              chalk.gray(`  Will reuse existing server: ${serverId}`)
+            );
+          }
         }
       } catch (error) {
         // Deployment not found or error - continue to create new
         console.log(
           chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
         );
+        if (serverId) {
+          console.log(chalk.gray(`  Will reuse existing server: ${serverId}`));
+        }
       }
     }
 
-    // Create deployment request
+    // Create deployment request (backend will auto-create server or use blue-green if serverId provided)
     const deploymentRequest: CreateDeploymentRequest = {
       name: projectName,
       source: {
@@ -1144,6 +1167,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         env: Object.keys(envVars).length > 0 ? envVars : undefined,
       },
       healthCheckPath: "/healthz",
+      serverId,
     };
 
     // Create deployment
@@ -1154,12 +1178,13 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
     );
 
-    // Save project link
+    // Save project link with serverId from backend
     await saveProjectLink(cwd, {
       deploymentId: deployment.id,
       deploymentName: projectName,
       deploymentUrl: deployment.domain,
       linkedAt: new Date().toISOString(),
+      serverId: deployment.serverId,
     });
     console.log(
       chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
