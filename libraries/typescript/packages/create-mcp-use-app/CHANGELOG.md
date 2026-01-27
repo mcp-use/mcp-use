@@ -1,5 +1,13 @@
 # create-mcp-use-app
 
+## 0.12.1
+
+### Patch Changes
+
+- bb28a69: Fix HMR file watcher exhausting inotify limits by properly ignoring node_modules
+
+  The HMR file watcher was attempting to watch files inside `node_modules/` despite having ignore patterns configured, which exhausted the inotify watch limit (ENOSPC errors) in containerized environments.
+
 ## 0.12.1-canary.0
 
 ### Patch Changes
