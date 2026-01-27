@@ -49,12 +49,7 @@ server.tool(
     }),
   },
   async ({ city }) => {
-    const response = await fetch(`https://wttr.in/${city}?format=j1`);
-    const data: any = await response.json();
-    const current = data.current_condition[0];
-    return text(
-      `The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`
-    );
+    return text(`The weather in ${city} is sunny`);
   }
 );
 

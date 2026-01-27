@@ -83,6 +83,24 @@ export async function mountMcp(
     );
   }
 
+  // Helper function to construct the full URL considering proxy headers
+  const getFullUrl = (c: Context): string => {
+    // Check for proxy headers (common in production deployments)
+    const proto =
+      c.req.header("X-Forwarded-Proto") ||
+      c.req.header("X-Forwarded-Protocol") ||
+      new URL(c.req.url).protocol.replace(":", "");
+
+    const host =
+      c.req.header("X-Forwarded-Host") ||
+      c.req.header("Host") ||
+      new URL(c.req.url).host;
+
+    const path = c.req.path;
+
+    return `${proto}://${host}${path}`;
+  };
+
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
     // Detect browser GET requests and return landing page
@@ -94,10 +112,11 @@ export async function mountMcp(
           !acceptHeader.includes("text/event-stream"));
 
       if (isBrowser) {
+        const fullUrl = getFullUrl(c);
         const landingPage = generateLandingPage(
           config.name,
           config.version,
-          c.req.url,
+          fullUrl,
           config.description
         );
         return new Response(landingPage, {
