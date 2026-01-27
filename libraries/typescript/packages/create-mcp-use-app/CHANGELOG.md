@@ -1,5 +1,19 @@
 # create-mcp-use-app
 
+## 0.12.0
+
+### Minor Changes
+
+- 1dcba40: feat: changed templates to use mcp-apps and alias apps-sdk => mcp-apps
+
+### Patch Changes
+
+- 1dcba40: fix: rename template to mcp-apps
+- 1dcba40: fix: mcp server landing now shows the external url instead of the internal
+- 1dcba40: chore: trigger canary release
+- 1dcba40: fix docs
+- 1dcba40: chore: fix vulnerabilities in deps
+
 ## 0.12.0-canary.5
 
 ### Patch Changes
