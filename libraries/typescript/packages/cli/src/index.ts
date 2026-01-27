@@ -1272,13 +1272,46 @@ program
       // Watch for file changes - watch .ts/.tsx files in project directory
       const watcher = chokidar.watch(".", {
         cwd: projectPath,
-        ignored: [
-          /(^|[/\\])\../, // dotfiles
-          "**/node_modules/**",
-          "**/dist/**",
-          "**/resources/**", // widgets are watched separately by vite
-          "**/*.d.ts", // type definitions
-        ],
+        ignored: (path: string, stats?: any) => {
+          // Normalize path separators for cross-platform compatibility
+          const normalizedPath = path.replace(/\\/g, "/");
+
+          // Ignore dotfiles and dot directories (hidden files)
+          if (/(^|\/)\.[^/]/.test(normalizedPath)) {
+            return true;
+          }
+
+          // Ignore node_modules directory and all its contents
+          if (
+            normalizedPath.includes("/node_modules/") ||
+            normalizedPath.endsWith("/node_modules")
+          ) {
+            return true;
+          }
+
+          // Ignore dist directory and all its contents
+          if (
+            normalizedPath.includes("/dist/") ||
+            normalizedPath.endsWith("/dist")
+          ) {
+            return true;
+          }
+
+          // Ignore resources directory (widgets watched separately by vite)
+          if (
+            normalizedPath.includes("/resources/") ||
+            normalizedPath.endsWith("/resources")
+          ) {
+            return true;
+          }
+
+          // Ignore .d.ts files (TypeScript declaration files)
+          if (stats?.isFile() && normalizedPath.endsWith(".d.ts")) {
+            return true;
+          }
+
+          return false;
+        },
         persistent: true,
         ignoreInitial: true,
         depth: 3, // Limit depth to avoid watching too many files
