@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.12.1-canary.0
+
+### Patch Changes
+
+- 7eb787f: fix(cli): preserve serverId when redeploying and refactor MCP server URL generation
+  - mcp-use@1.15.1-canary.0
+  - @mcp-use/inspector@0.17.1-canary.0
+
 ## 2.12.0
 
 ### Minor Changes
