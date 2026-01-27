@@ -45,6 +45,7 @@ export interface CreateDeploymentRequest {
   source: DeploymentSource;
   customDomain?: string;
   healthCheckPath?: string;
+  serverId?: string;
 }
 
 export interface Deployment {
