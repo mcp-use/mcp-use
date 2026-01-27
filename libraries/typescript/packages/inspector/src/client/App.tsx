@@ -28,6 +28,13 @@ function App() {
   const urlParams = new URLSearchParams(window.location.search);
   const isEmbedded = urlParams.get("embedded") === "true";
 
+  // Check if theme is forced via URL params
+  const forcedTheme = urlParams.get("theme") as
+    | "light"
+    | "dark"
+    | "system"
+    | null;
+
   // Create storage provider (only in non-embedded mode)
   const storageProvider = useMemo(
     () =>
@@ -38,7 +45,7 @@ function App() {
   );
 
   return (
-    <ThemeProvider>
+    <ThemeProvider forcedTheme={forcedTheme || undefined}>
       <WidgetDebugProvider>
         <McpClientProvider
           storageProvider={storageProvider}
