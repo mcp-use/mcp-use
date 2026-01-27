@@ -8,6 +8,7 @@
     "mcp-use": "1.15.1"
   },
   "changesets": [
-    "fix-hmr-node-modules-watching"
+    "fix-hmr-node-modules-watching",
+    "lucky-lilies-knock"
   ]
 }

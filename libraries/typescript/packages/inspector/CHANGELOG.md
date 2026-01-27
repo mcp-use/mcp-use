@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.17.2-canary.1
+
+### Patch Changes
+
+- 4d3e62e: fix(cli): fix hmr
+- Updated dependencies [4d3e62e]
+  - mcp-use@1.15.2-canary.1
+
 ## 0.17.2-canary.0
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.1-canary.0
+
+### Patch Changes
+
+- 4d3e62e: fix(cli): fix hmr
+
 ## 0.12.0
 
 ### Minor Changes
