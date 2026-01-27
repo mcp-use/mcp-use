@@ -48,6 +48,7 @@
     "vite": "^7.3.0"
   },
   "overrides": {
-    "sugarss": "^5.0.1"
+    "sugarss": "^5.0.1",
+    "lodash": "4.17.23"
   }
 }
