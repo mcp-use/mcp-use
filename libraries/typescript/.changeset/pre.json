@@ -8,6 +8,7 @@
     "mcp-use": "1.15.2"
   },
   "changesets": [
+    "heavy-streets-change",
     "open-jobs-brake"
   ]
 }
