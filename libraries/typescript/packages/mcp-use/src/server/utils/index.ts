@@ -7,3 +7,4 @@ export * from "./runtime.js";
 export * from "./server-helpers.js";
 export * from "./server-lifecycle.js";
 export * from "./hono-proxy.js";
+export * from "./completion-helpers.js";
