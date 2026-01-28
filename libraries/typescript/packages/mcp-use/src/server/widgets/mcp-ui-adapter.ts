@@ -17,7 +17,7 @@ import type {
   UIResourceContent,
   UIResourceDefinition,
 } from "../types/resource.js";
-import { slugifyWidgetName, processWidgetHtml } from "./widget-helpers.js";
+import { processWidgetHtml, slugifyWidgetName } from "./widget-helpers.js";
 
 /**
  * Configuration for building widget URLs
