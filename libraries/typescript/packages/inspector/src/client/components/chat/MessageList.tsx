@@ -1,15 +1,17 @@
-import { memo, useEffect, useRef } from "react";
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
+import { memo, useEffect, useRef } from "react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
+import type { MessageAttachment } from "./types";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string | Array<{ index: number; type: string; text: string }>;
   timestamp: number;
+  attachments?: MessageAttachment[];
   parts?: Array<{
     type: "text" | "tool-invocation";
     text?: string;
@@ -126,6 +128,7 @@ export const MessageList = memo(
                 key={message.id}
                 content={contentStr}
                 timestamp={message.timestamp}
+                attachments={message.attachments}
               />
             );
           }
