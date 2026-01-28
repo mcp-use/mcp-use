@@ -1,10 +1,24 @@
 ---
-title: "Library Updates"
+title: "Updates"
 description: "New updates and improvements"
-icon:  "history"
+icon: "history"
 ---
 
 import { Contributors } from '/snippets/contributors.jsx'
+
+<Update label="v1.6.0 - 2026‑01‑21">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.6.0&title=Bearer%20Token%20Auth%20and%20Middleware&date=2026-01-21" alt="Release 1.6.0" />
+  </Frame>
+  ## Bearer Token Auth & Middleware
+  - **New**: Bearer Token authentication for Python MCP servers ([#841](https://github.com/mcp-use/mcp-use/pull/841))
+  - **New**: Intercept MCP handshake with `on_initialize` middleware ([#769](https://github.com/mcp-use/mcp-use/pull/769))
+  - **Fix**: DNS rebinding protection for cloud/proxy deployments ([#825](https://github.com/mcp-use/mcp-use/pull/825))
+  - **Fix**: Improved debug and `pretty_print_jsonrpc` behavior ([#814](https://github.com/mcp-use/mcp-use/pull/814))
+  - **Fix**: Added timeout mechanism to `ConnectionManager.stop()` ([#726](https://github.com/mcp-use/mcp-use/pull/726))
+
+  <Contributors users="pietrozullo,renvins,Incharajayaram" />
+</Update>
 
 <Update label="v1.5.2 - 2025‑01‑12">
   <Frame>

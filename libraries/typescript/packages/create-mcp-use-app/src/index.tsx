@@ -312,7 +312,7 @@ program
   .argument("[project-name]", "Name of the MCP server project")
   .option(
     "-t, --template <template>",
-    "Template to use (starter, mcp-ui, apps-sdk) or GitHub repo URL (owner/repo or https://github.com/owner/repo)"
+    "Template to use (starter, mcp-ui, mcp-apps, blank) or GitHub repo URL (owner/repo or https://github.com/owner/repo)"
   )
   .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
@@ -457,6 +457,9 @@ program
 
         // Update package.json with project name
         updatePackageJson(projectPath, sanitizedProjectName);
+
+        // Update index.ts with project name
+        updateIndexTs(projectPath, sanitizedProjectName);
 
         // Determine which package manager to use
         let usedPackageManager = "npm";
@@ -614,7 +617,7 @@ program
         console.log("");
         console.log(chalk.bold("📁 Project structure:"));
         console.log(`   ${sanitizedProjectName}/`);
-        if (validatedTemplate === "apps-sdk") {
+        if (validatedTemplate === "mcp-apps") {
           console.log("   ├── resources/");
           console.log("   │   └── display-weather.tsx");
         }
@@ -859,11 +862,18 @@ function validateTemplateName(template: string): string {
     return sanitized;
   }
 
+  // Template aliases for backward compatibility
+  const aliases: Record<string, string> = {
+    "apps-sdk": "mcp-apps", // Silent redirect for backward compatibility
+  };
+
+  const resolvedTemplate = aliases[sanitized] || sanitized;
+
   // Security: Prevent path traversal attacks
   if (
-    sanitized.includes("..") ||
-    sanitized.includes("/") ||
-    sanitized.includes("\\")
+    resolvedTemplate.includes("..") ||
+    resolvedTemplate.includes("/") ||
+    resolvedTemplate.includes("\\")
   ) {
     console.error(chalk.red("❌ Invalid template name"));
     console.error(
@@ -873,7 +883,7 @@ function validateTemplateName(template: string): string {
   }
 
   // Only allow alphanumeric characters, hyphens, and underscores
-  if (!/^[a-zA-Z0-9_-]+$/.test(sanitized)) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(resolvedTemplate)) {
     console.error(chalk.red("❌ Invalid template name"));
     console.error(
       chalk.yellow(
@@ -883,7 +893,7 @@ function validateTemplateName(template: string): string {
     process.exit(1);
   }
 
-  return sanitized;
+  return resolvedTemplate;
 }
 
 async function copyTemplate(
@@ -951,10 +961,7 @@ async function copyTemplate(
       '💡 Tip: Use "starter" template for a comprehensive MCP server with all features'
     );
     console.log(
-      '💡 Tip: Use "mcp-ui" template for a MCP server with mcp-ui resources'
-    );
-    console.log(
-      '💡 Tip: Use "apps-sdk" template for a MCP server with OpenAI Apps SDK integration'
+      '💡 Tip: Use "mcp-apps" template for a MCP server that displays Widgets on ChatGPT, Claude, and other mcp-apps compatible clients'
     );
     console.log(
       '💡 Tip: Use a GitHub repo URL like "owner/repo" or "https://github.com/owner/repo" to use a custom template'
@@ -1026,6 +1033,21 @@ function updatePackageJson(projectPath: string, projectName: string) {
   packageJsonContent.description = `MCP server: ${projectName}`;
 
   writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2));
+}
+
+function updateIndexTs(projectPath: string, projectName: string) {
+  const indexPath = join(projectPath, "index.ts");
+
+  if (!existsSync(indexPath)) {
+    return; // index.ts doesn't exist, skip
+  }
+
+  let content = readFileSync(indexPath, "utf-8");
+
+  // Replace {{PROJECT_NAME}} placeholders with actual project name
+  content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+
+  writeFileSync(indexPath, content);
 }
 
 // Ink component for project name input
@@ -1139,12 +1161,20 @@ function TemplateSelector({
     };
   });
 
+  // Set default to mcp-apps if available, otherwise first template
+  const defaultIndex = items.findIndex((item) => item.value === "mcp-apps");
+  const initialIndex = defaultIndex >= 0 ? defaultIndex : 0;
+
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text bold>Select a template:</Text>
       </Box>
-      <SelectInput items={items} onSelect={(item) => onSelect(item.value)} />
+      <SelectInput
+        items={items}
+        initialIndex={initialIndex}
+        onSelect={(item) => onSelect(item.value)}
+      />
     </Box>
   );
 }

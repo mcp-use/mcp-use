@@ -19,17 +19,29 @@ import { MCPServer } from 'mcp-use/server'
 
 const server = new MCPServer({
   name: 'my-server',
+  title: 'My Server', // display name - shown in Inspector and MCP clients
   version: '1.0.0',              // Semantic version
   description: 'Server purpose',  // Human-readable description
   host: 'localhost',             // Hostname (defaults to 'localhost')
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // MCP Server production URL (needed for UI Widgets to work correctly)
+  websiteUrl: 'https://mcp-use.com', // Website URL (can be customized)
+  favicon: 'favicon.ico',        // Favicon relative to public/ folder
+  icons: [                       // Server icons for branding
+    {
+      src: 'icon.svg',           // Relative paths converted to absolute URLs
+      mimeType: 'image/svg+xml',
+      sizes: ['512x512']
+    }
+  ],
   allowedOrigins: process.env.NODE_ENV === 'production' 
     ? ['https://myapp.com']      // Production: explicit origins
     : undefined,                 // Development: allows all origins
-  sessionIdleTimeoutMs: 300000,  // Session idle timeout (default: 5 minutes)
+  sessionIdleTimeoutMs: 86400000,  // Session idle timeout (default: 1 day)
   autoCreateSessionOnInvalidId: true  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 })
 ```
+
+**Note:** When using `create-mcp-use-app`, these metadata fields (title, websiteUrl, favicon, icons) are automatically configured with your project name and mcp-use branding.
 
 ### Environment Variables
 
@@ -317,7 +329,7 @@ The server manages client sessions to maintain state across multiple requests. S
 
 **Session Configuration Options:**
 
-- **`sessionIdleTimeoutMs`**: Controls how long a session remains active when idle (default: 5 minutes)
+- **`sessionIdleTimeoutMs`**: Controls how long a session remains active when idle (default: 1 day)
 - **`autoCreateSessionOnInvalidId`**: Controls behavior when a client sends a request with an invalid or expired session ID
 
 **Session Reconnection Behavior:**
@@ -367,7 +379,7 @@ const specCompliantServer = new MCPServer({
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  sessionIdleTimeoutMs: 300000,  // 5 minutes
+  sessionIdleTimeoutMs: 3600000,  // 1 hour (default is 1 day)
   autoCreateSessionOnInvalidId: true  // Auto-create on invalid session
 })
 

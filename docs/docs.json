@@ -87,7 +87,7 @@
             "icon": "",
             "pages": [
               "home/mcp101",
-              "typescript/server/creating-apps-sdk-server",
+              "typescript/server/creating-mcp-apps-server",
               "guides/chatgpt-apps-flow"
             ]
           }
@@ -105,9 +105,9 @@
               {
                 "group": "Get Started",
                 "pages": [
+                  "python/getting-started/welcome",
                   "python/getting-started/quickstart",
-                  "python/getting-started/installation",
-                  "python/getting-started/configuration"
+                  "python/getting-started/installation"
                 ]
               },
               {
@@ -135,6 +135,13 @@
                       "python/server/elicitation",
                       "python/server/roots",
                       "python/server/notifications"
+                    ]
+                  },
+                  {
+                    "group": "Authentication",
+                    "icon": "shield",
+                    "pages": [
+                      "python/server/auth/bearer"
                     ]
                   },
                   "python/server/middleware",
@@ -375,6 +382,16 @@
                 "group": "Server",
                 "icon": "server",
                 "pages": [
+                  {
+                    "group": "Auth",
+                    "icon": "key",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_auth_bearer",
+                      "python/api-reference/mcp_use_server_auth_dependencies",
+                      "python/api-reference/mcp_use_server_auth_middleware",
+                      "python/api-reference/mcp_use_server_auth_models"
+                    ]
+                  },
                   "python/api-reference/mcp_use_server_context",
                   {
                     "group": "Logging",
@@ -426,6 +443,7 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_6_0",
                   "python/changelog/1_5_2",
                   "python/changelog/1_5_0",
                   "python/changelog/1_4_1",
@@ -542,8 +560,9 @@
                   {
                     "group": "UI Widgets",
                     "icon": "app-window-mac",
-                    "tag": "Apps SDK",
+                    "tag": "Cross-Compatible",
                     "pages": [
+                      "typescript/server/mcp-apps",
                       "typescript/server/ui-widgets",
                       "typescript/server/widget-components/usewidget",
                       "typescript/server/widget-components/mcpuseprovider",

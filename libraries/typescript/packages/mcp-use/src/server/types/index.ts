@@ -45,6 +45,7 @@ export {
   RawHtmlUIResource,
   RemoteDomUIResource,
   AppsSdkUIResource,
+  McpAppsUIResource,
   WidgetConfig,
   WidgetManifest,
   DiscoverWidgetsOptions,

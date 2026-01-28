@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { ErrorBoundary } from "./ErrorBoundary.js";
+import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { ThemeProvider } from "./ThemeProvider.js";
 import { WidgetControls } from "./WidgetControls.js";
 
@@ -43,8 +44,9 @@ interface McpUseProviderProps {
    */
   viewControls?: boolean | "pip" | "fullscreen";
   /**
-   * Automatically notify OpenAI about container height changes for auto-sizing
-   * Uses ResizeObserver to monitor the children container and calls window.openai.notifyIntrinsicHeight()
+   * Automatically notify host about container height changes for auto-sizing
+   * Supports both ChatGPT Apps SDK (window.openai) and MCP Apps (postMessage bridge)
+   * Uses ResizeObserver to monitor the children container
    * @default false
    */
   autoSize?: boolean;
@@ -77,7 +79,8 @@ export function McpUseProvider({
   autoSize = false,
 }: McpUseProviderProps) {
   const basename = getBasename();
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerElement, setContainerElement] =
+    useState<HTMLDivElement | null>(null);
   const lastHeightRef = useRef<number>(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationInProgressRef = useRef<boolean>(false);
@@ -120,10 +123,14 @@ export function McpUseProvider({
     };
   }, []);
 
-  // Notify OpenAI about height changes
+  // Notify host about height changes (dual-protocol support)
   const notifyHeight = useCallback((height: number) => {
-    if (typeof window !== "undefined" && window.openai?.notifyIntrinsicHeight) {
-      notificationInProgressRef.current = true;
+    if (typeof window === "undefined") return;
+
+    notificationInProgressRef.current = true;
+
+    // Try ChatGPT Apps SDK first
+    if (window.openai?.notifyIntrinsicHeight) {
       window.openai
         .notifyIntrinsicHeight(height)
         .then(() => {
@@ -132,10 +139,26 @@ export function McpUseProvider({
         .catch((error) => {
           notificationInProgressRef.current = false;
           console.error(
-            "[McpUseProvider] Failed to notify intrinsic height:",
+            "[McpUseProvider] Failed to notify intrinsic height (ChatGPT):",
             error
           );
         });
+      return;
+    }
+
+    // Fall back to MCP Apps bridge
+    // Always try to send - the bridge will handle if not connected yet
+    try {
+      const bridge = getMcpAppsBridge();
+      bridge.sendSizeChanged({ height });
+      console.log("[McpUseProvider] Sent size-changed notification:", height);
+      notificationInProgressRef.current = false;
+    } catch (error) {
+      notificationInProgressRef.current = false;
+      console.error(
+        "[McpUseProvider] Failed to notify size change (MCP Apps):",
+        error
+      );
     }
   }, []);
 
@@ -161,17 +184,28 @@ export function McpUseProvider({
   // Set up ResizeObserver for auto-sizing
   useEffect(() => {
     if (!autoSize) {
+      console.log("[McpUseProvider] autoSize is disabled");
       return;
     }
 
-    const container = containerRef.current;
-    if (!container || typeof ResizeObserver === "undefined") {
+    if (!containerElement) {
+      console.log("[McpUseProvider] No container element found for autoSize");
       return;
     }
+
+    if (typeof ResizeObserver === "undefined") {
+      console.log("[McpUseProvider] ResizeObserver not available");
+      return;
+    }
+
+    console.log("[McpUseProvider] Setting up ResizeObserver for autoSize");
 
     const observer = new ResizeObserver((entries) => {
       // Skip if notification is in progress to prevent feedback loop
       if (notificationInProgressRef.current) {
+        console.log(
+          "[McpUseProvider] Skipping resize - notification in progress"
+        );
         return;
       }
 
@@ -180,22 +214,29 @@ export function McpUseProvider({
         // Use scrollHeight as fallback for more accurate intrinsic height
         const scrollHeight = entry.target.scrollHeight;
         const intrinsicHeight = Math.max(height, scrollHeight);
+        console.log("[McpUseProvider] ResizeObserver fired:", {
+          height,
+          scrollHeight,
+          intrinsicHeight,
+        });
         debouncedNotifyHeight(intrinsicHeight);
       }
     });
 
-    observer.observe(container);
+    observer.observe(containerElement);
 
     // Initial measurement
     const initialHeight = Math.max(
-      container.offsetHeight,
-      container.scrollHeight
+      containerElement.offsetHeight,
+      containerElement.scrollHeight
     );
+    console.log("[McpUseProvider] Initial height measurement:", initialHeight);
     if (initialHeight > 0) {
       debouncedNotifyHeight(initialHeight);
     }
 
     return () => {
+      console.log("[McpUseProvider] Cleaning up ResizeObserver");
       observer.disconnect();
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
@@ -204,7 +245,7 @@ export function McpUseProvider({
       // Reset notification flag
       notificationInProgressRef.current = false;
     };
-  }, [autoSize, debouncedNotifyHeight]);
+  }, [autoSize, containerElement, debouncedNotifyHeight]);
 
   // Show loading state while router is being loaded
   if (isRouterLoading) {
@@ -253,7 +294,7 @@ export function McpUseProvider({
       minHeight: 0,
     };
     content = (
-      <div ref={containerRef} style={containerStyle}>
+      <div ref={setContainerElement} style={containerStyle}>
         {content}
       </div>
     );

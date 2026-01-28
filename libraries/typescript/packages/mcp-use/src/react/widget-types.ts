@@ -125,8 +125,8 @@ export interface UseWidgetResult<
   TToolInput extends UnknownObject = UnknownObject,
 > {
   // Props and state
-  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model) */
-  props: TProps;
+  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model). May be partial/empty while isPending; defaultProps may populate values. */
+  props: Partial<TProps>;
   /** Original tool input arguments */
   toolInput: TToolInput;
   /** Tool output from the last execution */
@@ -149,10 +149,14 @@ export interface UseWidgetResult<
   safeArea: SafeArea;
   /** Maximum height available */
   maxHeight: number;
+  /** Maximum width available (MCP Apps only) */
+  maxWidth?: number;
   /** User agent information */
   userAgent: UserAgent;
   /** Current locale */
   locale: string;
+  /** Current timezone (IANA timezone identifier) */
+  timeZone: string;
   /** MCP server base URL for making API requests */
   mcp_url: string;
 

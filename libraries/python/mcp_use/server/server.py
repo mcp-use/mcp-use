@@ -21,6 +21,8 @@ from mcp.types import (
     ServerResult,
 )
 
+# Import auth components
+from mcp_use.server.auth import AuthMiddleware, BearerAuthProvider
 from mcp_use.server.context import Context as MCPContext
 from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.middleware import (
@@ -59,6 +61,7 @@ class MCPServer(FastMCP):
         name: str | None = None,
         version: str | None = None,
         instructions: str | None = None,
+        auth: BearerAuthProvider | None = None,
         middleware: list[Middleware] | None = None,
         debug: bool = False,
         mcp_path: str = "/mcp",
@@ -100,6 +103,9 @@ class MCPServer(FastMCP):
 
         if version:
             self._mcp_server.version = version
+
+        # Store auth provider
+        self._auth = auth
 
         # Set debug level: DEBUG env var takes precedence, then debug parameter
         env_debug_level = self._parse_debug_level()
@@ -253,6 +259,8 @@ class MCPServer(FastMCP):
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
+        from starlette.middleware.cors import CORSMiddleware
+
         app = super().streamable_http_app()
 
         # Add MCP logging middleware (cast to satisfy type checker)
@@ -262,6 +270,25 @@ class MCPServer(FastMCP):
             mcp_path=self.mcp_path,
             pretty_print_jsonrpc=self.pretty_print_jsonrpc,
         )
+
+        # Add auth middleware if provider is configured
+        if self._auth:
+            app.add_middleware(
+                AuthMiddleware,
+                auth_provider=self._auth,
+            )
+            logger.debug("AuthMiddleware added to application")
+
+            # Add CORS middleware when auth is enabled (handles OPTIONS preflight)
+            # Note: allow_credentials=False because allow_origins=["*"] - browsers reject the combination
+            app.add_middleware(
+                CORSMiddleware,
+                allow_origins=["*"],
+                allow_credentials=False,
+                allow_methods=["GET", "POST", "OPTIONS"],
+                allow_headers=["*"],
+                expose_headers=["WWW-Authenticate"],
+            )
 
         return app
 

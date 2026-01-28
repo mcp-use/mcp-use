@@ -1,21 +1,30 @@
 ---
 title: "useWidget()"
-description: "Type-safe React adapter for OpenAI Apps SDK window.openai API"
+description: "Universal React hook for MCP Apps and ChatGPT Apps SDK widgets"
 icon: "webhook"
 ---
 
-The `useWidget` hook provides a type-safe React adapter for the OpenAI Apps SDK `window.openai` API. It automatically maps MCP UI props from `toolInput`, subscribes to all OpenAI global changes, and provides access to theme, display mode, safe areas, and action methods.
+The `useWidget` hook provides a **universal, protocol-agnostic** interface for building widgets that work with **both** MCP Apps (SEP-1865) and ChatGPT Apps SDK protocols. It automatically detects the environment and provides a consistent API regardless of which protocol is being used.
+
+<Info>
+**Protocol Detection**: The hook automatically detects whether it's running in:
+- **MCP Apps** environment (JSON-RPC over postMessage)
+- **ChatGPT Apps SDK** environment (window.openai API)
+
+Your widget code stays identical across both protocols!
+
+</Info>
 
 ## Import
 
 ```typescript
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 ```
 
 ## Basic Usage
 
 ```tsx
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 
 interface MyWidgetProps {
   city: string;
@@ -23,8 +32,9 @@ interface MyWidgetProps {
 }
 
 const MyWidget: React.FC = () => {
+  // Works identically in both MCP Apps and ChatGPT
   const { props, theme, callTool } = useWidget<MyWidgetProps>();
-  
+
   return (
     <div data-theme={theme}>
       <h1>{props.city}</h1>
@@ -34,63 +44,74 @@ const MyWidget: React.FC = () => {
 };
 ```
 
+<Note>
+**Cross-Protocol Compatibility**: This exact code works without modifications in:
+- ChatGPT (via Apps SDK protocol)
+- Claude Desktop (via MCP Apps protocol)
+- Any MCP Apps-compatible client
+
+The hook handles all protocol-specific communication behind the scenes.
+
+</Note>
+
 ## Type Parameters
 
 The hook accepts four optional type parameters:
 
 ```typescript
 useWidget<
-  TProps,      // Props type (from toolInput)
-  TOutput,     // Output type (from toolOutput/structuredContent)
-  TMetadata,   // Metadata type (from toolResponseMetadata)
-  TState       // State type (for widgetState)
->()
+  TProps, // Props type (from toolInput)
+  TOutput, // Output type (from toolOutput/structuredContent)
+  TMetadata, // Metadata type (from toolResponseMetadata)
+  TState // State type (for widgetState)
+>();
 ```
 
 ## Return Values
 
 ### Props and State
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `props` | `TProps` | Widget props (mapped from `toolInput` for MCP compatibility) |
-| `output` | `TOutput \| null` | Tool output from the last execution |
-| `metadata` | `TMetadata \| null` | Response metadata from the tool |
-| `state` | `TState \| null` | Persisted widget state |
-| `setState` | `(state: TState \| ((prev: TState \| null) => TState)) => Promise<void>` | Update widget state (persisted and shown to model) |
+| Property   | Type                                                                     | Description                                                                      |
+| ---------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `props`    | `Partial<TProps>`                                                        | Widget props (mapped from widget-only data). Empty `{}` when `isPending` is true |
+| `output`   | `TOutput \| null`                                                        | Tool output from the last execution                                              |
+| `metadata` | `TMetadata \| null`                                                      | Response metadata from the tool                                                  |
+| `state`    | `TState \| null`                                                         | Persisted widget state                                                           |
+| `setState` | `(state: TState \| ((prev: TState \| null) => TState)) => Promise<void>` | Update widget state (persisted and shown to model)                               |
 
 ### Layout and Theme
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `theme` | `"light" \| "dark"` | Current theme (auto-syncs with ChatGPT) |
-| `displayMode` | `"inline" \| "pip" \| "fullscreen"` | Current display mode |
-| `safeArea` | `SafeArea` | Safe area insets for mobile layout |
-| `maxHeight` | `number` | Maximum height available (pixels) |
-| `userAgent` | `UserAgent` | Device capabilities (`device`, `capabilities`) |
-| `locale` | `string` | Current locale (e.g., `"en-US"`) |
-| `mcp_url` | `string` | MCP server base URL for making API requests |
+| Property      | Type                                | Description                                    |
+| ------------- | ----------------------------------- | ---------------------------------------------- |
+| `theme`       | `"light" \| "dark"`                 | Current theme (auto-syncs with ChatGPT)        |
+| `displayMode` | `"inline" \| "pip" \| "fullscreen"` | Current display mode                           |
+| `safeArea`    | `SafeArea`                          | Safe area insets for mobile layout             |
+| `maxHeight`   | `number`                            | Maximum height available (pixels)              |
+| `userAgent`   | `UserAgent`                         | Device capabilities (`device`, `capabilities`) |
+| `locale`      | `string`                            | Current locale (e.g., `"en-US"`)               |
+| `mcp_url`     | `string`                            | MCP server base URL for making API requests    |
 
 ### Actions
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `callTool` | `(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>` | Call a tool on the MCP server |
-| `sendFollowUpMessage` | `(prompt: string) => Promise<void>` | Send a follow-up message to the ChatGPT conversation |
-| `openExternal` | `(href: string) => void` | Open an external URL in a new tab |
-| `requestDisplayMode` | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>` | Request a different display mode |
-| `notifyIntrinsicHeight` | `(height: number) => Promise<void>` | Notify OpenAI about intrinsic height changes for auto-sizing |
+| Method                  | Signature                                                                    | Description                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `callTool`              | `(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>` | Call a tool on the MCP server                                |
+| `sendFollowUpMessage`   | `(prompt: string) => Promise<void>`                                          | Send a follow-up message to the ChatGPT conversation         |
+| `openExternal`          | `(href: string) => void`                                                     | Open an external URL in a new tab                            |
+| `requestDisplayMode`    | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>`                      | Request a different display mode                             |
+| `notifyIntrinsicHeight` | `(height: number) => Promise<void>`                                          | Notify OpenAI about intrinsic height changes for auto-sizing |
 
 ### Availability
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `isAvailable` | `boolean` | Whether the `window.openai` API is available |
+| Property      | Type      | Description                                                                    |
+| ------------- | --------- | ------------------------------------------------------------------------------ |
+| `isAvailable` | `boolean` | Whether the `window.openai` API is available                                   |
+| `isPending`   | `boolean` | Whether the tool is currently executing. When `true`, props will be empty `{}` |
 
 ## Complete Example
 
 ```tsx
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 
 interface ProductProps {
   productId: string;
@@ -113,41 +134,95 @@ const ProductWidget: React.FC = () => {
     output,
     state,
     setState,
-    
+
     // Layout & theme
     theme,
     displayMode,
     safeArea,
-    
+
     // Actions
     callTool,
     sendFollowUpMessage,
     openExternal,
     requestDisplayMode,
     notifyIntrinsicHeight,
-    
+
     // Availability
     isAvailable,
   } = useWidget<ProductProps, ProductOutput, {}, ProductState>();
-  
+
   const handleAddToFavorites = async () => {
     const newFavorites = [...(state?.favorites || []), props.productId];
     await setState({ favorites: newFavorites });
   };
-  
+
   const handleGetReviews = async () => {
-    const result = await callTool('get-product-reviews', { 
-      productId: props.productId 
+    const result = await callTool("get-product-reviews", {
+      productId: props.productId,
     });
     // Handle result
   };
-  
+
   return (
     <div data-theme={theme}>
       <h1>{props.name}</h1>
       <p>${props.price}</p>
       <button onClick={handleAddToFavorites}>Add to Favorites</button>
       <button onClick={handleGetReviews}>Get Reviews</button>
+    </div>
+  );
+};
+```
+
+## Widget Lifecycle
+
+Widgets render **before** the tool execution completes. This means:
+
+1. **First render** (`isPending = true`):
+   - Widget mounts immediately when tool is called
+   - `props` is `{}` (empty object)
+   - `output` and `metadata` are `null`
+   - This allows showing loading states
+
+2. **After tool completes** (`isPending = false`):
+   - `props` contains the actual widget data
+   - `output` and `metadata` are available
+   - Widget re-renders with full data
+
+**Example:**
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<MyWidgetProps>();
+
+  if (isPending) {
+    return <LoadingSpinner />;
+  }
+
+  // Safe to access props now
+  return (
+    <div>
+      {props.city} - {props.temperature}°C
+    </div>
+  );
+};
+```
+
+**Alternative: Using optional chaining**
+
+```tsx
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<MyWidgetProps>();
+
+  return (
+    <div>
+      {isPending ? (
+        <LoadingSpinner />
+      ) : (
+        <div>
+          {props.city} - {props.temperature}°C
+        </div>
+      )}
     </div>
   );
 };
@@ -162,7 +237,7 @@ For convenience, there are specialized hooks for common use cases:
 Get only the widget props:
 
 ```tsx
-import { useWidgetProps } from 'mcp-use/react';
+import { useWidgetProps } from "mcp-use/react";
 
 const props = useWidgetProps<{ city: string; temperature: number }>();
 // { city: "Paris", temperature: 22 }
@@ -173,7 +248,7 @@ const props = useWidgetProps<{ city: string; temperature: number }>();
 Get only the theme:
 
 ```tsx
-import { useWidgetTheme } from 'mcp-use/react';
+import { useWidgetTheme } from "mcp-use/react";
 
 const theme = useWidgetTheme(); // 'light' | 'dark'
 ```
@@ -183,15 +258,15 @@ const theme = useWidgetTheme(); // 'light' | 'dark'
 Get state management:
 
 ```tsx
-import { useWidgetState } from 'mcp-use/react';
+import { useWidgetState } from "mcp-use/react";
 
 const [favorites, setFavorites] = useWidgetState<string[]>([]);
 
 // Update state
-await setFavorites(['item1', 'item2']);
+await setFavorites(["item1", "item2"]);
 
 // Or use functional update
-await setFavorites(prev => [...prev, 'newItem']);
+await setFavorites((prev) => [...prev, "newItem"]);
 ```
 
 ## Key Features
@@ -252,11 +327,11 @@ Widget state persists across widget interactions and is shown to the model:
 const { state, setState } = useWidget<{}, {}, {}, { favorites: string[] }>();
 
 // Update state
-await setState({ favorites: ['item1', 'item2'] });
+await setState({ favorites: ["item1", "item2"] });
 
 // Functional update
-await setState(prev => ({
-  favorites: [...(prev?.favorites || []), 'newItem']
+await setState((prev) => ({
+  favorites: [...(prev?.favorites || []), "newItem"],
 }));
 ```
 
@@ -268,8 +343,8 @@ Call other MCP tools from your widget:
 const { callTool } = useWidget();
 
 const handleSearch = async () => {
-  const result = await callTool('search-products', { 
-    query: 'laptop' 
+  const result = await callTool("search-products", {
+    query: "laptop",
   });
   // Handle result
 };
@@ -283,7 +358,7 @@ Send messages to the ChatGPT conversation:
 const { sendFollowUpMessage } = useWidget();
 
 const handleRequestInfo = async () => {
-  await sendFollowUpMessage('Show me more details about this product');
+  await sendFollowUpMessage("Show me more details about this product");
 };
 ```
 
@@ -295,7 +370,7 @@ Request display mode changes:
 const { requestDisplayMode } = useWidget();
 
 const handleFullscreen = async () => {
-  const result = await requestDisplayMode('fullscreen');
+  const result = await requestDisplayMode("fullscreen");
   // result.mode is the granted mode (may differ from requested)
 };
 ```
@@ -324,14 +399,14 @@ const { callTool, isAvailable } = useWidget();
 
 const handleAction = async () => {
   if (!isAvailable) {
-    console.warn('Widget API not available');
+    console.warn("Widget API not available");
     return;
   }
-  
+
   try {
-    await callTool('my-tool', {});
+    await callTool("my-tool", {});
   } catch (error) {
-    console.error('Tool call failed:', error);
+    console.error("Tool call failed:", error);
   }
 };
 ```
@@ -342,4 +417,3 @@ const handleAction = async () => {
 - [`WidgetControls`](./widgetcontrols) - Debug and view controls
 - [`ThemeProvider`](./themeprovider) - Theme management
 - [`ErrorBoundary`](./errorboundary) - Error handling
-

@@ -14,6 +14,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/client/index.ts", "src/client/components/AddToClientDropdown.tsx", "src/client/utils/**/*", "src/client/components/ui/**/*", "src/client/lib/**/*", "src/client/context/**/*"],
+  "include": ["src/client/index.ts", "src/client/components/AddToClientDropdown.tsx", "src/client/utils/**/*", "src/client/components/ui/**/*", "src/client/lib/**/*", "src/client/context/**/*", "src/client/constants/**/*"],
   "exclude": ["src/server/**/*", "src/client/**/*.test.*", "src/client/**/*.spec.*"]
 }

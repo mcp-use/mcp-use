@@ -2,12 +2,13 @@ import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpClient } from "mcp-use/react";
+import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
+import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
-import { IframeConsole } from "./IframeConsole";
+import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
 import { Spinner } from "./ui/spinner";
-import { WidgetInspectorControls } from "./WidgetInspectorControls";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -19,6 +20,17 @@ interface OpenAIComponentRendererProps {
   className?: string;
   noWrapper?: boolean;
   showConsole?: boolean;
+  customProps?: Record<string, string>;
+  onUpdateGlobals?: (updates: {
+    displayMode?: "inline" | "pip" | "fullscreen";
+    theme?: "light" | "dark";
+    maxHeight?: number;
+    locale?: string;
+    safeArea?: {
+      insets: { top: number; bottom: number; left: number; right: number };
+    };
+    userAgent?: any;
+  }) => void;
 }
 
 function Wrapper({
@@ -68,6 +80,8 @@ function OpenAIComponentRendererBase({
   className,
   noWrapper = false,
   showConsole = true,
+  customProps,
+  onUpdateGlobals,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<InstanceType<
     typeof window.HTMLIFrameElement
@@ -88,7 +102,7 @@ function OpenAIComponentRendererBase({
   const [isPipHovered, setIsPipHovered] = useState<boolean>(false);
   const [useDevMode, setUseDevMode] = useState<boolean>(false);
   const [widgetToolInput, setWidgetToolInput] = useState<any>(null);
-  const [widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
+  const [_widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -100,6 +114,7 @@ function OpenAIComponentRendererBase({
   const server = servers.find((connection) => connection.id === serverId);
   const serverBaseUrl = server?.url;
   const { resolvedTheme } = useTheme();
+  const { playground } = useWidgetDebug();
 
   // Refs to hold latest values without triggering effect re-runs
   // This prevents infinite loops caused by object/function reference changes
@@ -108,6 +123,7 @@ function OpenAIComponentRendererBase({
   const readResourceRef = useRef(readResource);
   const serverBaseUrlRef = useRef(serverBaseUrl);
   const resolvedThemeRef = useRef(resolvedTheme);
+  const customPropsRef = useRef(customProps);
 
   // Keep refs updated with latest values
   useEffect(() => {
@@ -116,6 +132,7 @@ function OpenAIComponentRendererBase({
     readResourceRef.current = readResource;
     serverBaseUrlRef.current = serverBaseUrl;
     resolvedThemeRef.current = resolvedTheme;
+    customPropsRef.current = customProps;
   });
 
   // Store widget data and set up iframe URL
@@ -127,6 +144,17 @@ function OpenAIComponentRendererBase({
       const currentReadResource = readResourceRef.current;
       const currentServerBaseUrl = serverBaseUrlRef.current;
       const currentResolvedTheme = resolvedThemeRef.current;
+      const currentCustomProps = customPropsRef.current;
+      // Capture playground from closure at effect run time
+      const currentPlayground = playground;
+
+      console.log(
+        "[OpenAIComponentRenderer] Storing widget data with playground:",
+        {
+          locale: currentPlayground.locale,
+          deviceType: currentPlayground.deviceType,
+        }
+      );
 
       try {
         // Extract structured content from tool result (the actual tool parameters)
@@ -135,23 +163,37 @@ function OpenAIComponentRendererBase({
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await currentReadResource(componentUrl);
 
-        // Extract CSP metadata from tool result
-        // Check both toolResult._meta (for tool calls) and toolResult.contents?.[0]?._meta (for resources)
+        // Extract CSP metadata - check tool result first, then resource (where appsSdkMetadata lives)
+        // The CSP is typically in the resource's _meta (set via appsSdkMetadata), not the tool result's _meta
         let widgetCSP = null;
-        const metaSource =
-          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
-        if (metaSource?.["openai/widgetCSP"]) {
-          widgetCSP = metaSource["openai/widgetCSP"];
+        if (currentToolResult?._meta?.["openai/widgetCSP"]) {
+          widgetCSP = currentToolResult._meta["openai/widgetCSP"];
+        } else if (resourceData?.contents?.[0]?._meta?.["openai/widgetCSP"]) {
+          widgetCSP = resourceData.contents[0]._meta["openai/widgetCSP"];
         }
+
+        // For other metadata, prefer tool result's _meta as it may have tool-specific overrides
+        const metaSource =
+          currentToolResult?._meta || resourceData?.contents?.[0]?._meta;
 
         // Extract widget props from _meta["mcp-use/props"]
         const widgetProps = metaSource?.["mcp-use/props"] || null;
+
+        // Merge widget props with custom props (custom props take precedence)
+        const mergedProps = {
+          ...(widgetProps || {}),
+          ...(currentCustomProps || {}),
+        };
+        const finalWidgetProps =
+          Object.keys(mergedProps).length > 0 ? mergedProps : null;
 
         // Debug logging
         console.log("[OpenAIComponentRenderer] Widget data extraction:", {
           hasMetaSource: !!metaSource,
           hasMcpUseProps: !!metaSource?.["mcp-use/props"],
           widgetProps,
+          customProps: currentCustomProps,
+          finalWidgetProps,
           toolArgs: currentToolArgs,
           structuredContent,
           metaKeys: metaSource ? Object.keys(metaSource) : [],
@@ -184,6 +226,9 @@ function OpenAIComponentRendererBase({
         setUseDevMode(computedUseDevMode || false);
 
         const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
+        // Get slugified name for URL routing (falls back to original name if not provided)
+        const slugifiedName =
+          metaForWidget?.["mcp-use/widget"]?.slugifiedName || widgetName;
 
         // Prepare widget data with optional dev URLs
         const widgetDataToStore: any = {
@@ -191,18 +236,26 @@ function OpenAIComponentRendererBase({
           uri: componentUrl,
           toolInput: finalToolInput, // Original tool call arguments
           toolOutput: structuredContent, // Tool output (structured data)
-          toolResponseMetadata: widgetProps
-            ? { "mcp-use/props": widgetProps }
-            : null, // Widget-specific props
+          toolResponseMetadata: finalWidgetProps
+            ? { "mcp-use/props": finalWidgetProps }
+            : null, // Widget-specific props (merged with custom props)
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata
           theme: currentResolvedTheme, // Pass the current theme to prevent flash
+          // Include current playground settings for window.openai initialization
+          playground: {
+            locale: currentPlayground.locale,
+            deviceType: currentPlayground.deviceType,
+            capabilities: currentPlayground.capabilities,
+            safeAreaInsets: currentPlayground.safeAreaInsets,
+          },
         };
 
-        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
+        if (computedUseDevMode && slugifiedName && currentServerBaseUrl) {
           const devServerBaseUrl = new URL(currentServerBaseUrl).origin;
-          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${widgetName}`;
+          // Use slugified name for URL routing
+          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
           widgetDataToStore.devWidgetUrl = devWidgetUrl;
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
         }
@@ -230,11 +283,13 @@ function OpenAIComponentRendererBase({
 
         if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
-          const proxyUrl = `/inspector/api/dev-widget/${toolId}`;
+          // Add timestamp to force iframe reload when widget data changes (e.g., props)
+          const proxyUrl = `/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(proxyUrl);
           setIsSameOrigin(true); // Proxy makes it same-origin
         } else {
-          const prodUrl = `/inspector/api/resources/widget/${toolId}`;
+          // Add timestamp to force iframe reload when widget data changes (e.g., props)
+          const prodUrl = `/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(prodUrl);
           // Relative URLs are always same-origin
           setIsSameOrigin(true);
@@ -252,9 +307,11 @@ function OpenAIComponentRendererBase({
     componentUrl,
     serverId,
     toolId,
-    // Note: toolArgs, toolResult, readResource, and serverBaseUrl are intentionally
+    customProps,
+    // Note: toolArgs, toolResult, readResource, serverBaseUrl, playground are intentionally
     // excluded to prevent re-running when these references change but values are the same.
-    // resolvedTheme is handled by a separate effect that updates iframe globals.
+    // resolvedTheme and playground are captured at mount time for initialization, then
+    // updated dynamically via updateIframeGlobals() without reloading the widget.
   ]);
 
   // Helper to update window.openai globals inside iframe
@@ -342,8 +399,13 @@ function OpenAIComponentRendererBase({
           );
         }
       }
+
+      // Notify parent component of globals updates
+      if (onUpdateGlobals) {
+        onUpdateGlobals(updates);
+      }
     },
-    []
+    [onUpdateGlobals]
   );
 
   // Handle display mode changes with native Fullscreen API
@@ -829,16 +891,20 @@ function OpenAIComponentRendererBase({
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
           <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-            <IframeConsole iframeId={toolId} enabled={true} />
-            {/* Always show debug controls in inspector */}
-            <WidgetInspectorControls
+            {/* Use advanced debug controls for Apps SDK (same as MCP Apps) */}
+            <MCPAppsDebugControls
               displayMode={displayMode}
               onDisplayModeChange={handleDisplayModeChange}
-              toolInput={widgetToolInput}
-              toolOutput={widgetToolOutput}
-              toolResult={toolResult}
-              iframeRef={iframeRef}
-              toolId={toolId}
+              toolCallId={toolId}
+              propsContext="tool"
+              resourceUri={componentUrl}
+              toolInput={widgetToolInput as Record<string, unknown>}
+              resourceAnnotations={undefined}
+              llmConfig={null}
+              resource={null}
+              onPropsChange={undefined}
+              protocol="apps-sdk"
+              onUpdateGlobals={updateIframeGlobals}
             />
           </div>
         )}
@@ -902,7 +968,7 @@ function OpenAIComponentRendererBase({
                   ? "100%"
                   : `${iframeHeight}px`,
             }}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
             title={`OpenAI Component: ${toolName}`}
             allow="web-share"
           />

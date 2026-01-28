@@ -1,7 +1,7 @@
 [project]
 name = "mcp-use"
-version = "1.5.2"
-description = "MCP Library for LLMs"
+version = "1.6.0"
+description = "Full Stack MCP framework for python, build MCP agents, clients, and servers."
 authors = [
     {name = "mcp-use, Inc.", email = "dev@mcp-use.io"},
     {name = "Pietro Zullo", email = "pietro.zullo@gmail.com"}

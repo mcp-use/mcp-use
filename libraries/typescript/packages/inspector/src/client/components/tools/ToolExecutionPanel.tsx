@@ -1,15 +1,30 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { Play, Save, X, Code } from "lucide-react";
 import { Button } from "@/client/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/client/components/ui/dialog";
 import { Spinner } from "@/client/components/ui/spinner";
-import { ToolInputForm } from "./ToolInputForm";
-import { useEffect, useState } from "react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { Copy, Check } from "lucide-react";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Code,
+  Copy,
+  Play,
+  Save,
+  X,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { JSONDisplay } from "../shared/JSONDisplay";
+import { ToolInputForm } from "./ToolInputForm";
 
 interface ToolExecutionPanelProps {
   selectedTool: Tool | null;
@@ -33,25 +48,23 @@ export function ToolExecutionPanel({
   onCancel,
 }: ToolExecutionPanelProps) {
   const [showCancelButton, setShowCancelButton] = useState(false);
-  const [showMetadata, setShowMetadata] = useState(() => {
-    // Load preference from localStorage
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mcp-inspector-show-tool-metadata");
-      return saved ? JSON.parse(saved) : false;
-    }
-    return false;
-  });
+  const [showMetadata, setShowMetadata] = useState(false);
   const [copiedMetadata, setCopiedMetadata] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
 
-  // Persist metadata visibility preference
+  // Check if description needs truncation (more than 3 lines)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(
-        "mcp-inspector-show-tool-metadata",
-        JSON.stringify(showMetadata)
-      );
+    if (descriptionRef.current && selectedTool?.description) {
+      const element = descriptionRef.current;
+      const lineHeight = parseFloat(getComputedStyle(element).lineHeight);
+      const height = element.scrollHeight;
+      const lines = Math.round(height / lineHeight);
+      setIsDescriptionTruncated(lines > 3);
+      setIsDescriptionExpanded(false);
     }
-  }, [showMetadata]);
+  }, [selectedTool?.description]);
 
   // Copy metadata to clipboard
   const copyMetadataToClipboard = () => {
@@ -103,13 +116,13 @@ export function ToolExecutionPanel({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-4 sm:pr-4">
+      <div className="shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-4 sm:pr-4">
         <div>
           <div className="flex flex-row items-center justify-between mb-0 gap-2">
             <h3 className="text-base sm:text-lg font-semibold">
               {selectedTool.name}
             </h3>
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-2 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -118,14 +131,14 @@ export function ToolExecutionPanel({
                     disabled={isExecuting}
                     size="sm"
                     className="lg:size-default gap-2"
-                    title="Toggle tool metadata"
+                    title="View tool metadata"
                   >
                     <Code className="h-4 w-4" />
                     <span className="hidden sm:inline">Metadata</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Show tool definition metadata</p>
+                  <p>View tool definition metadata</p>
                 </TooltipContent>
               </Tooltip>
               <Button
@@ -200,29 +213,64 @@ export function ToolExecutionPanel({
               )}
             </div>
           </div>
-          {selectedTool.description && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed mt-2">
-              {selectedTool.description}
-            </p>
-          )}
         </div>
       </div>
 
-      {showMetadata ? (
-        <div className="flex-1 overflow-hidden flex gap-4 px-3 sm:px-6 pb-4">
-          {/* Left side: Input form (60%) */}
-          <div className="flex-1 min-w-0 overflow-y-auto">
-            <ToolInputForm
-              selectedTool={selectedTool}
-              toolArgs={toolArgs}
-              onArgChange={onArgChange}
-            />
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 pb-4 pr-3">
+        {selectedTool.description && (
+          <div className="relative mb-4">
+            <div className="relative">
+              <p
+                ref={descriptionRef}
+                className={`text-sm text-gray-600 dark:text-gray-400 leading-relaxed transition-all duration-300 ${
+                  !isDescriptionExpanded && isDescriptionTruncated
+                    ? "line-clamp-3"
+                    : ""
+                }`}
+              >
+                {selectedTool.description}
+              </p>
+              {isDescriptionTruncated && !isDescriptionExpanded && (
+                <div className="absolute bottom-0 left-0 right-0 h-[1.4em] bg-linear-to-t from-white/95 dark:from-black/95 via-white/55 dark:via-black/55 to-transparent pointer-events-none" />
+              )}
+            </div>
+            {isDescriptionTruncated && (
+              <div className="flex justify-end">
+                <button
+                  onClick={() =>
+                    setIsDescriptionExpanded(!isDescriptionExpanded)
+                  }
+                  className="relative z-10 inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mt-1 transition-colors"
+                >
+                  {isDescriptionExpanded ? (
+                    <>
+                      Show less
+                      <ChevronUp className="h-3 w-3" />
+                    </>
+                  ) : (
+                    <>
+                      Show more
+                      <ChevronDown className="h-3 w-3" />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
+        )}
 
-          {/* Right side: Metadata display (40%) */}
-          <div className="w-2/5 flex flex-col bg-zinc-50 dark:bg-zinc-900/50 rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-            <div className="flex items-center justify-between p-3 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0">
-              <h4 className="text-sm font-medium">Tool Definition</h4>
+        <ToolInputForm
+          selectedTool={selectedTool}
+          toolArgs={toolArgs}
+          onArgChange={onArgChange}
+        />
+      </div>
+
+      <Dialog open={showMetadata} onOpenChange={setShowMetadata}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between gap-3">
+              <span>Tool Definition</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -236,31 +284,19 @@ export function ToolExecutionPanel({
                   <Copy className="h-3.5 w-3.5" />
                 )}
               </Button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3">
-              <pre className="text-xs font-mono text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap break-words">
-                {JSON.stringify(
-                  {
-                    name: selectedTool.name,
-                    description: selectedTool.description || "(no description)",
-                    _meta: (selectedTool as any)._meta || null,
-                  },
-                  null,
-                  2
-                )}
-              </pre>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto px-3 sm:px-6 pb-4 pr-3">
-          <ToolInputForm
-            selectedTool={selectedTool}
-            toolArgs={toolArgs}
-            onArgChange={onArgChange}
+            </DialogTitle>
+          </DialogHeader>
+
+          <JSONDisplay
+            data={{
+              name: selectedTool.name,
+              description: selectedTool.description || "(no description)",
+              _meta: (selectedTool as any)._meta || null,
+            }}
+            filename={`tool-definition-${selectedTool.name}-${Date.now()}.json`}
           />
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

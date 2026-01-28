@@ -128,6 +128,7 @@ export function Layout({ children }: LayoutProps) {
         "sampling",
         "elicitation",
         "notifications",
+        "playground",
       ];
       if (validTabs.includes(tab as TabType)) {
         setActiveTab(tab as TabType);

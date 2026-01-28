@@ -124,8 +124,8 @@ npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-ui --
 # UI Resource template (with standalone resources)
 npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-uiresource --template uiresource
 
-# Apps SDK template (advanced features)
-npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-apps-sdk --template apps_sdk
+# MCP Apps template (advanced features)
+npx --yes --package=./create-mcp-use-app-0.4.3.tgz create-mcp-use-app test-mcp-apps --template mcp-apps
 ```
 
 ### 5. Test Full Installation

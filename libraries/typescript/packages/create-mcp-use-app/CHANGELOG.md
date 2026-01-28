@@ -1,5 +1,216 @@
 # create-mcp-use-app
 
+## 0.12.1
+
+### Patch Changes
+
+- bb28a69: Fix HMR file watcher exhausting inotify limits by properly ignoring node_modules
+
+  The HMR file watcher was attempting to watch files inside `node_modules/` despite having ignore patterns configured, which exhausted the inotify watch limit (ENOSPC errors) in containerized environments.
+
+## 0.12.1-canary.0
+
+### Patch Changes
+
+- 4d3e62e: fix(cli): fix hmr
+
+## 0.12.0
+
+### Minor Changes
+
+- 1dcba40: feat: changed templates to use mcp-apps and alias apps-sdk => mcp-apps
+
+### Patch Changes
+
+- 1dcba40: fix: rename template to mcp-apps
+- 1dcba40: fix: mcp server landing now shows the external url instead of the internal
+- 1dcba40: chore: trigger canary release
+- 1dcba40: fix docs
+- 1dcba40: chore: fix vulnerabilities in deps
+
+## 0.12.0-canary.5
+
+### Patch Changes
+
+- a078aa9: fix: mcp server landing now shows the external url instead of the internal
+
+## 0.12.0-canary.4
+
+### Patch Changes
+
+- e910f64: chore: fix vulnerabilities in deps
+
+## 0.12.0-canary.3
+
+### Patch Changes
+
+- e4ca98e: chore: trigger canary release
+
+## 0.12.0-canary.2
+
+### Patch Changes
+
+- 67823ea: fix: rename template to mcp-apps
+
+## 0.12.0-canary.1
+
+### Patch Changes
+
+- 08d3b3a: fix docs
+
+## 0.12.0-canary.0
+
+### Minor Changes
+
+- 523d9d1: feat: changed templates to use mcp-apps and alias apps-sdk => mcp-apps
+
+## 0.11.1
+
+### Patch Changes
+
+- c64a2dd: fix(weather): update weather icon and color functions to handle undefined weather types
+
+## 0.11.1-canary.0
+
+### Patch Changes
+
+- 7e87931: fix(weather): update weather icon and color functions to handle undefined weather types
+
+## 0.11.0
+
+### Minor Changes
+
+- fe72e7e: feat: improved HMR support for widgets
+- fe72e7e: docs(widget-lifecycle): add guidance on handling loading states in widgets
+- fe72e7e: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+- fe72e7e: ## Dependency Updates
+
+  Updated 36 dependencies across all TypeScript packages to their latest compatible versions.
+
+  ### Major Updates
+  - **react-resizable-panels**: 3.0.6 → 4.4.1
+    - Migrated to v4 API (`PanelGroup` → `Group`, `PanelResizeHandle` → `Separator`)
+    - Updated `direction` prop to `orientation` across all inspector tabs
+    - Maintained backward compatibility through wrapper component
+
+  ### Minor & Patch Updates
+
+  **Framework & Build Tools:**
+  - @types/node: 25.0.2 → 25.0.9
+  - @types/react: 19.2.7 → 19.2.8
+  - @typescript-eslint/eslint-plugin: 8.49.0 → 8.53.1
+  - @typescript-eslint/parser: 8.49.0 → 8.53.1
+  - prettier: 3.7.4 → 3.8.0
+  - typescript-eslint: 8.49.0 → 8.53.1
+  - vite: 7.3.0 → 7.3.1
+  - vitest: 4.0.15 → 4.0.17
+
+  **Runtime Dependencies:**
+  - @hono/node-server: 1.19.7 → 1.19.9
+  - @langchain/anthropic: 1.3.0 → 1.3.10
+  - @langchain/core: 1.1.12 → 1.1.15
+  - @langchain/google-genai: 2.1.0 → 2.1.10
+  - @langchain/openai: 1.2.0 → 1.2.2
+  - @mcp-ui/client: 5.17.1 → 5.17.3
+  - @mcp-ui/server: 5.16.2 → 5.16.3
+  - posthog-js: 1.306.1 → 1.330.0
+  - posthog-node: 5.17.2 → 5.22.0
+  - ws: 8.18.3 → 8.19.0
+
+  **UI Components:**
+  - @eslint-react/eslint-plugin: 2.3.13 → 2.7.2
+  - eslint-plugin-format: 1.1.0 → 1.3.1
+  - eslint-plugin-react-refresh: 0.4.25 → 0.4.26
+  - framer-motion: 12.23.26 → 12.27.1
+  - motion: 12.23.26 → 12.27.1
+  - markdown-to-jsx: 9.3.5 → 9.5.7
+  - lucide-react: 0.561.0 → 0.562.0
+  - vite-express: 0.21.1 → 0.22.0
+
+  **Utilities:**
+  - globby: 16.0.0 → 16.1.0
+  - fs-extra: 11.3.2 → 11.3.3
+  - ink: 6.5.1 → 6.6.0
+
+  ### Removed
+  - Removed `@ai-sdk/react` from inspector (unused, only in tests)
+  - Removed `ai` from mcp-use dev dependencies (unused, only in tests/examples)
+
+## 0.11.0-canary.3
+
+### Minor Changes
+
+- 1fb5e5e: docs(widget-lifecycle): add guidance on handling loading states in widgets
+
+## 0.11.0-canary.2
+
+### Minor Changes
+
+- 3178200: ## Dependency Updates
+
+  Updated 36 dependencies across all TypeScript packages to their latest compatible versions.
+
+  ### Major Updates
+  - **react-resizable-panels**: 3.0.6 → 4.4.1
+    - Migrated to v4 API (`PanelGroup` → `Group`, `PanelResizeHandle` → `Separator`)
+    - Updated `direction` prop to `orientation` across all inspector tabs
+    - Maintained backward compatibility through wrapper component
+
+  ### Minor & Patch Updates
+
+  **Framework & Build Tools:**
+  - @types/node: 25.0.2 → 25.0.9
+  - @types/react: 19.2.7 → 19.2.8
+  - @typescript-eslint/eslint-plugin: 8.49.0 → 8.53.1
+  - @typescript-eslint/parser: 8.49.0 → 8.53.1
+  - prettier: 3.7.4 → 3.8.0
+  - typescript-eslint: 8.49.0 → 8.53.1
+  - vite: 7.3.0 → 7.3.1
+  - vitest: 4.0.15 → 4.0.17
+
+  **Runtime Dependencies:**
+  - @hono/node-server: 1.19.7 → 1.19.9
+  - @langchain/anthropic: 1.3.0 → 1.3.10
+  - @langchain/core: 1.1.12 → 1.1.15
+  - @langchain/google-genai: 2.1.0 → 2.1.10
+  - @langchain/openai: 1.2.0 → 1.2.2
+  - @mcp-ui/client: 5.17.1 → 5.17.3
+  - @mcp-ui/server: 5.16.2 → 5.16.3
+  - posthog-js: 1.306.1 → 1.330.0
+  - posthog-node: 5.17.2 → 5.22.0
+  - ws: 8.18.3 → 8.19.0
+
+  **UI Components:**
+  - @eslint-react/eslint-plugin: 2.3.13 → 2.7.2
+  - eslint-plugin-format: 1.1.0 → 1.3.1
+  - eslint-plugin-react-refresh: 0.4.25 → 0.4.26
+  - framer-motion: 12.23.26 → 12.27.1
+  - motion: 12.23.26 → 12.27.1
+  - markdown-to-jsx: 9.3.5 → 9.5.7
+  - lucide-react: 0.561.0 → 0.562.0
+  - vite-express: 0.21.1 → 0.22.0
+
+  **Utilities:**
+  - globby: 16.0.0 → 16.1.0
+  - fs-extra: 11.3.2 → 11.3.3
+  - ink: 6.5.1 → 6.6.0
+
+  ### Removed
+  - Removed `@ai-sdk/react` from inspector (unused, only in tests)
+  - Removed `ai` from mcp-use dev dependencies (unused, only in tests/examples)
+
+## 0.11.0-canary.1
+
+### Minor Changes
+
+- ad66391: fix: improved HMR support for widgets
+
+## 0.11.0-canary.0
+
+### Minor Changes
+
+- 53fdb48: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+
 ## 0.10.3
 
 ### Patch Changes

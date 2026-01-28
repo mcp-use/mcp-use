@@ -181,6 +181,7 @@ export function ChatTab({
             serverId={connection.url}
             readResource={readResource}
             tools={connection.tools}
+            sendMessage={sendMessage}
           />
         )}
       </div>

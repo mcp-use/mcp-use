@@ -11,9 +11,89 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
+import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
+
+/**
+ * Fetch with retry logic and exponential backoff for handling cold starts
+ *
+ * Retries fetch requests that fail due to connection timeouts or refused connections,
+ * which commonly occur when the Vite dev server is still initializing.
+ *
+ * @param url - The URL to fetch
+ * @param options - Fetch options
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param initialDelay - Initial delay in milliseconds before first retry (default: 500ms)
+ * @returns The successful response
+ * @throws The final error if all retries fail
+ */
+async function fetchWithRetry(
+  url: string,
+  options?: RequestInit,
+  maxRetries = 3,
+  initialDelay = 500
+): Promise<Response> {
+  let lastError: Error | unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // If successful, return immediately
+      if (response.ok || response.status < 500) {
+        return response;
+      }
+
+      // For 5xx errors, treat as retriable
+      lastError = new Error(
+        `Server error: ${response.status} ${response.statusText}`
+      );
+    } catch (error) {
+      lastError = error;
+
+      // Check if this is a retriable error (connection timeout or refused)
+      const isRetriable =
+        error instanceof Error &&
+        (error.message.includes("ETIMEDOUT") ||
+          error.message.includes("ECONNREFUSED") ||
+          error.message.includes("fetch failed") ||
+          error.message.includes("Failed to fetch"));
+
+      // If not retriable or this was the last attempt, throw immediately
+      if (!isRetriable || attempt === maxRetries) {
+        throw error;
+      }
+
+      // Calculate delay with exponential backoff
+      const delay = initialDelay * Math.pow(2, attempt);
+
+      // Log retry attempt (only on first retry to avoid spam)
+      if (attempt === 0) {
+        console.log(
+          `[Dev Widget Proxy] Dev server not ready, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
+        );
+      }
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
+    // For 5xx errors, retry with backoff
+    if (attempt < maxRetries) {
+      const delay = initialDelay * Math.pow(2, attempt);
+      console.log(
+        `[Dev Widget Proxy] Server error, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  // All retries exhausted
+  throw lastError;
+}
 
 /**
  * Register inspector-specific routes (proxy, chat, config, widget rendering)
@@ -36,6 +116,10 @@ export function registerInspectorRoutes(
     basePath: "/inspector/api/oauth",
     enableLogging: true,
   });
+
+  // Mount MCP Apps routes at /inspector/api/mcp-apps
+  // Note: registerMcpAppsRoutes handles the /inspector/api/mcp-apps prefix internally
+  registerMcpAppsRoutes(app);
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)
   app.post("/inspector/api/chat/stream", async (c) => {
@@ -182,8 +266,8 @@ export function registerInspectorRoutes(
         );
       }
 
-      // Fetch HTML from dev server
-      const response = await fetch(widgetData.devWidgetUrl);
+      // Fetch HTML from dev server with retry logic for cold starts
+      const response = await fetchWithRetry(widgetData.devWidgetUrl);
       if (!response.ok) {
         const status = response.status as 400 | 404 | 500 | 502 | 503;
         return c.html(
@@ -195,11 +279,13 @@ export function registerInspectorRoutes(
       let html = await response.text();
 
       // Create a modified widgetData with the fetched HTML as resourceData
+      // IMPORTANT: Preserve devServerBaseUrl for window.__mcpPublicUrl injection
       const modifiedWidgetData = {
         ...widgetData,
         resourceData: {
           contents: [{ text: html }],
         },
+        devServerBaseUrl: widgetData.devServerBaseUrl,
       };
 
       // Inject OpenAI wrapper using existing logic

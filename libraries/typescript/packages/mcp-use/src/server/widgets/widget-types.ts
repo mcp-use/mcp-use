@@ -22,6 +22,8 @@ export interface ServerConfig {
   buildId?: string;
   /** Path to favicon file relative to public directory (optional) */
   favicon?: string;
+  /** Whether public routes have been set up and in what mode (optional) */
+  publicRoutesMode?: "dev" | "production" | null;
 }
 
 /**
@@ -45,9 +47,31 @@ export type RegisterWidgetCallback = (widgetDefinition: {
   name: string;
   title: string;
   description: string;
-  type: "appsSdk";
+  type: "appsSdk" | "mcpApps";
   props: import("../types/resource.js").WidgetProps;
   _meta: Record<string, unknown>;
   htmlTemplate: string;
-  appsSdkMetadata: import("../types/resource.js").AppsSdkMetadata;
+  appsSdkMetadata?: import("../types/resource.js").AppsSdkMetadata;
+  metadata?: Record<string, any>;
 }) => void;
+
+/**
+ * Widget tool update callback function type
+ *
+ * Used to update widget tool metadata during HMR without re-registering.
+ */
+export type UpdateWidgetToolCallback = (
+  toolName: string,
+  updates: {
+    description?: string;
+    schema?: unknown; // Raw Zod schema - will be converted by the server
+    _meta?: Record<string, unknown>;
+  }
+) => void;
+
+/**
+ * Widget tool removal callback function type
+ *
+ * Used to remove widget tool and resources during HMR (e.g., when widget is renamed/deleted).
+ */
+export type RemoveWidgetToolCallback = (toolName: string) => void;

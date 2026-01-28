@@ -94,11 +94,27 @@ export {
 export {
   buildWidgetUrl,
   createExternalUrlResource,
+  createMcpAppsResource,
   createRawHtmlResource,
   createRemoteDomResource,
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./widgets/mcp-ui-adapter.js";
+
+// Protocol adapters for dual-protocol widget support
+export {
+  AppsSdkAdapter,
+  McpAppsAdapter,
+  type CSPConfig,
+  type ProtocolAdapter,
+  type UnifiedWidgetMetadata,
+} from "./widgets/adapters/index.js";
+
+// Re-export useful constants from @modelcontextprotocol/ext-apps
+export {
+  RESOURCE_MIME_TYPE,
+  RESOURCE_URI_META_KEY,
+} from "@modelcontextprotocol/ext-apps/server";
 
 // Middleware adapter utility functions
 export {
@@ -113,11 +129,16 @@ export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 
+// Landing page generator for browser requests
+export { generateLandingPage } from "./landing.js";
+
 export type {
+  AppsSdkUIResource,
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
   GetPromptResult,
   InputDefinition,
+  McpAppsUIResource,
   McpContext,
   PromptCallback,
   PromptDefinition,

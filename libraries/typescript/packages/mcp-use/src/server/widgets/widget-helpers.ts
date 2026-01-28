@@ -5,23 +5,61 @@
  * and prop handling.
  */
 
-import type { Hono as HonoType, Context } from "hono";
+import type { Context, Hono as HonoType } from "hono";
 import type {
+  InputDefinition,
   UIResourceContent,
   UIResourceDefinition,
-  InputDefinition,
   WidgetProps,
 } from "../types/index.js";
+import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./mcp-ui-adapter.js";
-import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+
+/**
+ * Slugify a widget name to make it URI-safe
+ *
+ * Converts widget names to valid URI components by:
+ * - Converting to lowercase
+ * - Replacing spaces and invalid characters with dashes
+ * - Removing consecutive dashes
+ * - Trimming dashes from start/end
+ *
+ * @param name - Widget name to slugify
+ * @returns URI-safe slugified name
+ *
+ * @example
+ * ```typescript
+ * slugifyWidgetName('My Awesome Widget')
+ * // Returns: 'my-awesome-widget'
+ *
+ * slugifyWidgetName('Product Search Results 2')
+ * // Returns: 'product-search-results-2'
+ * ```
+ */
+export function slugifyWidgetName(name: string): string {
+  // Prevent ReDoS by limiting input length
+  const MAX_LENGTH = 300;
+  if (name.length > MAX_LENGTH) {
+    name = name.substring(0, MAX_LENGTH);
+  }
+
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-_.]/g, "-") // Replace invalid chars with dash
+    .replace(/-+/g, "-") // Replace multiple consecutive dashes with single dash
+    .replace(/^-+/, "") // Trim dashes from start
+    .replace(/-+$/, ""); // Trim dashes from end
+}
 
 /**
  * Generate a widget URI with optional build ID for cache busting
  *
- * @param widgetName - Widget name/identifier
+ * The widget name is automatically slugified to ensure URI compliance.
+ *
+ * @param widgetName - Widget name/identifier (will be slugified)
  * @param buildId - Optional build ID for cache busting
  * @param extension - Optional file extension (e.g., '.html')
  * @param suffix - Optional suffix (e.g., random ID for dynamic URIs)
@@ -31,6 +69,9 @@ import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
  * ```typescript
  * generateWidgetUri('kanban-board', 'abc123', '.html')
  * // Returns: 'ui://widget/kanban-board-abc123.html'
+ *
+ * generateWidgetUri('My Widget', 'abc123', '.html')
+ * // Returns: 'ui://widget/my-widget-abc123.html'
  * ```
  */
 export function generateWidgetUri(
@@ -39,7 +80,9 @@ export function generateWidgetUri(
   extension: string = "",
   suffix: string = ""
 ): string {
-  const parts = [widgetName];
+  // Slugify the widget name to ensure URI compliance
+  const slugifiedName = slugifyWidgetName(widgetName);
+  const parts = [slugifiedName];
 
   // Add build ID if available (for cache busting)
   if (buildId) {
@@ -314,9 +357,11 @@ export function processWidgetHtml(
     );
 
     // Add window.__getFile and window.__mcpPublicUrl to head
+    // Use slugified name for URL routing
+    const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widgetName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
     );
   }
 
@@ -354,6 +399,8 @@ export function createWidgetRegistration(
         props?: unknown;
         inputs?: unknown;
         schema?: unknown;
+        metadata?: unknown;
+        appsSdkMetadata?: unknown;
         [key: string]: unknown;
       },
   html: string,
@@ -363,11 +410,12 @@ export function createWidgetRegistration(
   name: string;
   title: string;
   description: string;
-  type: "appsSdk";
+  type: "appsSdk" | "mcpApps";
   props: import("../types/resource.js").WidgetProps;
   _meta: Record<string, unknown>;
   htmlTemplate: string;
-  appsSdkMetadata: Record<string, any>;
+  appsSdkMetadata?: Record<string, any>;
+  metadata?: Record<string, any>;
 } {
   // Use props field (preferred) with fallback to inputs/schema for backward compatibility
   const props = (metadata.props ||
@@ -381,22 +429,32 @@ export function createWidgetRegistration(
   const exposeAsTool =
     metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : true;
 
+  // Auto-detect widget type based on metadata presence:
+  // - If unified `metadata` field is present → mcpApps (dual-protocol)
+  // - If only `appsSdkMetadata` is present → appsSdk (legacy ChatGPT-only)
+  // - Default → appsSdk (backward compatibility)
+  const widgetType = metadata.metadata ? "mcpApps" : "appsSdk";
+
   const mcp_connect_domain = serverConfig.serverBaseUrl
     ? new URL(serverConfig.serverBaseUrl || "").origin
     : null;
 
-  return {
+  // Get slugified name for URL routing
+  const slugifiedName = slugifyWidgetName(widgetName);
+
+  const baseRegistration = {
     name: widgetName,
     title: title as string,
     description: description as string,
-    type: "appsSdk",
+    type: widgetType as "appsSdk" | "mcpApps",
     props: props as import("../types/resource.js").WidgetProps,
     _meta: {
       "mcp-use/widget": {
         name: widgetName,
+        slugifiedName: slugifiedName, // URL-safe slug for dev routing
         title: title,
         description: description,
-        type: "appsSdk",
+        type: widgetType,
         props: props,
         html: html,
         dev: isDev,
@@ -405,35 +463,76 @@ export function createWidgetRegistration(
       ...(metadata._meta || {}),
     },
     htmlTemplate: html,
-    appsSdkMetadata: {
-      "openai/widgetDescription": description,
-      "openai/toolInvocation/invoking": `Loading ${widgetName}...`,
-      "openai/toolInvocation/invoked": `${widgetName} ready`,
-      "openai/widgetAccessible": true,
-      "openai/resultCanProduceWidget": true,
-      ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
-        {}),
-      "openai/widgetCSP": {
-        connect_domains: [
-          // always also add the base url of the server
-          ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-          ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-            ?.connect_domains as string[]) || []),
-        ],
-        resource_domains: [
-          "https://*.oaistatic.com",
-          "https://*.oaiusercontent.com",
-          ...(isDev ? [] : ["https://*.openai.com"]),
-          // always also add the base url of the server
-          ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-          // add additional CSP URLs from environment variable
-          ...serverConfig.cspUrls,
-          ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-            ?.resource_domains as string[]) || []),
-        ],
-      },
-    },
   };
+
+  // For appsSdk type (no unified metadata), add appsSdkMetadata
+  if (widgetType === "appsSdk") {
+    return {
+      ...baseRegistration,
+      type: "appsSdk" as const,
+      appsSdkMetadata: {
+        "openai/widgetDescription": description,
+        "openai/toolInvocation/invoking": `Loading ${widgetName}...`,
+        "openai/toolInvocation/invoked": `${widgetName} ready`,
+        "openai/widgetAccessible": true,
+        "openai/resultCanProduceWidget": true,
+        "openai/widgetDomain": "https://chatgpt.com", // Default domain (required for app submission)
+        ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
+          {}),
+        "openai/widgetCSP": {
+          connect_domains: [
+            // always also add the base url of the server
+            ...(mcp_connect_domain ? [mcp_connect_domain] : []),
+            ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+              ?.connect_domains as string[]) || []),
+          ],
+          resource_domains: [
+            "https://*.oaistatic.com",
+            "https://*.oaiusercontent.com",
+            ...(isDev ? [] : ["https://*.openai.com"]),
+            // always also add the base url of the server
+            ...(mcp_connect_domain ? [mcp_connect_domain] : []),
+            // add additional CSP URLs from environment variable
+            ...serverConfig.cspUrls,
+            ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+              ?.resource_domains as string[]) || []),
+          ],
+          // frame_domains for iframe embeds (optional per OpenAI spec)
+          ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+            ?.frame_domains
+            ? {
+                frame_domains: (metadata.appsSdkMetadata as any)?.[
+                  "openai/widgetCSP"
+                ]?.frame_domains as string[],
+              }
+            : {}),
+          // redirect_domains for openExternal redirects (optional per OpenAI spec)
+          ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+            ?.redirect_domains
+            ? {
+                redirect_domains: (metadata.appsSdkMetadata as any)?.[
+                  "openai/widgetCSP"
+                ]?.redirect_domains as string[],
+              }
+            : {}),
+        },
+      },
+    };
+  } else {
+    // For mcpApps type (has unified metadata), generate dual-protocol support
+    return {
+      ...baseRegistration,
+      type: "mcpApps" as const,
+      metadata: {
+        description,
+        ...((metadata.metadata as Record<string, unknown> | undefined) || {}),
+      },
+      // Include appsSdkMetadata if provided for advanced ChatGPT features
+      ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined)
+        ? { appsSdkMetadata: metadata.appsSdkMetadata as Record<string, any> }
+        : {}),
+    };
+  }
 }
 
 export async function createWidgetUIResource(

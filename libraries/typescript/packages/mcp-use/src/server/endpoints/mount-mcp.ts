@@ -6,17 +6,18 @@
  */
 
 import type { Context, Hono as HonoType } from "hono";
+import { join } from "node:path";
+import { Telemetry } from "../../telemetry/index.js";
+import { generateLandingPage } from "../landing.js";
 import type { SessionData } from "../sessions/index.js";
 import {
-  startIdleCleanup,
+  FileSystemSessionStore,
   InMemorySessionStore,
   InMemoryStreamManager,
-  FileSystemSessionStore,
+  startIdleCleanup,
 } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
 import { generateUUID } from "../utils/runtime.js";
-import { Telemetry } from "../../telemetry/index.js";
-import { join } from "node:path";
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -40,7 +41,7 @@ export async function mountMcp(
   const { WebStandardStreamableHTTPServerTransport } =
     await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
 
-  const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 300000; // Default: 5 minutes
+  const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 86400000; // Default: 1 day
 
   // Initialize session store (pluggable - can be Redis, Postgres, etc.)
   // Stores ONLY serializable metadata (client capabilities, log level, timestamps)
@@ -82,8 +83,49 @@ export async function mountMcp(
     );
   }
 
+  // Helper function to construct the full URL considering proxy headers
+  const getFullUrl = (c: Context): string => {
+    // Check for proxy headers (common in production deployments)
+    const proto =
+      c.req.header("X-Forwarded-Proto") ||
+      c.req.header("X-Forwarded-Protocol") ||
+      new URL(c.req.url).protocol.replace(":", "");
+
+    const host =
+      c.req.header("X-Forwarded-Host") ||
+      c.req.header("Host") ||
+      new URL(c.req.url).host;
+
+    const path = c.req.path;
+
+    return `${proto}://${host}${path}`;
+  };
+
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
+    // Detect browser GET requests and return landing page
+    if (c.req.method === "GET") {
+      const acceptHeader = c.req.header("Accept") || "";
+      const isBrowser =
+        acceptHeader.includes("text/html") ||
+        (!acceptHeader.includes("application/json") &&
+          !acceptHeader.includes("text/event-stream"));
+
+      if (isBrowser) {
+        const fullUrl = getFullUrl(c);
+        const landingPage = generateLandingPage(
+          config.name,
+          config.version,
+          fullUrl,
+          config.description
+        );
+        return new Response(landingPage, {
+          status: 200,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
+    }
+
     // Auto-detect mode based on Accept header
     // Per MCP spec: clients that support SSE will send Accept: text/event-stream
     // Clients that don't (k6, curl, etc.) should work in stateless mode
@@ -98,6 +140,12 @@ export async function mountMcp(
     if (useStatelessMode) {
       // STATELESS MODE: New server instance per request
       // Used for: Deno/edge runtimes, k6 load testing, curl, clients without SSE
+
+      // Handle HEAD requests for health checks (no session to maintain)
+      if (c.req.method === "HEAD") {
+        return new Response(null, { status: 200 });
+      }
+
       const server = mcpServerInstance.getServerForSession();
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined, // No session tracking
@@ -146,6 +194,11 @@ export async function mountMcp(
           if (session) {
             session.lastAccessedAt = Date.now();
             await sessionStore.set(sessionId, session);
+          }
+          // Also update in-memory sessions map for idle cleanup
+          const sessionData = sessions.get(sessionId);
+          if (sessionData) {
+            sessionData.lastAccessedAt = Date.now();
           }
         }
         return new Response(null, { status: 200 });

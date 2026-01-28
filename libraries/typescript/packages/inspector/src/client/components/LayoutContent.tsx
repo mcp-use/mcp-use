@@ -1,15 +1,15 @@
-import type { ReactNode, RefObject } from "react";
 import type { McpServer } from "mcp-use/react";
-
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+import type { ReactNode, RefObject } from "react";
 import { ChatTab } from "./ChatTab";
+import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { PromptsTab } from "./PromptsTab";
 import { ResourcesTab } from "./ResourcesTab";
-import { ToolsTab } from "./ToolsTab";
 import { SamplingTab } from "./SamplingTab";
-import { ElicitationTab } from "./ElicitationTab";
+import { ToolsTab } from "./ToolsTab";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 
 interface LayoutContentProps {
   selectedServer: MCPConnection | undefined;
@@ -64,7 +64,19 @@ export function LayoutContent({
         <PromptsTab
           ref={promptsSearchRef}
           prompts={selectedServer.prompts}
-          callPrompt={selectedServer.getPrompt}
+          callPrompt={(name, args) =>
+            selectedServer.getPrompt(
+              name,
+              args
+                ? (Object.fromEntries(
+                    Object.entries(args).map(([k, v]) => [
+                      k,
+                      typeof v === "string" ? v : String(v ?? ""),
+                    ])
+                  ) as Record<string, string>)
+                : undefined
+            )
+          }
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
         />
@@ -79,6 +91,7 @@ export function LayoutContent({
           readResource={selectedServer.readResource}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          mcpServerUrl={selectedServer.url || ""}
         />
       </div>
       <div

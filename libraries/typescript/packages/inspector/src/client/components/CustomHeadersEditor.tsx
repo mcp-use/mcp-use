@@ -1,11 +1,11 @@
 "use client";
 
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { cn } from "@/client/lib/utils";
+import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 export interface CustomHeader {
   name: string;
@@ -18,7 +18,7 @@ export interface CustomHeadersEditorProps {
   onChange: (headers: CustomHeader[]) => void;
   onSave?: () => void;
   className?: string;
-  title?: string;
+  title?: React.ReactNode;
   description?: string;
   maxHeaders?: number;
 }
@@ -33,6 +33,16 @@ export function CustomHeadersEditor({
   maxHeaders = 50,
 }: CustomHeadersEditorProps) {
   const [showValues, setShowValues] = useState<Record<string, boolean>>({});
+  const [focusHeaderId, setFocusHeaderId] = useState<string | null>(null);
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Focus the input when a new header is created from empty state
+  useEffect(() => {
+    if (focusHeaderId && inputRefs.current[focusHeaderId]) {
+      inputRefs.current[focusHeaderId]?.focus();
+      setFocusHeaderId(null);
+    }
+  }, [focusHeaderId, headers]);
 
   // Generate unique ID for new headers
   const generateId = () => Math.random().toString(36).slice(2, 11);
@@ -92,12 +102,14 @@ export function CustomHeadersEditor({
               onChange={(e) => {
                 // Create a new header when user starts typing
                 if (e.target.value.trim()) {
+                  const newId = generateId();
                   const newHeader: CustomHeader = {
-                    id: generateId(),
+                    id: newId,
                     name: e.target.value,
                     value: "",
                   };
                   onChange([newHeader]);
+                  setFocusHeaderId(newId);
                 }
               }}
               className="text-sm"
@@ -140,6 +152,9 @@ export function CustomHeadersEditor({
               className="grid grid-cols-[1fr_1fr] gap-4 items-center"
             >
               <Input
+                ref={(el) => {
+                  inputRefs.current[header.id] = el;
+                }}
                 placeholder="Authorization"
                 value={header.name}
                 onChange={(e) =>

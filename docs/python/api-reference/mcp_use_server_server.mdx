@@ -36,6 +36,7 @@ Initialize an MCP server.
 ><ParamField body="name" type="str | None" default="None" >   Server name for identification </ParamField>
 ><ParamField body="version" type="str | None" default="None" >   Server version string </ParamField>
 ><ParamField body="instructions" type="str | None" default="None" >   Instructions for the AI model using this server </ParamField>
+><ParamField body="auth" type="BearerAuthProvider | None" default="None" >   Parameter value </ParamField>
 ><ParamField body="middleware" type="list[Middleware] | None" default="None" >   List of middleware to apply to requests </ParamField>
 ><ParamField body="debug" type="bool" default="False" >   Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints) </ParamField>
 ><ParamField body="mcp_path" type="str" default='/mcp' >   Path for MCP endpoint (default: "/mcp") </ParamField>
@@ -49,7 +50,7 @@ Initialize an MCP server.
 
 **Signature**
 ```python wrap
-def __init__(name: str | None = None, version: str | None = None, instructions: str | None = None, middleware: list[Middleware] | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/inspector", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False, host: str = "0.0.0.0", port: int = 8000):
+def __init__(name: str | None = None, version: str | None = None, instructions: str | None = None, auth: BearerAuthProvider | None = None, middleware: list[Middleware] | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/inspector", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False, host: str = "0.0.0.0", port: int = 8000):
 ```
 
 </Card>

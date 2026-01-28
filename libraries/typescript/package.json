@@ -34,26 +34,27 @@
     "version:check": "changeset status",
     "test_app": "pnpm test_app:starter",
     "test_app:starter": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
-    "test_app:apps-sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps-sdk && cd test_app && pnpm install && pnpm dev",
-    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev"
+    "test_app:mcp-apps": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-apps && cd test_app && pnpm install && pnpm dev",
+    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev",
+    "test_app:blank": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template blank && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
-    "@types/node": "^25.0.2",
-    "@types/react": "^19.2.7",
+    "@types/node": "^25.0.9",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^8.49.0",
-    "@typescript-eslint/parser": "^8.49.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "prettier": "^3.7.4",
+    "prettier": "^3.8.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.49.0"
+    "typescript-eslint": "^8.53.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -81,9 +82,9 @@
       "react-router-dom": "^7.12.0",
       "qs": ">=6.14.1",
       "preact": ">=10.28.2",
-      "zod": "^4.2.0",
+      "zod": "4.2.0",
       "jsondiffpatch": ">=0.7.2",
-      "esbuild": ">=0.25.0",
+      "esbuild": "0.27.1",
       "vite": "^7.3.0",
       "prismjs": ">=1.30.0",
       "glob": ">=10.5.0",

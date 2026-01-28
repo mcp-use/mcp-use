@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.10.3",
+  "version": "0.12.1",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -48,8 +48,8 @@
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^14.0.2",
-    "fs-extra": "^11.3.2",
-    "ink": "^6.5.1",
+    "fs-extra": "^11.3.3",
+    "ink": "^6.6.0",
     "ink-select-input": "^6.2.0",
     "ink-text-input": "^6.0.0",
     "ora": "^9.0.0",
@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.17"
   },
   "publishConfig": {
     "access": "public"

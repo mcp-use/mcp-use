@@ -5,8 +5,10 @@ import "dotenv/config";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import open from "open";
+import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
@@ -26,6 +28,75 @@ program
   .name("mcp-use")
   .description("Create and run MCP servers with ui resources widgets")
   .version(packageVersion);
+
+/**
+ * Helper to display all package versions
+ *
+ * @param projectPath - Optional path to user's project directory.
+ *                      When provided, resolves packages from the project's node_modules (standalone installation).
+ *                      When omitted, falls back to relative paths (monorepo development).
+ */
+function displayPackageVersions(projectPath?: string) {
+  const packages = [
+    { name: "@mcp-use/cli", relativePath: "../package.json" },
+    {
+      name: "@mcp-use/inspector",
+      relativePath: "../../inspector/package.json",
+    },
+    {
+      name: "create-mcp-use-app",
+      relativePath: "../../create-mcp-use-app/package.json",
+    },
+    {
+      name: "mcp-use",
+      relativePath: "../../mcp-use/package.json",
+      highlight: true,
+    },
+  ];
+
+  console.log(chalk.gray("mcp-use packages:"));
+
+  for (const pkg of packages) {
+    const paddedName = pkg.name.padEnd(22);
+
+    try {
+      let pkgPath: string;
+
+      if (projectPath) {
+        // Standalone installation: Try to resolve from user's project node_modules
+        try {
+          const projectRequire = createRequire(
+            path.join(projectPath, "package.json")
+          );
+          pkgPath = projectRequire.resolve(`${pkg.name}/package.json`);
+        } catch (resolveError) {
+          // Package not found in project node_modules, try relative path as fallback
+          pkgPath = path.join(__dirname, pkg.relativePath);
+        }
+      } else {
+        // Monorepo development: Use relative paths
+        pkgPath = path.join(__dirname, pkg.relativePath);
+      }
+
+      const pkgContent = readFileSync(pkgPath, "utf-8");
+      const pkgJson = JSON.parse(pkgContent);
+      const version = pkgJson.version || "unknown";
+
+      if (pkg.highlight) {
+        console.log(
+          `  ${chalk.cyan.bold(paddedName)} ${chalk.cyan.bold(`v${version}`)}`
+        );
+      } else {
+        console.log(chalk.gray(`  ${paddedName} v${version}`));
+      }
+    } catch (error) {
+      // Log debug message when package is not found (aids troubleshooting)
+      if (process.env.DEBUG || process.env.VERBOSE) {
+        console.log(chalk.dim(`  ${paddedName} (not found)`));
+      }
+    }
+  }
+}
 
 // Helper to check if port is available
 async function isPortAvailable(
@@ -79,6 +150,12 @@ async function waitForServer(
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;
+}
+
+// Helper to normalize host for browser connections
+// 0.0.0.0 is valid for server binding but browsers cannot connect to it
+function normalizeBrowserHost(host: string): string {
+  return host === "0.0.0.0" ? "localhost" : host;
 }
 
 // Helper to run a command
@@ -244,8 +321,10 @@ async function findServerFile(projectPath: string): Promise<string> {
 }
 
 async function buildWidgets(
-  projectPath: string
+  projectPath: string,
+  options: { inline?: boolean } = {}
 ): Promise<Array<{ name: string; metadata: any }>> {
+  const { inline = true } = options; // Default to true for VS Code compatibility
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
   const resourcesDir = path.join(projectPath, "resources");
@@ -306,7 +385,11 @@ async function buildWidgets(
     return [];
   }
 
-  console.log(chalk.gray(`Building ${entries.length} widget(s)...`));
+  console.log(
+    chalk.gray(
+      `Building ${entries.length} widget(s)${inline ? " (inline mode for VS Code compatibility)" : ""}...`
+    )
+  );
 
   const react = (await import("@vitejs/plugin-react")).default;
   // @ts-ignore - @tailwindcss/vite may not have type declarations
@@ -323,9 +406,8 @@ async function buildWidgets(
     // No package.json or no mcpUse config, that's fine
   }
 
-  const builtWidgets: Array<{ name: string; metadata: any }> = [];
-
-  for (const entry of entries) {
+  // Helper function to build a single widget
+  const buildSingleWidget = async (entry: { name: string; path: string }) => {
     const widgetName = entry.name;
     const entryPath = entry.path.replace(/\\/g, "/");
 
@@ -639,21 +721,39 @@ export default {
         },
       };
 
+      // Build plugins array - add viteSingleFile when inlining for VS Code compatibility
+      const buildPlugins = inline
+        ? [
+            buildNodeStubsPlugin,
+            tailwindcss(),
+            react(),
+            viteSingleFile({ removeViteModuleLoader: true }),
+          ]
+        : [buildNodeStubsPlugin, tailwindcss(), react()];
+
       await build({
         root: tempDir,
         base: baseUrl,
-        plugins: [buildNodeStubsPlugin, tailwindcss(), react()],
-        experimental: {
-          renderBuiltUrl: (filename: string, { hostType }) => {
-            if (["js", "css"].includes(hostType)) {
-              return {
-                runtime: `window.__getFile(${JSON.stringify(filename)})`,
-              };
-            } else {
-              return { relative: true };
-            }
-          },
-        },
+        plugins: buildPlugins,
+        // Only use renderBuiltUrl for non-inline builds (external assets need runtime URL resolution)
+        ...(inline
+          ? {}
+          : {
+              experimental: {
+                renderBuiltUrl: (
+                  filename: string,
+                  { hostType }: { hostType: string }
+                ) => {
+                  if (["js", "css"].includes(hostType)) {
+                    return {
+                      runtime: `window.__getFile(${JSON.stringify(filename)})`,
+                    };
+                  } else {
+                    return { relative: true };
+                  }
+                },
+              },
+            }),
         resolve: {
           alias: {
             "@": resourcesDir,
@@ -666,6 +766,18 @@ export default {
         build: {
           outDir,
           emptyOutDir: true,
+          // Disable source maps to avoid CSP eval violations
+          // Source maps can use eval-based mappings which break strict CSP policies
+          sourcemap: false,
+          // Minify for smaller bundle size
+          minify: "esbuild",
+          // For inline builds, disable CSS code splitting and inline all assets
+          ...(inline
+            ? {
+                cssCodeSplit: false,
+                assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
+              }
+            : {}),
           rollupOptions: {
             input: path.join(tempDir, "index.html"),
             external: (id) => {
@@ -675,6 +787,54 @@ export default {
           },
         },
       });
+
+      // Post-process JS bundles to patch Zod's JIT compilation
+      // This prevents CSP eval violations in sandboxed iframes (MCP Apps hosts)
+      // See: https://github.com/colinhacks/zod/issues/4461
+      try {
+        const assetsDir = path.join(outDir, "assets");
+        const assetFiles = await fs.readdir(assetsDir);
+        const jsFiles = assetFiles.filter((f) => f.endsWith(".js"));
+
+        for (const jsFile of jsFiles) {
+          const jsPath = path.join(assetsDir, jsFile);
+          let content = await fs.readFile(jsPath, "utf8");
+
+          // Patch Zod's globalConfig to disable JIT compilation
+          // Zod 4.x uses: const globalConfig={};function config(o){return globalConfig}
+          // After minification: const X={};function Y(o){return X}
+          // We match the pattern where an empty object const is followed by a function returning it
+          const zodConfigPatterns = [
+            // Non-minified: export const globalConfig = {}
+            /export\s+const\s+globalConfig\s*=\s*\{\s*\}/g,
+            // Minified pattern: ZodEncodeError"}}const X={};function followed by return X
+            // This is the unique signature of Zod's globalConfig
+            /ZodEncodeError[^}]*\}\}const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\{\s*\}/g,
+          ];
+
+          let patched = false;
+          for (const pattern of zodConfigPatterns) {
+            if (pattern.test(content)) {
+              // Reset lastIndex for global regex
+              pattern.lastIndex = 0;
+              content = content.replace(pattern, (match) => {
+                return match.replace(/=\s*\{\s*\}/, "={jitless:true}");
+              });
+              patched = true;
+            }
+          }
+
+          if (patched) {
+            await fs.writeFile(jsPath, content, "utf8");
+            console.log(chalk.gray(`    → Patched Zod JIT in ${jsFile}`));
+          }
+        }
+      } catch (error) {
+        // Assets directory might not exist for some builds, that's okay
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          console.warn(chalk.yellow(`    ⚠ Failed to patch Zod JIT: ${error}`));
+        }
+      }
 
       // Post-process HTML for static deployments (e.g., Supabase)
       // If MCP_SERVER_URL is set, inject window globals at build time
@@ -726,15 +886,23 @@ export default {
         }
       }
 
-      builtWidgets.push({
-        name: widgetName,
-        metadata: widgetMetadata,
-      });
       console.log(chalk.green(`    ✓ Built ${widgetName}`));
+      return { name: widgetName, metadata: widgetMetadata };
     } catch (error) {
       console.error(chalk.red(`    ✗ Failed to build ${widgetName}:`), error);
+      return null;
     }
-  }
+  };
+
+  // Build all widgets in parallel
+  const buildResults = await Promise.all(
+    entries.map((entry) => buildSingleWidget(entry))
+  );
+
+  // Filter out failed builds (null results)
+  const builtWidgets = buildResults.filter(
+    (result): result is { name: string; metadata: any } => result !== null
+  );
 
   return builtWidgets;
 }
@@ -744,15 +912,23 @@ program
   .description("Build TypeScript and MCP UI widgets")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
   .option("--with-inspector", "Include inspector in production build")
+  .option(
+    "--inline",
+    "Inline all JS/CSS into HTML (required for VS Code MCP Apps)"
+  )
+  .option("--no-inline", "Keep JS/CSS as separate files (default)")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
       const { promises: fs } = await import("node:fs");
 
-      console.log(chalk.cyan.bold(`mcp-use v${packageJson.version}`));
+      displayPackageVersions(projectPath);
 
       // Build widgets first (this generates schemas)
-      const builtWidgets = await buildWidgets(projectPath);
+      // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
+      const builtWidgets = await buildWidgets(projectPath, {
+        inline: options.inline ?? false,
+      });
 
       // Then run tsc (now schemas are available for import)
       console.log(chalk.gray("Building TypeScript..."));
@@ -836,7 +1012,11 @@ program
   .description("Run development server with auto-reload and inspector")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
   .option("--port <port>", "Server port", "3000")
-  .option("--host <host>", "Server host", "localhost")
+  .option(
+    "--host <host>",
+    "Server host (use 0.0.0.0 to listen on all interfaces)",
+    "0.0.0.0"
+  )
   .option("--no-open", "Do not auto-open inspector")
   .option("--no-hmr", "Disable hot module reloading (use tsx watch instead)")
   // .option('--tunnel', 'Expose server through a tunnel')
@@ -847,7 +1027,7 @@ program
       const host = options.host;
       const useHmr = options.hmr !== false;
 
-      console.log(chalk.cyan.bold(`mcp-use v${packageJson.version}`));
+      displayPackageVersions(projectPath);
 
       // Check if port is available, find alternative if needed
       if (!(await isPortAvailable(port, host))) {
@@ -861,19 +1041,23 @@ program
       const serverFile = await findServerFile(projectPath);
 
       // Set environment variables for the server
+      const mcpUrl = `http://${host}:${port}`;
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
+      process.env.MCP_URL = mcpUrl;
 
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
 
         const processes: any[] = [];
+        const mcpUrl = `http://${host}:${port}`;
         const env: NodeJS.ProcessEnv = {
           PORT: String(port),
           HOST: host,
           NODE_ENV: "development",
+          MCP_URL: mcpUrl,
         };
 
         // Use local tsx if available, otherwise fall back to npx
@@ -919,12 +1103,15 @@ program
           const startTime = Date.now();
           const ready = await waitForServer(port, host);
           if (ready) {
-            const mcpEndpoint = `http://${host}:${port}/mcp`;
-            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const browserHost = normalizeBrowserHost(host);
+            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(
+              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+            );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
@@ -1046,12 +1233,15 @@ program
         if (options.open !== false) {
           const ready = await waitForServer(port, host);
           if (ready) {
-            const mcpEndpoint = `http://${host}:${port}/mcp`;
-            const inspectorUrl = `http://${host}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const browserHost = normalizeBrowserHost(host);
+            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
-            console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+            console.log(
+              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+            );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
@@ -1082,13 +1272,46 @@ program
       // Watch for file changes - watch .ts/.tsx files in project directory
       const watcher = chokidar.watch(".", {
         cwd: projectPath,
-        ignored: [
-          /(^|[/\\])\../, // dotfiles
-          "**/node_modules/**",
-          "**/dist/**",
-          "**/resources/**", // widgets are watched separately by vite
-          "**/*.d.ts", // type definitions
-        ],
+        ignored: (path: string, stats?: any) => {
+          // Normalize path separators for cross-platform compatibility
+          const normalizedPath = path.replace(/\\/g, "/");
+
+          // Ignore dotfiles and dot directories (hidden files)
+          if (/(^|\/)\.[^/]/.test(normalizedPath)) {
+            return true;
+          }
+
+          // Ignore node_modules directory and all its contents
+          if (
+            normalizedPath.includes("/node_modules/") ||
+            normalizedPath.endsWith("/node_modules")
+          ) {
+            return true;
+          }
+
+          // Ignore dist directory and all its contents
+          if (
+            normalizedPath.includes("/dist/") ||
+            normalizedPath.endsWith("/dist")
+          ) {
+            return true;
+          }
+
+          // Ignore resources directory (widgets watched separately by vite)
+          if (
+            normalizedPath.includes("/resources/") ||
+            normalizedPath.endsWith("/resources")
+          ) {
+            return true;
+          }
+
+          // Ignore .d.ts files (TypeScript declaration files)
+          if (stats?.isFile() && normalizedPath.endsWith(".d.ts")) {
+            return true;
+          }
+
+          return false;
+        },
         persistent: true,
         ignoreInitial: true,
         depth: 3, // Limit depth to avoid watching too many files

@@ -1,217 +1,212 @@
 ---
 title: "Quickstart"
-description: "Get started with mcp_use in minutes"
+description: "Get started with mcp-use in minutes"
 icon: "rocket"
 ---
 
-# Quickstart Guide
+**mcp-use** is a unified MCP framework to build **MCP servers**, **MCP clients** and **MCP Agents**.
 
-<Info>
-This guide will get you started with mcp_use in **under 5 minutes**. We'll cover installation, basic configuration, and running your first agent.
-</Info>
-
-## Installation
-
-<CodeGroup>
-```bash Python (pip)
-  pip install mcp-use
-  ```
-
-  ```bash TypeScript (npm)
-  npm install mcp-use
-  ```
-
-  ```bash Python (source)
-  git clone https://github.com/mcp-use/mcp-use.git
-  cd mcp-use
-  pip install -e .
-  ```
-
-  ```bash TypeScript (source)
-  git clone https://github.com/mcp-use/mcp-use.git
-  cd mcp-use-ts
-  npm install
-  npm run build
-  ```
-</CodeGroup>
-
-<Tip>
-Installing from source gives you access to the latest features and examples!
-</Tip>
-
-## Installing LangChain Providers
-
-mcp_use works with various LLM providers through LangChain. You'll need to install the appropriate LangChain provider package for your chosen LLM:
-
-<CodeGroup>
-```bash Python (OpenAI)
-  pip install langchain-openai
-  ```
-
-  ```bash TypeScript (OpenAI)
-  npm install @langchain/openai
-  ```
-
-  ```bash Python (Anthropic)
-  pip install langchain-anthropic
-  ```
-
-  ```bash TypeScript (Anthropic)
-  npm install @langchain/anthropic
-  ```
-
-  ```bash Python (Google)
-  pip install langchain-google-genai
-  ```
-
-  ```bash TypeScript (Google)
-  npm install @langchain/google-genai
-  ```
-
-  ```bash Python (Groq)
-  pip install langchain-groq
-  ```
-
-  ```bash TypeScript (Groq)
-  npm install @langchain/groq
-  ```
-</CodeGroup>
-
-<Warning>
-**Tool Calling Required**: Only models with tool calling capabilities can be used with mcp_use. Make sure your chosen model supports function calling or tool use.
-</Warning>
-
-<Tip>
-For other providers, check the [LangChain chat models documentation](https://python.langchain.com/docs/integrations/chat/)
-</Tip>
-
-## Environment Setup
-
-<Note>
-Set up your environment variables in a `.env` file for secure API key management:
-</Note>
-
-```bash .env
-OPENAI_API_KEY=your_api_key_here
-ANTHROPIC_API_KEY=your_api_key_here
-GROQ_API_KEY=your_api_key_here
-GOOGLE_API_KEY=your_api_key_here
+```mermaid
+%%{init: {'theme':'neutral'}}%%
+graph LR
+    Agent[MCP Agent] -->|uses| Client[MCP Client]
+    Client -->|connects to| Server[MCP Server]
+    Server -->|provides tools| Client
 ```
 
-## Your First Agent
+| Section | Description | |
+|---------|-------------|---------|
+| [Agent](#mcp-agent) | An AI Agent with tool calling capabilities through MCP connections | [Examples](https://github.com/mcp-use/mcp-use/tree/main/libraries/python/examples) |
+| [Client](#mcp-client) | A full featured MCP Client implementation for Python with async support | [Examples](https://github.com/mcp-use/mcp-use/tree/main/libraries/python/examples) |
+| [Server](#mcp-server) | The MCP Server framework implementation for Python | [Examples](https://github.com/mcp-use/mcp-use/tree/main/libraries/python/examples) |
 
-Here's a simple example to get you started:
+
+## MCP Agent
+
+**mcp-use** has a complete MCP Agent implementation for Python.
+**MCP Agents** are AI-powered agents that can use tools from MCP servers to accomplish complex tasks. They reason across multiple steps, selecting and executing tools as needed.
+Building such agents is easy with **mcp-use**, all you need is an LLM and the MCP Client.
 
 <CodeGroup>
-```python Python
-  import asyncio
-  import os
-  from dotenv import load_dotenv
-  from langchain_openai import ChatOpenAI
-  from mcp_use import MCPAgent, MCPClient
+```bash pip
+pip install mcp-use
+```
+```bash uv
+uv add mcp-use
+```
+```bash poetry
+poetry add mcp-use
+```
+</CodeGroup>
 
-  async def main():
-      # Load environment variables
-      load_dotenv()
+Here's a simple example to get you started for an agent with **browser tools** support.
 
-      # Create configuration dictionary
-      config = {
+```python
+import asyncio
+from langchain_openai import ChatOpenAI  # use your preferred LLM provider
+from mcp_use import MCPAgent, MCPClient
+
+async def main():
+    # Create MCPClient from configuration object
+    client = MCPClient({
         "mcpServers": {
-          "playwright": {
-            "command": "npx",
-            "args": ["@playwright/mcp@latest"],
-            "env": {
-              "DISPLAY": ":1"
+            "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest"],
+                "env": {
+                    "DISPLAY": ":1"
+                }
             }
-          }
         }
-      }
+    })
 
-      # Create MCPClient from configuration dictionary
-      client = MCPClient(config)
+    # Create agent with the client
+    agent = MCPAgent(
+        llm=ChatOpenAI(model="gpt-4o"),  # use your preferred LLM provider
+        client=client,
+        max_steps=30
+    )
 
-      # Create LLM
-      llm = ChatOpenAI(model="gpt-4o")
+    # Run the query
+    result = await agent.run(
+        "Find the best restaurant in San Francisco USING GOOGLE SEARCH"
+    )
+    print(f"\nResult: {result}")
 
-      # Create agent with the client
-      agent = MCPAgent(llm=llm, client=client, max_steps=30)
+    # Clean up
+    await client.close_all_sessions()
 
-      # Run the query
-      result = await agent.run(
-          "Find the best restaurant in San Francisco USING GOOGLE SEARCH",
-      )
-      print(f"\nResult: {result}")
-
-  if __name__ == "__main__":
-      asyncio.run(main())
-  ```
-</CodeGroup>
-
-## Configuration Options
-
-You can also load servers configuration from a config file:
-
-<CodeGroup>
-```python Python
-  client = MCPClient.from_config_file("browser_mcp.json")
-  ```
-</CodeGroup>
-
-Example configuration file (`browser_mcp.json`):
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"],
-      "env": {
-        "DISPLAY": ":1"
-      }
-    }
-  }
-}
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 <Tip>
-For multi-server setups, tool restrictions, and advanced configuration options, see the [Configuration Overview](/python/getting-started/configuration).
+For multi-server setups, tool restrictions, and advanced configuration options, see the [Agent Configuration](/python/agent/agent-configuration) and [Client Configuration](/python/client/client-configuration) guides.
 </Tip>
 
+For a complete overview of the mcp-use MCP Agent, see the [MCP Agent](/python/agent/building-custom-agents) documentation.
 
-## Available MCP Servers
 
-mcp_use supports **any MCP server**. Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) list for available options.
+### Available MCP Servers
 
-## Streaming Agent Output
+mcp-use supports **any MCP server**. Check out the [Awesome MCP Servers](https://github.com/punkpeye/awesome-mcp-servers) list for available options.
+Or deploy your own following the instruction [below](#mcp-server).
 
-Stream agent responses as they're generated:
+
+## MCP Client
+
+**mcp-use** has a complete MCP Client implementation for Python with full async support.
+It supports stdio and HTTP with SSE transports for connecting to any MCP server.
 
 <CodeGroup>
-```python Python
-  async for chunk in agent.stream("your query here"):
-      print(chunk, end="", flush=True)
-  ```
+```bash pip
+pip install mcp-use
+```
+```bash uv
+uv add mcp-use
+```
+```bash poetry
+poetry add mcp-use
+```
 </CodeGroup>
 
-<Tip>
-Uses LangChain's streaming API. See [streaming documentation](https://python.langchain.com/docs/how_to/streaming/) for more details.
-</Tip>
+Then create a new MCP Client:
+
+```python
+import asyncio
+from mcp_use import MCPClient
+
+async def main():
+    client = MCPClient({
+        "mcpServers": {
+            "everything": {
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-everything"]
+            }
+        }
+    })
+
+    # Initialize all configured sessions
+    await client.create_all_sessions()
+
+    # Get the session for a specific server
+    session = client.get_session("everything")
+
+    # List available tools
+    tools = await session.list_tools()
+    print(f"Available tools: {[t.name for t in tools]}")
+
+    # Call a specific tool with arguments
+    result = await session.call_tool("add", {"a": 1, "b": 2})
+    print(f"Result: {result}")
+
+    # Clean up
+    await client.close_all_sessions()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+To learn more about the MCP Client, see the [MCP Client](/python/client/connection-types) documentation.
+
+## MCP Server
+
+**mcp-use** has a complete MCP server framework implementation for Python.
+It supports all official MCP features including tools, resources, prompts, and middleware.
+
+<CodeGroup>
+```bash pip
+pip install mcp-use
+```
+```bash uv
+uv add mcp-use
+```
+```bash poetry
+poetry add mcp-use
+```
+</CodeGroup>
+
+Create a simple MCP server:
+
+```python
+from mcp_use import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    version="1.0.0",
+    description="My custom MCP server"
+)
+
+# Define a tool
+@server.tool()
+def get_weather(city: str) -> dict:
+    """Get weather for a city"""
+    return {"temperature": 72, "condition": "sunny", "city": city}
+
+# Start the server
+if __name__ == "__main__":
+    server.run()
+```
+
+To learn more about the MCP Server, see the [MCP Server](/python/server) documentation.
+
+---
 
 
 ## Next Steps
 
 <CardGroup cols={3}>
-  <Card title="Configuration" icon="gear" href="/python/getting-started/configuration">
-    Complete configuration guide covering client setup and agent customization
+  <Card title="Agent Configuration" icon="cog" href="/python/agent/agent-configuration">
+    Configure your Agent and connected MCP servers
   </Card>
   <Card title="LLM Integration" icon="brain" href="/python/agent/llm-integration">
-    Discover all supported LLM providers and optimization tips
+    Explore supported LLM providers and their setup
   </Card>
-  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
-    Explore real-world examples and use cases
+  <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/python/examples">
+    Browse real-world examples and use cases
   </Card>
 </CardGroup>
 
 <Tip>
-**Need Help?** Join our community discussions on GitHub or check out the comprehensive examples in our repository!
+**Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or [Github](https://github.com/mcp-use/mcp-use) communities.
 </Tip>

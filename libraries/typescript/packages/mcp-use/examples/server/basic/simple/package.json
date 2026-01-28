@@ -18,7 +18,13 @@
     "start": "mcp-use start"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@vitejs/plugin-react": "^5.1.2",
     "mcp-use": "workspace:*",
+    "node-mocks-http": "^1.17.2",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^7.3.0",
     "zod": "^4.2.0"
   },
   "devDependencies": {

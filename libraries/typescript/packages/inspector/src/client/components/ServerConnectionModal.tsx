@@ -23,7 +23,7 @@ interface ServerConnectionModalProps {
     transportType: "http" | "sse";
     proxyConfig?: {
       proxyAddress?: string;
-      customHeaders?: Record<string, string>;
+      headers?: Record<string, string>;
     };
   }) => void;
 }
@@ -65,23 +65,53 @@ export function ServerConnectionModal({
   // Prefill form when connection changes
   useEffect(() => {
     if (connection && open) {
+      // Try to get the original stored config from localStorage
+      // This contains the headers and proxyConfig that were originally saved
+      let storedConfig: any = null;
+      try {
+        const stored = localStorage.getItem("mcp-inspector-connections");
+        if (stored) {
+          const allServers = JSON.parse(stored);
+          storedConfig = allServers[connection.id];
+        }
+      } catch (e) {
+        // If we can't read from localStorage, fall back to connection object
+        console.warn(
+          "[ServerConnectionModal] Could not read from localStorage:",
+          e
+        );
+      }
+
       setUrl(connection.url);
 
       // Transport type is always HTTP now (SSE is deprecated)
       // No need to set transportType from connection
 
       // Determine connection type based on proxyConfig
-      if (connection.proxyConfig?.proxyAddress) {
+      const proxyAddress =
+        storedConfig?.proxyConfig?.proxyAddress ||
+        connection.proxyConfig?.proxyAddress;
+      if (proxyAddress) {
         setConnectionType("Via Proxy");
-        setProxyAddress(connection.proxyConfig.proxyAddress);
+        setProxyAddress(proxyAddress);
       } else {
         setConnectionType("Direct");
         setProxyAddress(`${window.location.origin}/inspector/api/proxy`);
       }
 
-      // Convert customHeaders from Record<string, string> to CustomHeader[]
+      // Convert headers from Record<string, string> to CustomHeader[]
+      // Check both 'headers' and 'customHeaders' for backwards compatibility
+      // Prioritize stored config over connection object
       const headersToConvert =
-        connection.proxyConfig?.customHeaders || connection.customHeaders || {};
+        storedConfig?.proxyConfig?.headers ||
+        storedConfig?.proxyConfig?.customHeaders ||
+        storedConfig?.headers ||
+        storedConfig?.customHeaders ||
+        connection.proxyConfig?.headers ||
+        connection.proxyConfig?.customHeaders ||
+        connection.headers ||
+        connection.customHeaders ||
+        {};
       const headerArray: CustomHeader[] = Object.entries(headersToConvert).map(
         ([name, value], index) => ({
           id: `header-${index}`,
@@ -132,7 +162,7 @@ export function ServerConnectionModal({
       connectionType === "Via Proxy" && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
-            customHeaders: customHeaders.reduce(
+            headers: customHeaders.reduce(
               (acc, header) => {
                 if (header.name && header.value) {
                   acc[header.name] = header.value;
@@ -143,7 +173,7 @@ export function ServerConnectionModal({
             ),
           }
         : {
-            customHeaders: customHeaders.reduce(
+            headers: customHeaders.reduce(
               (acc, header) => {
                 if (header.name && header.value) {
                   acc[header.name] = header.value;

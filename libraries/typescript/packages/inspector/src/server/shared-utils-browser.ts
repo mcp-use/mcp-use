@@ -412,10 +412,39 @@ export interface WidgetData {
   widgetCSP?: {
     connect_domains?: string[];
     resource_domains?: string[];
+    frame_domains?: string[];
   };
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
   theme?: "light" | "dark";
+  // Playground settings for initializing window.openai
+  playground?: {
+    locale?: string;
+    deviceType?: "mobile" | "tablet" | "desktop";
+    capabilities?: { hover: boolean; touch: boolean };
+    safeAreaInsets?: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    };
+  };
+  // MCP Apps (SEP-1865) support
+  protocol?: "mcp-apps" | "chatgpt-app";
+  toolName?: string;
+  mimeType?: string;
+  mcpAppsCsp?: {
+    connectDomains?: string[];
+    resourceDomains?: string[];
+    frameDomains?: string[];
+    baseUriDomains?: string[];
+  };
+  mcpAppsPermissions?: {
+    camera?: Record<string, never>;
+    microphone?: Record<string, never>;
+    geolocation?: Record<string, never>;
+    clipboardWrite?: Record<string, never>;
+  };
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -568,6 +597,7 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     toolId,
     devServerBaseUrl,
     theme,
+    playground,
   } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
@@ -622,6 +652,28 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   // Safely serialize theme, defaulting to 'light' if not provided
   const safeTheme = JSON.stringify(theme === "dark" ? "dark" : "light");
 
+  // Use playground values with fallbacks to defaults
+  const locale = playground?.locale || "en-US";
+  const deviceType = playground?.deviceType || "desktop";
+  const capabilities = playground?.capabilities || {
+    hover: true,
+    touch: false,
+  };
+  const safeAreaInsets = playground?.safeAreaInsets || {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  };
+
+  // Serialize playground values for injection
+  const safeLocale = JSON.stringify(locale);
+  const safeUserAgent = JSON.stringify({
+    device: { type: deviceType },
+    capabilities,
+  });
+  const safeSafeArea = JSON.stringify({ insets: safeAreaInsets });
+
   // Inject window.openai API script
   const apiScript = `
     <script>
@@ -647,9 +699,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},
-          locale: 'en-US',
-          safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
-          userAgent: {},
+          locale: ${safeLocale},
+          safeArea: ${safeSafeArea},
+          userAgent: ${safeUserAgent},
           widgetState: null,
 
           async setWidgetState(state) {
@@ -924,12 +976,56 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 }
 
 /**
+ * Transform MCP Apps camelCase CSP to snake_case for existing header builder
+ *
+ * MCP Apps (SEP-1865) uses camelCase (connectDomains, resourceDomains)
+ * ChatGPT Apps SDK uses snake_case (connect_domains, resource_domains)
+ *
+ * @param mcpAppsCsp - MCP Apps CSP configuration with camelCase keys
+ * @returns ChatGPT-compatible CSP configuration with snake_case keys
+ */
+export function transformMcpAppsCspToSnakeCase(mcpAppsCsp?: {
+  connectDomains?: string[];
+  resourceDomains?: string[];
+  frameDomains?: string[];
+  baseUriDomains?: string[];
+}):
+  | {
+      connect_domains?: string[];
+      resource_domains?: string[];
+      frame_domains?: string[];
+    }
+  | undefined {
+  if (!mcpAppsCsp) return undefined;
+
+  const result: {
+    connect_domains?: string[];
+    resource_domains?: string[];
+    frame_domains?: string[];
+  } = {};
+
+  if (mcpAppsCsp.connectDomains) {
+    result.connect_domains = mcpAppsCsp.connectDomains;
+  }
+  if (mcpAppsCsp.resourceDomains) {
+    result.resource_domains = mcpAppsCsp.resourceDomains;
+  }
+  if (mcpAppsCsp.frameDomains) {
+    result.frame_domains = mcpAppsCsp.frameDomains;
+  }
+  // Note: baseUriDomains is MCP Apps-specific, not in ChatGPT CSP
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
  * Get security headers for widget content
  */
 export function getWidgetSecurityHeaders(
   widgetCSP?: {
     connect_domains?: string[];
     resource_domains?: string[];
+    frame_domains?: string[];
   },
   devServerBaseUrl?: string
 ): Record<string, string> {
@@ -988,12 +1084,21 @@ export function getWidgetSecurityHeaders(
     connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
   }
 
+  // Build frame-src for embedding iframes (e.g., Cal.com embed)
+  // Use frame_domains if specified (per OpenAI spec), fall back to resource_domains for backwards compatibility
+  let frameSrc = "'self' blob:";
+  const frameDomains = widgetCSP?.frame_domains || widgetCSP?.resource_domains;
+  if (frameDomains && frameDomains.length > 0) {
+    frameSrc = `'self' blob: ${frameDomains.join(" ")}`;
+  }
+
   const headers: Record<string, string> = {
     "Content-Security-Policy": [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${resourceDomainsStr}`,
       "worker-src 'self' blob:",
-      "child-src 'self' blob:",
+      `child-src 'self' blob: ${frameDomains?.join(" ") || ""}`.trim(),
+      `frame-src ${frameSrc}`,
       `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
       `img-src ${imgSrc}`,
       `media-src ${mediaSrc}`,
@@ -1012,11 +1117,19 @@ export function getWidgetSecurityHeaders(
   // This will warn about resources that would fail in production
   if (devServerOrigin) {
     const prodConnectSrc = "'self' https: wss: ws:";
+    // Build production frame-src (use frame_domains if specified, fall back to resource_domains)
+    let prodFrameSrc = "'self' blob:";
+    const prodFrameDomains =
+      widgetCSP?.frame_domains || widgetCSP?.resource_domains;
+    if (prodFrameDomains && prodFrameDomains.length > 0) {
+      prodFrameSrc = `'self' blob: ${prodFrameDomains.join(" ")}`;
+    }
     headers["Content-Security-Policy-Report-Only"] = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${prodResourceDomainsStr}`,
       "worker-src 'self' blob:",
-      "child-src 'self' blob:",
+      `child-src 'self' blob: ${prodFrameDomains?.join(" ") || ""}`.trim(),
+      `frame-src ${prodFrameSrc}`,
       `style-src 'self' 'unsafe-inline' ${prodResourceDomainsStr}`,
       "img-src 'self' data: https: blob:",
       "media-src 'self' data: https: blob:",

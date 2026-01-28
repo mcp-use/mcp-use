@@ -342,11 +342,43 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("[MCP Proxy] Request failed:", message, error);
+
+      // Get targetUrl for better error logging
+      const url = new URL(c.req.url);
+      const targetFromQuery = url.searchParams.get("__mcp_target");
+      const targetUrl = targetFromQuery
+        ? targetFromQuery + url.pathname.replace(basePath, "")
+        : c.req.header("X-Target-URL");
+
+      // Check if this is a connection refused error (common when a stored server isn't running)
+      const isConnectionRefused =
+        error instanceof Error &&
+        (error.message.includes("ECONNREFUSED") ||
+          error.message.includes("fetch failed"));
+
+      if (isConnectionRefused) {
+        // This is expected when reconnecting to a stored server that's not running
+        // Log as a warning instead of error, without stack trace
+        console.warn(
+          `[MCP Proxy] Connection refused to ${targetUrl || "unknown target"} - server may not be running`
+        );
+      } else {
+        // Log other errors with full details
+        console.error(
+          "[MCP Proxy] Request failed:",
+          message,
+          "\nTarget URL:",
+          targetUrl || "unknown",
+          "\nError:",
+          error
+        );
+      }
+
       return c.json(
         {
           error: "Proxy request failed",
           details: message,
+          targetUrl: targetUrl || "unknown",
         },
         500
       );

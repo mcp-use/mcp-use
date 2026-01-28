@@ -346,10 +346,10 @@ export function SamplingTab({
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel defaultSize={40} minSize={30}>
         <ResizablePanelGroup
-          direction="vertical"
+          orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>

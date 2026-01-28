@@ -6,6 +6,88 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.14.2" description="January 2026">
+  ## Widget Rendering & Session Management Improvements
+  Patch release with widget rendering fixes, session timeout adjustments, and CLI deployment enhancements.
+
+### Widget Rendering & Session Management
+
+- **Fix**: Widget iframe reload by adding timestamp query parameter to force refresh when widget data changes
+- **Fix**: Retry logic with exponential backoff for dev widget fetching to handle Vite dev server cold starts
+- **Fix**: Default session idle timeout changed from 5 minutes to 1 day (86400000ms) to prevent premature session expiration
+- **Fix**: Session lastAccessedAt tracking now updates both persistent store and in-memory map
+- **Fix**: _meta merging now preserves existing fields (e.g., openai/outputTemplate) when updating tools and widgets
+- **Enhancement**: Support for frame_domains and redirect_domains in widget CSP metadata
+
+### CLI Improvements
+
+- **Fix**: Environment variables, build command, start command, and port configuration now properly passed during redeployment
+
+### Documentation
+
+- **Fix**: Updated sessionIdleTimeoutMs default value documentation from 5 minutes to 1 day across multiple files
+</Update>
+
+<Update label="v1.14.1" description="January 2026">
+  ## Dependency Updates
+  Patch release with dependency updates.
+
+- **Update**: Updated dependencies to @mcp-use/inspector v0.16.1 and @mcp-use/cli v2.11.1
+</Update>
+
+<Update label="v1.14.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.14.0&title=Server%20Metadata%20%26%20Widget%20Enhancements&date=2026-01&lang=typescript" alt="Release 1.14.0" />
+  </Frame>
+  ## Server Metadata & Widget Enhancements
+  Release introducing server metadata configuration and enhanced widget development experience.
+
+### Server Metadata & Configuration
+
+- **New**: Server metadata support with `title`, `websiteUrl`, and `icons` fields in MCP server configuration
+- **New**: Inspector UI displays server website URLs and icons for better branding
+- **Deprecated**: `autoCreateSessionOnInvalidId` config option - use `sessionStore` for persistent sessions
+- **Enhancement**: Dynamic project name support in server configurations
+
+### Widget & Development Experience
+
+- **Enhancement**: HMR support for widget tool management - widgets update immediately without server restart
+- **Enhancement**: Parallel widget building for improved development performance
+- **Enhancement**: ReDoS attack prevention in widget name slugification with input length validation
+- **Enhancement**: Improved widget lifecycle documentation with loading state guidance
+
+### CLI Improvements
+
+- **New**: `MCP_URL` environment variable automatically set in server process for easy access to server URL
+- **Enhancement**: Server process environment now includes `MCP_URL` in both development and production modes
+- **Enhancement**: CLI now displays all 4 package versions (`@mcp-use/cli`, `mcp-use`, `@mcp-use/inspector`, `create-mcp-use-app`) in `dev` and `build` commands with `mcp-use` highlighted for clarity
+
+### API & Protocol
+
+- **New**: HEAD request support in `mountMcp` function
+- **Enhancement**: Improved input schema handling in tool registration with better defaults
+
+### MCP Proxy Middleware
+
+- **Enhancement**: Improved error logging with better context for debugging
+- **Enhancement**: Connection refused errors now logged as warnings instead of errors
+- **Enhancement**: Error responses include target URL to help identify failing proxy requests
+- **Enhancement**: More detailed error messages for proxy request failures
+
+### Bug Fixes
+
+- **Fix**: Anthropic `tool_use.id` error resolved with LangChain package updates
+- **Fix**: Telemetry shutdown method compatibility with posthog-node v5.22.0
+- **Fix**: Input schema initialization now defaults to empty object when not provided
+
+### Dependencies
+
+- **Update**: `@langchain/anthropic` to 1.3.10 (fixes tool_call ID generation)
+- **Update**: `@langchain/core` to 1.1.15
+- **Update**: `langchain` to 1.2.10
+- **Update**: `react-resizable-panels` to 4.4.1
+</Update>
+
 <Update label="v1.13.5" description="January 2026">
   ## CLI Documentation Enhancement
   Patch release adding comprehensive CLI documentation.

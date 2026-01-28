@@ -1,11 +1,10 @@
+import { useWidget, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
-import { useWidget, type WidgetMetadata } from "mcp-use/react";
 import "./styles.css";
 
 /*
- * Apps SDK widget
- * Just export widgetMetadata with description and Zod schema, and mcp-use handles the rest!
+ * mcp-apps widget
  * See docs: https://mcp-use.com/docs/typescript/server/ui-widgets
  */
 
@@ -24,18 +23,35 @@ const propSchema = z.object({
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather for a city",
   props: propSchema,
+  metadata: {
+    csp: {
+      connectDomains: [],
+      resourceDomains: [],
+    },
+  },
 };
 
 type WeatherProps = z.infer<typeof propSchema>;
 
 const WeatherWidget: React.FC = () => {
   // Use the useWidget hook to get props from OpenAI Apps SDK
-  const { props, theme } = useWidget<WeatherProps>();
+  const { props, theme, isPending } = useWidget<WeatherProps>();
 
   console.log(props); // the widget props
 
+  // Show loading state while tool is executing
+  if (isPending) {
+    return (
+      <div className="max-w-sm mx-auto bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
+        </div>
+      </div>
+    );
+  }
+
   const { city, weather, temperature } = props;
-  const getWeatherIcon = (weatherType: string) => {
+  const getWeatherIcon = (weatherType: string | undefined) => {
     switch (weatherType?.toLowerCase()) {
       case "sunny":
         return "☀️";
@@ -50,7 +66,7 @@ const WeatherWidget: React.FC = () => {
     }
   };
 
-  const getWeatherColor = (weatherType: string) => {
+  const getWeatherColor = (weatherType: string | undefined) => {
     switch (weatherType?.toLowerCase()) {
       case "sunny":
         return "from-yellow-400 to-orange-500";
@@ -75,7 +91,7 @@ const WeatherWidget: React.FC = () => {
       className={`max-w-sm mx-auto ${bgColor} rounded-xl shadow-lg overflow-hidden`}
     >
       <div
-        className={`h-32 bg-gradient-to-br ${getWeatherColor(weather)} flex items-center justify-center`}
+        className={`h-32 bg-linear-to-br ${getWeatherColor(weather)} flex items-center justify-center`}
       >
         <div className="text-6xl">{getWeatherIcon(weather)}</div>
       </div>
