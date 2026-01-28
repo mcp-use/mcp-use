@@ -17,7 +17,7 @@ import type {
   UIResourceContent,
   UIResourceDefinition,
 } from "../types/resource.js";
-import { slugifyWidgetName } from "./widget-helpers.js";
+import { slugifyWidgetName, processWidgetHtml } from "./widget-helpers.js";
 
 /**
  * Configuration for building widget URLs
@@ -358,19 +358,31 @@ export async function createUIResourceFromDefinition(
     }
 
     case "appsSdk": {
+      // Process HTML with dynamic base URL (for gateway/proxy support)
+      const baseUrl = `${config.baseUrl}${config.port === 80 || config.port === 443 ? "" : `:${config.port}`}`;
+      const processedHtml = processWidgetHtml(
+        definition.htmlTemplate,
+        definition.name,
+        baseUrl
+      );
+
       return createAppsSdkResource(
         uri,
-        definition.htmlTemplate,
+        processedHtml,
         definition.appsSdkMetadata
       );
     }
 
     case "mcpApps": {
-      return createMcpAppsResource(
-        uri,
+      // Process HTML with dynamic base URL (for gateway/proxy support)
+      const baseUrl = `${config.baseUrl}${config.port === 80 || config.port === 443 ? "" : `:${config.port}`}`;
+      const processedHtml = processWidgetHtml(
         definition.htmlTemplate,
-        definition.metadata
+        definition.name,
+        baseUrl
       );
+
+      return createMcpAppsResource(uri, processedHtml, definition.metadata);
     }
 
     default: {
