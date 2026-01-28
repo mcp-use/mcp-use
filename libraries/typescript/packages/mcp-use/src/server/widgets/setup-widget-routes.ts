@@ -111,8 +111,19 @@ export function setupWidgetRoutes(
 
     try {
       let html = await fsHelpers.readFileSync(filePath, "utf8");
+
+      // Get dynamic base URL from request (for proper external URL support)
+      // Falls back to serverConfig.serverBaseUrl if request URL unavailable
+      let baseUrl = serverConfig.serverBaseUrl;
+      try {
+        const requestUrl = new URL(c.req.url);
+        baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+      } catch (e) {
+        // Fallback to configured serverBaseUrl if request URL parsing fails
+      }
+
       // Process HTML with base URL injection and path conversion
-      html = processWidgetHtml(html, widget, serverConfig.serverBaseUrl);
+      html = processWidgetHtml(html, widget, baseUrl);
       return c.html(html);
     } catch {
       return c.notFound();

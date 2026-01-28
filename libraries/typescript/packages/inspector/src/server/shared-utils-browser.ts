@@ -582,8 +582,13 @@ export function generateWidgetContainerHtml(
 
 /**
  * Generate widget content HTML with injected OpenAI API
+ * @param widgetData - Widget data from storage
+ * @param dynamicBaseUrl - Optional dynamic base URL from request (overrides devServerBaseUrl)
  */
-export function generateWidgetContentHtml(widgetData: WidgetData): {
+export function generateWidgetContentHtml(
+  widgetData: WidgetData,
+  dynamicBaseUrl?: string
+): {
   html: string;
   error?: string;
 } {
@@ -599,6 +604,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     theme,
     playground,
   } = widgetData;
+
+  // Use dynamic URL from request if provided, otherwise fall back to stored URL
+  const effectiveBaseUrl = dynamicBaseUrl || devServerBaseUrl;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
     serverId,
@@ -687,9 +695,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         }
 
         // Inject MCP widget utilities for Image component and file access
-        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
+        window.__mcpPublicUrl = ${effectiveBaseUrl ? `"${effectiveBaseUrl}/mcp-use/public"` : '""'};
         window.__getFile = function(filename) {
-          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
+          return ${effectiveBaseUrl ? `"${effectiveBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
         };
 
         const openaiAPI = {

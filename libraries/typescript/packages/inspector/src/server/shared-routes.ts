@@ -229,15 +229,27 @@ export function registerInspectorRoutes(
         );
       }
 
-      // Generate the widget HTML using shared function
-      const result = generateWidgetContentHtml(widgetData);
+      // Get dynamic base URL from request (for proper external URL support)
+      let dynamicBaseUrl: string | undefined;
+      try {
+        const requestUrl = new URL(c.req.url);
+        dynamicBaseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+      } catch (e) {
+        // Fallback to stored devServerBaseUrl if request URL parsing fails
+      }
+
+      // Generate the widget HTML using shared function with dynamic URL
+      const result = generateWidgetContentHtml(widgetData, dynamicBaseUrl);
 
       if (result.error) {
         return c.html(`<html><body>Error: ${result.error}</body></html>`, 404);
       }
 
-      // Set security headers with widget-specific CSP
-      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
+      // Set security headers with widget-specific CSP (using dynamic URL)
+      const headers = getWidgetSecurityHeaders(
+        widgetData.widgetCSP,
+        dynamicBaseUrl
+      );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
       });
