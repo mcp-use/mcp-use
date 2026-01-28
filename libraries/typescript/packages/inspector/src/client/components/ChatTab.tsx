@@ -103,6 +103,12 @@ export function ChatTab({
     onNewChat: clearMessages,
   });
 
+  const clearPromptsUIState = useCallback(() => {
+    setPromptFocusedIndex(-1);
+    setPromptsDropdownOpen(false);
+    triggerSpanRef.current = null;
+  }, []);
+
   const updatePromptsDropdownState = useCallback(() => {
     if (!textareaRef.current) {
       return;
@@ -113,13 +119,11 @@ export function ChatTab({
     setPromptsDropdownOpen(isPromptsRequested);
     if (isPromptsRequested) {
       triggerSpanRef.current = { start: caretIndex - 1, end: caretIndex };
+      setPromptFocusedIndex(0);
+    } else {
+      clearPromptsUIState();
     }
-    if (!isPromptsRequested) {
-      // clean up dropdown state
-      setPromptFocusedIndex(-1);
-      triggerSpanRef.current = null;
-    }
-  }, [inputValue]);
+  }, [inputValue, clearPromptsUIState]);
 
   // Focus the textarea when landing form is shown
   useEffect(() => {
@@ -146,10 +150,8 @@ export function ChatTab({
   const clearPromptsState = useCallback(() => {
     setSelectedPrompt(null);
     setPromptArgs({});
-    setPromptFocusedIndex(-1);
-    setPromptsDropdownOpen(false);
-    triggerSpanRef.current = null;
-  }, []);
+    clearPromptsUIState();
+  }, [clearPromptsUIState]);
 
   const handlePromptSelect = useCallback(
     async (prompt: Prompt) => {
@@ -211,8 +213,7 @@ export function ChatTab({
         });
       } else if (e.key === "Escape") {
         e.stopPropagation();
-        setPromptsDropdownOpen(false);
-        setPromptFocusedIndex(-1);
+        clearPromptsUIState();
       } else if (e.key === "Enter" && promptFocusedIndex >= 0) {
         const prompt = filteredPrompts[promptFocusedIndex];
         if (prompt) {
@@ -220,7 +221,12 @@ export function ChatTab({
         }
       }
     },
-    [filteredPrompts, promptFocusedIndex, handlePromptSelect]
+    [
+      filteredPrompts,
+      promptFocusedIndex,
+      handlePromptSelect,
+      clearPromptsUIState,
+    ]
   );
 
   const handleKeyDown = useCallback(
