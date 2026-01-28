@@ -66,6 +66,75 @@ await server.sendPromptsListChanged();
 
 See [Notifications](./notifications) for more details.
 
+## Prompt Arguments Autocomplete
+
+Enable completion suggestions for prompt arguments using the `completable()` helper. Clients can request suggestions via the MCP `completion/complete` protocol method.
+
+### List-Based Completion (Primitives)
+
+For simple cases with a fixed list of values, pass an array directly:
+
+```typescript Typescript highlight={8-11}
+import { completable } from 'mcp-use/server';
+import { z } from 'zod';
+
+server.prompt({
+  name: 'code-review',
+  description: 'Review code with language completion',
+  schema: z.object({
+    language: completable(
+      z.string(),
+      ['python', 'javascript', 'typescript', 'java', 'cpp']
+    ),
+    code: z.string().describe('The code to review'),
+  }),
+}, async ({ language, code }) => {
+  return {
+    messages: [{
+      role: 'system',
+      content: `Review this ${language} code: ${code}`
+    }]
+  }
+})
+```
+
+The list-based approach automatically filters suggestions based on case-insensitive prefix matching.
+
+### Callback-Based Completion (Dynamic)
+
+For dynamic or contextual completion, use a callback function:
+
+```typescript Typescript highlight={5-15}
+server.prompt({
+  name: 'analyze-project',
+  description: 'Analyze a project with dynamic completion',
+  schema: z.object({
+    projectId: completable(
+      z.string(),
+      async (value, context) => {
+        // Access other argument values via context
+        const userId = context?.arguments?.userId;
+        const projects = await fetchUserProjects(userId);
+        return projects
+          .filter(p => p.id.startsWith(value))
+          .map(p => p.id);
+      }
+    ),
+  }),
+}, async ({ projectId }) => {
+  return {
+    messages: [{
+      role: 'system',
+      content: `Analyzing project ${projectId}...`
+    }]
+  }
+})
+```
+
+The callback receives the current input value and optional context containing other argument values.
+
+**Note**: List-based completion works best for primitive types (string, number, enum). For complex types or custom logic, use the callback-based approach.
+
 ## Next Steps
 
 - [Tools Guide](./tools) - Building executable tools
