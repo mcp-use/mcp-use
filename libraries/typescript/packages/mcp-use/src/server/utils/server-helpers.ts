@@ -76,6 +76,53 @@ function normalizeUrlHost(url: string): string {
 }
 
 /**
+ * Extract base URL from request, respecting proxy forwarding headers
+ *
+ * Priority:
+ * 1. X-Forwarded-Host + X-Forwarded-Proto (from gateway/proxy)
+ * 2. Host header + protocol from URL
+ * 3. Full URL parsing
+ *
+ * @param request - Request object with url and header method
+ * @returns Base URL (protocol + host) or empty string if parsing fails
+ *
+ * @example
+ * ```typescript
+ * // Direct request
+ * extractBaseUrl({ url: 'http://localhost:3000/path', header: () => undefined })
+ * // Returns: 'http://localhost:3000'
+ *
+ * // Through gateway proxy
+ * extractBaseUrl({
+ *   url: 'https://internal.deploy.com/path',
+ *   header: (name) => name === 'X-Forwarded-Host' ? 'external.com' : undefined
+ * })
+ * // Returns: 'https://external.com'
+ * ```
+ */
+export function extractBaseUrl(request: {
+  url: string;
+  header: (name: string) => string | undefined;
+}): string {
+  // Check forwarding headers first (set by gateway/proxy)
+  const forwardedHost = request.header("X-Forwarded-Host");
+  const forwardedProto = request.header("X-Forwarded-Proto") || "https";
+
+  if (forwardedHost) {
+    return `${forwardedProto}://${forwardedHost}`;
+  }
+
+  // Fall back to direct URL parsing
+  try {
+    const requestUrl = new URL(request.url);
+    return `${requestUrl.protocol}//${requestUrl.host}`;
+  } catch (e) {
+    // If URL parsing fails, return empty string
+    return "";
+  }
+}
+
+/**
  * Get the server base URL with fallback to host:port if not configured
  *
  * @param serverBaseUrl - Explicitly configured base URL

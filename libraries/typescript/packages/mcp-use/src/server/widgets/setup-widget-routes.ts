@@ -5,13 +5,14 @@
  * and public resources in production mode.
  */
 
-import type { Hono as HonoType, Context } from "hono";
-import { pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+import type { Context, Hono as HonoType } from "hono";
+import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import { extractBaseUrl } from "../utils/server-helpers.js";
 import {
   getContentType,
   processWidgetHtml,
-  setupPublicRoutes,
   setupFaviconRoute,
+  setupPublicRoutes,
 } from "./widget-helpers.js";
 import type { ServerConfig } from "./widget-types.js";
 
@@ -112,15 +113,8 @@ export function setupWidgetRoutes(
     try {
       let html = await fsHelpers.readFileSync(filePath, "utf8");
 
-      // Get dynamic base URL from request (for proper external URL support)
-      // Falls back to serverConfig.serverBaseUrl if request URL unavailable
-      let baseUrl = serverConfig.serverBaseUrl;
-      try {
-        const requestUrl = new URL(c.req.url);
-        baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-      } catch (e) {
-        // Fallback to configured serverBaseUrl if request URL parsing fails
-      }
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const baseUrl = extractBaseUrl(c.req) || serverConfig.serverBaseUrl;
 
       // Process HTML with base URL injection and path conversion
       html = processWidgetHtml(html, widget, baseUrl);

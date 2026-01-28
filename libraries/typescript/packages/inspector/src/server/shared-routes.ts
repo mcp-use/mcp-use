@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
-import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { extractBaseUrl, mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
@@ -11,7 +12,6 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
-import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -229,14 +229,8 @@ export function registerInspectorRoutes(
         );
       }
 
-      // Get dynamic base URL from request (for proper external URL support)
-      let dynamicBaseUrl: string | undefined;
-      try {
-        const requestUrl = new URL(c.req.url);
-        dynamicBaseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-      } catch (e) {
-        // Fallback to stored devServerBaseUrl if request URL parsing fails
-      }
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const dynamicBaseUrl = extractBaseUrl(c.req);
 
       // Generate the widget HTML using shared function with dynamic URL
       const result = generateWidgetContentHtml(widgetData, dynamicBaseUrl);

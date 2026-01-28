@@ -6,6 +6,7 @@
  */
 
 import type { Hono } from "hono";
+import { extractBaseUrl } from "mcp-use/server";
 import { getWidgetData, storeWidgetData } from "../shared-utils-browser.js";
 
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
@@ -292,14 +293,9 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
-      // Get dynamic base URL from request (for proper external URL support)
-      let effectiveBaseUrl = widgetData.devServerBaseUrl;
-      try {
-        const requestUrl = new URL(c.req.url);
-        effectiveBaseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-      } catch (e) {
-        // Fallback to stored devServerBaseUrl if request URL parsing fails
-      }
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const effectiveBaseUrl =
+        extractBaseUrl(c.req) || widgetData.devServerBaseUrl;
 
       // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
       let processedHtml = htmlContent;
@@ -389,14 +385,9 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
-      // Get dynamic base URL from request (for proper external URL support)
-      let effectiveBaseUrl = widgetData.devServerBaseUrl;
-      try {
-        const requestUrl = new URL(c.req.url);
-        effectiveBaseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
-      } catch (e) {
-        // Fallback to stored devServerBaseUrl if request URL parsing fails
-      }
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const effectiveBaseUrl =
+        extractBaseUrl(c.req) || widgetData.devServerBaseUrl;
 
       // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
       let processedHtml = htmlContent;

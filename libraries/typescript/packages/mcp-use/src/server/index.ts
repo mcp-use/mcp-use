@@ -1,11 +1,11 @@
 export {
-  createMCPServer,
   MCPServer,
+  createMCPServer,
   type McpServerInstance,
 } from "./mcp-server.js";
 
 // Export version information (global)
-export { getPackageVersion, VERSION } from "../version.js";
+export { VERSION, getPackageVersion } from "../version.js";
 
 // Re-export tool context types
 export type {
@@ -128,6 +128,9 @@ export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
+
+// Server utility functions for URL handling and request processing
+export { extractBaseUrl } from "./utils/server-helpers.js";
 
 // Landing page generator for browser requests
 export { generateLandingPage } from "./landing.js";
