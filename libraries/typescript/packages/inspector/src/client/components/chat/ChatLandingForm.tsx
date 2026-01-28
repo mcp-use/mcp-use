@@ -13,6 +13,10 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
+import { PromptResultsList } from "./PromptResultsList";
+import { PromptsDropdown } from "./PromptsDropdown";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { PromptResult } from "../../hooks/useMCPPrompts";
 
 interface ChatLandingFormProps {
   mcpServerUrl: string;
@@ -21,10 +25,19 @@ interface ChatLandingFormProps {
   isLoading: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   llmConfig: LLMConfig | null;
+  promptsDropdownOpen: boolean;
+  promptFocusedIndex: number;
+  prompts: Prompt[];
+  selectedPrompt: Prompt | null;
+  promptResults: PromptResult[];
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onClick: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onConfigDialogOpenChange: (open: boolean) => void;
+  onPromptSelect: (prompt: Prompt) => void;
+  onDeletePromptResult: (index: number) => void;
 }
 
 export function ChatLandingForm({
@@ -34,10 +47,19 @@ export function ChatLandingForm({
   isLoading,
   textareaRef,
   llmConfig,
+  promptsDropdownOpen,
+  promptFocusedIndex,
+  prompts,
+  selectedPrompt,
+  promptResults,
   onInputChange,
   onKeyDown,
+  onKeyUp,
+  onClick,
   onSubmit,
   onConfigDialogOpenChange,
+  onPromptSelect,
+  onDeletePromptResult,
 }: ChatLandingFormProps) {
   return (
     <AuroraBackground>
@@ -54,17 +76,33 @@ export function ChatLandingForm({
         <form onSubmit={onSubmit} className="space-y-6">
           <div className="flex justify-center">
             <div className="relative w-full max-w-2xl">
+              <PromptsDropdown
+                prompts={prompts}
+                isOpen={promptsDropdownOpen}
+                selectedPrompt={selectedPrompt}
+                focusedIndex={promptFocusedIndex}
+                onPromptSelect={onPromptSelect}
+              />
+              <PromptResultsList
+                promptResults={promptResults}
+                onDeletePromptResult={onDeletePromptResult}
+              />
               <Textarea
                 ref={textareaRef}
                 value={inputValue}
                 onChange={(e) => onInputChange(e.target.value)}
                 onKeyDown={onKeyDown}
+                onKeyUp={onKeyUp}
+                onClick={onClick}
                 placeholder={
                   isConnected
                     ? "Ask a question or request an action..."
                     : "Server not connected"
                 }
-                className="p-4 min-h-[150px] max-h-[300px] rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800"
+                className={cn(
+                  "p-4 min-h-[150px] max-h-[300px] rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
+                  promptResults.length > 0 && "pt-16"
+                )}
                 disabled={!isConnected || isLoading}
               />
               <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">

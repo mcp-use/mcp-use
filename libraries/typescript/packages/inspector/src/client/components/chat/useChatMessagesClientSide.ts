@@ -5,6 +5,11 @@ type MCPConnection = McpServer;
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import { useCallback, useRef, useState } from "react";
 import type { LLMConfig, Message } from "./types";
+import type { PromptResult } from "../../hooks/useMCPPrompts";
+import {
+  convertMessagesToLangChain,
+  convertPromptResultsToMessages,
+} from "./conversion";
 
 interface UseChatMessagesClientSideProps {
   connection: MCPConnection;
@@ -26,7 +31,7 @@ export function useChatMessagesClientSide({
   const llmRef = useRef<any>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string) => {
+    async (userInput: string, promptResults: PromptResult[]) => {
       if (!userInput.trim() || !llmConfig || !isConnected) {
         return;
       }
@@ -38,7 +43,10 @@ export function useChatMessagesClientSide({
         timestamp: Date.now(),
       };
 
-      setMessages((prev) => [...prev, userMessage]);
+      const promptResultsMessages =
+        convertPromptResultsToMessages(promptResults);
+
+      setMessages((prev) => [...prev, ...promptResultsMessages, userMessage]);
       setIsLoading(true);
 
       // Create abort controller for cancellation
@@ -125,7 +133,7 @@ export function useChatMessagesClientSide({
           agentRef.current = new MCPAgent({
             llm: llmRef.current.instance,
             client: (connection.client ?? undefined) as any,
-            memoryEnabled: true,
+            memoryEnabled: false, // external history always used
             systemPrompt:
               "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
           });
@@ -138,11 +146,16 @@ export function useChatMessagesClientSide({
         }
 
         // Stream events from agent
+        const externalHistory = convertMessagesToLangChain([
+          ...messages,
+          ...promptResultsMessages,
+        ]);
+
         for await (const event of agentRef.current.streamEvents(
           userInput,
           10, // maxSteps
           false, // manageConnector - don't manage, already connected
-          undefined, // externalHistory - agent maintains its own with memoryEnabled
+          externalHistory, // externalHistory - keep history external to include prompt results
           undefined, // outputSchema
           abortControllerRef.current?.signal // pass abort signal to enable immediate cancellation
         )) {

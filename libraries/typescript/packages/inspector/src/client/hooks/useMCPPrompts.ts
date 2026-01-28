@@ -67,75 +67,82 @@ export function useMCPPrompts({
     setPromptArgs((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const executePrompt = useCallback(async () => {
-    if (!selectedPrompt || isExecuting) return;
+  const executePrompt = useCallback(
+    async (prompt: Prompt, args: Record<string, unknown>) => {
+      if (isExecuting) return;
 
-    setIsExecuting(true);
-    const startTime = Date.now();
+      setIsExecuting(true);
+      const startTime = Date.now();
 
-    try {
-      const result = await callPrompt(selectedPrompt.name, promptArgs);
-      const duration = Date.now() - startTime;
+      try {
+        const result = await callPrompt(prompt.name, args);
+        const duration = Date.now() - startTime;
 
-      // Track successful prompt call
-      const telemetry = Telemetry.getInstance();
-      telemetry
-        .capture(
-          new MCPPromptCallEvent({
-            promptName: selectedPrompt.name,
-            serverId,
-            success: true,
-          })
-        )
-        .catch(() => {
-          // Silently fail - telemetry should not break the application
-        });
+        // Track successful prompt call
+        const telemetry = Telemetry.getInstance();
+        telemetry
+          .capture(
+            new MCPPromptCallEvent({
+              promptName: prompt.name,
+              serverId,
+              success: true,
+            })
+          )
+          .catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
 
-      setResults((prev) => [
-        {
-          promptName: selectedPrompt.name,
-          args: promptArgs,
-          result,
+        setResults((prev) => [
+          {
+            promptName: prompt.name,
+            args: args,
+            result,
+            timestamp: startTime,
+            duration,
+          },
+          ...prev,
+        ]);
+      } catch (error) {
+        // Track failed prompt call
+        const telemetry = Telemetry.getInstance();
+        telemetry
+          .capture(
+            new MCPPromptCallEvent({
+              promptName: prompt.name,
+              serverId,
+              success: false,
+              error: error instanceof Error ? error.message : "Unknown error",
+            })
+          )
+          .catch(() => {
+            // Silently fail - telemetry should not break the application
+          });
+
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const errorResult: PromptResult = {
+          promptName: prompt.name,
+          args: args,
+          result: { error: errorMessage, isError: true },
+          error: errorMessage,
           timestamp: startTime,
-          duration,
-        },
-        ...prev,
-      ]);
-    } catch (error) {
-      // Track failed prompt call
-      const telemetry = Telemetry.getInstance();
-      telemetry
-        .capture(
-          new MCPPromptCallEvent({
-            promptName: selectedPrompt.name,
-            serverId,
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-          })
-        )
-        .catch(() => {
-          // Silently fail - telemetry should not break the application
-        });
+          duration: Date.now() - startTime,
+        };
 
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorResult: PromptResult = {
-        promptName: selectedPrompt.name,
-        args: promptArgs,
-        result: { error: errorMessage, isError: true },
-        error: errorMessage,
-        timestamp: startTime,
-        duration: Date.now() - startTime,
-      };
-
-      setResults((prev) => [errorResult, ...prev]);
-    } finally {
-      setIsExecuting(false);
-    }
-  }, [selectedPrompt, promptArgs, isExecuting, callPrompt, serverId]);
+        setResults((prev) => [errorResult, ...prev]);
+      } finally {
+        setIsExecuting(false);
+      }
+    },
+    [isExecuting, callPrompt, serverId]
+  );
 
   const handleDeleteResult = useCallback((index: number) => {
     setResults((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const clearPromptResults = useCallback(() => {
+    setResults([]);
   }, []);
 
   // Sync selectedPrompt with updated prompts list (for HMR support)
@@ -163,6 +170,11 @@ export function useMCPPrompts({
     }
   }, [prompts, selectedPrompt]);
 
+  const executeSelectedPrompt = useCallback(async () => {
+    if (!selectedPrompt || isExecuting) return;
+    executePrompt(selectedPrompt, promptArgs);
+  }, [selectedPrompt, promptArgs, isExecuting, executePrompt]);
+
   return {
     filteredPrompts,
     selectedPrompt,
@@ -175,7 +187,9 @@ export function useMCPPrompts({
     handlePromptSelect,
     handleArgChange,
     executePrompt,
+    executeSelectedPrompt,
     searchQuery,
     setSearchQuery,
+    clearPromptResults,
   };
 }

@@ -102,6 +102,9 @@ export function LayoutContent({
           key={selectedServer.id}
           connection={selectedServer}
           isConnected={selectedServer.state === "ready"}
+          prompts={selectedServer.prompts}
+          serverId={selectedServer.id}
+          callPrompt={selectedServer.getPrompt}
           readResource={selectedServer.readResource}
         />
       </div>

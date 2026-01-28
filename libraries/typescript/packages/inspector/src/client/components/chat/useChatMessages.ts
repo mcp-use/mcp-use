@@ -1,6 +1,8 @@
 import type { AuthConfig, LLMConfig, Message } from "./types";
 import { useCallback, useState, useRef } from "react";
 import { hashString } from "./utils";
+import { convertPromptResultsToMessages } from "./conversion";
+import type { PromptResult } from "../../hooks/useMCPPrompts";
 
 interface UseChatMessagesProps {
   mcpServerUrl: string;
@@ -20,7 +22,7 @@ export function useChatMessages({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string) => {
+    async (userInput: string, promptResults: PromptResult[]) => {
       if (!userInput.trim() || !llmConfig || !isConnected) {
         return;
       }
@@ -31,8 +33,12 @@ export function useChatMessages({
         content: userInput.trim(),
         timestamp: Date.now(),
       };
+      const promptResultsMessages =
+        convertPromptResultsToMessages(promptResults);
 
-      setMessages((prev) => [...prev, userMessage]);
+      const userMessages = [...promptResultsMessages, userMessage];
+
+      setMessages((prev) => [...prev, ...userMessages]);
       setIsLoading(true);
 
       // Create abort controller for cancellation
@@ -77,7 +83,7 @@ export function useChatMessages({
             mcpServerUrl,
             llmConfig,
             authConfig: authConfigWithTokens,
-            messages: [...messages, userMessage].map((m) => ({
+            messages: [...messages, ...userMessages].map((m) => ({
               role: m.role,
               content: m.content,
             })),
