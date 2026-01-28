@@ -14,6 +14,27 @@ import type { SchemaInput } from "@modelcontextprotocol/sdk/server/zod-compat.js
 import type { z } from "zod";
 
 /**
+ * Context provided to completion callbacks, containing other argument values
+ * that may be useful for contextual completion suggestions.
+ */
+export interface CompletionContext {
+  /**
+   * Other argument values from the same prompt/resource template.
+   * Useful for contextual completion based on previously provided values.
+   */
+  arguments?: Record<string, unknown>;
+}
+
+/**
+ * Utility type alias for completable schemas.
+ * Use this type when you need to reference a completable schema type.
+ *
+ * @example
+ * type LanguageSchema = Completable<z.ZodString>;
+ */
+export type Completable<T extends z.ZodTypeAny> = CompletableSchema<T>;
+
+/**
  * Make a schema "completable" so clients can request autocomplete
  * suggestions via MCP `completion/complete`.
  *
@@ -38,6 +59,18 @@ import type { z } from "zod";
  *     }),
  *   },
  *   async ({ language, code }) => text(`Reviewing ${language}...`)
+ * );
+ *
+ * @example
+ * // Number completion with list
+ * server.prompt(
+ *   {
+ *     name: "select-version",
+ *     schema: z.object({
+ *       version: completable(z.number(), [1, 2, 3, 10, 20, 30]),
+ *     }),
+ *   },
+ *   async ({ version }) => text(`Selected version ${version}`)
  * );
  *
  * @example
@@ -66,14 +99,22 @@ export function completable<
 // eslint-disable-next-line no-redeclare
 export function completable<T extends z.ZodTypeAny>(
   schema: T,
-  complete: CompleteCallback<T>
+  complete: (
+    value: SchemaInput<T>,
+    context?: CompletionContext
+  ) => Promise<SchemaInput<T>[]> | SchemaInput<T>[]
 ): CompletableSchema<T>;
 
 // Implementation
 // eslint-disable-next-line no-redeclare
 export function completable<T extends z.ZodTypeAny>(
   schema: T,
-  complete: z.infer<T>[] | CompleteCallback<T>
+  complete:
+    | z.infer<T>[]
+    | ((
+        value: SchemaInput<T>,
+        context?: CompletionContext
+      ) => Promise<SchemaInput<T>[]> | SchemaInput<T>[])
 ): CompletableSchema<T> {
   let callback: CompleteCallback<T>;
 
@@ -88,8 +129,10 @@ export function completable<T extends z.ZodTypeAny>(
       return filtered as SchemaInput<T>[];
     };
   } else {
-    // Overload 2: pass the callback as is
-    callback = complete;
+    // Overload 2: wrap the callback to match SDK's CompleteCallback signature
+    callback = async (value, context) => {
+      return await complete(value, context as CompletionContext);
+    };
   }
 
   return sdkCompletable(schema as any, callback); // Type assertion for Zod v3/v4 compatibility

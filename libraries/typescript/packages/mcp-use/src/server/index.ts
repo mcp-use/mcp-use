@@ -48,7 +48,11 @@ export {
 } from "./utils/response-helpers.js";
 
 // Completion utilities for prompt arguments
-export { completable } from "./utils/completion-helpers.js";
+export {
+  completable,
+  type Completable,
+  type CompletionContext,
+} from "./utils/completion-helpers.js";
 
 // OAuth utilities for authentication and authorization
 export {
