@@ -29,6 +29,8 @@ import {
   generateToolOutput,
   getBuildIdPart,
 } from "./protocol-helpers.js";
+import { getRequestContext } from "../context-storage.js";
+import { extractBaseUrl } from "../utils/server-helpers.js";
 
 /**
  * Minimal server interface for UI resource registration
@@ -272,10 +274,21 @@ export function uiResourceRegistration<T extends UIResourceServer>(
             ? applyDefaultProps(enrichedDefinition.props)
             : {};
 
+        // Get dynamic base URL from request context (respects gateway forwarding headers)
+        const requestContext = getRequestContext();
+        const dynamicBaseUrl = requestContext
+          ? extractBaseUrl(requestContext.req)
+          : null;
+
+        // Use dynamic URL if available, otherwise fall back to static serverConfig
+        const effectiveServerConfig: WidgetServerConfig = dynamicBaseUrl
+          ? { ...serverConfig, serverBaseUrl: dynamicBaseUrl }
+          : serverConfig;
+
         const uiResource = await createWidgetUIResource(
           enrichedDefinition,
           params,
-          serverConfig
+          effectiveServerConfig
         );
 
         // Ensure the resource content URI matches the registered URI (with build ID)
@@ -310,10 +323,22 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         annotations: enrichedDefinition.annotations,
         readCallback: async (uri: URL, params: Record<string, string>) => {
           // Use empty params since structuredContent is passed separately
+
+          // Get dynamic base URL from request context (respects gateway forwarding headers)
+          const requestContext = getRequestContext();
+          const dynamicBaseUrl = requestContext
+            ? extractBaseUrl(requestContext.req)
+            : null;
+
+          // Use dynamic URL if available, otherwise fall back to static serverConfig
+          const effectiveServerConfig: WidgetServerConfig = dynamicBaseUrl
+            ? { ...serverConfig, serverBaseUrl: dynamicBaseUrl }
+            : serverConfig;
+
           const uiResource = await createWidgetUIResource(
             enrichedDefinition,
             {},
-            serverConfig
+            effectiveServerConfig
           );
 
           // Ensure the resource content URI matches the template URI (with build ID)
@@ -464,11 +489,22 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         currentToolMeta.ui ? "present" : "missing"
       );
 
+      // Get dynamic base URL from request context (respects gateway forwarding headers)
+      const requestContext = getRequestContext();
+      const dynamicBaseUrl = requestContext
+        ? extractBaseUrl(requestContext.req)
+        : null;
+
+      // Use dynamic URL if available, otherwise fall back to static serverConfig
+      const effectiveServerConfig: WidgetServerConfig = dynamicBaseUrl
+        ? { ...serverConfig, serverBaseUrl: dynamicBaseUrl }
+        : serverConfig;
+
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         enrichedDefinition,
         params,
-        serverConfig
+        effectiveServerConfig
       );
 
       // For Apps SDK, return _meta at top level with only text in content
@@ -488,6 +524,33 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           "openai/outputTemplate": uniqueUri,
           "mcp-use/props": params, // Pass params as widget props
         };
+
+        // Dynamically update CSP domains to include the gateway URL
+        if (dynamicBaseUrl && uniqueToolMetadata["openai/widgetCSP"]) {
+          try {
+            const serverOrigin = new URL(dynamicBaseUrl).origin;
+            const widgetCSP = uniqueToolMetadata["openai/widgetCSP"] as {
+              connect_domains?: string[];
+              resource_domains?: string[];
+            };
+
+            // Add server origin to connect_domains
+            if (widgetCSP.connect_domains) {
+              widgetCSP.connect_domains = Array.from(
+                new Set([...widgetCSP.connect_domains, serverOrigin])
+              );
+            }
+
+            // Add server origin to resource_domains
+            if (widgetCSP.resource_domains) {
+              widgetCSP.resource_domains = Array.from(
+                new Set([...widgetCSP.resource_domains, serverOrigin])
+              );
+            }
+          } catch (e) {
+            // Ignore URL parsing errors
+          }
+        }
 
         // Generate tool output (what the model sees)
         const toolOutputResult = enrichedDefinition.toolOutput
@@ -550,6 +613,72 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         // Deep merge ui field to preserve CSP, prefersBorder, autoResize
         if (existingUi && mcpAppsUi) {
           uniqueToolMetadata.ui = { ...existingUi, ...mcpAppsUi };
+        }
+
+        // Dynamically update CSP domains to include the gateway URL (both protocols)
+        if (dynamicBaseUrl) {
+          try {
+            const serverOrigin = new URL(dynamicBaseUrl).origin;
+
+            // Update MCP Apps CSP (ui.csp.connectDomains, resourceDomains, baseUriDomains)
+            if (
+              uniqueToolMetadata.ui &&
+              typeof uniqueToolMetadata.ui === "object"
+            ) {
+              const ui = uniqueToolMetadata.ui as Record<string, unknown>;
+              if (ui.csp && typeof ui.csp === "object") {
+                const csp = ui.csp as Record<string, unknown>;
+
+                // Add to connectDomains
+                if (Array.isArray(csp.connectDomains)) {
+                  csp.connectDomains = Array.from(
+                    new Set([...csp.connectDomains, serverOrigin])
+                  );
+                }
+
+                // Add to resourceDomains
+                if (Array.isArray(csp.resourceDomains)) {
+                  csp.resourceDomains = Array.from(
+                    new Set([...csp.resourceDomains, serverOrigin])
+                  );
+                }
+
+                // Add to baseUriDomains
+                if (Array.isArray(csp.baseUriDomains)) {
+                  csp.baseUriDomains = Array.from(
+                    new Set([...csp.baseUriDomains, serverOrigin])
+                  );
+                }
+              }
+            }
+
+            // Update Apps SDK CSP (openai/widgetCSP)
+            if (
+              uniqueToolMetadata["openai/widgetCSP"] &&
+              typeof uniqueToolMetadata["openai/widgetCSP"] === "object"
+            ) {
+              const widgetCSP = uniqueToolMetadata["openai/widgetCSP"] as {
+                connect_domains?: string[];
+                resource_domains?: string[];
+              };
+
+              // Add to connect_domains
+              if (Array.isArray(widgetCSP.connect_domains)) {
+                widgetCSP.connect_domains = Array.from(
+                  new Set([...widgetCSP.connect_domains, serverOrigin])
+                );
+              }
+
+              // Add to resource_domains
+              if (Array.isArray(widgetCSP.resource_domains)) {
+                widgetCSP.resource_domains = Array.from(
+                  new Set([...widgetCSP.resource_domains, serverOrigin])
+                );
+              }
+            }
+          } catch (e) {
+            // Ignore URL parsing errors
+          }
         }
 
         // Generate tool output (what the model sees)
