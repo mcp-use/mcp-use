@@ -8,6 +8,7 @@
 import type { Context, Hono as HonoType } from "hono";
 import { join } from "node:path";
 import { Telemetry } from "../../telemetry/index.js";
+import { runWithContext } from "../context-storage.js";
 import { generateLandingPage } from "../landing.js";
 import type { SessionData } from "../sessions/index.js";
 import {
@@ -158,25 +159,28 @@ export async function mountMcp(
       try {
         await server.connect(transport);
 
-        // If client doesn't support SSE, add the Accept header to bypass SDK validation
-        // The transport requires Accept: text/event-stream even when using enableJsonResponse
-        const request = c.req.raw;
-        if (!clientSupportsSSE) {
-          // Clone request with modified headers
-          // Note: duplex is a Node.js-specific extension, cast to any to avoid TypeScript error
-          const modifiedRequest = new Request(request.url, {
-            method: request.method,
-            headers: {
-              ...Object.fromEntries(request.headers.entries()),
-              Accept: "application/json, text/event-stream",
-            },
-            body: request.body,
-            ...(request.body && ({ duplex: "half" } as any)),
-          });
-          return await transport.handleRequest(modifiedRequest);
-        }
+        // Wrap in request context so tool/resource callbacks can access headers
+        return await runWithContext(c, async () => {
+          // If client doesn't support SSE, add the Accept header to bypass SDK validation
+          // The transport requires Accept: text/event-stream even when using enableJsonResponse
+          const request = c.req.raw;
+          if (!clientSupportsSSE) {
+            // Clone request with modified headers
+            // Note: duplex is a Node.js-specific extension, cast to any to avoid TypeScript error
+            const modifiedRequest = new Request(request.url, {
+              method: request.method,
+              headers: {
+                ...Object.fromEntries(request.headers.entries()),
+                Accept: "application/json, text/event-stream",
+              },
+              body: request.body,
+              ...(request.body && ({ duplex: "half" } as any)),
+            });
+            return await transport.handleRequest(modifiedRequest);
+          }
 
-        return await transport.handleRequest(request);
+          return await transport.handleRequest(request);
+        });
       } catch (error) {
         console.error("[MCP] Stateless request error:", error);
         transport.close();
@@ -313,7 +317,11 @@ export async function mountMcp(
         });
 
         await server.connect(transport);
-        return transport.handleRequest(c.req.raw);
+
+        // Wrap in request context so tool/resource callbacks can access headers
+        return await runWithContext(c, () =>
+          transport.handleRequest(c.req.raw)
+        );
       }
 
       // Check if session ID doesn't exist in store at all (truly invalid)
@@ -353,8 +361,11 @@ export async function mountMcp(
           sessionData.honoContext = c;
         }
 
+        // Wrap in request context so tool/resource callbacks can access headers
         // Pass Web Standard Request directly - no adapter needed!
-        return transport.handleRequest(c.req.raw);
+        return await runWithContext(c, () =>
+          transport.handleRequest(c.req.raw)
+        );
       }
 
       // For new sessions or initialization, create new transport and server
@@ -447,8 +458,9 @@ export async function mountMcp(
       // Connect server to transport
       await server.connect(transport);
 
+      // Wrap in request context so tool/resource callbacks can access headers
       // Pass Web Standard Request directly - no adapter needed!
-      return transport.handleRequest(c.req.raw);
+      return await runWithContext(c, () => transport.handleRequest(c.req.raw));
     }
   };
 

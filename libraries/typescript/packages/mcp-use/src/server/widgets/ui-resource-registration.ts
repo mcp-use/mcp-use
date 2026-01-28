@@ -6,6 +6,7 @@
  */
 
 import z from "zod";
+import { getRequestContext } from "../context-storage.js";
 import type {
   FlatResourceTemplateDefinition,
   FlatResourceTemplateDefinitionWithoutCallback,
@@ -16,7 +17,13 @@ import type {
   ToolDefinition,
   UIResourceDefinition,
 } from "../types/index.js";
+import { extractBaseUrl } from "../utils/server-helpers.js";
 import { AppsSdkAdapter, McpAppsAdapter } from "./adapters/index.js";
+import {
+  buildDualProtocolMetadata,
+  generateToolOutput,
+  getBuildIdPart,
+} from "./protocol-helpers.js";
 import {
   applyDefaultProps,
   convertPropsToInputs,
@@ -24,13 +31,6 @@ import {
   generateWidgetUri,
   type WidgetServerConfig,
 } from "./widget-helpers.js";
-import {
-  buildDualProtocolMetadata,
-  generateToolOutput,
-  getBuildIdPart,
-} from "./protocol-helpers.js";
-import { getRequestContext } from "../context-storage.js";
-import { extractBaseUrl } from "../utils/server-helpers.js";
 
 /**
  * Minimal server interface for UI resource registration
