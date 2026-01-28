@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
-
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInputArea } from "./chat/ChatInputArea";
 import { ChatLandingForm } from "./chat/ChatLandingForm";
@@ -13,9 +13,9 @@ import { MessageList } from "./chat/MessageList";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
-import { useMCPPrompts } from "../hooks/useMCPPrompts";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
-import { toast } from "sonner";
+
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
 
 interface ChatTabProps {
   connection: MCPConnection;
@@ -80,8 +80,16 @@ export function ChatTab({
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
-  const { messages, isLoading, sendMessage, clearMessages, stop } =
-    useClientSide ? clientSideChat : serverSideChat;
+  const {
+    messages,
+    isLoading,
+    attachments,
+    sendMessage,
+    clearMessages,
+    stop,
+    addAttachment,
+    removeAttachment,
+  } = useClientSide ? clientSideChat : serverSideChat;
 
   const {
     filteredPrompts,
@@ -191,13 +199,16 @@ export function ChatTab({
   );
 
   const handleSendMessage = useCallback(() => {
-    if (!inputValue.trim()) {
+    // Can send if there's text, prompt results, or attachments
+    const hasContent =
+      inputValue.trim() || results.length > 0 || attachments.length > 0;
+    if (!hasContent) {
       return;
     }
     sendMessage(inputValue, results);
     setInputValue("");
     clearPromptResults();
-  }, [inputValue, results, sendMessage, clearPromptResults]);
+  }, [inputValue, results, sendMessage, clearPromptResults, attachments]);
 
   const handlePromptKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -291,6 +302,7 @@ export function ChatTab({
           prompts={filteredPrompts}
           selectedPrompt={selectedPrompt}
           promptResults={results}
+          attachments={attachments}
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
@@ -302,6 +314,8 @@ export function ChatTab({
             handleSendMessage();
           }}
           onConfigDialogOpenChange={setConfigDialogOpen}
+          onAttachmentAdd={addAttachment}
+          onAttachmentRemove={removeAttachment}
         />
       </div>
     );
@@ -356,6 +370,7 @@ export function ChatTab({
           prompts={filteredPrompts}
           promptResults={results}
           selectedPrompt={selectedPrompt}
+          attachments={attachments}
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
@@ -364,6 +379,8 @@ export function ChatTab({
           onClick={updatePromptsDropdownState}
           onSendMessage={handleSendMessage}
           onStopStreaming={stop}
+          onAttachmentAdd={addAttachment}
+          onAttachmentRemove={removeAttachment}
         />
       )}
     </div>

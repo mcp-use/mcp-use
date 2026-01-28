@@ -1,12 +1,13 @@
-import { Send, Square } from "lucide-react";
-import React from "react";
-import { PromptResultsList } from "./PromptResultsList";
-import { PromptsDropdown } from "./PromptsDropdown";
 import { Button } from "@/client/components/ui/button";
-import { Textarea } from "@/client/components/ui/textarea";
 import { cn } from "@/client/lib/utils";
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import { Send, Square } from "lucide-react";
+import React from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
+import { ChatInput } from "./ChatInput";
+import { PromptResultsList } from "./PromptResultsList";
+import { PromptsDropdown } from "./PromptsDropdown";
+import type { MessageAttachment } from "./types";
 
 interface ChatInputAreaProps {
   inputValue: string;
@@ -18,6 +19,7 @@ interface ChatInputAreaProps {
   prompts: Prompt[];
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
+  attachments: MessageAttachment[];
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -26,6 +28,8 @@ interface ChatInputAreaProps {
   onStopStreaming: () => void;
   onPromptSelect: (prompt: Prompt) => void;
   onDeletePromptResult: (index: number) => void;
+  onAttachmentAdd: (file: File) => void;
+  onAttachmentRemove: (index: number) => void;
 }
 
 export function ChatInputArea({
@@ -38,6 +42,7 @@ export function ChatInputArea({
   prompts,
   selectedPrompt,
   promptResults,
+  attachments,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -46,7 +51,13 @@ export function ChatInputArea({
   onStopStreaming,
   onPromptSelect,
   onDeletePromptResult,
+  onAttachmentAdd,
+  onAttachmentRemove,
 }: ChatInputAreaProps) {
+  // Can send if there's text, prompt results, or attachments
+  const canSend =
+    inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
+
   return (
     <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 sm:pt-0 text-foreground">
       <div className="relative w-full max-w-3xl backdrop-blur-xl">
@@ -61,43 +72,47 @@ export function ChatInputArea({
           promptResults={promptResults}
           onDeletePromptResult={onDeletePromptResult}
         />
-        <Textarea
-          ref={textareaRef}
-          value={inputValue}
-          onChange={(e) => onInputChange(e.target.value)}
+
+        <ChatInput
+          inputValue={inputValue}
+          isConnected={isConnected}
+          isLoading={isLoading}
+          textareaRef={textareaRef}
+          attachments={attachments}
+          placeholder="Ask a question"
+          className={cn(
+            "bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800",
+            promptResults.length > 0 && "pt-16"
+          )}
+          onInputChange={onInputChange}
           onKeyDown={onKeyDown}
           onKeyUp={onKeyUp}
           onClick={onClick}
-          placeholder={isConnected ? "Ask a question" : "Server not connected"}
-          className={cn(
-            "p-4 min-h-[150px] max-h-[300px] rounded-xl bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800",
-            promptResults.length > 0 && "pt-16"
-          )}
-          disabled={!isConnected || isLoading}
+          onAttachmentAdd={onAttachmentAdd}
+          onAttachmentRemove={onAttachmentRemove}
         />
-        <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">
-          <div className="flex items-center gap-2">
-            {isLoading ? (
-              <Button
-                className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
-                title="Stop streaming"
-                type="button"
-                onClick={onStopStreaming}
-              >
-                <Square className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                disabled={!inputValue.trim() || !isConnected || isLoading}
-                className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
-                title="Send"
-                type="button"
-                onClick={onSendMessage}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+
+        <div className="absolute right-0 p-3 bottom-0 flex items-center gap-2">
+          {isLoading ? (
+            <Button
+              className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
+              title="Stop streaming"
+              type="button"
+              onClick={onStopStreaming}
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              disabled={!canSend || !isConnected || isLoading}
+              className="min-w-none h-auto w-auto aspect-square rounded-full items-center justify-center flex"
+              title="Send"
+              type="button"
+              onClick={onSendMessage}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

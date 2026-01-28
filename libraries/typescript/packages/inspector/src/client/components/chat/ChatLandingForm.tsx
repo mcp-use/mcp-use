@@ -1,22 +1,21 @@
-import type { LLMConfig } from "./types";
-import { ArrowUp, Loader2 } from "lucide-react";
-
-import React from "react";
 import { AuroraBackground } from "@/client/components/ui/aurora-background";
 import { Badge } from "@/client/components/ui/badge";
 import { BlurFade } from "@/client/components/ui/blur-fade";
 import { Button } from "@/client/components/ui/button";
-import { Textarea } from "@/client/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import { ArrowUp, Loader2 } from "lucide-react";
+import React from "react";
+import type { PromptResult } from "../../hooks/useMCPPrompts";
+import { ChatInput } from "./ChatInput";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
-import type { PromptResult } from "../../hooks/useMCPPrompts";
+import type { LLMConfig, MessageAttachment } from "./types";
 
 interface ChatLandingFormProps {
   mcpServerUrl: string;
@@ -30,6 +29,7 @@ interface ChatLandingFormProps {
   prompts: Prompt[];
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
+  attachments: MessageAttachment[];
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -38,6 +38,8 @@ interface ChatLandingFormProps {
   onConfigDialogOpenChange: (open: boolean) => void;
   onPromptSelect: (prompt: Prompt) => void;
   onDeletePromptResult: (index: number) => void;
+  onAttachmentAdd: (file: File) => void;
+  onAttachmentRemove: (index: number) => void;
 }
 
 export function ChatLandingForm({
@@ -52,6 +54,7 @@ export function ChatLandingForm({
   prompts,
   selectedPrompt,
   promptResults,
+  attachments,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -60,7 +63,13 @@ export function ChatLandingForm({
   onConfigDialogOpenChange,
   onPromptSelect,
   onDeletePromptResult,
+  onAttachmentAdd,
+  onAttachmentRemove,
 }: ChatLandingFormProps) {
+  // Can send if there's text, prompt results, or attachments
+  const canSend =
+    inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
+
   return (
     <AuroraBackground>
       <BlurFade className="w-full max-w-4xl mx-auto px-2 sm:px-4">
@@ -87,34 +96,36 @@ export function ChatLandingForm({
                 promptResults={promptResults}
                 onDeletePromptResult={onDeletePromptResult}
               />
-              <Textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => onInputChange(e.target.value)}
+
+              <ChatInput
+                inputValue={inputValue}
+                isConnected={isConnected}
+                isLoading={isLoading}
+                textareaRef={textareaRef}
+                attachments={attachments}
+                placeholder="Ask a question or request an action..."
+                className={cn(
+                  "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
+                  promptResults.length > 0 && "pt-16"
+                )}
+                onInputChange={onInputChange}
                 onKeyDown={onKeyDown}
                 onKeyUp={onKeyUp}
                 onClick={onClick}
-                placeholder={
-                  isConnected
-                    ? "Ask a question or request an action..."
-                    : "Server not connected"
-                }
-                className={cn(
-                  "p-4 min-h-[150px] max-h-[300px] rounded-xl bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
-                  promptResults.length > 0 && "pt-16"
-                )}
-                disabled={!isConnected || isLoading}
+                onAttachmentAdd={onAttachmentAdd}
+                onAttachmentRemove={onAttachmentRemove}
               />
-              <div className="absolute left-0 p-3 bottom-0 w-full flex justify-end items-end">
+
+              <div className="absolute right-0 p-3 bottom-0">
                 <Button
                   type="submit"
                   size="sm"
                   className={cn(
                     "h-10 w-10 rounded-full",
                     isLoading && "animate-spin",
-                    !inputValue.trim() && "bg-zinc-400"
+                    !canSend && "bg-zinc-400"
                   )}
-                  disabled={isLoading || !inputValue.trim() || !isConnected}
+                  disabled={isLoading || !canSend || !isConnected}
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
