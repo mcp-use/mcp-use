@@ -466,6 +466,7 @@ export async function mountMcp(
 
   // Mount the handler for all HTTP methods on both /mcp and /sse
   for (const endpoint of ["/mcp", "/sse"]) {
+    // @ts-expect-error - Hono types don't perfectly match but runtime works correctly
     app.on(["GET", "POST", "DELETE", "HEAD"], endpoint, handleRequest);
   }
 
