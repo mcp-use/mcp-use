@@ -356,13 +356,27 @@ export function processWidgetHtml(
       `href="${baseUrl}/mcp-use/widgets/$1"`
     );
 
-    // Add window.__getFile and window.__mcpPublicUrl to head
+    // Add or replace window.__getFile and window.__mcpPublicUrl injection
     // Use slugified name for URL routing
     const slugifiedName = slugifyWidgetName(widgetName);
-    processedHtml = processedHtml.replace(
-      /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
-    );
+    const newInjectionScript = `<script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`;
+
+    // Check if script already exists and replace it, otherwise inject after <head>
+    const existingScriptRegex =
+      /<script>window\.__getFile\s*=.*?window\.__mcpPublicUrl\s*=.*?<\/script>/;
+    if (existingScriptRegex.test(processedHtml)) {
+      // Replace existing injection with new one
+      processedHtml = processedHtml.replace(
+        existingScriptRegex,
+        newInjectionScript
+      );
+    } else {
+      // Inject new script after <head> tag
+      processedHtml = processedHtml.replace(
+        /<head[^>]*>/i,
+        `<head>\n    ${newInjectionScript}`
+      );
+    }
   }
 
   return processedHtml;

@@ -6,6 +6,7 @@
  */
 
 import type { Hono } from "hono";
+import { extractBaseUrl } from "mcp-use/server";
 import { getWidgetData, storeWidgetData } from "../shared-utils-browser.js";
 
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
@@ -292,10 +293,14 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const effectiveBaseUrl =
+        extractBaseUrl(c.req) || widgetData.devServerBaseUrl;
+
       // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
       let processedHtml = htmlContent;
-      if (widgetData.devServerBaseUrl) {
-        const injectionScript = `<script>window.__mcpPublicUrl = "${widgetData.devServerBaseUrl}/mcp-use/public";</script>`;
+      if (effectiveBaseUrl) {
+        const injectionScript = `<script>window.__mcpPublicUrl = "${effectiveBaseUrl}/mcp-use/public";</script>`;
 
         // Inject after <head> tag if present
         if (processedHtml.includes("<head>")) {
@@ -309,11 +314,27 @@ export function registerMcpAppsRoutes(app: Hono) {
         }
       }
 
+      // Dynamically add server origin to CSP connectDomains for proper external URL support
+      let enhancedCsp = mcpAppsCsp;
+      if (effectiveBaseUrl && mcpAppsCsp) {
+        try {
+          const serverOrigin = new URL(effectiveBaseUrl).origin;
+          enhancedCsp = {
+            ...mcpAppsCsp,
+            connectDomains: Array.from(
+              new Set([...(mcpAppsCsp.connectDomains || []), serverOrigin])
+            ),
+          };
+        } catch (e) {
+          // If URL parsing fails, use original CSP
+        }
+      }
+
       // Return JSON with HTML and metadata for CSP enforcement
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
         html: processedHtml,
-        csp: isPermissive ? undefined : mcpAppsCsp,
+        csp: isPermissive ? undefined : enhancedCsp,
         permissions: mcpAppsPermissions,
         permissive: isPermissive,
         cspMode,
@@ -364,10 +385,14 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const effectiveBaseUrl =
+        extractBaseUrl(c.req) || widgetData.devServerBaseUrl;
+
       // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
       let processedHtml = htmlContent;
-      if (widgetData.devServerBaseUrl) {
-        const injectionScript = `<script>window.__mcpPublicUrl = "${widgetData.devServerBaseUrl}/mcp-use/public";</script>`;
+      if (effectiveBaseUrl) {
+        const injectionScript = `<script>window.__mcpPublicUrl = "${effectiveBaseUrl}/mcp-use/public";</script>`;
 
         // Inject after <head> tag if present
         if (processedHtml.includes("<head>")) {
@@ -381,11 +406,30 @@ export function registerMcpAppsRoutes(app: Hono) {
         }
       }
 
+      // Dynamically add server origin to CSP connectDomains for proper external URL support
+      let enhancedCsp = widgetData.mcpAppsCsp;
+      if (effectiveBaseUrl && widgetData.mcpAppsCsp) {
+        try {
+          const serverOrigin = new URL(effectiveBaseUrl).origin;
+          enhancedCsp = {
+            ...widgetData.mcpAppsCsp,
+            connectDomains: Array.from(
+              new Set([
+                ...(widgetData.mcpAppsCsp.connectDomains || []),
+                serverOrigin,
+              ])
+            ),
+          };
+        } catch (e) {
+          // If URL parsing fails, use original CSP
+        }
+      }
+
       // Return JSON with fresh HTML from Vite
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
         html: processedHtml,
-        csp: isPermissive ? undefined : widgetData.mcpAppsCsp,
+        csp: isPermissive ? undefined : enhancedCsp,
         permissions: widgetData.mcpAppsPermissions,
         mimeTypeValid: true, // Dev mode widgets always valid
       });

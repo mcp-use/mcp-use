@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
-import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { extractBaseUrl, mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
@@ -11,7 +12,6 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
-import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -229,15 +229,21 @@ export function registerInspectorRoutes(
         );
       }
 
-      // Generate the widget HTML using shared function
-      const result = generateWidgetContentHtml(widgetData);
+      // Get dynamic base URL from request, respecting proxy forwarding headers
+      const dynamicBaseUrl = extractBaseUrl(c.req);
+
+      // Generate the widget HTML using shared function with dynamic URL
+      const result = generateWidgetContentHtml(widgetData, dynamicBaseUrl);
 
       if (result.error) {
         return c.html(`<html><body>Error: ${result.error}</body></html>`, 404);
       }
 
-      // Set security headers with widget-specific CSP
-      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
+      // Set security headers with widget-specific CSP (using dynamic URL)
+      const headers = getWidgetSecurityHeaders(
+        widgetData.widgetCSP,
+        dynamicBaseUrl
+      );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
       });

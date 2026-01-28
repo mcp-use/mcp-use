@@ -582,8 +582,13 @@ export function generateWidgetContainerHtml(
 
 /**
  * Generate widget content HTML with injected OpenAI API
+ * @param widgetData - Widget data from storage
+ * @param dynamicBaseUrl - Optional dynamic base URL from request (overrides devServerBaseUrl)
  */
-export function generateWidgetContentHtml(widgetData: WidgetData): {
+export function generateWidgetContentHtml(
+  widgetData: WidgetData,
+  dynamicBaseUrl?: string
+): {
   html: string;
   error?: string;
 } {
@@ -599,6 +604,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     theme,
     playground,
   } = widgetData;
+
+  // Use dynamic URL from request if provided, otherwise fall back to stored URL
+  const effectiveBaseUrl = dynamicBaseUrl || devServerBaseUrl;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
     serverId,
@@ -687,9 +695,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         }
 
         // Inject MCP widget utilities for Image component and file access
-        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
+        window.__mcpPublicUrl = ${effectiveBaseUrl ? `"${effectiveBaseUrl}/mcp-use/public"` : '""'};
         window.__getFile = function(filename) {
-          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
+          return ${effectiveBaseUrl ? `"${effectiveBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
         };
 
         const openaiAPI = {
@@ -1078,10 +1086,17 @@ export function getWidgetSecurityHeaders(
     fontSrc = `'self' data: https: http: ${resourceDomainsStr}`;
   }
 
-  // Build connect-src with widget-specific domains
+  // Build connect-src with widget-specific domains + auto-add MCP server origin
+  const connectDomains = [...(widgetCSP?.connect_domains || [])];
+
+  // Always add the MCP server's origin so widgets can fetch from mcp_url
+  if (devServerOrigin && !connectDomains.includes(devServerOrigin)) {
+    connectDomains.push(devServerOrigin);
+  }
+
   let connectSrc = "'self' https: wss: ws:";
-  if (widgetCSP?.connect_domains && widgetCSP.connect_domains.length > 0) {
-    connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
+  if (connectDomains.length > 0) {
+    connectSrc = `'self' ${connectDomains.join(" ")} https: wss: ws:`;
   }
 
   // Build frame-src for embedding iframes (e.g., Cal.com embed)
