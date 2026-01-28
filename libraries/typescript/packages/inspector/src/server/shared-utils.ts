@@ -944,10 +944,17 @@ export function getWidgetSecurityHeaders(
     fontSrc = `'self' data: https: http: ${resourceDomainsStr}`;
   }
 
-  // Build connect-src with widget-specific domains
+  // Build connect-src with widget-specific domains + auto-add MCP server origin
+  const connectDomains = [...(widgetCSP?.connect_domains || [])];
+
+  // Always add the MCP server's origin so widgets can fetch from mcp_url
+  if (devServerOrigin && !connectDomains.includes(devServerOrigin)) {
+    connectDomains.push(devServerOrigin);
+  }
+
   let connectSrc = "'self' https: wss: ws:";
-  if (widgetCSP?.connect_domains && widgetCSP.connect_domains.length > 0) {
-    connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
+  if (connectDomains.length > 0) {
+    connectSrc = `'self' ${connectDomains.join(" ")} https: wss: ws:`;
   }
 
   // Build frame-src for embedding iframes (e.g., Cal.com embed)
