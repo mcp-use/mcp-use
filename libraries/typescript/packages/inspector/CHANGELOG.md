@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.18.0-canary.2
+
+### Minor Changes
+
+- 09c0300: Add multimodal support (image attachments) to Inspector chat. Users can now upload and send images to vision-capable LLMs (GPT-4o, Claude, Gemini) using the paperclip button. MCP prompts that return images are now properly displayed instead of showing raw JSON.
+
+### Patch Changes
+
+- mcp-use@1.16.0-canary.2
+
 ## 0.18.0-canary.1
 
 ### Patch Changes
