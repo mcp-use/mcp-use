@@ -1,11 +1,9 @@
 import type { Hono } from "hono";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
-import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
   generateWidgetContentHtml,
-  getRequestOrigin,
   getWidgetData,
   getWidgetSecurityHeaders,
   handleChatRequest,
@@ -13,6 +11,7 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
+import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -237,15 +236,8 @@ export function registerInspectorRoutes(
         return c.html(`<html><body>Error: ${result.error}</body></html>`, 404);
       }
 
-      // Extract runtime origin from request headers (proxy-aware)
-      const requestOrigin = getRequestOrigin(c);
-
       // Set security headers with widget-specific CSP
-      const headers = getWidgetSecurityHeaders(
-        widgetData.widgetCSP,
-        undefined,
-        requestOrigin
-      );
+      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
       });
@@ -406,14 +398,10 @@ export function registerInspectorRoutes(
         );
       }
 
-      // Extract runtime origin from request headers (proxy-aware)
-      const requestOrigin = getRequestOrigin(c);
-
       // Set security headers
       const headers = getWidgetSecurityHeaders(
         widgetData.widgetCSP,
-        widgetData.devServerBaseUrl,
-        requestOrigin
+        widgetData.devServerBaseUrl
       );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
