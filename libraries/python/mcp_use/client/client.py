@@ -312,6 +312,7 @@ class MCPClient:
             message_handler=self.message_handler,
             logging_callback=self.logging_callback,
             middleware=self.middleware,
+            verify=self.verify,
             roots=self.roots,
             list_roots_callback=self.list_roots_callback,
         )
