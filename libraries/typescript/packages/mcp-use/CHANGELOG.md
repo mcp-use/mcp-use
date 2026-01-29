@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.16.0-canary.3
+
+### Minor Changes
+
+- 3e2821f: Add dynamic CSP domain injection for widgets: the request origin (from X-Forwarded-Host or Host header) is now automatically added to connectDomains and resourceDomains in tool metadata at tools/list time. This enables widgets to work correctly when accessed through proxies like ngrok, Cloudflare tunnels, or other reverse proxies.
+
+### Patch Changes
+
+- @mcp-use/cli@2.12.4-canary.3
+- @mcp-use/inspector@0.18.0-canary.3
+
 ## 1.16.0-canary.2
 
 ### Patch Changes
