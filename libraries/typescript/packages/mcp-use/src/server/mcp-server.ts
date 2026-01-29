@@ -6,11 +6,17 @@ import {
   type RegisteredResourceTemplate,
   type RegisteredTool,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { normalizeObjectSchema } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
 import { Telemetry } from "../telemetry/index.js";
@@ -29,6 +35,7 @@ import {
   createParamsSchema,
   toolRegistration,
 } from "./tools/index.js";
+import { AppsSdkAdapter, McpAppsAdapter } from "./widgets/adapters/index.js";
 import {
   mountWidgets,
   setupFaviconRoute,
@@ -36,7 +43,6 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
-import { McpAppsAdapter, AppsSdkAdapter } from "./widgets/adapters/index.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -95,7 +101,9 @@ import {
   createHonoProxy,
   getDenoCorsHeaders,
   getEnv,
+  getRequestOriginFromHeaders,
   getServerBaseUrl as getServerBaseUrlHelper,
+  injectDynamicOriginIntoMeta,
   isDeno,
   isProductionMode as isProductionModeHelper,
   logRegisteredItems as logRegisteredItemsHelper,
@@ -2449,6 +2457,88 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     if (sessionId) {
       this.sessionRegisteredRefs.set(sessionId, sessionRefs);
     }
+
+    // Override ListToolsRequestSchema handler to enable lazy metadata evaluation
+    // This injects the dynamic request origin into tool metadata's CSP configuration
+    // at tools/list time rather than at registration time
+    const EMPTY_OBJECT_JSON_SCHEMA = {
+      type: "object" as const,
+      properties: {},
+    };
+
+    newServer.server.setRequestHandler(
+      ListToolsRequestSchema,
+      (_request: unknown, extra?: { requestInfo?: { headers?: unknown } }) => {
+        // Extract request origin from headers (proxy-aware)
+        const requestOrigin = getRequestOriginFromHeaders(
+          extra?.requestInfo?.headers as Parameters<
+            typeof getRequestOriginFromHeaders
+          >[0]
+        );
+
+        // Access SDK's internal _registeredTools
+        const registeredTools = (newServer as any)._registeredTools as Record<
+          string,
+          {
+            title?: string;
+            description?: string;
+            inputSchema?: unknown;
+            outputSchema?: unknown;
+            annotations?: unknown;
+            execution?: unknown;
+            _meta?: Record<string, unknown>;
+            enabled?: boolean;
+          }
+        >;
+
+        return {
+          tools: Object.entries(registeredTools)
+            .filter(([, tool]) => tool.enabled !== false)
+            .map(([name, tool]) => {
+              // Convert Zod schema to JSON Schema (same as SDK does)
+              const inputSchema = (() => {
+                const obj = normalizeObjectSchema(tool.inputSchema as any);
+                return obj
+                  ? toJsonSchemaCompat(obj, {
+                      strictUnions: true,
+                      pipeStrategy: "input",
+                    })
+                  : EMPTY_OBJECT_JSON_SCHEMA;
+              })();
+
+              // Build tool definition with dynamic metadata injection
+              const toolDefinition: Record<string, unknown> = {
+                name,
+                title: tool.title,
+                description: tool.description,
+                inputSchema,
+                annotations: tool.annotations,
+                execution: tool.execution,
+                // Inject dynamic origin into _meta for CSP
+                _meta: injectDynamicOriginIntoMeta(
+                  tool._meta as Parameters<
+                    typeof injectDynamicOriginIntoMeta
+                  >[0],
+                  requestOrigin
+                ),
+              };
+
+              // Handle output schema if present
+              if (tool.outputSchema) {
+                const obj = normalizeObjectSchema(tool.outputSchema as any);
+                if (obj) {
+                  toolDefinition.outputSchema = toJsonSchemaCompat(obj, {
+                    strictUnions: true,
+                    pipeStrategy: "output",
+                  });
+                }
+              }
+
+              return toolDefinition;
+            }),
+        };
+      }
+    );
 
     return newServer;
   }
