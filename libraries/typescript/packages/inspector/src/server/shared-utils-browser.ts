@@ -1088,7 +1088,47 @@ export function transformMcpAppsCspToSnakeCase(mcpAppsCsp?: {
 }
 
 /**
+ * Minimal context interface for extracting request headers
+ */
+interface RequestContext {
+  req: {
+    url: string;
+    header: (name: string) => string | undefined;
+  };
+}
+
+/**
+ * Extract the request origin from headers (proxy-aware)
+ *
+ * Checks X-Forwarded-Host and X-Forwarded-Proto headers first (for proxied requests),
+ * then falls back to Host header and request URL protocol.
+ *
+ * @param c - Request context with url and header access
+ * @returns Request origin (e.g., "https://myapp.com") or null if unavailable
+ */
+export function getRequestOrigin(c: RequestContext): string | null {
+  const proto =
+    c.req.header("X-Forwarded-Proto") ||
+    c.req.header("X-Forwarded-Protocol") ||
+    new URL(c.req.url).protocol.replace(":", "");
+
+  const host =
+    c.req.header("X-Forwarded-Host") ||
+    c.req.header("Host") ||
+    new URL(c.req.url).host;
+
+  if (!host) return null;
+
+  return `${proto}://${host}`;
+}
+
+/**
  * Get security headers for widget content
+ *
+ * @param widgetCSP - Widget-specific CSP configuration
+ * @param devServerBaseUrl - Dev server base URL for HMR
+ * @param requestOrigin - Dynamic request origin from headers (e.g., "https://myapp.com")
+ * @returns Security headers including CSP
  */
 export function getWidgetSecurityHeaders(
   widgetCSP?: {
@@ -1096,7 +1136,8 @@ export function getWidgetSecurityHeaders(
     resource_domains?: string[];
     frame_domains?: string[];
   },
-  devServerBaseUrl?: string
+  devServerBaseUrl?: string,
+  requestOrigin?: string | null
 ): Record<string, string> {
   const trustedCdns = [
     "https://persistent.oaistatic.com",
@@ -1148,9 +1189,16 @@ export function getWidgetSecurityHeaders(
   }
 
   // Build connect-src with widget-specific domains
+  let connectDomains = widgetCSP?.connect_domains || [];
+
+  // Add runtime request origin to allowed domains (dynamic, proxy-aware)
+  if (requestOrigin && !connectDomains.includes(requestOrigin)) {
+    connectDomains = [...connectDomains, requestOrigin];
+  }
+
   let connectSrc = "'self' https: wss: ws:";
-  if (widgetCSP?.connect_domains && widgetCSP.connect_domains.length > 0) {
-    connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
+  if (connectDomains.length > 0) {
+    connectSrc = `'self' ${connectDomains.join(" ")} https: wss: ws:`;
   }
 
   // Build frame-src for embedding iframes (e.g., Cal.com embed)

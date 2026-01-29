@@ -18,17 +18,17 @@ import type {
 } from "../types/index.js";
 import { AppsSdkAdapter, McpAppsAdapter } from "./adapters/index.js";
 import {
+  buildDualProtocolMetadata,
+  generateToolOutput,
+  getBuildIdPart,
+} from "./protocol-helpers.js";
+import {
   applyDefaultProps,
   convertPropsToInputs,
   createWidgetUIResource,
   generateWidgetUri,
   type WidgetServerConfig,
 } from "./widget-helpers.js";
-import {
-  buildDualProtocolMetadata,
-  generateToolOutput,
-  getBuildIdPart,
-} from "./protocol-helpers.js";
 
 /**
  * Minimal server interface for UI resource registration
@@ -70,8 +70,8 @@ export interface UIResourceServer {
 /**
  * Enrich widget definition with server origin in CSP
  *
- * Auto-injects the server's origin into resourceDomains and baseUriDomains
- * to allow loading built assets (React widgets) from the server itself.
+ * Auto-injects the server's origin into connectDomains, resourceDomains, and baseUriDomains
+ * to allow widgets to connect to the server and load built assets (React widgets) from it.
  */
 function enrichDefinitionWithServerOrigin(
   definition: UIResourceDefinition,
@@ -85,6 +85,16 @@ function enrichDefinitionWithServerOrigin(
 
   if (enrichedMetadata.csp) {
     enrichedMetadata.csp = { ...enrichedMetadata.csp };
+
+    // Add server origin to connectDomains (for API calls from widget to server)
+    if (!enrichedMetadata.csp.connectDomains) {
+      enrichedMetadata.csp.connectDomains = [serverOrigin];
+    } else if (!enrichedMetadata.csp.connectDomains.includes(serverOrigin)) {
+      enrichedMetadata.csp.connectDomains = [
+        ...enrichedMetadata.csp.connectDomains,
+        serverOrigin,
+      ];
+    }
 
     // Add server origin to resourceDomains (for loading scripts/styles)
     if (!enrichedMetadata.csp.resourceDomains) {
