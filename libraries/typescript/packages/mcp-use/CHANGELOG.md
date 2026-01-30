@@ -1,5 +1,18 @@
 # mcp-use
 
+## 1.16.0
+
+### Minor Changes
+
+- 32f2113: Add completable() helper for prompt argument autocomplete
+
+### Patch Changes
+
+- Updated dependencies [32f2113]
+- Updated dependencies [32f2113]
+  - @mcp-use/inspector@0.18.0
+  - @mcp-use/cli@2.12.4
+
 ## 1.16.0-canary.3
 
 ### Minor Changes

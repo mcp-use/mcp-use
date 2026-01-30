@@ -1,5 +1,17 @@
 # @mcp-use/inspector
 
+## 0.18.0
+
+### Minor Changes
+
+- 32f2113: Add prompts in Chat: type / to open a prompt, run it, and include its result in the thread before sending (prompts with args are not supported).
+- 32f2113: Add multimodal support (image attachments) to Inspector chat. Users can now upload and send images to vision-capable LLMs (GPT-4o, Claude, Gemini) using the paperclip button. MCP prompts that return images are now properly displayed instead of showing raw JSON.
+
+### Patch Changes
+
+- Updated dependencies [32f2113]
+  - mcp-use@1.16.0
+
 ## 0.18.0-canary.3
 
 ### Patch Changes
