@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.16.1-canary.0
+
+### Patch Changes
+
+- eb8d7a6: fix(widgets): auto-inject server origin into connectDomains CSP
+  - The `enrichDefinitionWithServerOrigin` function now automatically adds the server origin to `connectDomains` in addition to `resourceDomains` and `baseUriDomains`
+  - This allows widgets to make fetch/XHR/WebSocket calls back to the MCP server without explicitly declaring the domain in CSP
+  - Fixes an oversight where the CHANGELOG mentioned connectDomains injection but it was not implemented
+  - @mcp-use/cli@2.12.5-canary.0
+  - @mcp-use/inspector@0.18.1-canary.0
+
 ## 1.16.0
 
 ### Minor Changes
