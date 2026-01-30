@@ -9,6 +9,13 @@ import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { loginCommand } from "./auth.js";
 
+// Gateway domain configuration - single source of truth
+const GATEWAY_DOMAIN = "run.mcp-use.com";
+
+function buildGatewayUrl(slugOrId: string): string {
+  return `https://${slugOrId}.${GATEWAY_DOMAIN}/mcp`;
+}
+
 /**
  * Parse environment variables from .env file
  */
@@ -339,10 +346,10 @@ function getMcpServerUrl(deployment: Deployment): string {
     return `https://${deployment.customDomain}/mcp`;
   } else if (deployment.serverSlug) {
     // Gateway URL via haikunator slug
-    return `https://${deployment.serverSlug}.mcp-use.run/mcp`;
+    return buildGatewayUrl(deployment.serverSlug);
   } else if (deployment.serverId) {
     // Gateway URL via serverId (fallback if slug not available yet)
-    return `https://${deployment.serverId}.mcp-use.run/mcp`;
+    return buildGatewayUrl(deployment.serverId);
   } else {
     // Direct deployment URL (legacy deployments without server)
     return `https://${deployment.domain}/mcp`;
