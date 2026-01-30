@@ -1,16 +1,10 @@
-import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import type { McpServer } from "mcp-use/react";
-import { useCallback, useRef, useState } from "react";
-import type { PromptResult } from "../../hooks/useMCPPrompts";
-import {
-  convertMessagesToLangChain,
-  convertPromptResultsToMessages,
-} from "./conversion";
-import type { LLMConfig, Message, MessageAttachment } from "./types";
-import { fileToAttachment, isValidTotalSize } from "./utils";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
+import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
+import { useCallback, useRef, useState } from "react";
+import type { LLMConfig, Message } from "./types";
 
 interface UseChatMessagesClientSideProps {
   connection: MCPConnection;
@@ -27,44 +21,25 @@ export function useChatMessagesClientSide({
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const agentRef = useRef<any>(null);
   const llmRef = useRef<any>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string, promptResults: PromptResult[]) => {
-      // Can send if there's text, prompt results, or attachments
-      const hasContent =
-        userInput.trim() || promptResults.length > 0 || attachments.length > 0;
-      if (!hasContent || !llmConfig || !isConnected) {
+    async (userInput: string) => {
+      if (!userInput.trim() || !llmConfig || !isConnected) {
         return;
       }
 
-      const promptResultsMessages =
-        convertPromptResultsToMessages(promptResults);
-
-      // Create user message (always needed for externalHistory)
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         role: "user",
         content: userInput.trim(),
         timestamp: Date.now(),
-        attachments: attachments.length > 0 ? [...attachments] : undefined,
       };
 
-      // Only add user message to UI if there's actual user input or user-uploaded attachments
-      // Don't show it when only using prompt results (they create their own messages)
-      const userMessages: Message[] = [...promptResultsMessages];
-      if (userInput.trim() || attachments.length > 0) {
-        userMessages.push(userMessage);
-      }
-
-      setMessages((prev) => [...prev, ...userMessages]);
+      setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
-
-      // Clear attachments after sending
-      setAttachments([]);
 
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
@@ -150,7 +125,7 @@ export function useChatMessagesClientSide({
           agentRef.current = new MCPAgent({
             llm: llmRef.current.instance,
             client: (connection.client ?? undefined) as any,
-            memoryEnabled: false, // external history always used
+            memoryEnabled: true,
             systemPrompt:
               "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
           });
@@ -163,18 +138,11 @@ export function useChatMessagesClientSide({
         }
 
         // Stream events from agent
-        // Include the new user message with attachments in the external history
-        const externalHistory = convertMessagesToLangChain([
-          ...messages,
-          ...promptResultsMessages,
-          userMessage, // Include the new message with attachments
-        ]);
-
         for await (const event of agentRef.current.streamEvents(
           userInput,
           10, // maxSteps
           false, // manageConnector - don't manage, already connected
-          externalHistory, // externalHistory - keep history external to include prompt results AND new message
+          undefined, // externalHistory - agent maintains its own with memoryEnabled
           undefined, // outputSchema
           abortControllerRef.current?.signal // pass abort signal to enable immediate cancellation
         )) {
@@ -489,7 +457,7 @@ export function useChatMessagesClientSide({
         abortControllerRef.current = null;
       }
     },
-    [connection, llmConfig, isConnected, messages, readResource, attachments]
+    [connection, llmConfig, isConnected, messages, readResource]
   );
 
   const clearMessages = useCallback(() => {
@@ -505,47 +473,11 @@ export function useChatMessagesClientSide({
     }
   }, []);
 
-  const addAttachment = useCallback(async (file: File) => {
-    try {
-      const attachment = await fileToAttachment(file);
-
-      setAttachments((prev) => {
-        const newAttachments = [...prev, attachment];
-
-        // Check total size
-        if (!isValidTotalSize(newAttachments)) {
-          alert("Total attachment size exceeds 20MB limit");
-          return prev;
-        }
-
-        return newAttachments;
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Failed to add attachment");
-      }
-    }
-  }, []);
-
-  const removeAttachment = useCallback((index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const clearAttachments = useCallback(() => {
-    setAttachments([]);
-  }, []);
-
   return {
     messages,
     isLoading,
-    attachments,
     sendMessage,
     clearMessages,
     stop,
-    addAttachment,
-    removeAttachment,
-    clearAttachments,
   };
 }

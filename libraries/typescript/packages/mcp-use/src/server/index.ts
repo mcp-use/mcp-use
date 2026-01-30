@@ -47,13 +47,6 @@ export {
   type WidgetResponseConfig,
 } from "./utils/response-helpers.js";
 
-// Completion utilities for prompt arguments
-export {
-  completable,
-  type Completable,
-  type CompletionContext,
-} from "./utils/completion-helpers.js";
-
 // OAuth utilities for authentication and authorization
 export {
   getAuth,

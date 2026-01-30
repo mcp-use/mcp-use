@@ -1,37 +1,5 @@
 # @mcp-use/cli
 
-## 2.12.4-canary.3
-
-### Patch Changes
-
-- Updated dependencies [3e2821f]
-  - mcp-use@1.16.0-canary.3
-  - @mcp-use/inspector@0.18.0-canary.3
-
-## 2.12.4-canary.2
-
-### Patch Changes
-
-- Updated dependencies [09c0300]
-  - @mcp-use/inspector@0.18.0-canary.2
-  - mcp-use@1.16.0-canary.2
-
-## 2.12.4-canary.1
-
-### Patch Changes
-
-- Updated dependencies [9b9f371]
-  - mcp-use@1.16.0-canary.1
-  - @mcp-use/inspector@0.18.0-canary.1
-
-## 2.12.4-canary.0
-
-### Patch Changes
-
-- Updated dependencies [144ad6a]
-  - @mcp-use/inspector@0.18.0-canary.0
-  - mcp-use@1.15.4-canary.0
-
 ## 2.12.3
 
 ### Patch Changes

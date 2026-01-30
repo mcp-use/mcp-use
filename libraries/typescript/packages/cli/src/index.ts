@@ -1612,11 +1612,7 @@ program
       process.on("SIGINT", cleanup);
       process.on("SIGTERM", cleanup);
 
-      serverProc.on("exit", async (code) => {
-        // Server exited - cleanup tunnel before exiting CLI
-        if (!cleanupInProgress) {
-          await cleanup();
-        }
+      serverProc.on("exit", (code) => {
         process.exit(code || 0);
       });
     } catch (error) {

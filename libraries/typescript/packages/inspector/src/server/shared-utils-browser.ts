@@ -28,18 +28,9 @@ interface AuthConfig {
   [key: string]: unknown;
 }
 
-interface MessageAttachment {
-  type: "image" | "file";
-  data: string; // base64 encoded
-  mimeType: string;
-  name?: string;
-  size?: number;
-}
-
 interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
-  attachments?: MessageAttachment[];
 }
 
 interface ToolCall {
@@ -197,36 +188,6 @@ export async function* handleChatRequestStream(requestBody: {
     throw new Error("No user message found");
   }
 
-  // Convert message to LangChain format (supporting multimodal)
-  let messageInput: any;
-  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
-    // Multimodal message with attachments
-    const { HumanMessage } = await import("@langchain/core/messages");
-    const content: Array<any> = [
-      {
-        type: "text",
-        text: lastUserMessage.content || "[no content]",
-      },
-    ];
-
-    // Add image attachments
-    for (const attachment of lastUserMessage.attachments) {
-      if (attachment.type === "image") {
-        content.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${attachment.mimeType};base64,${attachment.data}`,
-          },
-        });
-      }
-    }
-
-    messageInput = new HumanMessage({ content });
-  } else {
-    // Regular text message
-    messageInput = lastUserMessage.content;
-  }
-
   try {
     // Generate a unique message ID
     const messageId = `msg-${Date.now()}`;
@@ -235,7 +196,7 @@ export async function* handleChatRequestStream(requestBody: {
     yield `data: ${JSON.stringify({ type: "message", id: messageId, role: "assistant" })}\n\n`;
 
     // Use streamEvents to get real-time updates
-    for await (const event of agent.streamEvents(messageInput)) {
+    for await (const event of agent.streamEvents(lastUserMessage.content)) {
       // Emit text content as it streams
       if (event.event === "on_chat_model_stream" && event.data?.chunk?.text) {
         const text = event.data.chunk.text;
@@ -424,38 +385,8 @@ export async function handleChatRequest(requestBody: {
     throw new Error("No user message found");
   }
 
-  // Convert message to LangChain format (supporting multimodal)
-  let messageInput: any;
-  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
-    // Multimodal message with attachments
-    const { HumanMessage } = await import("@langchain/core/messages");
-    const content: Array<any> = [
-      {
-        type: "text",
-        text: lastUserMessage.content || "[no content]",
-      },
-    ];
-
-    // Add image attachments
-    for (const attachment of lastUserMessage.attachments) {
-      if (attachment.type === "image") {
-        content.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${attachment.mimeType};base64,${attachment.data}`,
-          },
-        });
-      }
-    }
-
-    messageInput = new HumanMessage({ content });
-  } else {
-    // Regular text message
-    messageInput = lastUserMessage.content;
-  }
-
   // Get response from agent
-  const response = await agent.run(messageInput);
+  const response = await agent.run(lastUserMessage.content);
 
   // Clean up
   await client.closeAllSessions();

@@ -1,4 +1,4 @@
-import { MCPServer, object, text, completable } from "mcp-use/server";
+import { MCPServer, object, text } from "mcp-use/server";
 import { z } from "zod";
 
 // Create MCP server instance
@@ -79,20 +79,11 @@ server.prompt(
     name: "review-code",
     description: "Review code for best practices and potential issues",
     schema: z.object({
-      language: completable(z.string(), [
-        "python",
-        "javascript",
-        "typescript",
-        "java",
-        "cpp",
-        "go",
-        "rust",
-      ]).describe("The programming language"),
       code: z.string().describe("The code to review"),
     }),
   },
-  async ({ language, code }) => {
-    return text(`Reviewing ${language} code:\n\n${code}`);
+  async ({ code }) => {
+    return text(`Please review this code:\n\n${code}`);
   }
 );
 

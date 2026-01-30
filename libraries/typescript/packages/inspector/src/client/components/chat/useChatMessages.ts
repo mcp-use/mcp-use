@@ -1,13 +1,6 @@
-import { useCallback, useRef, useState } from "react";
-import type { PromptResult } from "../../hooks/useMCPPrompts";
-import { convertPromptResultsToMessages } from "./conversion";
-import type {
-  AuthConfig,
-  LLMConfig,
-  Message,
-  MessageAttachment,
-} from "./types";
-import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
+import type { AuthConfig, LLMConfig, Message } from "./types";
+import { useCallback, useState, useRef } from "react";
+import { hashString } from "./utils";
 
 interface UseChatMessagesProps {
   mcpServerUrl: string;
@@ -24,41 +17,23 @@ export function useChatMessages({
 }: UseChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string, promptResults: PromptResult[]) => {
-      // Can send if there's text, prompt results, or attachments
-      const hasContent =
-        userInput.trim() || promptResults.length > 0 || attachments.length > 0;
-      if (!hasContent || !llmConfig || !isConnected) {
+    async (userInput: string) => {
+      if (!userInput.trim() || !llmConfig || !isConnected) {
         return;
       }
 
-      const promptResultsMessages =
-        convertPromptResultsToMessages(promptResults);
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        role: "user",
+        content: userInput.trim(),
+        timestamp: Date.now(),
+      };
 
-      // Only create a user message if there's actual user input or user-uploaded attachments
-      // Don't create one when only using prompt results (they create their own messages)
-      const userMessages: Message[] = [...promptResultsMessages];
-
-      if (userInput.trim() || attachments.length > 0) {
-        const userMessage: Message = {
-          id: `user-${Date.now()}`,
-          role: "user",
-          content: userInput.trim(),
-          timestamp: Date.now(),
-          attachments: attachments.length > 0 ? [...attachments] : undefined,
-        };
-        userMessages.push(userMessage);
-      }
-
-      setMessages((prev) => [...prev, ...userMessages]);
+      setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
-
-      // Clear attachments after sending
-      setAttachments([]);
 
       // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
@@ -102,10 +77,9 @@ export function useChatMessages({
             mcpServerUrl,
             llmConfig,
             authConfig: authConfigWithTokens,
-            messages: [...messages, ...userMessages].map((m) => ({
+            messages: [...messages, userMessage].map((m) => ({
               role: m.role,
               content: m.content,
-              attachments: m.attachments,
             })),
           }),
         });
@@ -361,7 +335,7 @@ export function useChatMessages({
         abortControllerRef.current = null;
       }
     },
-    [llmConfig, isConnected, mcpServerUrl, messages, authConfig, attachments]
+    [llmConfig, isConnected, mcpServerUrl, messages, authConfig]
   );
 
   const clearMessages = useCallback(() => {
@@ -374,47 +348,11 @@ export function useChatMessages({
     }
   }, []);
 
-  const addAttachment = useCallback(async (file: File) => {
-    try {
-      const attachment = await fileToAttachment(file);
-
-      setAttachments((prev) => {
-        const newAttachments = [...prev, attachment];
-
-        // Check total size
-        if (!isValidTotalSize(newAttachments)) {
-          alert("Total attachment size exceeds 20MB limit");
-          return prev;
-        }
-
-        return newAttachments;
-      });
-    } catch (error) {
-      if (error instanceof Error) {
-        alert(error.message);
-      } else {
-        alert("Failed to add attachment");
-      }
-    }
-  }, []);
-
-  const removeAttachment = useCallback((index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const clearAttachments = useCallback(() => {
-    setAttachments([]);
-  }, []);
-
   return {
     messages,
     isLoading,
-    attachments,
     sendMessage,
     clearMessages,
     stop,
-    addAttachment,
-    removeAttachment,
-    clearAttachments,
   };
 }
