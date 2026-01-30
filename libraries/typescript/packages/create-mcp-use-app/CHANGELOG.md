@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.2
+
+### Patch Changes
+
+- c2b183c: fix: removed .ico white bg form templates icons
+
 ## 0.12.2-canary.0
 
 ### Patch Changes
