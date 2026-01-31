@@ -4,7 +4,7 @@ description: "Test and debug MCP Apps and ChatGPT Apps SDK widgets with dual-pro
 icon: "bug"
 ---
 
-The MCP Inspector provides comprehensive support for debugging widgets built with **both** MCP Apps (SEP-1865) and ChatGPT Apps SDK protocols. Test your tools, render widgets, switch protocols, and verify interactions all within the inspector interface.
+The mcp-use Inspector provides comprehensive support for debugging widgets built with **both** MCP Apps (SEP-1865) and ChatGPT Apps SDK protocols. Test your tools, render widgets, switch protocols, and verify interactions all within the inspector interface.
 
 <Info>
 **Dual-Protocol Support**: The inspector supports both widget protocols:
@@ -732,6 +732,38 @@ When a tool returns a widget reference:
 - Looks for `openai/outputTemplate` in tool metadata
 - Fetches widget resource from MCP server
 - Renders in dedicated widget container
+
+### Widget Lifecycle Testing
+
+Widgets render **before** tool execution completes, allowing them to show loading states. The mcp-use Inspector properly emulates this lifecycle:
+
+1. **Tool Called** → Widget iframe created immediately
+2. **Widget Renders** → `isPending=true`, shows loading state
+3. **Tool Completes** → Widget receives result via `window.openai` updates
+4. **Widget Updates** → `isPending=false`, shows data
+
+**Testing isPending Transitions:**
+
+To verify your widget handles the pending state correctly:
+
+1. Use a tool that takes >2 seconds to complete
+2. Widget should show loading state immediately (not after tool completes)
+3. Open browser DevTools console
+4. Look for logs showing `isPending: true` then `isPending: false`
+5. Verify widget transitions from loading UI to data display
+
+**Example Console Output:**
+
+```
+[MyWidget] isPending: true, props: {}           // Immediate render
+[MyWidget] isPending: false, props: {city: ...} // After tool completes
+```
+
+<Tip>
+Use the **Tools tab** to test widget lifecycle - execute a slow tool and watch the widget render in pending state before the tool completes.
+</Tip>
+
+See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete details on `isPending` behavior and implementation patterns.
 
 ### Dev Mode for Widgets
 
