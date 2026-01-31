@@ -183,18 +183,10 @@ export function ToolResultRenderer({
     }
 
     if (resourceUri && readResource) {
-      console.log(
-        "[ToolResultRenderer] Fetching resource for widget:",
-        resourceUri,
-        "protocol:",
-        activeProtocol
-      );
-
       fetchedUriRef.current = resourceUri;
 
       readResource(resourceUri)
         .then((data) => {
-          console.log("[ToolResultRenderer] Resource fetched:", data);
           // Extract the first resource from the contents array
           if (
             data?.contents &&
@@ -202,11 +194,6 @@ export function ToolResultRenderer({
             data.contents.length > 0
           ) {
             setResourceData(data.contents[0]);
-          } else {
-            console.warn(
-              "[ToolResultRenderer] No contents in fetched resource:",
-              data
-            );
           }
         })
         .catch((error) => {
