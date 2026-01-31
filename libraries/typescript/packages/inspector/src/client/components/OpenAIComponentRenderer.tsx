@@ -325,6 +325,8 @@ function OpenAIComponentRendererBase({
         insets: { top: number; bottom: number; left: number; right: number };
       };
       userAgent?: any;
+      toolOutput?: any;
+      toolResponseMetadata?: any;
     }) => {
       if (iframeRef.current?.contentWindow) {
         try {
@@ -361,6 +363,14 @@ function OpenAIComponentRendererBase({
             }
             if (updates.userAgent !== undefined) {
               iframeWindow.openai.userAgent = updates.userAgent;
+            }
+            // Update toolOutput and metadata (for Issue #930 fix)
+            if (updates.toolOutput !== undefined) {
+              iframeWindow.openai.toolOutput = updates.toolOutput;
+            }
+            if (updates.toolResponseMetadata !== undefined) {
+              iframeWindow.openai.toolResponseMetadata =
+                updates.toolResponseMetadata;
             }
 
             // Dispatch the set_globals event to notify React components
@@ -407,6 +417,24 @@ function OpenAIComponentRendererBase({
     },
     [onUpdateGlobals]
   );
+
+  // Update widget when tool result changes (Issue #930 fix)
+  // This allows widgets to transition from isPending=true to isPending=false
+  useEffect(() => {
+    if (!toolResult || !isReady || !iframeRef.current?.contentWindow) return;
+
+    // Extract the data we need to send to the widget
+    const structuredContent = toolResult?.structuredContent || toolResult;
+    const metadata = toolResult?._meta || null;
+
+    // Update iframe globals (wait for next frame to ensure window.openai is ready)
+    requestAnimationFrame(() => {
+      updateIframeGlobals({
+        toolOutput: structuredContent,
+        toolResponseMetadata: metadata,
+      });
+    });
+  }, [toolResult, isReady, updateIframeGlobals]);
 
   // Handle display mode changes with native Fullscreen API
   const handleDisplayModeChange = useCallback(

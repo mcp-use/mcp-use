@@ -161,3 +161,21 @@ export function getResourceUriForProtocol(
   }
   return null;
 }
+
+/**
+ * Check if a tool has widget support that can be pre-rendered
+ * (detected from metadata before tool execution)
+ *
+ * Returns true for MCP Apps and ChatGPT Apps (detected from metadata)
+ * Returns false for MCP-UI (requires result to detect)
+ *
+ * @param toolMeta - Tool metadata from tool definition (_meta field)
+ * @returns True if the widget can be pre-rendered before tool execution completes
+ */
+export function canPreRenderWidget(toolMeta?: Record<string, any>): boolean {
+  if (!toolMeta) return false;
+
+  const protocol = detectWidgetProtocol(toolMeta, undefined);
+  // mcp-ui requires result to detect, so it cannot be pre-rendered
+  return protocol !== null && protocol !== "mcp-ui";
+}
