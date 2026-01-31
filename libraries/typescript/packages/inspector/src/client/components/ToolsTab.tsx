@@ -460,6 +460,64 @@ export function ToolsTab({
         );
       }
 
+      // Extract tool metadata BEFORE executing to detect widget tools
+      const toolMeta =
+        (selectedTool as any)?._meta || (selectedTool as any)?.metadata;
+
+      // Check tool metadata for widget resources (MCP Apps or ChatGPT Apps)
+      const mcpAppsResourceUri = toolMeta?.ui?.resourceUri;
+      const openaiOutputTemplate = toolMeta?.["openai/outputTemplate"];
+      const widgetResourceUri = mcpAppsResourceUri || openaiOutputTemplate;
+
+      // Pre-fetch widget resource if this is a widget tool (Issue #930 fix)
+      let preFetchedResource: any = null;
+      if (widgetResourceUri && typeof widgetResourceUri === "string") {
+        // Create result entry with loading state BEFORE executing tool
+        const pendingResultEntry: ToolResult = {
+          toolName: selectedTool.name,
+          args: parsedArgs,
+          result: null, // No result yet
+          timestamp: startTime,
+          duration: 0,
+          toolMeta,
+          appsSdkResource: {
+            uri: widgetResourceUri,
+            resourceData: null,
+            isLoading: true,
+          },
+        };
+
+        // For widget components, replace results instead of appending
+        setResults([pendingResultEntry]);
+
+        // Pre-fetch the resource BEFORE executing the tool
+        try {
+          preFetchedResource = await readResource(widgetResourceUri);
+
+          // Update result entry with fetched resource (but no tool result yet)
+          setResults((prev) =>
+            prev.map((r, idx) =>
+              idx === 0
+                ? {
+                    ...r,
+                    appsSdkResource: {
+                      uri: widgetResourceUri,
+                      resourceData: preFetchedResource,
+                      isLoading: false,
+                    },
+                  }
+                : r
+            )
+          );
+
+          // Small delay to ensure widget iframe loads and shows pending state
+          // before we update it with the result (prevents race condition for fast tools)
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        } catch (error) {
+          // Continue with tool execution even if resource fetch fails
+        }
+      }
+
       // Use a 10 minute timeout for tool calls, as tools may trigger sampling/elicitation
       // which can take a long time (waiting for LLM responses or human input)
       const result = await callTool(selectedTool.name, parsedArgs, {
@@ -484,15 +542,8 @@ export function ToolsTab({
           // Silently fail - telemetry should not break the application
         });
 
-      // Extract tool metadata from tool definition
-      const toolMeta =
-        (selectedTool as any)?._meta || (selectedTool as any)?.metadata;
-
-      // Check tool metadata for widget resources (MCP Apps or ChatGPT Apps)
-      const mcpAppsResourceUri = toolMeta?.ui?.resourceUri;
-      const openaiOutputTemplate = toolMeta?.["openai/outputTemplate"];
-      const widgetResourceUri = mcpAppsResourceUri || openaiOutputTemplate;
-
+      // Widget resource was already fetched before tool execution (if applicable)
+      // Now we just need to update the result with tool output
       let appsSdkResource:
         | {
             uri: string;
@@ -503,68 +554,66 @@ export function ToolsTab({
         | undefined;
 
       if (widgetResourceUri && typeof widgetResourceUri === "string") {
-        // Create the result entry with loading state first
-        const resultEntry: ToolResult = {
-          toolName: selectedTool.name,
-          args: toolArgs,
-          result,
-          timestamp: startTime,
-          duration,
-          toolMeta,
-          appsSdkResource: {
-            uri: widgetResourceUri,
-            resourceData: null,
-            isLoading: true,
-          },
-        };
+        // Use pre-fetched resource if available
+        let resourceData = preFetchedResource;
 
-        // For widget components, replace results instead of appending
-        setResults([resultEntry]);
-
-        // Fetch the resource in the background
-        try {
-          const resourceData = await readResource(widgetResourceUri);
-
-          // Extract structured content from result
-          let structuredContent = null;
-          if (result?.structuredContent) {
-            structuredContent = result.structuredContent;
-          } else if (Array.isArray(result) && result[0]) {
-            const firstResult = result[0];
-            if (firstResult.output?.value?.structuredContent) {
-              structuredContent = firstResult.output.value.structuredContent;
-            } else if (firstResult.structuredContent) {
-              structuredContent = firstResult.structuredContent;
-            } else if (firstResult.output?.value) {
-              structuredContent = firstResult.output.value;
-            }
+        // If pre-fetch failed or didn't happen, fetch now as fallback
+        if (!resourceData) {
+          try {
+            resourceData = await readResource(widgetResourceUri);
+          } catch (fetchError) {
+            resourceData = null;
           }
-
-          // Fallback to entire result
-          if (!structuredContent) {
-            structuredContent = result;
-          }
-
-          appsSdkResource = {
-            uri: widgetResourceUri,
-            resourceData: {
-              ...resourceData,
-              structuredContent,
-            },
-            isLoading: false,
-          };
-        } catch (error) {
-          appsSdkResource = {
-            uri: widgetResourceUri,
-            resourceData: null,
-            isLoading: false,
-            error: error instanceof Error ? error.message : String(error),
-          };
         }
 
-        // Update the result with the fetched resource
+        // Extract structured content from result
+        let structuredContent = null;
+        if (result?.structuredContent) {
+          structuredContent = result.structuredContent;
+        } else if (Array.isArray(result) && result[0]) {
+          const firstResult = result[0];
+          if (firstResult.output?.value?.structuredContent) {
+            structuredContent = firstResult.output.value.structuredContent;
+          } else if (firstResult.structuredContent) {
+            structuredContent = firstResult.structuredContent;
+          } else if (firstResult.output?.value) {
+            structuredContent = firstResult.output.value;
+          }
+        }
+
+        // Fallback to entire result
+        if (!structuredContent) {
+          structuredContent = result;
+        }
+
+        appsSdkResource = resourceData
+          ? {
+              uri: widgetResourceUri,
+              resourceData: {
+                ...resourceData,
+                structuredContent,
+              },
+              isLoading: false,
+            }
+          : {
+              uri: widgetResourceUri,
+              resourceData: null,
+              isLoading: false,
+              error: "Failed to fetch widget resource",
+            };
+
+        // Update the result with the tool output
         setResults((prev) =>
-          prev.map((r, idx) => (idx === 0 ? { ...r, appsSdkResource } : r))
+          prev.map((r, idx) =>
+            idx === 0
+              ? {
+                  ...r,
+                  result,
+                  duration,
+                  appsSdkResource,
+                }
+              : r
+          )
         );
       } else {
         // Normal result without Apps SDK resource - keep history

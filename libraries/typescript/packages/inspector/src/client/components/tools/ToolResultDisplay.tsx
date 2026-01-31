@@ -401,9 +401,11 @@ export function ToolResultDisplay({
     () => result?.args,
     [result?.timestamp, selectedIndex]
   );
+  // Include duration in dependencies to detect when result is updated
+  // (timestamp stays same, but duration changes from 0 to actual value when tool completes)
   const memoizedResult = useMemo(
     () => result?.result,
-    [result?.timestamp, selectedIndex]
+    [result?.timestamp, result?.duration, selectedIndex]
   );
 
   // Memoize readResource to ensure stable reference
@@ -824,6 +826,7 @@ export function ToolResultDisplay({
                   return (
                     <div className="flex-1">
                       <OpenAIComponentRenderer
+                        key={`openai-${result.timestamp}`}
                         componentUrl={appsSdk.uri}
                         toolName={result.toolName}
                         toolArgs={memoizedArgs}
@@ -869,6 +872,7 @@ export function ToolResultDisplay({
                       </div>
 
                       <MCPAppsRenderer
+                        key={`mcp-apps-${result.timestamp}`}
                         serverId={serverId}
                         toolCallId={`tool-${result.timestamp}`}
                         toolName={result.toolName}

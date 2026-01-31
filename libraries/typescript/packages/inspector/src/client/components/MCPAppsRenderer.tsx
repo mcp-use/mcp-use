@@ -510,20 +510,26 @@ export function MCPAppsRenderer({
   }, [hostContext, isReady]);
 
   // Send tool input when ready
+  // Also resend when toolCallId changes (indicates re-execution)
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || !isReady || !toolInput) return;
 
     bridge.sendToolInput({ arguments: toolInput });
-  }, [isReady, toolInput]);
+  }, [isReady, toolInput, toolCallId]);
 
   // Send tool output when ready
+  // Allow sending null to reset widget to pending state (Issue #930)
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || !isReady || !toolOutput) return;
+    if (!bridge || !isReady) return;
 
-    bridge.sendToolResult(toolOutput as CallToolResult);
-  }, [isReady, toolOutput]);
+    // Send toolOutput even if null (allows widget to show pending state on re-execution)
+    if (toolOutput) {
+      bridge.sendToolResult(toolOutput as CallToolResult);
+    }
+    // Note: When toolOutput is null, widget stays in pending state (isPending=true)
+  }, [isReady, toolOutput, toolCallId]);
 
   // Handle CSP violations
   const handleSandboxMessage = useCallback(

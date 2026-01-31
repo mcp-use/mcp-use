@@ -44,7 +44,12 @@ export function ToolResultRenderer({
   );
 
   // Parse result if it's a JSON string (memoized to prevent re-renders)
+  // Allow null/undefined results (tool hasn't completed yet)
   const parsedResult = useMemo(() => {
+    if (!result) {
+      return null;
+    }
+
     if (typeof result === "string") {
       try {
         return JSON.parse(result);
@@ -251,7 +256,8 @@ export function ToolResultRenderer({
   }
 
   // Render MCP Apps component (Priority 1)
-  if (isMcpAppsTool && resourceData && serverId && readResource) {
+  // Render immediately if we have resourceUri from metadata, even if resourceData is still loading
+  if (isMcpAppsTool && resourceUri && serverId && readResource) {
     return (
       <MCPAppsRenderer
         serverId={serverId}
@@ -260,7 +266,7 @@ export function ToolResultRenderer({
         toolInput={widgetProps || toolArgs}
         toolOutput={parsedResult}
         toolMetadata={toolMeta}
-        resourceUri={resourceData.uri}
+        resourceUri={resourceData?.uri || resourceUri}
         readResource={readResource}
         className="my-4"
         noWrapper={true}
@@ -270,15 +276,16 @@ export function ToolResultRenderer({
   }
 
   // Render OpenAI Apps SDK component (Priority 2)
+  // Render immediately if we have resourceUri from metadata, even if resourceData is still loading
   if (
     (isAppsSdkTool || hasAppsSdkComponent) &&
-    resourceData &&
+    resourceUri &&
     serverId &&
     readResource
   ) {
     return (
       <OpenAIComponentRenderer
-        componentUrl={resourceData.uri}
+        componentUrl={resourceData?.uri || resourceUri}
         toolName={toolName}
         toolArgs={toolArgs}
         toolResult={parsedResult}
@@ -291,11 +298,8 @@ export function ToolResultRenderer({
     );
   }
 
-  // Show loading state for MCP Apps and Apps SDK tools
-  if (
-    (isMcpAppsTool || isAppsSdkTool || hasAppsSdkComponent) &&
-    !resourceData
-  ) {
+  // Show loading state only if we don't have enough info to render
+  if ((isMcpAppsTool || isAppsSdkTool || hasAppsSdkComponent) && !resourceUri) {
     return (
       <div className="flex items-center justify-center w-full h-[200px] rounded border">
         <Spinner className="size-5" />

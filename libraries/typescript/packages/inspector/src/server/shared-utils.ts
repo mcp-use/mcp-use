@@ -832,27 +832,32 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 
         // Emulate OpenAI behavior: initially toolOutput and toolResponseMetadata are null,
         // then they get populated when the "tool execution completes"
-        setTimeout(() => {
-          try {
-            if (window.openai) {
-              window.openai.toolOutput = ${safeToolOutput};
-              window.openai.toolResponseMetadata = ${safeToolResponseMetadata};
-              
-              // Dispatch set_globals event to notify React components
-              const globalsEvent = new CustomEvent('openai:set_globals', {
-                detail: {
-                  globals: {
-                    toolOutput: window.openai.toolOutput,
-                    toolResponseMetadata: window.openai.toolResponseMetadata,
+        // Only run this if toolOutput is provided (i.e., tool has already completed)
+        // For pending tools (toolOutput is null), this will be updated later via updateIframeGlobals
+        const hasToolOutput = ${safeToolOutput} !== null;
+        if (hasToolOutput) {
+          setTimeout(() => {
+            try {
+              if (window.openai) {
+                window.openai.toolOutput = ${safeToolOutput};
+                window.openai.toolResponseMetadata = ${safeToolResponseMetadata};
+                
+                // Dispatch set_globals event to notify React components
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolOutput: window.openai.toolOutput,
+                      toolResponseMetadata: window.openai.toolResponseMetadata,
+                    }
                   }
-                }
-              });
-              window.dispatchEvent(globalsEvent);
+                });
+                window.dispatchEvent(globalsEvent);
+              }
+            } catch (err) {
+              console.error('[Inspector] Failed to populate toolOutput:', err);
             }
-          } catch (err) {
-            console.error('[Inspector] Failed to populate toolOutput:', err);
-          }
-        }, 100); // Small delay to emulate tool execution time
+          }, 100); // Small delay to emulate tool execution time
+        }
       })();
     </script>
   `;
