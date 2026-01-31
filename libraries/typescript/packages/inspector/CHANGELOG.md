@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.18.2-canary.0
+
+### Patch Changes
+
+- fea26ff: fix: ensure pending state is emulated for widgets, reflecting chatgpt behaviour
+- 37af1bf: fix(inspector): adds logic to detect when server= contains a URL that's not already connected and automatically redirects to use autoConnect= instead.
+- Updated dependencies [fea26ff]
+  - mcp-use@1.16.2-canary.0
+
 ## 0.18.1
 
 ### Patch Changes
