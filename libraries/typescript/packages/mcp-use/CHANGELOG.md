@@ -1,5 +1,15 @@
 # mcp-use
 
+## 1.16.2
+
+### Patch Changes
+
+- 53ae49d: fix: ensure pending state is emulated for widgets, reflecting chatgpt behaviour
+- Updated dependencies [53ae49d]
+- Updated dependencies [53ae49d]
+  - @mcp-use/inspector@0.18.2
+  - @mcp-use/cli@2.12.6
+
 ## 1.16.2-canary.0
 
 ### Patch Changes
