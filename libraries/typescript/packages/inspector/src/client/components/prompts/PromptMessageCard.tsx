@@ -189,7 +189,12 @@ export function PromptMessageCard({ message, index }: PromptMessageCardProps) {
       </div>
 
       {/* Content */}
-      <div className="px-4 py-3">{renderContent()}</div>
+      <div
+        className="px-4 py-3"
+        data-testid={`prompt-message-content-${index}`}
+      >
+        {renderContent()}
+      </div>
     </div>
   );
 }

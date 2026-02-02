@@ -1,0 +1,52 @@
+diff --git a/dist/cjs/server/zod-compat.js b/dist/cjs/server/zod-compat.js
+index 2e75c80c64d05fdf813ddd158cbefc48831d5b12..1a0065e02ba52691c8522598fcf38b2f21c2d4e3 100644
+--- a/dist/cjs/server/zod-compat.js
++++ b/dist/cjs/server/zod-compat.js
+@@ -61,8 +61,8 @@ function objectFromShape(shape) {
+ // --- Unified parsing ---
+ function safeParse(schema, data) {
+     if (isZ4Schema(schema)) {
+-        // Mini exposes top-level safeParse
+-        const result = z4mini.safeParse(schema, data);
++        // Zod 4 schemas have safeParse as a method, not a top-level function
++        const result = schema.safeParse(data);
+         return result;
+     }
+     const v3Schema = schema;
+@@ -71,8 +71,8 @@ function safeParse(schema, data) {
+ }
+ async function safeParseAsync(schema, data) {
+     if (isZ4Schema(schema)) {
+-        // Mini exposes top-level safeParseAsync
+-        const result = await z4mini.safeParseAsync(schema, data);
++        // Zod 4 schemas have safeParseAsync as a method, not a top-level function
++        const result = await schema.safeParseAsync(data);
+         return result;
+     }
+     const v3Schema = schema;
+diff --git a/dist/esm/server/zod-compat.js b/dist/esm/server/zod-compat.js
+index be30a223061ff55d4462e5e43193b95c6f51d7ac..ef91904e94f4b07cc3b6c0e1346b5088335aa965 100644
+--- a/dist/esm/server/zod-compat.js
++++ b/dist/esm/server/zod-compat.js
+@@ -26,8 +26,8 @@ export function objectFromShape(shape) {
+ // --- Unified parsing ---
+ export function safeParse(schema, data) {
+     if (isZ4Schema(schema)) {
+-        // Mini exposes top-level safeParse
+-        const result = z4mini.safeParse(schema, data);
++        // Zod 4 schemas have safeParse as a method, not a top-level function
++        const result = schema.safeParse(data);
+         return result;
+     }
+     const v3Schema = schema;
+@@ -36,8 +36,8 @@ export function safeParse(schema, data) {
+ }
+ export async function safeParseAsync(schema, data) {
+     if (isZ4Schema(schema)) {
+-        // Mini exposes top-level safeParseAsync
+-        const result = await z4mini.safeParseAsync(schema, data);
++        // Zod 4 schemas have safeParseAsync as a method, not a top-level function
++        const result = await schema.safeParseAsync(data);
+         return result;
+     }
+     const v3Schema = schema;

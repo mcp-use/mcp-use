@@ -27,6 +27,7 @@ export function SamplingRequestToast({
       <div className="flex gap-2">
         {/* View Details button */}
         <button
+          data-testid="sampling-toast-view-details"
           className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
           onClick={(e) => {
             e.stopPropagation();
@@ -37,6 +38,7 @@ export function SamplingRequestToast({
         </button>
         {/* Approve button */}
         <button
+          data-testid="sampling-toast-approve"
           className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
           onClick={(e) => {
             e.stopPropagation();
@@ -47,6 +49,7 @@ export function SamplingRequestToast({
         </button>
         {/* Deny button */}
         <button
+          data-testid="sampling-toast-deny"
           className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
           onClick={(e) => {
             e.stopPropagation();

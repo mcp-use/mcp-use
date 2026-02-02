@@ -35,9 +35,15 @@ export function ServerCapabilitiesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[80vh] overflow-y-auto"
+        data-testid="server-info-modal"
+      >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle
+            className="flex items-center gap-2"
+            data-testid="server-info-modal-title"
+          >
             Server Information
           </DialogTitle>
         </DialogHeader>
@@ -61,7 +67,10 @@ export function ServerCapabilitiesModal({
                   <span className="text-sm font-medium min-w-[80px]">
                     Name:
                   </span>
-                  <span className="text-xs font-mono bg-muted rounded-md p-1 px-2">
+                  <span
+                    className="text-xs font-mono bg-muted rounded-md p-1 px-2"
+                    data-testid="server-info-name"
+                  >
                     {connection.serverInfo?.name || connection.name}
                   </span>
                 </div>
@@ -120,10 +129,12 @@ export function ServerCapabilitiesModal({
               Capabilities
             </h3>
 
-            <JSONDisplay
-              data={capabilities}
-              filename={`capabilities-${connection.name}-${Date.now()}.json`}
-            />
+            <div data-testid="server-info-capabilities">
+              <JSONDisplay
+                data={capabilities}
+                filename={`capabilities-${connection.name}-${Date.now()}.json`}
+              />
+            </div>
           </div>
         </div>
       </DialogContent>

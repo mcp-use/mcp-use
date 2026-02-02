@@ -248,7 +248,7 @@ export function ConfigurationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" data-testid="chat-config-dialog">
         <DialogHeader>
           <DialogTitle>LLM Provider Configuration</DialogTitle>
           <DialogDescription>
@@ -310,6 +310,7 @@ export function ConfigurationDialog({
                 onChange={(e) => onApiKeyChange(e.target.value)}
                 placeholder="Enter your API key"
                 className="pr-10"
+                data-testid="chat-config-api-key-input"
               />
               <Button
                 type="button"
@@ -352,6 +353,7 @@ export function ConfigurationDialog({
                       role="combobox"
                       aria-expanded={comboboxOpen}
                       className="w-full justify-between rounded-md"
+                      data-testid="chat-config-model-select"
                     >
                       {tempModel
                         ? models.find((model) => model.id === tempModel)
@@ -403,6 +405,7 @@ export function ConfigurationDialog({
                   value={tempModel}
                   onChange={(e) => onModelChange(e.target.value)}
                   placeholder="Enter model name manually"
+                  data-testid="chat-config-model-input"
                 />
               )}
             </div>
@@ -420,6 +423,7 @@ export function ConfigurationDialog({
                 !tempApiKey.trim() || (!!tempApiKey.trim() && !tempModel.trim())
               }
               className={showClearButton ? "ml-auto" : ""}
+              data-testid="chat-config-save-button"
             >
               <Key className="h-4 w-4 mr-2" />
               Save Configuration

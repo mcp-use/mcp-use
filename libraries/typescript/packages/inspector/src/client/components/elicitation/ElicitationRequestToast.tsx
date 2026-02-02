@@ -33,6 +33,7 @@ export function ElicitationRequestToast({
       <div className="flex gap-2 flex-wrap">
         {/* View Details button */}
         <button
+          data-testid="elicitation-toast-view-details"
           className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
           onClick={(e) => {
             e.stopPropagation();
@@ -44,6 +45,7 @@ export function ElicitationRequestToast({
         {/* Mode-specific action button */}
         {mode === "url" && onOpenUrl && (
           <button
+            data-testid="elicitation-toast-open-url"
             className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
             onClick={(e) => {
               e.stopPropagation();
@@ -55,6 +57,7 @@ export function ElicitationRequestToast({
         )}
         {/* Cancel button */}
         <button
+          data-testid="elicitation-toast-cancel"
           className="px-3 py-1.5 text-xs font-medium rounded-md hover:bg-accent hover:text-accent-foreground"
           onClick={(e) => {
             e.stopPropagation();

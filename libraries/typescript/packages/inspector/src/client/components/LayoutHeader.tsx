@@ -337,6 +337,7 @@ export function LayoutHeader({
                     <TabsTrigger
                       key={tab.id}
                       value={tab.id}
+                      data-testid={`tab-${tab.id}`}
                       icon={tab.icon}
                       showDot={showDot}
                       className={cn(
@@ -399,6 +400,7 @@ export function LayoutHeader({
                     return (
                       <TabsTrigger
                         value={tab.id}
+                        data-testid={`tab-${tab.id}`}
                         icon={tab.icon}
                         showDot={showDot}
                         className={cn(
@@ -623,6 +625,7 @@ export function LayoutHeader({
                   variant="ghost"
                   className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full px-1 -mx-3 flex gap-1"
                   onClick={onCommandPaletteOpen}
+                  data-testid="command-palette-trigger-button"
                 >
                   <Command className="size-4" />
                   <span className="text-base font-mono hidden sm:inline">

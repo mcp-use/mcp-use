@@ -143,16 +143,17 @@ export function toolRegistration<
   }
 
   // Determine input schema - prefer schema over inputs
-  let inputSchema: Record<string, z.ZodSchema>;
+  let inputSchema: z.ZodObject<any> | Record<string, z.ZodSchema>;
 
   if (toolDefinition.schema) {
-    // Use Zod schema if provided
-    inputSchema = this.convertZodSchemaToParams(toolDefinition.schema);
+    // Pass the full Zod schema directly to the SDK
+    // The SDK's normalizeObjectSchema() can handle full Zod object schemas
+    inputSchema = toolDefinition.schema;
   } else if (toolDefinition.inputs && toolDefinition.inputs.length > 0) {
     // Fall back to inputs array for backward compatibility
     inputSchema = this.createParamsSchema(toolDefinition.inputs);
   } else {
-    // No schema defined - empty schema
+    // No schema defined - pass empty object which SDK converts to z.object({})
     inputSchema = {};
   }
 

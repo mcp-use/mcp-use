@@ -379,7 +379,7 @@ export function ResourceResultDisplay({
             } else {
               // JSON mode for MCP Apps
               return (
-                <div className="px-4 pt-4">
+                <div className="px-4 pt-4" data-testid="resource-result-json">
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-apps-${Date.now()}.json`}
@@ -415,7 +415,7 @@ export function ResourceResultDisplay({
             } else {
               // JSON mode for Apps SDK resources
               return (
-                <div className="px-4 pt-4">
+                <div className="px-4 pt-4" data-testid="resource-result-json">
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
@@ -475,7 +475,7 @@ export function ResourceResultDisplay({
             } else {
               // JSON mode for MCP UI resources
               return (
-                <div className="px-4 pt-4">
+                <div className="px-4 pt-4" data-testid="resource-result-json">
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-ui-${Date.now()}.json`}
@@ -487,7 +487,7 @@ export function ResourceResultDisplay({
 
           // Default: show JSON for non-MCP UI resources
           return (
-            <div className="px-4 pt-4">
+            <div className="px-4 pt-4" data-testid="resource-result-json">
               <JSONDisplay
                 data={result.result}
                 filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}

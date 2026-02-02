@@ -51,6 +51,7 @@ export function RpcPanel({ serverId, className }: RpcPanelProps) {
       className={`flex flex-col border-t dark:border-zinc-700 ${className || ""}`}
     >
       <div
+        data-testid="rpc-panel-toggle"
         className="group flex items-center justify-between p-3 shrink-0 cursor-pointer hover:bg-muted/50 transition-colors"
         onClick={(e) => {
           e.preventDefault();
@@ -74,6 +75,7 @@ export function RpcPanel({ serverId, className }: RpcPanelProps) {
             <h3 className="text-sm font-medium">RPC Messages</h3>
             {rpcMessageCount > 0 && (
               <Badge
+                data-testid="rpc-message-count"
                 variant="secondary"
                 className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
               >

@@ -10,7 +10,12 @@ interface JSONDisplayProps {
   className?: string;
 }
 
-export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
+export function JSONDisplay({
+  data,
+  filename,
+  className,
+  ...props
+}: JSONDisplayProps) {
   const { prismStyle } = usePrismTheme();
   const jsonInfo = analyzeJSON(data);
 
@@ -20,7 +25,7 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
 
   if (jsonInfo.isLarge) {
     return (
-      <div className={className}>
+      <div className={className} {...props}>
         <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1">
@@ -74,7 +79,7 @@ export function JSONDisplay({ data, filename, className }: JSONDisplayProps) {
   }
 
   return (
-    <div className={className}>
+    <div className={className} {...props}>
       <SyntaxHighlighter
         language="json"
         style={prismStyle}

@@ -31,6 +31,7 @@ export function ToolsList({
         <ListItem
           key={tool.name}
           id={`tool-${tool.name}`}
+          data-testid={`tool-item-${tool.name}`}
           isSelected={selectedTool?.name === tool.name}
           isFocused={focusedIndex === index}
           icon={<Wrench className="h-4 w-4" />}

@@ -243,6 +243,7 @@ export function MCPAppsDebugControls({
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button
+                data-testid="debugger-device-button"
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -253,7 +254,10 @@ export function MCPAppsDebugControls({
           </TooltipTrigger>
           <TooltipContent>Device: {playground.deviceType}</TooltipContent>
         </Tooltip>
-        <DialogContent className="sm:max-w-[300px]">
+        <DialogContent
+          className="sm:max-w-[300px]"
+          data-testid="debugger-device-dialog"
+        >
           <DialogHeader>
             <DialogTitle>Device Type</DialogTitle>
           </DialogHeader>
@@ -267,6 +271,7 @@ export function MCPAppsDebugControls({
               return (
                 <Button
                   key={device.value}
+                  data-testid={`debugger-device-option-${device.value}`}
                   variant={
                     playground.deviceType === device.value
                       ? "default"
@@ -304,6 +309,7 @@ export function MCPAppsDebugControls({
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button
+                data-testid="debugger-locale-button"
                 variant="outline"
                 size="sm"
                 className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -314,12 +320,18 @@ export function MCPAppsDebugControls({
           </TooltipTrigger>
           <TooltipContent>Locale</TooltipContent>
         </Tooltip>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent
+          className="sm:max-w-[400px]"
+          data-testid="debugger-locale-dialog"
+        >
           <DialogHeader>
             <DialogTitle>Select Locale</DialogTitle>
           </DialogHeader>
           <Command>
-            <CommandInput placeholder="Search locales..." />
+            <CommandInput
+              placeholder="Search locales..."
+              data-testid="debugger-locale-search"
+            />
             <CommandList>
               <CommandEmpty>No locale found.</CommandEmpty>
               <CommandGroup>
@@ -327,6 +339,7 @@ export function MCPAppsDebugControls({
                   <CommandItem
                     key={locale.value}
                     value={locale.value}
+                    data-testid={`debugger-locale-option-${locale.value}`}
                     onSelect={() => {
                       updatePlaygroundSettings({ locale: locale.value });
                       // Update Apps SDK locale
@@ -352,6 +365,7 @@ export function MCPAppsDebugControls({
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
                 <Button
+                  data-testid="debugger-timezone-button"
                   variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -362,12 +376,18 @@ export function MCPAppsDebugControls({
             </TooltipTrigger>
             <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
           </Tooltip>
-          <DialogContent className="sm:max-w-[400px]">
+          <DialogContent
+            className="sm:max-w-[400px]"
+            data-testid="debugger-timezone-dialog"
+          >
             <DialogHeader>
               <DialogTitle>Select Timezone</DialogTitle>
             </DialogHeader>
             <Command>
-              <CommandInput placeholder="Search timezones..." />
+              <CommandInput
+                placeholder="Search timezones..."
+                data-testid="debugger-timezone-search"
+              />
               <CommandList>
                 <CommandEmpty>No timezone found.</CommandEmpty>
                 <CommandGroup>
@@ -375,6 +395,7 @@ export function MCPAppsDebugControls({
                     <CommandItem
                       key={tz.value}
                       value={tz.value}
+                      data-testid={`debugger-timezone-option-${tz.value.replace(/\//g, "-")}`}
                       onSelect={() => {
                         updatePlaygroundSettings({ timeZone: tz.value });
                         setTimezoneDialogOpen(false);
@@ -397,6 +418,7 @@ export function MCPAppsDebugControls({
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
                 <Button
+                  data-testid="debugger-csp-button"
                   variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -414,12 +436,16 @@ export function MCPAppsDebugControls({
               {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
             </TooltipContent>
           </Tooltip>
-          <DialogContent className="sm:max-w-[300px]">
+          <DialogContent
+            className="sm:max-w-[300px]"
+            data-testid="debugger-csp-dialog"
+          >
             <DialogHeader>
               <DialogTitle>CSP Mode</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
               <Button
+                data-testid="debugger-csp-option-permissive"
                 variant={
                   playground.cspMode === "permissive" ? "default" : "outline"
                 }
@@ -436,6 +462,7 @@ export function MCPAppsDebugControls({
                 </div>
               </Button>
               <Button
+                data-testid="debugger-csp-option-widget-declared"
                 variant={
                   playground.cspMode === "widget-declared"
                     ? "default"
@@ -462,6 +489,7 @@ export function MCPAppsDebugControls({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
+            data-testid="debugger-touch-button"
             variant="outline"
             size="sm"
             className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
@@ -506,6 +534,7 @@ export function MCPAppsDebugControls({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
+            data-testid="debugger-hover-button"
             variant="outline"
             size="sm"
             className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
@@ -550,6 +579,7 @@ export function MCPAppsDebugControls({
       <Popover>
         <PopoverTrigger asChild>
           <Button
+            data-testid="debugger-safe-area-button"
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -557,7 +587,10 @@ export function MCPAppsDebugControls({
             <SquareDashedMousePointer className="size-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-3">
+        <PopoverContent
+          className="w-64 p-3"
+          data-testid="debugger-safe-area-dialog"
+        >
           <div className="space-y-2">
             <label className="text-xs font-medium">Safe Area Insets</label>
             <SafeAreaInsetsEditor

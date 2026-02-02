@@ -115,25 +115,6 @@ export function ChatHeader({
             </TooltipContent>
           </Tooltip>
         )}
-        {/* Desktop: Show ConfigurationDialog button when no config */}
-        {!llmConfig && (
-          <div className="hidden sm:block">
-            <ConfigurationDialog
-              open={configDialogOpen}
-              onOpenChange={onConfigDialogOpenChange}
-              tempProvider={tempProvider}
-              tempModel={tempModel}
-              tempApiKey={tempApiKey}
-              onProviderChange={onProviderChange}
-              onModelChange={onModelChange}
-              onApiKeyChange={onApiKeyChange}
-              onSave={onSaveConfig}
-              onClear={onClearConfig}
-              showClearButton={!!llmConfig}
-              buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
-            />
-          </div>
-        )}
         {/* Always render the dialog for when it's opened */}
         <ConfigurationDialog
           open={configDialogOpen}

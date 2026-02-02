@@ -1159,9 +1159,12 @@ export function McpClientProvider({
         }
 
         // Merge the new options with the existing ones
-        const updatedOptions: McpServerOptions = {
+        const updatedOptions: McpServerOptions & { _updateVersion?: number } = {
           ...currentConfig.options,
           ...options,
+          // Add a version counter to force React to remount the wrapper
+          _updateVersion:
+            ((currentConfig.options as any)._updateVersion || 0) + 1,
         };
 
         // Disconnect the old server
@@ -1215,7 +1218,7 @@ export function McpClientProvider({
       {/* Render a wrapper for each configured server */}
       {serverConfigs.map((config) => (
         <McpServerWrapper
-          key={config.id}
+          key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
           id={config.id}
           options={config.options}
           defaultProxyConfig={defaultProxyConfig}

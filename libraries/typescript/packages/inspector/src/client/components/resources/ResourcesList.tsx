@@ -75,6 +75,7 @@ export function ResourcesList({
           <ListItem
             key={resource.uri}
             id={`resource-${resource.uri}`}
+            data-testid={`resource-item-${resource.name}`}
             isSelected={selectedResource?.uri === resource.uri}
             isFocused={focusedIndex === index}
             icon={icon}
