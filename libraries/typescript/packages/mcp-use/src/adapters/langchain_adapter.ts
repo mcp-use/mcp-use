@@ -86,7 +86,7 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     };
 
     const resourceName = sanitizeName(
-      mcpResource.name || `resource_${mcpResource.uri}`
+      `resource_${mcpResource.name || mcpResource.uri}`
     );
     const resourceUri = mcpResource.uri;
 
@@ -158,8 +158,9 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
           : z.object({}).optional();
     }
 
+    const promptName = `prompt_${mcpPrompt.name}`;
     const tool = new DynamicStructuredTool({
-      name: mcpPrompt.name,
+      name: promptName,
       description: mcpPrompt.description || "",
       schema: argsSchema,
       func: async (input: Record<string, any>): Promise<string> => {
