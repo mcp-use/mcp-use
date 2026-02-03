@@ -1628,7 +1628,7 @@ program
 // Authentication commands
 program
   .command("login")
-  .description("Login to mcp-use cloud")
+  .description("Login to Manufact cloud")
   .action(async () => {
     try {
       await loginCommand();
@@ -1644,7 +1644,7 @@ program
 
 program
   .command("logout")
-  .description("Logout from mcp-use cloud")
+  .description("Logout from Manufact cloud")
   .action(async () => {
     await logoutCommand();
   });
@@ -1659,7 +1659,7 @@ program
 // Deployment command
 program
   .command("deploy")
-  .description("Deploy MCP server from GitHub to mcp-use cloud")
+  .description("Deploy MCP server from GitHub to Manufact cloud")
   .option("--open", "Open deployment in browser after successful deploy")
   .option("--name <name>", "Custom deployment name")
   .option("--port <port>", "Server port", "3000")
