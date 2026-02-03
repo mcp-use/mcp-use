@@ -53,16 +53,20 @@ async function startCallbackServer(
       tokenResolver = res;
     });
 
-    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      if (req.url?.startsWith("/callback")) {
-        const url = new URL(req.url, `http://localhost:${port}`);
-        const token = url.searchParams.get("token");
-        const state = url.searchParams.get("state");
+    const server = createServer(
+      {
+        maxHeaderSize: 65536, // 64KB - handle very long JWT tokens in URL (increased from default 8192)
+      },
+      (req: IncomingMessage, res: ServerResponse) => {
+        if (req.url?.startsWith("/callback")) {
+          const url = new URL(req.url, `http://localhost:${port}`);
+          const token = url.searchParams.get("token");
+          const state = url.searchParams.get("state");
 
-        // Validate state parameter for CSRF protection
-        if (state !== expectedState) {
-          res.writeHead(400, { "Content-Type": "text/html" });
-          res.end(`
+          // Validate state parameter for CSRF protection
+          if (state !== expectedState) {
+            res.writeHead(400, { "Content-Type": "text/html" });
+            res.end(`
               <!DOCTYPE html>
               <html>
                 <head>
@@ -100,13 +104,13 @@ async function startCallbackServer(
                 </body>
               </html>
             `);
-          return;
-        }
+            return;
+          }
 
-        if (token && tokenResolver) {
-          // Send success response
-          res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(`
+          if (token && tokenResolver) {
+            // Send success response
+            res.writeHead(200, { "Content-Type": "text/html" });
+            res.end(`
               <!DOCTYPE html>
               <html>
                 <head>
@@ -205,10 +209,10 @@ async function startCallbackServer(
                 </body>
               </html>
             `);
-          tokenResolver(token);
-        } else {
-          res.writeHead(400, { "Content-Type": "text/html" });
-          res.end(`
+            tokenResolver(token);
+          } else {
+            res.writeHead(400, { "Content-Type": "text/html" });
+            res.end(`
               <!DOCTYPE html>
               <html>
                 <head>
@@ -284,9 +288,10 @@ async function startCallbackServer(
                 </body>
               </html>
             `);
+          }
         }
       }
-    });
+    );
 
     server.listen(port, () => {
       resolve({ server, token: tokenPromise });
@@ -316,7 +321,7 @@ export async function loginCommand(options?: {
       return;
     }
 
-    console.log(chalk.cyan.bold("🔐 Logging in to mcp-use cloud...\n"));
+    console.log(chalk.cyan.bold("🔐 Logging in to Manufact cloud...\n"));
 
     // Generate state for CSRF protection
     const state = crypto.randomBytes(32).toString("hex");

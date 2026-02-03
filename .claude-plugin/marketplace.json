@@ -1,0 +1,41 @@
+{
+  "name": "mcp-use",
+  "owner": {
+    "name": "mcp-use",
+    "email": "team@mcp-use.com"
+  },
+  "metadata": {
+    "description": "Official skills for mcp-use framework - build production-ready MCP servers and ChatGPT apps",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "all-skills",
+      "description": "Complete collection of mcp-use skills including MCP server building and ChatGPT app development",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/mcp-builder",
+        "./skills/chatgpt-app-builder"
+      ]
+    },
+    {
+      "name": "mcp-builder",
+      "description": "Build Model Context Protocol (MCP) servers with mcp-use framework. Includes quick start, tools, resources, prompts, testing, and deployment guidance.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/mcp-builder"
+      ]
+    },
+    {
+      "name": "chatgpt-app-builder",
+      "description": "Build custom ChatGPT apps and GPTs with actions, function calling, and best practices. Includes GPT configuration, OpenAPI schemas, authentication, and deployment guidance.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/chatgpt-app-builder"
+      ]
+    }
+  ]
+}

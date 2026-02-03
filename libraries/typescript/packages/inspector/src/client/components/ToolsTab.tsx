@@ -53,7 +53,6 @@ interface ToolsTabProps {
   readResource: (uri: string) => Promise<any>;
   serverId: string;
   isConnected: boolean;
-  refreshTools?: () => Promise<void>;
 }
 
 const SAVED_REQUESTS_KEY = "mcp-inspector-saved-requests";
@@ -78,10 +77,8 @@ export function ToolsTab({
   readResource,
   serverId,
   isConnected,
-  refreshTools,
 }: ToolsTabProps & { ref?: React.RefObject<ToolsTabRef | null> }) {
   // State
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
   const [selectedSavedRequest, setSelectedSavedRequest] =
     useState<SavedRequest | null>(null);
@@ -261,16 +258,6 @@ export function ToolsTab({
       setIsSearchExpanded(false);
     }
   }, [searchQuery]);
-
-  const handleRefresh = useCallback(async () => {
-    if (!refreshTools) return;
-    setIsRefreshing(true);
-    try {
-      await refreshTools();
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refreshTools]);
 
   // Collapse search when switching away from tools tab
   useEffect(() => {
@@ -540,12 +527,6 @@ export function ToolsTab({
       });
       const duration = Date.now() - startTime;
 
-      // Update toolMeta with result's _meta if present (for dynamic metadata from tool execution)
-      // This is important for HMR where tool results may have updated metadata
-      const updatedToolMeta = result?._meta
-        ? { ...toolMeta, ...result._meta }
-        : toolMeta;
-
       // Track successful tool execution
       const telemetry = Telemetry.getInstance();
       telemetry
@@ -630,7 +611,6 @@ export function ToolsTab({
                   result,
                   duration,
                   appsSdkResource,
-                  toolMeta: updatedToolMeta, // Include updated tool metadata for dual-protocol widget detection
                 }
               : r
           )
@@ -644,7 +624,7 @@ export function ToolsTab({
             result,
             timestamp: startTime,
             duration,
-            toolMeta: updatedToolMeta,
+            toolMeta,
           },
           ...prev,
         ]);
@@ -886,8 +866,6 @@ export function ToolsTab({
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
-                  onRefresh={refreshTools ? handleRefresh : undefined}
-                  isRefreshing={isRefreshing}
                 />
                 {activeTab === "tools" ? (
                   <ToolsList
@@ -995,8 +973,6 @@ export function ToolsTab({
                 searchInputRef={
                   searchInputRef as React.RefObject<HTMLInputElement>
                 }
-                onRefresh={refreshTools ? handleRefresh : undefined}
-                isRefreshing={isRefreshing}
               />
 
               {activeTab === "tools" ? (

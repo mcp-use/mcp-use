@@ -6,6 +6,111 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.16.2" description="January 2026">
+  ## Widget Behavior Fix
+  Patch release fixing widget pending state emulation.
+
+- **Fix**: Widget pending state now correctly emulated to reflect ChatGPT behavior
+- **Update**: Updated @mcp-use/inspector to v0.18.2
+- **Update**: Updated @mcp-use/cli to v2.12.6
+</Update>
+
+<Update label="v1.16.1" description="January 2026">
+  ## Widget CSP Enhancement
+  Patch release fixing widget Content Security Policy configuration.
+
+- **Fix**: Auto-inject server origin into `connectDomains` CSP
+- **Enhancement**: Widgets can now make fetch/XHR/WebSocket calls back to the MCP server without explicitly declaring the domain
+- **Fix**: Corrected oversight where CHANGELOG mentioned connectDomains injection but it was not implemented
+</Update>
+
+<Update label="v1.16.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.16.0&title=Prompt%20Autocomplete%20%26%20Dynamic%20CSP&date=2026-01&lang=typescript" alt="Release 1.16.0" />
+  </Frame>
+  ## Prompt Autocomplete & Dynamic CSP
+  Minor release introducing prompt argument autocomplete and dynamic CSP domain injection for widgets.
+
+### New Features
+
+- **New**: `completable()` helper for prompt argument autocomplete
+- **New**: Dynamic CSP domain injection for widgets at tools/list time
+
+### Enhancements
+
+- **Enhancement**: Request origin (from X-Forwarded-Host or Host header) now automatically added to `connectDomains` and `resourceDomains` in tool metadata
+- **Enhancement**: Widgets now work correctly when accessed through proxies like ngrok, Cloudflare tunnels, or other reverse proxies
+- **Enhancement**: Server origin automatically enriched in widget CSP metadata
+
+### Dependencies
+
+- **Update**: Updated @mcp-use/inspector to v0.18.0
+- **Update**: Updated @mcp-use/cli to v2.12.4
+</Update>
+
+<Update label="v1.15.3" description="January 2026">
+  ## HMR & Theme Fixes
+  Patch release fixing Hot Module Reloading edge cases and theme functionality.
+
+- **Fix**: HMR not working when server starts with 0 tools initially
+- **Fix**: Dark mode can now be enabled through theme URL parameter
+- **Update**: Updated @mcp-use/inspector to v0.17.3
+- **Update**: Updated @mcp-use/cli to v2.12.3
+</Update>
+
+<Update label="v1.15.2" description="January 2026">
+  ## HMR File Watcher Fix
+  Patch release fixing file watcher resource exhaustion in containerized environments.
+
+- **Fix**: HMR file watcher exhausting inotify limits by properly ignoring node_modules
+- **Fix**: Prevented ENOSPC errors in containerized environments caused by watching files inside `node_modules/` despite ignore patterns
+- **Update**: Updated @mcp-use/inspector to v0.17.2
+- **Update**: Updated @mcp-use/cli to v2.12.2
+</Update>
+
+<Update label="v1.15.1" description="January 2026">
+  ## CLI Deployment Enhancement
+  Patch release with CLI deployment improvements.
+
+- **Enhancement**: CLI `getMcpServerUrl()` function for improved deployment URL handling
+- **Update**: Updated @mcp-use/cli to v2.12.1
+- **Update**: Updated @mcp-use/inspector to v0.17.1
+</Update>
+
+<Update label="v1.15.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.15.0&title=MCP%20Apps%20Support%20%26%20Landing%20Pages&date=2026-01&lang=typescript" alt="Release 1.15.0" />
+  </Frame>
+  ## MCP Apps Support & Landing Pages
+  Major release introducing MCP Apps support with dual-protocol widget rendering and HTML landing pages for MCP server endpoints.
+
+### MCP Apps Support
+
+- **New**: Dual-protocol support enabling widgets to work with both MCP Apps and ChatGPT Apps SDK
+- **New**: `MCPAppsRenderer` component for advanced debugging and visualization
+- **New**: `MCPAppsDebugControls` component for widget debugging
+- **New**: Sandboxed iframe support with console logging and safe area insets for isolated widget rendering
+- **New**: Widget adapters (MCP Apps, Apps SDK) with protocol helpers for seamless cross-protocol compatibility
+- **New**: MCP Apps documentation and example server
+
+### Landing Pages
+
+- **New**: `generateLandingPage()` function that generates styled HTML landing pages for browser GET requests
+- **New**: Connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, and ChatGPT on landing pages
+- **Enhancement**: Browser host normalization for server connections in CLI
+
+### Bug Fixes & Security
+
+- **Fix**: MCP server landing now shows the external URL instead of the internal URL
+- **Fix**: Zod JIT compilation to prevent CSP violations in sandboxed environments
+- **Security**: Fixed vulnerabilities in dependencies
+
+### Dependencies
+
+- **Update**: Updated @mcp-use/inspector to v0.17.0
+- **Update**: Updated @mcp-use/cli to v2.12.0
+</Update>
+
 <Update label="v1.14.2" description="January 2026">
   ## Widget Rendering & Session Management Improvements
   Patch release with widget rendering fixes, session timeout adjustments, and CLI deployment enhancements.
