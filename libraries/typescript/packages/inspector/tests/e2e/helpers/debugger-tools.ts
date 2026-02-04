@@ -1,7 +1,9 @@
 import { expect, type FrameLocator, type Page } from "@playwright/test";
 
-const WIDGET_LOAD_TIMEOUT = 8000;
-const TOGGLE_UPDATE_TIMEOUT = 5000;
+// CI environments (Docker/xvfb) need longer timeouts due to slower rendering
+const CI_MULTIPLIER = process.env.CI ? 3 : 1;
+const WIDGET_LOAD_TIMEOUT = 8000 * CI_MULTIPLIER;
+const TOGGLE_UPDATE_TIMEOUT = 5000 * CI_MULTIPLIER;
 
 /**
  * Execute get-weather-delayed tool and wait for execution to start.
@@ -25,7 +27,7 @@ export async function executeWeatherTool(
  */
 export async function waitForWeatherWidgetAppsSdk(page: Page): Promise<void> {
   await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
-    timeout: 2000,
+    timeout: 2000 * CI_MULTIPLIER,
   });
   await page.getByTestId("tool-result-view-chatgpt-app").click();
   const appsSdkFrame = getAppsSdkWeatherFrame(page);
@@ -136,9 +138,10 @@ export async function changeTimezone(
  */
 export async function toggleTouch(page: Page, enabled: boolean): Promise<void> {
   const btn = page.getByTestId("debugger-touch-button");
-  const hasActiveClass = await btn.evaluate((el) =>
-    (el as HTMLElement).className.includes("border-blue")
-  );
+  const hasActiveClass = await btn.evaluate((el) => {
+    const classAttr = (el as any).className;
+    return typeof classAttr === "string" && classAttr.includes("border-blue");
+  });
   if (hasActiveClass !== enabled) {
     await btn.click();
   }
@@ -149,9 +152,10 @@ export async function toggleTouch(page: Page, enabled: boolean): Promise<void> {
  */
 export async function toggleHover(page: Page, enabled: boolean): Promise<void> {
   const btn = page.getByTestId("debugger-hover-button");
-  const hasActiveClass = await btn.evaluate((el) =>
-    (el as HTMLElement).className.includes("border-blue")
-  );
+  const hasActiveClass = await btn.evaluate((el) => {
+    const classAttr = (el as any).className;
+    return typeof classAttr === "string" && classAttr.includes("border-blue");
+  });
   if (hasActiveClass !== enabled) {
     await btn.click();
   }
@@ -248,4 +252,242 @@ export async function verifyWidgetDebugInfo(
       )
     ).toBeVisible({ timeout: TOGGLE_UPDATE_TIMEOUT });
   }
+}
+
+/**
+ * Navigate to Resources tab and select the weather-display resource.
+ */
+export async function navigateToResourcesAndSelectWeather(
+  page: Page
+): Promise<void> {
+  await page
+    .getByRole("tab", { name: /Resources/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Resources" })).toBeVisible();
+  await page.getByTestId("resource-item-weather-display").click();
+  // Wait for widget iframe to appear
+  await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
+    timeout: 5000,
+  });
+}
+
+/**
+ * Get weather-display resource widget frame (works for both MCP Apps and Apps SDK).
+ */
+export function getWeatherResourceFrame(page: Page): FrameLocator {
+  // Try MCP Apps first (nested iframe)
+  const mcpAppsOuter = page.frameLocator('iframe[title*="weather-display"]');
+  const innerFrames = mcpAppsOuter.frameLocator("iframe");
+  // If no inner frame, it's Apps SDK (single iframe)
+  return innerFrames;
+}
+
+/**
+ * Open props configuration dialog via the debugger controls.
+ */
+export async function openPropsDialog(page: Page): Promise<void> {
+  // Click props button to open popover
+  await page.getByTestId("debugger-props-button").click();
+  await expect(page.getByTestId("debugger-props-popover")).toBeVisible();
+  // Click "Create Preset"
+  await page.getByTestId("debugger-props-create-preset").click();
+  // Verify dialog opens
+  await expect(page.getByTestId("props-config-dialog")).toBeVisible();
+}
+
+/**
+ * Configure props manually in the props dialog.
+ * The props object keys should match the schema fields (e.g., {city: "Paris", temperature: "25"}).
+ */
+export async function configurePropsManually(
+  page: Page,
+  presetName: string,
+  props: Record<string, string>
+): Promise<void> {
+  // Enter preset name
+  await page.getByTestId("props-config-preset-name").fill(presetName);
+
+  // For schema-based props, SchemaFormField uses id={name} on inputs
+  // We need to fill each prop value by finding the input with id matching the field name
+  for (const [key, value] of Object.entries(props)) {
+    // Schema fields are rendered by SchemaFormField - look for input with id attribute
+    const input = page.locator(`input#${key}`);
+    await expect(input).toBeVisible({ timeout: 2000 });
+    await input.fill(value);
+  }
+
+  // Save the preset
+  await page.getByTestId("props-config-save-button").click();
+  // Dialog should close
+  await expect(page.getByTestId("props-config-dialog")).not.toBeVisible({
+    timeout: 3000,
+  });
+
+  // Close the props popover by clicking outside or pressing Escape
+  // The popover may still be open after the dialog closes, which could interfere with prop application
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("debugger-props-popover")).not.toBeVisible({
+    timeout: 1000,
+  });
+}
+
+/**
+ * Configure props using LLM generation.
+ */
+export async function configurePropsViaLLM(
+  page: Page,
+  presetName: string
+): Promise<void> {
+  // Enter preset name
+  await page.getByTestId("props-config-preset-name").fill(presetName);
+
+  // Wait for LLM to be available (button should appear instead of "not configured" message)
+  await expect(
+    page.getByTestId("props-config-generate-llm-button")
+  ).toBeVisible({
+    timeout: 5000,
+  });
+
+  // Click generate button
+  await page.getByTestId("props-config-generate-llm-button").click();
+
+  // Wait for generation to complete (spinner disappears)
+  await expect(page.getByTestId("props-config-generating")).toBeVisible();
+  await expect(page.getByTestId("props-config-generating")).not.toBeVisible({
+    timeout: 30000, // LLM might take time
+  });
+
+  // Save the preset
+  await page.getByTestId("props-config-save-button").click();
+  // Dialog should close
+  await expect(page.getByTestId("props-config-dialog")).not.toBeVisible();
+}
+
+/**
+ * Verify weather widget displays expected prop values.
+ * Props should include city, temperature, conditions, humidity, windSpeed.
+ */
+export async function verifyWeatherWidgetProps(
+  frame: FrameLocator,
+  props: {
+    city?: string;
+    temperature?: string | number;
+    conditions?: string;
+    humidity?: string | number;
+    windSpeed?: string | number;
+  }
+): Promise<void> {
+  if (props.city !== undefined) {
+    await expect(
+      frame.getByText(new RegExp(escapeRegex(props.city), "i"))
+    ).toBeVisible({ timeout: TOGGLE_UPDATE_TIMEOUT });
+  }
+  if (props.temperature !== undefined) {
+    await expect(
+      frame.getByText(
+        new RegExp(`${escapeRegex(String(props.temperature))}°`, "i")
+      )
+    ).toBeVisible({ timeout: TOGGLE_UPDATE_TIMEOUT });
+  }
+  if (props.conditions !== undefined) {
+    await expect(
+      frame.getByText(new RegExp(escapeRegex(props.conditions), "i"))
+    ).toBeVisible({ timeout: TOGGLE_UPDATE_TIMEOUT });
+  }
+  if (props.humidity !== undefined) {
+    await expect(
+      frame.getByText(
+        new RegExp(`${escapeRegex(String(props.humidity))}%`, "i")
+      )
+    ).toBeVisible({ timeout: TOGGLE_UPDATE_TIMEOUT });
+  }
+  if (props.windSpeed !== undefined) {
+    await expect(
+      frame.getByText(
+        new RegExp(`${escapeRegex(String(props.windSpeed))}.*km/h`, "i")
+      )
+    ).toBeVisible({ timeout: TOGGLE_UPDATE_TIMEOUT });
+  }
+}
+
+/**
+ * Enter fullscreen mode for MCP Apps widget.
+ */
+export async function enterFullscreenMode(page: Page): Promise<void> {
+  await page.getByTestId("debugger-fullscreen-button").click();
+  // Wait a bit for fullscreen animation
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Exit fullscreen mode for MCP Apps widget.
+ */
+export async function exitFullscreenMode(page: Page): Promise<void> {
+  await page.getByTestId("debugger-exit-fullscreen-button").click();
+  // Wait a bit for exit animation
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Enter PiP mode for MCP Apps widget.
+ */
+export async function enterPipMode(page: Page): Promise<void> {
+  await page.getByTestId("debugger-pip-button").click();
+  // Wait a bit for PiP animation
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Exit PiP mode for MCP Apps widget.
+ */
+export async function exitPipMode(page: Page): Promise<void> {
+  await page.getByTestId("debugger-exit-pip-button").click();
+  // Wait a bit for exit animation
+  await page.waitForTimeout(500);
+}
+
+/**
+ * Verify fullscreen mode is active.
+ */
+export async function verifyFullscreenMode(page: Page): Promise<void> {
+  // In fullscreen, the exit button should be visible and the enter buttons should not
+  await expect(page.getByTestId("debugger-exit-fullscreen-button")).toBeVisible(
+    {
+      timeout: 2000,
+    }
+  );
+  await expect(
+    page.getByTestId("debugger-fullscreen-button")
+  ).not.toBeVisible();
+  await expect(page.getByTestId("debugger-pip-button")).not.toBeVisible();
+}
+
+/**
+ * Verify PiP mode is active.
+ */
+export async function verifyPipMode(page: Page): Promise<void> {
+  // In PiP, the exit button should be visible and the enter buttons should not
+  await expect(page.getByTestId("debugger-exit-pip-button")).toBeVisible({
+    timeout: 2000,
+  });
+  await expect(
+    page.getByTestId("debugger-fullscreen-button")
+  ).not.toBeVisible();
+  await expect(page.getByTestId("debugger-pip-button")).not.toBeVisible();
+}
+
+/**
+ * Verify inline mode is active (neither fullscreen nor PiP).
+ */
+export async function verifyInlineMode(page: Page): Promise<void> {
+  // In inline mode, the enter buttons should be visible and exit buttons should not
+  await expect(page.getByTestId("debugger-fullscreen-button")).toBeVisible({
+    timeout: 2000,
+  });
+  await expect(page.getByTestId("debugger-pip-button")).toBeVisible();
+  await expect(
+    page.getByTestId("debugger-exit-fullscreen-button")
+  ).not.toBeVisible();
+  await expect(page.getByTestId("debugger-exit-pip-button")).not.toBeVisible();
 }

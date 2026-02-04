@@ -55,11 +55,17 @@ export default defineConfig({
   workers: 1,
   reporter: "html",
   timeout: 90_000, // 90 seconds per test (chat tests with LLM can be slow)
+  // CI environments (Docker/xvfb) need longer timeouts due to slower rendering
+  expect: {
+    timeout: process.env.CI ? 15_000 : 5_000, // Default expect timeout (3x for CI)
+  },
   use: {
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    // Slow down actions in CI for more reliable iframe interactions
+    ...(process.env.CI && { actionTimeout: 10_000 }),
   },
 
   projects: [

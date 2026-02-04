@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export interface PropPreset {
   id: string;
@@ -42,68 +42,44 @@ export function useResourceProps(resourceUri: string) {
     loadPresets();
   }, [resourceUri]);
 
-  // Save to localStorage
-  const saveToStorage = useCallback(
-    (presetsToSave: PropPreset[], activeId: string | null) => {
-      try {
-        const key = getStorageKey(resourceUri);
-        const data: ResourcePropsStorage = {
-          presets: presetsToSave,
-          activePresetId: activeId,
-        };
-        localStorage.setItem(key, JSON.stringify(data));
-      } catch (error) {
-        console.error("[useResourceProps] Failed to save presets:", error);
-      }
-    },
-    [resourceUri]
-  );
+  // Auto-save to localStorage whenever presets or activePresetId changes
+  useEffect(() => {
+    const key = getStorageKey(resourceUri);
+    const data: ResourcePropsStorage = {
+      presets,
+      activePresetId,
+    };
+    localStorage.setItem(key, JSON.stringify(data));
+  }, [resourceUri, presets, activePresetId]);
 
   // Add or update a preset
-  const savePreset = useCallback(
-    (preset: PropPreset) => {
-      setPresets((prev) => {
-        const existingIndex = prev.findIndex((p) => p.id === preset.id);
-        let updated: PropPreset[];
-        if (existingIndex >= 0) {
-          // Update existing
-          updated = [...prev];
-          updated[existingIndex] = preset;
-        } else {
-          // Add new
-          updated = [...prev, preset];
-        }
-        saveToStorage(updated, activePresetId);
-        return updated;
-      });
-    },
-    [activePresetId, saveToStorage]
-  );
+  const savePreset = useCallback((preset: PropPreset) => {
+    setPresets((prev) => {
+      const existingIndex = prev.findIndex((p) => p.id === preset.id);
+      let updated: PropPreset[];
+      if (existingIndex >= 0) {
+        // Update existing
+        updated = [...prev];
+        updated[existingIndex] = preset;
+      } else {
+        // Add new
+        updated = [...prev, preset];
+      }
+      return updated;
+    });
+  }, []);
 
   // Delete a preset
-  const deletePreset = useCallback(
-    (presetId: string) => {
-      setPresets((prev) => {
-        const updated = prev.filter((p) => p.id !== presetId);
-        const newActiveId = activePresetId === presetId ? null : activePresetId;
-        saveToStorage(updated, newActiveId);
-        if (activePresetId === presetId) {
-          setActivePresetId(null);
-        }
-        return updated;
-      });
-    },
-    [activePresetId, saveToStorage]
-  );
+  const deletePreset = useCallback((presetId: string) => {
+    setPresets((prev) => prev.filter((p) => p.id !== presetId));
+    // If deleting the active preset, clear the active state
+    setActivePresetId((current) => (current === presetId ? null : current));
+  }, []);
 
   // Set active preset
-  const setActivePreset = useCallback(
-    (presetId: string | null) => {
-      setActivePresetId(presetId);
-      saveToStorage(presets, presetId);
-    },
-    [presets, saveToStorage]
-  );
+  const setActivePreset = useCallback((presetId: string | null) => {
+    setActivePresetId(presetId);
+  }, []);
 
   // Get current active props
   const getActiveProps = useCallback((): Record<string, string> | null => {

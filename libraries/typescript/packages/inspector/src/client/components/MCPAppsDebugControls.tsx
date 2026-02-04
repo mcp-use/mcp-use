@@ -5,8 +5,8 @@ import {
   Maximize2,
   Monitor,
   MousePointer2,
-  Pointer,
   PictureInPicture,
+  Pointer,
   Settings,
   ShieldCheck,
   ShieldOff,
@@ -210,6 +210,7 @@ export function MCPAppsDebugControls({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                data-testid="debugger-fullscreen-button"
                 variant="outline"
                 size="sm"
                 className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -224,6 +225,7 @@ export function MCPAppsDebugControls({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                data-testid="debugger-pip-button"
                 variant="outline"
                 size="sm"
                 className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -616,6 +618,7 @@ export function MCPAppsDebugControls({
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                data-testid="debugger-props-button"
               >
                 <Braces className="size-3.5" />
               </Button>
@@ -630,13 +633,17 @@ export function MCPAppsDebugControls({
                 : presets.find((p) => p.id === selectValue)?.name || "Custom"}
           </TooltipContent>
         </Tooltip>
-        <PopoverContent className="w-64 p-2">
+        <PopoverContent
+          className="w-64 p-2"
+          data-testid="debugger-props-popover"
+        >
           <div className="space-y-1">
             <Button
               variant={selectValue === NO_PROPS_VALUE ? "default" : "ghost"}
               size="sm"
               className="w-full justify-start"
               onClick={() => handleValueChange(NO_PROPS_VALUE)}
+              data-testid="debugger-props-no-props"
             >
               No Props
             </Button>
@@ -647,6 +654,7 @@ export function MCPAppsDebugControls({
                 size="sm"
                 className="w-full justify-start"
                 onClick={() => handleValueChange(TOOL_PROPS_VALUE)}
+                data-testid="debugger-props-tool-props"
               >
                 Props from Tool
               </Button>
@@ -659,6 +667,7 @@ export function MCPAppsDebugControls({
                   size="sm"
                   className="w-full justify-start pr-14"
                   onClick={() => handleValueChange(preset.id)}
+                  data-testid={`debugger-props-preset-${preset.id}`}
                 >
                   {preset.name}
                 </Button>
@@ -668,6 +677,7 @@ export function MCPAppsDebugControls({
                     size="sm"
                     className="h-6 w-6 p-0"
                     onClick={(e) => handleEditPreset(preset, e)}
+                    data-testid={`debugger-props-edit-${preset.id}`}
                   >
                     <Settings className="h-3 w-3" />
                   </Button>
@@ -676,6 +686,7 @@ export function MCPAppsDebugControls({
                     size="sm"
                     className="h-6 w-6 p-0"
                     onClick={(e) => handleDeletePreset(preset.id, e)}
+                    data-testid={`debugger-props-delete-${preset.id}`}
                   >
                     <Trash2 className="h-3 w-3 text-destructive" />
                   </Button>
@@ -688,6 +699,7 @@ export function MCPAppsDebugControls({
               size="sm"
               className="w-full justify-start text-primary"
               onClick={() => handleValueChange(CREATE_PRESET_VALUE)}
+              data-testid="debugger-props-create-preset"
             >
               + Create Preset...
             </Button>

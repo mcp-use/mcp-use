@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  configureLLMAPI,
   connectToConformanceServer,
   navigateToTools,
 } from "./helpers/connection";
@@ -436,6 +437,86 @@ test.describe("Inspector MCP Server Connections", () => {
     const textContent = page.getByTestId("tool-execution-results-text-content");
     await expect(textContent).toBeVisible({ timeout: 10000 });
     await expect(textContent).toContainText("positive");
+  });
+
+  test("test_sampling - should generate response with LLM", async ({
+    page,
+  }) => {
+    // Skip if no API key available
+    const apiKey = process.env.OPENAI_API_KEY || "";
+    if (!apiKey) {
+      test.skip();
+      return;
+    }
+
+    // Configure LLM first
+    await configureLLMAPI(page);
+
+    await page.getByRole("tab", { name: /Tools/ }).first().click();
+    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+
+    // Execute sampling tool
+    await page.getByTestId("tool-item-test_sampling").click();
+    await expect(
+      page.getByTestId("tool-execution-execute-button")
+    ).toBeVisible();
+    await expect(page.getByTestId("tool-param-prompt")).toBeVisible();
+    await page
+      .getByTestId("tool-param-prompt")
+      .fill("Analyze sentiment: how are you? reply positive");
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    // Wait for sampling toast and click "View Details"
+    const viewDetailsButton = page.getByTestId("sampling-toast-view-details");
+    await expect(viewDetailsButton).toBeVisible({ timeout: 5000 });
+    await viewDetailsButton.click();
+
+    // Verify we're on the Sampling tab
+    await expect(page.getByRole("heading", { name: "Sampling" })).toBeVisible();
+
+    // Switch to LLM mode
+    await page.getByTestId("sampling-response-mode-select").click();
+    await page.getByTestId("sampling-response-mode-llm").click();
+
+    // Wait for LLM to be available (button should appear instead of "not configured" message)
+    await expect(page.getByTestId("sampling-generate-llm-button")).toBeVisible({
+      timeout: 5000,
+    });
+
+    // Click Generate with LLM
+    await page.getByTestId("sampling-generate-llm-button").click();
+
+    // Wait for generation to complete
+    await expect(page.getByTestId("sampling-generating")).toBeVisible();
+    await expect(page.getByTestId("sampling-generating")).not.toBeVisible({
+      timeout: 30000, // LLM might take time
+    });
+
+    // Verify form fields are populated with LLM response
+    const modelInput = page.getByTestId("sampling-model-input");
+    await expect(modelInput).not.toHaveValue("stub-model");
+
+    const textContent = page.getByTestId("sampling-text-content");
+    await expect(textContent).not.toBeEmpty();
+
+    // Approve the response
+    await page.getByTestId("sampling-approve-button").click();
+
+    // Wait for success toast and click "View Tool Result"
+    const viewToolResultButton = page.getByTestId("sampling-view-tool-result");
+    await expect(viewToolResultButton).toBeVisible({ timeout: 5000 });
+    await viewToolResultButton.click();
+
+    // Verify we're back on the Tools tab
+    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible({
+      timeout: 3000,
+    });
+
+    // Verify tool execution completes
+    const textContentResult = page.getByTestId(
+      "tool-execution-results-text-content"
+    );
+    await expect(textContentResult).toBeVisible({ timeout: 10000 });
   });
 
   test("test_elicitation - should handle elicitation flow and accept request", async ({

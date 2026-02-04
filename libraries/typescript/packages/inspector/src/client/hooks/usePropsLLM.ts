@@ -1,6 +1,6 @@
+import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useRef } from "react";
 import type { LLMConfig } from "../components/chat/types";
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 
 interface UsePropsLLMProps {
   llmConfig: LLMConfig | null;
@@ -81,8 +81,12 @@ Example: {"query": "example search term"}`;
           const llmOptions: any = {
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature ?? 0.7,
           };
+
+          // Only add temperature if explicitly configured to avoid model-specific issues
+          if (llmConfig.temperature !== undefined) {
+            llmOptions.temperature = llmConfig.temperature;
+          }
 
           if (llmConfig.provider === "openai") {
             const { ChatOpenAI } = await import("@langchain/openai");

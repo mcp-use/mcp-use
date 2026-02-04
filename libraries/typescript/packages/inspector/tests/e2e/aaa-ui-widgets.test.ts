@@ -40,7 +40,8 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
     await expect(page.getByTestId("tool-param-city")).toBeVisible();
     await page.getByTestId("tool-param-city").fill("tokyo");
     await expect(page.getByTestId("tool-param-delay")).toBeVisible();
-    await page.getByTestId("tool-param-delay").fill("2000");
+    // Use longer delay to account for Vite cold start (widget JS compilation can take 5+ seconds)
+    await page.getByTestId("tool-param-delay").fill("10000");
 
     await page.getByTestId("tool-execution-execute-button").click();
 
@@ -54,12 +55,12 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
       'iframe[title^="OpenAI Component: get-weather-delayed"]'
     );
 
-    // Test pending state: loader should be visible while tool is executing (2s delay)
+    // Test pending state: loader should be visible while tool is executing (10s delay)
     const spinner = appsSdkFrame.locator('[class*="animate-spin"]').first();
     await expect(spinner).toBeVisible({ timeout: 10000 });
 
-    // Wait for loader to disappear and content to appear
-    await expect(spinner).not.toBeVisible({ timeout: 5000 });
+    // Wait for loader to disappear and content to appear (10s delay + buffer)
+    await expect(spinner).not.toBeVisible({ timeout: 15000 });
     await expect(appsSdkFrame.getByText(/tokyo/i)).toBeVisible();
     await expect(appsSdkFrame.getByText("Partly Cloudy")).toBeVisible();
     await expect(appsSdkFrame.getByText(/22/)).toBeVisible();
@@ -281,7 +282,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
 
     await expect(
       page.getByTestId("chat-tool-call-get-weather-delayed")
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 25000 });
 
     // MCP Apps uses double-nested iframe (outer proxy + inner guest)
     const outerFrame = page.frameLocator(

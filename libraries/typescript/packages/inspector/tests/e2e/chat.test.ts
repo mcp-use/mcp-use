@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  configureLLMAPI,
   connectToConformanceServer,
   navigateToTools,
 } from "./helpers/connection";
@@ -13,48 +14,6 @@ test.describe.serial("Inspector Chat Tests", () => {
   //
   // Tests run sequentially to avoid interference between chat sessions
 
-  // Helper function to configure API key for chat
-  async function configureChatAPI(page: any) {
-    const apiKey = process.env.OPENAI_API_KEY || "";
-
-    // Navigate to Chat tab
-    await page.getByRole("tab", { name: /Chat/ }).first().click();
-    await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
-
-    // Click Configure API Key button
-    await page.getByTestId("chat-configure-api-key-button").click();
-
-    // Verify dialog opens
-    await expect(page.getByTestId("chat-config-dialog")).toBeVisible();
-
-    // Enter API key
-    await page.getByTestId("chat-config-api-key-input").fill(apiKey);
-
-    // Wait for models to load
-    await page.waitForTimeout(1000);
-
-    // Click on the model selector to open the popover
-    await page.getByTestId("chat-config-model-select").click();
-
-    // Search for and select gpt-4o-mini model
-    const modelSearch = page.getByPlaceholder("Search models...");
-    await expect(modelSearch).toBeVisible();
-    await modelSearch.fill("gpt-5-nano");
-
-    // Click on the model option
-    await page
-      .getByRole("option", { name: /gpt-5-nano/ })
-      .first()
-      .click();
-
-    // Save configuration
-    await page.getByTestId("chat-config-save-button").click();
-
-    // Verify dialog closes and landing form appears
-    await expect(page.getByTestId("chat-config-dialog")).not.toBeVisible();
-    await expect(page.getByTestId("chat-landing-header")).toBeVisible();
-  }
-
   test.beforeEach(async ({ page, context }) => {
     // Clear localStorage and cookies before each test
     await context.clearCookies();
@@ -66,7 +25,12 @@ test.describe.serial("Inspector Chat Tests", () => {
 
     // Navigate to Tools tab
     await navigateToTools(page);
-    await configureChatAPI(page);
+
+    // Configure LLM API
+    await configureLLMAPI(page);
+
+    // Verify chat landing page appears after configuration
+    await expect(page.getByTestId("chat-landing-header")).toBeVisible();
   });
 
   test("should send message and receive response, then send followup", async ({

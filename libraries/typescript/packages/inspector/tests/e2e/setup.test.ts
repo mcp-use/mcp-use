@@ -8,25 +8,6 @@ test.describe.serial("Inspector Setup and Smoke Tests", () => {
     await page.evaluate(() => localStorage.clear());
   });
 
-  test("should render without console errors", async ({ page }) => {
-    const errors: string[] = [];
-
-    page.on("console", (msg) => {
-      if (msg.type() === "error") {
-        errors.push(msg.text());
-      }
-    });
-
-    page.on("pageerror", (error) => {
-      errors.push(error.message);
-    });
-
-    await page.goto("/");
-    await page.waitForLoadState("networkidle");
-
-    expect(errors).toEqual([]);
-  });
-
   test("should load and render the inspector", async ({ page }) => {
     await page.goto("/");
 

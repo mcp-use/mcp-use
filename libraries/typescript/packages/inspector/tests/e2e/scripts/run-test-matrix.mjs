@@ -269,10 +269,11 @@ async function main() {
       );
     }
 
-    const playwrightProc = spawn("playwright", playwrightArgs, {
+    // Use npx to find playwright in node_modules/.bin (works in CI and locally)
+    const playwrightProc = spawn("npx", ["playwright", ...playwrightArgs], {
       cwd: inspectorDir,
       stdio: "inherit",
-      shell: false, // Don't use shell to avoid argument parsing issues
+      shell: false,
       env: {
         ...process.env,
         ...playwrightEnv,

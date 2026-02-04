@@ -2,6 +2,9 @@ import { expect, type Page } from "@playwright/test";
 
 import { getTestMatrix } from "./test-matrix";
 
+// CI environments (Docker/xvfb) need longer timeouts due to slower rendering
+const CI_MULTIPLIER = process.env.CI ? 3 : 1;
+
 /**
  * Wait for HMR reload to propagate. Use after modifying server or widget files.
  * Gives the dev server time to rebuild and the Inspector time to reflect changes.
@@ -39,7 +42,7 @@ export async function warmWidgets(
       try {
         await page.request.get(
           `${baseUrl}/mcp-use/widgets/${widgetName}/index.html`,
-          { timeout: 10000 }
+          { timeout: 10000 * CI_MULTIPLIER }
         );
       } catch (e) {
         // Ignore errors - widget may not exist or build may fail
@@ -95,10 +98,10 @@ export async function waitForWidgetTools(
       await expect(
         page.getByTestId("tool-item-apps-sdk-only-card")
       ).toBeVisible({
-        timeout: 2000,
+        timeout: 2000 * CI_MULTIPLIER,
       });
       await expect(page.getByTestId("tool-item-display-info")).toBeVisible({
-        timeout: 2000,
+        timeout: 2000 * CI_MULTIPLIER,
       });
     } catch {
       // Widgets not present, continue anyway
@@ -107,10 +110,10 @@ export async function waitForWidgetTools(
     // Wait for auto-registered widget tools to appear
     // These are registered asynchronously after the server starts
     await expect(page.getByTestId("tool-item-apps-sdk-only-card")).toBeVisible({
-      timeout: 10000,
+      timeout: 10000 * CI_MULTIPLIER,
     });
     await expect(page.getByTestId("tool-item-display-info")).toBeVisible({
-      timeout: 10000,
+      timeout: 10000 * CI_MULTIPLIER,
     });
   }
 }
@@ -152,4 +155,38 @@ export async function goToInspectorWithAutoConnectAndOpenTools(
   if (waitForWidgets) {
     await waitForWidgetTools(page);
   }
+}
+
+/**
+ * Configure LLM API key for sampling/chat features.
+ * Reusable across chat and sampling tests.
+ */
+export async function configureLLMAPI(page: Page): Promise<void> {
+  const apiKey = process.env.OPENAI_API_KEY || "";
+
+  // Navigate to Chat tab
+  await page.getByRole("tab", { name: /Chat/ }).first().click();
+  await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
+
+  // Click Configure API Key button
+  await page.getByTestId("chat-configure-api-key-button").click();
+  await expect(page.getByTestId("chat-config-dialog")).toBeVisible();
+
+  // Enter API key
+  await page.getByTestId("chat-config-api-key-input").fill(apiKey);
+  await page.waitForTimeout(1000);
+
+  // Select model
+  await page.getByTestId("chat-config-model-select").click();
+  const modelSearch = page.getByPlaceholder("Search models...");
+  await expect(modelSearch).toBeVisible();
+  await modelSearch.fill("gpt-5-nano");
+  await page
+    .getByRole("option", { name: /gpt-5-nano/ })
+    .first()
+    .click();
+
+  // Save configuration
+  await page.getByTestId("chat-config-save-button").click();
+  await expect(page.getByTestId("chat-config-dialog")).not.toBeVisible();
 }

@@ -36,7 +36,7 @@ export const MCP_APPS_CONFIG = {
     /** Picture-in-picture width */
     PIP_WIDTH: 768,
     /** Picture-in-picture height */
-    PIP_HEIGHT: 384,
+    PIP_HEIGHT: 400,
     /** Default iframe height for inline mode */
     DEFAULT_HEIGHT: 400,
   },
