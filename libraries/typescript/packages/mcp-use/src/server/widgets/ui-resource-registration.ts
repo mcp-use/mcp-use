@@ -70,7 +70,7 @@ export interface UIResourceServer {
 /**
  * Enrich widget definition with server origin in CSP
  *
- * Auto-injects the server's origin into resourceDomains and baseUriDomains
+ * Auto-injects the server's origin into connectDomains, resourceDomains, and baseUriDomains
  * to allow loading built assets (React widgets) from the server itself.
  */
 function enrichDefinitionWithServerOrigin(
@@ -92,6 +92,16 @@ function enrichDefinitionWithServerOrigin(
     } else if (!enrichedMetadata.csp.resourceDomains.includes(serverOrigin)) {
       enrichedMetadata.csp.resourceDomains = [
         ...enrichedMetadata.csp.resourceDomains,
+        serverOrigin,
+      ];
+    }
+
+    // Add server origin to connectDomains (for fetch/XHR/WebSocket)
+    if (!enrichedMetadata.csp.connectDomains) {
+      enrichedMetadata.csp.connectDomains = [serverOrigin];
+    } else if (!enrichedMetadata.csp.connectDomains.includes(serverOrigin)) {
+      enrichedMetadata.csp.connectDomains = [
+        ...enrichedMetadata.csp.connectDomains,
         serverOrigin,
       ];
     }

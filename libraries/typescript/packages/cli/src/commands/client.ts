@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import { getPackageVersion } from "mcp-use/server";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
+import { getPackageVersion } from "mcp-use/server";
 import { createInterface } from "node:readline";
 import {
   formatError,
@@ -117,10 +117,10 @@ function getCliClientInfo() {
     description: "mcp-use CLI - Command-line interface for MCP servers",
     icons: [
       {
-        src: "https://mcp-use.com/logo.png",
+        src: "https://manufact.com/logo.png",
       },
     ],
-    websiteUrl: "https://mcp-use.com",
+    websiteUrl: "https://manufact.com",
   };
 }
 

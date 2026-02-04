@@ -517,11 +517,16 @@ export function useWidget<
       return toolResponseMetadata === null;
     }
     if (provider === "mcp-apps") {
-      // In MCP Apps, widget is pending until we receive tool-input notification
-      return mcpAppsToolInput === null;
+      // In MCP Apps, widget is pending until we receive tool-result notification
+      // We check toolOutput instead of toolInput because input is sent immediately
+      return mcpAppsToolOutput === null;
+    }
+    // For mcp-ui (URL params), check if toolOutput is null (tool hasn't completed)
+    if (provider === "mcp-ui") {
+      return toolOutput === null || toolOutput === undefined;
     }
     return false;
-  }, [provider, toolResponseMetadata, mcpAppsToolInput]);
+  }, [provider, toolResponseMetadata, mcpAppsToolOutput, toolOutput]);
 
   return {
     // Props and state (with defaults)

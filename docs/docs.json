@@ -69,6 +69,7 @@
                   "inspector/index",
                   "inspector/cli",
                   "inspector/connection-settings",
+                  "inspector/url-parameters",
                   "inspector/keyboard-shortcuts",
                   "inspector/command-palette",
                   "inspector/rpc-logging",

@@ -711,15 +711,16 @@ CSP_URLS=https://myserver.com,...other domains
 
 ### Using the Inspector
 
-The MCP Inspector provides full support for testing widgets during development:
+The mcp-use Inspector provides full support for testing widgets during development:
 
 1. **Start your server**: `npm run dev`
 2. **Open Inspector**: `http://localhost:3000/inspector`
 3. **Test widgets**: Execute tools to see widgets render
-4. **Debug interactions**: Use console logs and inspector features
-5. **Test API methods**: Verify `callTool`, `setState`, etc. work correctly
+4. **Verify lifecycle**: Widgets render immediately with `isPending=true`, then update when tool completes
+5. **Debug interactions**: Use console logs and inspector features
+6. **Test API methods**: Verify `callTool`, `setState`, etc. work correctly
 
-See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for complete testing guide.
+See [Debugging Widgets](/inspector/debugging-chatgpt-apps) for complete testing guide.
 
 ## Testing in ChatGPT
 

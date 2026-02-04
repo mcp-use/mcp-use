@@ -1,5 +1,114 @@
 # mcp-use
 
+## 1.16.3
+
+### Patch Changes
+
+- Updated dependencies [b1b2895]
+  - @mcp-use/cli@2.13.0
+  - @mcp-use/inspector@0.18.3
+
+## 1.16.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c0822e1]
+  - @mcp-use/cli@2.13.0-canary.0
+  - @mcp-use/inspector@0.18.3-canary.0
+
+## 1.16.2
+
+### Patch Changes
+
+- 53ae49d: fix: ensure pending state is emulated for widgets, reflecting chatgpt behaviour
+- Updated dependencies [53ae49d]
+- Updated dependencies [53ae49d]
+  - @mcp-use/inspector@0.18.2
+  - @mcp-use/cli@2.12.6
+
+## 1.16.2-canary.0
+
+### Patch Changes
+
+- fea26ff: fix: ensure pending state is emulated for widgets, reflecting chatgpt behaviour
+- Updated dependencies [fea26ff]
+- Updated dependencies [37af1bf]
+  - @mcp-use/inspector@0.18.2-canary.0
+  - @mcp-use/cli@2.12.6-canary.0
+
+## 1.16.1
+
+### Patch Changes
+
+- 4bdb92e: fix(widgets): auto-inject server origin into connectDomains CSP
+  - The `enrichDefinitionWithServerOrigin` function now automatically adds the server origin to `connectDomains` in addition to `resourceDomains` and `baseUriDomains`
+  - This allows widgets to make fetch/XHR/WebSocket calls back to the MCP server without explicitly declaring the domain in CSP
+  - Fixes an oversight where the CHANGELOG mentioned connectDomains injection but it was not implemented
+  - @mcp-use/cli@2.12.5
+  - @mcp-use/inspector@0.18.1
+
+## 1.16.1-canary.0
+
+### Patch Changes
+
+- eb8d7a6: fix(widgets): auto-inject server origin into connectDomains CSP
+  - The `enrichDefinitionWithServerOrigin` function now automatically adds the server origin to `connectDomains` in addition to `resourceDomains` and `baseUriDomains`
+  - This allows widgets to make fetch/XHR/WebSocket calls back to the MCP server without explicitly declaring the domain in CSP
+  - Fixes an oversight where the CHANGELOG mentioned connectDomains injection but it was not implemented
+  - @mcp-use/cli@2.12.5-canary.0
+  - @mcp-use/inspector@0.18.1-canary.0
+
+## 1.16.0
+
+### Minor Changes
+
+- 32f2113: Add completable() helper for prompt argument autocomplete
+
+### Patch Changes
+
+- Updated dependencies [32f2113]
+- Updated dependencies [32f2113]
+  - @mcp-use/inspector@0.18.0
+  - @mcp-use/cli@2.12.4
+
+## 1.16.0-canary.3
+
+### Minor Changes
+
+- 3e2821f: Add dynamic CSP domain injection for widgets: the request origin (from X-Forwarded-Host or Host header) is now automatically added to connectDomains and resourceDomains in tool metadata at tools/list time. This enables widgets to work correctly when accessed through proxies like ngrok, Cloudflare tunnels, or other reverse proxies.
+
+### Patch Changes
+
+- @mcp-use/cli@2.12.4-canary.3
+- @mcp-use/inspector@0.18.0-canary.3
+
+## 1.16.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [09c0300]
+  - @mcp-use/inspector@0.18.0-canary.2
+  - @mcp-use/cli@2.12.4-canary.2
+
+## 1.16.0-canary.1
+
+### Minor Changes
+
+- 9b9f371: Add completable() helper for prompt argument autocomplete
+
+### Patch Changes
+
+- @mcp-use/cli@2.12.4-canary.1
+- @mcp-use/inspector@0.18.0-canary.1
+
+## 1.15.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [144ad6a]
+  - @mcp-use/inspector@0.18.0-canary.0
+  - @mcp-use/cli@2.12.4-canary.0
+
 ## 1.15.3
 
 ### Patch Changes

@@ -91,7 +91,7 @@ export function PromptsTab({
     isExecuting,
     handlePromptSelect,
     handleArgChange,
-    executePrompt,
+    executeSelectedPrompt,
     searchQuery,
     setSearchQuery,
   } = useMCPPrompts({ prompts, callPrompt, serverId });
@@ -519,7 +519,7 @@ export function PromptsTab({
                   isExecuting={isExecuting}
                   isConnected={isConnected}
                   onArgChange={handleArgChange}
-                  onExecute={executePrompt}
+                  onExecute={executeSelectedPrompt}
                   onSave={openSaveDialog}
                 />
               </motion.div>
@@ -621,7 +621,7 @@ export function PromptsTab({
               isExecuting={isExecuting}
               isConnected={isConnected}
               onArgChange={handleArgChange}
-              onExecute={executePrompt}
+              onExecute={executeSelectedPrompt}
               onSave={openSaveDialog}
             />
           </ResizablePanel>

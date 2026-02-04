@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
-
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInputArea } from "./chat/ChatInputArea";
 import { ChatLandingForm } from "./chat/ChatLandingForm";
@@ -14,23 +14,41 @@ import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 
+// Type alias for backward compatibility
+type MCPConnection = McpServer;
+
 interface ChatTabProps {
   connection: MCPConnection;
   isConnected: boolean;
   useClientSide?: boolean;
+  prompts: Prompt[];
+  serverId: string;
   readResource?: (uri: string) => Promise<any>;
+  callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>;
 }
+
+// Check text up to caret position for " /" or "/" at start of line or textarea
+const PROMPT_TRIGGER_REGEX = /(?:^\/$|\s+\/$)/;
+// Keys that trigger prompt dropdown actions if promptsDropdownOpen is true
+const PROMPT_ARROW_KEYS = ["ArrowDown", "ArrowUp", "Escape", "Enter"];
 
 export function ChatTab({
   connection,
   isConnected,
   useClientSide = true,
+  prompts,
+  serverId,
+  callPrompt,
   readResource,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
+  const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
+  const [promptFocusedIndex, setPromptFocusedIndex] = useState(-1);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Track position of trigger for removal in textarea
+  const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
 
-  // Use custom hooks for configuration and chat messages
+  // Use custom hooks for configuration, chat messages and mcp prompts handling
   const {
     llmConfig,
     authConfig: userAuthConfig,
@@ -62,13 +80,58 @@ export function ChatTab({
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
-  const { messages, isLoading, sendMessage, clearMessages, stop } =
-    useClientSide ? clientSideChat : serverSideChat;
+  const {
+    messages,
+    isLoading,
+    attachments,
+    sendMessage,
+    clearMessages,
+    stop,
+    addAttachment,
+    removeAttachment,
+  } = useClientSide ? clientSideChat : serverSideChat;
+
+  const {
+    filteredPrompts,
+    setSelectedPrompt,
+    selectedPrompt,
+    setPromptArgs,
+    executePrompt,
+    results,
+    handleDeleteResult,
+    clearPromptResults,
+  } = useMCPPrompts({
+    prompts,
+    callPrompt,
+    serverId,
+  });
 
   // Register keyboard shortcuts (only active when ChatTab is mounted)
   useKeyboardShortcuts({
     onNewChat: clearMessages,
   });
+
+  const clearPromptsUIState = useCallback(() => {
+    setPromptFocusedIndex(-1);
+    setPromptsDropdownOpen(false);
+    triggerSpanRef.current = null;
+  }, []);
+
+  const updatePromptsDropdownState = useCallback(() => {
+    if (!textareaRef.current) {
+      return;
+    }
+    const caretIndex = textareaRef.current.selectionStart;
+    const textUpToCaret = inputValue.slice(0, caretIndex);
+    const isPromptsRequested = PROMPT_TRIGGER_REGEX.test(textUpToCaret);
+    setPromptsDropdownOpen(isPromptsRequested);
+    if (isPromptsRequested) {
+      triggerSpanRef.current = { start: caretIndex - 1, end: caretIndex };
+      setPromptFocusedIndex(0);
+    } else {
+      clearPromptsUIState();
+    }
+  }, [inputValue, clearPromptsUIState]);
 
   // Focus the textarea when landing form is shown
   useEffect(() => {
@@ -84,22 +147,119 @@ export function ChatTab({
     }
   }, [isLoading, messages.length]);
 
-  const handleSendMessage = useCallback(() => {
-    if (!inputValue.trim()) {
+  // Handle MCP prompts requested
+  useEffect(() => {
+    if (!textareaRef.current) {
       return;
     }
-    sendMessage(inputValue);
+    updatePromptsDropdownState();
+  }, [inputValue, updatePromptsDropdownState]);
+
+  const clearPromptsState = useCallback(() => {
+    setSelectedPrompt(null);
+    setPromptArgs({});
+    clearPromptsUIState();
+  }, [clearPromptsUIState]);
+
+  const handlePromptSelect = useCallback(
+    async (prompt: Prompt) => {
+      setSelectedPrompt(prompt);
+
+      if (prompt.arguments && prompt.arguments.length > 0) {
+        // Reject prompt if has args for now
+        setSelectedPrompt(null);
+        toast.error("Prompts with arguments are not supported", {
+          description:
+            "This prompt requires arguments which are not yet supported in chat mode.",
+        });
+        // Add support for prompts with args here
+        return;
+      }
+
+      try {
+        const EMPTY_ARGS: Record<string, unknown> = {};
+        await executePrompt(prompt, EMPTY_ARGS);
+      } catch (error) {
+        console.error("Error executing prompt", error);
+      } finally {
+        if (textareaRef.current && triggerSpanRef.current) {
+          const { start, end } = triggerSpanRef.current;
+          const next = inputValue.slice(0, start) + inputValue.slice(end);
+          setInputValue(next);
+          requestAnimationFrame(() => {
+            // focus and set trigger span position
+            textareaRef.current?.focus();
+            textareaRef.current?.setSelectionRange(start, start);
+          });
+        }
+        clearPromptsState();
+      }
+    },
+    [executePrompt, clearPromptsState, inputValue]
+  );
+
+  const handleSendMessage = useCallback(() => {
+    // Can send if there's text, prompt results, or attachments
+    const hasContent =
+      inputValue.trim() || results.length > 0 || attachments.length > 0;
+    if (!hasContent) {
+      return;
+    }
+    sendMessage(inputValue, results);
     setInputValue("");
-  }, [inputValue, sendMessage]);
+    clearPromptResults();
+  }, [inputValue, results, sendMessage, clearPromptResults, attachments]);
+
+  const handlePromptKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "ArrowDown") {
+        setPromptFocusedIndex((prev) => {
+          if (filteredPrompts.length === 0) return -1;
+          return (prev + 1) % filteredPrompts.length;
+        });
+      } else if (e.key === "ArrowUp") {
+        setPromptFocusedIndex((prev) => {
+          if (filteredPrompts.length === 0) return -1;
+          return (prev - 1 + filteredPrompts.length) % filteredPrompts.length;
+        });
+      } else if (e.key === "Escape") {
+        e.stopPropagation();
+        clearPromptsUIState();
+      } else if (e.key === "Enter" && promptFocusedIndex >= 0) {
+        const prompt = filteredPrompts[promptFocusedIndex];
+        if (prompt) {
+          handlePromptSelect(prompt);
+        }
+      }
+    },
+    [
+      filteredPrompts,
+      promptFocusedIndex,
+      handlePromptSelect,
+      clearPromptsUIState,
+    ]
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+      if (PROMPT_ARROW_KEYS.includes(e.key) && promptsDropdownOpen) {
+        e.preventDefault();
+        handlePromptKeyDown(e);
+      } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         handleSendMessage();
       }
     },
-    [handleSendMessage]
+    [handleSendMessage, handlePromptKeyDown, promptsDropdownOpen]
+  );
+
+  const handleKeyUp = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        updatePromptsDropdownState();
+      }
+    },
+    [updatePromptsDropdownState]
   );
 
   const handleClearConfig = useCallback(() => {
@@ -137,13 +297,25 @@ export function ChatTab({
           isLoading={isLoading}
           textareaRef={textareaRef}
           llmConfig={llmConfig}
+          promptsDropdownOpen={promptsDropdownOpen}
+          promptFocusedIndex={promptFocusedIndex}
+          prompts={filteredPrompts}
+          selectedPrompt={selectedPrompt}
+          promptResults={results}
+          attachments={attachments}
+          onDeletePromptResult={handleDeleteResult}
+          onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
           onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          onClick={updatePromptsDropdownState}
           onSubmit={(e) => {
             e.preventDefault();
             handleSendMessage();
           }}
           onConfigDialogOpenChange={setConfigDialogOpen}
+          onAttachmentAdd={addAttachment}
+          onAttachmentRemove={removeAttachment}
         />
       </div>
     );
@@ -193,10 +365,22 @@ export function ChatTab({
           isConnected={isConnected}
           isLoading={isLoading}
           textareaRef={textareaRef}
+          promptsDropdownOpen={promptsDropdownOpen}
+          promptFocusedIndex={promptFocusedIndex}
+          prompts={filteredPrompts}
+          promptResults={results}
+          selectedPrompt={selectedPrompt}
+          attachments={attachments}
+          onDeletePromptResult={handleDeleteResult}
+          onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
           onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          onClick={updatePromptsDropdownState}
           onSendMessage={handleSendMessage}
           onStopStreaming={stop}
+          onAttachmentAdd={addAttachment}
+          onAttachmentRemove={removeAttachment}
         />
       )}
     </div>

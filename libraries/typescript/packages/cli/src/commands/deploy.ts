@@ -9,6 +9,13 @@ import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { loginCommand } from "./auth.js";
 
+// Gateway domain configuration - single source of truth
+const GATEWAY_DOMAIN = "run.mcp-use.com";
+
+function buildGatewayUrl(slugOrId: string): string {
+  return `https://${slugOrId}.${GATEWAY_DOMAIN}/mcp`;
+}
+
 /**
  * Parse environment variables from .env file
  */
@@ -339,10 +346,10 @@ function getMcpServerUrl(deployment: Deployment): string {
     return `https://${deployment.customDomain}/mcp`;
   } else if (deployment.serverSlug) {
     // Gateway URL via haikunator slug
-    return `https://${deployment.serverSlug}.mcp-use.run/mcp`;
+    return buildGatewayUrl(deployment.serverSlug);
   } else if (deployment.serverId) {
     // Gateway URL via serverId (fallback if slug not available yet)
-    return `https://${deployment.serverId}.mcp-use.run/mcp`;
+    return buildGatewayUrl(deployment.serverId);
   } else {
     // Direct deployment URL (legacy deployments without server)
     return `https://${deployment.domain}/mcp`;
@@ -482,12 +489,12 @@ async function displayDeploymentProgress(
       // Determine dashboard URL if server exists
       let dashboardUrl: string | null = null;
       if (finalDeployment.serverSlug) {
-        dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverSlug}`;
+        dashboardUrl = `https://manufact.com/cloud/servers/${finalDeployment.serverSlug}`;
       } else if (finalDeployment.serverId) {
-        dashboardUrl = `https://mcp-use.com/cloud/servers/${finalDeployment.serverId}`;
+        dashboardUrl = `https://manufact.com/cloud/servers/${finalDeployment.serverId}`;
       }
 
-      const inspectorUrl = `https://inspector.mcp-use.com/inspector?autoConnect=${encodeURIComponent(
+      const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(
         mcpServerUrl
       )}`;
 
@@ -760,7 +767,7 @@ async function promptGitHubInstallation(
     );
     console.log(
       chalk.white("Please visit: ") +
-        chalk.cyan("https://cloud.mcp-use.com/cloud/settings")
+        chalk.cyan("https://manufact.com/cloud/settings")
     );
     console.log(
       chalk.gray("Then connect your GitHub account and try again.\n")
@@ -815,7 +822,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
     }
 
-    console.log(chalk.cyan.bold("🚀 Deploying to mcp-use cloud...\n"));
+    console.log(chalk.cyan.bold("🚀 Deploying to Manufact cloud...\n"));
 
     // Check if this is an MCP project
     const isMcp = await isMcpProject(cwd);
@@ -993,9 +1000,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           console.log(
             chalk.gray("Please try connecting GitHub from the web UI:")
           );
-          console.log(
-            chalk.cyan("  https://cloud.mcp-use.com/cloud/settings\n")
-          );
+          console.log(chalk.cyan("  https://manufact.com/cloud/settings\n"));
           process.exit(1);
         }
         githubVerified = true;
@@ -1064,7 +1069,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       console.log(chalk.gray("\nPlease ensure:"));
       console.log(
         chalk.cyan(
-          "  1. You have connected GitHub at https://cloud.mcp-use.com/cloud/settings"
+          "  1. You have connected GitHub at https://manufact.com/cloud/settings"
         )
       );
       console.log(

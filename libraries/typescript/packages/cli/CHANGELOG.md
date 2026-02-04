@@ -1,5 +1,113 @@
 # @mcp-use/cli
 
+## 2.13.0
+
+### Minor Changes
+
+- b1b2895: Update CLI to Manufact branding and fix authentication issues
+  - Changed default web URL from `mcp-use.com` to `manufact.com` for login flow
+  - Fixed 431 "Request Header Fields Too Large" error by increasing callback server header limit to 16KB
+  - Updated all user-facing messages to reference "Manufact" instead of "mcp-use"
+  - Updated dashboard, inspector, and settings URLs to use `manufact.com` domain
+  - Kept gateway domain as `run.mcp-use.com` for backward compatibility with existing deployments
+
+### Patch Changes
+
+- mcp-use@1.16.3
+- @mcp-use/inspector@0.18.3
+
+## 2.13.0-canary.0
+
+### Minor Changes
+
+- c0822e1: Update CLI to Manufact branding and fix authentication issues
+  - Changed default web URL from `mcp-use.com` to `manufact.com` for login flow
+  - Fixed 431 "Request Header Fields Too Large" error by increasing callback server header limit to 16KB
+  - Updated all user-facing messages to reference "Manufact" instead of "mcp-use"
+  - Updated dashboard, inspector, and settings URLs to use `manufact.com` domain
+  - Kept gateway domain as `run.mcp-use.com` for backward compatibility with existing deployments
+
+### Patch Changes
+
+- mcp-use@1.16.3-canary.0
+- @mcp-use/inspector@0.18.3-canary.0
+
+## 2.12.6
+
+### Patch Changes
+
+- Updated dependencies [53ae49d]
+- Updated dependencies [53ae49d]
+  - @mcp-use/inspector@0.18.2
+  - mcp-use@1.16.2
+
+## 2.12.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fea26ff]
+- Updated dependencies [37af1bf]
+  - @mcp-use/inspector@0.18.2-canary.0
+  - mcp-use@1.16.2-canary.0
+
+## 2.12.5
+
+### Patch Changes
+
+- Updated dependencies [4bdb92e]
+  - mcp-use@1.16.1
+  - @mcp-use/inspector@0.18.1
+
+## 2.12.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [eb8d7a6]
+  - mcp-use@1.16.1-canary.0
+  - @mcp-use/inspector@0.18.1-canary.0
+
+## 2.12.4
+
+### Patch Changes
+
+- Updated dependencies [32f2113]
+- Updated dependencies [32f2113]
+- Updated dependencies [32f2113]
+  - @mcp-use/inspector@0.18.0
+  - mcp-use@1.16.0
+
+## 2.12.4-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3e2821f]
+  - mcp-use@1.16.0-canary.3
+  - @mcp-use/inspector@0.18.0-canary.3
+
+## 2.12.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [09c0300]
+  - @mcp-use/inspector@0.18.0-canary.2
+  - mcp-use@1.16.0-canary.2
+
+## 2.12.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9b9f371]
+  - mcp-use@1.16.0-canary.1
+  - @mcp-use/inspector@0.18.0-canary.1
+
+## 2.12.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [144ad6a]
+  - @mcp-use/inspector@0.18.0-canary.0
+  - mcp-use@1.15.4-canary.0
+
 ## 2.12.3
 
 ### Patch Changes

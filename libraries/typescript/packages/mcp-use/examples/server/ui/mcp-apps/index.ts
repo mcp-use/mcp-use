@@ -1,5 +1,6 @@
 import { MCPServer, object, widget } from "mcp-use/server";
 import { z } from "zod";
+import { setTimeout as sleep } from "timers/promises";
 
 const server = new MCPServer({
   name: "mcp-apps-example",
@@ -80,6 +81,47 @@ server.tool(
         ...weather,
       },
       message: `Current weather in ${city}: ${weather.conditions}, ${weather.temperature}°C`,
+    });
+  }
+);
+
+// Delayed weather tool to test widget lifecycle (Issue #930)
+server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city, delay }) => {
+    // Simulate slow API call
+    await sleep(delay);
+
+    const cityLower = city.toLowerCase();
+    const weather = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "Unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    return widget({
+      props: {
+        city,
+        ...weather,
+      },
+      message: `Current weather in ${city}: ${weather.conditions}, ${weather.temperature}°C (fetched after ${delay}ms delay)`,
     });
   }
 );
@@ -209,6 +251,12 @@ This server demonstrates dual-protocol widget support:
 
 Try these tools:
 - get-weather: Get weather for a city (uses weather-display widget)
+- get-weather-delayed: Test widget lifecycle with 5s delay (Issue #930)
 - greeting-display: Auto-exposed widget with props
 - get-info: Learn about dual-protocol support
+
+To test Issue #930 fix:
+1. Call get-weather-delayed with city="Paris"
+2. Widget should appear immediately showing loading state
+3. After 5 seconds, widget updates with weather data
 `);

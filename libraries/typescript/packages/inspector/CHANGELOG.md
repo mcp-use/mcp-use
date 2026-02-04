@@ -1,5 +1,95 @@
 # @mcp-use/inspector
 
+## 0.18.3
+
+### Patch Changes
+
+- mcp-use@1.16.3
+
+## 0.18.3-canary.0
+
+### Patch Changes
+
+- mcp-use@1.16.3-canary.0
+
+## 0.18.2
+
+### Patch Changes
+
+- 53ae49d: fix: ensure pending state is emulated for widgets, reflecting chatgpt behaviour
+- 53ae49d: fix(inspector): adds logic to detect when server= contains a URL that's not already connected and automatically redirects to use autoConnect= instead.
+- Updated dependencies [53ae49d]
+  - mcp-use@1.16.2
+
+## 0.18.2-canary.0
+
+### Patch Changes
+
+- fea26ff: fix: ensure pending state is emulated for widgets, reflecting chatgpt behaviour
+- 37af1bf: fix(inspector): adds logic to detect when server= contains a URL that's not already connected and automatically redirects to use autoConnect= instead.
+- Updated dependencies [fea26ff]
+  - mcp-use@1.16.2-canary.0
+
+## 0.18.1
+
+### Patch Changes
+
+- Updated dependencies [4bdb92e]
+  - mcp-use@1.16.1
+
+## 0.18.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [eb8d7a6]
+  - mcp-use@1.16.1-canary.0
+
+## 0.18.0
+
+### Minor Changes
+
+- 32f2113: Add prompts in Chat: type / to open a prompt, run it, and include its result in the thread before sending (prompts with args are not supported).
+- 32f2113: Add multimodal support (image attachments) to Inspector chat. Users can now upload and send images to vision-capable LLMs (GPT-4o, Claude, Gemini) using the paperclip button. MCP prompts that return images are now properly displayed instead of showing raw JSON.
+
+### Patch Changes
+
+- Updated dependencies [32f2113]
+  - mcp-use@1.16.0
+
+## 0.18.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3e2821f]
+  - mcp-use@1.16.0-canary.3
+
+## 0.18.0-canary.2
+
+### Minor Changes
+
+- 09c0300: Add multimodal support (image attachments) to Inspector chat. Users can now upload and send images to vision-capable LLMs (GPT-4o, Claude, Gemini) using the paperclip button. MCP prompts that return images are now properly displayed instead of showing raw JSON.
+
+### Patch Changes
+
+- mcp-use@1.16.0-canary.2
+
+## 0.18.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9b9f371]
+  - mcp-use@1.16.0-canary.1
+
+## 0.18.0-canary.0
+
+### Minor Changes
+
+- 144ad6a: Add prompts in Chat: type / to open a prompt, run it, and include its result in the thread before sending (prompts with args are not supported).
+
+### Patch Changes
+
+- mcp-use@1.15.4-canary.0
+
 ## 0.17.3
 
 ### Patch Changes

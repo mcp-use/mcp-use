@@ -422,11 +422,36 @@ export function Layout({ children }: LayoutProps) {
     // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
     const serverId = searchParams.get("server");
 
+    // If server= is a URL and no matching connection exists, treat it as autoConnect=
+    if (
+      serverId &&
+      (serverId.startsWith("http://") || serverId.startsWith("https://"))
+    ) {
+      const existingConnection = connections.find(
+        (conn) => conn.id === serverId
+      );
+
+      if (!existingConnection) {
+        // Redirect to use autoConnect= parameter instead
+        const params = new URLSearchParams(searchParams);
+        params.delete("server");
+        params.set("autoConnect", serverId);
+        navigate(`/?${params.toString()}`, { replace: true });
+        return;
+      }
+    }
+
     // Update selected server if changed
     if (serverId !== selectedServerId) {
       setSelectedServerId(serverId);
     }
-  }, [location.search, selectedServerId, setSelectedServerId]);
+  }, [
+    location.search,
+    selectedServerId,
+    setSelectedServerId,
+    connections,
+    navigate,
+  ]);
 
   // Handle failed server connections - redirect to home
   useEffect(() => {

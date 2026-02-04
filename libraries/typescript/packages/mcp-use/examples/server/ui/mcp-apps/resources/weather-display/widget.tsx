@@ -53,11 +53,6 @@ const WeatherDisplay: React.FC = () => {
 
   const isDark = theme === "dark";
 
-  // Test console logging
-  console.log("[Weather Widget] Rendering with props:", props);
-  console.warn("[Weather Widget] Theme is", theme);
-  console.error("[Weather Widget] Test error message for console drawer");
-
   // Extract values for display
   const platform = userAgent?.device?.type || "unknown";
   const hasTouch = userAgent?.capabilities?.touch || false;

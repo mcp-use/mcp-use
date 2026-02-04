@@ -4,178 +4,235 @@ description: "Configure MCPClient for connecting to MCP servers"
 icon: "server"
 ---
 
-<Info>
-This guide covers MCPClient configuration options for connecting to MCP servers. For agent configuration, see the [Agent Configuration](/python/agent/agent-configuration) guide.
-</Info>
+## Quick Start
 
-
-## MCP Server Configuration
-
-mcp_use supports any MCP server through a flexible configuration system. (For a list of awesome servers you can visit https://github.com/punkpeye/awesome-mcp-servers or https://github.com/appcypher/awesome-mcp-servers which have an amazing collection of them)
-
-The configuration is defined in a JSON file with the following structure:
-
-```json
-{
-  "mcpServers": {
-    "server_name": {
-      "command": "command_to_run",
-      "args": ["arg1", "arg2"],
-      "env": {
-        "ENV_VAR": "value"
-      }
-    }
-  }
-}
-```
-
-MCP servers can use different connection types (STDIO, HTTP). For details on these connection types and how to configure them, see the [Connection Types](./connection-types) guide.
-Each server entry in the `mcpServers` object has a `server_name` and then specific options depending on how `mcp-use` should connect to and/or manage the server.
-
-- `server_name`: (Required) A unique string identifier for this MCP server configuration. This name is used to select the server, for example, in `agent.run(..., server_name="your_server_name")`.
-
-**For STDIO-based servers (local):**
-These are servers that `mcp-use` will start and manage as local child processes, communicating via their standard input/output streams.
-
-- `command`: (Required) The executable command to start the server (e.g., `"npx"`, `"python"`).
-- `args`: (Optional) An array of string arguments to pass to the `command` (e.g., `["-y", "@playwright/mcp@latest"]`).
-- `env`: (Optional) An object defining environment variables to set for the server's process (e.g., `{"DISPLAY": ":1"}`).
-
-**For HTTP/HTTPS-based servers (SSE and Streamable HTTP)**
-
-These are servers that are typically already running and accessible via an HTTP(S) endpoint. `mcp-use` acts as an HTTP client to communicate with them.
-
-- `url`: (Required) The full URL where the MCP server is listening (e.g., `"http://localhost:7777/mcp"`, `"https://api.example.com/mcp"`).
-- `headers`: (Optional) An object containing custom HTTP headers to be sent with every request to this server (e.g., for authentication: `{"Authorization": "Bearer your_api_token"}`).
-
-Additional options might be available depending on the specific connection type or wrappers used. Always refer to the [Connection Types](./connection-types) documentation for the most detailed and up-to-date specifications for each type.
-
-### Example Configuration
-
-Here's a basic example of how to configure an MCP server:
-
-```json
-{
-  "mcpServers": {
-    "my_server": {
-      "command": "npx",
-      "args": ["@my-mcp/server"],
-      "env": {
-        "PORT": "3000"
-      }
-    }
-  }
-}
-```
-
-### Multiple Server Configuration
-
-You can configure multiple MCP servers in a single configuration file, allowing you to use different servers for different tasks or combine their capabilities (e.g.):
-
-```json
-{
-  "mcpServers": {
-    "airbnb": {
-      "command": "npx",
-      "args": ["-y", "@openbnb/mcp-server-airbnb", "--ignore-robots-txt"]
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"],
-      "env": { "DISPLAY": ":1" }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/home/pietro/projects/mcp-use/"
-      ]
-    }
-  }
-}
-```
-
-For a complete example of using multiple servers, see the [multi-server example](https://github.com/mcp-use/mcp-use/blob/main/examples/multi_server_example.py) in our repository.
-
-
-## Client Creation Methods
-
-There are several ways to create an MCPClient:
-
-### From Dictionary/Object
-
-Create configuration programmatically:
-
-<CodeGroup>
-```python Python
+```python
 from mcp_use import MCPClient
 
-config = {
+# From config file
+client = MCPClient("config.json")
+
+# From dictionary
+client = MCPClient({
     "mcpServers": {
         "playwright": {
             "command": "npx",
-            "args": ["@playwright/mcp@latest"],
-            "env": {"DISPLAY": ":1"}
+            "args": ["@playwright/mcp@latest"]
         }
     }
-}
+})
 
-client = MCPClient(config)
+# Create sessions and use
+await client.create_all_sessions()
+session = client.get_session("playwright")
+tools = await session.list_tools()
+
+# Clean up when done
+await client.close_all_sessions()
 ```
-</CodeGroup>
 
-### From Configuration File
+## MCPClient Parameters
 
-Load configuration from a JSON file:
+`MCPClient` is the main entry point for connecting to MCP servers. It provides flexible configuration for SSL, sandboxing, middleware, and server-initiated callbacks.
 
-<CodeGroup>
-```python Python
-from mcp_use import MCPClient
+<Card title="MCPClient Constructor Parameters">
 
-client = MCPClient.from_config_file("config.json")
-```
-</CodeGroup>
+<ParamField body="config" type="str | dict | None" default="None">
+  Path to a JSON configuration file or a configuration dictionary containing server definitions
+</ParamField>
 
+<ParamField body="allowed_servers" type="list[str] | None" default="None">
+  Restrict which servers from the config to use. When set, only the specified servers will be available
+</ParamField>
 
-### With Sandbox Options
+<ParamField body="verify" type="bool | None" default="True">
+  SSL certificate verification for HTTP/HTTPS servers. Set to `False` for self-signed certificates or internal servers
+</ParamField>
 
-Enable sandboxed execution:
+<ParamField body="sandbox" type="bool" default="False">
+  Run MCP servers in an isolated E2B sandbox environment. See [Sandbox](/python/client/sandbox) for configuration
+</ParamField>
 
-<CodeGroup>
-```python Python
-from mcp_use import MCPClient
-from mcp_use.types.sandbox import SandboxOptions
+<ParamField body="sandbox_options" type="SandboxOptions | None" default="None">
+  E2B sandbox configuration including `api_key` and `sandbox_template_id`. Required when `sandbox=True`. See [Sandbox](/python/client/sandbox)
+</ParamField>
 
-sandbox_options: SandboxOptions = {
-    "api_key": "your_e2b_api_key",
-    "sandbox_template_id": "code-interpreter-v1"
+<ParamField body="code_mode" type="bool" default="False">
+  Enable Python code execution mode for interacting with MCP tools programmatically. See [Code Mode](/python/client/code-mode)
+</ParamField>
+
+<ParamField body="middleware" type="list[Middleware] | None" default="None">
+  Custom middleware for intercepting and processing tool calls. See [Middleware](/python/client/middleware)
+</ParamField>
+
+<ParamField body="roots" type="list[Root] | None" default="None">
+  Directories or files to advertise to servers. Roots inform servers about accessible filesystem locations. See [Roots](/python/client/roots)
+</ParamField>
+
+<ParamField body="list_roots_callback" type="ListRootsFnT | None" default="None">
+  Custom callback to handle `roots/list` requests from servers. Overrides the static `roots` parameter with dynamic responses
+</ParamField>
+
+<ParamField body="sampling_callback" type="SamplingFnT | None" default="None">
+  Handle server-initiated sampling requests (LLM completions). Required for servers that use sampling. See [Sampling](/python/client/sampling)
+</ParamField>
+
+<ParamField body="elicitation_callback" type="ElicitationFnT | None" default="None">
+  Handle server requests for user input or decisions. See [Elicitation](/python/client/elicitation)
+</ParamField>
+
+<ParamField body="message_handler" type="MessageHandlerFnT | None" default="None">
+  Handle server notifications and messages. See [Notifications](/python/client/notifications)
+</ParamField>
+
+<ParamField body="logging_callback" type="LoggingFnT | None" default="None">
+  Handle server log messages. See [Logging](/python/client/logging)
+</ParamField>
+
+</Card>
+
+---
+
+## Server Configuration
+
+MCP servers are configured in the `mcpServers` object. Each server has a unique name and connection settings.
+
+### STDIO Servers (Local)
+
+Servers that run as local processes:
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "env": {"DISPLAY": ":1"}
+    }
+  }
 }
+```
 
+| Field | Required | Description |
+|-------|----------|-------------|
+| `command` | Yes | Executable to run (`npx`, `python`, etc.) |
+| `args` | No | Arguments to pass to the command |
+| `env` | No | Environment variables for the process |
+
+### HTTP Servers (Remote)
+
+Servers accessible via HTTP/HTTPS:
+
+```json
+{
+  "mcpServers": {
+    "remote_server": {
+      "url": "https://api.example.com/mcp",
+      "headers": {"Authorization": "Bearer token123"}
+    }
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `url` | Yes | Server URL (supports SSE and Streamable HTTP) |
+| `headers` | No | HTTP headers for authentication |
+| `timeout` | No | Connection timeout in seconds (default: 5) |
+| `sse_read_timeout` | No | SSE read timeout in seconds (default: 300) |
+| `auth` | No | Authentication config (see [Authentication](/python/client/authentication)) |
+
+### WebSocket Servers
+
+Servers accessible via WebSocket:
+
+```json
+{
+  "mcpServers": {
+    "ws_server": {
+      "ws_url": "wss://api.example.com/mcp",
+      "headers": {"Authorization": "Bearer token123"}
+    }
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `ws_url` | Yes | WebSocket URL |
+| `headers` | No | HTTP headers for the upgrade request |
+| `auth` | No | Bearer token string |
+
+---
+
+## Multiple Servers
+
+Configure multiple servers for different capabilities:
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {"GITHUB_TOKEN": "ghp_..."}
+    }
+  }
+}
+```
+
+```python
+client = MCPClient("config.json")
+await client.create_all_sessions()
+
+# Access specific server
+playwright = client.get_session("playwright")
+github = client.get_session("github")
+```
+
+See [Multi-Server Setup](/python/client/multi-server-setup) for details.
+
+---
+
+## Alternative Constructors
+
+### from_dict
+
+```python
 client = MCPClient.from_dict(
-    config,
-    sandbox=True,
-    sandbox_options=sandbox_options
+    config={"mcpServers": {...}},
+    verify=False,
+    sandbox=True
 )
 ```
-</CodeGroup>
 
-## Best Practices
+### from_config_file
 
-1. **API Keys**: Always use environment variables for sensitive information
-2. **Configuration Files**: Keep configuration files in version control (without sensitive data)
-3. **Server Naming**: Use descriptive names for your MCP servers
-4. **Environment Variables**: Set appropriate environment variables for each server
-5. **Testing**: Test server connections independently before using with agents
-6. **Monitoring**: Enable logging to monitor server connection health
+```python
+client = MCPClient.from_config_file(
+    filepath="config.json",
+    verify=False,
+    sandbox=True
+)
+```
 
-## Error Handling
+Both accept the same parameters as `MCPClient()`.
 
-Common client configuration errors and solutions:
+---
 
-1. **Server Not Found**: Check if the server command is installed and accessible
-2. **Connection Timeout**: Verify server is running and network connectivity
-3. **Permission Denied**: Ensure proper file permissions and environment setup
-4. **Invalid Configuration**: Validate JSON syntax and required fields
+## Common Issues
 
-For detailed troubleshooting, see the [Connection Types](./connection-types) guide.
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `Server 'x' not found` | Server name not in config | Check spelling, verify config file |
+| `SSL certificate error` | Self-signed cert or internal server | Set `verify=False` |
+| `Connection timeout` | Server not running or unreachable | Check server URL/command, network |
+| `Permission denied` | Missing permissions for command | Check file permissions, PATH |

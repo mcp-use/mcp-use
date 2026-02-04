@@ -1,15 +1,18 @@
-import { memo, useEffect, useRef } from "react";
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
+import { memo, useEffect, useRef } from "react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
+import type { MessageAttachment } from "./types";
+import { detectWidgetProtocol } from "@/client/utils/widget-detection";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string | Array<{ index: number; type: string; text: string }>;
   timestamp: number;
+  attachments?: MessageAttachment[];
   parts?: Array<{
     type: "text" | "tool-invocation";
     text?: string;
@@ -51,6 +54,14 @@ export const MessageList = memo(
     const getToolMeta = (toolName: string): Record<string, any> | undefined => {
       const tool = tools?.find((t) => t.name === toolName);
       return tool?._meta;
+    };
+
+    // Helper function to check if a tool has widget support
+    const isWidgetTool = (toolName: string): boolean => {
+      const toolMeta = getToolMeta(toolName);
+      const protocol = detectWidgetProtocol(toolMeta, undefined);
+      // mcp-ui requires result to detect, so don't pre-render for those
+      return protocol !== null && protocol !== "mcp-ui";
     };
 
     // Scroll to bottom when messages change or streaming status changes
@@ -126,6 +137,7 @@ export const MessageList = memo(
                 key={message.id}
                 content={contentStr}
                 timestamp={message.timestamp}
+                attachments={message.attachments}
               />
             );
           }
@@ -173,11 +185,13 @@ export const MessageList = memo(
                             }
                           />
                           {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                          {part.toolInvocation.result && (
+                          {/* Render immediately for widget tools, even if result is null */}
+                          {(part.toolInvocation.result ||
+                            isWidgetTool(part.toolInvocation.toolName)) && (
                             <ToolResultRenderer
                               toolName={part.toolInvocation.toolName}
                               toolArgs={part.toolInvocation.args}
-                              result={part.toolInvocation.result}
+                              result={part.toolInvocation.result || null}
                               serverId={serverId}
                               readResource={readResource}
                               toolMeta={getToolMeta(
@@ -214,11 +228,13 @@ export const MessageList = memo(
                                 state={toolCall.result ? "result" : "call"}
                               />
                               {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                              {toolCall.result && (
+                              {/* Render immediately for widget tools, even if result is null */}
+                              {(toolCall.result ||
+                                isWidgetTool(toolCall.toolName)) && (
                                 <ToolResultRenderer
                                   toolName={toolCall.toolName}
                                   toolArgs={toolCall.args}
-                                  result={toolCall.result}
+                                  result={toolCall.result || null}
                                   serverId={serverId}
                                   readResource={readResource}
                                   toolMeta={getToolMeta(toolCall.toolName)}

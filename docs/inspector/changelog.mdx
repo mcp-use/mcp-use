@@ -6,6 +6,102 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.18.2" description="January 2026">
+  ## Inspector Fixes
+  Patch release with widget behavior fix and improved URL handling.
+
+- **Fix**: Widget pending state now correctly emulated to reflect ChatGPT behavior
+- **Fix**: Inspector now detects when `server=` query parameter contains a URL that's not already connected and automatically redirects to use `autoConnect=` instead
+- **Update**: Updated mcp-use dependency to v1.16.2
+</Update>
+
+<Update label="v0.18.1" description="January 2026">
+  ## Dependency Update
+  Patch release aligned with mcp-use v1.16.1.
+
+- **Update**: Updated mcp-use dependency to v1.16.1
+</Update>
+
+<Update label="v0.18.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.18.0&title=Chat%20Prompts%20%26%20Multimodal%20Support&date=2026-01&lang=inspector" alt="Release 0.18.0" />
+  </Frame>
+  ## Chat Prompts & Multimodal Support
+  Minor release introducing prompts in chat and multimodal image support for vision-capable LLMs.
+
+### Chat Prompts
+
+- **New**: Prompts in Chat - type / to open a prompt, run it, and include its result in the thread before sending
+- **Note**: Prompts with arguments are not yet supported in this release
+
+### Multimodal Support
+
+- **New**: Image attachment support in Inspector chat
+- **New**: Upload and send images to vision-capable LLMs (GPT-4o, Claude, Gemini) using the paperclip button
+- **Enhancement**: MCP prompts that return images are now properly displayed instead of showing raw JSON
+- **Enhancement**: Full multimodal support for image content in chat interface
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.16.0
+</Update>
+
+<Update label="v0.17.3" description="January 2026">
+  ## Theme URL Parameter Fix
+  Patch release enabling dark mode through URL parameter.
+
+- **Fix**: Enable dark mode through theme URL parameter
+- **Update**: Aligned with mcp-use v1.15.3
+</Update>
+
+<Update label="v0.17.2" description="January 2026">
+  ## HMR File Watcher Fix
+  Patch release fixing file watcher resource exhaustion in containerized environments.
+
+- **Fix**: HMR file watcher exhausting inotify limits by properly ignoring node_modules
+- **Fix**: Prevented ENOSPC errors in containerized environments caused by watching files inside `node_modules/`
+- **Update**: Aligned with mcp-use v1.15.2
+</Update>
+
+<Update label="v0.17.1" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Update**: Updated mcp-use to v1.15.1
+</Update>
+
+<Update label="v0.17.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.17.0&title=MCP%20Apps%20Support%20%26%20Landing%20Pages&date=2026-01&lang=inspector" alt="Release 0.17.0" />
+  </Frame>
+  ## MCP Apps Support & Landing Pages
+  Major release introducing MCP Apps support with dual-protocol widget rendering and enhanced inspector capabilities.
+
+### MCP Apps Support
+
+- **New**: Dual-protocol support enabling widgets to work with both MCP Apps and ChatGPT Apps SDK
+- **New**: `MCPAppsRenderer` component for advanced debugging and visualization
+- **New**: `MCPAppsDebugControls` component for widget debugging
+- **New**: Sandboxed iframe support with console logging and safe area insets for isolated widget rendering
+- **New**: Widget adapters (MCP Apps, Apps SDK) with protocol helpers for seamless cross-protocol compatibility
+
+### Landing Pages
+
+- **New**: HTML landing page support for MCP server endpoints
+- **New**: Connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, and ChatGPT
+- **Enhancement**: Browser host normalization for server connections
+
+### Bug Fixes & Security
+
+- **Fix**: MCP server landing now shows the external URL instead of the internal URL
+- **Fix**: Zod JIT compilation to prevent CSP violations in sandboxed environments
+- **Security**: Fixed vulnerabilities in dependencies
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.15.0
+</Update>
+
 <Update label="v0.16.2" description="January 2026">
   ## UI Enhancements & Connection Handling
   Patch release with improved UI components, widget security enhancements, and better connection management.
