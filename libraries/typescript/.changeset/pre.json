@@ -8,7 +8,11 @@
     "mcp-use": "1.16.1"
   },
   "changesets": [
+    "brave-rockets-jump",
     "heavy-years-build",
+    "modern-flies-say",
+    "quiet-foxes-dance",
+    "smart-dogs-think",
     "thick-dodos-lead"
   ]
 }
