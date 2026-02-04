@@ -829,7 +829,11 @@ export function ToolResultDisplay({
                   const appsSdk = result.appsSdkResource;
 
                   if (appsSdk.isLoading) {
-                    return <></>;
+                    return (
+                      <div className="flex items-center justify-center w-full h-[200px]">
+                        <Spinner className="size-5" />
+                      </div>
+                    );
                   }
 
                   if (appsSdk.error) {

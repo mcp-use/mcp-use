@@ -47,11 +47,14 @@ const { baseURL, webServer } = (() => {
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // Tests share a single MCP server, so they must run serially to avoid interference
+  // (e.g., HMR tests modify server files, tool calls can change server state)
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: "html",
+  timeout: 90_000, // 90 seconds per test (chat tests with LLM can be slow)
   use: {
     baseURL,
     trace: "on-first-retry",

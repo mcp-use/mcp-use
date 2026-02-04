@@ -29,6 +29,7 @@ import {
   createParamsSchema,
   toolRegistration,
 } from "./tools/index.js";
+import { AppsSdkAdapter, McpAppsAdapter } from "./widgets/adapters/index.js";
 import {
   mountWidgets,
   setupFaviconRoute,
@@ -36,7 +37,6 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
-import { McpAppsAdapter, AppsSdkAdapter } from "./widgets/adapters/index.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -1146,11 +1146,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           } else if (newReg.args && newReg.args.length > 0) {
             argsSchema = this.createParamsSchema(newReg.args);
           }
+
+          // Wrap handler to support both CallToolResult and GetPromptResult
+          // This ensures prompts can use tool response helpers (text(), object(), etc.)
+          const wrappedHandler = async (
+            params: Record<string, unknown>,
+            extra?: any
+          ) => {
+            const result = await (handler as any)(params, extra);
+
+            // If it's already a GetPromptResult, return as-is
+            if ("messages" in result && Array.isArray(result.messages)) {
+              return result as any;
+            }
+
+            // Convert CallToolResult to GetPromptResult
+            const { convertToolResultToPromptResult } =
+              await import("./prompts/conversion.js");
+            return convertToolResultToPromptResult(result) as any;
+          };
+
           promptRef.update({
             title: newReg.title,
             description: newReg.description,
             argsSchema: argsSchema as any,
-            callback: handler as any,
+            callback: wrappedHandler as any,
           });
         }
       },
@@ -1164,6 +1184,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: ResourceDefinition,
       handler: unknown
     ): RegisteredResource => {
+      // Wrap handler to support both CallToolResult and ReadResourceResult
+      const wrappedHandler = async (extra?: any) => {
+        const result = await (handler as any)(extra);
+
+        // If it's already a ReadResourceResult, return as-is
+        if ("contents" in result && Array.isArray(result.contents)) {
+          return result;
+        }
+
+        // Convert CallToolResult to ReadResourceResult
+        const { convertToolResultToResourceResult } =
+          await import("./resources/conversion.js");
+        return convertToolResultToResourceResult(config.uri, result);
+      };
+
       return server.registerResource(
         config.name || name,
         config.uri,
@@ -1172,7 +1207,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           description: config.description,
           mimeType: config.mimeType || "text/plain",
         },
-        handler as any
+        wrappedHandler as any
       );
     };
 
@@ -1283,13 +1318,30 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const resourceRef = refs?.resources.get(key);
         if (resourceRef) {
           const newReg = config as ResourceDefinition;
+
+          // Wrap handler to support both CallToolResult and ReadResourceResult
+          // This ensures resources can use tool response helpers (text(), object(), etc.)
+          const wrappedHandler = async (extra?: any) => {
+            const result = await (handler as any)(extra);
+
+            // If it's already a ReadResourceResult, return as-is
+            if ("contents" in result && Array.isArray(result.contents)) {
+              return result;
+            }
+
+            // Convert CallToolResult to ReadResourceResult
+            const { convertToolResultToResourceResult } =
+              await import("./resources/conversion.js");
+            return convertToolResultToResourceResult(newReg.uri, result);
+          };
+
           resourceRef.update({
             metadata: {
               title: newReg.title,
               description: newReg.description,
               mimeType: newReg.mimeType || "text/plain",
             },
-            callback: handler as any,
+            callback: wrappedHandler as any,
           });
         }
       },
@@ -1325,11 +1377,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       if (mimeType) metadata.mimeType = mimeType;
       if (config.annotations) metadata.annotations = config.annotations;
 
+      // Wrap handler to support both CallToolResult and ReadResourceResult
+      const wrappedHandler = async (uri: URL, extra?: any) => {
+        const result = await (handler as any)(uri, extra);
+
+        // If it's already a ReadResourceResult, return as-is
+        if ("contents" in result && Array.isArray(result.contents)) {
+          return result;
+        }
+
+        // Convert CallToolResult to ReadResourceResult
+        const { convertToolResultToResourceResult } =
+          await import("./resources/conversion.js");
+        return convertToolResultToResourceResult(uri.toString(), result);
+      };
+
       return server.registerResource(
         name,
         template,
         metadata as any,
-        handler as any
+        wrappedHandler as any
       ) as unknown as RegisteredResourceTemplate;
     };
 

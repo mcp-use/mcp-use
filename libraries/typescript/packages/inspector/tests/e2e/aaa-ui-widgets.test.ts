@@ -1,18 +1,32 @@
 import { expect, test } from "@playwright/test";
 import {
   connectToConformanceServer,
+  goToInspectorWithAutoConnectAndOpenTools,
   navigateToTools,
+  warmWidgets,
 } from "./helpers/connection";
+import { getTestMatrix } from "./helpers/test-matrix";
+
+test.describe.configure({ mode: "serial" });
 
 test.describe("Conformance UI widgets - Tools Tab", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto("http://localhost:3000/inspector");
 
-    await page.evaluate(() => localStorage.clear());
+    const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
+    if (usesBuiltinInspector) {
+      await goToInspectorWithAutoConnectAndOpenTools(page, {
+        waitForWidgets: true,
+      });
+    } else {
+      await page.goto(inspectorUrl);
+      await page.evaluate(() => localStorage.clear());
+      await connectToConformanceServer(page);
+      await navigateToTools(page);
+    }
 
-    await connectToConformanceServer(page);
-    await navigateToTools(page);
+    // Pre-warm widgets to avoid Vite cold start delays
+    await warmWidgets(page, ["get-weather-delayed", "apps-sdk-only-card"]);
   });
 
   test("get-weather-delayed - should show weather widget in both Apps SDK and MCP Apps tabs", async ({
@@ -32,7 +46,7 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
 
     // Tab 1: Component (Apps SDK) - verify pending state first
     await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
-      timeout: 2000,
+      timeout: 10000,
     });
     await page.getByTestId("tool-result-view-chatgpt-app").click();
 
@@ -42,7 +56,7 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
 
     // Test pending state: loader should be visible while tool is executing (2s delay)
     const spinner = appsSdkFrame.locator('[class*="animate-spin"]').first();
-    await expect(spinner).toBeVisible({ timeout: 2000 });
+    await expect(spinner).toBeVisible({ timeout: 10000 });
 
     // Wait for loader to disappear and content to appear
     await expect(spinner).not.toBeVisible({ timeout: 5000 });
@@ -94,17 +108,28 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
       widgetFrame
         .getByText(/ChatGPT-only widget|Custom|appsSdkMetadata only/)
         .first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: 45000 });
   });
 });
 
 test.describe("Conformance UI widgets - Resources Tab", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto("http://localhost:3000/inspector");
-    await page.evaluate(() => localStorage.clear());
-    await connectToConformanceServer(page);
-    await navigateToTools(page);
+
+    const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
+    if (usesBuiltinInspector) {
+      await goToInspectorWithAutoConnectAndOpenTools(page, {
+        waitForWidgets: true,
+      });
+    } else {
+      await page.goto(inspectorUrl);
+      await page.evaluate(() => localStorage.clear());
+      await connectToConformanceServer(page);
+      await navigateToTools(page);
+    }
+
+    // Pre-warm widgets to avoid Vite cold start delays
+    await warmWidgets(page, ["weather-display"]);
 
     await page
       .getByRole("tab", { name: /Resources/ })
@@ -175,10 +200,22 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
 
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
-    await page.goto("http://localhost:3000/inspector");
-    await page.evaluate(() => localStorage.clear());
-    await connectToConformanceServer(page);
-    await navigateToTools(page);
+
+    const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
+    if (usesBuiltinInspector) {
+      await goToInspectorWithAutoConnectAndOpenTools(page, {
+        waitForWidgets: true,
+      });
+    } else {
+      await page.goto(inspectorUrl);
+      await page.evaluate(() => localStorage.clear());
+      await connectToConformanceServer(page);
+      await navigateToTools(page);
+    }
+
+    // Pre-warm widgets to avoid Vite cold start delays
+    await warmWidgets(page, ["get-weather-delayed", "apps-sdk-only-card"]);
+
     await configureChatAPI(page);
   });
 
@@ -195,7 +232,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     ).toBeVisible({ timeout: 20000 });
 
     await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 15000,
+      timeout: 45000,
     });
 
     // MCP Apps uses double-nested iframe (outer proxy + inner guest)
@@ -221,7 +258,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     ).toBeVisible({ timeout: 20000 });
 
     await expect(page.getByTestId("chat-tool-call-status-result")).toBeVisible({
-      timeout: 15000,
+      timeout: 45000,
     });
 
     const widgetFrame = page
@@ -229,7 +266,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       .first();
     await expect(
       widgetFrame.getByText(/ChatGPT-only widget|appsSdkMetadata only/).first()
-    ).toBeVisible({ timeout: 15000 });
+    ).toBeVisible({ timeout: 45000 });
   });
 
   test("widget pending state in chat - should show loading then content", async ({

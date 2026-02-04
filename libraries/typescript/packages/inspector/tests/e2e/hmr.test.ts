@@ -34,6 +34,10 @@ test.describe("HMR (Hot Module Reload)", () => {
       await restoreFile(originalWidgetContent, CONFORMANCE_WEATHER_WIDGET_PATH);
       originalWidgetContent = null;
     }
+    // Wait for HMR to complete after file restoration
+    // This ensures the server is stable before the next test starts
+    // and widget tools have time to re-register
+    await new Promise((resolve) => setTimeout(resolve, 3000));
   });
 
   test("tool addition - new tool appears in UI after HMR", async ({ page }) => {
@@ -163,12 +167,14 @@ server.tool(
       'iframe[title^="OpenAI Component: get-weather-delayed"]'
     );
     await expect(appsSdkFrame.getByText(/tokyo/i)).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
     await expect(appsSdkFrame.getByText("Partly Cloudy")).toBeVisible();
 
     // Verify widget loads in MCP Apps iframe
-    await page.getByTestId("tool-result-view-mcp-apps").click();
+    await page.getByTestId("tool-result-view-mcp-apps").click({
+      timeout: 10000,
+    });
     const mcpAppsOuter = page.frameLocator(
       'iframe[title^="MCP App: get-weather-delayed"]'
     );

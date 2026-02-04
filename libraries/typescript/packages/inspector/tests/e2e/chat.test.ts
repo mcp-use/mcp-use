@@ -4,12 +4,14 @@ import {
   navigateToTools,
 } from "./helpers/connection";
 
-test.describe("Inspector Chat Tests", () => {
+test.describe.serial("Inspector Chat Tests", () => {
   // Note: To run these tests with a real MCP server:
   // 1. cd packages/mcp-use/examples/server/features/conformance
   // 2. pnpm build && pnpm start --port 3002
   // 3. Ensure you have OPENAI_API_KEY in your .env file
   // Then run: pnpm test:e2e tests/e2e/chat.test.ts
+  //
+  // Tests run sequentially to avoid interference between chat sessions
 
   // Helper function to configure API key for chat
   async function configureChatAPI(page: any) {
@@ -87,7 +89,7 @@ test.describe("Inspector Chat Tests", () => {
 
     // Verify assistant response appears
     await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
-      timeout: 15000,
+      timeout: 45000,
     });
 
     // Wait for response to complete (no loading state)
@@ -143,7 +145,7 @@ test.describe("Inspector Chat Tests", () => {
 
     // Verify assistant response appears
     await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
-      timeout: 15000,
+      timeout: 45000,
     });
   });
 
@@ -173,7 +175,7 @@ test.describe("Inspector Chat Tests", () => {
 
     // Verify assistant response appears
     await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
-      timeout: 15000,
+      timeout: 45000,
     });
   });
 
@@ -207,7 +209,7 @@ test.describe("Inspector Chat Tests", () => {
 
     // Verify assistant response appears
     await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
-      timeout: 15000,
+      timeout: 45000,
     });
   });
 

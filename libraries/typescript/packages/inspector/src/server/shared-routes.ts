@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
@@ -11,7 +12,6 @@ import {
   storeWidgetData,
 } from "./shared-utils-browser.js";
 import { formatErrorResponse } from "./utils.js";
-import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
@@ -474,8 +474,18 @@ export function registerInspectorRoutes(
     });
   });
 
+  // Helper to check if telemetry is disabled via environment
+  const isTelemetryDisabled = () =>
+    process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false" ||
+    process.env.NODE_ENV === "test";
+
   // Telemetry proxy endpoint - forwards telemetry events to PostHog from server-side
   app.post("/inspector/api/tel/posthog", async (c) => {
+    // Skip telemetry in test environments
+    if (isTelemetryDisabled()) {
+      return c.json({ success: true });
+    }
+
     try {
       const body = await c.req.json();
       const { event, user_id, properties } = body;
@@ -516,6 +526,11 @@ export function registerInspectorRoutes(
 
   // Telemetry proxy endpoint - forwards telemetry events to Scarf from server-side
   app.post("/inspector/api/tel/scarf", async (c) => {
+    // Skip telemetry in test environments
+    if (isTelemetryDisabled()) {
+      return c.json({ success: true });
+    }
+
     try {
       const body = await c.req.json();
 

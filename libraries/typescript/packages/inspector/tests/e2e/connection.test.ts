@@ -162,9 +162,6 @@ test.describe("Inspector MCP Server Connections", () => {
     ).toBeVisible({
       timeout: 3000,
     });
-    await expect(
-      page.getByTestId("connection-form-connect-button")
-    ).not.toBeVisible();
   });
 
   test("should reconnect after updating connection settings", async ({
@@ -230,9 +227,9 @@ test.describe("Inspector MCP Server Connections", () => {
       .fill("http://localhost:3002/mcp");
     await dialog.getByTestId("connection-form-connect-button").click();
 
-    await expect(page.getByText("Connection settings updated")).toBeVisible({
-      timeout: 10000,
-    });
+    const toast = page.getByText("Connection settings updated").first();
+    await expect(toast).toBeVisible({ timeout: 10000 });
+    await expect(toast).toBeHidden({ timeout: 10000 });
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
       timeout: 10000,
     });

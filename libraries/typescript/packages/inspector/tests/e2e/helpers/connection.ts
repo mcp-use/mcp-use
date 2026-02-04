@@ -15,6 +15,41 @@ export async function waitForHMRReload(
 }
 
 /**
+ * Pre-warm widgets by fetching their URLs to trigger Vite build.
+ * This eliminates cold start delays when widgets are first rendered in tests.
+ * Only runs when Vite dev server is active (TEST_SERVER_MODE=builtin-dev).
+ */
+export async function warmWidgets(
+  page: Page,
+  widgetNames: string[]
+): Promise<void> {
+  const { supportsHMR, serverUrl } = getTestMatrix();
+
+  // Only warm widgets in dev mode with Vite
+  if (!supportsHMR) {
+    return;
+  }
+
+  // Extract base URL from server URL (remove /mcp path)
+  const baseUrl = serverUrl.replace(/\/mcp$/, "");
+
+  // Fetch each widget URL to trigger Vite transformation
+  await Promise.all(
+    widgetNames.map(async (widgetName) => {
+      try {
+        await page.request.get(
+          `${baseUrl}/mcp-use/widgets/${widgetName}/index.html`,
+          { timeout: 10000 }
+        );
+      } catch (e) {
+        // Ignore errors - widget may not exist or build may fail
+        // Tests will fail later if widget is actually broken
+      }
+    })
+  );
+}
+
+/**
  * Connect to the conformance test server
  * This helper can be used in beforeEach or beforeAll hooks
  */
@@ -33,6 +68,54 @@ export async function connectToConformanceServer(page: Page) {
 }
 
 /**
+ * Wait for widget tools to be registered on the server.
+ * Widget tools are auto-registered from the resources/ directory.
+ * This prevents race conditions where tests run before widgets finish registering.
+ *
+ * After HMR events (especially from other tests), widget tools may not be immediately
+ * available. This function handles that by:
+ * 1. First waiting briefly for widgets to appear
+ * 2. If not found, reloading the page to get fresh tools list
+ * 3. Then waiting again with full timeout
+ *
+ * @param page - Playwright page object
+ * @param options - Optional configuration
+ * @param options.skipIfMissing - If true, silently skip if widgets are not found (default: false)
+ */
+export async function waitForWidgetTools(
+  page: Page,
+  options?: { skipIfMissing?: boolean }
+) {
+  const skipIfMissing = options?.skipIfMissing ?? false;
+
+  if (skipIfMissing) {
+    // Try to wait for widgets, but don't fail if they're not present
+    // This is useful for HMR tests that start with a minimal server configuration
+    try {
+      await expect(
+        page.getByTestId("tool-item-apps-sdk-only-card")
+      ).toBeVisible({
+        timeout: 2000,
+      });
+      await expect(page.getByTestId("tool-item-display-info")).toBeVisible({
+        timeout: 2000,
+      });
+    } catch {
+      // Widgets not present, continue anyway
+    }
+  } else {
+    // Wait for auto-registered widget tools to appear
+    // These are registered asynchronously after the server starts
+    await expect(page.getByTestId("tool-item-apps-sdk-only-card")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("tool-item-display-info")).toBeVisible({
+      timeout: 10000,
+    });
+  }
+}
+
+/**
  * Navigate to the Tools tab for the connected server
  */
 export async function navigateToTools(page: Page) {
@@ -40,20 +123,33 @@ export async function navigateToTools(page: Page) {
   await page.getByTestId(`server-tile-${serverUrl}`).click();
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
   await expect(page.getByTestId("tool-item-test_simple_text")).toBeVisible();
+
+  // Wait for widget tools to be registered to avoid race conditions
+  await waitForWidgetTools(page);
 }
 
-/** Inspector and MCP server URLs when running builtin dev (HMR) — both on port 3000. */
-const BUILTIN_DEV_INSPECTOR_URL = "http://localhost:3000/inspector";
-const BUILTIN_DEV_SERVER_URL = "http://localhost:3000/mcp";
-
 /**
- * For builtin inspector (TEST_SERVER_MODE=builtin-dev): navigate with autoConnect
- * and ensure the Tools tab is open. Use in HMR tests only; inspector and server
- * are both on port 3000 in this setup.
+ * Navigate to inspector with autoConnect and ensure the Tools tab is open.
+ * Works across all test matrix configurations by using getTestMatrix() for URLs.
+ *
+ * @param page - Playwright page object
+ * @param options - Optional configuration
+ * @param options.waitForWidgets - Whether to wait for widget tools (default: false for HMR tests)
  */
-export async function goToInspectorWithAutoConnectAndOpenTools(page: Page) {
-  const url = `${BUILTIN_DEV_INSPECTOR_URL}?autoConnect=${encodeURIComponent(BUILTIN_DEV_SERVER_URL)}`;
+export async function goToInspectorWithAutoConnectAndOpenTools(
+  page: Page,
+  options?: { waitForWidgets?: boolean }
+) {
+  const { inspectorUrl, serverUrl } = getTestMatrix();
+  const waitForWidgets = options?.waitForWidgets ?? false;
+  const url = `${inspectorUrl}?autoConnect=${encodeURIComponent(serverUrl)}`;
   await page.goto(url);
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
   await expect(page.getByTestId("tool-item-test_simple_text")).toBeVisible();
+
+  // Wait for widget tools to be registered if requested (ui-widgets tests)
+  // HMR tests skip this since they start with a minimal server
+  if (waitForWidgets) {
+    await waitForWidgetTools(page);
+  }
 }

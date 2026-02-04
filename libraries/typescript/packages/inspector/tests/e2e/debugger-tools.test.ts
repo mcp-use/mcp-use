@@ -30,7 +30,9 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
     // const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
     // if (usesBuiltinInspector) {
-    await goToInspectorWithAutoConnectAndOpenTools(page);
+    await goToInspectorWithAutoConnectAndOpenTools(page, {
+      waitForWidgets: true,
+    });
     // } else {
     //   await page.goto(inspectorUrl);
     //   await connectToConformanceServer(page);
