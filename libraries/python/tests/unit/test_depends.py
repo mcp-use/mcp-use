@@ -1,4 +1,3 @@
-# ruff: noqa: B008
 """Tests for Depends() dependency injection."""
 
 from __future__ import annotations
