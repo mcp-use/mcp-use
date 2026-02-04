@@ -47,7 +47,7 @@ async function startServer() {
 
     // Check for port from command line arguments first
     const cliPort = parsePortFromArgs();
-    let port = cliPort ?? 3001;
+    let port = cliPort ?? 3000;
     const available = await isPortAvailable(port);
 
     if (!available) {
