@@ -3,14 +3,15 @@ title: "Response Helpers"
 description: "Utility functions for creating standardized MCP tool and resource responses"
 icon: "drill"
 ---
+
 ![mcp-use helpers](/images/ts-helpers.png)
 
 Response helpers are utility functions that simplify creating standardized responses for MCP tools, resources, and prompts. Instead of manually constructing `CallToolResult` objects, these helpers provide a clean, type-safe API with automatic MIME type handling.
 
-
 ## Why Use Response Helpers?
 
 Response helpers provide several benefits:
+
 - **Consistency**: Standardized response format across your server
 - **Type Safety**: TypeScript types ensure correct usage
 - **Less Boilerplate**: No need to manually construct response objects
@@ -92,11 +93,10 @@ server.tool({
 Returns XML formatted content.
 
 ```typescript
-import { xml } from 'mcp-use/server';
+import { xml } from "mcp-use/server";
 
-server.resource(
-  { name: 'sitemap', uri: 'data://sitemap' },
-  async () => xml('<?xml version="1.0"?><urlset>...</urlset>')
+server.resource({ name: "sitemap", uri: "data://sitemap" }, async () =>
+  xml('<?xml version="1.0"?><urlset>...</urlset>')
 );
 ```
 
@@ -107,11 +107,10 @@ server.resource(
 Returns CSS stylesheet content.
 
 ```typescript
-import { css } from 'mcp-use/server';
+import { css } from "mcp-use/server";
 
-server.resource(
-  { name: 'styles', uri: 'asset://theme.css' },
-  async () => css('body { margin: 0; padding: 0; font-family: sans-serif; }')
+server.resource({ name: "styles", uri: "asset://theme.css" }, async () =>
+  css("body { margin: 0; padding: 0; font-family: sans-serif; }")
 );
 ```
 
@@ -122,11 +121,10 @@ server.resource(
 Returns JavaScript code content.
 
 ```typescript
-import { javascript } from 'mcp-use/server';
+import { javascript } from "mcp-use/server";
 
-server.resource(
-  { name: 'script', uri: 'asset://main.js' },
-  async () => javascript('console.log("Application started");')
+server.resource({ name: "script", uri: "asset://main.js" }, async () =>
+  javascript('console.log("Application started");')
 );
 ```
 
@@ -162,12 +160,15 @@ server.resource(
 ```
 
 **Returns**: `TypedCallToolResult<T>` with:
+
 - Text content: Pretty-printed JSON string
 - Structured content: Typed object data
 - MIME type: `application/json`
 
 <Tip>
-The `object()` helper includes both stringified JSON for backwards compatibility as specified by the protocol and the new structured data property. 
+  The `object()` helper includes both stringified JSON for backwards
+  compatibility as specified by the protocol and the new structured data
+  property.
 </Tip>
 
 ### array()
@@ -189,7 +190,8 @@ server.tool({
 **Returns**: `TypedCallToolResult<{ data: T }>` with structured content
 
 <Note>
-Arrays are automatically wrapped in an object with a `data` field. If you pass an array to `object()`, it will automatically call `array()` internally.
+  Arrays are automatically wrapped in an object with a `data` field. If you pass
+  an array to `object()`, it will automatically call `array()` internally.
 </Note>
 
 ## Media Content
@@ -216,6 +218,7 @@ server.resource(
 ```
 
 **Parameters**:
+
 - `data`: Base64 string or data URL
 - `mimeType`: Image MIME type (default: `'image/png'`)
 
@@ -242,6 +245,7 @@ server.resource(
 ```
 
 **Parameters**:
+
 - `dataOrPath`: Base64 audio data or file path
 - `mimeType`: Audio MIME type (optional, inferred from extension for files)
 
@@ -250,7 +254,8 @@ server.resource(
 **Supported formats**: WAV, MP3, OGG, M4A, WebM, FLAC, AAC
 
 <Warning>
-When using file paths, make sure to `await` the result as the file is read asynchronously.
+  When using file paths, make sure to `await` the result as the file is read
+  asynchronously.
 </Warning>
 
 ### binary()
@@ -258,19 +263,17 @@ When using file paths, make sure to `await` the result as the file is read async
 Returns arbitrary binary content as base64.
 
 ```typescript
-import { binary } from 'mcp-use/server';
+import { binary } from "mcp-use/server";
 
-server.resource(
-  { name: 'document', uri: 'file://document.pdf' },
-  async () => {
-    const pdfData = await readFile('./document.pdf');
-    const base64 = pdfData.toString('base64');
-    return binary(base64, 'application/pdf');
-  }
-);
+server.resource({ name: "document", uri: "file://document.pdf" }, async () => {
+  const pdfData = await readFile("./document.pdf");
+  const base64 = pdfData.toString("base64");
+  return binary(base64, "application/pdf");
+});
 ```
 
 **Parameters**:
+
 - `base64Data`: Base64-encoded binary data
 - `mimeType`: Content MIME type
 
@@ -356,7 +359,8 @@ server.tool({
 **Returns**: `CallToolResult` with `isError: true`
 
 <Tip>
-Using `error()` provides a standardized way to communicate failures to clients while maintaining consistent response structure.
+  Using `error()` provides a standardized way to communicate failures to clients
+  while maintaining consistent response structure.
 </Tip>
 
 ## Mixed Content
@@ -410,7 +414,8 @@ server.tool({
 **Returns**: `CallToolResult` with merged content array and combined metadata
 
 <Note>
-The `mix()` helper merges content arrays and combines `structuredContent` and `_meta` objects from all inputs, allowing complex multi-part responses.
+  The `mix()` helper merges content arrays and combines `structuredContent` and
+  `_meta` objects from all inputs, allowing complex multi-part responses.
 </Note>
 
 ## Widget Responses
@@ -420,42 +425,50 @@ The `mix()` helper merges content arrays and combines `structuredContent` and `_
 Creates a response that returns runtime data for an OpenAI Apps SDK widget. Used in conjunction with the `widget` config on your tool definition.
 
 <Note>
-The `widget()` helper only handles **runtime data**. Widget configuration (name, invoking status, etc.) must be set on the tool's `widget` config property at registration time.
+  The `widget()` helper only handles **runtime data**. Widget configuration
+  (name, invoking status, etc.) must be set on the tool's `widget` config
+  property at registration time.
 </Note>
 
 ```typescript
-import { widget, text } from 'mcp-use/server';
-import z from 'zod';
+import { widget, text } from "mcp-use/server";
+import z from "zod";
 
-server.tool({
-  name: 'show-weather',
-  schema: z.object({ city: z.string() }),
-  // Widget configuration goes here (registration-time)
-  widget: {
-    name: 'weather-display',      // Must match widget in resources/
-    invoking: 'Fetching weather data...',
-    invoked: 'Weather data loaded',
-    widgetAccessible: true,
-    resultCanProduceWidget: true
-  }
-}, async ({ city }) => {
-  const weatherData = await fetchWeather(city);
-  
-  // widget() helper returns runtime data only
-  return widget({
-    props: {
-      city,
-      temperature: weatherData.temp,
-      conditions: weatherData.conditions,
-      humidity: weatherData.humidity
+server.tool(
+  {
+    name: "show-weather",
+    schema: z.object({ city: z.string() }),
+    // Widget configuration goes here (registration-time)
+    widget: {
+      name: "weather-display", // Must match widget in resources/
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+      widgetAccessible: true,
+      resultCanProduceWidget: true,
     },
-    output: text(`Weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`),
-    message: `Showing weather for ${city}`
-  });
-});
+  },
+  async ({ city }) => {
+    const weatherData = await fetchWeather(city);
+
+    // widget() helper returns runtime data only
+    return widget({
+      props: {
+        city,
+        temperature: weatherData.temp,
+        conditions: weatherData.conditions,
+        humidity: weatherData.humidity,
+      },
+      output: text(
+        `Weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`
+      ),
+      message: `Showing weather for ${city}`,
+    });
+  }
+);
 ```
 
 **Parameters:**
+
 - `props` - Widget-only data passed to `useWidget().props` in your widget component (hidden from the model)
 - `output` - Optional response helper (text(), object(), etc.) that defines what the model sees
 - `message` - Optional text message override (used if no output provided)
@@ -463,7 +476,118 @@ server.tool({
 **Returns**: `CallToolResult` with widget props in `_meta["mcp-use/props"]` and tool output in `content`
 
 <Tip>
-The widget name must match a `.tsx` file or folder in your `resources/` directory. The widget will receive the `props` data via the `useWidget()` hook, while the model sees the `output` or `message` in the conversation.
+  The widget name must match a `.tsx` file or folder in your `resources/`
+  directory. The widget will receive the `props` data via the `useWidget()`
+  hook, while the model sees the `output` or `message` in the conversation.
+</Tip>
+
+## Using Response Helpers in Prompts and Resources
+
+Response helpers aren't just for tools - they work seamlessly with prompts and resources too. The server automatically converts `CallToolResult` to the appropriate format (`GetPromptResult` for prompts, `ReadResourceResult` for resources), allowing you to use the same familiar API across all MCP primitives.
+
+### Prompts with Response Helpers
+
+Instead of manually constructing message objects, you can use the same helpers you use in tools. The server automatically converts them to the required `GetPromptResult` format:
+
+```typescript
+import { text, object, mix, image } from "mcp-use/server";
+import { z } from "zod";
+
+// Simple text prompt
+server.prompt(
+  {
+    name: "greeting",
+    description: "Generate a greeting message",
+    schema: z.object({ name: z.string() }),
+  },
+  async ({ name }) => {
+    return text(`Hello, ${name}! How can I help you today?`);
+  }
+);
+
+// Structured data prompt
+server.prompt(
+  {
+    name: "user_context",
+    description: "Provide user context data",
+    schema: z.object({ userId: z.string() }),
+  },
+  async ({ userId }) => {
+    const userData = await fetchUser(userId);
+    return object({
+      userId: userData.id,
+      email: userData.email,
+      preferences: userData.preferences,
+    });
+  }
+);
+
+// Mixed content prompt
+server.prompt(
+  {
+    name: "analysis_report",
+    description: "Generate analysis report with visualization",
+    schema: z.object({ dataId: z.string() }),
+  },
+  async ({ dataId }) => {
+    const data = await fetchData(dataId);
+    const chart = await generateChart(data);
+
+    return mix(
+      text("Analysis Report"),
+      object({ summary: data.summary, metrics: data.metrics }),
+      image(chart, "image/png")
+    );
+  }
+);
+```
+
+**How it works**: When you return a response helper from a prompt handler, the server automatically converts it to a `GetPromptResult` with properly formatted messages. The content becomes message content, and any structured data is preserved.
+
+### Resources with Response Helpers
+
+Resources fully support response helpers (you've seen examples throughout this guide). The automatic conversion ensures consistent behavior:
+
+```typescript
+import { text, object, markdown } from "mcp-use/server";
+
+// Text resource
+server.resource(
+  {
+    name: "readme",
+    uri: "doc://readme",
+  },
+  async () => markdown("# Welcome\n\nGetting started...")
+);
+
+// Structured resource
+server.resource(
+  {
+    name: "config",
+    uri: "config://app",
+  },
+  async () => object({ version: "1.0.0", features: ["auth", "api"] })
+);
+
+// Resource template with helpers
+server.resourceTemplate(
+  {
+    name: "user_profile",
+    uriTemplate: "user://{userId}/profile",
+  },
+  async (uri, { userId }) => {
+    const profile = await fetchProfile(userId);
+    return object(profile);
+  }
+);
+```
+
+**Automatic Conversion**: The server converts `CallToolResult` to `ReadResourceResult` format, extracting content and metadata appropriately. This means you can use the same response helpers for tools, prompts, and resources without worrying about format differences.
+
+<Tip>
+  This unified API makes it easy to share response-building logic across tools,
+  prompts, and resources. For example, a helper function that returns `object()`
+  can be used in all three contexts.
 </Tip>
 
 ## Type Safety
@@ -471,17 +595,17 @@ The widget name must match a `.tsx` file or folder in your `resources/` director
 Response helpers are fully typed for TypeScript users:
 
 ```typescript
-import { object, TypedCallToolResult } from 'mcp-use/server';
+import { object, TypedCallToolResult } from "mcp-use/server";
 
 // Type inference
-const response = object({ userId: '123', name: 'Alice' });
+const response = object({ userId: "123", name: "Alice" });
 // response type: TypedCallToolResult<{ userId: string; name: string }>
 
 // Explicit typing
 interface UserData {
   userId: string;
   email: string;
-  role: 'admin' | 'user';
+  role: "admin" | "user";
 }
 
 function getUserResponse(user: UserData): TypedCallToolResult<UserData> {
@@ -489,11 +613,9 @@ function getUserResponse(user: UserData): TypedCallToolResult<UserData> {
 }
 ```
 
-
 ## Next Steps
 
 - [Tools](./tools) - Learn about creating MCP tools
 - [Resources](./resources) - Managing static and dynamic content
 - [Prompts](./prompts) - Building interactive prompts
 - [UI Widgets](./ui-widgets) - Creating OpenAI Apps SDK widgets
-
