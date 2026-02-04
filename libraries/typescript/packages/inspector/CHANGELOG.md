@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.18.4-canary.2
+
+### Patch Changes
+
+- 03094a1: fix(inspector): solved cold start issue for widgets
+  - mcp-use@1.16.4-canary.2
+
 ## 0.18.4-canary.1
 
 ### Patch Changes
