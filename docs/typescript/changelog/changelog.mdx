@@ -6,6 +6,64 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.16.4" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.16.4&title=HMR%20Improvements%20%26%20Widget%20Enhancements&date=2026-02&lang=typescript" alt="Release 1.16.4" />
+  </Frame>
+  ## HMR Improvements & Widget Enhancements
+  Patch release with Hot Module Reload improvements, widget lifecycle enhancements, and CLI build system improvements.
+
+### HMR & Server Improvements
+
+- **Fix**: Tool schema preservation during HMR now uses Zod schemas directly instead of converting to params
+- **Fix**: Empty schema changed from `{}` to `z.object({})` to ensure `safeParseAsync` works correctly
+- **Enhancement**: Prompts now support tool response helpers (`text()`, `object()`, `image()`, etc.) via automatic conversion to `GetPromptResult`
+- **Enhancement**: Resources now support tool response helpers via automatic conversion to `ReadResourceResult`
+- **Enhancement**: Widget resources (`ui://widget/*`) and resource templates preserved during HMR
+- **Enhancement**: Enhanced prompt conversion to handle edge cases (single content objects, bare content items, mixed content arrays)
+
+### CLI Build Improvements
+
+- **New**: Build manifest with `entryPoint` tracking written to `dist/mcp-use.json` for reliable server location
+- **Enhancement**: Support for multiple TypeScript output paths (dist/index.js, dist/src/index.js, custom paths)
+- **Enhancement**: Start command reads `entryPoint` from manifest for accurate server location
+- **Enhancement**: Clear error messages when no built server file is found, listing all attempted locations
+
+### Widget Improvements
+
+- **Fix**: Widget pending state now correctly emulated to reflect ChatGPT behavior
+- **Enhancement**: Immediate widget rendering during pending states
+- **Enhancement**: Enhanced widget lifecycle management with better tool output handling
+- **New**: Delayed weather tool example (`get-weather-delayed`) in conformance server for testing widget lifecycle
+
+### Dependencies
+
+- **Update**: Updated @mcp-use/inspector to v0.18.4
+- **Update**: Updated @mcp-use/cli to v2.13.1
+- **Update**: Updated create-mcp-use-app to v0.12.3
+</Update>
+
+<Update label="v1.16.3" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.16.3&title=CLI%20Manufact%20Rebrand&date=2026-02&lang=typescript" alt="Release 1.16.3" />
+  </Frame>
+  ## CLI Manufact Rebrand
+  Minor release with CLI branding updates and authentication improvements.
+
+### CLI Rebrand
+
+- **Enhancement**: Updated CLI branding from "mcp-use" to "Manufact"
+- **Enhancement**: Changed default web URL from `mcp-use.com` to `manufact.com` for login flow
+- **Fix**: Fixed 431 "Request Header Fields Too Large" error by increasing callback server header limit to 16KB
+- **Enhancement**: Updated dashboard, inspector, and settings URLs to use `manufact.com` domain
+- **Enhancement**: Gateway domain remains `run.mcp-use.com` for backward compatibility with existing deployments
+
+### Dependencies
+
+- **Update**: Updated @mcp-use/cli to v2.13.0
+- **Update**: Updated @mcp-use/inspector to v0.18.3
+</Update>
+
 <Update label="v1.16.2" description="January 2026">
   ## Widget Behavior Fix
   Patch release fixing widget pending state emulation.
@@ -121,7 +179,7 @@ tag: "New"
 - **Fix**: Retry logic with exponential backoff for dev widget fetching to handle Vite dev server cold starts
 - **Fix**: Default session idle timeout changed from 5 minutes to 1 day (86400000ms) to prevent premature session expiration
 - **Fix**: Session lastAccessedAt tracking now updates both persistent store and in-memory map
-- **Fix**: _meta merging now preserves existing fields (e.g., openai/outputTemplate) when updating tools and widgets
+- **Fix**: \_meta merging now preserves existing fields (e.g., openai/outputTemplate) when updating tools and widgets
 - **Enhancement**: Support for frame_domains and redirect_domains in widget CSP metadata
 
 ### CLI Improvements

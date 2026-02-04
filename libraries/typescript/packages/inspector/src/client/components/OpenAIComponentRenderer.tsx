@@ -215,9 +215,11 @@ function OpenAIComponentRendererBase({
         };
         urlParams.set("mcpUseParams", JSON.stringify(params));
 
-        // Check for dev mode widget - check both _meta locations
+        // Check for dev mode widget - check all _meta locations (toolResult, toolResult.contents, and resourceData.contents)
         const metaForWidget =
-          currentToolResult?._meta || currentToolResult?.contents?.[0]?._meta;
+          currentToolResult?._meta ||
+          currentToolResult?.contents?.[0]?._meta ||
+          resourceData?.contents?.[0]?._meta;
 
         // Use dev mode if metadata says so
         const computedUseDevMode =
