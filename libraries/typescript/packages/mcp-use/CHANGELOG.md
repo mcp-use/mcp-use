@@ -1,5 +1,84 @@
 # mcp-use
 
+## 1.16.4
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+- ac3e216: fix(server): HMR tool schema preservation, prompt/resource handler wrappers for CallToolResult conversion, preserve widget resources during HMR, and prompt content normalization
+
+  **HMR Schema Preservation:**
+  - Fixed tool schema handling during HMR to use Zod schemas directly instead of converting to params
+  - Changed empty schema from `{}` to `z.object({})` to ensure `safeParseAsync` works correctly
+  - Preserves full Zod validation capabilities during hot module reload
+
+  **Handler Wrapper Improvements:**
+  - Added automatic handler wrapping for prompts and resources to support `CallToolResult` format
+  - Prompts now support tool response helpers (`text()`, `object()`, `image()`, etc.) via automatic conversion to `GetPromptResult`
+  - Resources now support tool response helpers via automatic conversion to `ReadResourceResult`
+  - Applied wrappers in `listen()`, `addPrompt()`, `addResource()`, and `syncPrimitive()` methods
+
+  **Widget Resource Preservation:**
+  - Widget resources (`ui://widget/*`) and resource templates are now preserved during HMR
+  - Prevents deletion of widget registrations that are only registered on initial load
+  - Ensures widgets remain functional across hot reloads
+
+  **HMR Sync Behavior:**
+  - Changed `hmr-sync.ts` to prefer `onUpdate` handler over in-place updates
+  - Ensures proper handler wrapping for prompts/resources during updates
+  - Maintains correct order-preserving update behavior
+
+  **Content Normalization:**
+  - Enhanced prompt conversion to handle edge cases:
+    - Single content objects without array wrapper
+    - Bare content items (result is the content, not wrapped in `content` property)
+    - Mixed content type arrays
+  - Improved robustness of `CallToolResult` to `GetPromptResult` conversion
+
+  Commits: 116a3be4 (partial)
+
+- ac3e216: fix: ensure pending state is emulated for widgets, reflecting ChatGPT behaviour
+
+  **Inspector Changes:**
+  - Updated MCPAppsRenderer and OpenAIComponentRenderer to handle tool output and metadata more effectively, allowing for immediate rendering of widgets even when results are pending
+  - Enhanced MessageList and ToolResultRenderer to support immediate rendering of widget tools, improving responsiveness during tool execution
+  - Added utility functions for widget detection and pre-rendering capabilities based on tool metadata
+
+  **Server Changes:**
+  - Introduced delayed weather tool example (`get-weather-delayed`) in conformance server to demonstrate widget lifecycle management with artificial delays
+
+  **Documentation:**
+  - Updated inspector and widget lifecycle testing documentation
+  - Enhanced debugging guides for ChatGPT Apps with widget lifecycle testing instructions
+
+  These changes address Issue #930, ensuring widgets can display loading states and update seamlessly upon tool completion.
+
+  Commits: fea26ff4
+
+- ac3e216: chore(deps): upgrade @modelcontextprotocol/sdk to 1.26.0
+
+  **Dependencies:**
+  - Updated `@modelcontextprotocol/sdk` from `^1.25.3` to `^1.26.0`
+  - Applied the same Zod 4 compatibility patch to SDK 1.26.0
+  - Removed old SDK 1.25.3 patch file
+
+  **Patch Details:**
+
+  The SDK still requires a patch to fix Zod 4 compatibility in the `zod-compat.js` module. The patch ensures that Zod 4 schemas use their instance methods (`schema.safeParse()`) instead of attempting to call non-existent top-level functions (`z4mini.safeParse()`).
+
+  This is a drop-in replacement upgrade with no breaking changes.
+
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+  - @mcp-use/inspector@0.18.4
+  - @mcp-use/cli@2.13.1
+
 ## 1.16.4-canary.3
 
 ### Patch Changes

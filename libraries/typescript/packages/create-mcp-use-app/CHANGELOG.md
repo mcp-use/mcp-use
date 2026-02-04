@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.3
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+
 ## 0.12.3-canary.0
 
 ### Patch Changes

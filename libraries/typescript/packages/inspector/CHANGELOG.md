@@ -1,5 +1,116 @@
 # @mcp-use/inspector
 
+## 0.18.4
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+- ac3e216: fix: ensure pending state is emulated for widgets, reflecting ChatGPT behaviour
+
+  **Inspector Changes:**
+  - Updated MCPAppsRenderer and OpenAIComponentRenderer to handle tool output and metadata more effectively, allowing for immediate rendering of widgets even when results are pending
+  - Enhanced MessageList and ToolResultRenderer to support immediate rendering of widget tools, improving responsiveness during tool execution
+  - Added utility functions for widget detection and pre-rendering capabilities based on tool metadata
+
+  **Server Changes:**
+  - Introduced delayed weather tool example (`get-weather-delayed`) in conformance server to demonstrate widget lifecycle management with artificial delays
+
+  **Documentation:**
+  - Updated inspector and widget lifecycle testing documentation
+  - Enhanced debugging guides for ChatGPT Apps with widget lifecycle testing instructions
+
+  These changes address Issue #930, ensuring widgets can display loading states and update seamlessly upon tool completion.
+
+  Commits: fea26ff4
+
+- ac3e216: chore(inspector): add refresh buttons for tools, resources, and prompts lists
+
+  **UI Enhancements:**
+  - Added refresh buttons with loading states to Tools, Resources, and Prompts tabs
+  - Implemented `ListTabHeader` component with refresh functionality and spinning icon animation
+  - Added refresh handlers in `ToolsTab`, `ResourcesTab`, and `PromptsTab` with loading state management
+  - Connected refresh callbacks through `LayoutContent` to enable manual list updates
+
+  **Developer Experience:**
+  - Allows users to manually refresh primitives without reconnecting to the server
+  - Improves workflow when testing server changes or investigating stale data
+
+  Commits: 03238f28
+
+- ac3e216: fix(inspector): solved cold start issue for widgets
+- ac3e216: chore(inspector): add E2E test suite, default port 3000 when not in dev, skip telemetry in test env, and data-testid for testability
+
+  **E2E Testing Infrastructure:**
+  - Added comprehensive Playwright-based E2E testing suite with full coverage for:
+    - Chat functionality and message handling
+    - Connection management and authentication flows (OAuth, API key, custom headers)
+    - HMR (Hot Module Reload) for tools, prompts, and resources
+    - UI widgets and lifecycle states
+    - Command palette and debugger tools
+  - Created test fixtures for auth servers (OAuth mock, API key, custom headers)
+  - Implemented test helpers for connection, authentication, and debugger tools
+  - Added test matrix for parameterized test scenarios across multiple inspector modes
+  - Comprehensive E2E testing documentation in `tests/e2e/README.md`
+
+  **CI/CD Integration:**
+  - New GitHub Actions workflow (`.github/workflows/inspector-e2e.yml`) for automated E2E testing
+  - Tests run across multiple modes: mix (SSE + WebSocket), prod (HTTP only), builtin (no connection)
+  - Improved Playwright configuration with CI-optimized timeouts
+
+  **Testability Improvements:**
+  - Added `data-testid` attributes across 40+ UI components for reliable element selection:
+    - Connection forms, server list, command palette
+    - Chat interface, tool execution panels
+    - Resources, prompts, and tools tabs
+    - Elicitation and sampling displays
+  - Enhanced component accessibility for automated testing
+
+  **Server Improvements:**
+  - Changed default port from 3001 to 3000 for production builds (dev still uses 3001)
+  - Skip telemetry (PostHog/Scarf) when `NODE_ENV=test` or `MCP_USE_ANONYMIZED_TELEMETRY=false`
+  - Added `start-auth-servers.ts` utility for running authentication test servers
+
+  **Widget Testing:**
+  - Created widget examples for conformance testing (weather-display, status-card, display-info, apps-sdk-only-card)
+  - Enhanced widget props support in ToolResultDisplay
+  - Added delayed weather tool to conformance server for lifecycle testing
+
+  Commits: 03238f28, 836b760d, 6a76e51a, 0eb147dc, 116a3be4 (partial)
+
+- ac3e216: fix(inspector): add logic to detect when server= contains a URL that's not already connected and automatically redirect to use autoConnect= instead
+
+  **Connection Handling:**
+  - Enhanced Layout component to detect when `server=` URL parameter is provided but no matching connection exists
+  - Automatically redirects to use `autoConnect=` parameter for seamless connection establishment
+  - Updated dependencies in useEffect hook to include connections and navigate for improved functionality
+
+  **Documentation:**
+  - Added comprehensive URL parameters documentation page to inspector reference
+  - Included examples and usage patterns for `server=`, `autoConnect=`, and other query parameters
+
+  Resolves #932
+
+  Commits: 37af1bf7
+
+- ac3e216: chore(deps): upgrade @modelcontextprotocol/sdk to 1.26.0
+
+  **Dependencies:**
+  - Updated `@modelcontextprotocol/sdk` from `^1.25.3` to `^1.26.0`
+  - Applied the same Zod 4 compatibility patch to SDK 1.26.0
+  - Removed old SDK 1.25.3 patch file
+
+  **Patch Details:**
+
+  The SDK still requires a patch to fix Zod 4 compatibility in the `zod-compat.js` module. The patch ensures that Zod 4 schemas use their instance methods (`schema.safeParse()`) instead of attempting to call non-existent top-level functions (`z4mini.safeParse()`).
+
+  This is a drop-in replacement upgrade with no breaking changes.
+
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+  - mcp-use@1.16.4
+
 ## 0.18.4-canary.3
 
 ### Patch Changes
