@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.13.1-canary.1
+
+### Patch Changes
+
+- d0239d2: fix(mcp-use): release canary versions
+- Updated dependencies [d0239d2]
+  - @mcp-use/inspector@0.18.4-canary.1
+  - mcp-use@1.16.4-canary.1
+
 ## 2.13.1-canary.0
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.12.3-canary.0
+
+### Patch Changes
+
+- d0239d2: fix(mcp-use): release canary versions
+
 ## 0.12.2
 
 ### Patch Changes
