@@ -270,6 +270,7 @@ export function JsonRpcLoggerView({
               <div
                 key={it.id}
                 className="group hover:bg-muted/50 transition-all duration-200 overflow-hidden"
+                data-testid={`rpc-message-${it.method.replace(/\//g, "-")}`}
               >
                 <div
                   className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"

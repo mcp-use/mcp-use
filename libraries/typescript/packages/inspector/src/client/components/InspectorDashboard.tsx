@@ -589,6 +589,7 @@ export function InspectorDashboard() {
               {connections.map((connection) => (
                 <div
                   key={connection.id}
+                  data-testid={`server-tile-${connection.id}`}
                   onClick={() => handleServerClick(connection)}
                   className={`group rounded-lg bg-zinc-100 dark:bg-white/10 p-4 transition-colors ${
                     connection.state === "ready"
@@ -614,6 +615,7 @@ export function InspectorDashboard() {
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
+                                  data-testid={`server-tile-status-${connection.state}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleCopyError(connection.error!);
@@ -639,6 +641,7 @@ export function InspectorDashboard() {
                             </Tooltip>
                           ) : (
                             <div
+                              data-testid={`server-tile-status-${connection.state}`}
                               className={`w-2 h-2 rounded-full ${
                                 connection.state === "ready"
                                   ? "bg-emerald-600 animate-status-pulse"
@@ -680,6 +683,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-copy-config"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -699,6 +703,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-info"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -719,6 +724,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-settings"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -738,6 +744,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-remove"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -759,6 +766,7 @@ export function InspectorDashboard() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
+                              data-testid="server-tile-reconnect"
                               variant="secondary"
                               size="sm"
                               onClick={(e) =>
@@ -866,6 +874,7 @@ export function InspectorDashboard() {
                         </Button>
                       ) : connection.authUrl ? (
                         <Button
+                          data-testid="server-tile-authenticate"
                           size="sm"
                           className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
                           variant="outline"

@@ -298,7 +298,10 @@ export function useChatMessagesClientSide({
 
               // Store the unwrapped result
               toolPart.toolInvocation.result = result;
-              toolPart.toolInvocation.state = "result";
+              // Check if result indicates an error
+              toolPart.toolInvocation.state = result?.isError
+                ? "error"
+                : "result";
 
               // Check result's _meta field for Apps SDK component
               const appsSdkUri = result?._meta?.["openai/outputTemplate"];

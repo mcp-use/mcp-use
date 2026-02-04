@@ -49,12 +49,14 @@ export function LayoutContent({
         className="h-full"
       >
         <ToolsTab
+          key={`tools-${selectedServer.id}-${selectedServer.state}`}
           ref={toolsSearchRef}
           tools={selectedServer.tools}
           callTool={selectedServer.callTool}
           readResource={selectedServer.readResource}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          refreshTools={selectedServer.refreshTools}
         />
       </div>
       <div
@@ -62,6 +64,7 @@ export function LayoutContent({
         className="h-full"
       >
         <PromptsTab
+          key={`prompts-${selectedServer.id}-${selectedServer.state}`}
           ref={promptsSearchRef}
           prompts={selectedServer.prompts}
           callPrompt={(name, args) =>
@@ -79,6 +82,7 @@ export function LayoutContent({
           }
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
+          refreshPrompts={selectedServer.refreshPrompts}
         />
       </div>
       <div
@@ -86,12 +90,14 @@ export function LayoutContent({
         className="h-full"
       >
         <ResourcesTab
+          key={`resources-${selectedServer.id}-${selectedServer.state}`}
           ref={resourcesSearchRef}
           resources={selectedServer.resources}
           readResource={selectedServer.readResource}
           serverId={selectedServer.id}
           isConnected={selectedServer.state === "ready"}
           mcpServerUrl={selectedServer.url || ""}
+          refreshResources={selectedServer.refreshResources}
         />
       </div>
       <div
@@ -99,7 +105,7 @@ export function LayoutContent({
         className="h-full"
       >
         <ChatTab
-          key={selectedServer.id}
+          key={`chat-${selectedServer.id}-${selectedServer.state}`}
           connection={selectedServer}
           isConnected={selectedServer.state === "ready"}
           prompts={selectedServer.prompts}
@@ -113,6 +119,7 @@ export function LayoutContent({
         className="h-full"
       >
         <SamplingTab
+          key={`sampling-${selectedServer.id}-${selectedServer.state}`}
           pendingRequests={selectedServer.pendingSamplingRequests}
           onApprove={selectedServer.approveSampling}
           onReject={selectedServer.rejectSampling}
@@ -126,6 +133,7 @@ export function LayoutContent({
         className="h-full"
       >
         <ElicitationTab
+          key={`elicitation-${selectedServer.id}-${selectedServer.state}`}
           pendingRequests={selectedServer.pendingElicitationRequests}
           onApprove={selectedServer.approveElicitation}
           onReject={selectedServer.rejectElicitation}
@@ -138,6 +146,7 @@ export function LayoutContent({
         className="h-full"
       >
         <NotificationsTab
+          key={`notifications-${selectedServer.id}-${selectedServer.state}`}
           notifications={selectedServer.notifications}
           unreadCount={selectedServer.unreadNotificationCount}
           markNotificationRead={selectedServer.markNotificationRead}

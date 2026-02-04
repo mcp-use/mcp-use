@@ -141,6 +141,7 @@ export function ToolInputForm({
               </Label>
               <Textarea
                 id={key}
+                data-testid={`tool-param-${key}`}
                 value={stringValue}
                 onChange={(e) => onArgChange(key, e.target.value)}
                 placeholder={typedProp?.description || `Enter ${key}`}
@@ -169,7 +170,11 @@ export function ToolInputForm({
                 value={String(toolArgs[key] || "")}
                 onValueChange={(value) => onArgChange(key, value)}
               >
-                <SelectTrigger id={key} className="w-full">
+                <SelectTrigger
+                  id={key}
+                  className="w-full"
+                  data-testid={`tool-param-${key}`}
+                >
                   <SelectValue
                     placeholder={typedProp.description || "Select an option"}
                   />
@@ -202,6 +207,7 @@ export function ToolInputForm({
             </Label>
             <Input
               id={key}
+              data-testid={`tool-param-${key}`}
               value={stringValue}
               onChange={(e) => onArgChange(key, e.target.value)}
               placeholder={typedProp?.description || `Enter ${key}`}

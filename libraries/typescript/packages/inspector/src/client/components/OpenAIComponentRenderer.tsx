@@ -1,7 +1,7 @@
 import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useMcpClient } from "mcp-use/react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
@@ -943,7 +943,7 @@ function OpenAIComponentRendererBase({
           centerVertically && "items-center",
           displayMode === "fullscreen" && "bg-background",
           displayMode === "pip" &&
-            "fixed bottom-6 right-6 z-50 rounded-3xl w-[768px] h-96 shadow-2xl border overflow-hidden"
+            "fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-fit min-w-[300px] max-w-[min(90vw,1200px)] h-[400px] shadow-2xl border overflow-hidden"
         )}
         onMouseEnter={() => displayMode === "pip" && setIsPipHovered(true)}
         onMouseLeave={() => displayMode === "pip" && setIsPipHovered(false)}

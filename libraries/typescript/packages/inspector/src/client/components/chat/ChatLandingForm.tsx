@@ -74,7 +74,10 @@ export function ChatLandingForm({
     <AuroraBackground>
       <BlurFade className="w-full max-w-4xl mx-auto px-2 sm:px-4">
         <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-light mb-2 dark:text-white">
+          <h1
+            className="text-2xl sm:text-4xl font-light mb-2 dark:text-white"
+            data-testid="chat-landing-header"
+          >
             Chat with MCP Server
           </h1>
           <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-light break-all px-2">
@@ -126,6 +129,7 @@ export function ChatLandingForm({
                     !canSend && "bg-zinc-400"
                   )}
                   disabled={isLoading || !canSend || !isConnected}
+                  data-testid="chat-send-button"
                 >
                   {isLoading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

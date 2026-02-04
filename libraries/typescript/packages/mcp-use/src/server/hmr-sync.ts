@@ -284,12 +284,19 @@ export function syncPrimitive<TConfig, THandler>(
           const refs = session.getRefs();
           const existingRef = refs?.get(key);
 
-          if (supportsInPlaceUpdate && existingRef?.update && !configChanged) {
-            // In-place update (only handler changed)
-            existingRef.update(newReg.handler);
-          } else if (onUpdate) {
+          if (onUpdate) {
             // Use custom order-preserving update handler
+            // This is preferred over in-place update because it properly handles
+            // handler wrapping (e.g., prompt conversion) and config updates
             onUpdate(session, key, newReg.config, newReg.handler);
+          } else if (
+            supportsInPlaceUpdate &&
+            existingRef?.update &&
+            !configChanged
+          ) {
+            // In-place update (only handler changed)
+            // Only use this path if no custom onUpdate handler is provided
+            existingRef.update(newReg.handler);
           } else {
             // Full re-registration needed (doesn't preserve order)
             if (existingRef) {

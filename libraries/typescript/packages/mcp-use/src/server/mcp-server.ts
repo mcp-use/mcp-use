@@ -29,6 +29,7 @@ import {
   createParamsSchema,
   toolRegistration,
 } from "./tools/index.js";
+import { AppsSdkAdapter, McpAppsAdapter } from "./widgets/adapters/index.js";
 import {
   mountWidgets,
   setupFaviconRoute,
@@ -36,7 +37,6 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
-import { McpAppsAdapter, AppsSdkAdapter } from "./widgets/adapters/index.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -857,13 +857,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       handler: unknown,
       nativeServer: any
     ): RegisteredTool => {
-      let inputSchema: Record<string, any>;
+      // For HMR, we need to preserve Zod schemas properly
+      // Use the original schema directly, or create z.object({}) for empty schemas
+      let inputSchema: z.ZodObject<any> | Record<string, z.ZodSchema>;
       if (config.schema) {
-        inputSchema = this.convertZodSchemaToParams(config.schema);
+        // Pass the Zod schema directly - it will be used for validation
+        inputSchema = config.schema;
       } else if (config.inputs && config.inputs.length > 0) {
         inputSchema = this.createParamsSchema(config.inputs);
       } else {
-        inputSchema = {};
+        // Create proper Zod schema instead of plain {} to ensure safeParseAsync works
+        inputSchema = z.object({});
       }
 
       return {
@@ -1021,6 +1025,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       } else if (config.args && config.args.length > 0) {
         argsSchema = this.createParamsSchema(config.args);
       }
+      // Wrap handler to support both CallToolResult and GetPromptResult (same as listen() method)
+      const wrappedHandler = async (...args: any[]) => {
+        const result = await (handler as any)(...args);
+
+        // If it's already a GetPromptResult, return as-is
+        if ("messages" in result && Array.isArray(result.messages)) {
+          return result;
+        }
+
+        // Convert CallToolResult to GetPromptResult
+        const { convertToolResultToPromptResult } =
+          await import("./prompts/conversion.js");
+        return convertToolResultToPromptResult(result);
+      };
       return server.registerPrompt(
         name,
         {
@@ -1028,7 +1046,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           description: config.description ?? "",
           argsSchema: argsSchema as any,
         },
-        handler as any
+        wrappedHandler as any
       );
     };
 
@@ -1128,11 +1146,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           } else if (newReg.args && newReg.args.length > 0) {
             argsSchema = this.createParamsSchema(newReg.args);
           }
+
+          // Wrap handler to support both CallToolResult and GetPromptResult
+          // This ensures prompts can use tool response helpers (text(), object(), etc.)
+          const wrappedHandler = async (
+            params: Record<string, unknown>,
+            extra?: any
+          ) => {
+            const result = await (handler as any)(params, extra);
+
+            // If it's already a GetPromptResult, return as-is
+            if ("messages" in result && Array.isArray(result.messages)) {
+              return result as any;
+            }
+
+            // Convert CallToolResult to GetPromptResult
+            const { convertToolResultToPromptResult } =
+              await import("./prompts/conversion.js");
+            return convertToolResultToPromptResult(result) as any;
+          };
+
           promptRef.update({
             title: newReg.title,
             description: newReg.description,
             argsSchema: argsSchema as any,
-            callback: handler as any,
+            callback: wrappedHandler as any,
           });
         }
       },
@@ -1146,6 +1184,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: ResourceDefinition,
       handler: unknown
     ): RegisteredResource => {
+      // Wrap handler to support both CallToolResult and ReadResourceResult
+      const wrappedHandler = async (extra?: any) => {
+        const result = await (handler as any)(extra);
+
+        // If it's already a ReadResourceResult, return as-is
+        if ("contents" in result && Array.isArray(result.contents)) {
+          return result;
+        }
+
+        // Convert CallToolResult to ReadResourceResult
+        const { convertToolResultToResourceResult } =
+          await import("./resources/conversion.js");
+        return convertToolResultToResourceResult(config.uri, result);
+      };
+
       return server.registerResource(
         config.name || name,
         config.uri,
@@ -1154,11 +1207,29 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           description: config.description,
           mimeType: config.mimeType || "text/plain",
         },
-        handler as any
+        wrappedHandler as any
       );
     };
 
     // --- RESOURCES ---
+    // IMPORTANT: Preserve widget resources during HMR
+    // Widget resources (ui://widget/*) are only registered on initial load, not during HMR
+    // Copy them to the new server's registrations to prevent deletion
+    for (const [key, registration] of this.registrations.resources) {
+      const uri = (registration.config as any).uri;
+      if (uri && uri.startsWith("ui://widget/")) {
+        other.registrations.resources.set(key, registration);
+      }
+    }
+    // ALSO preserve widget resource templates (for dynamic URIs)
+    for (const [key, registration] of this.registrations.resourceTemplates) {
+      const uriTemplate = (registration.config as any).resourceTemplate
+        ?.uriTemplate;
+      if (uriTemplate && uriTemplate.startsWith("ui://widget/")) {
+        other.registrations.resourceTemplates.set(key, registration);
+      }
+    }
+
     const resourcesResult = syncPrimitive({
       primitiveName: "Resources",
       currentRegistrations: this.registrations.resources,
@@ -1247,13 +1318,30 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const resourceRef = refs?.resources.get(key);
         if (resourceRef) {
           const newReg = config as ResourceDefinition;
+
+          // Wrap handler to support both CallToolResult and ReadResourceResult
+          // This ensures resources can use tool response helpers (text(), object(), etc.)
+          const wrappedHandler = async (extra?: any) => {
+            const result = await (handler as any)(extra);
+
+            // If it's already a ReadResourceResult, return as-is
+            if ("contents" in result && Array.isArray(result.contents)) {
+              return result;
+            }
+
+            // Convert CallToolResult to ReadResourceResult
+            const { convertToolResultToResourceResult } =
+              await import("./resources/conversion.js");
+            return convertToolResultToResourceResult(newReg.uri, result);
+          };
+
           resourceRef.update({
             metadata: {
               title: newReg.title,
               description: newReg.description,
               mimeType: newReg.mimeType || "text/plain",
             },
-            callback: handler as any,
+            callback: wrappedHandler as any,
           });
         }
       },
@@ -1289,11 +1377,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       if (mimeType) metadata.mimeType = mimeType;
       if (config.annotations) metadata.annotations = config.annotations;
 
+      // Wrap handler to support both CallToolResult and ReadResourceResult
+      const wrappedHandler = async (uri: URL, extra?: any) => {
+        const result = await (handler as any)(uri, extra);
+
+        // If it's already a ReadResourceResult, return as-is
+        if ("contents" in result && Array.isArray(result.contents)) {
+          return result;
+        }
+
+        // Convert CallToolResult to ReadResourceResult
+        const { convertToolResultToResourceResult } =
+          await import("./resources/conversion.js");
+        return convertToolResultToResourceResult(uri.toString(), result);
+      };
+
       return server.registerResource(
         name,
         template,
         metadata as any,
-        handler as any
+        wrappedHandler as any
       ) as unknown as RegisteredResourceTemplate;
     };
 
@@ -1427,7 +1530,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.registrations.resourceTemplates = templatesResult.updatedRegistrations;
 
     // Sync widget definitions (for widget() helper metadata)
-    this.widgetDefinitions = new Map(other.widgetDefinitions);
+    // IMPORTANT: During HMR, widget resources aren't re-registered, so the new server's
+    // widgetDefinitions Map is empty. We need to:
+    // 1. Update definitions on THIS (running) server
+    // 2. ALSO copy them to OTHER (new) server so closures in handlers can find them
+    for (const [widgetName, widgetDef] of other.widgetDefinitions) {
+      this.widgetDefinitions.set(widgetName, widgetDef);
+    }
+    // Copy existing widget definitions TO the new server as well
+    // This ensures tool callback wrappers (which reference the new server via closure) can find them
+    for (const [widgetName, widgetDef] of this.widgetDefinitions) {
+      if (!other.widgetDefinitions.has(widgetName)) {
+        other.widgetDefinitions.set(widgetName, widgetDef);
+      }
+    }
 
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());
@@ -1793,6 +1909,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           const result = await originalCallback(params, ctx);
 
           // Look up the widget definition and inject its metadata into the response
+          // Use self (the running server) because widgetDefinitions are synced TO the running server during HMR
           const widgetDef = self.widgetDefinitions.get(widgetName);
           const widgetType = widgetDef?.["mcp-use/widgetType"] as
             | string
@@ -1907,18 +2024,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         | import("./types/index.js").PromptDefinitionWithoutCallback,
       callback?: import("./types/index.js").PromptCallback<any, HasOAuth>
     ) => {
+      // First call originalPrompt which creates the wrapped handler with conversion logic
+      const result = originalPrompt.call(
+        self as any,
+        promptDefinition,
+        callback as any
+      );
+
+      // After originalPrompt returns, the registeredPrompts list is updated
+      // Store the prompt info in registrations for HMR (the handler is already wrapped by originalPrompt)
       const actualCallback = callback || (promptDefinition as any).cb;
-      if (actualCallback) {
+      if (actualCallback && !(self as any).isReplaying) {
+        // Store the raw callback - the wrapping will happen again during sync via originalPrompt
         self.registrations.prompts.set(promptDefinition.name, {
           config: promptDefinition as any,
           handler: actualCallback as any,
         });
       }
-      return originalPrompt.call(
-        self as any,
-        promptDefinition,
-        callback as any
-      );
+      return result;
     }) as any;
 
     this.resource = ((

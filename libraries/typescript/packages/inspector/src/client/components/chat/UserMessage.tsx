@@ -20,9 +20,15 @@ export function UserMessage({
   }
 
   return (
-    <div className="flex items-start gap-3 justify-end group/user-message">
+    <div
+      className="flex items-start gap-3 justify-end group/user-message"
+      data-testid="chat-message-user"
+    >
       <div className="flex-1 min-w-0 flex flex-col items-end">
-        <div className="bg-zinc-200 dark:bg-zinc-800 text-primary rounded-3xl px-4 py-2 max-w-[80%] break-words">
+        <div
+          className="bg-zinc-200 dark:bg-zinc-800 text-primary rounded-3xl px-4 py-2 max-w-[80%] break-words"
+          data-testid="chat-message-content"
+        >
           {/* Render image attachments */}
           {attachments && attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">

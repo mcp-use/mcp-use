@@ -253,7 +253,10 @@ export function useChatMessages({
 
                 if (toolPart && toolPart.toolInvocation) {
                   toolPart.toolInvocation.result = event.result;
-                  toolPart.toolInvocation.state = "result";
+                  // Check if result indicates an error
+                  toolPart.toolInvocation.state = event.result?.isError
+                    ? "error"
+                    : "result";
                   console.log(
                     "[Parts after tool-result]",
                     parts.length,

@@ -116,6 +116,7 @@ export function PromptInputForm({
         </Label>
         <Input
           id={key}
+          data-testid={`prompt-param-${key}`}
           value={stringValue}
           onChange={(e) => onArgChange(key, e.target.value)}
           placeholder={arg.description || `Enter ${key}`}

@@ -119,13 +119,17 @@ export function ToolExecutionPanel({
       <div className="shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-4 sm:pr-4">
         <div>
           <div className="flex flex-row items-center justify-between mb-0 gap-2">
-            <h3 className="text-base sm:text-lg font-semibold">
+            <h3
+              className="text-base sm:text-lg font-semibold"
+              data-testid="tool-execution-title"
+            >
               {selectedTool.name}
             </h3>
             <div className="flex gap-2 shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    data-testid="tool-execution-metadata-button"
                     variant={showMetadata ? "default" : "outline"}
                     onClick={() => setShowMetadata(!showMetadata)}
                     disabled={isExecuting}
@@ -142,6 +146,7 @@ export function ToolExecutionPanel({
                 </TooltipContent>
               </Tooltip>
               <Button
+                data-testid="tool-execution-save-button"
                 variant="outline"
                 onClick={onSave}
                 disabled={isExecuting}
@@ -160,6 +165,7 @@ export function ToolExecutionPanel({
                       className="relative"
                     >
                       <Button
+                        data-testid="tool-execution-cancel-button"
                         onClick={onCancel}
                         variant={showCancelButton ? "destructive" : "default"}
                         size="sm"
@@ -190,6 +196,7 @@ export function ToolExecutionPanel({
                 </Tooltip>
               ) : (
                 <Button
+                  data-testid="tool-execution-execute-button"
                   onClick={onExecute}
                   disabled={isExecuting || !isConnected}
                   size="sm"
@@ -222,6 +229,7 @@ export function ToolExecutionPanel({
             <div className="relative">
               <p
                 ref={descriptionRef}
+                data-testid="tool-execution-description"
                 className={`text-sm text-gray-600 dark:text-gray-400 leading-relaxed transition-all duration-300 ${
                   !isDescriptionExpanded && isDescriptionTruncated
                     ? "line-clamp-3"

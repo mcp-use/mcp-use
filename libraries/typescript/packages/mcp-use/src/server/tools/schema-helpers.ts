@@ -26,8 +26,15 @@ import { z } from "zod";
 export function convertZodSchemaToParams(
   zodSchema: z.ZodObject<any>
 ): Record<string, z.ZodSchema> {
-  // Validate that it's a ZodObject
-  if (!(zodSchema instanceof z.ZodObject)) {
+  // Validate that it's a ZodObject using duck-typing to support both zod and zod/v3 imports
+  // Check for _def.typeName === "ZodObject" instead of instanceof to support different zod versions
+  const hasZodObjectStructure =
+    zodSchema &&
+    typeof zodSchema === "object" &&
+    "_def" in zodSchema &&
+    (zodSchema as any)._def?.typeName === "ZodObject";
+
+  if (!hasZodObjectStructure && !(zodSchema instanceof z.ZodObject)) {
     throw new Error("schema must be a Zod object schema (z.object({...}))");
   }
 

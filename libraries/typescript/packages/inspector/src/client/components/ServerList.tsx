@@ -95,7 +95,10 @@ export function ServerList() {
       ) : (
         <div className="grid gap-4">
           {connections.map((connection) => (
-            <Card key={connection.id}>
+            <Card
+              key={connection.id}
+              data-testid={`server-card-${connection.id}`}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
@@ -106,6 +109,7 @@ export function ServerList() {
                       </h3>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span
+                          data-testid={`server-card-status-${connection.state}`}
                           className={`px-2 py-1 rounded-full text-xs font-medium flex items-center ${getStatusColor(
                             connection.state
                           )}`}
@@ -137,6 +141,7 @@ export function ServerList() {
                   <div className="flex items-center space-x-2">
                     {connection.state === "ready" && (
                       <Button
+                        data-testid={`server-card-info-${connection.id}`}
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenCapabilities(connection)}
@@ -145,7 +150,12 @@ export function ServerList() {
                         <Info className="w-4 h-4" />
                       </Button>
                     )}
-                    <Button asChild variant="outline" size="sm">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      data-testid={`server-card-inspect-${connection.id}`}
+                    >
                       <Link
                         to={`/?server=${encodeURIComponent(connection.id)}`}
                       >
@@ -153,6 +163,7 @@ export function ServerList() {
                       </Link>
                     </Button>
                     <Button
+                      data-testid={`server-card-delete-${connection.id}`}
                       variant="outline"
                       size="sm"
                       onClick={() => handleDeleteConnection(connection.id)}

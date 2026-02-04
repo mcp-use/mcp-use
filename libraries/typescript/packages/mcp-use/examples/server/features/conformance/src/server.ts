@@ -9,15 +9,16 @@
 import { setTimeout as sleep } from "timers/promises";
 
 import {
-  MCPServer,
-  text,
-  image,
-  resource,
-  error,
-  object,
-  binary,
-  mix,
   audio,
+  binary,
+  error,
+  image,
+  MCPServer,
+  mix,
+  object,
+  resource,
+  text,
+  widget,
 } from "mcp-use/server";
 import { z } from "zod";
 
@@ -374,6 +375,74 @@ server.prompt(
   },
   async (params) =>
     mix(text("Here is a test image:"), image(RED_PIXEL_PNG, "image/png"))
+);
+
+// =============================================================================
+// UI WIDGET: get-weather-delayed (weather display with artificial delay)
+// =============================================================================
+
+const weatherData: Record<
+  string,
+  {
+    temperature: number;
+    conditions: string;
+    humidity: number;
+    windSpeed: number;
+  }
+> = {
+  tokyo: {
+    temperature: 22,
+    conditions: "Partly Cloudy",
+    humidity: 65,
+    windSpeed: 12,
+  },
+  london: { temperature: 15, conditions: "Rainy", humidity: 80, windSpeed: 20 },
+  "new york": {
+    temperature: 18,
+    conditions: "Sunny",
+    humidity: 55,
+    windSpeed: 8,
+  },
+  paris: { temperature: 17, conditions: "Cloudy", humidity: 70, windSpeed: 15 },
+};
+
+server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city, delay }) => {
+    await sleep(delay);
+
+    const cityLower = city.toLowerCase();
+    const weather = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "Unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    return widget({
+      props: {
+        city,
+        ...weather,
+      },
+      message: `Current weather in ${city}: ${weather.conditions}, ${weather.temperature}°C (fetched after ${delay}ms delay)`,
+    });
+  }
 );
 
 await server.listen();

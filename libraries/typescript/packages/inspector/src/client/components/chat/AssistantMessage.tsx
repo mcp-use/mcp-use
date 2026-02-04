@@ -46,10 +46,16 @@ export function AssistantMessage({
   }
 
   return (
-    <div className="flex items-start gap-6 group/message relative">
+    <div
+      className="flex items-start gap-6 group/message relative"
+      data-testid="chat-message-assistant"
+    >
       <div className="flex-1 min-w-0">
         <div className="wrap-break-word">
-          <div className="text-base leading-7 font-sans text-start wrap-break-word transition-all duration-300 ease-in-out">
+          <div
+            className="text-base leading-7 font-sans text-start wrap-break-word transition-all duration-300 ease-in-out"
+            data-testid="chat-message-content"
+          >
             <MarkdownRenderer content={content} />
           </div>
         </div>

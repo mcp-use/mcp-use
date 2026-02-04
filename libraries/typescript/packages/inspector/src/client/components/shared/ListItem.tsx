@@ -20,6 +20,8 @@ interface ListItemProps {
   onClick: () => void;
   /** Optional additional class names */
   className?: string;
+  /** Optional data-testid for testing */
+  "data-testid"?: string;
 }
 
 export function ListItem({
@@ -32,10 +34,12 @@ export function ListItem({
   metadata,
   onClick,
   className,
+  "data-testid": dataTestId,
 }: ListItemProps) {
   return (
     <button
       id={id}
+      data-testid={dataTestId}
       type="button"
       onClick={onClick}
       className={cn(
