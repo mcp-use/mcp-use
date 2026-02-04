@@ -1,3 +1,6 @@
+# ruff: noqa: B008
+"""Tests for Depends() dependency injection."""
+
 from __future__ import annotations
 
 import inspect
@@ -5,6 +8,7 @@ import inspect
 import pytest
 
 from mcp_use.server.dependencies import Depends, wrap_tool_with_dependencies
+
 
 def get_db():
     return "db_connection"
@@ -20,6 +24,7 @@ def get_contextual_resource():
 
 async def get_async_contextual():
     yield "async_contextual"
+
 
 class TestDepends:
     def test_depends_stores_callable(self):

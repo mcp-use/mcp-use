@@ -393,6 +393,7 @@
                     ]
                   },
                   "python/api-reference/mcp_use_server_context",
+                  "python/api-reference/mcp_use_server_dependencies",
                   {
                     "group": "Logging",
                     "icon": "logs",
