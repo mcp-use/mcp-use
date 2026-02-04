@@ -6,6 +6,62 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.18.4" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.18.4&title=E2E%20Testing%20%26%20Refresh%20Features&date=2026-02&lang=inspector" alt="Release 0.18.4" />
+  </Frame>
+  ## E2E Testing & Refresh Features
+  Patch release with comprehensive E2E testing infrastructure and enhanced UI functionality.
+
+### E2E Testing Infrastructure
+
+- **New**: Comprehensive Playwright-based E2E test suite with full coverage for chat, connections, HMR, widgets, and command palette
+- **New**: GitHub Actions workflow (`.github/workflows/inspector-e2e.yml`) for automated E2E testing across multiple modes
+- **New**: Test fixtures for authentication servers (OAuth mock, API key, custom headers)
+- **New**: Test helpers for connection, authentication, and debugger tools
+- **New**: Test matrix for parameterized test scenarios across multiple inspector modes (mix, prod, builtin)
+- **New**: Widget examples for conformance testing (weather-display, status-card, display-info, apps-sdk-only-card)
+- **Enhancement**: Comprehensive E2E testing documentation in `tests/e2e/README.md`
+
+### Testability Improvements
+
+- **Enhancement**: Added `data-testid` attributes across 40+ UI components for reliable element selection
+- **Enhancement**: Enhanced component accessibility for automated testing including connection forms, server list, command palette, chat interface, tool execution panels, resources/prompts/tools tabs, and elicitation/sampling displays
+
+### UI Enhancements
+
+- **New**: Refresh buttons with loading states for Tools, Resources, and Prompts tabs
+- **New**: `ListTabHeader` component with refresh functionality and spinning icon animation
+- **Enhancement**: Manual refresh capability for primitives without reconnecting to server
+- **Fix**: Inspector now detects when `server=` query parameter contains a URL that's not already connected and automatically redirects to use `autoConnect=` instead
+- **Enhancement**: Added comprehensive URL parameters documentation page to inspector reference
+
+### Widget Improvements
+
+- **Fix**: Widget pending state now correctly emulated to reflect ChatGPT behavior
+- **Enhancement**: MCPAppsRenderer and OpenAIComponentRenderer handle tool output and metadata more effectively
+- **Enhancement**: Immediate rendering of widgets even when results are pending
+- **Enhancement**: MessageList and ToolResultRenderer support immediate rendering of widget tools
+- **Enhancement**: Widget props support in ToolResultDisplay
+
+### Server Improvements
+
+- **Enhancement**: Changed default port from 3001 to 3000 for production builds (dev still uses 3001)
+- **Enhancement**: Skip telemetry (PostHog/Scarf) when `NODE_ENV=test` or `MCP_USE_ANONYMIZED_TELEMETRY=false`
+- **New**: `start-auth-servers.ts` utility for running authentication test servers
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.16.4
+</Update>
+
+<Update label="v0.18.3" description="February 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Update**: Updated mcp-use to v1.16.3
+</Update>
+
 <Update label="v0.18.2" description="January 2026">
   ## Inspector Fixes
   Patch release with widget behavior fix and improved URL handling.
