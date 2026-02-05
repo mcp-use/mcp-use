@@ -147,7 +147,10 @@ public class OAuthCallbackServer : IDisposable
             _listener.Stop();
             _listener.Close();
         }
-        catch { }
+        catch
+        {
+            // Dispose should not throw; ignore errors during cleanup
+        }
     }
 }
 

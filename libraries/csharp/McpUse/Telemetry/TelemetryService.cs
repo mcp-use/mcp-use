@@ -481,7 +481,7 @@ internal class LangfuseSink : ITelemetrySink
         try
         {
             var batch = new { batch = eventsToSend };
-            var content = new StringContent(
+            using var content = new StringContent(
                 JsonSerializer.Serialize(batch),
                 System.Text.Encoding.UTF8,
                 "application/json");

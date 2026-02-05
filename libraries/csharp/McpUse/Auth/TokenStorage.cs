@@ -65,7 +65,10 @@ public class FileTokenStorage : ITokenStorage
             {
                 File.SetUnixFileMode(filePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
             }
-            catch { }
+            catch
+            {
+                // Best-effort: saving tokens should not fail just because we couldn't tighten permissions
+            }
         }
     }
 

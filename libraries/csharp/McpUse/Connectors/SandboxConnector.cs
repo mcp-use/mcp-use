@@ -272,7 +272,10 @@ public class E2BSandboxProvider : ISandboxProvider
             {
                 await _httpClient.DeleteAsync($"sandboxes/{_sandboxId}", cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Best-effort sandbox cleanup; ignore errors
+            }
         }
 
         _httpClient?.Dispose();
@@ -324,7 +327,7 @@ public class DockerSandboxProvider : ISandboxProvider
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         // Start a Docker container
-        var process = new System.Diagnostics.Process
+        using var process = new System.Diagnostics.Process
         {
             StartInfo = new System.Diagnostics.ProcessStartInfo
             {
@@ -344,7 +347,7 @@ public class DockerSandboxProvider : ISandboxProvider
     {
         if (_containerId != null)
         {
-            var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process
             {
                 StartInfo = new System.Diagnostics.ProcessStartInfo
                 {
@@ -365,7 +368,7 @@ public class DockerSandboxProvider : ISandboxProvider
             throw new InvalidOperationException("Container not started");
 
         // Get the mapped port
-        var process = new System.Diagnostics.Process
+        using var process = new System.Diagnostics.Process
         {
             StartInfo = new System.Diagnostics.ProcessStartInfo
             {
@@ -385,7 +388,7 @@ public class DockerSandboxProvider : ISandboxProvider
             ? string.Join(" ", env.Select(kv => $"-e {kv.Key}={kv.Value}"))
             : "";
 
-        var execProcess = new System.Diagnostics.Process
+        using var execProcess = new System.Diagnostics.Process
         {
             StartInfo = new System.Diagnostics.ProcessStartInfo
             {

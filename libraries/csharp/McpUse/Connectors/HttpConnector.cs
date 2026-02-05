@@ -111,7 +111,10 @@ public class HttpConnector : IConnector
             {
                 await _sseTask;
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                // Expected when SSE connection is cancelled during disconnect
+            }
         }
 
         _httpClient?.Dispose();
@@ -130,7 +133,7 @@ public class HttpConnector : IConnector
             throw new McpConnectionException("Not connected");
 
         var json = JsonSerializer.Serialize(request, _jsonOptions);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         // Add session ID if we have one
         if (_sessionId != null)
@@ -158,7 +161,7 @@ public class HttpConnector : IConnector
             throw new McpConnectionException("Not connected");
 
         var json = JsonSerializer.Serialize(notification, _jsonOptions);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         if (_sessionId != null)
         {
@@ -174,7 +177,7 @@ public class HttpConnector : IConnector
 
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, "/sse");
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/sse");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
             if (_sessionId != null)
@@ -215,7 +218,10 @@ public class HttpConnector : IConnector
                 }
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // Expected when SSE connection is cancelled; treat as normal shutdown
+        }
         catch (Exception ex)
         {
             if (_isConnected)

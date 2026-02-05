@@ -208,7 +208,7 @@ public class LangfuseCallback : IObservabilityCallback
             };
 
             var json = JsonSerializer.Serialize(batch, _jsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             await _httpClient.PostAsync($"{_baseUrl}/api/public/ingestion", content, cancellationToken);
         }
@@ -349,10 +349,13 @@ public class LaminarCallback : IObservabilityCallback
         try
         {
             var json = JsonSerializer.Serialize(span, _jsonOptions);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
             await _httpClient.PostAsync($"{_baseUrl}/v1/spans", content, cancellationToken);
         }
-        catch { }
+        catch
+        {
+            // Silently ignore telemetry errors to not disrupt the main flow
+        }
     }
 }
 

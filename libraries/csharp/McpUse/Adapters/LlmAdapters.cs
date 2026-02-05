@@ -125,13 +125,12 @@ public abstract class BaseAdapter<T> : IMcpAdapter where T : class
             try
             {
                 var prompts = await session.ListPromptsAsync(cancellationToken);
-                foreach (var prompt in prompts)
+                var convertedPrompts = prompts
+                    .Select(p => ConvertPrompt(p, session))
+                    .Where(p => p is not null);
+                foreach (var prompt in convertedPrompts)
                 {
-                    var converted = ConvertPrompt(prompt, session);
-                    if (converted is not null)
-                    {
-                        Prompts.Add(converted);
-                    }
+                    Prompts.Add(prompt!);
                 }
             }
             catch (Exception ex)

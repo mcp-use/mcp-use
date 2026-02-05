@@ -140,7 +140,7 @@ public class OAuth : IHttpAuth
         if (_tokens == null || _metadata?.RevocationEndpoint == null)
             return;
 
-        var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["token"] = _tokens.AccessToken,
             ["client_id"] = _config.ClientId ?? _clientRegistration?.ClientId ?? ""
@@ -170,7 +170,10 @@ public class OAuth : IHttpAuth
                 return;
             }
         }
-        catch { }
+        catch
+        {
+            // Metadata not available at well-known endpoint, will try OpenID Connect discovery next
+        }
 
         // Try OpenID Connect discovery
         metadataUrl = $"{_config.ServerUrl.TrimEnd('/')}/.well-known/openid-configuration";
@@ -185,7 +188,10 @@ public class OAuth : IHttpAuth
                 return;
             }
         }
-        catch { }
+        catch
+        {
+            // OpenID Connect discovery also failed, will throw below
+        }
 
         throw new OAuthException($"Failed to discover OAuth metadata for {_config.ServerUrl}");
     }
@@ -204,7 +210,7 @@ public class OAuth : IHttpAuth
             token_endpoint_auth_method = "none" // Public client
         };
 
-        var content = new StringContent(
+        using var content = new StringContent(
             JsonSerializer.Serialize(request, _jsonOptions),
             Encoding.UTF8,
             "application/json");
@@ -245,7 +251,7 @@ public class OAuth : IHttpAuth
         var clientId = _config.ClientId ?? _clientRegistration?.ClientId
             ?? throw new OAuthException("No client ID available");
 
-        var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["code"] = code,
@@ -271,7 +277,7 @@ public class OAuth : IHttpAuth
         var clientId = _config.ClientId ?? _clientRegistration?.ClientId
             ?? throw new OAuthException("No client ID available");
 
-        var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
             ["refresh_token"] = _tokens.RefreshToken,

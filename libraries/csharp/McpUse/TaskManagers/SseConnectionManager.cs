@@ -133,7 +133,7 @@ public class SseConnectionManager : IAsyncDisposable
 
     private async Task ProcessSseStreamAsync(CancellationToken cancellationToken)
     {
-        var request = new HttpRequestMessage(HttpMethod.Get, _endpoint);
+        using var request = new HttpRequestMessage(HttpMethod.Get, _endpoint);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
         using var timeoutCts = new CancellationTokenSource(_readTimeout);

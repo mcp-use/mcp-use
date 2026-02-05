@@ -159,7 +159,10 @@ public class StdioConnector : IConnector
             {
                 await _stdin.DisposeAsync();
             }
-            catch { }
+            catch
+            {
+                // Ignore errors during stream disposal
+            }
             _stdin = null;
         }
 
@@ -173,7 +176,10 @@ public class StdioConnector : IConnector
                     await _process.WaitForExitAsync(cancellationToken);
                 }
             }
-            catch { }
+            catch
+            {
+                // Ignore errors during process termination
+            }
             _process.Dispose();
             _process = null;
         }
