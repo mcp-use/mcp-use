@@ -107,11 +107,8 @@ public class OAuthCallbackServer : IDisposable
 
     private async Task SendResponseAsync(HttpListenerResponse response, OAuthCallbackResult result)
     {
-        string html;
-
-        if (result.Error != null)
-        {
-            html = $"""
+        var html = result.Error != null
+            ? $"""
                 <!DOCTYPE html>
                 <html>
                 <head><title>Authentication Failed</title></head>
@@ -121,11 +118,8 @@ public class OAuthCallbackServer : IDisposable
                     <p>You can close this window.</p>
                 </body>
                 </html>
-                """;
-        }
-        else
-        {
-            html = """
+                """
+            : """
                 <!DOCTYPE html>
                 <html>
                 <head><title>Authentication Successful</title></head>
@@ -136,7 +130,6 @@ public class OAuthCallbackServer : IDisposable
                 </body>
                 </html>
                 """;
-        }
 
         var buffer = Encoding.UTF8.GetBytes(html);
         response.ContentType = "text/html; charset=utf-8";

@@ -81,7 +81,7 @@ public class StreamableHttpConnectionManager : IAsyncDisposable
             id = Guid.NewGuid().ToString()
         };
 
-        var response = await SendAsync(initRequest, cancellationToken);
+        _ = await SendAsync(initRequest, cancellationToken);
         _isConnected = true;
     }
 

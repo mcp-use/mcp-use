@@ -272,20 +272,20 @@ public class ServerManager : IServerManager
             return "No MCP servers are currently defined.";
         }
 
-        var result = "Available MCP servers:\n";
+        var result = new System.Text.StringBuilder("Available MCP servers:\n");
         for (int i = 0; i < servers.Count; i++)
         {
             var serverName = servers[i];
             var activeMarker = serverName == ActiveServer ? " (ACTIVE)" : "";
-            result += $"{i + 1}. {serverName}{activeMarker}\n";
+            result.AppendLine($"{i + 1}. {serverName}{activeMarker}");
 
             if (_serverTools.TryGetValue(serverName, out var tools))
             {
-                result += $"   {tools.Count} tools available for this server\n";
+                result.AppendLine($"   {tools.Count} tools available for this server");
             }
         }
 
-        return result;
+        return result.ToString();
     }
 
     [Description("Connect to a specific MCP server to use its tools.")]
@@ -325,13 +325,13 @@ public class ServerManager : IServerManager
             return $"No tools found matching query: '{query}'";
         }
 
-        var output = $"Found {results.Count} tools matching '{query}':\n";
+        var output = new System.Text.StringBuilder($"Found {results.Count} tools matching '{query}':\n");
         foreach (var result in results)
         {
             var activeMarker = result.ServerName == ActiveServer ? " (ACTIVE)" : "";
-            output += $"- {result.ServerName}{activeMarker}.{result.ToolName}: {result.Description}\n";
+            output.AppendLine($"- {result.ServerName}{activeMarker}.{result.ToolName}: {result.Description}");
         }
 
-        return output;
+        return output.ToString();
     }
 }

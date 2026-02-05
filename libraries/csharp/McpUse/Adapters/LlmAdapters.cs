@@ -94,10 +94,8 @@ public abstract class BaseAdapter<T> : IMcpAdapter where T : class
 
             // Create tools
             var tools = await session.ListToolsAsync(cancellationToken);
-            foreach (var tool in tools)
+            foreach (var tool in tools.Where(t => !DisallowedTools.Contains(t.Name)))
             {
-                if (DisallowedTools.Contains(tool.Name)) continue;
-
                 var converted = ConvertTool(tool, session);
                 if (converted is not null)
                 {
@@ -110,13 +108,12 @@ public abstract class BaseAdapter<T> : IMcpAdapter where T : class
             try
             {
                 var resources = await session.ListResourcesAsync(cancellationToken);
-                foreach (var resource in resources)
+                var convertedResources = resources
+                    .Select(r => ConvertResource(r, session))
+                    .Where(r => r is not null);
+                foreach (var resource in convertedResources)
                 {
-                    var converted = ConvertResource(resource, session);
-                    if (converted is not null)
-                    {
-                        Resources.Add(converted);
-                    }
+                    Resources.Add(resource!);
                 }
             }
             catch (Exception ex)

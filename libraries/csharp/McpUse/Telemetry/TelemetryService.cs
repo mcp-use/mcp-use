@@ -330,12 +330,9 @@ public class TelemetryService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await FlushAsync();
-        foreach (var sink in _sinks)
+        foreach (var disposable in _sinks.OfType<IAsyncDisposable>())
         {
-            if (sink is IAsyncDisposable disposable)
-            {
-                await disposable.DisposeAsync();
-            }
+            await disposable.DisposeAsync();
         }
     }
 }
