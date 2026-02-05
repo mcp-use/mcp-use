@@ -10,11 +10,28 @@ import {
   handleChatRequest,
   handleChatRequestStream,
   storeWidgetData,
-} from "./shared-utils-browser.js";
+} from "./shared-utils.js";
 import { formatErrorResponse } from "./utils.js";
 
 // WebSocket proxy for Vite HMR - note: requires WebSocket library
 // For now, this is a placeholder that will be implemented when WebSocket support is added
+
+/**
+ * Get frame-ancestors policy from environment variable
+ * Format: Space-separated list of origins or '*'
+ * Example: MCP_INSPECTOR_FRAME_ANCESTORS="https://app.example.com http://localhost:3000"
+ */
+function getFrameAncestorsFromEnv(): string | undefined {
+  const envValue = process.env.MCP_INSPECTOR_FRAME_ANCESTORS;
+  if (!envValue) return undefined;
+
+  // Validate format (either '*' or space-separated origins)
+  const trimmed = envValue.trim();
+  if (trimmed === "*") return "*";
+
+  // For origin list, keep as-is (CSP expects space-separated)
+  return trimmed;
+}
 
 /**
  * Fetch with retry logic and exponential backoff for handling cold starts
@@ -237,7 +254,11 @@ export function registerInspectorRoutes(
       }
 
       // Set security headers with widget-specific CSP
-      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
+      const headers = getWidgetSecurityHeaders(
+        widgetData.widgetCSP,
+        undefined, // No dev server for production widgets
+        getFrameAncestorsFromEnv()
+      );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
       });
@@ -401,7 +422,8 @@ export function registerInspectorRoutes(
       // Set security headers
       const headers = getWidgetSecurityHeaders(
         widgetData.widgetCSP,
-        widgetData.devServerBaseUrl
+        widgetData.devServerBaseUrl,
+        getFrameAncestorsFromEnv()
       );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);

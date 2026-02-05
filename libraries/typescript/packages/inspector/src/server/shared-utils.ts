@@ -1,14 +1,10 @@
-import { Buffer } from "node:buffer";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 /**
- * Shared utilities for MCP Inspector server functionality
+ * Browser-compatible utilities for MCP Inspector chat functionality
+ * Works in both Node.js and browser environments without Node.js-specific APIs
  */
 
 interface LLMConfig {
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "google";
   model: string;
   apiKey: string;
   temperature?: number;
@@ -32,9 +28,18 @@ interface AuthConfig {
   [key: string]: unknown;
 }
 
+interface MessageAttachment {
+  type: "image" | "file";
+  data: string; // base64 encoded
+  mimeType: string;
+  name?: string;
+  size?: number;
+}
+
 interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  attachments?: MessageAttachment[];
 }
 
 interface ToolCall {
@@ -44,13 +49,28 @@ interface ToolCall {
 }
 
 // Type for LangChain LLM models - using any for flexibility with dynamic imports
-
 type BaseLLM = any;
 
 interface ServerConfig {
   url: string;
   headers?: Record<string, string>;
   [key: string]: unknown;
+}
+
+/**
+ * Cross-platform base64 encoding utility
+ */
+function toBase64(str: string): string {
+  // Check if we're in a browser environment
+  if (typeof window !== "undefined" && typeof window.btoa === "function") {
+    return window.btoa(str);
+  }
+  // Node.js environment
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(str).toString("base64");
+  }
+  // Fallback - shouldn't reach here in practice
+  throw new Error("No base64 encoding method available");
 }
 
 /**
@@ -71,6 +91,9 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Dynamically import mcp-use and LLM providers
+  // Note: MCPClient supports multiple servers via client.addServer(name, config)
+  // Import from main entry (not browser) since this runs server-side.
+  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
   const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
@@ -101,13 +124,14 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
-    preventAutoAuth: true, // Prevent auto OAuth popup in server-side context
+    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
   };
 
   // Handle authentication - support both custom auth and OAuth
@@ -119,9 +143,7 @@ export async function* handleChatRequestStream(requestBody: {
       authConfig.username &&
       authConfig.password
     ) {
-      const auth = Buffer.from(
-        `${authConfig.username}:${authConfig.password}`
-      ).toString("base64");
+      const auth = toBase64(`${authConfig.username}:${authConfig.password}`);
       serverConfig.headers.Authorization = `Basic ${auth}`;
     } else if (authConfig.type === "bearer" && authConfig.token) {
       serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
@@ -145,9 +167,7 @@ export async function* handleChatRequestStream(requestBody: {
       url.password &&
       (!authConfig || authConfig.type === "none")
     ) {
-      const auth = Buffer.from(`${url.username}:${url.password}`).toString(
-        "base64"
-      );
+      const auth = toBase64(`${url.username}:${url.password}`);
       serverConfig.headers = serverConfig.headers || {};
       serverConfig.headers.Authorization = `Basic ${auth}`;
       serverConfig.url = `${url.protocol}//${url.host}${url.pathname}${url.search}`;
@@ -177,6 +197,36 @@ export async function* handleChatRequestStream(requestBody: {
     throw new Error("No user message found");
   }
 
+  // Convert message to LangChain format (supporting multimodal)
+  let messageInput: any;
+  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
+    // Multimodal message with attachments
+    const { HumanMessage } = await import("@langchain/core/messages");
+    const content: Array<any> = [
+      {
+        type: "text",
+        text: lastUserMessage.content || "[no content]",
+      },
+    ];
+
+    // Add image attachments
+    for (const attachment of lastUserMessage.attachments) {
+      if (attachment.type === "image") {
+        content.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${attachment.mimeType};base64,${attachment.data}`,
+          },
+        });
+      }
+    }
+
+    messageInput = new HumanMessage({ content });
+  } else {
+    // Regular text message
+    messageInput = lastUserMessage.content;
+  }
+
   try {
     // Generate a unique message ID
     const messageId = `msg-${Date.now()}`;
@@ -185,7 +235,7 @@ export async function* handleChatRequestStream(requestBody: {
     yield `data: ${JSON.stringify({ type: "message", id: messageId, role: "assistant" })}\n\n`;
 
     // Use streamEvents to get real-time updates
-    for await (const event of agent.streamEvents(lastUserMessage.content)) {
+    for await (const event of agent.streamEvents(messageInput)) {
       // Emit text content as it streams
       if (event.event === "on_chat_model_stream" && event.data?.chunk?.text) {
         const text = event.data.chunk.text;
@@ -225,7 +275,15 @@ export async function* handleChatRequestStream(requestBody: {
 }
 
 /**
- * Handle chat API request with MCP agent (non-streaming, kept for backwards compatibility)
+ * Execute a non-streaming chat turn using an MCP agent and the specified LLM configuration.
+ *
+ * @param requestBody - Request parameters
+ * @param requestBody.mcpServerUrl - Base URL of the MCP server to connect to
+ * @param requestBody.llmConfig - LLM provider configuration (provider, model, apiKey, etc.)
+ * @param requestBody.authConfig - Optional authentication configuration for the MCP server
+ * @param requestBody.messages - Array of chat messages; only the last message with role "user" is used as the query
+ * @returns An object containing `content` with the agent's response text and `toolCalls` with recorded tool invocations (empty for this non-streaming implementation)
+ * @throws If required fields are missing, if the LLM provider is unsupported, or if no user message is found
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string;
@@ -242,6 +300,9 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Dynamically import mcp-use and LLM providers
+  // Note: MCPClient supports multiple servers via client.addServer(name, config)
+  // Import from main entry (not browser) since this runs server-side.
+  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
   const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
@@ -272,13 +333,14 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
-    preventAutoAuth: true, // Prevent auto OAuth popup in server-side context
+    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
   };
 
   // Handle authentication - support both custom auth and OAuth
@@ -290,9 +352,7 @@ export async function handleChatRequest(requestBody: {
       authConfig.username &&
       authConfig.password
     ) {
-      const auth = Buffer.from(
-        `${authConfig.username}:${authConfig.password}`
-      ).toString("base64");
+      const auth = toBase64(`${authConfig.username}:${authConfig.password}`);
       serverConfig.headers.Authorization = `Basic ${auth}`;
     } else if (authConfig.type === "bearer" && authConfig.token) {
       serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
@@ -325,9 +385,7 @@ export async function handleChatRequest(requestBody: {
       (!authConfig || authConfig.type === "none")
     ) {
       // Extract auth from URL
-      const auth = Buffer.from(`${url.username}:${url.password}`).toString(
-        "base64"
-      );
+      const auth = toBase64(`${url.username}:${url.password}`);
       serverConfig.headers = serverConfig.headers || {};
       serverConfig.headers.Authorization = `Basic ${auth}`;
       // Remove auth from URL to avoid double encoding
@@ -366,8 +424,38 @@ export async function handleChatRequest(requestBody: {
     throw new Error("No user message found");
   }
 
+  // Convert message to LangChain format (supporting multimodal)
+  let messageInput: any;
+  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
+    // Multimodal message with attachments
+    const { HumanMessage } = await import("@langchain/core/messages");
+    const content: Array<any> = [
+      {
+        type: "text",
+        text: lastUserMessage.content || "[no content]",
+      },
+    ];
+
+    // Add image attachments
+    for (const attachment of lastUserMessage.attachments) {
+      if (attachment.type === "image") {
+        content.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${attachment.mimeType};base64,${attachment.data}`,
+          },
+        });
+      }
+    }
+
+    messageInput = new HumanMessage({ content });
+  } else {
+    // Regular text message
+    messageInput = lastUserMessage.content;
+  }
+
   // Get response from agent
-  const response = await agent.run(lastUserMessage.content);
+  const response = await agent.run(messageInput);
 
   // Clean up
   await client.closeAllSessions();
@@ -376,58 +464,6 @@ export async function handleChatRequest(requestBody: {
     content: response,
     toolCalls: [],
   };
-}
-
-/**
- * Get content type for static assets
- */
-export function getContentType(filePath: string): string {
-  if (filePath.endsWith(".js")) {
-    return "application/javascript";
-  } else if (filePath.endsWith(".css")) {
-    return "text/css";
-  } else if (filePath.endsWith(".svg")) {
-    return "image/svg+xml";
-  } else if (filePath.endsWith(".html")) {
-    return "text/html";
-  } else if (filePath.endsWith(".json")) {
-    return "application/json";
-  } else if (filePath.endsWith(".png")) {
-    return "image/png";
-  } else if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
-    return "image/jpeg";
-  } else if (filePath.endsWith(".ico")) {
-    return "image/x-icon";
-  } else {
-    return "application/octet-stream";
-  }
-}
-
-/**
- * Check if client files exist
- */
-export function checkClientFiles(clientDistPath: string): boolean {
-  return existsSync(clientDistPath);
-}
-
-/**
- * Get client dist path
- * Returns different paths depending on whether running from CLI or server
- */
-export function getClientDistPath(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-
-  // Check if we're running from dist/cli.js or dist/server/*.js
-  // CLI: dist/cli.js -> path is './web'
-  // Server: dist/server/*.js -> path is '../web'
-  if (__dirname.endsWith("dist") || __dirname.endsWith("dist/")) {
-    // Running from CLI (dist/cli.js)
-    return join(__dirname, "web");
-  }
-
-  // Running from server (dist/server/*.js)
-  return join(__dirname, "../web");
 }
 
 /**
@@ -462,6 +498,22 @@ export interface WidgetData {
       left: number;
     };
   };
+  // MCP Apps (SEP-1865) support
+  protocol?: "mcp-apps" | "chatgpt-app";
+  toolName?: string;
+  mimeType?: string;
+  mcpAppsCsp?: {
+    connectDomains?: string[];
+    resourceDomains?: string[];
+    frameDomains?: string[];
+    baseUriDomains?: string[];
+  };
+  mcpAppsPermissions?: {
+    camera?: Record<string, never>;
+    microphone?: Record<string, never>;
+    geolocation?: Record<string, never>;
+    clipboardWrite?: Record<string, never>;
+  };
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -495,7 +547,7 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolResponseMetadata,
     resourceData,
     toolId,
-    widgetCSP: _widgetCSP,
+    widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
@@ -510,7 +562,7 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     hasToolOutput: !!toolOutput,
     hasToolResponseMetadata: !!toolResponseMetadata,
     toolResponseMetadata,
-    hasWidgetCSP: !!_widgetCSP,
+    hasWidgetCSP: !!widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
   });
@@ -539,7 +591,7 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     timestamp: Date.now(),
-    widgetCSP: _widgetCSP,
+    widgetCSP,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
@@ -575,7 +627,7 @@ export function generateWidgetContainerHtml(
         (async function() {
           try {
             // Change URL to "/" BEFORE loading widget (for React Router)
-            history.replaceState(null, '', '/');
+            //history.replaceState(null, '', '/');
 
             // Fetch the actual widget HTML using toolId
             const response = await fetch('${basePath}/api/resources/widget-content/${toolId}');
@@ -612,9 +664,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     toolResponseMetadata,
     resourceData,
     toolId,
-    widgetCSP: _widgetCSP,
     devServerBaseUrl,
     theme,
+    playground,
   } = widgetData;
 
   console.log("[Widget Content] Using pre-fetched resource for:", {
@@ -669,6 +721,28 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   // Safely serialize theme, defaulting to 'light' if not provided
   const safeTheme = JSON.stringify(theme === "dark" ? "dark" : "light");
 
+  // Use playground values with fallbacks to defaults
+  const locale = playground?.locale || "en-US";
+  const deviceType = playground?.deviceType || "desktop";
+  const capabilities = playground?.capabilities || {
+    hover: true,
+    touch: false,
+  };
+  const safeAreaInsets = playground?.safeAreaInsets || {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  };
+
+  // Serialize playground values for injection
+  const safeLocale = JSON.stringify(locale);
+  const safeUserAgent = JSON.stringify({
+    device: { type: deviceType },
+    capabilities,
+  });
+  const safeSafeArea = JSON.stringify({ insets: safeAreaInsets });
+
   // Inject window.openai API script
   const apiScript = `
     <script>
@@ -689,14 +763,14 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 
         const openaiAPI = {
           toolInput: ${safeToolInput},
-          toolOutput: null,  // Initially null to emulate OpenAI behavior (widget renders before tool completes)
-          toolResponseMetadata: null,  // Initially null to emulate OpenAI behavior
+          toolOutput: ${safeToolOutput},
+          toolResponseMetadata: ${safeToolResponseMetadata},
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},
-          locale: 'en-US',
-          safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
-          userAgent: {},
+          locale: ${safeLocale},
+          safeArea: ${safeSafeArea},
+          userAgent: ${safeUserAgent},
           widgetState: null,
 
           async setWidgetState(state) {
@@ -766,6 +840,20 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             return this.sendFollowupTurn(prompt);
           },
 
+          async notifyIntrinsicHeight(height) {
+            console.log('[OpenAI Widget] notifyIntrinsicHeight called with:', height);
+            if (typeof height !== 'number' || height < 0) {
+              console.error('[OpenAI Widget] Invalid height value:', height);
+              throw new Error('Height must be a non-negative number');
+            }
+            const message = {
+              type: 'openai:notifyIntrinsicHeight',
+              height
+            };
+            console.log('[OpenAI Widget] Sending postMessage to parent:', message);
+            window.parent.postMessage(message, '*');
+          },
+
           openExternal(payload) {
             const href = typeof payload === 'string' ? payload : payload?.href;
             if (href) {
@@ -786,17 +874,6 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           writable: false,
           configurable: false,
           enumerable: true
-        });
-
-        // Listen for widget state requests from inspector
-        window.addEventListener('message', (event) => {
-          if (event.data?.type === 'mcp-inspector:getWidgetState') {
-            window.parent.postMessage({
-              type: 'mcp-inspector:widgetStateResponse',
-              toolId: event.data.toolId,
-              state: openaiAPI.widgetState
-            }, '*');
-          }
         });
 
         setTimeout(() => {
@@ -821,6 +898,113 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           } catch (err) {}
         }, 0);
 
+        // Listen for widget state requests from inspector
+        window.addEventListener('message', (event) => {
+          if (event.data?.type === 'mcp-inspector:getWidgetState') {
+            window.parent.postMessage({
+              type: 'mcp-inspector:widgetStateResponse',
+              toolId: event.data.toolId,
+              state: openaiAPI.widgetState
+            }, '*');
+            return;
+          }
+        });
+
+        // Listen for globals changes from parent (for displayMode, theme, etc.)
+        window.addEventListener('message', (event) => {
+          // Handle new general globalsChanged message
+          if (event.data?.type === 'openai:globalsChanged') {
+            const updates = event.data.updates || {};
+            let hasChanges = false;
+
+            // Update displayMode
+            if (updates.displayMode && ['inline', 'pip', 'fullscreen'].includes(updates.displayMode)) {
+              openaiAPI.displayMode = updates.displayMode;
+              hasChanges = true;
+            }
+
+            // Update theme
+            if (updates.theme && ['light', 'dark'].includes(updates.theme)) {
+              openaiAPI.theme = updates.theme;
+              hasChanges = true;
+            }
+
+            // Update maxHeight
+            if (updates.maxHeight !== undefined && typeof updates.maxHeight === 'number') {
+              openaiAPI.maxHeight = updates.maxHeight;
+              hasChanges = true;
+            }
+
+            // Update locale
+            if (updates.locale && typeof updates.locale === 'string') {
+              openaiAPI.locale = updates.locale;
+              hasChanges = true;
+            }
+
+            // Update safeArea
+            if (updates.safeArea && typeof updates.safeArea === 'object') {
+              openaiAPI.safeArea = updates.safeArea;
+              hasChanges = true;
+            }
+
+            // Update userAgent
+            if (updates.userAgent !== undefined) {
+              openaiAPI.userAgent = updates.userAgent;
+              hasChanges = true;
+            }
+
+            // Dispatch set_globals event to notify React components if any changes occurred
+            if (hasChanges) {
+              try {
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolInput: openaiAPI.toolInput,
+                      toolOutput: openaiAPI.toolOutput,
+                      toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                      widgetState: openaiAPI.widgetState,
+                      displayMode: openaiAPI.displayMode,
+                      maxHeight: openaiAPI.maxHeight,
+                      theme: openaiAPI.theme,
+                      locale: openaiAPI.locale,
+                      safeArea: openaiAPI.safeArea,
+                      userAgent: openaiAPI.userAgent
+                    }
+                  }
+                });
+                window.dispatchEvent(globalsEvent);
+              } catch (err) {}
+            }
+          }
+          // Handle legacy displayModeChanged message for backward compatibility
+          else if (event.data?.type === 'openai:displayModeChanged') {
+            const newMode = event.data.mode;
+            if (newMode && ['inline', 'pip', 'fullscreen'].includes(newMode)) {
+              openaiAPI.displayMode = newMode;
+              // Dispatch set_globals event to notify React components
+              try {
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolInput: openaiAPI.toolInput,
+                      toolOutput: openaiAPI.toolOutput,
+                      toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                      widgetState: openaiAPI.widgetState,
+                      displayMode: newMode,
+                      maxHeight: openaiAPI.maxHeight,
+                      theme: openaiAPI.theme,
+                      locale: openaiAPI.locale,
+                      safeArea: openaiAPI.safeArea,
+                      userAgent: openaiAPI.userAgent
+                    }
+                  }
+                });
+                window.dispatchEvent(globalsEvent);
+              } catch (err) {}
+            }
+          }
+        });
+
         setTimeout(() => {
           try {
             const stored = localStorage.getItem(${safeWidgetStateKey});
@@ -829,42 +1013,13 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             }
           } catch (err) {}
         }, 0);
-
-        // Emulate OpenAI behavior: initially toolOutput and toolResponseMetadata are null,
-        // then they get populated when the "tool execution completes"
-        // Only run this if toolOutput is provided (i.e., tool has already completed)
-        // For pending tools (toolOutput is null), this will be updated later via updateIframeGlobals
-        const hasToolOutput = ${safeToolOutput} !== null;
-        if (hasToolOutput) {
-          setTimeout(() => {
-            try {
-              if (window.openai) {
-                window.openai.toolOutput = ${safeToolOutput};
-                window.openai.toolResponseMetadata = ${safeToolResponseMetadata};
-                
-                // Dispatch set_globals event to notify React components
-                const globalsEvent = new CustomEvent('openai:set_globals', {
-                  detail: {
-                    globals: {
-                      toolOutput: window.openai.toolOutput,
-                      toolResponseMetadata: window.openai.toolResponseMetadata,
-                    }
-                  }
-                });
-                window.dispatchEvent(globalsEvent);
-              }
-            } catch (err) {
-              console.error('[Inspector] Failed to populate toolOutput:', err);
-            }
-          }, 100); // Small delay to emulate tool execution time
-        }
       })();
     </script>
   `;
 
   // Inject script into HTML
   let modifiedHtml;
-  if (htmlContent.includes("<html>") && htmlContent.includes("<head>")) {
+  if (htmlContent.includes("<html") && htmlContent.includes("<head")) {
     // If it's a full HTML document, inject at the beginning of head
     // Preserve any existing base tag instead of commenting it out
     modifiedHtml = htmlContent.replace("<head>", `<head>${apiScript}`);
@@ -890,6 +1045,49 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 }
 
 /**
+ * Transform MCP Apps camelCase CSP to snake_case for existing header builder
+ *
+ * MCP Apps (SEP-1865) uses camelCase (connectDomains, resourceDomains)
+ * ChatGPT Apps SDK uses snake_case (connect_domains, resource_domains)
+ *
+ * @param mcpAppsCsp - MCP Apps CSP configuration with camelCase keys
+ * @returns ChatGPT-compatible CSP configuration with snake_case keys
+ */
+export function transformMcpAppsCspToSnakeCase(mcpAppsCsp?: {
+  connectDomains?: string[];
+  resourceDomains?: string[];
+  frameDomains?: string[];
+  baseUriDomains?: string[];
+}):
+  | {
+      connect_domains?: string[];
+      resource_domains?: string[];
+      frame_domains?: string[];
+    }
+  | undefined {
+  if (!mcpAppsCsp) return undefined;
+
+  const result: {
+    connect_domains?: string[];
+    resource_domains?: string[];
+    frame_domains?: string[];
+  } = {};
+
+  if (mcpAppsCsp.connectDomains) {
+    result.connect_domains = mcpAppsCsp.connectDomains;
+  }
+  if (mcpAppsCsp.resourceDomains) {
+    result.resource_domains = mcpAppsCsp.resourceDomains;
+  }
+  if (mcpAppsCsp.frameDomains) {
+    result.frame_domains = mcpAppsCsp.frameDomains;
+  }
+  // Note: baseUriDomains is MCP Apps-specific, not in ChatGPT CSP
+
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
  * Get security headers for widget content
  */
 export function getWidgetSecurityHeaders(
@@ -898,7 +1096,8 @@ export function getWidgetSecurityHeaders(
     resource_domains?: string[];
     frame_domains?: string[];
   },
-  devServerBaseUrl?: string
+  devServerBaseUrl?: string,
+  frameAncestors?: string
 ): Record<string, string> {
   const trustedCdns = [
     "https://persistent.oaistatic.com",
@@ -963,6 +1162,16 @@ export function getWidgetSecurityHeaders(
     frameSrc = `'self' blob: ${frameDomains.join(" ")}`;
   }
 
+  // Determine frame-ancestors policy
+  let frameAncestorsPolicy = "'self'"; // Default: same-origin only
+
+  // In dev mode with no explicit override, allow all origins for easier embedding
+  if (devServerOrigin && !frameAncestors) {
+    frameAncestorsPolicy = "*";
+  } else if (frameAncestors) {
+    frameAncestorsPolicy = frameAncestors;
+  }
+
   const headers: Record<string, string> = {
     "Content-Security-Policy": [
       "default-src 'self'",
@@ -975,7 +1184,7 @@ export function getWidgetSecurityHeaders(
       `media-src ${mediaSrc}`,
       `font-src ${fontSrc}`,
       `connect-src ${connectSrc}`,
-      "frame-ancestors 'self'",
+      `frame-ancestors ${frameAncestorsPolicy}`,
     ].join("; "),
     "X-Frame-Options": "SAMEORIGIN",
     "X-Content-Type-Options": "nosniff",
@@ -1006,7 +1215,7 @@ export function getWidgetSecurityHeaders(
       "media-src 'self' data: https: blob:",
       `font-src 'self' data: ${prodResourceDomainsStr}`,
       `connect-src ${prodConnectSrc}`,
-      "frame-ancestors 'self'",
+      `frame-ancestors ${frameAncestorsPolicy}`,
     ].join("; ");
   }
 

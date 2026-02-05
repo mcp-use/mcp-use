@@ -212,6 +212,30 @@ app.use(cors({
 mountInspector(app)
 ```
 
+### Embedding Widget Iframes
+
+If you need to embed inspector widgets in iframes from your own application (e.g., embedding widgets in your dashboard or admin panel), you can configure allowed origins using the `MCP_INSPECTOR_FRAME_ANCESTORS` environment variable.
+
+```bash
+# Allow embedding from specific domains
+MCP_INSPECTOR_FRAME_ANCESTORS="https://app.example.com https://admin.example.com" node server.js
+
+# Or in development, allow all origins
+MCP_INSPECTOR_FRAME_ANCESTORS="*" npm run dev
+```
+
+**Security Note:**
+
+<Note>
+By default, the inspector uses:
+- **Development mode** (when `devServerBaseUrl` is detected): `frame-ancestors *` (allows all origins)
+- **Production mode**: `frame-ancestors 'self'` (same-origin only)
+
+This prevents unauthorized sites from embedding your inspector widgets while making development easier.
+</Note>
+
+For more details, see the [CLI Environment Variables](/inspector/cli#mcpinspectorframeancestors) documentation.
+
 ## Troubleshooting
 
 ### Inspector Not Loading
