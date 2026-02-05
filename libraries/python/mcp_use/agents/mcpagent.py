@@ -40,6 +40,15 @@ from mcp_use.agents.middleware import tool_error_handler
 
 # Import observability manager
 from mcp_use.agents.observability import ObservabilityManager
+from mcp_use.agents.utils.stream_utils import (
+    accumulate_messages,
+    detect_tool_updates,
+    extract_message_text_content,
+    extract_tool_calls_from_message,
+    format_observation_for_logging,
+    format_tool_input_for_logging,
+    normalize_message_content,
+)
 from mcp_use.agents.prompts.system_prompt_builder import create_system_message
 from mcp_use.agents.prompts.templates import (
     DEFAULT_SYSTEM_PROMPT_TEMPLATE,
@@ -707,10 +716,10 @@ class MCPAgent:
             # Check for tool updates before starting execution (if using server manager)
             if self.use_server_manager and self.server_manager:
                 current_tools = self.server_manager.tools
-                current_tool_names = {tool.name for tool in current_tools}
-                existing_tool_names = {tool.name for tool in self._tools}
+                tool_update_detected = detect_tool_updates(current_tools, self._tools)
 
-                if current_tool_names != existing_tool_names:
+                if tool_update_detected:
+                    current_tool_names = [tool.name for tool in current_tools]
                     logger.info(
                         f"🔄 Tools changed before execution, updating agent. New tools: {', '.join(current_tool_names)}"
                     )
@@ -770,29 +779,17 @@ class MCPAgent:
                                 messages = [messages]
 
                             # Add new messages to accumulated messages for potential restart
-                            for msg in messages:
-                                if msg not in accumulated_messages:
-                                    accumulated_messages.append(msg)
+                            accumulate_messages(messages, accumulated_messages)
                             for message in messages:
                                 # Track tool calls
-                                if hasattr(message, "tool_calls") and message.tool_calls:
+                                tool_calls = extract_tool_calls_from_message(message)
+                                if tool_calls:
                                     # Extract text content from message for the log
-                                    log_text = ""
-                                    if hasattr(message, "content"):
-                                        if isinstance(message.content, str):
-                                            log_text = message.content
-                                        elif isinstance(message.content, list):
-                                            # Extract text blocks from content array
-                                            text_parts = [
-                                                (block.get("text", "") if isinstance(block, dict) else str(block))
-                                                for block in message.content
-                                                if isinstance(block, dict) and block.get("type") == "text"
-                                            ]
-                                            log_text = "\n".join(text_parts)
+                                    log_text = extract_message_text_content(message)
 
-                                    for tool_call in message.tool_calls:
-                                        tool_name = tool_call.get("name", "unknown")
-                                        tool_input = tool_call.get("args", {})
+                                    for tool_call in tool_calls:
+                                        tool_name = tool_call["name"]
+                                        tool_input = tool_call["args"]
                                         tool_call_id = tool_call.get("id")
 
                                         action = AgentAction(
@@ -806,9 +803,7 @@ class MCPAgent:
                                         self.tools_used_names.append(tool_name)
                                         steps_taken += 1
 
-                                        tool_input_str = str(tool_input)
-                                        if len(tool_input_str) > 100:
-                                            tool_input_str = tool_input_str[:97] + "..."
+                                        tool_input_str = format_tool_input_for_logging(tool_input)
 
                                 # Track tool results and yield AgentStep
                                 if isinstance(message, ToolMessage):
@@ -821,18 +816,17 @@ class MCPAgent:
                                         log_agent_step(item, pretty_print=self.pretty_print)
                                         yield item
 
-                                    observation_str = str(observation)
-                                    if len(observation_str) > 100:
-                                        observation_str = observation_str[:97] + "..."
-                                    observation_str = observation_str.replace("\n", " ")
+                                    observation_str = format_observation_for_logging(observation)
 
                                     # --- Check for tool updates after tool results (safe restart point) ---
                                     if self.use_server_manager and self.server_manager:
                                         current_tools = self.server_manager.tools
-                                        current_tool_names = {tool.name for tool in current_tools}
-                                        existing_tool_names = {tool.name for tool in self._tools}
+                                        tool_update_detected = detect_tool_updates(
+                                            current_tools, self._tools
+                                        )
 
-                                        if current_tool_names != existing_tool_names:
+                                        if tool_update_detected:
+                                            current_tool_names = [tool.name for tool in current_tools]
                                             logger.info(
                                                 f"🔄 Tools changed during execution. "
                                                 f"New tools: {', '.join(current_tool_names)}"
@@ -854,7 +848,7 @@ class MCPAgent:
 
                                 # Track final AI message (without tool calls = final response)
                                 if isinstance(message, AIMessage) and not message.tool_calls:
-                                    final_output = self._normalize_output(message.content)
+                                    final_output = normalize_message_content(message.content)
                                     logger.info("✅ Agent finished with output")
 
                         # Break out of node loop if restarting

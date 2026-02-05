@@ -12,3 +12,12 @@ export {
   type LLMConfig,
   type LLMProvider,
 } from "./llm_provider.js";
+
+export {
+  accumulateMessages,
+  detectToolUpdates,
+  extractToolCallsFromMessage,
+  formatObservationForLogging,
+  formatToolInputForLogging,
+  normalizeMessageContent,
+} from "./stream_utils.js";
