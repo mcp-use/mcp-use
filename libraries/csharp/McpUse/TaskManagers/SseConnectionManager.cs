@@ -89,7 +89,10 @@ public class SseConnectionManager : IAsyncDisposable
             {
                 await _connectionTask;
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                // Expected when connection is cancelled during disconnect
+            }
         }
 
         _cts?.Dispose();

@@ -177,7 +177,7 @@ public class ServerManager : IServerManager
             ActiveServer = serverName;
 
             // Initialize server tools if not already done
-            if (!_serverTools.ContainsKey(serverName))
+            if (!_serverTools.TryGetValue(serverName, out var existingTools))
             {
                 var tools = await session.GetAIFunctionsAsync(cancellationToken);
                 _serverTools[serverName] = tools.ToList();

@@ -542,4 +542,18 @@ public class StreamingAgentUpdate
     public string? ToolResult { get; init; }
     public string? Error { get; init; }
     public string? Message { get; init; }
+
+    /// <summary>
+    /// Returns a string representation suitable for console output.
+    /// </summary>
+    public override string ToString() => Type switch
+    {
+        UpdateType.Text => Text ?? "",
+        UpdateType.ToolCall or UpdateType.ToolStart => $"[Calling {ToolName}...]",
+        UpdateType.ToolResult => $"[{ToolName} result: {ToolResult}]",
+        UpdateType.ToolError => $"[{ToolName} error: {Error}]",
+        UpdateType.StepStart => $"[Step {Step}]",
+        UpdateType.Complete => Message ?? "[Complete]",
+        _ => ""
+    };
 }

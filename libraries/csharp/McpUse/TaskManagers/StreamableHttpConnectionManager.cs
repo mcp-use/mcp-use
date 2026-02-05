@@ -242,7 +242,10 @@ public class StreamableHttpConnectionManager : IAsyncDisposable
                         var message = new StreamableHttpMessage { Data = lastDoc };
                         MessageReceived?.Invoke(this, message);
                     }
-                    catch { }
+                    catch
+                    {
+                        // Skip malformed JSON in stream
+                    }
                 }
             }
         }

@@ -185,7 +185,10 @@ public class ObservabilityManager
             {
                 await callback.OnRunStartAsync(context, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -197,7 +200,10 @@ public class ObservabilityManager
             {
                 await callback.OnRunEndAsync(context, result, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -209,7 +215,10 @@ public class ObservabilityManager
             {
                 await callback.OnStepStartAsync(context, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -221,7 +230,10 @@ public class ObservabilityManager
             {
                 await callback.OnStepEndAsync(context, result, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -233,7 +245,10 @@ public class ObservabilityManager
             {
                 await callback.OnToolCallAsync(context, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -245,7 +260,10 @@ public class ObservabilityManager
             {
                 await callback.OnToolResultAsync(context, result, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -257,7 +275,10 @@ public class ObservabilityManager
             {
                 await callback.OnLlmCallAsync(context, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -269,7 +290,10 @@ public class ObservabilityManager
             {
                 await callback.OnLlmResultAsync(context, result, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 
@@ -281,7 +305,10 @@ public class ObservabilityManager
             {
                 await callback.OnErrorAsync(context, cancellationToken);
             }
-            catch { }
+            catch
+            {
+                // Observability callbacks should not disrupt the main flow
+            }
         }
     }
 }

@@ -449,7 +449,10 @@ public class WebSocketConnector : IAsyncDisposable
             {
                 await _receiveTask;
             }
-            catch { }
+            catch
+            {
+                // Ignore errors during receive task cleanup
+            }
         }
 
         await DisconnectAsync();

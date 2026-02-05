@@ -190,7 +190,10 @@ public class StdioConnector : IConnector
             {
                 await _readTask;
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                // Expected when read task is cancelled during disconnect
+            }
             _readTask = null;
         }
 
@@ -267,7 +270,10 @@ public class StdioConnector : IConnector
                 }
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // Expected when read operation is cancelled
+        }
         catch (Exception ex)
         {
             Disconnected?.Invoke(this, ex);
