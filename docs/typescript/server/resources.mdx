@@ -93,6 +93,29 @@ server.resourceTemplate({
 })
 ```
 
+### Autocomplete for template variables
+
+Provide completion suggestions for URI template variables so clients can autocomplete values:
+
+```typescript
+server.resourceTemplate({
+  name: 'user_data',
+  uriTemplate: 'user://{userId}/profile',
+  callbacks: {
+    complete: {
+      // List of string values (prefix-filtered)
+      userId: ['user-1', 'user-2', 'user-3'],
+      // Or a callback for dynamic suggestions
+      // userId: async (value) => (await fetchUserIds(value)).map(u => u.id),
+    },
+  },
+}, async (uri, { userId }) => {
+  const userData = await fetchUserData(userId)
+  return text(`User name: ${userData.name}`)
+})
+```
+
+
 ## Resource Annotations
 
 Provide metadata to help clients use resources effectively:
