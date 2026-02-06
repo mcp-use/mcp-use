@@ -10,6 +10,8 @@ import {
   type CompletableSchema,
   type CompleteCallback,
 } from "@modelcontextprotocol/sdk/server/completable.js";
+import type { ResourceTemplateCallbacks } from "../types/resource.js";
+import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SchemaInput } from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { z } from "zod";
 
@@ -136,4 +138,39 @@ export function completable<T extends z.ZodTypeAny>(
   }
 
   return sdkCompletable(schema as any, callback); // Type assertion for Zod v3/v4 compatibility
+}
+
+/**
+ * Normalizes resource template complete options for the SDK.
+ * Users can provide either a string array (allowed values) or a callback per variable.
+ * String arrays are converted into the default prefix-filter callback; callbacks are passed through unchanged.
+ *
+ * @param completes - Optional map of variable name to string[] or CompleteResourceTemplateCallback
+ * @returns SDK-ready complete map, or empty object when input is undefined/empty
+ */
+export function toResourceTemplateCompleteCallbacks(
+  completes?: ResourceTemplateCallbacks["complete"]
+): { [variable: string]: CompleteResourceTemplateCallback } {
+  if (!completes) {
+    return {};
+  }
+
+  const normalized: { [variable: string]: CompleteResourceTemplateCallback } =
+    {};
+  for (const key of Object.keys(completes)) {
+    const complete = completes[key];
+    if (Array.isArray(complete)) {
+      const callback = async (value: string) => {
+        const prefix = (value ?? "").toString().trim().toLowerCase();
+        const filtered = complete.filter((item) => {
+          return String(item).toLowerCase().startsWith(prefix);
+        });
+        return filtered;
+      };
+      normalized[key] = callback;
+    } else {
+      normalized[key] = complete;
+    }
+  }
+  return normalized;
 }

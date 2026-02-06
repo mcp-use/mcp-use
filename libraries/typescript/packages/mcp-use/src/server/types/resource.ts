@@ -2,6 +2,7 @@ import type {
   ReadResourceResult,
   CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
@@ -159,6 +160,15 @@ export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
     >);
 
 /**
+ * Complete callback for a resource template
+ */
+export interface ResourceTemplateCallbacks {
+  complete?: {
+    [variable: string]: string[] | CompleteResourceTemplateCallback;
+  };
+}
+
+/**
  * Configuration for a resource template
  */
 export interface ResourceTemplateConfig {
@@ -170,6 +180,8 @@ export interface ResourceTemplateConfig {
   mimeType?: string;
   /** Description of the resource */
   description?: string;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -221,6 +233,8 @@ export interface FlatResourceTemplateDefinition<
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceTemplateCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -243,6 +257,8 @@ export interface FlatResourceTemplateDefinitionWithoutCallback {
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -264,6 +280,8 @@ export interface ResourceDefinition<HasOAuth extends boolean = false> {
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -284,6 +302,8 @@ export interface ResourceDefinitionWithoutCallback {
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**

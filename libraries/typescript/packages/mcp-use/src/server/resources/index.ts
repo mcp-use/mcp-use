@@ -16,6 +16,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import { convertToolResultToResourceResult } from "./conversion.js";
+import { toResourceTemplateCompleteCallbacks } from "../utils/completion-helpers.js";
 
 // Export subscription management
 export { ResourceSubscriptionManager } from "./subscriptions.js";
@@ -331,10 +332,24 @@ export function registerResourceTemplate(
           | ResourceTemplateDefinitionWithoutCallback
       ).resourceTemplate.description;
 
+  const resourceCallbacks = isFlatStructure
+    ? (
+        resourceTemplateDefinition as
+          | FlatResourceTemplateDefinition
+          | FlatResourceTemplateDefinitionWithoutCallback
+      ).callbacks
+    : (
+        resourceTemplateDefinition as
+          | ResourceTemplateDefinition
+          | ResourceTemplateDefinitionWithoutCallback
+      ).resourceTemplate.callbacks;
+
+  console.log("resourceCallbacks", resourceCallbacks);
+
   // Create ResourceTemplate instance from SDK
   const template = new ResourceTemplate(uriTemplate, {
+    complete: toResourceTemplateCompleteCallbacks(resourceCallbacks?.complete), // Optional: callback for auto-completion
     list: undefined, // Optional: callback to list all matching resources
-    complete: undefined, // Optional: callback for auto-completion
   });
 
   // Create metadata object with optional fields
