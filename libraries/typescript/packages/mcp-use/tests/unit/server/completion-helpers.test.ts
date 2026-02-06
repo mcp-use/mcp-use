@@ -8,6 +8,7 @@ import {
   isCompletable,
   getCompleter,
 } from "@modelcontextprotocol/sdk/server/completable.js";
+import { toResourceTemplateCompleteCallbacks } from "../../../src/server/utils/completion-helpers.js";
 
 describe("completable()", () => {
   const mustGetCompleter = <T extends z.ZodTypeAny>(schema: T) => {
@@ -170,5 +171,40 @@ describe("completable()", () => {
       const result = await completer("t");
       expect(result).toEqual(["typescript"]);
     });
+  });
+});
+
+describe("toResourceTemplateCompleteCallbacks", () => {
+  it("should convert string array to prefix-filter callback", async () => {
+    const callbacks = toResourceTemplateCompleteCallbacks({
+      name: ["John", "Jane", "Jim", "Jill"],
+    });
+    expect(Object.keys(callbacks)).toEqual(["name"]);
+    const callback = callbacks.name!;
+
+    // Empty prefix returns all
+    expect(await callback("")).toEqual(["John", "Jane", "Jim", "Jill"]);
+
+    // Prefix matching (case-insensitive)
+    expect(await callback("j")).toEqual(["John", "Jane", "Jim", "Jill"]);
+    expect(await callback("Jo")).toEqual(["John"]);
+    expect(await callback("Jane")).toEqual(["Jane"]);
+
+    // No match
+    expect(await callback("xyz")).toEqual([]);
+  });
+  it("should pass through callback functions", async () => {
+    const callbackFn = async (value: string): Promise<string[]> => {
+      return ["John", "Jane", "Jim", "Jill"].filter((v) => v.startsWith(value));
+    };
+    const callbacks = toResourceTemplateCompleteCallbacks({
+      name: callbackFn,
+    });
+    expect(Object.keys(callbacks)).toEqual(["name"]);
+    expect(callbacks.name).toBe(callbackFn);
+  });
+  it("should return empty object when input is undefined", () => {
+    const callbacks = toResourceTemplateCompleteCallbacks(undefined);
+    expect(callbacks).toEqual({});
   });
 });
