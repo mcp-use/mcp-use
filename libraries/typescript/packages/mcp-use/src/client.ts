@@ -218,12 +218,14 @@ export class MCPClient extends BaseMCPClient {
     | CodeExecutorFunction
     | BaseCodeExecutor = "vm";
   private _executorOptions?: ExecutorOptions;
-  private _samplingCallback?: (
+  private _defaultOnSampling?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
-  private _elicitationCallback?: (
+
+  private _defaultElicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+
 
   /**
    * Creates a new MCPClient instance.
@@ -316,14 +318,13 @@ export class MCPClient extends BaseMCPClient {
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
     // Support both new and deprecated names
-    this._samplingCallback = options?.onSampling ?? options?.samplingCallback;
+    this._defaultOnSampling = options?.onSampling ?? options?.samplingCallback;
     if (options?.samplingCallback && !options?.onSampling) {
       console.warn(
         '[MCPClient] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
       );
     }
-    this._elicitationCallback = options?.elicitationCallback;
-
+    this._defaultElicitationCallback = options?.elicitationCallback;
     if (this.codeMode) {
       this._setupCodeModeConnector();
     }
@@ -454,9 +455,9 @@ export class MCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    return createConnectorFromConfig(serverConfig as ServerConfig, {
-      samplingCallback: this._samplingCallback,
-      elicitationCallback: this._elicitationCallback,
+    return createConnectorFromConfig(serverConfig, {
+      defaultOnSampling: this._defaultOnSampling,
+      defaultElicitationCallback: this._defaultElicitationCallback,
     });
   }
 

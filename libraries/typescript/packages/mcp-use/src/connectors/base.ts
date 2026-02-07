@@ -81,7 +81,15 @@ export interface ConnectorInitOptions {
    * - Form mode: Collect structured data with JSON schema validation
    * - URL mode: Direct users to external URLs for sensitive interactions
    */
+  defaultOnSampling?: (
+    params: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+
   elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+
+  defaultElicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
 }
@@ -104,8 +112,18 @@ export abstract class BaseConnector {
     // Support both new and deprecated name
     const finalOpts = {
       ...opts,
-      onSampling: opts.onSampling ?? opts.samplingCallback,
+      // connector-level sampling has priority
+      onSampling:
+        opts.onSampling ??
+        opts.samplingCallback ??
+        opts.defaultOnSampling,
+
+      // connector-level elicitation has priority
+      elicitationCallback:
+        opts.elicitationCallback ??
+        opts.defaultElicitationCallback,
     };
+
     if (opts.samplingCallback && !opts.onSampling) {
       console.warn(
         '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
@@ -291,7 +309,7 @@ export abstract class BaseConnector {
       logger.debug("setupSamplingHandler: No client available");
       return;
     }
-    const samplingCallback = this.opts.onSampling ?? this.opts.samplingCallback;
+    const samplingCallback = this.opts.onSampling;
     if (!samplingCallback) {
       logger.debug("setupSamplingHandler: No sampling callback provided");
       return;
