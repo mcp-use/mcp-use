@@ -930,6 +930,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             nativeServer
           );
           nativeServer._registeredTools[name] = toolEntry;
+          // Ensure tools/list and tools/call handlers are registered on the SDK server.
+          // This is idempotent -- only registers handlers the first time (when
+          // _toolHandlersInitialized is false), which happens when the session was
+          // created with zero tools (e.g. blank template).
+          if (typeof nativeServer.setToolRequestHandlers === "function") {
+            nativeServer.setToolRequestHandlers();
+          }
           return toolEntry;
         },
       })),
@@ -1572,6 +1579,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           try {
             if (
               toolsResult.changes.added.length ||
+              toolsResult.changes.removed.length ||
               toolsResult.changes.updated.length
             ) {
               session.server.sendToolListChanged();
@@ -1585,6 +1593,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           try {
             if (
               promptsResult.changes.added.length ||
+              promptsResult.changes.removed.length ||
               promptsResult.changes.updated.length
             ) {
               session.server.sendPromptListChanged();
@@ -1598,8 +1607,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           try {
             if (
               resourcesResult.changes.added.length ||
+              resourcesResult.changes.removed.length ||
               resourcesResult.changes.updated.length ||
               templatesResult.changes.added.length ||
+              templatesResult.changes.removed.length ||
               templatesResult.changes.updated.length
             ) {
               session.server.sendResourceListChanged();
