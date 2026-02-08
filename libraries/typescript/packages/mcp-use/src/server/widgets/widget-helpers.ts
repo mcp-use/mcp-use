@@ -430,10 +430,10 @@ export function createWidgetRegistration(
     metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : true;
 
   // Auto-detect widget type based on metadata presence:
-  // - If unified `metadata` field is present → mcpApps (dual-protocol)
+  // - Default → mcpApps (dual-protocol for both ChatGPT and MCP Apps clients)
   // - If only `appsSdkMetadata` is present → appsSdk (legacy ChatGPT-only)
-  // - Default → appsSdk (backward compatibility)
-  const widgetType = metadata.metadata ? "mcpApps" : "appsSdk";
+  const widgetType =
+    metadata.appsSdkMetadata && !metadata.metadata ? "appsSdk" : "mcpApps";
 
   const mcp_connect_domain = serverConfig.serverBaseUrl
     ? new URL(serverConfig.serverBaseUrl || "").origin

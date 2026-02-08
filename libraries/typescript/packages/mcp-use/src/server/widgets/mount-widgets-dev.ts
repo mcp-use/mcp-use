@@ -571,7 +571,10 @@ if (container && Component) {
             await import("./widget-helpers.js");
 
           // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
-          const widgetType = metadata.metadata ? "mcpApps" : "appsSdk";
+          const widgetType =
+            metadata.appsSdkMetadata && !metadata.metadata
+              ? "appsSdk"
+              : "mcpApps";
           const slugifiedName = slugifyWidgetName(widgetName);
 
           // Debug logging
@@ -618,7 +621,7 @@ if (container && Component) {
                 exposeAsTool: metadata.exposeAsTool ?? true,
               },
               // Include unified metadata for dual-protocol support (MCP Apps)
-              ...(metadata.metadata ? { ui: metadata.metadata } : {}),
+              ...(metadata.metadata ? { ui: metadata.metadata } : { ui: {} }),
             },
           });
 
