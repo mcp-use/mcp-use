@@ -34,6 +34,55 @@ function getFrameAncestorsFromEnv(): string | undefined {
 }
 
 /**
+ * Convert a URL to use localhost for server-side fetches.
+ *
+ * When the Inspector runs behind a reverse proxy (e.g., E2B sandbox), the
+ * devServerBaseUrl/devWidgetUrl from the client contains the external proxy URL
+ * (e.g., https://3000-xxx.e2b.app/...). Server-side fetches to this external URL
+ * may go through the proxy's catch-all route which returns the Inspector SPA HTML
+ * instead of the Vite-served widget content.
+ *
+ * Since the server-side handler runs on the SAME machine as the dev server,
+ * we convert external URLs to http://localhost:{PORT} to fetch directly from
+ * the Vite middleware.
+ *
+ * @param externalUrl - The URL that may be an external proxy URL
+ * @param requestUrl - The current request URL (used to derive the local port)
+ * @returns The URL rewritten to use localhost, or the original URL if already local
+ */
+function toLocalhostUrl(externalUrl: string, requestUrl: string): string {
+  try {
+    const url = new URL(externalUrl);
+    // Already localhost - no rewrite needed
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return externalUrl;
+    }
+
+    // Derive the local port from the request URL (the server's own port)
+    // or from the external URL's hostname pattern (e.g., "3000-xxx.e2b.app" -> port 3000)
+    let localPort = "3000";
+    try {
+      const reqUrl = new URL(requestUrl);
+      if (reqUrl.hostname === "localhost" || reqUrl.hostname === "127.0.0.1") {
+        localPort = reqUrl.port || "3000";
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    // Try to extract port from E2B-style hostname: "3000-xxx.e2b.app" -> "3000"
+    const portMatch = url.hostname.match(/^(\d+)-/);
+    if (portMatch) {
+      localPort = portMatch[1];
+    }
+
+    return `http://localhost:${localPort}${url.pathname}${url.search}`;
+  } catch {
+    return externalUrl;
+  }
+}
+
+/**
  * Fetch with retry logic and exponential backoff for handling cold starts
  *
  * Retries fetch requests that fail due to connection timeouts or refused connections,
@@ -287,8 +336,17 @@ export function registerInspectorRoutes(
         );
       }
 
+      // When running behind a reverse proxy (e.g., E2B sandbox), devWidgetUrl may be
+      // an external URL (https://3000-xxx.e2b.app/...) that the proxy resolves back
+      // to the Inspector SPA instead of the Vite-served widget. Convert to localhost
+      // since the server-side fetch runs on the same machine as the dev server.
+      const localDevWidgetUrl = toLocalhostUrl(
+        widgetData.devWidgetUrl,
+        c.req.url
+      );
+
       // Fetch HTML from dev server with retry logic for cold starts
-      const response = await fetchWithRetry(widgetData.devWidgetUrl);
+      const response = await fetchWithRetry(localDevWidgetUrl);
       if (!response.ok) {
         const status = response.status as 400 | 404 | 500 | 502 | 503;
         return c.html(
@@ -329,6 +387,8 @@ export function registerInspectorRoutes(
       const widgetName = widgetNameMatch ? widgetNameMatch[1] : "widget";
 
       // Replace absolute paths to dev server with proxy paths
+      // Match both the external URL (devServerBaseUrl) and localhost URLs
+      // When fetched from localhost (toLocalhostUrl), HTML contains localhost:PORT URLs
       const escapedBaseUrl = widgetData.devServerBaseUrl.replace(
         /[.*+?^${}()|[\]\\]/g,
         "\\$&"
@@ -339,20 +399,26 @@ export function registerInspectorRoutes(
           "g"
         ),
         (_match, attr, url) => {
-          // Extract the path after the base URL
           const path = url.replace(widgetData.devServerBaseUrl, "");
           return `${attr}="${proxyBase}${path}"`;
         }
       );
 
+      // Also rewrite localhost URLs (the Vite server generates HTML with localhost URLs)
+      // This is needed when the server-side fetch uses localhost (behind reverse proxy)
+      html = html.replace(
+        /(src|href|from\s+)(['"])(https?:\/\/(?:localhost|0\.0\.0\.0|127\.0\.0\.1):\d+)(\/mcp-use\/widgets\/[^'"]+)(['"])/g,
+        (_match, attr, q1, _origin, path, q2) => {
+          return `${attr}${q1}${proxyBase}${path}${q2}`;
+        }
+      );
+
       // Also handle relative paths that start with /mcp-use/widgets/
-      // In dev mode, load all assets directly from dev server for simplicity
-      // This avoids issues with dynamically loaded assets that bypass HTML rewriting
+      // Rewrite to proxy paths (not direct dev server URLs) to avoid proxy catch-all issues
       html = html.replace(
         /(src|href)="(\/mcp-use\/widgets\/[^"]+)"/g,
         (_match, attr, path) => {
-          // Rewrite to absolute URL pointing to dev server
-          return `${attr}="${widgetData.devServerBaseUrl}${path}"`;
+          return `${attr}="${proxyBase}${path}"`;
         }
       );
 
@@ -370,17 +436,34 @@ export function registerInspectorRoutes(
 
       // Inject base tag and Vite HMR WebSocket configuration
       if (widgetData.devServerBaseUrl) {
+        // Determine if we're behind a reverse proxy (external URL differs from localhost)
+        const isRemote = (() => {
+          try {
+            const url = new URL(widgetData.devServerBaseUrl);
+            return (
+              url.hostname !== "localhost" &&
+              url.hostname !== "127.0.0.1" &&
+              url.hostname !== "0.0.0.0"
+            );
+          } catch {
+            return false;
+          }
+        })();
+
+        // For HMR WebSocket: use localhost when behind a proxy (browser can't reach it,
+        // but Vite client will try). When local, point directly to dev server.
         const devServerUrl = new URL(widgetData.devServerBaseUrl);
         const wsProtocol = devServerUrl.protocol === "https:" ? "wss" : "ws";
-        const wsHost = devServerUrl.host; // e.g., "localhost:3004"
-
-        // Point directly to Vite HMR endpoint on the dev server
+        const wsHost = devServerUrl.host;
         const directWsUrl = `${wsProtocol}://${wsHost}/mcp-use/widgets/`;
 
-        // Inject base tag to make all relative URLs resolve against dev server
-        // This is critical for Vite's dynamic module loading
-        // MUST be injected right after <head> tag, before any scripts
-        const baseTag = `<base href="${widgetData.devServerBaseUrl}/mcp-use/widgets/${widgetName}/">`;
+        // For <base> tag: when behind a proxy, use the proxy path so relative URLs
+        // (like dynamic imports) go through the asset proxy instead of the external URL.
+        // When local, point to the dev server directly.
+        const baseHref = isRemote
+          ? `${proxyBase}/mcp-use/widgets/${widgetName}/`
+          : `${widgetData.devServerBaseUrl}/mcp-use/widgets/${widgetName}/`;
+        const baseTag = `<base href="${baseHref}">`;
 
         // Inject CSP violation listener to warn about non-whitelisted resources
         const cspWarningScript = `
@@ -453,7 +536,12 @@ export function registerInspectorRoutes(
       }
 
       // Construct full URL to dev server asset
-      const devAssetUrl = `${widgetData.devServerBaseUrl}${assetPath}`;
+      // Use localhost for server-side fetch (same fix as dev-widget handler above)
+      const localBaseUrl = toLocalhostUrl(
+        widgetData.devServerBaseUrl,
+        c.req.url
+      );
+      const devAssetUrl = `${localBaseUrl}${assetPath}`;
 
       // Forward request to dev server
       const response = await fetch(devAssetUrl, {

@@ -864,6 +864,10 @@ export default PostHog;
     server: {
       middlewareMode: true,
       origin: serverOrigin,
+      // Allow all hosts so the Vite middleware works behind reverse proxies
+      // (e.g., ngrok, E2B sandbox proxy, Cloudflare tunnels)
+      // Without this, Vite returns 403 for requests with non-localhost Host headers
+      allowedHosts: true,
       hmr: {
         // Explicitly configure HMR for better cross-platform support
         // Use wss for HTTPS deployments, ws otherwise
