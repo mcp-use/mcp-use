@@ -70,7 +70,7 @@ export type UpdateWidgetToolCallback = (
     schema?: unknown; // Raw Zod schema - will be converted by the server
     _meta?: Record<string, unknown>;
   }
-) => void;
+) => boolean;
 
 /**
  * Widget tool removal callback function type

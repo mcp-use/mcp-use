@@ -56,14 +56,16 @@ export async function mountWidgetsDev(
   const resourcesDir = options?.resourcesDir || "resources";
   const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
-  // Check if resources directory exists
+  // Ensure resources directory exists - create it if missing.
+  // In dynamic workflows (e.g., Mango/E2B), widgets are created after the server starts,
+  // so we need the directory to exist for the Vite file watcher to monitor it.
   try {
     await fs.access(srcDir);
-  } catch (error) {
+  } catch {
     console.log(
-      `[WIDGETS] No ${resourcesDir}/ directory found - skipping widget serving`
+      `[WIDGETS] No ${resourcesDir}/ directory found - creating it for widget watching`
     );
-    return;
+    await fs.mkdir(srcDir, { recursive: true });
   }
 
   // Find all TSX widget files and folders with widget.tsx
@@ -105,8 +107,12 @@ export async function mountWidgetsDev(
   }
 
   if (entries.length === 0) {
-    console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
-    return;
+    console.log(
+      `[WIDGETS] No widgets found in ${resourcesDir}/ directory yet - watching for new widgets...`
+    );
+    // Don't return - still start the Vite dev server so it watches for new widget files.
+    // This is critical for workflows where widgets are created after the server starts
+    // (e.g., Mango/E2B sandboxes where Claude creates widgets dynamically).
   }
 
   // Create a temp directory for widget entry files
@@ -596,7 +602,7 @@ if (container && Component) {
 
           // Use the update callback to update tool in place with complete metadata
           // Pass the raw Zod schema - the server will convert it internally
-          updateWidgetTool(widgetName, {
+          const updated = updateWidgetTool(widgetName, {
             description: metadata.description || `Widget: ${widgetName}`,
             schema: schemaField,
             _meta: {
@@ -615,7 +621,16 @@ if (container && Component) {
               ...(metadata.metadata ? { ui: metadata.metadata } : {}),
             },
           });
-          return;
+
+          if (updated) {
+            return;
+          }
+
+          // Tool was removed (e.g., by index.ts HMR sync) - fall through
+          // to full registration below to re-create it
+          console.log(
+            `[WIDGET-HMR] Tool ${widgetName} not found, falling back to full registration`
+          );
         }
 
         // Full registration for new widgets

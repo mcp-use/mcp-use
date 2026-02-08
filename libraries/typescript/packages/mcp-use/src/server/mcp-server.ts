@@ -93,6 +93,7 @@ import {
   applyDenoCorsHeaders,
   createHonoApp,
   createHonoProxy,
+  installCustomRoutesMiddleware,
   getDenoCorsHeaders,
   getEnv,
   getServerBaseUrl as getServerBaseUrlHelper,
@@ -278,6 +279,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
   /** @internal Whether public routes have been set up and in what mode */
   private publicRoutesMode: "dev" | "production" | null = null;
+
+  /**
+   * @internal Mutable registry of custom HTTP route handlers for HMR support.
+   * Key format: "METHOD:PATH" (e.g., "get:/api/fruits")
+   * Handlers are stored here so they can be swapped during HMR without
+   * re-registering routes on the immutable Hono router.
+   */
+
+  public _customRoutes = new Map<string, ((...args: any[]) => any)[]>();
 
   /**
    * Port number the server is listening on (set after calling {@link listen}).
@@ -648,13 +658,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       schema?: unknown; // Raw Zod schema - will be converted internally
       _meta?: Record<string, unknown>;
     }
-  ): void {
+  ): boolean {
     // Guard against prototype pollution
     if (!isSafePropertyKey(toolName)) {
       console.warn(
         `[MCP-Server] Rejected potentially malicious tool name: ${toolName}`
       );
-      return;
+      return false;
     }
 
     // Convert Zod schema to input schema if provided
@@ -672,20 +682,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Update our wrapper's registration
     const registration = this.registrations.tools.get(toolName);
-    if (registration) {
-      if (updates.description !== undefined) {
-        registration.config.description = updates.description;
-      }
-      if (updates._meta !== undefined) {
-        // Merge _meta to preserve existing fields like openai/outputTemplate
-        registration.config._meta = {
-          ...registration.config._meta,
-          ...updates._meta,
-        };
-      }
-      if ("schema" in updates) {
-        registration.config.schema = updates.schema as any;
-      }
+    if (!registration) {
+      // Tool doesn't exist (may have been removed by HMR sync).
+      // Return false so caller can fall back to full registration.
+      return false;
+    }
+
+    if (updates.description !== undefined) {
+      registration.config.description = updates.description;
+    }
+    if (updates._meta !== undefined) {
+      // Merge _meta to preserve existing fields like openai/outputTemplate
+      registration.config._meta = {
+        ...registration.config._meta,
+        ...updates._meta,
+      };
+    }
+    if ("schema" in updates) {
+      registration.config.schema = updates.schema as any;
     }
 
     // Update the SDK's internal _registeredTools for all sessions
@@ -728,6 +742,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       }
     }
+
+    return true;
   }
 
   /**
@@ -910,6 +926,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       primitiveName: "Tools",
       currentRegistrations: this.registrations.tools,
       newRegistrations: other.registrations.tools,
+      // Don't remove widget-registered tools during index.ts HMR sync.
+      // Widget tools are managed by the Vite file watcher, not by index.ts.
+      shouldRemove: (_key, reg) => {
+        const meta = (reg.config as any)?._meta;
+        return !meta?.["mcp-use/widget"];
+      },
       sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
         sessionId,
         getRefs: () => refs?.tools,
@@ -1557,6 +1579,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
     this.registeredResources = Array.from(this.registrations.resources.keys());
 
+    // --- CUSTOM HTTP ROUTES ---
+    // Sync custom HTTP route handlers (registered via server.get(), server.post(), etc.)
+    // The middleware installed at startup reads from _customRoutes at request time,
+    // so we only need to update the map — no Hono router changes needed.
+    // See: https://github.com/honojs/hono/issues/3817
+    if (other._customRoutes.size > 0) {
+      for (const [key, handlers] of other._customRoutes) {
+        this._customRoutes.set(key, handlers);
+      }
+    }
+    // Remove routes that no longer exist in the new module
+    for (const key of this._customRoutes.keys()) {
+      if (!other._customRoutes.has(key)) {
+        this._customRoutes.delete(key);
+      }
+    }
+
     // Log all changes
     const allChanges = [
       toolsResult.changes,
@@ -1785,6 +1824,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger);
+
+    // Install the custom routes middleware FIRST (before any other routes).
+    // This single middleware dispatches from the mutable _customRoutes map,
+    // enabling HMR for custom HTTP routes (server.get(), server.post(), etc.)
+    // without hitting Hono's "matcher already built" error.
+    // See: https://github.com/honojs/hono/issues/3817
+    installCustomRoutesMiddleware(this.app, this._customRoutes);
 
     // Setup public routes immediately if icons/favicon are configured
     // This ensures icons are served even before listen() or getHandler() is called

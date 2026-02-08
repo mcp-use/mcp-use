@@ -103,7 +103,9 @@ export async function mountWidgets(
     server.uiResource(widgetDef);
   };
 
-  // Update callback for HMR - directly updates tool config without re-registering
+  // Update callback for HMR - directly updates tool config without re-registering.
+  // Returns false if the tool doesn't exist (e.g., removed by index.ts HMR sync),
+  // so the caller can fall back to full registration.
   const updateWidgetTool = (
     toolName: string,
     updates: {
@@ -111,8 +113,8 @@ export async function mountWidgets(
       schema?: unknown;
       _meta?: Record<string, unknown>;
     }
-  ) => {
-    (server as any).updateWidgetToolInPlace(toolName, updates);
+  ): boolean => {
+    return (server as any).updateWidgetToolInPlace(toolName, updates);
   };
 
   // Remove callback for HMR - removes tool and resources when widget is deleted/renamed
