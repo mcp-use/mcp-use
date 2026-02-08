@@ -930,6 +930,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             nativeServer
           );
           nativeServer._registeredTools[name] = toolEntry;
+          // Ensure tools/list and tools/call handlers are registered on the SDK server.
+          // This is idempotent -- only registers handlers the first time (when
+          // _toolHandlersInitialized is false), which happens when the session was
+          // created with zero tools (e.g. blank template).
+          if (typeof nativeServer.setToolRequestHandlers === "function") {
+            nativeServer.setToolRequestHandlers();
+          }
           return toolEntry;
         },
       })),
@@ -1572,6 +1579,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           try {
             if (
               toolsResult.changes.added.length ||
+              toolsResult.changes.removed.length ||
               toolsResult.changes.updated.length
             ) {
               session.server.sendToolListChanged();
@@ -1585,6 +1593,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           try {
             if (
               promptsResult.changes.added.length ||
+              promptsResult.changes.removed.length ||
               promptsResult.changes.updated.length
             ) {
               session.server.sendPromptListChanged();
@@ -1598,8 +1607,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           try {
             if (
               resourcesResult.changes.added.length ||
+              resourcesResult.changes.removed.length ||
               resourcesResult.changes.updated.length ||
               templatesResult.changes.added.length ||
+              templatesResult.changes.removed.length ||
               templatesResult.changes.updated.length
             ) {
               session.server.sendResourceListChanged();
@@ -2132,6 +2143,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         },
       }
     );
+
+    // Pre-initialize all request handlers (tools/list, prompts/list, resources/list)
+    // on the SDK server so they are always available, even when starting with zero
+    // registrations (e.g. blank template). Without this, HMR-added tools would
+    // trigger list_changed notifications but the tools/list handler wouldn't exist,
+    // causing -32601 "Method not found" errors on clients.
+    // These calls are idempotent -- they check internal *HandlersInitialized flags.
+    const serverAny = newServer as any;
+    if (typeof serverAny.setToolRequestHandlers === "function") {
+      serverAny.setToolRequestHandlers();
+    }
+    if (typeof serverAny.setPromptRequestHandlers === "function") {
+      serverAny.setPromptRequestHandlers();
+    }
+    if (typeof serverAny.setResourceRequestHandlers === "function") {
+      serverAny.setResourceRequestHandlers();
+    }
 
     // Initialize refs storage for this session (for hot reload support)
     const sessionRefs = {

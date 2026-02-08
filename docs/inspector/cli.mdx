@@ -58,6 +58,39 @@ Display help information and available options.
 npx @mcp-use/inspector --help
 ```
 
+## Environment Variables
+
+### `MCP_INSPECTOR_FRAME_ANCESTORS`
+
+Configure which origins can embed the inspector widget in iframes. This is useful when embedding the inspector into your own application or when testing widgets from different domains.
+
+**Default behavior:**
+- **Development mode**: `*` (allows all origins for easier development)
+- **Production mode**: `'self'` (same-origin only for security)
+
+**Format:** Space-separated list of origins or `*` for all origins
+
+**Examples:**
+
+```bash
+# Allow embedding from specific domains
+MCP_INSPECTOR_FRAME_ANCESTORS="https://app.example.com https://dev.example.com" npx @mcp-use/inspector
+
+# Allow embedding from any domain (useful for development)
+MCP_INSPECTOR_FRAME_ANCESTORS="*" npx @mcp-use/inspector
+
+# Multiple origins with wildcards
+MCP_INSPECTOR_FRAME_ANCESTORS="https://*.example.com http://localhost:*" npx @mcp-use/inspector
+```
+
+<Note>
+In production deployments, it's recommended to explicitly list allowed origins rather than using `*` to prevent unauthorized embedding.
+</Note>
+
+<Tip>
+When running in development mode (`npm run dev`), the inspector automatically allows all origins by default, so you don't need to set this variable unless you want to test production CSP policies.
+</Tip>
+
 ## Automatic Port Selection
 
 If the specified port (or default 8080) is already in use, the inspector will automatically try the next available port. The terminal output will show the actual port being used:

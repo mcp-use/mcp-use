@@ -2,7 +2,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { Hono } from "hono";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutes } from "./shared-static.js";
-import { checkClientFiles, getClientDistPath } from "./shared-utils.js";
+import { checkClientFiles, getClientDistPath } from "./file-utils.js";
 
 /**
  * Mount the MCP Inspector UI at a specified path on an Express or Hono app

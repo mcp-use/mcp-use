@@ -5,7 +5,7 @@ import {
   checkClientFiles,
   getClientDistPath,
   getContentType,
-} from "./shared-utils.js";
+} from "./file-utils.js";
 
 /**
  * Register routes that serve the built inspector client, handle SPA entry routing, and provide a fallback when client files are missing.
