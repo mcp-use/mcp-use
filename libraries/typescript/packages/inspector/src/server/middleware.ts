@@ -23,7 +23,13 @@ import { checkClientFiles, getClientDistPath } from "./file-utils.js";
  */
 export function mountInspector(
   app: Express | Hono,
-  config?: { autoConnectUrl?: string | null }
+  config?: {
+    autoConnectUrl?: string | null;
+    /** Whether the server is running in development mode (enables same-origin sandbox) */
+    devMode?: boolean;
+    /** Override the sandbox origin for MCP Apps widgets (e.g., for production reverse proxies) */
+    sandboxOrigin?: string | null;
+  }
 ): void {
   // Find the built client files
   const clientDistPath = getClientDistPath();
@@ -37,10 +43,16 @@ export function mountInspector(
     );
   }
 
+  // Build runtime config to inject into the HTML
+  const runtimeConfig = {
+    devMode: config?.devMode,
+    sandboxOrigin: config?.sandboxOrigin,
+  };
+
   // If it's already a Hono app, register routes directly
   if (app instanceof Hono) {
     registerInspectorRoutes(app, config);
-    registerStaticRoutes(app, clientDistPath);
+    registerStaticRoutes(app, clientDistPath, runtimeConfig);
     return;
   }
 
@@ -49,7 +61,7 @@ export function mountInspector(
 
   // Register routes on Hono app
   registerInspectorRoutes(honoApp, config);
-  registerStaticRoutes(honoApp, clientDistPath);
+  registerStaticRoutes(honoApp, clientDistPath, runtimeConfig);
 
   // Convert all Hono routes to Express middleware
   app.use((req: Request, res: Response, next: NextFunction) => {

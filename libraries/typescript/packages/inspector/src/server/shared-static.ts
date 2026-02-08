@@ -8,13 +8,54 @@ import {
 } from "./file-utils.js";
 
 /**
+ * Runtime configuration injected into the inspector HTML at serve time.
+ */
+interface RuntimeConfig {
+  /** Whether the server is running in development mode */
+  devMode?: boolean;
+  /** Override sandbox origin for MCP Apps widgets behind reverse proxies */
+  sandboxOrigin?: string | null;
+}
+
+/**
+ * Inject runtime configuration scripts into the inspector HTML.
+ * These globals are read by client-side components like SandboxedIframe.tsx.
+ */
+function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
+  if (!config) return html;
+
+  const scripts: string[] = [];
+
+  if (config.devMode) {
+    scripts.push(`<script>window.__MCP_DEV_MODE__ = true;</script>`);
+  }
+
+  if (config.sandboxOrigin) {
+    scripts.push(
+      `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+    );
+  }
+
+  if (scripts.length === 0) return html;
+
+  // Inject before closing </head> tag
+  const injection = scripts.join("\n    ");
+  return html.replace("</head>", `    ${injection}\n  </head>`);
+}
+
+/**
  * Register routes that serve the built inspector client, handle SPA entry routing, and provide a fallback when client files are missing.
  *
  * This registers asset serving under the inspector path, redirects the root path to `/inspector` while preserving query parameters, serves the SPA entry (`index.html`) for inspector routes, and installs a final catch-all that serves the SPA or a build-missing fallback page. If `clientDistPath` is not provided, the built client path is resolved automatically.
  *
  * @param clientDistPath - Optional path to the built inspector client directory; when omitted, the implementation resolves the default distribution path
+ * @param runtimeConfig - Optional runtime configuration to inject into the HTML
  */
-export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
+export function registerStaticRoutes(
+  app: Hono,
+  clientDistPath?: string,
+  runtimeConfig?: RuntimeConfig
+) {
   const distPath = clientDistPath || getClientDistPath();
 
   if (!checkClientFiles(distPath)) {
@@ -67,7 +108,10 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
   app.get("/inspector", (c) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, "utf-8");
+      const content = injectRuntimeConfig(
+        readFileSync(indexPath, "utf-8"),
+        runtimeConfig
+      );
       return c.html(content);
     }
     return c.html(`
@@ -89,7 +133,10 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
   const handleInspectorRoute = (c: any) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, "utf-8");
+      const content = injectRuntimeConfig(
+        readFileSync(indexPath, "utf-8"),
+        runtimeConfig
+      );
       return c.html(content);
     }
     return c.notFound();
@@ -102,7 +149,10 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
   app.get("*", (c) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, "utf-8");
+      const content = injectRuntimeConfig(
+        readFileSync(indexPath, "utf-8"),
+        runtimeConfig
+      );
       return c.html(content);
     }
     return c.html(`

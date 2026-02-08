@@ -64,7 +64,13 @@ export async function mountInspectorUI(
       transportType: "sse",
       connectionType: "Direct",
     });
-    mountInspector(app, { autoConnectUrl: autoConnectConfig });
+    mountInspector(app, {
+      autoConnectUrl: autoConnectConfig,
+      // In dev mode, tell the inspector to use same-origin for MCP Apps sandbox.
+      // This avoids requiring a sandbox-{hostname} subdomain that doesn't exist
+      // behind reverse proxies (ngrok, E2B, etc.)
+      devMode: !isProduction,
+    });
     console.log(
       `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`
     );
