@@ -157,7 +157,7 @@ export async function startServer(
   } else {
     // Node.js runtime
     const { serve } = await import("@hono/node-server");
-    serve(
+    const server = serve(
       {
         fetch: app.fetch,
         port,
@@ -168,5 +168,13 @@ export async function startServer(
         console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
       }
     );
+
+    // Set up Vite HMR WebSocket proxy if available.
+    // This forwards WebSocket upgrades from the main server to Vite's internal WS port,
+    // enabling HMR through reverse proxies (ngrok, E2B, etc.)
+    const wsProxySetup = (app as any).__viteWsProxy;
+    if (wsProxySetup && server) {
+      wsProxySetup(server);
+    }
   }
 }

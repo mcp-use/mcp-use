@@ -275,10 +275,7 @@ if (container && Component) {
     );
   }
 
-  // Derive WebSocket protocol from serverBaseUrl (wss for HTTPS, ws otherwise)
-  const wsProtocol = serverConfig.serverBaseUrl.startsWith("https:")
-    ? "wss"
-    : "ws";
+  // Note: WebSocket protocol (ws/wss) is auto-detected by Vite client from the page URL
 
   // Create a single shared Vite dev server for all widgets
   console.log(
@@ -872,15 +869,21 @@ export default PostHog;
       // Without this, Vite returns 403 for requests with non-localhost Host headers
       allowedHosts: true,
       hmr: {
-        // Configure HMR for cross-platform support
-        // Use wss for HTTPS deployments, ws otherwise
-        protocol: wsProtocol,
-        // NOTE: In middleware mode, Vite creates its own WebSocket server on a random port.
-        // This means HMR live reload won't work through reverse proxies (ngrok, E2B, etc.)
-        // because the proxy doesn't forward WebSocket traffic to that random port.
-        // Widget rendering still works - only hot reload is affected.
-        // To fix this properly, the main HTTP server instance would need to be passed
-        // via hmr.server, but it's not available at Vite creation time.
+        // Explicitly set the internal HMR WebSocket port so we can proxy to it.
+        // In middleware mode, Vite creates a standalone WebSocket server.
+        // We need to know this port to forward upgrade requests from the main server.
+        // Using 24678 (Vite's default) to avoid surprises.
+        port: 24678,
+        // Configure the CLIENT to connect to the main server port instead of Vite's
+        // standalone port. Our WebSocket proxy on the main server forwards
+        // to Vite's internal port. This enables HMR through reverse proxies.
+        // - Behind HTTPS proxy (ngrok/E2B): client connects to wss://host:443/...
+        //   → proxy → port 3000 → our WS proxy → Vite WS on port 24678
+        // - Local: client connects to ws://localhost:3000/...
+        //   → our WS proxy → Vite WS on port 24678
+        clientPort: serverConfig.serverBaseUrl.startsWith("https:")
+          ? 443
+          : Number(serverConfig.serverPort) || 3000,
       },
       watch: {
         // Watch the resources directory for HMR to work
@@ -917,6 +920,54 @@ export default PostHog;
       "import.meta.env.SSR": true,
     },
   });
+
+  // Set up WebSocket proxy for Vite HMR through the main HTTP server.
+  // In middleware mode, Vite creates its own WebSocket on a random port (e.g., 24678).
+  // Reverse proxies (ngrok, E2B) only forward traffic on the main port.
+  // This proxy intercepts WebSocket upgrade requests on the main server at the widget
+  // base path and forwards them to Vite's internal WebSocket server.
+  // Read HMR port from resolved config (we set it explicitly above to 24678)
+  const viteHmrPort = (viteServer.config.server.hmr as any)?.port || 24678;
+  if (viteHmrPort) {
+    console.log(
+      `[WIDGETS] Vite HMR WebSocket on port ${viteHmrPort}, setting up proxy on main server`
+    );
+
+    // Store the proxy setup function - it will be called when the HTTP server is available
+    const hmrPort = viteHmrPort;
+    const widgetRoute = baseRoute;
+    // Pre-import net module at setup time (works in both CJS and ESM)
+    const netModule = await import("node:net");
+    const setupWsProxy = (httpServer: import("http").Server) => {
+      httpServer.on("upgrade", (req: any, socket: any, head: any) => {
+        // Only proxy requests to the widget base route
+        if (req.url?.startsWith(`${widgetRoute}/`) || req.url === widgetRoute) {
+          const upstream = netModule.createConnection(
+            { port: hmrPort, host: "localhost" },
+            () => {
+              // Forward the original upgrade request to Vite's WebSocket server
+              const rawRequest =
+                `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n` +
+                Object.entries(req.headers)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join("\r\n") +
+                "\r\n\r\n";
+              upstream.write(rawRequest);
+              if (head.length > 0) upstream.write(head);
+              // Pipe bidirectionally
+              socket.pipe(upstream);
+              upstream.pipe(socket);
+            }
+          );
+          upstream.on("error", () => socket.destroy());
+          socket.on("error", () => upstream.destroy());
+        }
+      });
+    };
+
+    // Store for later use when HTTP server is available
+    (app as any).__viteWsProxy = setupWsProxy;
+  }
 
   // Custom middleware to handle widget-specific paths
   app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {

@@ -1077,19 +1077,24 @@ program
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
-      process.env.MCP_URL = mcpUrl;
+      // Only set MCP_URL if not already provided by the user.
+      // Users may set MCP_URL to an external proxy URL (ngrok, E2B, etc.)
+      // for correct widget URLs and HMR WebSocket connections through proxies.
+      if (!process.env.MCP_URL) {
+        process.env.MCP_URL = mcpUrl;
+      }
 
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
 
         const processes: any[] = [];
-        const mcpUrl = `http://${host}:${port}`;
         const env: NodeJS.ProcessEnv = {
           PORT: String(port),
           HOST: host,
           NODE_ENV: "development",
-          MCP_URL: mcpUrl,
+          // Preserve user-provided MCP_URL (e.g., for reverse proxy setups)
+          MCP_URL: process.env.MCP_URL || mcpUrl,
         };
 
         // Use local tsx if available, otherwise fall back to npx
