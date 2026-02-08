@@ -756,6 +756,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
         }
 
         // Inject MCP widget utilities for Image component and file access
+        // __mcpServerUrl provides the server origin for widgets to use in API calls
+        // (e.g., fetch(window.__mcpServerUrl + '/api/fruits') instead of hardcoding localhost)
+        window.__mcpServerUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}"` : '""'};
         window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
         window.__getFile = function(filename) {
           return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;

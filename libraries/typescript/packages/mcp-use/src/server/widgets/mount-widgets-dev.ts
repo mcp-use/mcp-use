@@ -234,8 +234,8 @@ if (container && Component) {
 
     // Include Vite client and React refresh preamble explicitly
     // This is needed when loading in sandboxed iframes where auto-injection may not work
-    // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
-    // when trying to resolve these paths as file paths during HTML analysis
+    // Use the base route path (not full URL) so URLs resolve against the document origin.
+    // This works both locally and behind reverse proxies (ngrok, E2B, etc.)
     const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
     const htmlContent = `<!doctype html>
 <html lang="en">
@@ -274,9 +274,6 @@ if (container && Component) {
       "utf8"
     );
   }
-
-  // Build the server origin URL
-  const serverOrigin = serverConfig.serverBaseUrl;
 
   // Derive WebSocket protocol from serverBaseUrl (wss for HTTPS, ws otherwise)
   const wsProtocol = serverConfig.serverBaseUrl.startsWith("https:")
@@ -474,7 +471,7 @@ if (container && Component) {
 }
 `;
 
-        // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
+        // Use the base route path for URLs so they resolve against the document origin
         const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
         const htmlContent = `<!doctype html>
 <html lang="en">
@@ -863,15 +860,27 @@ export default PostHog;
     },
     server: {
       middlewareMode: true,
-      origin: serverOrigin,
+      // NOTE: We intentionally do NOT set `origin` here.
+      // Setting origin to a localhost URL (e.g., "http://localhost:3000") causes Vite
+      // to hardcode absolute URLs for all module imports (@fs/, @vite/client, etc.).
+      // When the server runs behind a reverse proxy (ngrok, E2B, Cloudflare tunnels),
+      // the browser can't access localhost, breaking all dynamic module loading.
+      // Without `origin`, Vite generates relative URLs that resolve against the
+      // document origin, which works both locally and behind proxies.
+      //
       // Allow all hosts so the Vite middleware works behind reverse proxies
-      // (e.g., ngrok, E2B sandbox proxy, Cloudflare tunnels)
       // Without this, Vite returns 403 for requests with non-localhost Host headers
       allowedHosts: true,
       hmr: {
-        // Explicitly configure HMR for better cross-platform support
+        // Configure HMR for cross-platform support
         // Use wss for HTTPS deployments, ws otherwise
         protocol: wsProtocol,
+        // NOTE: In middleware mode, Vite creates its own WebSocket server on a random port.
+        // This means HMR live reload won't work through reverse proxies (ngrok, E2B, etc.)
+        // because the proxy doesn't forward WebSocket traffic to that random port.
+        // Widget rendering still works - only hot reload is affected.
+        // To fix this properly, the main HTTP server instance would need to be passed
+        // via hmr.server, but it's not available at Vite creation time.
       },
       watch: {
         // Watch the resources directory for HMR to work
