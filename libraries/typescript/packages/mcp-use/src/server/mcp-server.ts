@@ -2144,6 +2144,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     );
 
+    // Pre-initialize all request handlers (tools/list, prompts/list, resources/list)
+    // on the SDK server so they are always available, even when starting with zero
+    // registrations (e.g. blank template). Without this, HMR-added tools would
+    // trigger list_changed notifications but the tools/list handler wouldn't exist,
+    // causing -32601 "Method not found" errors on clients.
+    // These calls are idempotent -- they check internal *HandlersInitialized flags.
+    const serverAny = newServer as any;
+    if (typeof serverAny.setToolRequestHandlers === "function") {
+      serverAny.setToolRequestHandlers();
+    }
+    if (typeof serverAny.setPromptRequestHandlers === "function") {
+      serverAny.setPromptRequestHandlers();
+    }
+    if (typeof serverAny.setResourceRequestHandlers === "function") {
+      serverAny.setResourceRequestHandlers();
+    }
+
     // Initialize refs storage for this session (for hot reload support)
     const sessionRefs = {
       tools: new Map<string, RegisteredTool>(),
