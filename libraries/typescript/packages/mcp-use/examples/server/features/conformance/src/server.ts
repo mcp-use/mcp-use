@@ -349,11 +349,15 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      arg1: completable(z.string(), ["foo", "bar"]),
-      arg2: completable(z.string(), ["baz", "qux"]),
+      arg1: completable(z.string().optional(), () => {
+        return ["default1"]
+      }),
+      arg2: completable(z.string().optional(), () => {
+        return ["default2"]
+      }),
     }),
   },
-  async ({ arg1, arg2 }) =>
+  async ({ arg1 = "default1", arg2 = "default2" }) =>
     text(`Prompt with arguments: arg1='${arg1}', arg2='${arg2}'`)
 );
 
