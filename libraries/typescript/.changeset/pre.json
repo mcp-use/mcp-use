@@ -8,6 +8,7 @@
     "mcp-use": "1.16.4"
   },
   "changesets": [
+    "icy-paws-sleep",
     "long-poems-walk"
   ]
 }
