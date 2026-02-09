@@ -37,6 +37,7 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
+import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
 // Import and re-export tool context types for public API
 import type {
@@ -82,6 +83,7 @@ import type {
   ReadResourceTemplateCallback,
   ResourceDefinition,
   ResourceTemplateDefinition,
+  ResourceTemplateCallbacks,
 } from "./types/resource.js";
 import type {
   InferToolInput,
@@ -577,9 +579,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         try {
           const uriTemplate =
             resourceTemplateReg.config.resourceTemplate.uriTemplate;
+          const resourceCallbacks =
+            resourceTemplateReg.config.resourceTemplate.callbacks;
           const template = new ResourceTemplate(uriTemplate, {
             list: undefined,
-            complete: undefined,
+            complete: toResourceTemplateCompleteCallbacks(
+              resourceCallbacks?.complete
+            ),
           });
 
           const _registeredTemplate = session.server.registerResource(
@@ -1394,10 +1400,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       const templateDescription = isFlatStructure
         ? undefined
         : config.resourceTemplate.description;
+      const resourceCallbacks: ResourceTemplateCallbacks | undefined =
+        isFlatStructure
+          ? (config as any).callbacks
+          : config.resourceTemplate.callbacks;
 
       const template = new ResourceTemplate(uriTemplate, {
         list: undefined,
-        complete: undefined,
+        complete: toResourceTemplateCompleteCallbacks(
+          resourceCallbacks?.complete
+        ),
       });
       const metadata: Record<string, unknown> = {};
       if (config.title) metadata.title = config.title;
@@ -1808,6 +1820,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       {
         capabilities: {
           logging: {},
+          completions: {},
           tools: {
             listChanged: true,
           },
@@ -2176,6 +2189,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       {
         capabilities: {
           logging: {},
+          completions: {},
           tools: {
             listChanged: true,
           },
@@ -2499,10 +2513,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         ? undefined
         : config.resourceTemplate.description;
 
+      const resourceCallbacks: ResourceTemplateCallbacks | undefined =
+        isFlatStructure
+          ? (config as any).callbacks
+          : config.resourceTemplate.callbacks;
+
       // Create ResourceTemplate instance from SDK
       const template = new ResourceTemplate(uriTemplate, {
         list: undefined,
-        complete: undefined,
+        complete: toResourceTemplateCompleteCallbacks(
+          resourceCallbacks?.complete
+        ),
       });
 
       // Create metadata object
