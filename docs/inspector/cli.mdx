@@ -91,6 +91,33 @@ In production deployments, it's recommended to explicitly list allowed origins r
 When running in development mode (`npm run dev`), the inspector automatically allows all origins by default, so you don't need to set this variable unless you want to test production CSP policies.
 </Tip>
 
+### `MCP_URL`
+
+Set the external base URL for your MCP server. This is useful when running behind a reverse proxy (ngrok, E2B sandboxes, Cloudflare tunnels) where the public URL differs from `localhost`.
+
+When set, the CLI will use this URL for widget asset URLs and Vite HMR WebSocket connections, ensuring everything works correctly through the proxy.
+
+**Default behavior:**
+- If not set, the CLI generates a `localhost` URL automatically
+- If set, the CLI preserves your value and does not overwrite it
+
+**Examples:**
+
+```bash
+# ngrok tunnel
+MCP_URL=https://abc123.ngrok.io npx @mcp-use/cli dev
+
+# E2B sandbox
+MCP_URL=https://3000-abc123.e2b.app npx @mcp-use/cli dev
+
+# Cloudflare tunnel
+MCP_URL=https://my-tunnel.trycloudflare.com npx @mcp-use/cli dev
+```
+
+<Tip>
+When using a reverse proxy, set `MCP_URL` to the public-facing URL. This ensures widget hot-reload (HMR) and asset loading work correctly through the proxy.
+</Tip>
+
 ## Automatic Port Selection
 
 If the specified port (or default 8080) is already in use, the inspector will automatically try the next available port. The terminal output will show the actual port being used:
