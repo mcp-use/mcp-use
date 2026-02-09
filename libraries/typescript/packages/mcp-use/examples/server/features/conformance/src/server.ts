@@ -350,10 +350,10 @@ server.prompt(
     description: "A prompt that accepts arguments",
     schema: z.object({
       arg1: completable(z.string().optional(), () => {
-        return ["default1"]
+        return ["default1"];
       }),
       arg2: completable(z.string().optional(), () => {
-        return ["default2"]
+        return ["default2"];
       }),
     }),
   },
