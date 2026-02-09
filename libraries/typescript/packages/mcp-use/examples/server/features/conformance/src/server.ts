@@ -11,6 +11,7 @@ import { setTimeout as sleep } from "timers/promises";
 import {
   audio,
   binary,
+  completable,
   error,
   image,
   MCPServer,
@@ -275,6 +276,11 @@ server.resourceTemplate(
       name: "Template Resource",
       description: "A templated resource",
       mimeType: "application/json",
+      callbacks: {
+        complete: {
+          id: ["foo", "bar", "baz", "qux"],
+        },
+      },
     },
   },
   async (uri: URL, variables: Record<string, any>) => ({
@@ -343,11 +349,11 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      arg1: z.string().optional(),
-      arg2: z.string().optional(),
+      arg1: completable(z.string(), ["foo", "bar"]),
+      arg2: completable(z.string(), ["baz", "qux"]),
     }),
   },
-  async ({ arg1 = "default1", arg2 = "default2" }) =>
+  async ({ arg1, arg2 }) =>
     text(`Prompt with arguments: arg1='${arg1}', arg2='${arg2}'`)
 );
 
