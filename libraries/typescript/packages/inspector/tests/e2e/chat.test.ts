@@ -5,7 +5,7 @@ import {
   navigateToTools,
 } from "./helpers/connection";
 
-test.describe.serial("Inspector Chat Tests", () => {
+test.describe("Inspector Chat Tests", () => {
   // Note: To run these tests with a real MCP server:
   // 1. cd packages/mcp-use/examples/server/features/conformance
   // 2. pnpm build && pnpm start --port 3002

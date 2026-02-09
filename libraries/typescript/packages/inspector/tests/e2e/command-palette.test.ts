@@ -4,8 +4,6 @@ import {
   navigateToTools,
 } from "./helpers/connection";
 
-test.describe.configure({ mode: "serial" });
-
 let page: Page;
 
 test.describe("Inspector Command Palette Tests", () => {

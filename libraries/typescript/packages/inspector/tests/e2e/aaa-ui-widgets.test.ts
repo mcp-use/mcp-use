@@ -7,8 +7,6 @@ import {
 } from "./helpers/connection";
 import { getTestMatrix } from "./helpers/test-matrix";
 
-test.describe.configure({ mode: "serial" });
-
 test.describe("Conformance UI widgets - Tools Tab", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();

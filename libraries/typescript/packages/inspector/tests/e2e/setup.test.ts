@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test.describe.serial("Inspector Setup and Smoke Tests", () => {
+test.describe("Inspector Setup and Smoke Tests", () => {
   test.beforeEach(async ({ page, context }) => {
     // Clear localStorage and cookies before each test
     await context.clearCookies();
@@ -38,8 +38,10 @@ test.describe.serial("Inspector Setup and Smoke Tests", () => {
     });
 
     expect(version).toBeTruthy();
-    // should be format x.x.x
-    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    // should be semver (x.x.x or x.x.x-prerelease or x.x.x+build)
+    expect(version).toMatch(
+      /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/
+    );
     expect(typeof version).toBe("string");
   });
 
