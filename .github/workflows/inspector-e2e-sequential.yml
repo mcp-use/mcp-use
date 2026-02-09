@@ -1,0 +1,208 @@
+name: Inspector E2E Tests (Sequential)
+
+permissions:
+  contents: read
+
+# ============================================================================
+# Inspector E2E Tests - Sequential
+# ============================================================================
+#
+# Runs Playwright E2E tests for the Inspector package across all test modes
+# sequentially: mix -> prod -> builtin. Each mode runs to completion even if
+# a previous mode fails.
+#
+# Modes:
+# - mix: Built server :3002, dev inspector :3000 (most common dev setup)
+# - prod: Built server :3002, built inspector :3000 (production simulation)
+# - builtin: Dev server with built-in inspector :3000 (HMR tests)
+#
+# Triggered on: Manual dispatch only (workflow_dispatch)
+#
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # ── Job 1: Mix mode ──────────────────────────────────────────────────────
+  e2e-mix:
+    name: "E2E (mix)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Link CLI Binaries
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @mcp-use/inspector exec playwright install --with-deps chromium
+
+      - name: Run E2E Tests (mix mode)
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: "false"
+          NODE_ENV: test
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cd packages/inspector
+          node tests/e2e/scripts/run-test-matrix.mjs mix
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-mix
+          path: libraries/typescript/packages/inspector/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-mix
+          path: libraries/typescript/packages/inspector/test-results/
+          retention-days: 7
+
+  # ── Job 2: Prod mode ─────────────────────────────────────────────────────
+  e2e-prod:
+    name: "E2E (prod)"
+    needs: e2e-mix
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Link CLI Binaries
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @mcp-use/inspector exec playwright install --with-deps chromium
+
+      - name: Run E2E Tests (prod mode)
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: "false"
+          NODE_ENV: test
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cd packages/inspector
+          node tests/e2e/scripts/run-test-matrix.mjs prod
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-prod
+          path: libraries/typescript/packages/inspector/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-prod
+          path: libraries/typescript/packages/inspector/test-results/
+          retention-days: 7
+
+  # ── Job 3: Builtin mode ──────────────────────────────────────────────────
+  e2e-builtin:
+    name: "E2E (builtin)"
+    needs: e2e-prod
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Link CLI Binaries
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @mcp-use/inspector exec playwright install --with-deps chromium
+
+      - name: Run E2E Tests (builtin mode)
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: "false"
+          NODE_ENV: test
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cd packages/inspector
+          node tests/e2e/scripts/run-test-matrix.mjs builtin
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-builtin
+          path: libraries/typescript/packages/inspector/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-builtin
+          path: libraries/typescript/packages/inspector/test-results/
+          retention-days: 7
