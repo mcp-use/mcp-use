@@ -56,14 +56,16 @@ export async function mountWidgetsDev(
   const resourcesDir = options?.resourcesDir || "resources";
   const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
-  // Check if resources directory exists
+  // Ensure resources directory exists - create it if missing.
+  // In dynamic workflows (e.g., Mango/E2B), widgets are created after the server starts,
+  // so we need the directory to exist for the Vite file watcher to monitor it.
   try {
     await fs.access(srcDir);
-  } catch (error) {
+  } catch {
     console.log(
-      `[WIDGETS] No ${resourcesDir}/ directory found - skipping widget serving`
+      `[WIDGETS] No ${resourcesDir}/ directory found - creating it for widget watching`
     );
-    return;
+    await fs.mkdir(srcDir, { recursive: true });
   }
 
   // Find all TSX widget files and folders with widget.tsx
@@ -105,8 +107,12 @@ export async function mountWidgetsDev(
   }
 
   if (entries.length === 0) {
-    console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
-    return;
+    console.log(
+      `[WIDGETS] No widgets found in ${resourcesDir}/ directory yet - watching for new widgets...`
+    );
+    // Don't return - still start the Vite dev server so it watches for new widget files.
+    // This is critical for workflows where widgets are created after the server starts
+    // (e.g., Mango/E2B sandboxes where Claude creates widgets dynamically).
   }
 
   // Create a temp directory for widget entry files
@@ -234,8 +240,8 @@ if (container && Component) {
 
     // Include Vite client and React refresh preamble explicitly
     // This is needed when loading in sandboxed iframes where auto-injection may not work
-    // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
-    // when trying to resolve these paths as file paths during HTML analysis
+    // Use the base route path (not full URL) so URLs resolve against the document origin.
+    // This works both locally and behind reverse proxies (ngrok, E2B, etc.)
     const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
     const htmlContent = `<!doctype html>
 <html lang="en">
@@ -275,13 +281,7 @@ if (container && Component) {
     );
   }
 
-  // Build the server origin URL
-  const serverOrigin = serverConfig.serverBaseUrl;
-
-  // Derive WebSocket protocol from serverBaseUrl (wss for HTTPS, ws otherwise)
-  const wsProtocol = serverConfig.serverBaseUrl.startsWith("https:")
-    ? "wss"
-    : "ws";
+  // Note: WebSocket protocol (ws/wss) is auto-detected by Vite client from the page URL
 
   // Create a single shared Vite dev server for all widgets
   console.log(
@@ -474,7 +474,7 @@ if (container && Component) {
 }
 `;
 
-        // Use full URLs (serverBaseUrl + baseRoute) to avoid Vite pre-transform errors
+        // Use the base route path for URLs so they resolve against the document origin
         const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
         const htmlContent = `<!doctype html>
 <html lang="en">
@@ -571,7 +571,10 @@ if (container && Component) {
             await import("./widget-helpers.js");
 
           // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
-          const widgetType = metadata.metadata ? "mcpApps" : "appsSdk";
+          const widgetType =
+            metadata.appsSdkMetadata && !metadata.metadata
+              ? "appsSdk"
+              : "mcpApps";
           const slugifiedName = slugifyWidgetName(widgetName);
 
           // Debug logging
@@ -602,7 +605,7 @@ if (container && Component) {
 
           // Use the update callback to update tool in place with complete metadata
           // Pass the raw Zod schema - the server will convert it internally
-          updateWidgetTool(widgetName, {
+          const updated = updateWidgetTool(widgetName, {
             description: metadata.description || `Widget: ${widgetName}`,
             schema: schemaField,
             _meta: {
@@ -618,10 +621,19 @@ if (container && Component) {
                 exposeAsTool: metadata.exposeAsTool ?? true,
               },
               // Include unified metadata for dual-protocol support (MCP Apps)
-              ...(metadata.metadata ? { ui: metadata.metadata } : {}),
+              ...(metadata.metadata ? { ui: metadata.metadata } : { ui: {} }),
             },
           });
-          return;
+
+          if (updated) {
+            return;
+          }
+
+          // Tool was removed (e.g., by index.ts HMR sync) - fall through
+          // to full registration below to re-create it
+          console.log(
+            `[WIDGET-HMR] Tool ${widgetName} not found, falling back to full registration`
+          );
         }
 
         // Full registration for new widgets
@@ -863,11 +875,33 @@ export default PostHog;
     },
     server: {
       middlewareMode: true,
-      origin: serverOrigin,
+      // NOTE: We intentionally do NOT set `origin` here.
+      // Setting origin to a localhost URL (e.g., "http://localhost:3000") causes Vite
+      // to hardcode absolute URLs for all module imports (@fs/, @vite/client, etc.).
+      // When the server runs behind a reverse proxy (ngrok, E2B, Cloudflare tunnels),
+      // the browser can't access localhost, breaking all dynamic module loading.
+      // Without `origin`, Vite generates relative URLs that resolve against the
+      // document origin, which works both locally and behind proxies.
+      //
+      // Allow all hosts so the Vite middleware works behind reverse proxies
+      // Without this, Vite returns 403 for requests with non-localhost Host headers
+      allowedHosts: true,
       hmr: {
-        // Explicitly configure HMR for better cross-platform support
-        // Use wss for HTTPS deployments, ws otherwise
-        protocol: wsProtocol,
+        // Explicitly set the internal HMR WebSocket port so we can proxy to it.
+        // In middleware mode, Vite creates a standalone WebSocket server.
+        // We need to know this port to forward upgrade requests from the main server.
+        // Using 24678 (Vite's default) to avoid surprises.
+        port: 24678,
+        // Configure the CLIENT to connect to the main server port instead of Vite's
+        // standalone port. Our WebSocket proxy on the main server forwards
+        // to Vite's internal port. This enables HMR through reverse proxies.
+        // - Behind HTTPS proxy (ngrok/E2B): client connects to wss://host:443/...
+        //   → proxy → port 3000 → our WS proxy → Vite WS on port 24678
+        // - Local: client connects to ws://localhost:3000/...
+        //   → our WS proxy → Vite WS on port 24678
+        clientPort: serverConfig.serverBaseUrl.startsWith("https:")
+          ? 443
+          : Number(serverConfig.serverPort) || 3000,
       },
       watch: {
         // Watch the resources directory for HMR to work
@@ -904,6 +938,54 @@ export default PostHog;
       "import.meta.env.SSR": true,
     },
   });
+
+  // Set up WebSocket proxy for Vite HMR through the main HTTP server.
+  // In middleware mode, Vite creates its own WebSocket on a random port (e.g., 24678).
+  // Reverse proxies (ngrok, E2B) only forward traffic on the main port.
+  // This proxy intercepts WebSocket upgrade requests on the main server at the widget
+  // base path and forwards them to Vite's internal WebSocket server.
+  // Read HMR port from resolved config (we set it explicitly above to 24678)
+  const viteHmrPort = (viteServer.config.server.hmr as any)?.port || 24678;
+  if (viteHmrPort) {
+    console.log(
+      `[WIDGETS] Vite HMR WebSocket on port ${viteHmrPort}, setting up proxy on main server`
+    );
+
+    // Store the proxy setup function - it will be called when the HTTP server is available
+    const hmrPort = viteHmrPort;
+    const widgetRoute = baseRoute;
+    // Pre-import net module at setup time (works in both CJS and ESM)
+    const netModule = await import("node:net");
+    const setupWsProxy = (httpServer: import("http").Server) => {
+      httpServer.on("upgrade", (req: any, socket: any, head: any) => {
+        // Only proxy requests to the widget base route
+        if (req.url?.startsWith(`${widgetRoute}/`) || req.url === widgetRoute) {
+          const upstream = netModule.createConnection(
+            { port: hmrPort, host: "localhost" },
+            () => {
+              // Forward the original upgrade request to Vite's WebSocket server
+              const rawRequest =
+                `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n` +
+                Object.entries(req.headers)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join("\r\n") +
+                "\r\n\r\n";
+              upstream.write(rawRequest);
+              if (head.length > 0) upstream.write(head);
+              // Pipe bidirectionally
+              socket.pipe(upstream);
+              upstream.pipe(socket);
+            }
+          );
+          upstream.on("error", () => socket.destroy());
+          socket.on("error", () => upstream.destroy());
+        }
+      });
+    };
+
+    // Store for later use when HTTP server is available
+    (app as any).__viteWsProxy = setupWsProxy;
+  }
 
   // Custom middleware to handle widget-specific paths
   app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {

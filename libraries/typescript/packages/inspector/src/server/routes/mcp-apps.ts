@@ -2,11 +2,11 @@
  * MCP Apps (SEP-1865) Server Routes
  *
  * Provides endpoints for storing widget data and serving widget HTML.
- * Reuses existing widget storage infrastructure from shared-utils-browser.ts
+ * Reuses existing widget storage infrastructure from shared-utils.ts
  */
 
 import type { Hono } from "hono";
-import { getWidgetData, storeWidgetData } from "../shared-utils-browser.js";
+import { getWidgetData, storeWidgetData } from "../shared-utils.js";
 
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 

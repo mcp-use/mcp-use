@@ -263,18 +263,11 @@ export function MCPAppsRenderer({
     };
 
     fetchWidgetHtml();
-  }, [
-    serverId,
-    resourceUri,
-    toolCallId,
-    toolName,
-    toolInput,
-    toolOutput,
-    resolvedTheme,
-    cspMode,
-    addWidget,
-    hostContext,
-  ]);
+    // Only re-fetch when the widget identity changes, not on every render.
+    // hostContext, addWidget, toolInput, toolOutput, resolvedTheme are intentionally
+    // excluded to prevent infinite re-render loops — they are captured by closure
+    // at the time of the fetch and don't warrant refetching the widget HTML.
+  }, [serverId, resourceUri, toolCallId, toolName, cspMode]);
 
   // Initialize AppBridge when HTML is ready
   useEffect(() => {

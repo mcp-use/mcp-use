@@ -105,9 +105,17 @@ export const SandboxedIframe = forwardRef<
 
     let sandboxHost: string;
 
-    // Priority 2: Local development - use same origin (localhost or 127.0.0.1)
-    // Sandbox attributes provide sufficient isolation without cross-origin enforcement
-    if (currentHost === "localhost" || currentHost === "127.0.0.1") {
+    // Priority 2: Local development or dev mode - use same origin
+    // In dev mode (mcp-use dev) or localhost, sandbox attributes provide sufficient
+    // isolation without requiring a separate sandbox-{hostname} subdomain.
+    // This enables MCP Apps widgets to work behind reverse proxies (ngrok, E2B)
+    // where the sandbox-{hostname} subdomain doesn't exist.
+    const isDevMode = (window as any).__MCP_DEV_MODE__ === true;
+    if (
+      currentHost === "localhost" ||
+      currentHost === "127.0.0.1" ||
+      isDevMode
+    ) {
       sandboxHost = currentHost; // Keep same origin
     } else {
       // Priority 3: Production - use convention: sandbox-{hostname}

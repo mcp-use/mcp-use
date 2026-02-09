@@ -24,6 +24,9 @@ export interface ServerConfig {
   favicon?: string;
   /** Whether public routes have been set up and in what mode (optional) */
   publicRoutesMode?: "dev" | "production" | null;
+  /** Pre-created HTTP server for Vite HMR WebSocket support (optional, Node.js only) */
+
+  httpServer?: any;
 }
 
 /**
@@ -67,7 +70,7 @@ export type UpdateWidgetToolCallback = (
     schema?: unknown; // Raw Zod schema - will be converted by the server
     _meta?: Record<string, unknown>;
   }
-) => void;
+) => boolean;
 
 /**
  * Widget tool removal callback function type
