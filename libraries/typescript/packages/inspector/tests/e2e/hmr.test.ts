@@ -609,8 +609,12 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      arg1: z.string().optional(),
-      arg2: z.string().optional(),
+      arg1: completable(z.string().optional(), () => {
+        return ["default1"];
+      }),
+      arg2: completable(z.string().optional(), () => {
+        return ["default2"];
+      }),
     }),
   },
   async ({ arg1 = "default1", arg2 = "default2" }) =>
@@ -655,8 +659,12 @@ server.prompt(
       const content = await readConformanceFile();
       const newContent = content.replace(
         `schema: z.object({
-      arg1: z.string().optional(),
-      arg2: z.string().optional(),
+      arg1: completable(z.string().optional(), () => {
+        return ["default1"];
+      }),
+      arg2: completable(z.string().optional(), () => {
+        return ["default2"];
+      }),
     }),`,
         `schema: z.object({
       arg1: z.string().describe("Required arg1"),
