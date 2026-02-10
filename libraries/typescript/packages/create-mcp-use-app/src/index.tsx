@@ -2,7 +2,7 @@
 
 import chalk from "chalk";
 import { Command } from "commander";
-import { Box, render, Text } from "ink";
+import { Box, render, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
 import { spawn, spawnSync } from "node:child_process";
@@ -322,6 +322,10 @@ program
   .option("--yarn", "Use yarn as package manager")
   .option("--npm", "Use npm as package manager")
   .option("--pnpm", "Use pnpm as package manager")
+  .option("--skills", "Install recommended skills (non-interactive)")
+  .option("--no-skills", "Skip installing recommended skills")
+  .option("--claude-md", "Include CLAUDE.md file (non-interactive)")
+  .option("--no-claude-md", "Skip including CLAUDE.md file")
   .action(
     async (
       projectName: string | undefined,
@@ -335,6 +339,8 @@ program
         yarn?: boolean;
         npm?: boolean;
         pnpm?: boolean;
+        skills?: boolean;
+        claudeMd?: boolean;
       }
     ) => {
       try {
@@ -375,6 +381,38 @@ program
         // Set default template if still not selected
         if (!selectedTemplate) {
           selectedTemplate = "starter";
+        }
+
+        // Prompt for project options (skills, CLAUDE.md)
+        // --skills / --no-skills / --claudemd / --no-claudemd control non-interactively
+        // When neither is set (undefined), show interactive prompt if TTY available
+        let shouldInstallSkills: boolean;
+        let shouldIncludeClaude: boolean;
+
+        const skillsExplicit = options.skills !== undefined;
+        const claudeMdExplicit = options.claudeMd !== undefined;
+
+        if (skillsExplicit && claudeMdExplicit) {
+          // Both explicitly set via flags, no prompt needed
+          shouldInstallSkills = options.skills === true;
+          shouldIncludeClaude = options.claudeMd === true;
+        } else if (process.stdin.isTTY) {
+          // Interactive terminal available, show prompt
+          const selected = await promptForOptions(
+            skillsExplicit ? options.skills === true : true,
+            claudeMdExplicit ? options.claudeMd === true : true
+          );
+          shouldInstallSkills = skillsExplicit
+            ? options.skills === true
+            : selected.installSkills;
+          shouldIncludeClaude = claudeMdExplicit
+            ? options.claudeMd === true
+            : selected.includeClaude;
+          console.log("");
+        } else {
+          // No TTY (CI, piped), use flag values or default to true
+          shouldInstallSkills = options.skills !== false;
+          shouldIncludeClaude = options.claudeMd !== false;
         }
 
         // Validate project name
@@ -482,6 +520,15 @@ program
             // We'll determine the working one during installation
             usedPackageManager = defaultOrder[0];
           }
+        }
+
+        // Write CLAUDE.md if opted in
+        if (shouldIncludeClaude) {
+          const claudeContent = generateClaudeMd(
+            sanitizedProjectName,
+            usedPackageManager
+          );
+          writeFileSync(join(projectPath, "CLAUDE.md"), claudeContent);
         }
 
         // Install dependencies if requested (default is false)
@@ -600,6 +647,11 @@ program
           }
         }
 
+        // Install recommended skills if opted in
+        if (shouldInstallSkills) {
+          await installSkills(projectPath);
+        }
+
         // Note: Git initialization is skipped to avoid delays when scanning node_modules.
         // Users can run `git init` themselves when ready.
 
@@ -631,6 +683,14 @@ program
           console.log(
             "   │   └── display-weather.tsx (OpenAI Apps SDK example)"
           );
+        }
+        if (shouldInstallSkills) {
+          console.log("   ├── .claude/skills/");
+          console.log("   │   ├── mcp-builder/");
+          console.log("   │   └── chatgpt-app-builder/");
+        }
+        if (shouldIncludeClaude) {
+          console.log("   ├── CLAUDE.md");
         }
         console.log("   ├── index.ts (server entry point)");
         console.log("   ├── package.json");
@@ -1190,6 +1250,251 @@ async function promptForTemplate(): Promise<string> {
       />
     );
   });
+}
+
+// Ink component for project options (skills, CLAUDE.md) with checkboxes
+interface OptionItem {
+  label: string;
+  key: string;
+  checked: boolean;
+}
+
+function OptionsSelector({
+  initialInstallSkills = true,
+  initialIncludeClaude = true,
+  onSubmit,
+}: {
+  initialInstallSkills?: boolean;
+  initialIncludeClaude?: boolean;
+  onSubmit: (selected: Record<string, boolean>) => void;
+}) {
+  const [cursor, setCursor] = useState(0);
+  const [items, setItems] = useState<OptionItem[]>([
+    {
+      label: "Install recommended skills (mcp-builder, chatgpt-app-builder)",
+      key: "installSkills",
+      checked: initialInstallSkills,
+    },
+    {
+      label: "Include CLAUDE.md file",
+      key: "includeClaude",
+      checked: initialIncludeClaude,
+    },
+  ]);
+
+  useInput((input, key) => {
+    if (key.upArrow) {
+      setCursor((prev) => (prev > 0 ? prev - 1 : items.length - 1));
+    } else if (key.downArrow) {
+      setCursor((prev) => (prev < items.length - 1 ? prev + 1 : 0));
+    } else if (input === " ") {
+      setItems((prev) =>
+        prev.map((item, i) =>
+          i === cursor ? { ...item, checked: !item.checked } : item
+        )
+      );
+    } else if (key.return) {
+      const result: Record<string, boolean> = {};
+      for (const item of items) {
+        result[item.key] = item.checked;
+      }
+      onSubmit(result);
+    }
+  });
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Options:</Text>
+        <Text color="gray"> (space to toggle, enter to confirm)</Text>
+      </Box>
+      {items.map((item, i) => (
+        <Box key={item.key}>
+          <Text color={i === cursor ? "cyan" : undefined}>
+            {i === cursor ? "❯ " : "  "}
+            {item.checked ? "[x]" : "[ ]"} {item.label}
+          </Text>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+async function promptForOptions(
+  defaultInstallSkills: boolean = true,
+  defaultIncludeClaude: boolean = true
+): Promise<{ installSkills: boolean; includeClaude: boolean }> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <OptionsSelector
+        initialInstallSkills={defaultInstallSkills}
+        initialIncludeClaude={defaultIncludeClaude}
+        onSubmit={(selected) => {
+          unmount();
+          resolve({
+            installSkills: selected.installSkills ?? true,
+            includeClaude: selected.includeClaude ?? true,
+          });
+        }}
+      />
+    );
+  });
+}
+
+// Generate CLAUDE.md content for the project
+function generateClaudeMd(projectName: string, packageManager: string): string {
+  const installCmd = getInstallCommand(packageManager);
+  const devCmd = getDevCommand(packageManager);
+  const runPrefix =
+    packageManager === "yarn"
+      ? "yarn"
+      : packageManager === "pnpm"
+        ? "pnpm"
+        : "npm run";
+
+  return `# CLAUDE.md
+
+This file provides guidance to Claude Code when working with this MCP server project.
+
+## Project Overview
+
+${projectName} is an MCP (Model Context Protocol) server built with [mcp-use](https://mcp-use.com). It exposes tools, resources, and prompts that AI assistants can use.
+
+## Development Commands
+
+\`\`\`bash
+# Install dependencies
+${installCmd}
+
+# Start development server with hot reload and Inspector UI
+${devCmd}
+
+# Build for production
+${runPrefix} build
+
+# Deploy to mcp-use Cloud
+${runPrefix} deploy
+\`\`\`
+
+## Project Structure
+
+\`\`\`
+${projectName}/
+├── index.ts          # Server entry point - define tools, resources, and prompts
+├── resources/        # Widget UI components (React/TSX)
+├── public/           # Static assets (icons, images)
+├── package.json
+├── tsconfig.json
+└── README.md
+\`\`\`
+
+## Key Concepts
+
+### Tools
+Tools are functions that AI assistants can call. Define them in \`index.ts\` using \`server.tool()\`:
+- Each tool has a name, description, input schema (Zod), and handler function
+- Tools can return text, images, or structured data
+
+### Resources
+Resources are UI widgets (React components) that render rich content in compatible clients.
+- Define resources in the \`resources/\` directory as \`.tsx\` files
+- Resources are registered via \`server.resource()\` in \`index.ts\`
+- They receive data from tool results and render interactive UI
+
+### Prompts
+Prompts are reusable prompt templates that clients can use.
+- Define them with \`server.prompt()\` in \`index.ts\`
+- They can accept arguments and return structured messages
+
+## Testing
+
+Run the dev server and use the built-in Inspector UI to test your tools and resources:
+\`\`\`bash
+${devCmd}
+\`\`\`
+
+The Inspector opens automatically and lets you invoke tools, view resources, and debug your server.
+
+## Learn More
+
+- Documentation: https://mcp-use.com/docs
+- GitHub: https://github.com/mcp-use/mcp-use
+- Discord: https://mcp-use.com/discord
+`;
+}
+
+// Send install telemetry to the skills leaderboard (same endpoint as npx skills)
+function trackSkillInstall(
+  installedSkills: string[],
+  skillFiles: Record<string, string>
+): void {
+  try {
+    const params = new URLSearchParams({
+      event: "install",
+      source: "https://github.com/mcp-use/skills",
+      skills: installedSkills.join(","),
+      agents: "claude-code",
+      sourceType: "github",
+      skillFiles: JSON.stringify(skillFiles),
+    });
+
+    // Fire and forget
+    fetch(`https://add-skill.vercel.sh/t?${params.toString()}`).catch(() => {});
+  } catch {
+    // Silently fail - telemetry should never break the CLI
+  }
+}
+
+// Install recommended skills by downloading from GitHub raw content
+async function installSkills(projectPath: string): Promise<void> {
+  const skills = ["mcp-builder", "chatgpt-app-builder"];
+  const baseUrl =
+    "https://raw.githubusercontent.com/mcp-use/skills/main/skills";
+  const files = ["SKILL.md", "LICENSE.txt"];
+
+  console.log("");
+  console.log(chalk.cyan("🧠 Installing recommended skills..."));
+
+  const installedSkills: string[] = [];
+  const skillFiles: Record<string, string> = {};
+
+  for (const skill of skills) {
+    const spinner = ora(`Installing ${skill} skill...`).start();
+    try {
+      const skillDir = join(projectPath, ".claude", "skills", skill);
+      mkdirSync(skillDir, { recursive: true });
+
+      let allSuccess = true;
+      for (const file of files) {
+        const url = `${baseUrl}/${skill}/${file}`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const content = await response.text();
+          writeFileSync(join(skillDir, file), content);
+        } else {
+          // LICENSE.txt is optional, SKILL.md is required
+          if (file === "SKILL.md") {
+            allSuccess = false;
+          }
+        }
+      }
+
+      if (allSuccess) {
+        spinner.succeed(`${skill} skill installed`);
+        installedSkills.push(skill);
+        skillFiles[skill] = `.claude/skills/${skill}/SKILL.md`;
+      } else {
+        spinner.warn(`${skill} skill installation had issues (non-fatal)`);
+      }
+    } catch {
+      spinner.warn(`Could not install ${skill} skill (non-fatal)`);
+    }
+  }
+
+  // Send telemetry for installed skills (same as npx skills add)
+  if (installedSkills.length > 0) {
+    trackSkillInstall(installedSkills, skillFiles);
+  }
 }
 
 program.parse();
