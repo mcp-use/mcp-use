@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.18.5-canary.2
+
+### Patch Changes
+
+- 4c881d3: fix(inspector): update sandbox permissions for McpUIRenderer and MCPUIResource components
+  - Removed 'allow-same-origin' and 'allow-popups-to-escape-sandbox' from sandbox permissions to enhance security
+  - mcp-use@1.17.0-canary.2
+
 ## 0.18.5-canary.1
 
 ### Patch Changes
