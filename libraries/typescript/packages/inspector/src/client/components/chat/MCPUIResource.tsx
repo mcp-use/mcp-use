@@ -53,8 +53,7 @@ export const MCPUIResource = memo(({ resource }: MCPUIResourceProps) => {
             overflow: "auto",
           },
           autoResizeIframe: true,
-          sandboxPermissions:
-            "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+          sandboxPermissions: "allow-scripts allow-forms allow-popups",
         }}
       />
     </div>
