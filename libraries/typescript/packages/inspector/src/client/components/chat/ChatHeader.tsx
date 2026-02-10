@@ -27,6 +27,10 @@ interface ChatHeaderProps {
   onClearConfig: () => void;
   /** When true, hides the API key config badge/button and dialog. */
   hideConfigButton?: boolean;
+  /** Label for the clear/new-chat button. Default: "New Chat". */
+  clearButtonLabel?: string;
+  /** When true, hides the "Chat" title in the header. */
+  hideTitle?: boolean;
 }
 
 export function ChatHeader({
@@ -44,11 +48,13 @@ export function ChatHeader({
   onSaveConfig,
   onClearConfig,
   hideConfigButton,
+  clearButtonLabel,
+  hideTitle,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
       <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4 bg-background/40 backdrop-blur-sm">
-        <h3 className="text-xl sm:text-3xl font-base">Chat</h3>
+        {!hideTitle && <h3 className="text-xl sm:text-3xl font-base">Chat</h3>}
         {llmConfig && !hideConfigButton && (
           <>
             {/* Desktop: Show badge with text */}
@@ -107,14 +113,16 @@ export function ChatHeader({
                 onClick={onClearChat}
               >
                 <SquarePen className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">New Chat</span>
+                <span className="hidden sm:inline">
+                  {clearButtonLabel ?? "New Chat"}
+                </span>
                 <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
                   ⌘O
                 </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>New Chat</p>
+              <p>{clearButtonLabel ?? "New Chat"}</p>
             </TooltipContent>
           </Tooltip>
         )}

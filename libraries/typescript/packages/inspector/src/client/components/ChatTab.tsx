@@ -34,6 +34,12 @@ export interface ChatTabProps {
   /** Externally-managed LLM config. When provided, bypasses localStorage-based config
    *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
   managedLlmConfig?: import("./chat/types").LLMConfig;
+  /** Label for the clear/new-chat button. Default: "New Chat". */
+  clearButtonLabel?: string;
+  /** When true, hides the "Chat" title in the header. Default: false. */
+  hideTitle?: boolean;
+  /** When true, hides the model badge on the landing form. Default: false. */
+  hideModelBadge?: boolean;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -52,6 +58,9 @@ export function ChatTab({
   readResource,
   chatApiUrl,
   managedLlmConfig,
+  clearButtonLabel,
+  hideTitle,
+  hideModelBadge,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -335,6 +344,7 @@ export function ChatTab({
           onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
+          hideModelBadge={hideModelBadge}
         />
       </div>
     );
@@ -358,6 +368,8 @@ export function ChatTab({
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
         hideConfigButton={isManaged}
+        clearButtonLabel={clearButtonLabel}
+        hideTitle={hideTitle}
       />
 
       {/* Messages Area */}

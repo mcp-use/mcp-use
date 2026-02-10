@@ -40,6 +40,8 @@ interface ChatLandingFormProps {
   onDeletePromptResult: (index: number) => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
+  /** When true, hides the model badge below the input. */
+  hideModelBadge?: boolean;
 }
 
 export function ChatLandingForm({
@@ -65,6 +67,7 @@ export function ChatLandingForm({
   onDeletePromptResult,
   onAttachmentAdd,
   onAttachmentRemove,
+  hideModelBadge,
 }: ChatLandingFormProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -140,7 +143,7 @@ export function ChatLandingForm({
               </div>
             </div>
           </div>
-          {llmConfig && (
+          {llmConfig && !hideModelBadge && (
             <div className="flex justify-center mt-4">
               <Tooltip>
                 <TooltipTrigger asChild>
