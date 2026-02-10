@@ -6,6 +6,37 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.17.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.17.0&title=Resource%20Template%20Completion%20%26%20Reverse%20Proxy%20Support&date=2026-02&lang=typescript" alt="Release 1.17.0" />
+  </Frame>
+  ## Resource Template Completion & Reverse Proxy Support
+  Minor release adding resource template variable completion, custom route HMR, and comprehensive reverse proxy support.
+
+### Resource Template Completion
+
+- **New**: Resource template variable completion — templates can define `callbacks.complete` per variable (string array or callback) for client-side autocomplete of URI template variables
+- **New**: `toResourceTemplateCompleteCallbacks` utility for normalizing completion definitions
+- **New**: MCP servers now publish completion capabilities
+
+### HMR & Reverse Proxy Improvements
+
+- **New**: Custom HTTP route HMR — routes registered via `server.get()`, `server.post()`, etc. now hot-swap without restart
+- **New**: Widget tool protection during HMR — tools tagged with `_meta["mcp-use/widget"]` preserved during sync
+- **New**: Dynamic widget creation — `resources/` directory auto-created, dev server watches for new widgets even if none exist at startup
+- **New**: Vite HMR WebSocket proxy for hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels)
+- **New**: `MCP_URL` environment variable can be pre-set by users for external proxy URLs; CLI will not overwrite it
+- **New**: `window.__mcpServerUrl` global injected into widget HTML for dynamic API URL construction
+- **Enhancement**: List-changed notifications now fire on removal, not just add/update
+- **Enhancement**: Pre-initialized request handlers prevent `-32601 Method not found` errors on dynamic tool registration
+- **Enhancement**: Widget type default changed to `mcpApps` (dual-protocol) instead of `appsSdk`
+
+### Dependencies
+
+- **Update**: Updated @mcp-use/inspector to v0.18.5
+- **Update**: Updated @mcp-use/cli to v2.13.2
+</Update>
+
 <Update label="v1.16.4" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.16.4&title=HMR%20Improvements%20%26%20Widget%20Enhancements&date=2026-02&lang=typescript" alt="Release 1.16.4" />

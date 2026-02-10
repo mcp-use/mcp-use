@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.18.5" description="February 2026">
+  ## Iframe Embedding & Reverse Proxy Support
+  Patch release with iframe embedding configuration, reverse proxy improvements, and widget rendering fixes.
+
+- **New**: `MCP_INSPECTOR_FRAME_ANCESTORS` environment variable to control which origins can embed the inspector in iframes via CSP `frame-ancestors`
+- **New**: `mountInspector` accepts `devMode` and `sandboxOrigin` options for deployment flexibility
+- **New**: Runtime config injection (`__MCP_DEV_MODE__`, `__MCP_SANDBOX_ORIGIN__` window globals) without rebuild
+- **Enhancement**: Server-side widget fetches convert external proxy URLs to localhost for correct content retrieval
+- **Enhancement**: Simplified widget asset URL rewriting for improved reverse proxy reliability
+- **Fix**: Infinite re-render loop in `MCPAppsRenderer` caused by excessive `useEffect` dependencies
+- **Update**: Updated mcp-use to v1.17.0
+</Update>
+
 <Update label="v0.18.4" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=0.18.4&title=E2E%20Testing%20%26%20Refresh%20Features&date=2026-02&lang=inspector" alt="Release 0.18.4" />
