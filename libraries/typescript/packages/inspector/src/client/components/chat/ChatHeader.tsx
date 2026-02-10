@@ -25,6 +25,8 @@ interface ChatHeaderProps {
   onApiKeyChange: (apiKey: string) => void;
   onSaveConfig: () => void;
   onClearConfig: () => void;
+  /** When true, hides the API key config badge/button and dialog. */
+  hideConfigButton?: boolean;
 }
 
 export function ChatHeader({
@@ -41,12 +43,13 @@ export function ChatHeader({
   onApiKeyChange,
   onSaveConfig,
   onClearConfig,
+  hideConfigButton,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
       <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4 bg-background/40 backdrop-blur-sm">
         <h3 className="text-xl sm:text-3xl font-base">Chat</h3>
-        {llmConfig && (
+        {llmConfig && !hideConfigButton && (
           <>
             {/* Desktop: Show badge with text */}
             <Tooltip>
@@ -73,7 +76,7 @@ export function ChatHeader({
       </div>
       <div className="flex items-center gap-2 pr-2 sm:pr-3 pt-0 sm:pt-2 shrink-0">
         {/* Mobile: Show provider icon button when config exists (leftmost on mobile) */}
-        {llmConfig && (
+        {llmConfig && !hideConfigButton && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -115,21 +118,23 @@ export function ChatHeader({
             </TooltipContent>
           </Tooltip>
         )}
-        {/* Always render the dialog for when it's opened */}
-        <ConfigurationDialog
-          open={configDialogOpen}
-          onOpenChange={onConfigDialogOpenChange}
-          tempProvider={tempProvider}
-          tempModel={tempModel}
-          tempApiKey={tempApiKey}
-          onProviderChange={onProviderChange}
-          onModelChange={onModelChange}
-          onApiKeyChange={onApiKeyChange}
-          onSave={onSaveConfig}
-          onClear={onClearConfig}
-          showClearButton={!!llmConfig}
-          buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
-        />
+        {/* Always render the dialog for when it's opened (hidden when externally managed) */}
+        {!hideConfigButton && (
+          <ConfigurationDialog
+            open={configDialogOpen}
+            onOpenChange={onConfigDialogOpenChange}
+            tempProvider={tempProvider}
+            tempModel={tempModel}
+            tempApiKey={tempApiKey}
+            onProviderChange={onProviderChange}
+            onModelChange={onModelChange}
+            onApiKeyChange={onApiKeyChange}
+            onSave={onSaveConfig}
+            onClear={onClearConfig}
+            showClearButton={!!llmConfig}
+            buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
+          />
+        )}
       </div>
     </div>
   );

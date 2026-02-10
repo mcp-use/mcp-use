@@ -21,6 +21,9 @@ interface OpenAIComponentRendererProps {
   noWrapper?: boolean;
   showConsole?: boolean;
   customProps?: Record<string, string>;
+  /** When provided, used directly instead of looking up via useMcpClient().
+   *  This avoids the dependency on McpClientProvider context. */
+  serverBaseUrl?: string;
   onUpdateGlobals?: (updates: {
     displayMode?: "inline" | "pip" | "fullscreen";
     theme?: "light" | "dark";
@@ -81,6 +84,7 @@ function OpenAIComponentRendererBase({
   noWrapper = false,
   showConsole = true,
   customProps,
+  serverBaseUrl: serverBaseUrlProp,
   onUpdateGlobals,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<InstanceType<
@@ -110,9 +114,12 @@ function OpenAIComponentRendererBase({
   );
   const toolId = toolIdRef.current;
 
+  // Always call useMcpClient() to satisfy React's hooks-rules-of-order.
+  // Prefer the explicit serverBaseUrl prop when provided (e.g. when embedded
+  // outside the inspector's own McpClientProvider).
   const { servers } = useMcpClient();
   const server = servers.find((connection) => connection.id === serverId);
-  const serverBaseUrl = server?.url;
+  const serverBaseUrl = serverBaseUrlProp ?? server?.url;
   const { resolvedTheme } = useTheme();
   const { playground } = useWidgetDebug();
 
@@ -262,9 +269,15 @@ function OpenAIComponentRendererBase({
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
         }
 
+        // When serverBaseUrl is provided (embedded cross-origin), use it as the
+        // base for inspector API calls so they target the sandbox, not the host app.
+        const inspectorApiBase = currentServerBaseUrl
+          ? new URL(currentServerBaseUrl).origin
+          : "";
+
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
         const storeResponse = await fetch(
-          "/inspector/api/resources/widget/store",
+          `${inspectorApiBase}/inspector/api/resources/widget/store`,
           {
             method: "POST",
             headers: {
@@ -286,15 +299,14 @@ function OpenAIComponentRendererBase({
         if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
           // Add timestamp to force iframe reload when widget data changes (e.g., props)
-          const proxyUrl = `/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
+          const proxyUrl = `${inspectorApiBase}/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(proxyUrl);
-          setIsSameOrigin(true); // Proxy makes it same-origin
+          setIsSameOrigin(!inspectorApiBase); // Cross-origin when using external base
         } else {
           // Add timestamp to force iframe reload when widget data changes (e.g., props)
-          const prodUrl = `/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
+          const prodUrl = `${inspectorApiBase}/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(prodUrl);
-          // Relative URLs are always same-origin
-          setIsSameOrigin(true);
+          setIsSameOrigin(!inspectorApiBase);
         }
       } catch (error) {
         console.error("Error storing widget data:", error);
@@ -310,10 +322,14 @@ function OpenAIComponentRendererBase({
     serverId,
     toolId,
     customProps,
-    // Note: toolArgs, toolResult, readResource, serverBaseUrl, playground are intentionally
-    // excluded to prevent re-running when these references change but values are the same.
-    // resolvedTheme and playground are captured at mount time for initialization, then
-    // updated dynamically via updateIframeGlobals() without reloading the widget.
+    // Re-run when toolArgs or toolResult materially change (e.g., from empty
+    // to populated when streaming tool-call → tool-result arrives).
+    // Serialized to avoid re-runs from object reference changes.
+    JSON.stringify(toolArgs),
+    JSON.stringify(toolResult?._meta),
+    // Note: readResource, serverBaseUrl, playground are intentionally excluded.
+    // resolvedTheme and playground are captured at mount time for initialization,
+    // then updated dynamically via updateIframeGlobals() without reloading the widget.
   ]);
 
   // Helper to update window.openai globals inside iframe
@@ -782,20 +798,31 @@ function OpenAIComponentRendererBase({
   // OpenAI Apps SDK UI uses [data-theme] attribute to set color-scheme via CSS
   // This ensures design tokens adapt to dark mode
   useEffect(() => {
-    if (!iframeRef.current?.contentDocument || !isReady) return;
-
-    const iframeDoc = iframeRef.current.contentDocument;
-    const htmlElement = iframeDoc.documentElement;
-    // Set data-theme attribute (used by OpenAI Apps SDK UI CSS)
-    htmlElement.setAttribute("data-theme", resolvedTheme);
-    // Also set inline style as fallback
-    htmlElement.style.colorScheme = resolvedTheme;
+    if (!isReady) return;
+    // For cross-origin iframes, use postMessage only (no direct DOM access)
+    if (!isSameOrigin) {
+      updateIframeGlobals({ theme: resolvedTheme });
+      return;
+    }
+    try {
+      if (!iframeRef.current?.contentDocument) return;
+      const iframeDoc = iframeRef.current.contentDocument;
+      const htmlElement = iframeDoc.documentElement;
+      // Set data-theme attribute (used by OpenAI Apps SDK UI CSS)
+      htmlElement.setAttribute("data-theme", resolvedTheme);
+      // Also set inline style as fallback
+      htmlElement.style.colorScheme = resolvedTheme;
+    } catch {
+      // Cross-origin access denied — fall through to postMessage
+    }
     updateIframeGlobals({ theme: resolvedTheme });
-  }, [resolvedTheme, isReady, updateIframeGlobals]);
+  }, [resolvedTheme, isReady, isSameOrigin, updateIframeGlobals]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
+  // Only works for same-origin iframes; cross-origin iframes rely on
+  // notifyIntrinsicHeight() postMessage from the widget.
   useEffect(() => {
-    if (!widgetUrl) return;
+    if (!widgetUrl || !isSameOrigin) return;
 
     const measure = () => {
       // Skip automatic measurement if widget is using notifyIntrinsicHeight
@@ -804,17 +831,21 @@ function OpenAIComponentRendererBase({
       }
 
       const iframe = iframeRef.current;
-      const contentDoc = iframe?.contentWindow?.document;
-      const body = contentDoc?.body;
-      if (!iframe || !body) return;
+      try {
+        const contentDoc = iframe?.contentWindow?.document;
+        const body = contentDoc?.body;
+        if (!iframe || !body) return;
 
-      const contentHeight = body.scrollHeight || 0;
-      const maxHeight =
-        typeof window !== "undefined" ? window.innerHeight : contentHeight;
-      const newHeight = Math.min(contentHeight, maxHeight);
-      if (newHeight > 0 && newHeight !== lastMeasuredHeightRef.current) {
-        lastMeasuredHeightRef.current = newHeight;
-        setIframeHeight(newHeight);
+        const contentHeight = body.scrollHeight || 0;
+        const maxHeight =
+          typeof window !== "undefined" ? window.innerHeight : contentHeight;
+        const newHeight = Math.min(contentHeight, maxHeight);
+        if (newHeight > 0 && newHeight !== lastMeasuredHeightRef.current) {
+          lastMeasuredHeightRef.current = newHeight;
+          setIframeHeight(newHeight);
+        }
+      } catch {
+        // Cross-origin access denied — skip measurement
       }
     };
 
@@ -831,7 +862,7 @@ function OpenAIComponentRendererBase({
       window.cancelAnimationFrame(rafId);
       window.removeEventListener("resize", measure);
     };
-  }, [widgetUrl]);
+  }, [widgetUrl, isSameOrigin]);
 
   // Determine if we should vertically center (only when container height > iframe height)
   useEffect(() => {

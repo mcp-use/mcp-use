@@ -1,5 +1,4 @@
 import { Key, Settings } from "lucide-react";
-import React from "react";
 
 import { Button } from "@/client/components/ui/button";
 

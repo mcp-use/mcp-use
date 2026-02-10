@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "composite": false,
     "rootDir": "src/client",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": false,
@@ -9,11 +10,16 @@
     "noEmit": false,
     "outDir": "dist/client",
     "allowSyntheticDefaultImports": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/client/index.ts", "src/client/components/AddToClientDropdown.tsx", "src/client/utils/**/*", "src/client/components/ui/**/*", "src/client/lib/**/*", "src/client/context/**/*", "src/client/constants/**/*"],
+  "include": [
+    "src/client/index.ts",
+    "src/types/**/*"
+  ],
   "exclude": ["src/server/**/*", "src/client/**/*.test.*", "src/client/**/*.spec.*"]
 }

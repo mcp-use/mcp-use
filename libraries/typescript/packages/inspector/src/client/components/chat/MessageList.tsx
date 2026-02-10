@@ -37,6 +37,8 @@ interface MessageListProps {
   readResource?: (uri: string) => Promise<any>;
   tools?: any[];
   sendMessage?: (message: string) => Promise<void>;
+  /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
+  serverBaseUrl?: string;
 }
 
 export const MessageList = memo(
@@ -47,6 +49,7 @@ export const MessageList = memo(
     readResource,
     tools,
     sendMessage,
+    serverBaseUrl,
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -194,6 +197,7 @@ export const MessageList = memo(
                               result={part.toolInvocation.result || null}
                               serverId={serverId}
                               readResource={readResource}
+                              serverBaseUrl={serverBaseUrl}
                               toolMeta={getToolMeta(
                                 part.toolInvocation.toolName
                               )}
@@ -237,6 +241,7 @@ export const MessageList = memo(
                                   result={toolCall.result || null}
                                   serverId={serverId}
                                   readResource={readResource}
+                                  serverBaseUrl={serverBaseUrl}
                                   toolMeta={getToolMeta(toolCall.toolName)}
                                   onSendFollowUp={sendMessage}
                                 />
