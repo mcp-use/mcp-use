@@ -65,6 +65,7 @@ export function ChatInput({
             <div
               key={index}
               className="relative group bg-zinc-100/90 dark:bg-zinc-900/90 backdrop-blur-sm rounded-lg p-2 flex items-center gap-2 border border-zinc-200 dark:border-zinc-700"
+              data-testid={`chat-attachment-${index}`}
             >
               <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex flex-col min-w-0">
@@ -82,6 +83,7 @@ export function ChatInput({
                 className="shrink-0 p-1 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
                 title="Remove attachment"
                 type="button"
+                data-testid={`chat-attachment-remove-${index}`}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -104,6 +106,7 @@ export function ChatInput({
           className
         )}
         disabled={!isConnected || isLoading}
+        data-testid="chat-input"
       />
 
       {/* Hidden file input */}
@@ -128,6 +131,7 @@ export function ChatInput({
             className="h-auto w-auto aspect-square rounded-full p-2"
             title="Attach images"
             type="button"
+            data-testid="chat-attach-button"
           >
             <Paperclip className="h-4 w-4" />
           </Button>

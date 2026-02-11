@@ -97,6 +97,9 @@ export function ResourceResultDisplay({
   const [activeProps, setActiveProps] = useState<Record<string, string> | null>(
     null
   );
+  const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
+    "inline" | "pip" | "fullscreen"
+  >("inline");
   // Check for OpenAI Apps SDK component
   // OpenAI metadata can be in:
   // 1. Resource annotations from the resource list (resourceAnnotations)
@@ -349,11 +352,8 @@ export function ResourceResultDisplay({
                   <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
                     <MCPAppsDebugControls
                       toolCallId={`resource-${result.timestamp}`}
-                      displayMode="inline"
-                      onDisplayModeChange={(mode) => {
-                        console.log("Display mode change:", mode);
-                        // Display mode changes are handled by MCPAppsRenderer internally
-                      }}
+                      displayMode={mcpAppsDisplayMode}
+                      onDisplayModeChange={setMcpAppsDisplayMode}
                       propsContext="resource"
                       resourceUri={result.uri}
                       resourceAnnotations={combinedAnnotations}
@@ -373,13 +373,16 @@ export function ResourceResultDisplay({
                     resourceUri={mcpAppsResourceUri}
                     readResource={readResource}
                     className="w-full h-full relative flex p-4"
+                    customProps={activeProps || undefined}
+                    displayMode={mcpAppsDisplayMode}
+                    onDisplayModeChange={setMcpAppsDisplayMode}
                   />
                 </div>
               );
             } else {
               // JSON mode for MCP Apps
               return (
-                <div className="px-4 pt-4">
+                <div className="px-4 pt-4" data-testid="resource-result-json">
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-apps-${Date.now()}.json`}
@@ -415,7 +418,7 @@ export function ResourceResultDisplay({
             } else {
               // JSON mode for Apps SDK resources
               return (
-                <div className="px-4 pt-4">
+                <div className="px-4 pt-4" data-testid="resource-result-json">
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
@@ -475,7 +478,7 @@ export function ResourceResultDisplay({
             } else {
               // JSON mode for MCP UI resources
               return (
-                <div className="px-4 pt-4">
+                <div className="px-4 pt-4" data-testid="resource-result-json">
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-ui-${Date.now()}.json`}
@@ -487,7 +490,7 @@ export function ResourceResultDisplay({
 
           // Default: show JSON for non-MCP UI resources
           return (
-            <div className="px-4 pt-4">
+            <div className="px-4 pt-4" data-testid="resource-result-json">
               <JSONDisplay
                 data={result.result}
                 filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}

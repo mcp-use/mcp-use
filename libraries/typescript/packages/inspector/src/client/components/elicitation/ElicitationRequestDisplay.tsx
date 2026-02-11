@@ -143,6 +143,7 @@ export function ElicitationRequestDisplay({
             React.createElement(
               "button",
               {
+                "data-testid": "elicitation-view-tool-result",
                 className:
                   "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
                 onClick: () => {
@@ -229,6 +230,7 @@ export function ElicitationRequestDisplay({
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id={`field-${fieldName}`}
+                    data-testid={`elicitation-field-${fieldName}`}
                     checked={formData[fieldName] || false}
                     onCheckedChange={(checked) =>
                       handleFieldChange(fieldName, checked)
@@ -244,6 +246,7 @@ export function ElicitationRequestDisplay({
               ) : fieldType === "number" || fieldType === "integer" ? (
                 <Input
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   type="number"
                   value={formData[fieldName] || ""}
                   onChange={(e) =>
@@ -259,6 +262,7 @@ export function ElicitationRequestDisplay({
               ) : field.enum ? (
                 <select
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   value={formData[fieldName] || ""}
                   onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -274,6 +278,7 @@ export function ElicitationRequestDisplay({
                 (field.format === "textarea" || field.maxLength > 100) ? (
                 <Textarea
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   value={formData[fieldName] || ""}
                   onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                   placeholder={field.default || ""}
@@ -282,6 +287,7 @@ export function ElicitationRequestDisplay({
               ) : (
                 <Input
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   type="text"
                   value={formData[fieldName] || ""}
                   onChange={(e) => handleFieldChange(fieldName, e.target.value)}
@@ -463,13 +469,27 @@ export function ElicitationRequestDisplay({
 
       {/* Actions Footer */}
       <div className="flex gap-2 p-4 border-t dark:border-zinc-700">
-        <Button onClick={handleAccept} className="flex-1">
+        <Button
+          onClick={handleAccept}
+          className="flex-1"
+          data-testid="elicitation-accept-button"
+        >
           Accept
         </Button>
-        <Button onClick={handleDecline} variant="outline" className="flex-1">
+        <Button
+          onClick={handleDecline}
+          variant="outline"
+          className="flex-1"
+          data-testid="elicitation-decline-button"
+        >
           Decline
         </Button>
-        <Button onClick={handleCancel} variant="outline" className="flex-1">
+        <Button
+          onClick={handleCancel}
+          variant="outline"
+          className="flex-1"
+          data-testid="elicitation-cancel-button"
+        >
           Cancel
         </Button>
       </div>

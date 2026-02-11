@@ -1,5 +1,258 @@
 # mcp-use
 
+## 1.17.0
+
+### Minor Changes
+
+- 3d787ba: Added support for resource template variable completion: resource templates can define callbacks.complete per variable (either a string array or a callback), which is normalized and passed to the SDK so clients can use autocomplete for URI template variables. Includes toResourceTemplateCompleteCallbacks, unit tests, and documentation updates.
+
+  Also publishes completion capabilities in TypeScript SDK MCP servers.
+
+- 3d787ba: Improve reverse proxy support, HMR reliability, and widget handling across the stack.
+
+  ### `mcp-use` (minor)
+  - **Custom HTTP route HMR:** Routes registered via `server.get()`, `server.post()`, etc. now support hot module replacement — handlers are hot-swapped without a server restart.
+  - **Widget tool protection during HMR:** Widget-registered tools are no longer accidentally removed when `index.ts` HMR sync runs. Tools tagged with `_meta["mcp-use/widget"]` are preserved.
+  - **Dynamic widget creation:** The `resources/` directory is auto-created if missing, and the dev server watches for new widgets even if none exist at startup. This enables workflows where widgets are created after the server starts
+  - **Vite HMR WebSocket proxy:** A TCP-level WebSocket proxy forwards HMR `upgrade` requests from the main HTTP server to Vite's internal HMR port, enabling hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels).
+  - **`MCP_URL` environment variable:** Can now be pre-set by users to an external proxy URL. The CLI will not overwrite it, allowing correct widget URLs and HMR WebSocket connections behind reverse proxies.
+  - **List-changed notifications on removal:** `sendToolListChanged()`, `sendResourceListChanged()`, and `sendPromptListChanged()` now also fire when items are removed, not just added/updated.
+  - **Pre-initialized request handlers:** Tool, prompt, and resource request handlers are pre-registered during session initialization, preventing `Method not found` errors when clients connect to servers that start with zero registrations and add them dynamically.
+  - **Widget type default changed:** Widgets now default to `mcpApps` (dual-protocol) instead of `appsSdk`. Only widgets with explicit `appsSdkMetadata` and no `metadata` field use the `appsSdk` type.
+  - **`window.__mcpServerUrl` global:** Injected into widget HTML so widgets can dynamically construct API URLs (e.g., `fetch(window.__mcpServerUrl + '/api/data')`).
+
+  ### `@mcp-use/inspector` (patch)
+  - **`MCP_INSPECTOR_FRAME_ANCESTORS` env var:** Controls which origins can embed the inspector in iframes via CSP `frame-ancestors`. Defaults to `*` in development and `'self'` in production.
+  - **`mountInspector` configuration options:** Accepts new `devMode` (boolean) and `sandboxOrigin` (string | null) options for controlling sandbox behavior in different deployment environments.
+  - **Runtime config injection:** `__MCP_DEV_MODE__` and `__MCP_SANDBOX_ORIGIN__` window globals are injected into the served HTML at runtime, enabling client-side configuration without rebuild.
+  - **Localhost URL conversion:** Server-side fetches of widget HTML now convert external proxy URLs to `localhost` to avoid reverse proxy catch-all routes returning SPA HTML instead of Vite-served widget content.
+  - **Simplified URL rewriting:** Widget asset URLs are now rewritten to bare server-relative paths that resolve directly through Vite middleware, improving reliability behind reverse proxies.
+  - **Fixed infinite re-render loop:** Removed excessive `useEffect` dependencies in `MCPAppsRenderer` that caused continuous re-fetching of widget HTML.
+
+  ### `@mcp-use/cli` (patch)
+  - **Respect user-provided `MCP_URL`:** The CLI no longer overwrites `MCP_URL` if already set, allowing users to configure external proxy URLs for reverse proxy setups.
+
+### Patch Changes
+
+- Updated dependencies [3d787ba]
+- Updated dependencies [3d787ba]
+  - @mcp-use/inspector@0.18.5
+  - @mcp-use/cli@2.13.2
+
+## 1.17.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4c881d3]
+  - @mcp-use/inspector@0.18.5-canary.2
+  - @mcp-use/cli@2.13.2-canary.2
+
+## 1.17.0-canary.1
+
+### Minor Changes
+
+- 31fdb69: Added support for resource template variable completion: resource templates can define callbacks.complete per variable (either a string array or a callback), which is normalized and passed to the SDK so clients can use autocomplete for URI template variables. Includes toResourceTemplateCompleteCallbacks, unit tests, and documentation updates.
+
+  Also publishes completion capabilities in TypeScript SDK MCP servers.
+
+### Patch Changes
+
+- @mcp-use/cli@2.13.2-canary.1
+- @mcp-use/inspector@0.18.5-canary.1
+
+## 1.17.0-canary.0
+
+### Minor Changes
+
+- 4a03ce0: Improve reverse proxy support, HMR reliability, and widget handling across the stack.
+
+  ### `mcp-use` (minor)
+  - **Custom HTTP route HMR:** Routes registered via `server.get()`, `server.post()`, etc. now support hot module replacement — handlers are hot-swapped without a server restart.
+  - **Widget tool protection during HMR:** Widget-registered tools are no longer accidentally removed when `index.ts` HMR sync runs. Tools tagged with `_meta["mcp-use/widget"]` are preserved.
+  - **Dynamic widget creation:** The `resources/` directory is auto-created if missing, and the dev server watches for new widgets even if none exist at startup. This enables workflows where widgets are created after the server starts
+  - **Vite HMR WebSocket proxy:** A TCP-level WebSocket proxy forwards HMR `upgrade` requests from the main HTTP server to Vite's internal HMR port, enabling hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels).
+  - **`MCP_URL` environment variable:** Can now be pre-set by users to an external proxy URL. The CLI will not overwrite it, allowing correct widget URLs and HMR WebSocket connections behind reverse proxies.
+  - **List-changed notifications on removal:** `sendToolListChanged()`, `sendResourceListChanged()`, and `sendPromptListChanged()` now also fire when items are removed, not just added/updated.
+  - **Pre-initialized request handlers:** Tool, prompt, and resource request handlers are pre-registered during session initialization, preventing `Method not found` errors when clients connect to servers that start with zero registrations and add them dynamically.
+  - **Widget type default changed:** Widgets now default to `mcpApps` (dual-protocol) instead of `appsSdk`. Only widgets with explicit `appsSdkMetadata` and no `metadata` field use the `appsSdk` type.
+  - **`window.__mcpServerUrl` global:** Injected into widget HTML so widgets can dynamically construct API URLs (e.g., `fetch(window.__mcpServerUrl + '/api/data')`).
+
+  ### `@mcp-use/inspector` (patch)
+  - **`MCP_INSPECTOR_FRAME_ANCESTORS` env var:** Controls which origins can embed the inspector in iframes via CSP `frame-ancestors`. Defaults to `*` in development and `'self'` in production.
+  - **`mountInspector` configuration options:** Accepts new `devMode` (boolean) and `sandboxOrigin` (string | null) options for controlling sandbox behavior in different deployment environments.
+  - **Runtime config injection:** `__MCP_DEV_MODE__` and `__MCP_SANDBOX_ORIGIN__` window globals are injected into the served HTML at runtime, enabling client-side configuration without rebuild.
+  - **Localhost URL conversion:** Server-side fetches of widget HTML now convert external proxy URLs to `localhost` to avoid reverse proxy catch-all routes returning SPA HTML instead of Vite-served widget content.
+  - **Simplified URL rewriting:** Widget asset URLs are now rewritten to bare server-relative paths that resolve directly through Vite middleware, improving reliability behind reverse proxies.
+  - **Fixed infinite re-render loop:** Removed excessive `useEffect` dependencies in `MCPAppsRenderer` that caused continuous re-fetching of widget HTML.
+
+  ### `@mcp-use/cli` (patch)
+  - **Respect user-provided `MCP_URL`:** The CLI no longer overwrites `MCP_URL` if already set, allowing users to configure external proxy URLs for reverse proxy setups.
+
+### Patch Changes
+
+- Updated dependencies [4a03ce0]
+  - @mcp-use/inspector@0.18.5-canary.0
+  - @mcp-use/cli@2.13.2-canary.0
+
+## 1.16.4
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+- ac3e216: fix(server): HMR tool schema preservation, prompt/resource handler wrappers for CallToolResult conversion, preserve widget resources during HMR, and prompt content normalization
+
+  **HMR Schema Preservation:**
+  - Fixed tool schema handling during HMR to use Zod schemas directly instead of converting to params
+  - Changed empty schema from `{}` to `z.object({})` to ensure `safeParseAsync` works correctly
+  - Preserves full Zod validation capabilities during hot module reload
+
+  **Handler Wrapper Improvements:**
+  - Added automatic handler wrapping for prompts and resources to support `CallToolResult` format
+  - Prompts now support tool response helpers (`text()`, `object()`, `image()`, etc.) via automatic conversion to `GetPromptResult`
+  - Resources now support tool response helpers via automatic conversion to `ReadResourceResult`
+  - Applied wrappers in `listen()`, `addPrompt()`, `addResource()`, and `syncPrimitive()` methods
+
+  **Widget Resource Preservation:**
+  - Widget resources (`ui://widget/*`) and resource templates are now preserved during HMR
+  - Prevents deletion of widget registrations that are only registered on initial load
+  - Ensures widgets remain functional across hot reloads
+
+  **HMR Sync Behavior:**
+  - Changed `hmr-sync.ts` to prefer `onUpdate` handler over in-place updates
+  - Ensures proper handler wrapping for prompts/resources during updates
+  - Maintains correct order-preserving update behavior
+
+  **Content Normalization:**
+  - Enhanced prompt conversion to handle edge cases:
+    - Single content objects without array wrapper
+    - Bare content items (result is the content, not wrapped in `content` property)
+    - Mixed content type arrays
+  - Improved robustness of `CallToolResult` to `GetPromptResult` conversion
+
+  Commits: 116a3be4 (partial)
+
+- ac3e216: fix: ensure pending state is emulated for widgets, reflecting ChatGPT behaviour
+
+  **Inspector Changes:**
+  - Updated MCPAppsRenderer and OpenAIComponentRenderer to handle tool output and metadata more effectively, allowing for immediate rendering of widgets even when results are pending
+  - Enhanced MessageList and ToolResultRenderer to support immediate rendering of widget tools, improving responsiveness during tool execution
+  - Added utility functions for widget detection and pre-rendering capabilities based on tool metadata
+
+  **Server Changes:**
+  - Introduced delayed weather tool example (`get-weather-delayed`) in conformance server to demonstrate widget lifecycle management with artificial delays
+
+  **Documentation:**
+  - Updated inspector and widget lifecycle testing documentation
+  - Enhanced debugging guides for ChatGPT Apps with widget lifecycle testing instructions
+
+  These changes address Issue #930, ensuring widgets can display loading states and update seamlessly upon tool completion.
+
+  Commits: fea26ff4
+
+- ac3e216: chore(deps): upgrade @modelcontextprotocol/sdk to 1.26.0
+
+  **Dependencies:**
+  - Updated `@modelcontextprotocol/sdk` from `^1.25.3` to `^1.26.0`
+  - Applied the same Zod 4 compatibility patch to SDK 1.26.0
+  - Removed old SDK 1.25.3 patch file
+
+  **Patch Details:**
+
+  The SDK still requires a patch to fix Zod 4 compatibility in the `zod-compat.js` module. The patch ensures that Zod 4 schemas use their instance methods (`schema.safeParse()`) instead of attempting to call non-existent top-level functions (`z4mini.safeParse()`).
+
+  This is a drop-in replacement upgrade with no breaking changes.
+
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+  - @mcp-use/inspector@0.18.4
+  - @mcp-use/cli@2.13.1
+
+## 1.16.4-canary.3
+
+### Patch Changes
+
+- f7ca602: chore(deps): upgrade @modelcontextprotocol/sdk to 1.26.0
+
+  **Dependencies:**
+  - Updated `@modelcontextprotocol/sdk` from `^1.25.3` to `^1.26.0`
+  - Applied the same Zod 4 compatibility patch to SDK 1.26.0
+  - Removed old SDK 1.25.3 patch file
+
+  **Patch Details:**
+
+  The SDK still requires a patch to fix Zod 4 compatibility in the `zod-compat.js` module. The patch ensures that Zod 4 schemas use their instance methods (`schema.safeParse()`) instead of attempting to call non-existent top-level functions (`z4mini.safeParse()`).
+
+  This is a drop-in replacement upgrade with no breaking changes.
+
+- Updated dependencies [f7ca602]
+  - @mcp-use/inspector@0.18.4-canary.3
+  - @mcp-use/cli@2.13.1-canary.3
+
+## 1.16.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [03094a1]
+  - @mcp-use/inspector@0.18.4-canary.2
+  - @mcp-use/cli@2.13.1-canary.2
+
+## 1.16.4-canary.1
+
+### Patch Changes
+
+- d0239d2: fix(mcp-use): release canary versions
+- Updated dependencies [d0239d2]
+  - @mcp-use/inspector@0.18.4-canary.1
+  - @mcp-use/cli@2.13.1-canary.1
+
+## 1.16.4-canary.0
+
+### Patch Changes
+
+- 7c2d7e3: fix(server): HMR tool schema preservation, prompt/resource handler wrappers for CallToolResult conversion, preserve widget resources during HMR, and prompt content normalization
+
+  **HMR Schema Preservation:**
+  - Fixed tool schema handling during HMR to use Zod schemas directly instead of converting to params
+  - Changed empty schema from `{}` to `z.object({})` to ensure `safeParseAsync` works correctly
+  - Preserves full Zod validation capabilities during hot module reload
+
+  **Handler Wrapper Improvements:**
+  - Added automatic handler wrapping for prompts and resources to support `CallToolResult` format
+  - Prompts now support tool response helpers (`text()`, `object()`, `image()`, etc.) via automatic conversion to `GetPromptResult`
+  - Resources now support tool response helpers via automatic conversion to `ReadResourceResult`
+  - Applied wrappers in `listen()`, `addPrompt()`, `addResource()`, and `syncPrimitive()` methods
+
+  **Widget Resource Preservation:**
+  - Widget resources (`ui://widget/*`) and resource templates are now preserved during HMR
+  - Prevents deletion of widget registrations that are only registered on initial load
+  - Ensures widgets remain functional across hot reloads
+
+  **HMR Sync Behavior:**
+  - Changed `hmr-sync.ts` to prefer `onUpdate` handler over in-place updates
+  - Ensures proper handler wrapping for prompts/resources during updates
+  - Maintains correct order-preserving update behavior
+
+  **Content Normalization:**
+  - Enhanced prompt conversion to handle edge cases:
+    - Single content objects without array wrapper
+    - Bare content items (result is the content, not wrapped in `content` property)
+    - Mixed content type arrays
+  - Improved robustness of `CallToolResult` to `GetPromptResult` conversion
+
+  Commits: 116a3be4 (partial)
+
+- Updated dependencies [7c2d7e3]
+- Updated dependencies [7c2d7e3]
+- Updated dependencies [7c2d7e3]
+  - @mcp-use/inspector@0.18.4-canary.0
+  - @mcp-use/cli@2.13.1-canary.0
+
 ## 1.16.3
 
 ### Patch Changes

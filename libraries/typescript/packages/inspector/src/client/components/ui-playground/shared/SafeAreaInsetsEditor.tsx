@@ -43,6 +43,7 @@ export function SafeAreaInsetsEditor({
           value={value.top}
           onChange={(e) => handleChange("top", e.target.value)}
           className="h-8"
+          data-testid="debugger-safe-area-top"
         />
       </div>
       <div className="space-y-1">
@@ -53,6 +54,7 @@ export function SafeAreaInsetsEditor({
           value={value.right}
           onChange={(e) => handleChange("right", e.target.value)}
           className="h-8"
+          data-testid="debugger-safe-area-right"
         />
       </div>
       <div className="space-y-1">
@@ -63,6 +65,7 @@ export function SafeAreaInsetsEditor({
           value={value.bottom}
           onChange={(e) => handleChange("bottom", e.target.value)}
           className="h-8"
+          data-testid="debugger-safe-area-bottom"
         />
       </div>
       <div className="space-y-1">
@@ -73,6 +76,7 @@ export function SafeAreaInsetsEditor({
           value={value.left}
           onChange={(e) => handleChange("left", e.target.value)}
           className="h-8"
+          data-testid="debugger-safe-area-left"
         />
       </div>
     </div>

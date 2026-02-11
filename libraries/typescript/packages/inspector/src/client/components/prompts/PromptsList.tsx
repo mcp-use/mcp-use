@@ -31,6 +31,7 @@ export function PromptsList({
         <ListItem
           key={prompt.name}
           id={`prompt-${prompt.name}`}
+          data-testid={`prompt-item-${prompt.name}`}
           isSelected={selectedPrompt?.name === prompt.name}
           isFocused={focusedIndex === index}
           icon={<MessageSquare className="h-4 w-4" />}

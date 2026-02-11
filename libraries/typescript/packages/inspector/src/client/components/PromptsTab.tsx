@@ -37,6 +37,7 @@ interface PromptsTabProps {
   callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>;
   serverId: string;
   isConnected: boolean;
+  refreshPrompts?: () => Promise<void>;
 }
 
 const SAVED_PROMPTS_KEY = "mcp-inspector-saved-prompts";
@@ -61,8 +62,10 @@ export function PromptsTab({
   callPrompt,
   serverId,
   isConnected,
+  refreshPrompts,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
   // State
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedSavedPrompt, setSelectedSavedPrompt] =
     useState<SavedPrompt | null>(null);
   const { selectedPromptName, setSelectedPromptName } = useInspector();
@@ -178,6 +181,16 @@ export function PromptsTab({
       setIsSearchExpanded(false);
     }
   }, [searchQuery]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!refreshPrompts) return;
+    setIsRefreshing(true);
+    try {
+      await refreshPrompts();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshPrompts]);
 
   const loadSavedPrompt = useCallback(
     (prompt: SavedPrompt) => {
@@ -484,6 +497,8 @@ export function PromptsTab({
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
+                  onRefresh={refreshPrompts ? handleRefresh : undefined}
+                  isRefreshing={isRefreshing}
                 />
                 {activeTab === "prompts" ? (
                   <PromptsList
@@ -579,6 +594,8 @@ export function PromptsTab({
                 searchInputRef={
                   searchInputRef as React.RefObject<HTMLInputElement>
                 }
+                onRefresh={refreshPrompts ? handleRefresh : undefined}
+                isRefreshing={isRefreshing}
               />
 
               {activeTab === "prompts" ? (

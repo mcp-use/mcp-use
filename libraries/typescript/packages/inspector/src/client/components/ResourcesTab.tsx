@@ -37,6 +37,7 @@ interface ResourcesTabProps {
   serverId: string;
   isConnected: boolean;
   mcpServerUrl: string;
+  refreshResources?: () => Promise<void>;
 }
 
 /**
@@ -56,8 +57,10 @@ export function ResourcesTab({
   serverId,
   isConnected,
   mcpServerUrl,
+  refreshResources,
 }: ResourcesTabProps & { ref?: React.RefObject<ResourcesTabRef | null> }) {
   // State
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedResource, setSelectedResource] = useState<Resource | null>(
     null
   );
@@ -128,6 +131,16 @@ export function ResourcesTab({
       setIsSearchExpanded(false);
     }
   }, [searchQuery]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!refreshResources) return;
+    setIsRefreshing(true);
+    try {
+      await refreshResources();
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refreshResources]);
 
   const filteredResources = useMemo(() => {
     if (!searchQuery) return resources;
@@ -418,6 +431,8 @@ export function ResourcesTab({
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
+                  onRefresh={refreshResources ? handleRefresh : undefined}
+                  isRefreshing={isRefreshing}
                 />
                 <div className="flex flex-col h-full">
                   <ResourcesList
@@ -484,6 +499,8 @@ export function ResourcesTab({
                 searchInputRef={
                   searchInputRef as React.RefObject<HTMLInputElement>
                 }
+                onRefresh={refreshResources ? handleRefresh : undefined}
+                isRefreshing={isRefreshing}
               />
 
               <ResourcesList

@@ -930,10 +930,41 @@ program
         inline: options.inline ?? false,
       });
 
+      // Find the source server file before building
+      let sourceServerFile: string | undefined;
+      try {
+        sourceServerFile = await findServerFile(projectPath);
+      } catch {
+        // No server file found, that's okay for widget-only projects
+      }
+
       // Then run tsc (now schemas are available for import)
       console.log(chalk.gray("Building TypeScript..."));
       await runCommand("npx", ["tsc"], projectPath);
       console.log(chalk.green("✓ TypeScript build complete!"));
+
+      // Determine where the entry point was compiled to
+      let entryPoint: string | undefined;
+      if (sourceServerFile) {
+        // Check possible output locations based on common tsconfig patterns
+        // tsc may or may not preserve the src/ prefix depending on rootDir setting
+        const baseName = path.basename(sourceServerFile, ".ts") + ".js";
+        const possibleOutputs = [
+          `dist/${baseName}`, // rootDir set to project root or src
+          `dist/src/${baseName}`, // no rootDir, source in src/
+          `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+        ];
+
+        for (const candidate of possibleOutputs) {
+          try {
+            await access(path.join(projectPath, candidate));
+            entryPoint = candidate;
+            break;
+          } catch {
+            continue;
+          }
+        }
+      }
 
       // Copy public folder if it exists
       const publicDir = path.join(projectPath, "public");
@@ -983,6 +1014,7 @@ program
         includeInspector,
         buildTime,
         buildId,
+        entryPoint, // Server entry point for `mcp-use start`
         widgets: widgetsData,
       };
 
@@ -1045,19 +1077,24 @@ program
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
-      process.env.MCP_URL = mcpUrl;
+      // Only set MCP_URL if not already provided by the user.
+      // Users may set MCP_URL to an external proxy URL (ngrok, E2B, etc.)
+      // for correct widget URLs and HMR WebSocket connections through proxies.
+      if (!process.env.MCP_URL) {
+        process.env.MCP_URL = mcpUrl;
+      }
 
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
 
         const processes: any[] = [];
-        const mcpUrl = `http://${host}:${port}`;
         const env: NodeJS.ProcessEnv = {
           PORT: String(port),
           HOST: host,
           NODE_ENV: "development",
-          MCP_URL: mcpUrl,
+          // Preserve user-provided MCP_URL (e.g., for reverse proxy setups)
+          MCP_URL: process.env.MCP_URL || mcpUrl,
         };
 
         // Use local tsx if available, otherwise fall back to npx
@@ -1517,11 +1554,49 @@ program
       }
 
       // Find the built server file
-      let serverFile = "dist/index.js";
+      // First try to read from manifest (set during build)
+      let serverFile: string | undefined;
+      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+
       try {
-        await access(path.join(projectPath, serverFile));
+        const manifestContent = await readFile(manifestPath, "utf-8");
+        const manifest = JSON.parse(manifestContent);
+        if (manifest.entryPoint) {
+          // Verify the entry point exists
+          await access(path.join(projectPath, manifest.entryPoint));
+          serverFile = manifest.entryPoint;
+        }
       } catch {
-        serverFile = "dist/server.js";
+        // Manifest doesn't exist or entryPoint not set, fall back to searching
+      }
+
+      // Fall back to checking common locations if manifest didn't help
+      if (!serverFile) {
+        const serverCandidates = [
+          "dist/index.js",
+          "dist/server.js",
+          "dist/src/index.js",
+          "dist/src/server.js",
+        ];
+
+        for (const candidate of serverCandidates) {
+          try {
+            await access(path.join(projectPath, candidate));
+            serverFile = candidate;
+            break;
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      if (!serverFile) {
+        console.error(
+          chalk.red(
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+          )
+        );
+        process.exit(1);
       }
 
       console.log("Starting production server...");

@@ -64,7 +64,9 @@
   },
   "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
   "pnpm": {
-    "patchedDependencies": {},
+    "patchedDependencies": {
+      "@modelcontextprotocol/sdk": "patches/@modelcontextprotocol__sdk.patch"
+    },
     "overrides": {
       "mcp-use": "workspace:*",
       "@mcp-use/inspector": "workspace:*",
@@ -82,7 +84,7 @@
       "react-router-dom": "^7.12.0",
       "qs": ">=6.14.1",
       "preact": ">=10.28.2",
-      "zod": "4.2.0",
+      "zod": "4.3.5",
       "jsondiffpatch": ">=0.7.2",
       "esbuild": "0.27.1",
       "vite": "^7.3.0",

@@ -101,6 +101,18 @@ export function PropsConfigDialog({
           required: required.length > 0 ? required : undefined,
         };
       }
+
+      // Check if it's already in JSON Schema format (not Zod)
+      if (
+        mcpUseWidget.props.type === "object" &&
+        mcpUseWidget.props.properties
+      ) {
+        console.log("[PropsConfigDialog] Found JSON Schema in mcp-use/widget", {
+          props: mcpUseWidget.props,
+        });
+        // It's already JSON Schema, return as-is
+        return mcpUseWidget.props;
+      }
     }
 
     // Check standard JSON Schema locations
@@ -316,7 +328,10 @@ export function PropsConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
+      <DialogContent
+        className="sm:max-w-[600px] max-h-[80vh] flex flex-col"
+        data-testid="props-config-dialog"
+      >
         <DialogHeader>
           <DialogTitle>
             {editingPreset ? "Edit Preset" : "Create Props Preset"}
@@ -333,6 +348,7 @@ export function PropsConfigDialog({
             <Label htmlFor="preset-name">Preset Name</Label>
             <Input
               id="preset-name"
+              data-testid="props-config-preset-name"
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
               placeholder="e.g., Dark Theme, Production Config"
@@ -357,12 +373,16 @@ export function PropsConfigDialog({
                 size="sm"
                 variant="outline"
                 className="w-full"
+                data-testid="props-config-generate-llm-button"
               >
                 {isGenerating ? (
-                  <>
+                  <span
+                    data-testid="props-config-generating"
+                    className="flex items-center gap-2"
+                  >
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Generating...
-                  </>
+                  </span>
                 ) : (
                   <>
                     <Sparkles className="h-4 w-4 mr-2" />
@@ -377,7 +397,12 @@ export function PropsConfigDialog({
               </p>
             )}
             {generationError && (
-              <p className="text-xs text-destructive">{generationError}</p>
+              <p
+                className="text-xs text-destructive"
+                data-testid="props-config-error"
+              >
+                {generationError}
+              </p>
             )}
           </div>
 
@@ -414,13 +439,14 @@ export function PropsConfigDialog({
                     size="sm"
                     variant="ghost"
                     disabled={isGenerating}
+                    data-testid="props-config-add-prop"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Prop
                   </Button>
                 </div>
 
-                {propPairs.map((pair) => (
+                {propPairs.map((pair, index) => (
                   <div key={pair.id} className="flex items-center gap-2">
                     <div className="flex-1 grid grid-cols-2 gap-2">
                       <Input
@@ -430,6 +456,7 @@ export function PropsConfigDialog({
                           handlePairChange(pair.id, "key", e.target.value)
                         }
                         disabled={isGenerating}
+                        data-testid={`props-config-key-${index}`}
                       />
                       <Input
                         placeholder="Value"
@@ -438,6 +465,7 @@ export function PropsConfigDialog({
                           handlePairChange(pair.id, "value", e.target.value)
                         }
                         disabled={isGenerating}
+                        data-testid={`props-config-value-${index}`}
                       />
                     </div>
                     <Button
@@ -446,6 +474,7 @@ export function PropsConfigDialog({
                       onClick={() => handleRemovePair(pair.id)}
                       disabled={propPairs.length === 1 || isGenerating}
                       className="h-9 w-9 p-0"
+                      data-testid={`props-config-remove-${index}`}
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
                     </Button>
@@ -461,10 +490,15 @@ export function PropsConfigDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isGenerating}
+            data-testid="props-config-cancel-button"
           >
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isGenerating}>
+          <Button
+            onClick={handleSave}
+            disabled={isGenerating}
+            data-testid="props-config-save-button"
+          >
             {editingPreset ? "Update" : "Create"} Preset
           </Button>
         </DialogFooter>

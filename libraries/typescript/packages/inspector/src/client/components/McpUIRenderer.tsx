@@ -77,8 +77,7 @@ export function McpUIRenderer({
             width: "100%",
             minHeight: "200px",
           },
-          sandboxPermissions:
-            "allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox",
+          sandboxPermissions: "allow-scripts allow-forms allow-popups",
           // Pass custom props as data attributes
           ...(customProps
             ? {

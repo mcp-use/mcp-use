@@ -43,6 +43,7 @@ export function ElicitationRequestsList({
           <ListItem
             key={request.id}
             id={`elicitation-request-${request.id}`}
+            data-testid={`elicitation-request-item-${index}`}
             isSelected={selectedRequest?.id === request.id}
             isFocused={focusedIndex === index}
             title={

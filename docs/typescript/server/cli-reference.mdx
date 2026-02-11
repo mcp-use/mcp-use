@@ -1,0 +1,704 @@
+---
+title: "CLI Reference"
+description: "Complete reference for the @mcp-use/cli build and deployment tool"
+icon: "terminal"
+---
+
+The `@mcp-use/cli` is a build and development tool for creating MCP servers with integrated UI widgets. It provides commands for development, building, deployment, and authentication.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+# Install globally
+npm install -g @mcp-use/cli
+
+# Or use with npx (no installation needed)
+
+npx @mcp-use/cli dev
+
+# Install as project dependency
+
+npm install --save-dev @mcp-use/cli
+
+````
+
+```bash yarn
+# Install globally
+yarn global add @mcp-use/cli
+
+# Or use with yarn
+yarn @mcp-use/cli dev
+
+# Install as project dependency
+yarn add --dev @mcp-use/cli
+````
+
+```bash pnpm
+# Install globally
+pnpm add -g @mcp-use/cli
+
+# Or use with pnpm
+pnpm @mcp-use/cli dev
+
+# Install as project dependency
+pnpm add -D @mcp-use/cli
+```
+
+</CodeGroup>
+
+<Tip>
+  When using `create-mcp-use-app`, the CLI is automatically installed as a
+  project dependency.
+</Tip>
+
+---
+
+## Commands
+
+### `dev` - Development Server
+
+Start a development server with hot reload, automatic TypeScript compilation, and auto-opening inspector.
+
+```bash
+mcp-use dev [options]
+```
+
+**What happens in dev mode:**
+
+1. TypeScript files are compiled in watch mode
+2. UI widgets are built with hot reload
+3. Server runs with automatic restart on changes
+4. Inspector automatically opens at `http://localhost:3000/inspector`
+5. MCP endpoint is available at `http://localhost:3000/mcp`
+
+**Options:**
+
+| Option              | Description                  | Default           |
+| ------------------- | ---------------------------- | ----------------- |
+| `-p, --path <path>` | Project directory            | Current directory |
+| `--port <port>`     | Server port                  | 3000              |
+| `--no-open`         | Don't auto-open inspector    | false             |
+| `--no-hmr`          | Disable Hot Module Reloading | false             |
+
+**Examples:**
+
+```bash
+# Basic development
+mcp-use dev
+
+# Custom port
+mcp-use dev --port 8080
+
+# Disable inspector auto-open
+mcp-use dev --no-open
+
+# Disable HMR (uses tsx watch instead)
+mcp-use dev --no-hmr
+
+# Custom project path
+mcp-use dev -p ./my-server
+```
+
+#### Hot Module Reloading (HMR)
+
+HMR is enabled by default in development mode. It allows you to modify tools, prompts, and resources without restarting the server or dropping client connections.
+
+**What can be hot-reloaded:**
+
+- Adding new tools, prompts, resources, or resource templates
+- Updating existing registrations (descriptions, schemas, handlers)
+- Removing registrations
+
+**What requires a restart:**
+
+- Server configuration changes (name, version, port)
+- Adding new middleware
+- Changes to OAuth configuration
+
+Connected clients automatically receive `list_changed` notifications and refresh their cached lists.
+
+<Note>
+  If you encounter issues with HMR, disable it with `--no-hmr` to fall back to
+  full server restarts on changes.
+</Note>
+
+---
+
+### `build` - Production Build
+
+Build your MCP server for production deployment.
+
+```bash
+mcp-use build [options]
+```
+
+**What happens during build:**
+
+1. TypeScript is compiled to JavaScript
+2. All `.tsx` files in `resources/` are bundled as standalone HTML pages
+3. Assets are hashed for optimal caching
+4. Output is optimized and minified
+5. Build manifest (`dist/mcp-use.json`) is created
+
+**Options:**
+
+| Option              | Description                | Default           |
+| ------------------- | -------------------------- | ----------------- |
+| `-p, --path <path>` | Project directory          | Current directory |
+| `--with-inspector`  | Include inspector in build | false             |
+
+**Examples:**
+
+```bash
+# Basic build
+mcp-use build
+
+# Build with inspector included
+mcp-use build --with-inspector
+
+# Build specific project
+mcp-use build -p ./my-server
+```
+
+<Tip>
+  Use the `MCP_SERVER_URL` environment variable during build to configure widget
+  asset paths for static deployments (e.g., Supabase Storage).
+</Tip>
+
+---
+
+### `start` - Production Server
+
+Start the production server from built files.
+
+```bash
+mcp-use start [options]
+```
+
+**Options:**
+
+| Option              | Description       | Default           |
+| ------------------- | ----------------- | ----------------- |
+| `-p, --path <path>` | Project directory | Current directory |
+| `--port <port>`     | Server port       | 3000              |
+| `--tunnel`          | Expose via tunnel | false             |
+
+**Examples:**
+
+```bash
+# Start production server
+mcp-use start
+
+# Custom port
+mcp-use start --port 8080
+
+# Start with tunnel (exposes server publicly)
+mcp-use start --tunnel
+
+# Start specific project
+mcp-use start -p ./my-server
+```
+
+<Note>
+  The `start` command looks for the server entry point in the build manifest
+  (`dist/mcp-use.json`). If not found, it falls back to checking
+  `dist/index.js`, `dist/server.js`, etc.
+</Note>
+
+---
+
+### `deploy` - Cloud Deployment
+
+Deploy your MCP server to mcp-use cloud.
+
+```bash
+mcp-use deploy [options]
+```
+
+**Options:**
+
+| Option                | Description                       | Default        |
+| --------------------- | --------------------------------- | -------------- |
+| `--name <name>`       | Custom deployment name            | Auto-generated |
+| `--port <port>`       | Server port                       | 3000           |
+| `--runtime <runtime>` | Runtime: "node" or "python"       | "node"         |
+| `--open`              | Open deployment in browser        | false          |
+| `--env <key=value>`   | Environment variable (repeatable) | -              |
+| `--env-file <path>`   | Path to .env file                 | -              |
+
+**Examples:**
+
+```bash
+# Basic deployment
+mcp-use deploy
+
+# Deploy with custom name and open in browser
+mcp-use deploy --name my-server --open
+
+# Deploy with environment variables
+mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
+
+# Deploy with .env file
+mcp-use deploy --env-file .env.production
+
+# Python runtime
+mcp-use deploy --runtime python
+```
+
+**Deployment Process:**
+
+1. Checks if project is a GitHub repository
+2. Prompts to install GitHub App if needed
+3. Creates or links deployment project
+4. Builds and deploys from GitHub
+5. Returns deployment URLs (MCP endpoint and Inspector)
+
+<Tip>
+  The deploy command automatically creates a `.mcp-use/project.json` file to
+  link your local project to the cloud deployment for stable URLs across
+  redeployments.
+</Tip>
+
+---
+
+### Authentication Commands
+
+#### `login` - Authenticate with mcp-use Cloud
+
+```bash
+mcp-use login
+```
+
+Starts an OAuth-style device code flow to authenticate with [Manufact cloud](https://manufact.com). Opens a browser window to complete authentication.
+
+**What happens:**
+
+1. CLI generates a device code
+2. Opens browser to authentication page
+3. Stores session token in `~/.mcp-use/config.json`
+
+#### `whoami` - Check Authentication Status
+
+```bash
+mcp-use whoami
+```
+
+Displays your current authentication status and user information.
+
+#### `logout` - Sign Out
+
+```bash
+mcp-use logout
+```
+
+Removes authentication credentials from `~/.mcp-use/config.json`.
+
+---
+
+## Build Artifacts & Generated Files
+
+The CLI generates several files during build, deployment, and development. Understanding these files helps with debugging and advanced configuration.
+
+### `dist/mcp-use.json` - Build Manifest
+
+**Location:** `<project>/dist/mcp-use.json`
+
+**Created by:** `mcp-use build`
+
+**Purpose:** Stores metadata about the built server, including widget information, build details, and runtime configuration.
+
+**Structure:**
+
+```json
+{
+  "includeInspector": true,
+  "buildTime": "2025-02-04T10:30:00.000Z",
+  "buildId": "a1b2c3d4e5f6g7h8",
+  "entryPoint": "dist/index.js",
+  "widgets": {
+    "weather-display": {
+      "title": "Weather Display",
+      "description": "Shows weather information",
+      "props": {
+        "type": "object",
+        "properties": {
+          "city": { "type": "string" }
+        }
+      }
+    }
+  },
+  "tunnel": {
+    "subdomain": "my-server-abc123"
+  }
+}
+```
+
+**Contents:**
+
+- `includeInspector` - Whether inspector was included in build
+- `buildTime` - ISO timestamp of build
+- `buildId` - Unique build identifier (hash)
+- `entryPoint` - Path to server entry point for `mcp-use start`
+- `widgets` - Map of widget names to their metadata (title, description, props schema)
+- `tunnel` - Tunnel configuration (subdomain persists across restarts)
+
+**Usage:**
+
+- Read by `mcp-use start` to locate the server entry point
+- Stores tunnel subdomain for consistent URLs
+- Contains widget schemas for runtime widget rendering
+
+---
+
+### `.mcp-use/project.json` - Deployment Link
+
+**Location:** `<project>/.mcp-use/project.json`
+
+**Created by:** `mcp-use deploy`
+
+**Purpose:** Links your local project to a cloud deployment, ensuring stable URLs across redeployments.
+
+**Structure:**
+
+```json
+{
+  "deploymentId": "dep_abc123xyz",
+  "deploymentName": "my-mcp-server",
+  "deploymentUrl": "https://my-server.deploy.mcp-use.com",
+  "linkedAt": "2025-02-04T10:00:00.000Z",
+  "serverId": "srv_def456uvw"
+}
+```
+
+**Contents:**
+
+- `deploymentId` - Unique deployment identifier
+- `deploymentName` - Human-readable deployment name
+- `deploymentUrl` - Full URL to deployed server
+- `linkedAt` - ISO timestamp when link was created
+- `serverId` - Server identifier in cloud platform
+
+**Gitignore:**
+
+The CLI automatically adds `.mcp-use/` to your `.gitignore` as this file contains deployment-specific information that shouldn't be committed.
+
+---
+
+### `.mcp-use/sessions.json` - Development Sessions
+
+**Location:** `<project>/.mcp-use/sessions.json`
+
+**Created by:** `mcp-use dev` (automatically)
+
+**Purpose:** Persists session metadata during development to survive hot reloads and server restarts.
+
+**Structure:**
+
+```json
+{
+  "session-id-1": {
+    "clientCapabilities": { ... },
+    "clientInfo": { "name": "claude-desktop", "version": "1.0.0" },
+    "protocolVersion": "2024-11-05",
+    "logLevel": "info",
+    "lastAccessedAt": 1707048000000
+  },
+  "session-id-2": { ... }
+}
+```
+
+**Contents:**
+
+- Session ID mapped to session metadata
+- Client capabilities and info
+- Protocol version
+- Log level
+- Last access timestamp
+
+**Behavior:**
+
+- Only used in development mode (NODE_ENV !== 'production')
+- Enables seamless hot reload without losing client connections
+- Automatically cleaned up (expired sessions removed on load)
+
+<Note>
+  In production, sessions are stored in memory by default. Use [Redis
+  Storage](/typescript/server/session-management/redis-storage) for production
+  deployments with multiple server instances.
+</Note>
+
+---
+
+### `~/.mcp-use/config.json` - User Authentication
+
+**Location:** `~/.mcp-use/config.json` (user home directory)
+
+**Created by:** `mcp-use login`
+
+**Purpose:** Stores user-level CLI authentication credentials.
+
+**Structure:**
+
+```json
+{
+  "apiKey": "your-api-key-here",
+  "apiUrl": "https://cloud.manufact.com/api/v1"
+}
+```
+
+**Contents:**
+
+- `apiKey` - Authentication token for mcp-use cloud
+- `apiUrl` - Backend API URL (can be customized for local development)
+
+**Usage:**
+
+- Used by `mcp-use deploy`, `mcp-use whoami`
+- Removed by `mcp-use logout`
+- Can be customized with `MCP_API_URL` and `MCP_WEB_URL` environment variables
+
+---
+
+## Environment Variables
+
+### Development & Build
+
+| Variable         | Description                       | Default     |
+| ---------------- | --------------------------------- | ----------- |
+| `PORT`           | Server port                       | 3000        |
+| `NODE_ENV`       | Environment mode                  | development |
+| `MCP_SERVER_URL` | Server URL for widget asset paths | -           |
+
+**Examples:**
+
+```bash
+# Custom port
+PORT=8080 mcp-use dev
+
+# Production build with custom MCP URL
+MCP_SERVER_URL=https://myserver.com mcp-use build
+```
+
+### Deployment & Cloud
+
+| Variable      | Description               | Default                           |
+| ------------- | ------------------------- | --------------------------------- |
+| `MCP_WEB_URL` | Frontend URL (auth pages) | https://manufact.com              |
+| `MCP_API_URL` | Backend API URL           | https://cloud.manufact.com/api/v1 |
+
+**Examples:**
+
+```bash
+# Local development environment
+export MCP_WEB_URL=http://localhost:3000
+export MCP_API_URL=http://localhost:8000
+mcp-use login
+mcp-use deploy
+```
+
+<Tip>
+  See the [CLI README
+  ENVIRONMENT.md](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli/ENVIRONMENT.md)
+  for detailed environment configuration examples.
+</Tip>
+
+---
+
+## Project Structure
+
+The CLI expects the following project structure:
+
+```
+my-mcp-server/
+├── package.json
+├── tsconfig.json
+├── src/
+│   └── index.ts              # MCP server entry point
+├── resources/                # UI widgets (React components)
+│   ├── weather.tsx           # Widget file
+│   └── dashboard/            # Widget directory
+│       └── widget.tsx        # Widget in subdirectory
+├── public/                   # Static assets (optional)
+│   └── favicon.ico
+├── dist/                     # Build output (generated)
+│   ├── index.js              # Compiled server
+│   ├── mcp-use.json          # Build manifest
+│   ├── public/               # Copied static assets
+│   └── resources/            # Built widgets
+│       └── mcp-use/
+│           └── widgets/
+│               ├── weather/
+│               │   ├── index.html
+│               │   └── assets/
+│               │       └── index-[hash].js
+│               └── dashboard/
+│                   ├── index.html
+│                   └── assets/
+│                       └── index-[hash].js
+└── .mcp-use/                 # CLI metadata (auto-generated)
+    ├── project.json          # Deployment link
+    └── sessions.json         # Dev sessions
+```
+
+---
+
+## Common Workflows
+
+### Development Workflow
+
+```bash
+# Start development
+mcp-use dev
+
+# Make changes to src/index.ts or resources/*.tsx
+# Server hot-reloads automatically
+# Inspector shows changes immediately
+```
+
+### Build and Deploy Workflow
+
+```bash
+# Build for production
+mcp-use build
+
+# Test locally
+mcp-use start
+
+# Deploy to cloud
+mcp-use login
+mcp-use deploy
+```
+
+### CI/CD Pipeline
+
+```bash
+# In your CI/CD pipeline
+npm install
+npm run build       # Uses mcp-use build
+npm run start       # Uses mcp-use start
+
+# Or with PM2 for production
+npm run build
+pm2 start "mcp-use start" --name my-mcp-server
+```
+
+### Docker Deployment
+
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --production
+
+# Copy source and build
+COPY . .
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+
+# Start server
+CMD ["npm", "start"]
+```
+
+---
+
+## Package.json Scripts
+
+Add these convenience scripts to your `package.json`:
+
+```json
+{
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy",
+    "tunnel": "mcp-use start --tunnel"
+  }
+}
+```
+
+---
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Use a different port
+mcp-use dev --port 3001
+```
+
+### TypeScript Compilation Errors
+
+```bash
+# Check tsconfig.json
+# Ensure all dependencies are installed
+npm install
+
+# Check TypeScript version
+npx tsc --version
+```
+
+### Widgets Not Loading
+
+**Symptoms:** Widgets don't appear or show 404 errors
+
+**Solutions:**
+
+- Ensure `.tsx` files are in the `resources/` directory
+- Check React dependencies are installed (`react`, `react-dom`)
+- Verify build output in `dist/resources/mcp-use/widgets/`
+- Check widget metadata in `dist/mcp-use.json`
+
+### Inspector Not Opening
+
+```bash
+# Manually open http://localhost:3000/inspector
+# Or disable auto-open
+mcp-use dev --no-open
+```
+
+### Build Fails with "Entry Point Not Found"
+
+**Cause:** The build can't locate your server entry point
+
+**Solutions:**
+
+- Ensure you have `src/index.ts` or `src/server.ts`
+- Check `tsconfig.json` has correct `outDir` setting
+- Verify no TypeScript compilation errors
+
+### Deploy Fails with GitHub Permissions
+
+**Cause:** mcp-use GitHub App doesn't have access to your repository
+
+**Solutions:**
+
+1. Visit the GitHub App installation page (CLI provides link)
+2. Grant access to your repository
+3. Retry `mcp-use deploy`
+
+### HMR Not Working
+
+**Symptoms:** Changes don't reflect without manual restart
+
+**Solutions:**
+
+- Check file watcher isn't hitting system limits (especially in Docker)
+- Try disabling and re-enabling: `mcp-use dev --no-hmr` then restart normally
+- Ensure changes are in watched directories (`src/`, `resources/`)
+- Check console for HMR error messages
+
+---
+
+## Next Steps
+
+- [Server Configuration](/typescript/server/configuration) - Advanced server configuration
+- [Deployment Guide](/typescript/server/deployment/mcp-use) - Deploy to mcp-use cloud
+- [UI Widgets](/typescript/server/ui-widgets) - Build interactive widgets
+- [Session Management](/typescript/server/session-management) - Configure session storage

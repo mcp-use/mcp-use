@@ -119,6 +119,36 @@ app.route('/debug', inspectorApp)
 
 ## Configuration Options
 
+### `mountInspector` Options
+
+The `mountInspector` function accepts an optional configuration object:
+
+```typescript
+import { mountInspector } from '@mcp-use/inspector'
+
+mountInspector(app, {
+  autoConnectUrl: 'http://localhost:3000/mcp',  // Auto-connect to an MCP server
+  devMode: true,                                  // Enable development mode
+  sandboxOrigin: 'https://sandbox.example.com',   // Custom sandbox origin
+})
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `autoConnectUrl` | `string \| null` | `undefined` | MCP server URL to auto-connect on load |
+| `devMode` | `boolean` | `true` if not production | Enables same-origin sandbox for MCP Apps widgets (no subdomain required) |
+| `sandboxOrigin` | `string \| null` | `undefined` | Override the sandbox origin for MCP Apps widgets |
+
+#### `devMode`
+
+When `devMode` is `true`, the inspector uses same-origin for the MCP Apps widget sandbox instead of requiring a `sandbox-{hostname}` subdomain. This is essential when running behind reverse proxies (ngrok, E2B, Cloudflare tunnels) where that subdomain does not exist.
+
+When using `mcp-use/server`, `devMode` is automatically set to `true` in development and `false` in production.
+
+#### `sandboxOrigin`
+
+Override the sandbox origin used for MCP Apps widget iframes. Use this when you have a specific domain configured for sandboxed content in production.
+
 ### Environment Detection
 
 The inspector automatically detects the framework:
@@ -211,6 +241,57 @@ app.use(cors({
 
 mountInspector(app)
 ```
+
+### Reverse Proxy Support
+
+The inspector and MCP Apps widgets work behind reverse proxies such as ngrok, E2B sandboxes, and Cloudflare tunnels. To set this up:
+
+1. **Set `MCP_URL`** to the public-facing URL of your server. This ensures widget asset URLs and Vite HMR WebSocket connections route correctly through the proxy.
+
+```bash
+MCP_URL=https://abc123.ngrok.io npx @mcp-use/cli dev
+```
+
+2. **`devMode` is enabled automatically** in development, so MCP Apps widgets use same-origin sandboxing (no `sandbox-{hostname}` subdomain required).
+
+3. **Vite HMR works through the proxy** — a WebSocket proxy forwards HMR connections from the main HTTP server to Vite's internal port automatically.
+
+See the [CLI Environment Variables](/inspector/cli#mcp_url) documentation for more details on `MCP_URL`.
+
+### Widget Server URL
+
+Widgets rendered via MCP Apps have access to a `window.__mcpServerUrl` global variable containing the server's origin URL. Use this to construct API URLs dynamically instead of hardcoding `localhost`:
+
+```typescript
+// Inside a widget
+const data = await fetch(`${window.__mcpServerUrl}/api/data`)
+```
+
+This global is injected automatically and works correctly behind reverse proxies.
+
+### Embedding Widget Iframes
+
+If you need to embed inspector widgets in iframes from your own application (e.g., embedding widgets in your dashboard or admin panel), you can configure allowed origins using the `MCP_INSPECTOR_FRAME_ANCESTORS` environment variable.
+
+```bash
+# Allow embedding from specific domains
+MCP_INSPECTOR_FRAME_ANCESTORS="https://app.example.com https://admin.example.com" node server.js
+
+# Or in development, allow all origins
+MCP_INSPECTOR_FRAME_ANCESTORS="*" npm run dev
+```
+
+**Security Note:**
+
+<Note>
+By default, the inspector uses:
+- **Development mode** (when `devServerBaseUrl` is detected): `frame-ancestors *` (allows all origins)
+- **Production mode**: `frame-ancestors 'self'` (same-origin only)
+
+This prevents unauthorized sites from embedding your inspector widgets while making development easier.
+</Note>
+
+For more details, see the [CLI Environment Variables](/inspector/cli#mcpinspectorframeancestors) documentation.
 
 ## Troubleshooting
 

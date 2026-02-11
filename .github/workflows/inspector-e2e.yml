@@ -1,0 +1,107 @@
+name: Inspector E2E Tests
+
+permissions:
+  contents: read
+
+# ============================================================================
+# Inspector E2E Tests
+# ============================================================================
+#
+# Runs Playwright E2E tests for the Inspector package across all test modes:
+# - mix: Built server :3002, dev inspector :3000 (most common dev setup)
+# - prod: Built server :3002, built inspector :3000 (production simulation)
+# - builtin: Dev server with built-in inspector :3000 (HMR tests)
+#
+# Triggered on:
+# - PRs from canary to main (runs all 3 modes for release validation)
+# - Manual dispatch (can run all modes or a single mode)
+#
+
+on:
+  pull_request:
+    branches: [main]
+    # Only run on PRs coming from canary branch
+    # This catches release PRs before they merge to main
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "Test mode (all runs matrix, or pick one)"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - mix
+          - prod
+          - builtin
+
+jobs:
+  inspector-e2e:
+    name: "Inspector E2E (${{ matrix.mode }})"
+    runs-on: ubuntu-latest
+    # Disabled: set to false to skip without deleting the workflow. Re-enable by restoring:
+    # if: github.event_name == 'workflow_dispatch' || github.head_ref == 'canary'
+    if: false
+    strategy:
+      fail-fast: true
+      matrix:
+        # Run all modes for comprehensive testing (or single mode for manual dispatch)
+        # - mix: Built server :3002, dev inspector :3000 (most common dev setup)
+        # - prod: Built server :3002, built inspector :3000 (production simulation)
+        # - builtin: Dev server with built-in inspector :3000 (HMR tests)
+        mode: ${{ github.event.inputs.test_mode == 'all' || github.event.inputs.test_mode == '' && fromJson('["mix", "prod", "builtin"]') || fromJson(format('["{0}"]', github.event.inputs.test_mode)) }}
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Link CLI Binaries
+        # After build, CLI binaries exist - re-run install to create symlinks
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm --filter @mcp-use/inspector exec playwright install --with-deps chromium
+
+      - name: Run E2E Tests (${{ matrix.mode }} mode)
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: "false"
+          NODE_ENV: test
+        run: |
+          cd packages/inspector
+          node tests/e2e/scripts/run-test-matrix.mjs ${{ matrix.mode }}
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.mode }}
+          path: libraries/typescript/packages/inspector/playwright-report/
+          retention-days: 30
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.mode }}
+          path: libraries/typescript/packages/inspector/test-results/
+          retention-days: 7

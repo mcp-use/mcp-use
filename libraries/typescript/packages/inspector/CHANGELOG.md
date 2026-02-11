@@ -1,5 +1,292 @@
 # @mcp-use/inspector
 
+## 0.18.5
+
+### Patch Changes
+
+- 3d787ba: Improve reverse proxy support, HMR reliability, and widget handling across the stack.
+
+  ### `mcp-use` (minor)
+  - **Custom HTTP route HMR:** Routes registered via `server.get()`, `server.post()`, etc. now support hot module replacement — handlers are hot-swapped without a server restart.
+  - **Widget tool protection during HMR:** Widget-registered tools are no longer accidentally removed when `index.ts` HMR sync runs. Tools tagged with `_meta["mcp-use/widget"]` are preserved.
+  - **Dynamic widget creation:** The `resources/` directory is auto-created if missing, and the dev server watches for new widgets even if none exist at startup. This enables workflows where widgets are created after the server starts
+  - **Vite HMR WebSocket proxy:** A TCP-level WebSocket proxy forwards HMR `upgrade` requests from the main HTTP server to Vite's internal HMR port, enabling hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels).
+  - **`MCP_URL` environment variable:** Can now be pre-set by users to an external proxy URL. The CLI will not overwrite it, allowing correct widget URLs and HMR WebSocket connections behind reverse proxies.
+  - **List-changed notifications on removal:** `sendToolListChanged()`, `sendResourceListChanged()`, and `sendPromptListChanged()` now also fire when items are removed, not just added/updated.
+  - **Pre-initialized request handlers:** Tool, prompt, and resource request handlers are pre-registered during session initialization, preventing `Method not found` errors when clients connect to servers that start with zero registrations and add them dynamically.
+  - **Widget type default changed:** Widgets now default to `mcpApps` (dual-protocol) instead of `appsSdk`. Only widgets with explicit `appsSdkMetadata` and no `metadata` field use the `appsSdk` type.
+  - **`window.__mcpServerUrl` global:** Injected into widget HTML so widgets can dynamically construct API URLs (e.g., `fetch(window.__mcpServerUrl + '/api/data')`).
+
+  ### `@mcp-use/inspector` (patch)
+  - **`MCP_INSPECTOR_FRAME_ANCESTORS` env var:** Controls which origins can embed the inspector in iframes via CSP `frame-ancestors`. Defaults to `*` in development and `'self'` in production.
+  - **`mountInspector` configuration options:** Accepts new `devMode` (boolean) and `sandboxOrigin` (string | null) options for controlling sandbox behavior in different deployment environments.
+  - **Runtime config injection:** `__MCP_DEV_MODE__` and `__MCP_SANDBOX_ORIGIN__` window globals are injected into the served HTML at runtime, enabling client-side configuration without rebuild.
+  - **Localhost URL conversion:** Server-side fetches of widget HTML now convert external proxy URLs to `localhost` to avoid reverse proxy catch-all routes returning SPA HTML instead of Vite-served widget content.
+  - **Simplified URL rewriting:** Widget asset URLs are now rewritten to bare server-relative paths that resolve directly through Vite middleware, improving reliability behind reverse proxies.
+  - **Fixed infinite re-render loop:** Removed excessive `useEffect` dependencies in `MCPAppsRenderer` that caused continuous re-fetching of widget HTML.
+
+  ### `@mcp-use/cli` (patch)
+  - **Respect user-provided `MCP_URL`:** The CLI no longer overwrites `MCP_URL` if already set, allowing users to configure external proxy URLs for reverse proxy setups.
+
+- 3d787ba: fix(inspector): update sandbox permissions for McpUIRenderer and MCPUIResource components
+  - Removed 'allow-same-origin' and 'allow-popups-to-escape-sandbox' from sandbox permissions to enhance security
+
+- Updated dependencies [3d787ba]
+- Updated dependencies [3d787ba]
+  - mcp-use@1.17.0
+
+## 0.18.5-canary.2
+
+### Patch Changes
+
+- 4c881d3: fix(inspector): update sandbox permissions for McpUIRenderer and MCPUIResource components
+  - Removed 'allow-same-origin' and 'allow-popups-to-escape-sandbox' from sandbox permissions to enhance security
+  - mcp-use@1.17.0-canary.2
+
+## 0.18.5-canary.1
+
+### Patch Changes
+
+- Updated dependencies [31fdb69]
+  - mcp-use@1.17.0-canary.1
+
+## 0.18.5-canary.0
+
+### Patch Changes
+
+- 4a03ce0: Improve reverse proxy support, HMR reliability, and widget handling across the stack.
+
+  ### `mcp-use` (minor)
+  - **Custom HTTP route HMR:** Routes registered via `server.get()`, `server.post()`, etc. now support hot module replacement — handlers are hot-swapped without a server restart.
+  - **Widget tool protection during HMR:** Widget-registered tools are no longer accidentally removed when `index.ts` HMR sync runs. Tools tagged with `_meta["mcp-use/widget"]` are preserved.
+  - **Dynamic widget creation:** The `resources/` directory is auto-created if missing, and the dev server watches for new widgets even if none exist at startup. This enables workflows where widgets are created after the server starts
+  - **Vite HMR WebSocket proxy:** A TCP-level WebSocket proxy forwards HMR `upgrade` requests from the main HTTP server to Vite's internal HMR port, enabling hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels).
+  - **`MCP_URL` environment variable:** Can now be pre-set by users to an external proxy URL. The CLI will not overwrite it, allowing correct widget URLs and HMR WebSocket connections behind reverse proxies.
+  - **List-changed notifications on removal:** `sendToolListChanged()`, `sendResourceListChanged()`, and `sendPromptListChanged()` now also fire when items are removed, not just added/updated.
+  - **Pre-initialized request handlers:** Tool, prompt, and resource request handlers are pre-registered during session initialization, preventing `Method not found` errors when clients connect to servers that start with zero registrations and add them dynamically.
+  - **Widget type default changed:** Widgets now default to `mcpApps` (dual-protocol) instead of `appsSdk`. Only widgets with explicit `appsSdkMetadata` and no `metadata` field use the `appsSdk` type.
+  - **`window.__mcpServerUrl` global:** Injected into widget HTML so widgets can dynamically construct API URLs (e.g., `fetch(window.__mcpServerUrl + '/api/data')`).
+
+  ### `@mcp-use/inspector` (patch)
+  - **`MCP_INSPECTOR_FRAME_ANCESTORS` env var:** Controls which origins can embed the inspector in iframes via CSP `frame-ancestors`. Defaults to `*` in development and `'self'` in production.
+  - **`mountInspector` configuration options:** Accepts new `devMode` (boolean) and `sandboxOrigin` (string | null) options for controlling sandbox behavior in different deployment environments.
+  - **Runtime config injection:** `__MCP_DEV_MODE__` and `__MCP_SANDBOX_ORIGIN__` window globals are injected into the served HTML at runtime, enabling client-side configuration without rebuild.
+  - **Localhost URL conversion:** Server-side fetches of widget HTML now convert external proxy URLs to `localhost` to avoid reverse proxy catch-all routes returning SPA HTML instead of Vite-served widget content.
+  - **Simplified URL rewriting:** Widget asset URLs are now rewritten to bare server-relative paths that resolve directly through Vite middleware, improving reliability behind reverse proxies.
+  - **Fixed infinite re-render loop:** Removed excessive `useEffect` dependencies in `MCPAppsRenderer` that caused continuous re-fetching of widget HTML.
+
+  ### `@mcp-use/cli` (patch)
+  - **Respect user-provided `MCP_URL`:** The CLI no longer overwrites `MCP_URL` if already set, allowing users to configure external proxy URLs for reverse proxy setups.
+
+- Updated dependencies [4a03ce0]
+  - mcp-use@1.17.0-canary.0
+
+## 0.18.4
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+- ac3e216: fix: ensure pending state is emulated for widgets, reflecting ChatGPT behaviour
+
+  **Inspector Changes:**
+  - Updated MCPAppsRenderer and OpenAIComponentRenderer to handle tool output and metadata more effectively, allowing for immediate rendering of widgets even when results are pending
+  - Enhanced MessageList and ToolResultRenderer to support immediate rendering of widget tools, improving responsiveness during tool execution
+  - Added utility functions for widget detection and pre-rendering capabilities based on tool metadata
+
+  **Server Changes:**
+  - Introduced delayed weather tool example (`get-weather-delayed`) in conformance server to demonstrate widget lifecycle management with artificial delays
+
+  **Documentation:**
+  - Updated inspector and widget lifecycle testing documentation
+  - Enhanced debugging guides for ChatGPT Apps with widget lifecycle testing instructions
+
+  These changes address Issue #930, ensuring widgets can display loading states and update seamlessly upon tool completion.
+
+  Commits: fea26ff4
+
+- ac3e216: chore(inspector): add refresh buttons for tools, resources, and prompts lists
+
+  **UI Enhancements:**
+  - Added refresh buttons with loading states to Tools, Resources, and Prompts tabs
+  - Implemented `ListTabHeader` component with refresh functionality and spinning icon animation
+  - Added refresh handlers in `ToolsTab`, `ResourcesTab`, and `PromptsTab` with loading state management
+  - Connected refresh callbacks through `LayoutContent` to enable manual list updates
+
+  **Developer Experience:**
+  - Allows users to manually refresh primitives without reconnecting to the server
+  - Improves workflow when testing server changes or investigating stale data
+
+  Commits: 03238f28
+
+- ac3e216: fix(inspector): solved cold start issue for widgets
+- ac3e216: chore(inspector): add E2E test suite, default port 3000 when not in dev, skip telemetry in test env, and data-testid for testability
+
+  **E2E Testing Infrastructure:**
+  - Added comprehensive Playwright-based E2E testing suite with full coverage for:
+    - Chat functionality and message handling
+    - Connection management and authentication flows (OAuth, API key, custom headers)
+    - HMR (Hot Module Reload) for tools, prompts, and resources
+    - UI widgets and lifecycle states
+    - Command palette and debugger tools
+  - Created test fixtures for auth servers (OAuth mock, API key, custom headers)
+  - Implemented test helpers for connection, authentication, and debugger tools
+  - Added test matrix for parameterized test scenarios across multiple inspector modes
+  - Comprehensive E2E testing documentation in `tests/e2e/README.md`
+
+  **CI/CD Integration:**
+  - New GitHub Actions workflow (`.github/workflows/inspector-e2e.yml`) for automated E2E testing
+  - Tests run across multiple modes: mix (SSE + WebSocket), prod (HTTP only), builtin (no connection)
+  - Improved Playwright configuration with CI-optimized timeouts
+
+  **Testability Improvements:**
+  - Added `data-testid` attributes across 40+ UI components for reliable element selection:
+    - Connection forms, server list, command palette
+    - Chat interface, tool execution panels
+    - Resources, prompts, and tools tabs
+    - Elicitation and sampling displays
+  - Enhanced component accessibility for automated testing
+
+  **Server Improvements:**
+  - Changed default port from 3001 to 3000 for production builds (dev still uses 3001)
+  - Skip telemetry (PostHog/Scarf) when `NODE_ENV=test` or `MCP_USE_ANONYMIZED_TELEMETRY=false`
+  - Added `start-auth-servers.ts` utility for running authentication test servers
+
+  **Widget Testing:**
+  - Created widget examples for conformance testing (weather-display, status-card, display-info, apps-sdk-only-card)
+  - Enhanced widget props support in ToolResultDisplay
+  - Added delayed weather tool to conformance server for lifecycle testing
+
+  Commits: 03238f28, 836b760d, 6a76e51a, 0eb147dc, 116a3be4 (partial)
+
+- ac3e216: fix(inspector): add logic to detect when server= contains a URL that's not already connected and automatically redirect to use autoConnect= instead
+
+  **Connection Handling:**
+  - Enhanced Layout component to detect when `server=` URL parameter is provided but no matching connection exists
+  - Automatically redirects to use `autoConnect=` parameter for seamless connection establishment
+  - Updated dependencies in useEffect hook to include connections and navigate for improved functionality
+
+  **Documentation:**
+  - Added comprehensive URL parameters documentation page to inspector reference
+  - Included examples and usage patterns for `server=`, `autoConnect=`, and other query parameters
+
+  Resolves #932
+
+  Commits: 37af1bf7
+
+- ac3e216: chore(deps): upgrade @modelcontextprotocol/sdk to 1.26.0
+
+  **Dependencies:**
+  - Updated `@modelcontextprotocol/sdk` from `^1.25.3` to `^1.26.0`
+  - Applied the same Zod 4 compatibility patch to SDK 1.26.0
+  - Removed old SDK 1.25.3 patch file
+
+  **Patch Details:**
+
+  The SDK still requires a patch to fix Zod 4 compatibility in the `zod-compat.js` module. The patch ensures that Zod 4 schemas use their instance methods (`schema.safeParse()`) instead of attempting to call non-existent top-level functions (`z4mini.safeParse()`).
+
+  This is a drop-in replacement upgrade with no breaking changes.
+
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+  - mcp-use@1.16.4
+
+## 0.18.4-canary.3
+
+### Patch Changes
+
+- f7ca602: chore(deps): upgrade @modelcontextprotocol/sdk to 1.26.0
+
+  **Dependencies:**
+  - Updated `@modelcontextprotocol/sdk` from `^1.25.3` to `^1.26.0`
+  - Applied the same Zod 4 compatibility patch to SDK 1.26.0
+  - Removed old SDK 1.25.3 patch file
+
+  **Patch Details:**
+
+  The SDK still requires a patch to fix Zod 4 compatibility in the `zod-compat.js` module. The patch ensures that Zod 4 schemas use their instance methods (`schema.safeParse()`) instead of attempting to call non-existent top-level functions (`z4mini.safeParse()`).
+
+  This is a drop-in replacement upgrade with no breaking changes.
+
+- Updated dependencies [f7ca602]
+  - mcp-use@1.16.4-canary.3
+
+## 0.18.4-canary.2
+
+### Patch Changes
+
+- 03094a1: fix(inspector): solved cold start issue for widgets
+  - mcp-use@1.16.4-canary.2
+
+## 0.18.4-canary.1
+
+### Patch Changes
+
+- d0239d2: fix(mcp-use): release canary versions
+- Updated dependencies [d0239d2]
+  - mcp-use@1.16.4-canary.1
+
+## 0.18.4-canary.0
+
+### Patch Changes
+
+- 7c2d7e3: chore(inspector): add refresh buttons for tools, resources, and prompts lists
+
+  **UI Enhancements:**
+  - Added refresh buttons with loading states to Tools, Resources, and Prompts tabs
+  - Implemented `ListTabHeader` component with refresh functionality and spinning icon animation
+  - Added refresh handlers in `ToolsTab`, `ResourcesTab`, and `PromptsTab` with loading state management
+  - Connected refresh callbacks through `LayoutContent` to enable manual list updates
+
+  **Developer Experience:**
+  - Allows users to manually refresh primitives without reconnecting to the server
+  - Improves workflow when testing server changes or investigating stale data
+
+  Commits: 03238f28
+
+- 7c2d7e3: chore(inspector): add E2E test suite, default port 3000 when not in dev, skip telemetry in test env, and data-testid for testability
+
+  **E2E Testing Infrastructure:**
+  - Added comprehensive Playwright-based E2E testing suite with full coverage for:
+    - Chat functionality and message handling
+    - Connection management and authentication flows (OAuth, API key, custom headers)
+    - HMR (Hot Module Reload) for tools, prompts, and resources
+    - UI widgets and lifecycle states
+    - Command palette and debugger tools
+  - Created test fixtures for auth servers (OAuth mock, API key, custom headers)
+  - Implemented test helpers for connection, authentication, and debugger tools
+  - Added test matrix for parameterized test scenarios across multiple inspector modes
+  - Comprehensive E2E testing documentation in `tests/e2e/README.md`
+
+  **CI/CD Integration:**
+  - New GitHub Actions workflow (`.github/workflows/inspector-e2e.yml`) for automated E2E testing
+  - Tests run across multiple modes: mix (SSE + WebSocket), prod (HTTP only), builtin (no connection)
+  - Improved Playwright configuration with CI-optimized timeouts
+
+  **Testability Improvements:**
+  - Added `data-testid` attributes across 40+ UI components for reliable element selection:
+    - Connection forms, server list, command palette
+    - Chat interface, tool execution panels
+    - Resources, prompts, and tools tabs
+    - Elicitation and sampling displays
+  - Enhanced component accessibility for automated testing
+
+  **Server Improvements:**
+  - Changed default port from 3001 to 3000 for production builds (dev still uses 3001)
+  - Skip telemetry (PostHog/Scarf) when `NODE_ENV=test` or `MCP_USE_ANONYMIZED_TELEMETRY=false`
+  - Added `start-auth-servers.ts` utility for running authentication test servers
+
+  **Widget Testing:**
+  - Created widget examples for conformance testing (weather-display, status-card, display-info, apps-sdk-only-card)
+  - Enhanced widget props support in ToolResultDisplay
+  - Added delayed weather tool to conformance server for lifecycle testing
+
+  Commits: 03238f28, 836b760d, 6a76e51a, 0eb147dc, 116a3be4 (partial)
+
+- Updated dependencies [7c2d7e3]
+  - mcp-use@1.16.4-canary.0
+
 ## 0.18.3
 
 ### Patch Changes

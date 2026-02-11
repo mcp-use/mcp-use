@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "mcp-use": "workspace:*",
-    "zod": "^4.2.0"
-  },
-  "devDependencies": {}
+    "zod": "4.3.5"
+  }
 }

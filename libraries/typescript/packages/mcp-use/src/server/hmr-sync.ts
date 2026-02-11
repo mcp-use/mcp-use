@@ -80,6 +80,14 @@ export interface SyncOptions<TConfig, THandler> {
     newConfig: TConfig,
     newHandler: THandler
   ) => void;
+  /**
+   * Optional predicate to prevent removal of specific items.
+   * When provided, items that return false will be preserved during sync
+   * even if they're not in the new registrations.
+   * This is used to protect widget-registered tools from being removed
+   * when index.ts HMR sync runs (widgets are registered separately by the file watcher).
+   */
+  shouldRemove?: (key: string, reg: Registration<TConfig, THandler>) => boolean;
 }
 
 /**
@@ -207,9 +215,18 @@ export function syncPrimitive<TConfig, THandler>(
   }
 
   // Handle truly removed items (not renames)
-  const trulyRemoved = potentiallyRemoved.filter(
-    (oldKey) => !Array.from(renames.values()).includes(oldKey)
-  );
+  // Also skip items protected by the shouldRemove predicate (e.g., widget-registered tools)
+  const { shouldRemove } = options;
+  const trulyRemoved = potentiallyRemoved.filter((oldKey) => {
+    // Skip renames
+    if (Array.from(renames.values()).includes(oldKey)) return false;
+    // Check shouldRemove predicate if provided
+    if (shouldRemove) {
+      const reg = currentRegistrations.get(oldKey);
+      if (reg && !shouldRemove(oldKey, reg)) return false;
+    }
+    return true;
+  });
 
   for (const removedKey of trulyRemoved) {
     // Remove from updatedRegistrations
@@ -284,12 +301,19 @@ export function syncPrimitive<TConfig, THandler>(
           const refs = session.getRefs();
           const existingRef = refs?.get(key);
 
-          if (supportsInPlaceUpdate && existingRef?.update && !configChanged) {
-            // In-place update (only handler changed)
-            existingRef.update(newReg.handler);
-          } else if (onUpdate) {
+          if (onUpdate) {
             // Use custom order-preserving update handler
+            // This is preferred over in-place update because it properly handles
+            // handler wrapping (e.g., prompt conversion) and config updates
             onUpdate(session, key, newReg.config, newReg.handler);
+          } else if (
+            supportsInPlaceUpdate &&
+            existingRef?.update &&
+            !configChanged
+          ) {
+            // In-place update (only handler changed)
+            // Only use this path if no custom onUpdate handler is provided
+            existingRef.update(newReg.handler);
           } else {
             // Full re-registration needed (doesn't preserve order)
             if (existingRef) {

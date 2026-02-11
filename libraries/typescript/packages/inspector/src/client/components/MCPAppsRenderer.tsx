@@ -38,6 +38,7 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
 import { cn } from "../lib/utils";
+import { FullscreenNavbar } from "./FullscreenNavbar";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
 import { SandboxedIframe } from "./ui/SandboxedIframe";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
@@ -58,6 +59,7 @@ interface MCPAppsRendererProps {
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
   noWrapper?: boolean;
+  customProps?: Record<string, string>;
 }
 
 /**
@@ -77,6 +79,7 @@ export function MCPAppsRenderer({
   displayMode: displayModeProp,
   onDisplayModeChange,
   noWrapper,
+  customProps,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -260,18 +263,11 @@ export function MCPAppsRenderer({
     };
 
     fetchWidgetHtml();
-  }, [
-    serverId,
-    resourceUri,
-    toolCallId,
-    toolName,
-    toolInput,
-    toolOutput,
-    resolvedTheme,
-    cspMode,
-    addWidget,
-    hostContext,
-  ]);
+    // Only re-fetch when the widget identity changes, not on every render.
+    // hostContext, addWidget, toolInput, toolOutput, resolvedTheme are intentionally
+    // excluded to prevent infinite re-render loops — they are captured by closure
+    // at the time of the fetch and don't warrant refetching the widget HTML.
+  }, [serverId, resourceUri, toolCallId, toolName, cspMode]);
 
   // Initialize AppBridge when HTML is ready
   useEffect(() => {
@@ -513,10 +509,16 @@ export function MCPAppsRenderer({
   // Also resend when toolCallId changes (indicates re-execution)
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || !isReady || !toolInput) return;
+    if (!bridge || !isReady) return;
 
-    bridge.sendToolInput({ arguments: toolInput });
-  }, [isReady, toolInput, toolCallId]);
+    // Merge customProps with toolInput
+    const mergedArgs = {
+      ...toolInput,
+      ...customProps,
+    };
+
+    bridge.sendToolInput({ arguments: mergedArgs });
+  }, [isReady, toolInput, customProps, toolCallId]);
 
   // Send tool output when ready
   // Allow sending null to reset widget to pending state (Issue #930)
@@ -648,7 +650,7 @@ export function MCPAppsRenderer({
 
     if (isPip) {
       return [
-        `fixed bottom-6 right-6 z-50 rounded-3xl w-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_WIDTH}px] h-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_HEIGHT}px]`,
+        `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-fit min-w-[300px] max-w-[min(90vw,1200px)] h-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_HEIGHT}px]`,
         "shadow-2xl border overflow-hidden",
         "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
       ].join(" ");
@@ -674,23 +676,16 @@ export function MCPAppsRenderer({
     <WidgetWrapper className={className} noWrapper={noWrapper}>
       <div ref={containerRef} className={containerClassName}>
         {isFullscreen && (
-          <div className="flex items-center justify-between px-4 h-14 border-b border-zinc-200 dark:border-zinc-700 bg-background shrink-0">
-            <div />
-            <div className="font-medium text-sm text-zinc-600 dark:text-zinc-400">
-              {toolName}
-            </div>
-            <button
-              onClick={() => handleDisplayModeChange("inline")}
-              className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
-              aria-label="Exit fullscreen"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <FullscreenNavbar
+            title={toolName}
+            onClose={() => handleDisplayModeChange("inline")}
+            testId="debugger-exit-fullscreen-button"
+          />
         )}
 
         {isPip && (
           <button
+            data-testid="debugger-exit-pip-button"
             onClick={() => handleDisplayModeChange("inline")}
             className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
             aria-label="Close PiP mode"

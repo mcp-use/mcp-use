@@ -154,7 +154,10 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
                 Text Content
               </div>
-              <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-sm whitespace-pre-wrap break-words">
+              <div
+                className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-sm whitespace-pre-wrap break-words"
+                data-testid="tool-execution-results-text-content"
+              >
                 {text}
               </div>
             </div>
@@ -173,12 +176,14 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
                   src={`data:${item.mimeType || "image/png"};base64,${item.data}`}
                   alt="Result"
                   className="max-w-full rounded"
+                  data-testid="tool-execution-results-image-content"
                 />
                 {item.annotations && (
                   <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     <JSONDisplay
                       data={item.annotations}
                       filename={`image-annotations-${idx}.json`}
+                      data-testid="tool-execution-results-image-annotations"
                     />
                   </div>
                 )}
@@ -199,12 +204,14 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
                   controls
                   src={`data:${item.mimeType || "audio/wav"};base64,${item.data}`}
                   className="w-full"
+                  data-testid="tool-execution-results-audio-content"
                 />
                 {item.annotations && (
                   <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                     <JSONDisplay
                       data={item.annotations}
                       filename={`audio-annotations-${idx}.json`}
+                      data-testid="tool-execution-results-audio-annotations"
                     />
                   </div>
                 )}
@@ -257,6 +264,7 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
                     <JSONDisplay
                       data={item.annotations}
                       filename={`resource-link-annotations-${idx}.json`}
+                      data-testid="tool-execution-results-resource-link-annotations"
                     />
                   </div>
                 )}
@@ -274,20 +282,26 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
                 Embedded Resource
               </div>
               <div className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 space-y-2">
-                <div className="font-mono text-sm break-all">
+                <div
+                  className="font-mono text-sm break-all"
+                  data-testid="tool-execution-results-resource-uri"
+                >
                   <span className="text-gray-600 dark:text-gray-400">URI:</span>{" "}
                   {resource.uri}
                 </div>
                 {resource.mimeType && (
                   <div className="text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">
+                    <span
+                      className="text-gray-600 dark:text-gray-400"
+                      data-testid="tool-execution-results-mime-type"
+                    >
                       MIME Type:
                     </span>{" "}
                     {resource.mimeType}
                   </div>
                 )}
                 {resource.text && (
-                  <div>
+                  <div data-testid="tool-execution-results-resource-text-content">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                       Content:
                     </div>
@@ -309,6 +323,7 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
                     <JSONDisplay
                       data={resource.annotations}
                       filename={`resource-annotations-${idx}.json`}
+                      data-testid="tool-execution-results-resource-annotations"
                     />
                   </div>
                 )}
@@ -323,7 +338,11 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
             <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
               Unknown Content Type: {item.type || "N/A"}
             </div>
-            <JSONDisplay data={item} filename={`content-${idx}.json`} />
+            <JSONDisplay
+              data={item}
+              filename={`content-${idx}.json`}
+              data-testid="tool-execution-results-unknown-content"
+            />
           </div>
         );
       })}
@@ -656,6 +675,7 @@ export function ToolResultDisplay({
                         <span className="text-xs text-zinc-400">|</span>
                       )}
                       <button
+                        data-testid={`tool-result-view-${view.mode}`}
                         onClick={() => setViewMode(view.mode)}
                         className={`text-xs font-medium ${
                           viewMode === view.mode
@@ -703,6 +723,7 @@ export function ToolResultDisplay({
                 hasMcpUIResources) &&
                 onMaximize && (
                   <Button
+                    data-testid="tool-result-maximize"
                     variant="ghost"
                     size="sm"
                     onClick={onMaximize}
@@ -747,6 +768,7 @@ export function ToolResultDisplay({
               )}
 
               <Button
+                data-testid={`tool-result-copy-${originalResultIndex}`}
                 variant="ghost"
                 size="sm"
                 onClick={() => onCopy(originalResultIndex, result.result)}
@@ -807,7 +829,11 @@ export function ToolResultDisplay({
                   const appsSdk = result.appsSdkResource;
 
                   if (appsSdk.isLoading) {
-                    return <></>;
+                    return (
+                      <div className="flex items-center justify-center w-full h-[200px]">
+                        <Spinner className="size-5" />
+                      </div>
+                    );
                   }
 
                   if (appsSdk.error) {
@@ -853,6 +879,18 @@ export function ToolResultDisplay({
                     );
                   }
 
+                  // Extract widget props from toolOutput._meta (same as OpenAI renderer)
+                  const metaSource = memoizedResult?._meta;
+                  const widgetProps = metaSource?.["mcp-use/props"] || null;
+
+                  // Merge widget props (from output) with custom props (from debug controls) and tool args
+                  // Priority: activeProps > widgetProps > memoizedArgs
+                  const finalToolInput = {
+                    ...(memoizedArgs || {}),
+                    ...(widgetProps || {}),
+                    ...(activeProps || {}),
+                  };
+
                   return (
                     <div className="flex-1 relative">
                       {/* Floating controls in top-right */}
@@ -876,7 +914,7 @@ export function ToolResultDisplay({
                         serverId={serverId}
                         toolCallId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
-                        toolInput={activeProps || memoizedArgs}
+                        toolInput={finalToolInput}
                         toolOutput={memoizedResult}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
@@ -949,9 +987,15 @@ export function ToolResultDisplay({
                     const structuredContent = result.result?.structuredContent;
 
                     return (
-                      <div className="px-4 pt-4 space-y-4">
+                      <div
+                        className="px-4 pt-4 space-y-4"
+                        data-testid="tool-execution-results-content"
+                      >
                         {structuredContent && (
-                          <div className="space-y-2">
+                          <div
+                            className="space-y-2"
+                            data-testid="tool-execution-results-structured-content"
+                          >
                             <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
                               Structured Content
                             </div>
@@ -968,7 +1012,10 @@ export function ToolResultDisplay({
 
                         {!structuredContent &&
                           (!content || content.length === 0) && (
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div
+                              className="text-sm text-gray-500 dark:text-gray-400"
+                              data-testid="tool-execution-results-no-content"
+                            >
                               No content to display
                             </div>
                           )}

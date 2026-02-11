@@ -109,6 +109,7 @@ export function ChatInputArea({
               title="Send"
               type="button"
               onClick={onSendMessage}
+              data-testid="chat-send-button"
             >
               <Send className="h-4 w-4" />
             </Button>

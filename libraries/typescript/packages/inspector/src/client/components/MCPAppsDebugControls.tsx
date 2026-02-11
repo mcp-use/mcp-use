@@ -5,8 +5,8 @@ import {
   Maximize2,
   Monitor,
   MousePointer2,
-  Pointer,
   PictureInPicture,
+  Pointer,
   Settings,
   ShieldCheck,
   ShieldOff,
@@ -210,6 +210,7 @@ export function MCPAppsDebugControls({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                data-testid="debugger-fullscreen-button"
                 variant="outline"
                 size="sm"
                 className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -224,6 +225,7 @@ export function MCPAppsDebugControls({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                data-testid="debugger-pip-button"
                 variant="outline"
                 size="sm"
                 className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -243,6 +245,7 @@ export function MCPAppsDebugControls({
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button
+                data-testid="debugger-device-button"
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -253,7 +256,10 @@ export function MCPAppsDebugControls({
           </TooltipTrigger>
           <TooltipContent>Device: {playground.deviceType}</TooltipContent>
         </Tooltip>
-        <DialogContent className="sm:max-w-[300px]">
+        <DialogContent
+          className="sm:max-w-[300px]"
+          data-testid="debugger-device-dialog"
+        >
           <DialogHeader>
             <DialogTitle>Device Type</DialogTitle>
           </DialogHeader>
@@ -267,6 +273,7 @@ export function MCPAppsDebugControls({
               return (
                 <Button
                   key={device.value}
+                  data-testid={`debugger-device-option-${device.value}`}
                   variant={
                     playground.deviceType === device.value
                       ? "default"
@@ -304,6 +311,7 @@ export function MCPAppsDebugControls({
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button
+                data-testid="debugger-locale-button"
                 variant="outline"
                 size="sm"
                 className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -314,12 +322,18 @@ export function MCPAppsDebugControls({
           </TooltipTrigger>
           <TooltipContent>Locale</TooltipContent>
         </Tooltip>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent
+          className="sm:max-w-[400px]"
+          data-testid="debugger-locale-dialog"
+        >
           <DialogHeader>
             <DialogTitle>Select Locale</DialogTitle>
           </DialogHeader>
           <Command>
-            <CommandInput placeholder="Search locales..." />
+            <CommandInput
+              placeholder="Search locales..."
+              data-testid="debugger-locale-search"
+            />
             <CommandList>
               <CommandEmpty>No locale found.</CommandEmpty>
               <CommandGroup>
@@ -327,6 +341,7 @@ export function MCPAppsDebugControls({
                   <CommandItem
                     key={locale.value}
                     value={locale.value}
+                    data-testid={`debugger-locale-option-${locale.value}`}
                     onSelect={() => {
                       updatePlaygroundSettings({ locale: locale.value });
                       // Update Apps SDK locale
@@ -352,6 +367,7 @@ export function MCPAppsDebugControls({
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
                 <Button
+                  data-testid="debugger-timezone-button"
                   variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -362,12 +378,18 @@ export function MCPAppsDebugControls({
             </TooltipTrigger>
             <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
           </Tooltip>
-          <DialogContent className="sm:max-w-[400px]">
+          <DialogContent
+            className="sm:max-w-[400px]"
+            data-testid="debugger-timezone-dialog"
+          >
             <DialogHeader>
               <DialogTitle>Select Timezone</DialogTitle>
             </DialogHeader>
             <Command>
-              <CommandInput placeholder="Search timezones..." />
+              <CommandInput
+                placeholder="Search timezones..."
+                data-testid="debugger-timezone-search"
+              />
               <CommandList>
                 <CommandEmpty>No timezone found.</CommandEmpty>
                 <CommandGroup>
@@ -375,6 +397,7 @@ export function MCPAppsDebugControls({
                     <CommandItem
                       key={tz.value}
                       value={tz.value}
+                      data-testid={`debugger-timezone-option-${tz.value.replace(/\//g, "-")}`}
                       onSelect={() => {
                         updatePlaygroundSettings({ timeZone: tz.value });
                         setTimezoneDialogOpen(false);
@@ -397,6 +420,7 @@ export function MCPAppsDebugControls({
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
                 <Button
+                  data-testid="debugger-csp-button"
                   variant="outline"
                   size="sm"
                   className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -414,12 +438,16 @@ export function MCPAppsDebugControls({
               {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
             </TooltipContent>
           </Tooltip>
-          <DialogContent className="sm:max-w-[300px]">
+          <DialogContent
+            className="sm:max-w-[300px]"
+            data-testid="debugger-csp-dialog"
+          >
             <DialogHeader>
               <DialogTitle>CSP Mode</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
               <Button
+                data-testid="debugger-csp-option-permissive"
                 variant={
                   playground.cspMode === "permissive" ? "default" : "outline"
                 }
@@ -436,6 +464,7 @@ export function MCPAppsDebugControls({
                 </div>
               </Button>
               <Button
+                data-testid="debugger-csp-option-widget-declared"
                 variant={
                   playground.cspMode === "widget-declared"
                     ? "default"
@@ -462,6 +491,7 @@ export function MCPAppsDebugControls({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
+            data-testid="debugger-touch-button"
             variant="outline"
             size="sm"
             className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
@@ -506,6 +536,7 @@ export function MCPAppsDebugControls({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
+            data-testid="debugger-hover-button"
             variant="outline"
             size="sm"
             className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
@@ -550,6 +581,7 @@ export function MCPAppsDebugControls({
       <Popover>
         <PopoverTrigger asChild>
           <Button
+            data-testid="debugger-safe-area-button"
             variant="outline"
             size="sm"
             className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
@@ -557,7 +589,10 @@ export function MCPAppsDebugControls({
             <SquareDashedMousePointer className="size-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64 p-3">
+        <PopoverContent
+          className="w-64 p-3"
+          data-testid="debugger-safe-area-dialog"
+        >
           <div className="space-y-2">
             <label className="text-xs font-medium">Safe Area Insets</label>
             <SafeAreaInsetsEditor
@@ -583,6 +618,7 @@ export function MCPAppsDebugControls({
                 variant="outline"
                 size="sm"
                 className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                data-testid="debugger-props-button"
               >
                 <Braces className="size-3.5" />
               </Button>
@@ -597,13 +633,17 @@ export function MCPAppsDebugControls({
                 : presets.find((p) => p.id === selectValue)?.name || "Custom"}
           </TooltipContent>
         </Tooltip>
-        <PopoverContent className="w-64 p-2">
+        <PopoverContent
+          className="w-64 p-2"
+          data-testid="debugger-props-popover"
+        >
           <div className="space-y-1">
             <Button
               variant={selectValue === NO_PROPS_VALUE ? "default" : "ghost"}
               size="sm"
               className="w-full justify-start"
               onClick={() => handleValueChange(NO_PROPS_VALUE)}
+              data-testid="debugger-props-no-props"
             >
               No Props
             </Button>
@@ -614,6 +654,7 @@ export function MCPAppsDebugControls({
                 size="sm"
                 className="w-full justify-start"
                 onClick={() => handleValueChange(TOOL_PROPS_VALUE)}
+                data-testid="debugger-props-tool-props"
               >
                 Props from Tool
               </Button>
@@ -626,6 +667,7 @@ export function MCPAppsDebugControls({
                   size="sm"
                   className="w-full justify-start pr-14"
                   onClick={() => handleValueChange(preset.id)}
+                  data-testid={`debugger-props-preset-${preset.id}`}
                 >
                   {preset.name}
                 </Button>
@@ -635,6 +677,7 @@ export function MCPAppsDebugControls({
                     size="sm"
                     className="h-6 w-6 p-0"
                     onClick={(e) => handleEditPreset(preset, e)}
+                    data-testid={`debugger-props-edit-${preset.id}`}
                   >
                     <Settings className="h-3 w-3" />
                   </Button>
@@ -643,6 +686,7 @@ export function MCPAppsDebugControls({
                     size="sm"
                     className="h-6 w-6 p-0"
                     onClick={(e) => handleDeletePreset(preset.id, e)}
+                    data-testid={`debugger-props-delete-${preset.id}`}
                   >
                     <Trash2 className="h-3 w-3 text-destructive" />
                   </Button>
@@ -655,6 +699,7 @@ export function MCPAppsDebugControls({
               size="sm"
               className="w-full justify-start text-primary"
               onClick={() => handleValueChange(CREATE_PRESET_VALUE)}
+              data-testid="debugger-props-create-preset"
             >
               + Create Preset...
             </Button>
