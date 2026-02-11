@@ -862,7 +862,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * runningServer.syncRegistrationsFrom(newServer.server);
    * ```
    */
-  public syncRegistrationsFrom(other: MCPServerClass<boolean>): void {
+  public syncRegistrationsFrom(other: MCPServerClass<boolean>): {
+    totalChanges: number;
+    tools: { added: number; removed: number; updated: number };
+    prompts: { added: number; removed: number; updated: number };
+    resources: { added: number; removed: number; updated: number };
+  } {
     // Build session contexts array (shared across all primitives)
     const sessionContexts = Array.from(this.sessions.entries()).map(
       ([sessionId, session]) => ({
@@ -872,12 +877,87 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       })
     );
 
+    // Helper to wrap a raw user callback with session context, enhanced context,
+    // and AsyncLocalStorage - mirroring what toolRegistration() does at initial registration.
+    // Without this wrapping, HMR-updated tools would lose access to context features
+    // like ctx.log(), ctx.sample(), ctx.elicit(), etc.
+    const wrapHandler = (
+      rawHandler: unknown,
+      session: { server?: any }
+    ): ((
+      params: Record<string, unknown>,
+      extra?: {
+        _meta?: { progressToken?: number };
+        sendNotification?: (notification: {
+          method: string;
+          params: Record<string, unknown>;
+        }) => Promise<void>;
+      }
+    ) => Promise<any>) => {
+      // Capture references needed by the closure (avoids aliasing `this`)
+      const sessions = this.sessions;
+      const createMessageFn = this.createMessage.bind(this);
+      const actualCallback = rawHandler as any;
+
+      return async (
+        params: Record<string, unknown>,
+        extra?: {
+          _meta?: { progressToken?: number };
+          sendNotification?: (notification: {
+            method: string;
+            params: Record<string, unknown>;
+          }) => Promise<void>;
+        }
+      ) => {
+        const initialRequestContext = getRequestContext();
+        const extraProgressToken = extra?._meta?.progressToken;
+        const extraSendNotification = extra?.sendNotification;
+
+        const {
+          requestContext,
+          session: foundSession,
+          progressToken,
+          sendNotification,
+        } = findSessionContext(
+          sessions,
+          initialRequestContext,
+          extraProgressToken,
+          extraSendNotification
+        );
+
+        const nativeServer = session.server;
+        const enhancedContext = createEnhancedContext(
+          requestContext,
+          createMessageFn,
+          nativeServer?.server?.elicitInput?.bind(nativeServer.server) ??
+            (async () => ({ action: "decline" as const })),
+          progressToken,
+          sendNotification,
+          foundSession?.logLevel,
+          foundSession?.clientCapabilities
+        );
+
+        const executeCallback = async () => {
+          if (actualCallback.length >= 2) {
+            return await actualCallback(params, enhancedContext);
+          }
+          return await actualCallback(params);
+        };
+
+        if (requestContext) {
+          return await runWithContext(requestContext, executeCallback);
+        }
+        return await executeCallback();
+      };
+    };
+
     // Helper to create tool entry for SDK
     const createToolEntry = (
       name: string,
       config: ToolDefinition,
       handler: unknown,
-      nativeServer: any
+      nativeServer: any,
+      session?: { server?: any }
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
@@ -892,6 +972,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         inputSchema = z.object({});
       }
 
+      // Wrap the raw handler with session context so that ctx.log(), ctx.sample(),
+      // ctx.elicit(), etc. work correctly after HMR updates
+      const wrappedHandler = session?.server
+        ? wrapHandler(handler, session)
+        : handler;
+
       return {
         title: config.title,
         description: config.description ?? "",
@@ -900,7 +986,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         annotations: config.annotations,
         execution: { taskSupport: "forbidden" },
         _meta: config._meta,
-        handler: handler,
+        handler: wrappedHandler,
         enabled: true,
         disable: function (this: RegisteredTool) {
           this.enabled = false;
@@ -955,7 +1041,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             name,
             config as ToolDefinition,
             handler,
-            nativeServer
+            nativeServer,
+            session
           );
           nativeServer._registeredTools[name] = toolEntry;
           // Ensure tools/list and tools/call handlers are registered on the SDK server.
@@ -993,7 +1080,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               newKey,
               config as ToolDefinition,
               handler,
-              nativeServer
+              nativeServer,
+              session
             );
           } else {
             newTools[key] = oldTools[key];
@@ -1036,7 +1124,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             key,
             config as ToolDefinition,
             handler,
-            nativeServer
+            nativeServer,
+            session
           );
           nativeServer._registeredTools[key] = newEntry;
           if (refs?.tools) {
@@ -1677,6 +1766,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     } else {
       console.log("[HMR] No registration changes detected");
     }
+
+    return {
+      totalChanges,
+      tools: {
+        added: toolsResult.changes.added.length,
+        removed: toolsResult.changes.removed.length,
+        updated: toolsResult.changes.updated.length,
+      },
+      prompts: {
+        added: promptsResult.changes.added.length,
+        removed: promptsResult.changes.removed.length,
+        updated: promptsResult.changes.updated.length,
+      },
+      resources: {
+        added:
+          resourcesResult.changes.added.length +
+          templatesResult.changes.added.length,
+        removed:
+          resourcesResult.changes.removed.length +
+          templatesResult.changes.removed.length,
+        updated:
+          resourcesResult.changes.updated.length +
+          templatesResult.changes.updated.length,
+      },
+    };
   }
 
   /**

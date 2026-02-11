@@ -287,12 +287,28 @@ export function syncPrimitive<TConfig, THandler>(
     const oldReg = currentRegistrations.get(key)!;
     const newReg = newRegistrations.get(key)!;
 
+    const oldNormalized = normalizeHandler(oldReg.handler);
+    const newNormalized = normalizeHandler(newReg.handler);
     const configChanged =
       JSON.stringify(oldReg.config) !== JSON.stringify(newReg.config);
-    const handlerChanged =
-      normalizeHandler(oldReg.handler) !== normalizeHandler(newReg.handler);
+    const handlerChanged = oldNormalized !== newNormalized;
 
     if (configChanged || handlerChanged) {
+      console.debug(
+        `[HMR] ${primitiveName} "${key}" changed:` +
+          (configChanged ? " config" : "") +
+          (handlerChanged ? " handler" : "")
+      );
+      if (handlerChanged) {
+        // Show a short preview of old vs new handler for debugging
+        const previewLength = 80;
+        console.debug(
+          `[HMR]   old handler: ${oldNormalized.slice(0, previewLength)}${oldNormalized.length > previewLength ? "..." : ""}`
+        );
+        console.debug(
+          `[HMR]   new handler: ${newNormalized.slice(0, previewLength)}${newNormalized.length > previewLength ? "..." : ""}`
+        );
+      }
       updatedRegistrations.set(key, newReg);
 
       // Update active sessions
@@ -334,6 +350,10 @@ export function syncPrimitive<TConfig, THandler>(
       }
 
       changes.updated.push(key);
+    } else {
+      console.debug(
+        `[HMR] ${primitiveName} "${key}" unchanged (config and handler identical)`
+      );
     }
   }
 
