@@ -104,7 +104,13 @@ export function useChatMessages({
             authConfig: authConfigWithTokens,
             messages: [...messages, ...userMessages].map((m) => ({
               role: m.role,
-              content: m.content,
+              content:
+                m.content ||
+                (m.parts
+                  ?.filter((p) => p.type === "text")
+                  .map((p) => p.text)
+                  .join("") ??
+                  ""),
               attachments: m.attachments,
             })),
           }),
