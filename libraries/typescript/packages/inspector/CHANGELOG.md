@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.18.6
+
+### Patch Changes
+
+- Updated dependencies [df428ca]
+  - mcp-use@1.17.1
+
 ## 0.18.6-canary.0
 
 ### Patch Changes
