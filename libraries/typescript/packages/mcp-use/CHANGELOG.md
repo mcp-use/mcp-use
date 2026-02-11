@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.17.1-canary.0
+
+### Patch Changes
+
+- 637edaf: fix(useWidget): enhance type definitions for useWidget result
+  - @mcp-use/cli@2.13.3-canary.0
+  - @mcp-use/inspector@0.18.6-canary.0
+
 ## 1.17.0
 
 ### Minor Changes
