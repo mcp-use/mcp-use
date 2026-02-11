@@ -58,7 +58,7 @@ interface ToolResultDisplayProps {
   copiedResult: number | null;
   serverId: string;
   readResource: (uri: string) => Promise<any>;
-  onCopy: (index: number, result: any) => void;
+  onCopy: (index: number, text: string) => void;
   onDelete: (index: number) => void;
   onFullscreen: (index: number) => void;
   onMaximize?: () => void;
@@ -386,6 +386,17 @@ export function ToolResultDisplay({
 
   // Find the original index in the results array for the current result
   const originalResultIndex = results.findIndex((r) => r === result);
+
+  // Copyable content: error message when present, otherwise pretty-printed result
+  const errorMessageForCopy = result
+    ? result.error || extractErrorMessage(result.result)
+    : null;
+  const copyableText =
+    errorMessageForCopy != null
+      ? errorMessageForCopy
+      : result != null
+        ? JSON.stringify(result.result, null, 2)
+        : "";
 
   // Reset to first result when filtered results change
   useEffect(() => {
@@ -771,7 +782,7 @@ export function ToolResultDisplay({
                 data-testid={`tool-result-copy-${originalResultIndex}`}
                 variant="ghost"
                 size="sm"
-                onClick={() => onCopy(originalResultIndex, result.result)}
+                onClick={() => onCopy(originalResultIndex, copyableText)}
               >
                 {copiedResult === originalResultIndex ? (
                   <Check className="h-4 w-4" />

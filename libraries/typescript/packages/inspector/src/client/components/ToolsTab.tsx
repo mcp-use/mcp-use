@@ -694,9 +694,9 @@ export function ToolsTab({
     }
   }, [selectedTool, toolArgs, isExecuting, callTool, readResource, serverId]);
 
-  const handleCopyResult = useCallback(async (index: number, result: any) => {
+  const handleCopyResult = useCallback(async (index: number, text: string) => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+      await navigator.clipboard.writeText(text);
       setCopiedResult(index);
       setTimeout(() => setCopiedResult(null), 2000);
     } catch (error) {
