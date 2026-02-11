@@ -40,6 +40,8 @@ export interface ChatTabProps {
   hideTitle?: boolean;
   /** When true, hides the model badge on the landing form. Default: false. */
   hideModelBadge?: boolean;
+  /** When true, hides the MCP server URL on the landing form. Default: false. */
+  hideServerUrl?: boolean;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -61,6 +63,7 @@ export function ChatTab({
   clearButtonLabel,
   hideTitle,
   hideModelBadge,
+  hideServerUrl,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -345,6 +348,7 @@ export function ChatTab({
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
           hideModelBadge={hideModelBadge}
+          hideServerUrl={hideServerUrl}
         />
       </div>
     );

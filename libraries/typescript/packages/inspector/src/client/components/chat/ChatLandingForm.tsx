@@ -42,6 +42,8 @@ interface ChatLandingFormProps {
   onAttachmentRemove: (index: number) => void;
   /** When true, hides the model badge below the input. */
   hideModelBadge?: boolean;
+  /** When true, hides the MCP server URL below the title. */
+  hideServerUrl?: boolean;
 }
 
 export function ChatLandingForm({
@@ -68,6 +70,7 @@ export function ChatLandingForm({
   onAttachmentAdd,
   onAttachmentRemove,
   hideModelBadge,
+  hideServerUrl,
 }: ChatLandingFormProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -83,9 +86,11 @@ export function ChatLandingForm({
           >
             Chat with MCP Server
           </h1>
-          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-light break-all px-2">
-            {mcpServerUrl}
-          </p>
+          {!hideServerUrl && (
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-light break-all px-2">
+              {mcpServerUrl}
+            </p>
+          )}
         </div>
 
         <form onSubmit={onSubmit} className="space-y-6">
