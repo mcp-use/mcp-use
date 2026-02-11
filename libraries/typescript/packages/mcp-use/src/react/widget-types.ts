@@ -115,18 +115,14 @@ declare global {
 }
 
 /**
- * Result type for the useWidget hook
+ * Shared fields for the useWidget hook result (everything except props and isPending)
  */
-export interface UseWidgetResult<
-  TProps extends UnknownObject = UnknownObject,
+interface UseWidgetResultBase<
   TOutput extends UnknownObject = UnknownObject,
   TMetadata extends UnknownObject = UnknownObject,
   TState extends UnknownObject = UnknownObject,
   TToolInput extends UnknownObject = UnknownObject,
 > {
-  // Props and state
-  /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model). May be partial/empty while isPending; defaultProps may populate values. */
-  props: Partial<TProps>;
   /** Original tool input arguments */
   toolInput: TToolInput;
   /** Tool output from the last execution */
@@ -175,6 +171,40 @@ export interface UseWidgetResult<
 
   /** Whether the widget API is available */
   isAvailable: boolean;
-  /** Whether the tool is currently executing (metadata is null) */
-  isPending: boolean;
 }
+
+/**
+ * Result type for the useWidget hook.
+ *
+ * Uses a discriminated union on `isPending`:
+ * - When `isPending` is `true`, `props` is `Partial<TProps>` (fields may be undefined).
+ * - When `isPending` is `false`, `props` is `TProps` (all fields are present).
+ *
+ * This allows TypeScript to narrow the type after an `if (isPending)` guard:
+ * ```tsx
+ * const { props, isPending } = useWidget<{ city: string }>();
+ * if (isPending) return <Loading />;
+ * // props.city is `string` here, not `string | undefined`
+ * ```
+ */
+export type UseWidgetResult<
+  TProps extends UnknownObject = UnknownObject,
+  TOutput extends UnknownObject = UnknownObject,
+  TMetadata extends UnknownObject = UnknownObject,
+  TState extends UnknownObject = UnknownObject,
+  TToolInput extends UnknownObject = UnknownObject,
+> = UseWidgetResultBase<TOutput, TMetadata, TState, TToolInput> &
+  (
+    | {
+        /** Whether the tool is currently executing (props may be incomplete) */
+        isPending: true;
+        /** Widget props — partial while the tool is still executing */
+        props: Partial<TProps>;
+      }
+    | {
+        /** Whether the tool is currently executing (props are fully populated) */
+        isPending: false;
+        /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model) */
+        props: TProps;
+      }
+  );
