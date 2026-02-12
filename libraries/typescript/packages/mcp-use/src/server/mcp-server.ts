@@ -551,64 +551,82 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         );
       }
 
-      // Add widget resources to this session
+      // Add widget resources to this session (skip if already propagated)
+      const sessionRefs = this.sessionRegisteredRefs.get(sessionId);
       if (resourceReg && session.server) {
-        try {
-          const _registeredResource = session.server.registerResource(
-            resourceReg.config.name,
-            resourceReg.config.uri,
-            {
-              title: resourceReg.config.title,
-              description: resourceReg.config.description,
-              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
-            } as any,
-            resourceReg.handler as any
-          );
-          console.log(
-            `[MCP-Server] Added resource ${resourceUri} to session ${sessionId}`
-          );
-        } catch (e) {
-          console.warn(
-            `[MCP-Server] Failed to register resource ${resourceUri} for session ${sessionId}:`,
-            e
-          );
+        if (sessionRefs?.resources?.has(resourceKey)) {
+          // Already registered by propagateWidgetResourcesToSessions
+        } else {
+          try {
+            const registered = session.server.registerResource(
+              resourceReg.config.name,
+              resourceReg.config.uri,
+              {
+                title: resourceReg.config.title,
+                description: resourceReg.config.description,
+                mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+              } as any,
+              resourceReg.handler as any
+            );
+            if (sessionRefs?.resources) {
+              sessionRefs.resources.set(resourceKey, registered);
+            }
+            console.log(
+              `[MCP-Server] Added resource ${resourceUri} to session ${sessionId}`
+            );
+          } catch (e) {
+            console.warn(
+              `[MCP-Server] Failed to register resource ${resourceUri} for session ${sessionId}:`,
+              e
+            );
+          }
         }
       }
 
-      // Add widget resource template to this session (for Apps SDK)
+      // Add widget resource template to this session (skip if already propagated)
       if (resourceTemplateReg && session.server) {
-        try {
-          const uriTemplate =
-            resourceTemplateReg.config.resourceTemplate.uriTemplate;
-          const resourceCallbacks =
-            resourceTemplateReg.config.resourceTemplate.callbacks;
-          const template = new ResourceTemplate(uriTemplate, {
-            list: undefined,
-            complete: toResourceTemplateCompleteCallbacks(
-              resourceCallbacks?.complete
-            ),
-          });
+        if (sessionRefs?.resourceTemplates?.has(resourceTemplateKey)) {
+          // Already registered by propagateWidgetResourcesToSessions
+        } else {
+          try {
+            const uriTemplate =
+              resourceTemplateReg.config.resourceTemplate.uriTemplate;
+            const resourceCallbacks =
+              resourceTemplateReg.config.resourceTemplate.callbacks;
+            const template = new ResourceTemplate(uriTemplate, {
+              list: undefined,
+              complete: toResourceTemplateCompleteCallbacks(
+                resourceCallbacks?.complete
+              ),
+            });
 
-          const _registeredTemplate = session.server.registerResource(
-            resourceTemplateReg.config.name,
-            template,
-            {
-              title: resourceTemplateReg.config.title,
-              description: resourceTemplateReg.config.description,
-              mimeType:
-                resourceTemplateReg.config.resourceTemplate.mimeType ||
-                "text/html+skybridge",
-            } as any,
-            resourceTemplateReg.handler as any
-          );
-          console.log(
-            `[MCP-Server] Added resource template ${resourceTemplateUri} to session ${sessionId}`
-          );
-        } catch (e) {
-          console.warn(
-            `[MCP-Server] Failed to register resource template ${resourceTemplateUri} for session ${sessionId}:`,
-            e
-          );
+            const registered = session.server.registerResource(
+              resourceTemplateReg.config.name,
+              template,
+              {
+                title: resourceTemplateReg.config.title,
+                description: resourceTemplateReg.config.description,
+                mimeType:
+                  resourceTemplateReg.config.resourceTemplate.mimeType ||
+                  "text/html+skybridge",
+              } as any,
+              resourceTemplateReg.handler as any
+            );
+            if (sessionRefs?.resourceTemplates) {
+              sessionRefs.resourceTemplates.set(
+                resourceTemplateKey,
+                registered as unknown as RegisteredResourceTemplate
+              );
+            }
+            console.log(
+              `[MCP-Server] Added resource template ${resourceTemplateUri} to session ${sessionId}`
+            );
+          } catch (e) {
+            console.warn(
+              `[MCP-Server] Failed to register resource template ${resourceTemplateUri} for session ${sessionId}:`,
+              e
+            );
+          }
         }
       }
     }
