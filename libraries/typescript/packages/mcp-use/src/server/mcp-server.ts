@@ -466,7 +466,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       "{id}"
     );
     const resourceKey = `${widgetName}:${resourceUri}`;
-    const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
+    // Resource templates are stored by name only (no URI suffix)
+    const resourceTemplateKey = `${widgetName}-dynamic`;
     const resourceReg = this.registrations.resources.get(resourceKey);
     const resourceTemplateReg =
       this.registrations.resourceTemplates.get(resourceTemplateKey);
@@ -668,7 +669,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       ".html",
       "{id}"
     );
-    const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
+    // Resource templates are stored by name only (no URI suffix)
+    const resourceTemplateKey = `${widgetName}-dynamic`;
     const resourceTemplateReg =
       this.registrations.resourceTemplates.get(resourceTemplateKey);
 
@@ -677,10 +679,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     for (const [sessionId, session] of this.sessions) {
       if (!session.server) continue;
 
+      // Get session refs for tracking (ensures syncPrimitive can track these during HMR)
+      const sessionRefs = this.sessionRegisteredRefs.get(sessionId);
+
       // Add static resource
       if (resourceReg) {
         try {
-          session.server.registerResource(
+          const registered = session.server.registerResource(
             resourceReg.config.name,
             resourceReg.config.uri,
             {
@@ -690,6 +695,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             } as any,
             resourceReg.handler as any
           );
+          // Track in session refs so syncPrimitive preserves it during HMR
+          if (sessionRefs?.resources) {
+            sessionRefs.resources.set(resourceKey, registered);
+          }
           console.log(
             `[MCP-Server] Propagated resource ${resourceUri} to session ${sessionId}`
           );
@@ -712,7 +721,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             ),
           });
 
-          session.server.registerResource(
+          const registered = session.server.registerResource(
             resourceTemplateReg.config.name,
             template,
             {
@@ -724,6 +733,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             } as any,
             resourceTemplateReg.handler as any
           );
+          // Track in session refs so syncPrimitive preserves it during HMR
+          if (sessionRefs?.resourceTemplates) {
+            sessionRefs.resourceTemplates.set(
+              resourceTemplateKey,
+              registered as unknown as RegisteredResourceTemplate
+            );
+          }
           console.log(
             `[MCP-Server] Propagated resource template ${resourceTemplateUri} to session ${sessionId}`
           );

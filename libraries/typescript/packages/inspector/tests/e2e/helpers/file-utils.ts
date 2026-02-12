@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,10 @@ export const CONFORMANCE_SERVER_PATH = path.join(
 export const CONFORMANCE_WEATHER_WIDGET_PATH = path.join(
   conformanceRoot,
   "resources/weather-display/widget.tsx"
+);
+export const CONFORMANCE_RESOURCES_DIR = path.join(
+  conformanceRoot,
+  "resources"
 );
 
 /**
@@ -57,4 +61,30 @@ export async function restoreFile(
   filePath: string = CONFORMANCE_SERVER_PATH
 ): Promise<void> {
   await writeConformanceFile(content, filePath);
+}
+
+/**
+ * Write a file inside a widget's resource directory.
+ * Creates the widget directory if it doesn't exist.
+ * Triggers the file watcher to register the widget via HMR.
+ */
+export async function writeConformanceResourceFile(
+  widgetName: string,
+  fileName: string,
+  content: string
+): Promise<void> {
+  const widgetDir = path.join(CONFORMANCE_RESOURCES_DIR, widgetName);
+  await mkdir(widgetDir, { recursive: true });
+  await writeFile(path.join(widgetDir, fileName), content, "utf-8");
+}
+
+/**
+ * Remove a widget's resource directory (and all its contents).
+ * Used for cleanup after tests that dynamically create widget files.
+ */
+export async function removeConformanceResourceDir(
+  widgetName: string
+): Promise<void> {
+  const widgetDir = path.join(CONFORMANCE_RESOURCES_DIR, widgetName);
+  await rm(widgetDir, { recursive: true, force: true });
 }
