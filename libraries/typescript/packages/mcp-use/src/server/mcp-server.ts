@@ -862,12 +862,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * runningServer.syncRegistrationsFrom(newServer.server);
    * ```
    */
-  public syncRegistrationsFrom(other: MCPServerClass<boolean>): {
-    totalChanges: number;
-    tools: { added: number; removed: number; updated: number };
-    prompts: { added: number; removed: number; updated: number };
-    resources: { added: number; removed: number; updated: number };
-  } {
+  public syncRegistrationsFrom(other: MCPServerClass<boolean>): void {
     // Build session contexts array (shared across all primitives)
     const sessionContexts = Array.from(this.sessions.entries()).map(
       ([sessionId, session]) => ({
@@ -1041,8 +1036,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             name,
             config as ToolDefinition,
             handler,
-            nativeServer,
-            session
+            nativeServer
           );
           nativeServer._registeredTools[name] = toolEntry;
           // Ensure tools/list and tools/call handlers are registered on the SDK server.
@@ -1080,8 +1074,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               newKey,
               config as ToolDefinition,
               handler,
-              nativeServer,
-              session
+              nativeServer
             );
           } else {
             newTools[key] = oldTools[key];
@@ -1766,31 +1759,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     } else {
       console.log("[HMR] No registration changes detected");
     }
-
-    return {
-      totalChanges,
-      tools: {
-        added: toolsResult.changes.added.length,
-        removed: toolsResult.changes.removed.length,
-        updated: toolsResult.changes.updated.length,
-      },
-      prompts: {
-        added: promptsResult.changes.added.length,
-        removed: promptsResult.changes.removed.length,
-        updated: promptsResult.changes.updated.length,
-      },
-      resources: {
-        added:
-          resourcesResult.changes.added.length +
-          templatesResult.changes.added.length,
-        removed:
-          resourcesResult.changes.removed.length +
-          templatesResult.changes.removed.length,
-        updated:
-          resourcesResult.changes.updated.length +
-          templatesResult.changes.updated.length,
-      },
-    };
   }
 
   /**

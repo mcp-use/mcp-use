@@ -134,6 +134,165 @@ server.tool(
     await expect(page.getByText(/Echo:/)).toBeVisible({ timeout: 5000 });
   });
 
+  test("tool handler logic change - new logic runs after HMR", async ({
+    page,
+  }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    const content = await readConformanceFile();
+    // Change only the handler logic: add .toUpperCase() to the message
+    // Name, description, and schema remain identical
+    const newContent = content.replace(
+      /text\(`Echo: \$\{message\}`\)/,
+      // eslint-disable-next-line no-template-curly-in-string
+      "text(`Echo: ${message.toUpperCase()}`)"
+    );
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    await page.getByTestId("tool-item-test_simple_text").click();
+    await page.getByTestId("tool-param-message").fill("hello");
+    await page.getByTestId("tool-execution-execute-button").click();
+    await expect(page.getByText("Echo: HELLO")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("tool handler change - text to widget after HMR", async ({ page }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    const content = await readConformanceFile();
+    // Replace the test_simple_text tool: change from returning text() to widget()
+    // Reuses the existing weather-display widget build
+    const oldToolBlock = `// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().optional(),
+    }),
+  },
+  async ({ message = "Hello, World!" }: { message?: string }) =>
+    text(\`Echo: \${message}\`)
+);`;
+    const newToolBlock = `// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().optional(),
+    }),
+    widget: {
+      name: "weather-display",
+    },
+  },
+  async ({ message = "Hello, World!" }: { message?: string }) =>
+    widget({ props: { city: message, temperature: 99, conditions: "HMR Test", humidity: 50, windSpeed: 5 }, message: \`Widget: \${message}\` })
+);`;
+    const newContent = content.replace(oldToolBlock, newToolBlock);
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    await page.getByTestId("tool-item-test_simple_text").click();
+    await page.getByTestId("tool-param-message").fill("hmr-city");
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    // The tool now returns a widget, so the widget view tabs should appear
+    await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Verify widget loads in MCP Apps iframe
+    await page.getByTestId("tool-result-view-mcp-apps").click();
+    const mcpAppsOuter = page.frameLocator(
+      'iframe[title^="MCP App: test_simple_text"]'
+    );
+    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+    await expect(mcpAppsGuest.getByText("HMR Test")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test("tool handler change - widget to text after HMR", async ({ page }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    const content = await readConformanceFile();
+    // Replace get-weather-delayed: change from returning widget() to text()
+    // Remove the widget config and simplify the handler
+    const oldToolBlock = `server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city, delay }) => {
+    await sleep(delay);
+
+    const cityLower = city.toLowerCase();
+    const weather = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "Unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    return widget({
+      props: {
+        city,
+        ...weather,
+      },
+      message: \`Current weather in \${city}: \${weather.conditions}, \${weather.temperature}°C (fetched after \${delay}ms delay)\`,
+    });
+  }
+);`;
+    const newToolBlock = `server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+  },
+  async ({ city }) => {
+    return text(\`Weather for \${city}: sunny\`);
+  }
+);`;
+    const newContent = content.replace(oldToolBlock, newToolBlock);
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    await page.getByTestId("tool-item-get-weather-delayed").click();
+    await page.getByTestId("tool-param-city").fill("tokyo");
+    await page.getByTestId("tool-param-delay").fill("100");
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    // The tool now returns text, not a widget
+    await expect(page.getByText("Weather for tokyo: sunny")).toBeVisible({
+      timeout: 10000,
+    });
+    // Widget view tabs should not appear
+    await expect(
+      page.getByTestId("tool-result-view-chatgpt-app")
+    ).not.toBeVisible({ timeout: 3000 });
+  });
+
   test("tool schema change - add parameter and test execution", async ({
     page,
   }) => {
