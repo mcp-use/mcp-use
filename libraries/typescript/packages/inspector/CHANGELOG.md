@@ -1,5 +1,18 @@
 # @mcp-use/inspector
 
+## 0.18.7
+
+### Patch Changes
+
+- 5760a10: fix(inspector): copy button copies error text instead of null
+- 5760a10: fix(chat): enhance message conversion logic to handle empty content and attachments
+  - Updated `convertMessagesToLangChain` to fall back on `m.parts` when `m.content` is empty, ensuring text is retrieved from streamed assistant messages.
+  - Modified `useChatMessages` to prioritize `m.parts` for message content, improving message handling consistency.
+  - Adjusted `handleChatRequestStream` to utilize `externalHistory` for better context management during agent interactions, preventing message duplication.
+
+- Updated dependencies [5760a10]
+  - mcp-use@1.17.2
+
 ## 0.18.7-canary.1
 
 ### Patch Changes
