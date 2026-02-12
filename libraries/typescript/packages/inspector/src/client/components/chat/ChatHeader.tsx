@@ -31,6 +31,12 @@ interface ChatHeaderProps {
   clearButtonLabel?: string;
   /** When true, hides the "Chat" title in the header. */
   hideTitle?: boolean;
+  /** When true, hides the icon on the clear/new-chat button. */
+  clearButtonHideIcon?: boolean;
+  /** When true, hides the keyboard shortcut (⌘O) on the clear/new-chat button. */
+  clearButtonHideShortcut?: boolean;
+  /** Button variant for the clear/new-chat button. Default: "default". */
+  clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
 }
 
 export function ChatHeader({
@@ -50,6 +56,9 @@ export function ChatHeader({
   hideConfigButton,
   clearButtonLabel,
   hideTitle,
+  clearButtonHideIcon,
+  clearButtonHideShortcut,
+  clearButtonVariant,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
@@ -103,22 +112,27 @@ export function ChatHeader({
             </TooltipContent>
           </Tooltip>
         )}
-        {/* New Chat button - rightmost on mobile, primary style */}
+        {/* New Chat / Clear button */}
         {hasMessages && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                variant={clearButtonVariant ?? "default"}
                 size="default"
-                className="p-2 sm:pr-1 sm:pl-3 cursor-pointer"
+                className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
                 onClick={onClearChat}
               >
-                <SquarePen className="h-4 w-4 sm:mr-2" />
+                {!clearButtonHideIcon && (
+                  <SquarePen className="h-4 w-4 sm:mr-2" />
+                )}
                 <span className="hidden sm:inline">
                   {clearButtonLabel ?? "New Chat"}
                 </span>
-                <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                  ⌘O
-                </span>
+                {!clearButtonHideShortcut && (
+                  <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                    ⌘O
+                  </span>
+                )}
               </Button>
             </TooltipTrigger>
             <TooltipContent>

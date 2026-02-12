@@ -42,6 +42,12 @@ export interface ChatTabProps {
   hideModelBadge?: boolean;
   /** When true, hides the MCP server URL on the landing form. Default: false. */
   hideServerUrl?: boolean;
+  /** When true, hides the icon on the clear/new-chat button. */
+  clearButtonHideIcon?: boolean;
+  /** When true, hides the keyboard shortcut (⌘O) on the clear/new-chat button. */
+  clearButtonHideShortcut?: boolean;
+  /** Button variant for the clear/new-chat button. Default: "default". */
+  clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -64,6 +70,9 @@ export function ChatTab({
   hideTitle,
   hideModelBadge,
   hideServerUrl,
+  clearButtonHideIcon,
+  clearButtonHideShortcut,
+  clearButtonVariant,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -374,6 +383,9 @@ export function ChatTab({
         hideConfigButton={isManaged}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}
+        clearButtonHideIcon={clearButtonHideIcon}
+        clearButtonHideShortcut={clearButtonHideShortcut}
+        clearButtonVariant={clearButtonVariant}
       />
 
       {/* Messages Area */}
