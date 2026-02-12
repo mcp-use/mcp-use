@@ -1183,7 +1183,7 @@ program
 
       const chokidarModule = await import("chokidar");
       const chokidar = (chokidarModule as any).default || chokidarModule;
-      const { pathToFileURL } = await import("node:url");
+      const { pathToFileURL, fileURLToPath } = await import("node:url");
       const { createRequire } = await import("node:module");
 
       // Try to get tsx's tsImport function for TypeScript support
@@ -1239,7 +1239,15 @@ program
           await tsImport(`${serverFilePath}?t=${Date.now()}`, {
             parentURL: import.meta.url,
             onImport: (file: string) => {
-              console.debug(`[HMR] Loaded: ${file}`);
+              const filePath = file.startsWith("file://")
+                ? fileURLToPath(file)
+                : file;
+              if (
+                !filePath.includes("node_modules") &&
+                filePath.startsWith(projectPath)
+              ) {
+                console.debug(`[HMR] Loaded: ${file}`);
+              }
             },
           });
         } else {

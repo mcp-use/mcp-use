@@ -647,6 +647,103 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Propagate widget resources (static + template) to all existing sessions.
+   *
+   * Called from uiResourceRegistration after resource/resourceTemplate have been
+   * added to wrapper-level registrations. This ensures existing sessions see
+   * newly discovered widgets without requiring a reconnect, even when the widget
+   * does not expose an auto-generated tool (exposeAsTool=false).
+   *
+   * @param widgetName - Name of the widget whose resources should be pushed
+   * @internal
+   */
+  public propagateWidgetResourcesToSessions(widgetName: string): void {
+    const resourceUri = generateWidgetUri(widgetName, this.buildId, ".html");
+    const resourceKey = `${widgetName}:${resourceUri}`;
+    const resourceReg = this.registrations.resources.get(resourceKey);
+
+    const resourceTemplateUri = generateWidgetUri(
+      widgetName,
+      this.buildId,
+      ".html",
+      "{id}"
+    );
+    const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
+    const resourceTemplateReg =
+      this.registrations.resourceTemplates.get(resourceTemplateKey);
+
+    if (!resourceReg && !resourceTemplateReg) return;
+
+    for (const [sessionId, session] of this.sessions) {
+      if (!session.server) continue;
+
+      // Add static resource
+      if (resourceReg) {
+        try {
+          session.server.registerResource(
+            resourceReg.config.name,
+            resourceReg.config.uri,
+            {
+              title: resourceReg.config.title,
+              description: resourceReg.config.description,
+              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+            } as any,
+            resourceReg.handler as any
+          );
+          console.log(
+            `[MCP-Server] Propagated resource ${resourceUri} to session ${sessionId}`
+          );
+        } catch (_e) {
+          // Resource may already be registered by addWidgetTool
+        }
+      }
+
+      // Add resource template
+      if (resourceTemplateReg) {
+        try {
+          const uriTemplate =
+            resourceTemplateReg.config.resourceTemplate.uriTemplate;
+          const resourceCallbacks =
+            resourceTemplateReg.config.resourceTemplate.callbacks;
+          const template = new ResourceTemplate(uriTemplate, {
+            list: undefined,
+            complete: toResourceTemplateCompleteCallbacks(
+              resourceCallbacks?.complete
+            ),
+          });
+
+          session.server.registerResource(
+            resourceTemplateReg.config.name,
+            template,
+            {
+              title: resourceTemplateReg.config.title,
+              description: resourceTemplateReg.config.description,
+              mimeType:
+                resourceTemplateReg.config.resourceTemplate.mimeType ||
+                "text/html+skybridge",
+            } as any,
+            resourceTemplateReg.handler as any
+          );
+          console.log(
+            `[MCP-Server] Propagated resource template ${resourceTemplateUri} to session ${sessionId}`
+          );
+        } catch (_e) {
+          // Resource template may already be registered by addWidgetTool
+        }
+      }
+
+      // Send resource list changed notification
+      if (session.server?.sendResourceListChanged) {
+        try {
+          session.server.sendResourceListChanged();
+        } catch (_e) {
+          // Session may be disconnected
+        }
+      }
+    }
+  }
+
+  /**
    * Update a widget tool's configuration in place (for HMR)
    *
    * This method updates a widget tool's metadata (description, schema) without
