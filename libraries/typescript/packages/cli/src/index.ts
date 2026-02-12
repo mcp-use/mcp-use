@@ -771,6 +771,8 @@ export default {
           sourcemap: false,
           // Minify for smaller bundle size
           minify: "esbuild",
+          // Widgets bundle React+Zod; suppress expected chunk size warning
+          chunkSizeWarningLimit: 1024,
           // For inline builds, disable CSS code splitting and inline all assets
           ...(inline
             ? {
