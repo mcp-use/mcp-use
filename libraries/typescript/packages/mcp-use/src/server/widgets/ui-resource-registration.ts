@@ -77,44 +77,51 @@ function enrichDefinitionWithServerOrigin(
   definition: UIResourceDefinition,
   serverOrigin: string | null
 ): UIResourceDefinition {
-  if (!serverOrigin || definition.type !== "mcpApps" || !definition.metadata) {
+  if (!serverOrigin || definition.type !== "mcpApps") {
     return definition;
   }
 
-  const enrichedMetadata = { ...definition.metadata };
+  // Create metadata if it doesn't exist
+  const enrichedMetadata = definition.metadata
+    ? { ...definition.metadata }
+    : ({} as NonNullable<typeof definition.metadata>);
 
-  if (enrichedMetadata.csp) {
+  // Always ensure CSP exists so the server origin is injected even when
+  // the widget author didn't explicitly declare a csp config
+  if (!enrichedMetadata.csp) {
+    enrichedMetadata.csp = {};
+  } else {
     enrichedMetadata.csp = { ...enrichedMetadata.csp };
+  }
 
-    // Add server origin to resourceDomains (for loading scripts/styles)
-    if (!enrichedMetadata.csp.resourceDomains) {
-      enrichedMetadata.csp.resourceDomains = [serverOrigin];
-    } else if (!enrichedMetadata.csp.resourceDomains.includes(serverOrigin)) {
-      enrichedMetadata.csp.resourceDomains = [
-        ...enrichedMetadata.csp.resourceDomains,
-        serverOrigin,
-      ];
-    }
+  // Add server origin to resourceDomains (for loading scripts/styles)
+  if (!enrichedMetadata.csp.resourceDomains) {
+    enrichedMetadata.csp.resourceDomains = [serverOrigin];
+  } else if (!enrichedMetadata.csp.resourceDomains.includes(serverOrigin)) {
+    enrichedMetadata.csp.resourceDomains = [
+      ...enrichedMetadata.csp.resourceDomains,
+      serverOrigin,
+    ];
+  }
 
-    // Add server origin to connectDomains (for fetch/XHR/WebSocket)
-    if (!enrichedMetadata.csp.connectDomains) {
-      enrichedMetadata.csp.connectDomains = [serverOrigin];
-    } else if (!enrichedMetadata.csp.connectDomains.includes(serverOrigin)) {
-      enrichedMetadata.csp.connectDomains = [
-        ...enrichedMetadata.csp.connectDomains,
-        serverOrigin,
-      ];
-    }
+  // Add server origin to connectDomains (for fetch/XHR/WebSocket)
+  if (!enrichedMetadata.csp.connectDomains) {
+    enrichedMetadata.csp.connectDomains = [serverOrigin];
+  } else if (!enrichedMetadata.csp.connectDomains.includes(serverOrigin)) {
+    enrichedMetadata.csp.connectDomains = [
+      ...enrichedMetadata.csp.connectDomains,
+      serverOrigin,
+    ];
+  }
 
-    // Add server origin to baseUriDomains (for <base> tag)
-    if (!enrichedMetadata.csp.baseUriDomains) {
-      enrichedMetadata.csp.baseUriDomains = [serverOrigin];
-    } else if (!enrichedMetadata.csp.baseUriDomains.includes(serverOrigin)) {
-      enrichedMetadata.csp.baseUriDomains = [
-        ...enrichedMetadata.csp.baseUriDomains,
-        serverOrigin,
-      ];
-    }
+  // Add server origin to baseUriDomains (for <base> tag)
+  if (!enrichedMetadata.csp.baseUriDomains) {
+    enrichedMetadata.csp.baseUriDomains = [serverOrigin];
+  } else if (!enrichedMetadata.csp.baseUriDomains.includes(serverOrigin)) {
+    enrichedMetadata.csp.baseUriDomains = [
+      ...enrichedMetadata.csp.baseUriDomains,
+      serverOrigin,
+    ];
   }
 
   return {
