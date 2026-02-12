@@ -1,0 +1,30 @@
+{
+  "name": "streaming-props-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Example MCP server demonstrating streaming tool props to widgets (partialToolInput / isStreaming)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "tailwindcss": "^4.1.18",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@mcp-use/cli": "workspace:*",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/node": "^25.0.2",
+    "@vitejs/plugin-react": "^5.1.2",
+    "tsx": "^4.21.0",
+    "vite": "^7.3.0"
+  },
+  "overrides": {
+    "sugarss": "^5.0.1"
+  }
+}

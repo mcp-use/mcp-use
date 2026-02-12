@@ -20,6 +20,8 @@ interface ToolResultRendererProps {
   onSendFollowUp?: (text: string) => void;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
+  /** Partial/streaming tool arguments (forwarded to widget as partialToolInput) */
+  partialToolArgs?: Record<string, unknown>;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ToolResultRenderer({
   toolMeta,
   onSendFollowUp,
   serverBaseUrl,
+  partialToolArgs,
 }: ToolResultRendererProps) {
   const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
@@ -222,6 +225,7 @@ export function ToolResultRenderer({
             toolInput={widgetProps || toolArgs}
             toolOutput={parsedResult}
             toolMetadata={toolMeta}
+            partialToolInput={partialToolArgs}
             resourceUri={resourceData.uri}
             readResource={readResource}
             noWrapper={true}
@@ -258,6 +262,7 @@ export function ToolResultRenderer({
         toolInput={widgetProps || toolArgs}
         toolOutput={parsedResult}
         toolMetadata={toolMeta}
+        partialToolInput={partialToolArgs}
         resourceUri={resourceData?.uri || resourceUri}
         readResource={readResource}
         className="my-4"
