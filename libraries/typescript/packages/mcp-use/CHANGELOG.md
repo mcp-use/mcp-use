@@ -1,5 +1,15 @@
 # mcp-use
 
+## 1.17.2-canary.1
+
+### Patch Changes
+
+- 3644a26: fix(ui-resource-registration): improve metadata handling for server origin injection
+  - Simplified the logic for enriching UI resource definitions with server origin by ensuring metadata is created if it doesn't exist.
+  - Enhanced the handling of Content Security Policy (CSP) to always include server origin in resourceDomains, connectDomains, and baseUriDomains, improving security and functionality for widget loading.
+  - @mcp-use/cli@2.13.4-canary.1
+  - @mcp-use/inspector@0.18.7-canary.1
+
 ## 1.17.2-canary.0
 
 ### Patch Changes
