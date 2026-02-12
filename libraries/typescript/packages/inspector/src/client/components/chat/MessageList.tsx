@@ -20,7 +20,8 @@ interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "result" | "error";
+      state?: "pending" | "streaming" | "result" | "error";
+      partialArgs?: Record<string, unknown>;
     };
   }>;
   toolCalls?: Array<{
@@ -179,14 +180,17 @@ export const MessageList = memo(
                             state={
                               part.toolInvocation.state === "error"
                                 ? "error"
-                                : part.toolInvocation.state === "pending"
+                                : part.toolInvocation.state === "streaming"
                                   ? "call"
-                                  : "result"
+                                  : part.toolInvocation.state === "pending"
+                                    ? "call"
+                                    : "result"
                             }
                           />
-                          {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                          {/* Render immediately for widget tools, even if result is null */}
+                          {/* Render tool result / widget */}
+                          {/* Render immediately for widget tools or streaming tools, even if result is null */}
                           {(part.toolInvocation.result ||
+                            part.toolInvocation.state === "streaming" ||
                             isWidgetTool(part.toolInvocation.toolName)) && (
                             <ToolResultRenderer
                               toolName={part.toolInvocation.toolName}
@@ -198,6 +202,7 @@ export const MessageList = memo(
                                 part.toolInvocation.toolName
                               )}
                               onSendFollowUp={sendMessage}
+                              partialToolArgs={part.toolInvocation.partialArgs}
                             />
                           )}
                         </div>
