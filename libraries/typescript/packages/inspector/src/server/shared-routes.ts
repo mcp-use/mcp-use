@@ -351,10 +351,18 @@ export function registerInspectorRoutes(
         c.req.url
       );
 
+      const debugWidget =
+        process.env.DEBUG != null &&
+        process.env.DEBUG !== "" &&
+        process.env.DEBUG !== "0" &&
+        process.env.DEBUG.toLowerCase() !== "false";
+
       // Fetch HTML from dev server with retry logic for cold starts
-      console.log(
-        `[Dev Widget Proxy] Fetching from: ${localDevWidgetUrl} (original: ${widgetData.devWidgetUrl})`
-      );
+      if (debugWidget) {
+        console.log(
+          `[Dev Widget Proxy] Fetching from: ${localDevWidgetUrl} (original: ${widgetData.devWidgetUrl})`
+        );
+      }
       const response = await fetchWithRetry(localDevWidgetUrl);
       if (!response.ok) {
         const status = response.status as 400 | 404 | 500 | 502 | 503;
@@ -488,11 +496,12 @@ export function registerInspectorRoutes(
         c.header(key, value);
       });
 
-      // Debug: log script URLs in final HTML
-      const scriptUrls = [...html.matchAll(/src\s*=\s*["']([^"']+)["']/g)].map(
-        (m) => m[1]
-      );
-      console.log(`[Dev Widget Proxy] Final HTML script URLs:`, scriptUrls);
+      if (debugWidget) {
+        const scriptUrls = [
+          ...html.matchAll(/src\s*=\s*["']([^"']+)["']/g),
+        ].map((m) => m[1]);
+        console.log(`[Dev Widget Proxy] Final HTML script URLs:`, scriptUrls);
+      }
 
       return c.html(html);
     } catch (error) {
