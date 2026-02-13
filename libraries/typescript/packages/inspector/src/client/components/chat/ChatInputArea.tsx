@@ -30,6 +30,10 @@ interface ChatInputAreaProps {
   onDeletePromptResult: (index: number) => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
+  /** Optional followup suggestions rendered above the chat input. */
+  followups?: string[];
+  /** Called when a followup suggestion is selected. */
+  onFollowupSelect?: (followup: string) => void;
 }
 
 export function ChatInputArea({
@@ -53,6 +57,8 @@ export function ChatInputArea({
   onDeletePromptResult,
   onAttachmentAdd,
   onAttachmentRemove,
+  followups = [],
+  onFollowupSelect,
 }: ChatInputAreaProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -61,6 +67,23 @@ export function ChatInputArea({
   return (
     <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 sm:pt-0 text-foreground">
       <div className="relative w-full max-w-3xl backdrop-blur-xl">
+        {followups.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {followups.map((followup) => (
+              <Button
+                key={followup}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => onFollowupSelect?.(followup)}
+                disabled={isLoading || !isConnected}
+              >
+                {followup}
+              </Button>
+            ))}
+          </div>
+        )}
         <PromptsDropdown
           isOpen={promptsDropdownOpen}
           prompts={prompts}

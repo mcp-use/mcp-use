@@ -44,6 +44,10 @@ interface ChatLandingFormProps {
   hideModelBadge?: boolean;
   /** When true, hides the MCP server URL below the title. */
   hideServerUrl?: boolean;
+  /** Optional quick question suggestions displayed below the landing input. */
+  quickQuestions?: string[];
+  /** Called when a quick question is selected. */
+  onQuickQuestionSelect?: (question: string) => void;
 }
 
 export function ChatLandingForm({
@@ -71,6 +75,8 @@ export function ChatLandingForm({
   onAttachmentRemove,
   hideModelBadge,
   hideServerUrl,
+  quickQuestions = [],
+  onQuickQuestionSelect,
 }: ChatLandingFormProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -148,6 +154,23 @@ export function ChatLandingForm({
               </div>
             </div>
           </div>
+          {quickQuestions.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 px-2">
+              {quickQuestions.map((question) => (
+                <Button
+                  key={question}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full bg-white/70 dark:bg-black/50"
+                  onClick={() => onQuickQuestionSelect?.(question)}
+                  disabled={isLoading || !isConnected}
+                >
+                  {question}
+                </Button>
+              ))}
+            </div>
+          )}
           {llmConfig && !hideModelBadge && (
             <div className="flex justify-center mt-4">
               <Tooltip>
