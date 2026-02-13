@@ -8,6 +8,7 @@
     "mcp-use": "1.17.2"
   },
   "changesets": [
+    "three-parts-carry",
     "wicked-adults-grow"
   ]
 }
