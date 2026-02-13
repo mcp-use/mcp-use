@@ -1,4 +1,5 @@
 // useMcp.ts
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   Prompt,
   Resource,
@@ -1403,10 +1404,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         addLog("info", "Triggering fresh OAuth authorization...");
 
         // Generate a fresh authorization URL and redirect immediately
-        // We need to manually trigger what the SDK would do
-        const { auth } =
-          await import("@modelcontextprotocol/sdk/client/auth.js");
-
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const baseUrl = new URL(url).origin;

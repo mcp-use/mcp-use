@@ -352,6 +352,17 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   const exposeAsTool =
     enrichedDefinition.exposeAsTool ?? widgetMetadata?.exposeAsTool ?? true;
 
+  // FIX: Propagate newly registered resources to existing sessions independently of tool registration
+  // Previously, resource propagation was only done inside addWidgetTool (which requires exposeAsTool=true).
+  // Resources must be pushed to existing sessions regardless of whether the widget exposes a tool.
+  if (
+    !isUpdate &&
+    (server as any).sessions &&
+    typeof (server as any).propagateWidgetResourcesToSessions === "function"
+  ) {
+    (server as any).propagateWidgetResourcesToSessions(enrichedDefinition.name);
+  }
+
   // Register the tool only if exposeAsTool is not false
   // Note: Resources and resource templates are always registered regardless of exposeAsTool
   // because custom tools may reference them via the widget() helper

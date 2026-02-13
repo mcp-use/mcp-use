@@ -523,6 +523,7 @@ function McpServerWrapper({
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
+          _meta: (t as any)._meta,
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );

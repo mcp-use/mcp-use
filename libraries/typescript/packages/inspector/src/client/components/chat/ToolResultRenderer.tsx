@@ -18,6 +18,8 @@ interface ToolResultRendererProps {
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
   onSendFollowUp?: (text: string) => void;
+  /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
+  serverBaseUrl?: string;
 }
 
 /**
@@ -31,6 +33,7 @@ export function ToolResultRenderer({
   readResource,
   toolMeta,
   onSendFollowUp,
+  serverBaseUrl,
 }: ToolResultRendererProps) {
   const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
@@ -223,6 +226,7 @@ export function ToolResultRenderer({
             readResource={readResource}
             noWrapper={true}
             onSendFollowUp={onSendFollowUp}
+            serverBaseUrl={serverBaseUrl}
           />
         )}
 
@@ -236,6 +240,7 @@ export function ToolResultRenderer({
             readResource={readResource}
             noWrapper={true}
             showConsole={false}
+            serverBaseUrl={serverBaseUrl}
           />
         )}
       </div>
@@ -258,6 +263,7 @@ export function ToolResultRenderer({
         className="my-4"
         noWrapper={true}
         onSendFollowUp={onSendFollowUp}
+        serverBaseUrl={serverBaseUrl}
       />
     );
   }
@@ -281,6 +287,7 @@ export function ToolResultRenderer({
         noWrapper={true}
         className="my-4"
         showConsole={false}
+        serverBaseUrl={serverBaseUrl}
       />
     );
   }
