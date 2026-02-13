@@ -269,11 +269,12 @@ function OpenAIComponentRendererBase({
           widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
         }
 
-        // When serverBaseUrl is provided (embedded cross-origin), use it as the
-        // base for inspector API calls so they target the sandbox, not the host app.
-        const inspectorApiBase = currentServerBaseUrl
-          ? new URL(currentServerBaseUrl).origin
-          : "";
+        // Inspector API routes (/inspector/api/*) are always served by the same
+        // origin that hosts the inspector UI.  Use relative URLs so fetch targets
+        // window.location.origin (the inspector) instead of the MCP server.
+        // The previous logic mistakenly derived the base from the MCP server URL
+        // (serverBaseUrl), which broke when the server ran on a different port.
+        const inspectorApiBase = "";
 
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
         const storeResponse = await fetch(
