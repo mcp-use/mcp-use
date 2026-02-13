@@ -399,6 +399,34 @@ export function MCPAppsRenderer({
         timestamp: new Date().toISOString(),
         url: resourceUri,
       });
+      if (
+        level === "error" &&
+        typeof window !== "undefined" &&
+        window.parent !== window
+      ) {
+        const message =
+          typeof data === "string"
+            ? data
+            : typeof (data as { message?: unknown })?.message === "string"
+              ? String((data as { message: string }).message)
+              : "MCP Apps runtime error";
+        const stack =
+          typeof (data as { stack?: unknown })?.stack === "string"
+            ? String((data as { stack: string }).stack)
+            : undefined;
+        window.parent.postMessage(
+          {
+            type: "mcp-inspector:widget:error",
+            source: "mcp-apps:logging",
+            message,
+            stack,
+            timestamp: Date.now(),
+            toolId: toolCallId,
+            url: resourceUri,
+          },
+          "*"
+        );
+      }
       return {};
     };
 
@@ -457,6 +485,45 @@ export function MCPAppsRenderer({
       const proxyOrigin = new URL(iframe.src).origin;
       if (event.origin !== proxyOrigin) return;
       if (event.source !== iframe.contentWindow) return;
+
+      if (event.data?.type === "iframe-console-log") {
+        if (
+          event.data.level === "error" &&
+          typeof window !== "undefined" &&
+          window.parent !== window
+        ) {
+          const args = Array.isArray(event.data.args) ? event.data.args : [];
+          const first = args[0];
+          const message =
+            typeof first === "string"
+              ? first
+              : typeof first?.message === "string"
+                ? first.message
+                : "MCP Apps iframe runtime error";
+          const stack =
+            typeof first?.error?.stack === "string"
+              ? first.error.stack
+              : typeof first?.stack === "string"
+                ? first.stack
+                : undefined;
+          window.parent.postMessage(
+            {
+              type: "mcp-inspector:widget:error",
+              source: "mcp-apps:iframe-console:error",
+              message,
+              stack,
+              timestamp: Date.now(),
+              toolId: toolCallId,
+              url:
+                typeof event.data.url === "string"
+                  ? event.data.url
+                  : resourceUri,
+            },
+            "*"
+          );
+        }
+        return;
+      }
 
       // Log received message
       rpcLogBus.publish({
