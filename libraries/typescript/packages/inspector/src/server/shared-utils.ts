@@ -845,6 +845,68 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
         };
 
+        function emitWidgetRuntimeError(payload) {
+          var args = [{
+            message: payload && payload.message ? payload.message : "Unknown widget runtime error",
+            stack: payload && payload.stack ? payload.stack : undefined,
+            source: payload && payload.source ? payload.source : undefined,
+            fileName: payload && payload.fileName ? payload.fileName : undefined,
+            line: payload && payload.line ? payload.line : undefined,
+            column: payload && payload.column ? payload.column : undefined,
+            timestamp: payload && payload.timestamp ? payload.timestamp : Date.now(),
+          }];
+          try {
+            window.parent.postMessage(
+              {
+                type: "iframe-console-log",
+                level: "error",
+                args: args,
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                toolId: ${safeToolId},
+              },
+              "*"
+            );
+          } catch (emitErr) {}
+        }
+
+        window.addEventListener("error", function(event) {
+          var err = event && event.error;
+          var message =
+            (err && err.message) ||
+            (event && event.message) ||
+            "Unknown widget runtime error";
+          emitWidgetRuntimeError({
+            source: "window.error",
+            message: String(message),
+            stack: err && err.stack ? String(err.stack) : undefined,
+            fileName: event && event.filename ? String(event.filename) : undefined,
+            line: event && typeof event.lineno === "number" ? event.lineno : undefined,
+            column: event && typeof event.colno === "number" ? event.colno : undefined,
+            timestamp: Date.now(),
+          });
+        });
+
+        window.addEventListener("unhandledrejection", function(event) {
+          var reason = event ? event.reason : undefined;
+          var message = "Unhandled promise rejection";
+          var stack = undefined;
+          if (reason && typeof reason === "object") {
+            message = String(reason.message || message);
+            stack = reason.stack ? String(reason.stack) : undefined;
+          } else if (typeof reason === "string") {
+            message = reason;
+          } else if (reason != null) {
+            message = String(reason);
+          }
+          emitWidgetRuntimeError({
+            source: "window.unhandledrejection",
+            message: message,
+            stack: stack,
+            timestamp: Date.now(),
+          });
+        });
+
         const openaiAPI = {
           toolInput: ${safeToolInput},
           toolOutput: ${safeToolOutput},
