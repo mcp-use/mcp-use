@@ -31,6 +31,12 @@ export interface HttpConnectorOptions extends ConnectorInitOptions {
   disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
   gatewayUrl?: string; // Optional gateway URL to route requests through
   serverId?: string; // Optional server ID for gateway observability
+  reconnectionOptions?: {
+    maxReconnectionDelay?: number;
+    initialReconnectionDelay?: number;
+    reconnectionDelayGrowFactor?: number;
+    maxRetries?: number;
+  };
 }
 
 export class HttpConnector extends BaseConnector {
@@ -268,10 +274,13 @@ export class HttpConnector extends BaseConnector {
           },
           // Pass through reconnection options
           reconnectionOptions: {
-            maxReconnectionDelay: 30000,
-            initialReconnectionDelay: 1000,
-            reconnectionDelayGrowFactor: 1.5,
-            maxRetries: 2, // Disable automatic reconnection - let higher-level logic handle it
+            maxReconnectionDelay:
+              this.opts.reconnectionOptions?.maxReconnectionDelay ?? 30000,
+            initialReconnectionDelay:
+              this.opts.reconnectionOptions?.initialReconnectionDelay ?? 1000,
+            reconnectionDelayGrowFactor:
+              this.opts.reconnectionOptions?.reconnectionDelayGrowFactor ?? 1.5,
+            maxRetries: this.opts.reconnectionOptions?.maxRetries ?? 2, // Default to 2 - let higher-level logic handle it if it fails
           },
           // Don't pass sessionId - let the SDK generate it automatically during connect()
         }

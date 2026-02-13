@@ -90,8 +90,37 @@ export type UseMcpOptions = {
   debug?: boolean;
   /** Auto retry connection if initial connection fails, with delay in ms (default: false) */
   autoRetry?: boolean | number;
-  /** Auto reconnect if an established connection is lost, with delay in ms (default: 3000) */
-  autoReconnect?: boolean | number;
+  /** 
+   * Auto reconnect if an established connection is lost.
+   * 
+   * Can be:
+   * - `boolean`: Enable/disable with default 3000ms delay and 10000ms health check
+   * - `number`: Reconnect delay in ms
+   * - `object`: Full configuration for reconnection and health checks
+   * 
+   * @default 3000
+   */
+  autoReconnect?:
+    | boolean
+    | number
+    | {
+        /** Whether to enable automatic reconnection (default: true) */
+        enabled?: boolean;
+        /** Initial delay in ms before first reconnection attempt (default: 3000) */
+        initialDelay?: number;
+        /** 
+         * Interval in ms for health check polling. 
+         * Set to false to disable health checks entirely.
+         * @default 10000
+         */
+        healthCheckInterval?: number | false;
+        /** 
+         * Timeout in ms for health check requests.
+         * Consider connection dead after this time without response.
+         * @default 30000
+         */
+        healthCheckTimeout?: number;
+      };
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
   /**
