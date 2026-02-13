@@ -573,6 +573,40 @@ function OpenAIComponentRendererBase({
 
       // Let console log messages pass through (handled by useIframeConsole hook)
       if (event.data?.type === "iframe-console-log") {
+        const isErrorLevel = event.data.level === "error";
+        if (isErrorLevel) {
+          const args = Array.isArray(event.data.args) ? event.data.args : [];
+          const first = args[0];
+          const extractedMessage =
+            typeof first === "string"
+              ? first
+              : typeof first?.message === "string"
+                ? first.message
+                : "Widget runtime error";
+          const extractedStack =
+            typeof first?.error?.stack === "string"
+              ? first.error.stack
+              : typeof first?.stack === "string"
+                ? first.stack
+                : undefined;
+          if (typeof window !== "undefined" && window.parent !== window) {
+            window.parent.postMessage(
+              {
+                type: "mcp-inspector:widget:error",
+                source: "iframe-console:error",
+                message: extractedMessage,
+                stack: extractedStack,
+                timestamp: Date.now(),
+                url:
+                  typeof event.data.url === "string"
+                    ? event.data.url
+                    : undefined,
+                toolId,
+              },
+              "*"
+            );
+          }
+        }
         return;
       }
 
