@@ -296,17 +296,25 @@ function OpenAIComponentRendererBase({
           );
         }
 
+        // Determine if the widget iframe will be same-origin with the inspector page.
+        // When inspectorApiBase matches window.location.origin (e.g. both http://localhost:3000),
+        // the iframe is same-origin and we can access its DOM for console interception & debug controls.
+        const computedIsSameOrigin = inspectorApiBase
+          ? typeof window !== "undefined" &&
+            inspectorApiBase === window.location.origin
+          : true;
+
         if (computedUseDevMode && widgetName && currentServerBaseUrl) {
           // Use proxy URL for dev widgets (same-origin, supports HMR)
           // Add timestamp to force iframe reload when widget data changes (e.g., props)
           const proxyUrl = `${inspectorApiBase}/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(proxyUrl);
-          setIsSameOrigin(!inspectorApiBase); // Cross-origin when using external base
+          setIsSameOrigin(computedIsSameOrigin);
         } else {
           // Add timestamp to force iframe reload when widget data changes (e.g., props)
           const prodUrl = `${inspectorApiBase}/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
           setWidgetUrl(prodUrl);
-          setIsSameOrigin(!inspectorApiBase);
+          setIsSameOrigin(computedIsSameOrigin);
         }
       } catch (error) {
         console.error("Error storing widget data:", error);
