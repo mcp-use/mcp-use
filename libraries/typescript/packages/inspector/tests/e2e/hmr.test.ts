@@ -22,6 +22,7 @@ test.describe("HMR (Hot Module Reload)", () => {
   let originalServerContent: string | null = null;
   let originalWidgetContent: string | null = null;
   let hmrTestWidgetCreated = false;
+  let hmrReaddWidgetCreated = false;
 
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
@@ -40,6 +41,10 @@ test.describe("HMR (Hot Module Reload)", () => {
     if (hmrTestWidgetCreated) {
       await removeConformanceResourceDir("hmr-test-widget");
       hmrTestWidgetCreated = false;
+    }
+    if (hmrReaddWidgetCreated) {
+      await removeConformanceResourceDir("hmr-readd-widget");
+      hmrReaddWidgetCreated = false;
     }
     // Wait for HMR to complete after file restoration
     // This ensures the server is stable before the next test starts
@@ -1235,6 +1240,83 @@ server.tool(
       const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
       await expect(
         mcpAppsGuest.getByText("HMR Widget: hello from HMR")
+      ).toBeVisible({ timeout: 15000 });
+    });
+
+    test("widget resource deletion and re-addition re-registers resource for existing session", async ({
+      page,
+    }) => {
+      const widgetName = "hmr-readd-widget";
+      const firstWidgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import React from "react";
+import { z } from "zod";
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "HMR re-add test widget",
+  props: z.object({
+    message: z.string().describe("Message to display"),
+  }),
+};
+
+function Inner() {
+  const { props } = useWidget();
+  return <div>Readd Widget V1: {props?.message || "no message"}</div>;
+}
+
+export default function HmrReaddWidget() {
+  return (
+    <McpUseProvider>
+      <Inner />
+    </McpUseProvider>
+  );
+}
+`;
+
+      const secondWidgetContent = firstWidgetContent.replace(
+        "Readd Widget V1:",
+        "Readd Widget V2:"
+      );
+
+      // Step 1: add widget and verify it appears as a resource.
+      await writeConformanceResourceFile(
+        widgetName,
+        "widget.tsx",
+        firstWidgetContent
+      );
+      hmrReaddWidgetCreated = true;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      await page
+        .getByRole("tab", { name: /Resources/ })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Resources" })
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("resource-item-hmr-readd-widget")
+      ).toBeVisible({ timeout: 15000 });
+
+      // Step 2: delete widget and verify resource disappears.
+      await removeConformanceResourceDir(widgetName);
+      hmrReaddWidgetCreated = false;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      await expect(
+        page.getByTestId("resource-item-hmr-readd-widget")
+      ).not.toBeVisible({ timeout: 15000 });
+
+      // Step 3: re-add same widget name; resource must re-appear for the same session.
+      await writeConformanceResourceFile(
+        widgetName,
+        "widget.tsx",
+        secondWidgetContent
+      );
+      hmrReaddWidgetCreated = true;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      await expect(
+        page.getByTestId("resource-item-hmr-readd-widget")
       ).toBeVisible({ timeout: 15000 });
     });
   });

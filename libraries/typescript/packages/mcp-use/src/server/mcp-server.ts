@@ -921,6 +921,34 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.registrations.resources.delete(resourceKey);
     this.registrations.resourceTemplates.delete(resourceTemplateKey);
 
+    // Remove from the root native server registry as well.
+    // Widgets are registered through wrapper methods that also touch native server state;
+    // if we only clean per-session state, re-adding the same widget can fail with
+    // "Resource ... is already registered".
+    const rootNativeServer = this.nativeServer as any;
+    if (rootNativeServer._registeredTools?.[toolName]) {
+      delete rootNativeServer._registeredTools[toolName];
+    }
+    if (rootNativeServer._registeredResources?.[resourceUri]) {
+      delete rootNativeServer._registeredResources[resourceUri];
+    }
+    if (rootNativeServer._registeredResources?.[resourceTemplateUri]) {
+      delete rootNativeServer._registeredResources[resourceTemplateUri];
+    }
+    // Some SDK internals also track templates by name; clear both shapes defensively.
+    if (rootNativeServer._registeredResourceTemplates?.[resourceTemplateKey]) {
+      delete rootNativeServer._registeredResourceTemplates[resourceTemplateKey];
+    }
+    if (
+      rootNativeServer._registeredResourceTemplateNames &&
+      typeof rootNativeServer._registeredResourceTemplateNames.delete ===
+        "function"
+    ) {
+      rootNativeServer._registeredResourceTemplateNames.delete(
+        resourceTemplateKey
+      );
+    }
+
     // Remove from SDK's internal state for all sessions
     for (const [, session] of this.sessions) {
       if (!session.server) continue;
@@ -939,6 +967,18 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Remove resource template (using slugified URI)
       if (nativeServer._registeredResources?.[resourceTemplateUri]) {
         delete nativeServer._registeredResources[resourceTemplateUri];
+      }
+      if (nativeServer._registeredResourceTemplates?.[resourceTemplateKey]) {
+        delete nativeServer._registeredResourceTemplates[resourceTemplateKey];
+      }
+      if (
+        nativeServer._registeredResourceTemplateNames &&
+        typeof nativeServer._registeredResourceTemplateNames.delete ===
+          "function"
+      ) {
+        nativeServer._registeredResourceTemplateNames.delete(
+          resourceTemplateKey
+        );
       }
     }
 
