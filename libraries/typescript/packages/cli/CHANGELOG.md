@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 2.13.6-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix: increased threshold for bundle size warning
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - @mcp-use/inspector@0.18.9-canary.0
+  - mcp-use@1.17.4-canary.0
+
 ## 2.13.5
 
 ### Patch Changes

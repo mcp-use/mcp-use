@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.18.9-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix(logs): reduces the amount of noisy logs in the dev server
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - mcp-use@1.17.4-canary.0
+
 ## 0.18.8
 
 ### Patch Changes

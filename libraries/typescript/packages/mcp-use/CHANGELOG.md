@@ -1,5 +1,22 @@
 # mcp-use
 
+## 1.17.4-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix(logs): reduces the amount of noisy logs in the dev server
+- 4a118cc: fix: propagate widget resources and resource templates to existing MCP sessions during HMR
+
+  Widget resources added via the file watcher (e.g. creating a new file in `resources/`) were registered in the server wrapper but never pushed to already-connected sessions. This caused "Resource ui://widget/... not found" errors when tools referencing those widgets were executed without reconnecting.
+  - Added `propagateWidgetResourcesToSessions()` to push newly registered widget resources and templates to all active sessions independently of tool registration
+  - Fixed resource template lookup key mismatch in `addWidgetTool` and `propagateWidgetResourcesToSessions` — templates are stored by name only, not `name:uri`
+  - Track propagated resources in `sessionRegisteredRefs` so `syncPrimitive` preserves them across subsequent HMR cycles
+
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - @mcp-use/cli@2.13.6-canary.0
+  - @mcp-use/inspector@0.18.9-canary.0
+
 ## 1.17.3
 
 ### Patch Changes

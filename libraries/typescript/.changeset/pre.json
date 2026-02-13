@@ -7,5 +7,9 @@
     "@mcp-use/inspector": "0.18.8",
     "mcp-use": "1.17.3"
   },
-  "changesets": []
+  "changesets": [
+    "lazy-animals-feel",
+    "slow-otters-lick",
+    "sour-hoops-arrive"
+  ]
 }
