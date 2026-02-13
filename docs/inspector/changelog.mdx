@@ -6,6 +6,34 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.18.8" description="February 2026">
+  ## Widget Readiness & Iframe Global Sync Fixes
+  Patch release focused on widget iframe lifecycle reliability and state update safety.
+
+- **Fix**: Reset widget readiness state when widget URL changes so new iframes re-initialize correctly
+- **Enhancement**: Improved tool output and response metadata transitions from pending to ready states
+- **Enhancement**: Queued iframe global updates until OpenAI globals are available for more reliable widget synchronization
+- **Fix**: Added animation frame cleanup logic to prevent memory leaks during component unmount
+- **Update**: Updated mcp-use to v1.17.3
+</Update>
+
+<Update label="v0.18.7" description="February 2026">
+  ## Chat Conversion & Error Copy Fixes
+  Patch release improving chat message conversion and copy behavior.
+
+- **Fix**: Copy button now copies actual error text instead of `null`
+- **Fix**: Chat message conversion now falls back to `parts` when `content` is empty, with improved attachment handling
+- **Enhancement**: Chat request streaming now uses external history for better context handling and to avoid duplicated messages
+- **Update**: Updated mcp-use to v1.17.2
+</Update>
+
+<Update label="v0.18.6" description="February 2026">
+  ## Dependency Update
+  Patch release aligned with mcp-use dependency updates.
+
+- **Update**: Updated mcp-use to v1.17.1
+</Update>
+
 <Update label="v0.18.5" description="February 2026">
   ## Iframe Embedding & Reverse Proxy Support
   Patch release with iframe embedding configuration, reverse proxy improvements, and widget rendering fixes.
