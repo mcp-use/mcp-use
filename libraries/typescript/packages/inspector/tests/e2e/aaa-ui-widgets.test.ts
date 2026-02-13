@@ -263,8 +263,9 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     const widgetFrame = page
       .frameLocator('iframe[title^="OpenAI Component: apps-sdk-only-card"]')
       .first();
+    // Assert on stable heading text (message body can vary if LLM passes a custom arg)
     await expect(
-      widgetFrame.getByText(/ChatGPT-only widget|appsSdkMetadata only/).first()
+      widgetFrame.getByText("ChatGPT-only widget (Apps SDK)")
     ).toBeVisible({ timeout: 45000 });
   });
 

@@ -1,5 +1,27 @@
 # @mcp-use/inspector
 
+## 0.18.8
+
+### Patch Changes
+
+- af55041: fix(inspector): enhance iframe global updates handling and cleanup
+- af55041: fix(inspector): reset readiness state on widget URL change and enhance tool output handling
+  - mcp-use@1.17.3
+
+## 0.18.8-canary.1
+
+### Patch Changes
+
+- f437838: fix(inspector): enhance iframe global updates handling and cleanup
+  - mcp-use@1.17.3-canary.1
+
+## 0.18.8-canary.0
+
+### Patch Changes
+
+- a872832: fix(inspector): reset readiness state on widget URL change and enhance tool output handling
+  - mcp-use@1.17.3-canary.0
+
 ## 0.18.7
 
 ### Patch Changes

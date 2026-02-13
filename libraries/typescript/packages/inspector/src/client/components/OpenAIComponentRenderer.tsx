@@ -36,6 +36,19 @@ interface OpenAIComponentRendererProps {
   }) => void;
 }
 
+type IframeGlobalUpdates = {
+  displayMode?: "inline" | "pip" | "fullscreen";
+  theme?: "light" | "dark";
+  maxHeight?: number;
+  locale?: string;
+  safeArea?: {
+    insets: { top: number; bottom: number; left: number; right: number };
+  };
+  userAgent?: any;
+  toolOutput?: any;
+  toolResponseMetadata?: any;
+};
+
 function Wrapper({
   children,
   className,
@@ -94,6 +107,7 @@ function OpenAIComponentRendererBase({
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
+
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
   const lastNotifiedHeightRef = useRef<number>(0);
@@ -107,6 +121,8 @@ function OpenAIComponentRendererBase({
   const [useDevMode, setUseDevMode] = useState<boolean>(false);
   const [widgetToolInput, setWidgetToolInput] = useState<any>(null);
   const [_widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
+  const pendingGlobalUpdatesRef = useRef<IframeGlobalUpdates | null>(null);
+  const flushGlobalsRafRef = useRef<number | null>(null);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
@@ -343,18 +359,35 @@ function OpenAIComponentRendererBase({
 
   // Helper to update window.openai globals inside iframe
   const updateIframeGlobals = useCallback(
-    (updates: {
-      displayMode?: "inline" | "pip" | "fullscreen";
-      theme?: "light" | "dark";
-      maxHeight?: number;
-      locale?: string;
-      safeArea?: {
-        insets: { top: number; bottom: number; left: number; right: number };
+    (updates: IframeGlobalUpdates) => {
+      const scheduleFlushWhenOpenAiAvailable = () => {
+        if (flushGlobalsRafRef.current !== null) {
+          return;
+        }
+        let attempts = 0;
+        const tryFlush = () => {
+          const iframeWindow = iframeRef.current?.contentWindow;
+          const pending = pendingGlobalUpdatesRef.current;
+          if (!iframeWindow || !pending) {
+            flushGlobalsRafRef.current = null;
+            return;
+          }
+          if (iframeWindow.openai) {
+            pendingGlobalUpdatesRef.current = null;
+            flushGlobalsRafRef.current = null;
+            updateIframeGlobals(pending);
+            return;
+          }
+          attempts += 1;
+          if (attempts >= 60) {
+            flushGlobalsRafRef.current = null;
+            return;
+          }
+          flushGlobalsRafRef.current = window.requestAnimationFrame(tryFlush);
+        };
+        flushGlobalsRafRef.current = window.requestAnimationFrame(tryFlush);
       };
-      userAgent?: any;
-      toolOutput?: any;
-      toolResponseMetadata?: any;
-    }) => {
+
       if (iframeRef.current?.contentWindow) {
         try {
           const iframeWindow = iframeRef.current.contentWindow;
@@ -424,6 +457,13 @@ function OpenAIComponentRendererBase({
                 "*"
               );
             }
+          } else {
+            // Queue updates until OpenAI globals are available inside the iframe.
+            pendingGlobalUpdatesRef.current = {
+              ...(pendingGlobalUpdatesRef.current || {}),
+              ...updates,
+            };
+            scheduleFlushWhenOpenAiAvailable();
           }
         } catch (e) {
           // Cross-origin or other error, use postMessage instead
@@ -444,6 +484,15 @@ function OpenAIComponentRendererBase({
     },
     [onUpdateGlobals]
   );
+
+  useEffect(() => {
+    return () => {
+      if (flushGlobalsRafRef.current !== null) {
+        window.cancelAnimationFrame(flushGlobalsRafRef.current);
+        flushGlobalsRafRef.current = null;
+      }
+    };
+  }, []);
 
   // Update widget when tool result changes (Issue #930 fix)
   // This allows widgets to transition from isPending=true to isPending=false
@@ -504,6 +553,12 @@ function OpenAIComponentRendererBase({
   // Handle postMessage communication with iframe
   useEffect(() => {
     if (!widgetUrl) return;
+
+    // Reset readiness whenever we load a new widget URL.
+    setIsReady(false);
+    setError(null);
+
+    let hasHandledLoad = false;
 
     const handleMessage = async (event: any) => {
       // Only accept messages from our iframe
@@ -743,6 +798,10 @@ function OpenAIComponentRendererBase({
     window.addEventListener("message", handleMessage);
 
     const handleLoad = () => {
+      if (hasHandledLoad) {
+        return;
+      }
+      hasHandledLoad = true;
       setIsReady(true);
       setError(null);
       // Inject console interceptor after iframe loads (only for same-origin)
@@ -778,13 +837,14 @@ function OpenAIComponentRendererBase({
     iframe?.addEventListener("load", handleLoad);
     iframe?.addEventListener("error", handleError);
 
-    // Also try to inject immediately if iframe is already loaded (only for same-origin)
+    // Handle the race where the iframe finishes loading before listeners are attached.
+    // In that case, "load" won't fire again and the widget can stay pending forever.
     if (
       iframe &&
-      isSameOrigin &&
-      iframe.contentDocument?.readyState === "complete"
+      (iframe.contentDocument?.readyState === "complete" ||
+        iframe.contentDocument?.readyState === "interactive")
     ) {
-      injectConsoleInterceptor(iframe);
+      handleLoad();
     }
 
     return () => {
