@@ -993,7 +993,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * runningServer.syncRegistrationsFrom(newServer.server);
    * ```
    */
-  public syncRegistrationsFrom(other: MCPServerClass<boolean>): void {
+  public syncRegistrationsFrom(other: MCPServerClass<boolean>): {
+    totalChanges: number;
+    tools: { added: number; removed: number; updated: number };
+    prompts: { added: number; removed: number; updated: number };
+    resources: { added: number; removed: number; updated: number };
+  } {
     // Build session contexts array (shared across all primitives)
     const sessionContexts = Array.from(this.sessions.entries()).map(
       ([sessionId, session]) => ({
@@ -1890,6 +1895,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     } else {
       console.log("[HMR] No registration changes detected");
     }
+
+    return {
+      totalChanges,
+      tools: {
+        added: toolsResult.changes.added.length,
+        removed: toolsResult.changes.removed.length,
+        updated: toolsResult.changes.updated.length,
+      },
+      prompts: {
+        added: promptsResult.changes.added.length,
+        removed: promptsResult.changes.removed.length,
+        updated: promptsResult.changes.updated.length,
+      },
+      resources: {
+        added:
+          resourcesResult.changes.added.length +
+          templatesResult.changes.added.length,
+        removed:
+          resourcesResult.changes.removed.length +
+          templatesResult.changes.removed.length,
+        updated:
+          resourcesResult.changes.updated.length +
+          templatesResult.changes.updated.length,
+      },
+    };
   }
 
   /**
