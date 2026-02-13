@@ -90,6 +90,17 @@ function OpenAIComponentRendererBase({
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
+
+  // Reset isReady when widgetUrl changes so the update effect re-fires
+  // after the new iframe loads. Without this, when storeAndSetUrl re-runs
+  // (e.g. after toolResult arrives) and creates a new widgetUrl, isReady
+  // stays true, setIsReady(true) in handleLoad is a no-op, and the
+  // toolResult update effect never re-triggers for the new iframe.
+  useEffect(() => {
+    if (widgetUrl) {
+      setIsReady(false);
+    }
+  }, [widgetUrl]);
   const [iframeHeight, setIframeHeight] = useState<number>(400);
   const lastMeasuredHeightRef = useRef<number>(0);
   const lastNotifiedHeightRef = useRef<number>(0);

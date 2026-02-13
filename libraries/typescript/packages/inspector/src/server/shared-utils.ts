@@ -1021,6 +1021,18 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
               hasChanges = true;
             }
 
+            // Update toolOutput (allows widget to transition from isPending=true to isPending=false)
+            if (updates.toolOutput !== undefined) {
+              openaiAPI.toolOutput = updates.toolOutput;
+              hasChanges = true;
+            }
+
+            // Update toolResponseMetadata
+            if (updates.toolResponseMetadata !== undefined) {
+              openaiAPI.toolResponseMetadata = updates.toolResponseMetadata;
+              hasChanges = true;
+            }
+
             // Dispatch set_globals event to notify React components if any changes occurred
             if (hasChanges) {
               try {
