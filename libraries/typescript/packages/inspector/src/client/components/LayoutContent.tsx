@@ -162,6 +162,8 @@ export function LayoutContent({
             clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
             clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
             clearButtonVariant={embeddedConfig.chatClearButtonVariant}
+            chatQuickQuestions={embeddedConfig.chatQuickQuestions}
+            chatFollowups={embeddedConfig.chatFollowups}
           />
         </div>
       )}
