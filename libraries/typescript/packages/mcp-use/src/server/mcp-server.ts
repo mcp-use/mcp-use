@@ -914,11 +914,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       ".html",
       "{id}"
     );
+    const resourceKey = `${toolName}:${resourceUri}`;
+    // Resource templates are stored by name only (no URI suffix)
+    const resourceTemplateKey = `${toolName}-dynamic`;
     this.registrations.tools.delete(toolName);
-    this.registrations.resources.delete(`${toolName}:${resourceUri}`);
-    this.registrations.resourceTemplates.delete(
-      `${toolName}-dynamic:${resourceTemplateUri}`
-    );
+    this.registrations.resources.delete(resourceKey);
+    this.registrations.resourceTemplates.delete(resourceTemplateKey);
 
     // Remove from SDK's internal state for all sessions
     for (const [, session] of this.sessions) {
@@ -941,11 +942,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     }
 
-    // Remove from sessionRegisteredRefs (using slugified URIs)
+    // Remove from sessionRegisteredRefs (using registration key formats)
     for (const [, refs] of this.sessionRegisteredRefs) {
       refs.tools.delete(toolName);
-      refs.resources.delete(resourceUri);
-      refs.resourceTemplates.delete(resourceTemplateUri);
+      refs.resources.delete(resourceKey);
+      refs.resourceTemplates.delete(resourceTemplateKey);
     }
 
     // Send notifications to all sessions

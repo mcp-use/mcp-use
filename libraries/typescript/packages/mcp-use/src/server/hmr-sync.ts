@@ -13,6 +13,15 @@ export function normalizeHandler(handler: unknown): string {
   return String(handler);
 }
 
+function isDebugLoggingEnabled(): boolean {
+  const debugValue = globalThis.process?.env?.DEBUG;
+  return !!(
+    debugValue &&
+    debugValue !== "0" &&
+    debugValue.toLowerCase() !== "false"
+  );
+}
+
 /**
  * Registration entry with config and handler
  */
@@ -115,6 +124,7 @@ export function syncPrimitive<TConfig, THandler>(
     onRename,
     onUpdate,
   } = options;
+  const debugEnabled = isDebugLoggingEnabled();
 
   const changes: SyncChanges = {
     added: [],
@@ -294,20 +304,22 @@ export function syncPrimitive<TConfig, THandler>(
     const handlerChanged = oldNormalized !== newNormalized;
 
     if (configChanged || handlerChanged) {
-      console.debug(
-        `[HMR] ${primitiveName} "${key}" changed:` +
-          (configChanged ? " config" : "") +
-          (handlerChanged ? " handler" : "")
-      );
-      if (handlerChanged) {
-        // Show a short preview of old vs new handler for debugging
-        const previewLength = 80;
+      if (debugEnabled) {
         console.debug(
-          `[HMR]   old handler: ${oldNormalized.slice(0, previewLength)}${oldNormalized.length > previewLength ? "..." : ""}`
+          `[HMR] ${primitiveName} "${key}" changed:` +
+            (configChanged ? " config" : "") +
+            (handlerChanged ? " handler" : "")
         );
-        console.debug(
-          `[HMR]   new handler: ${newNormalized.slice(0, previewLength)}${newNormalized.length > previewLength ? "..." : ""}`
-        );
+        if (handlerChanged) {
+          // Show a short preview of old vs new handler for debugging.
+          const previewLength = 80;
+          console.debug(
+            `[HMR]   old handler: ${oldNormalized.slice(0, previewLength)}${oldNormalized.length > previewLength ? "..." : ""}`
+          );
+          console.debug(
+            `[HMR]   new handler: ${newNormalized.slice(0, previewLength)}${newNormalized.length > previewLength ? "..." : ""}`
+          );
+        }
       }
       updatedRegistrations.set(key, newReg);
 
@@ -350,7 +362,7 @@ export function syncPrimitive<TConfig, THandler>(
       }
 
       changes.updated.push(key);
-    } else {
+    } else if (debugEnabled) {
       console.debug(
         `[HMR] ${primitiveName} "${key}" unchanged (config and handler identical)`
       );
