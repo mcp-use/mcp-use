@@ -28,21 +28,18 @@ The easiest way to get started is to use the `create-mcp-use-app` command, which
 ```bash npm
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
-npm install
 npm run dev
 ```
 
 ```bash pnpm
 pnpm create mcp-use-app my-mcp-server
 cd my-mcp-server
-pnpm install
 pnpm dev
 ```
 
 ```bash yarn
 yarn create mcp-use-app my-mcp-server
 cd my-mcp-server
-yarn install
 yarn dev
 ```
 </CodeGroup>
@@ -53,8 +50,9 @@ This command will create a new MCP server with:
 - Example UI Widgets React components in `resources/` folder exposed as tools and resources in Apps SDK for ChatGPT and MCP-UI format.
 - Pre-configured server metadata (title, icons, websiteUrl) with your project name and mcp-use branding.
 - Pre-configured build tools and dev server.
-- All necessary dependencies installed.
 - MCP Inspector to test your server.
+- Optionally install all dependencies
+- Optionally install skills for Claude Code or Cursor when prompted (so the AI agent can assist you in your IDE)
 
 ### Project Structure
 

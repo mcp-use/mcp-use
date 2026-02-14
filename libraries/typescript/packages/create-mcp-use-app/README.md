@@ -40,7 +40,6 @@ Create a new MCP application in seconds:
 ```bash
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
-npm run dev
 ```
 
 That's it! Your MCP server is running at `http://localhost:3000` with the inspector automatically opened in your browser.
@@ -96,6 +95,8 @@ You'll be prompted for:
 - Project name
 - Project template
 - Package manager preference
+- Install dependencies (Y/n)
+- Skills installation (Claude Code, Cursor, Both, or None)
 
 ### Direct Mode
 
@@ -122,8 +123,17 @@ npx create-mcp-use-app my-project --npm
 npx create-mcp-use-app my-project --yarn
 npx create-mcp-use-app my-project --pnpm
 
-# Install deps automatically
+# Install deps automatically (or --no-install to skip and skip prompt)
 npx create-mcp-use-app my-project --install
+npx create-mcp-use-app my-project --no-install
+
+# Skills presets for Claude Code / Cursor (omit to prompt)
+npx create-mcp-use-app my-project --ide claude-code
+npx create-mcp-use-app my-project --ide cursor
+npx create-mcp-use-app my-project --ide claude-code,cursor
+
+# List all available templates
+npx create-mcp-use-app --list-templates
 ```
 
 ---
