@@ -1185,7 +1185,7 @@ function SkillsPresetSelector({
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>Install skills for (select one):</Text>
+        <Text bold>Install skills for Claude Code or Cursor? (select one):</Text>
       </Box>
       <SelectInput
         items={items}
