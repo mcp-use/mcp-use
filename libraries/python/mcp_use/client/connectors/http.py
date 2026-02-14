@@ -91,7 +91,7 @@ class HttpConnector(BaseConnector):
         Args:
             auth: Authentication method - can be:
                 - A string token: Use Bearer token authentication
-                - A dict with OAuth config: {"client_id": "...", "client_secret": "...", "scope": "..."}
+                - A dict with OAuth config: Supports custom URLs, skip_discovery, or oauth_provider
                 - An httpx.Auth object: Use custom authentication
         """
         if isinstance(auth, str):
@@ -99,7 +99,7 @@ class HttpConnector(BaseConnector):
             self._auth = BearerAuth(token=auth)
             self.headers["Authorization"] = f"Bearer {auth}"
         elif isinstance(auth, dict):
-            # Check if this is an OAuth provider configuration
+            # Check for OAuth provider configuration
             if "oauth_provider" in auth:
                 oauth_provider = auth["oauth_provider"]
                 if isinstance(oauth_provider, dict):
@@ -114,6 +114,51 @@ class HttpConnector(BaseConnector):
                     oauth_provider=oauth_provider,
                 )
                 self._oauth_config = auth
+            # Check for custom OAuth URLs
+            elif "authorization_url" in auth or "token_url" in auth:
+                authorization_url = auth.get("authorization_url")
+                token_url = auth.get("token_url")
+
+                if not authorization_url or not token_url:
+                    raise ValueError(
+                        "Both 'authorization_url' and 'token_url' are required "
+                        "when using custom OAuth URLs configuration."
+                    )
+
+                # Build OAuth metadata from custom URLs
+                metadata_dict: dict[str, Any] = {
+                    "issuer": auth.get("issuer", self.base_url),
+                    "authorization_endpoint": authorization_url,
+                    "token_endpoint": token_url,
+                    "code_challenge_methods_supported": ["S256"],
+                }
+
+                if auth.get("registration_url"):
+                    metadata_dict["registration_endpoint"] = auth["registration_url"]
+
+                oauth_provider = OAuthClientProvider(
+                    id="custom-oauth-config",
+                    display_name="Custom OAuth Configuration",
+                    metadata=metadata_dict,
+                )
+
+                self._oauth = OAuth(
+                    self.base_url,
+                    scope=auth.get("scope"),
+                    client_id=auth.get("client_id"),
+                    client_secret=auth.get("client_secret"),
+                    callback_port=auth.get("callback_port"),
+                    client_metadata_url=auth.get("client_metadata_url"),
+                    oauth_provider=oauth_provider,
+                )
+                self._oauth_config = auth
+                logger.debug(f"Using custom OAuth URLs: authorization={authorization_url}, token={token_url}")
+            # Check if OAuth discovery should be skipped
+            elif auth.get("skip_discovery", False):
+                logger.debug("OAuth discovery skipped as per configuration")
+                self._oauth = None
+                self._auth = None
+            # Standard OAuth with auto-discovery
             else:
                 self._oauth = OAuth(
                     self.base_url,
