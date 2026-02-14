@@ -110,6 +110,45 @@ function getInstallArgs(packageManager: string): string[] {
   }
 }
 
+// Run npx skills add in the project directory (for Claude Code / Cursor presets)
+function runSkillsAdd(
+  projectPath: string,
+  presets: string[]
+): Promise<void> {
+  if (presets.length === 0) return Promise.resolve();
+  const args = [
+    "--yes",
+    "--package",
+    "skills@latest",
+    "--",
+    "skills",
+    "add",
+    "mcp-use/mcp-use",
+    ...presets.flatMap((p) => ["-a", p]),
+  ];
+  return new Promise((resolve, reject) => {
+    const child = spawn("npx", args, {
+      cwd: projectPath,
+      stdio: "inherit",
+      shell: process.platform === "win32",
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`skills add exited with code ${code}`));
+    });
+    child.on("error", reject);
+  });
+}
+
+// Parse --ide option: "claude-code", "cursor", or "claude-code,cursor"
+function parseIdeOption(ide: string): string[] {
+  const normalized = ide
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s === "claude-code" || s === "cursor");
+  return [...new Set(normalized)];
+}
+
 const program = new Command();
 
 // Render logo as ASCII art
@@ -316,6 +355,11 @@ program
   )
   .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
+  .option("--no-install", "Skip installing dependencies (and skip prompt)")
+  .option(
+    "--ide <presets>",
+    "Skills presets: claude-code, cursor, or comma-separated (e.g. claude-code,cursor). Omit to prompt."
+  )
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
   .option("--canary", "Use canary versions of packages")
@@ -329,6 +373,7 @@ program
         template?: string;
         listTemplates?: boolean;
         install?: boolean;
+        ide?: string;
         git: boolean;
         dev: boolean;
         canary: boolean;
@@ -461,6 +506,13 @@ program
         // Update index.ts with project name
         updateIndexTs(projectPath, sanitizedProjectName);
 
+        // Ask to install dependencies if not explicitly set
+        console.log("");
+        const shouldInstall =
+          options.install !== undefined
+            ? options.install
+            : await promptForInstall();
+
         // Determine which package manager to use
         let usedPackageManager = "npm";
 
@@ -484,8 +536,8 @@ program
           }
         }
 
-        // Install dependencies if requested (default is false)
-        if (options.install === true) {
+        // Install dependencies if requested or chosen via prompt
+        if (shouldInstall) {
           // Always show a message before installing
           console.log("");
           console.log(chalk.cyan("📦 Installing dependencies..."));
@@ -600,6 +652,35 @@ program
           }
         }
 
+        // Ask for skills presets if not set via --ide, then run npx skills add from project root
+        console.log("");
+        const skillsPresets =
+          options.ide !== undefined
+            ? parseIdeOption(options.ide)
+            : await promptForSkillsPresets();
+        if (skillsPresets.length > 0) {
+          console.log("");
+          console.log(chalk.cyan("📚 Installing skills..."));
+          // Cursor does not support symlinking
+          // Remove this when Cursor supports symlinking
+          // https://forum.cursor.com/t/cursor-doesnt-follow-symlinks-to-discover-skills/149693
+          if (skillsPresets.includes("cursor")) {
+            console.log(
+              chalk.yellow("⚠️  When prompted for Installation Method, choose Copy instead of Symlink.")
+            );
+          }
+          try {
+            await runSkillsAdd(projectPath, skillsPresets);
+            console.log(chalk.green("✅ Skills installed successfully!"));
+          } catch (err) {
+            console.log(
+              chalk.yellow(
+                "⚠️  Skills install failed. Run `npx skills add mcp-use/mcp-use` manually in root directory."
+              )
+            );
+          }
+        }
+
         // Note: Git initialization is skipped to avoid delays when scanning node_modules.
         // Users can run `git init` themselves when ready.
 
@@ -639,7 +720,7 @@ program
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
         console.log(chalk.cyan(`   cd ${sanitizedProjectName}`));
-        if (!options.install) {
+        if (!shouldInstall) {
           console.log(
             chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`)
           );
@@ -1048,6 +1129,92 @@ function updateIndexTs(projectPath: string, projectName: string) {
   content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
 
   writeFileSync(indexPath, content);
+}
+
+// Ink component for install dependencies prompt (Y/n)
+function InstallPrompt({ onSubmit }: { onSubmit: (install: boolean) => void }) {
+  const [value, setValue] = useState("");
+
+  const handleSubmit = (val: string) => {
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed === "" || trimmed === "y" || trimmed === "yes") {
+      onSubmit(true);
+    } else if (trimmed === "n" || trimmed === "no") {
+      onSubmit(false);
+    }
+  };
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Install dependencies now? (Y/n)</Text>
+      </Box>
+      <Box>
+        <Text color="cyan">❯ </Text>
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      </Box>
+    </Box>
+  );
+}
+
+async function promptForInstall(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <InstallPrompt
+        onSubmit={(install) => {
+          unmount();
+          resolve(install);
+        }}
+      />
+    );
+  });
+}
+
+// Ink component for skills preset selection (Claude Code, Cursor, Both, None)
+function SkillsPresetSelector({
+  onSelect,
+}: {
+  onSelect: (presets: string[]) => void;
+}) {
+  const items = [
+    { label: "Claude Code", value: "claude-code" },
+    { label: "Cursor", value: "cursor" },
+    { label: "Both (Claude Code + Cursor)", value: "both" },
+    { label: "None", value: "none" },
+  ];
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Install skills for (select one):</Text>
+      </Box>
+      <SelectInput
+        items={items}
+        onSelect={(item) => {
+          const presets =
+            item.value === "none"
+              ? []
+              : item.value === "both"
+                ? ["claude-code", "cursor"]
+                : [item.value];
+          onSelect(presets);
+        }}
+      />
+    </Box>
+  );
+}
+
+async function promptForSkillsPresets(): Promise<string[]> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <SkillsPresetSelector
+        onSelect={(presets) => {
+          unmount();
+          resolve(presets);
+        }}
+      />
+    );
+  });
 }
 
 // Ink component for project name input
