@@ -111,10 +111,7 @@ function getInstallArgs(packageManager: string): string[] {
 }
 
 // Run npx skills add in the project directory (for Claude Code / Cursor presets)
-function runSkillsAdd(
-  projectPath: string,
-  presets: string[]
-): Promise<void> {
+function runSkillsAdd(projectPath: string, presets: string[]): Promise<void> {
   if (presets.length === 0) return Promise.resolve();
   const args = [
     "--yes",
@@ -666,7 +663,9 @@ program
           // https://forum.cursor.com/t/cursor-doesnt-follow-symlinks-to-discover-skills/149693
           if (skillsPresets.includes("cursor")) {
             console.log(
-              chalk.yellow("⚠️  When prompted for Installation Method, choose Copy instead of Symlink.")
+              chalk.yellow(
+                "⚠️  When prompted for Installation Method, choose Copy instead of Symlink."
+              )
             );
           }
           try {
