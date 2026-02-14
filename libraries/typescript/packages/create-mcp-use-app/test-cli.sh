@@ -62,18 +62,22 @@ run_test() {
     # Remove existing test app
     rm -rf "$app_name"
     
+    # Non-interactive: skip install/skills prompts
+    local non_interactive="--no-install --ide none"
+    [ "$install" == "yes" ] && non_interactive="--install --ide none"
+    
     # Build command
     local cmd=""
     
     case "$pm" in
         npm)
-            cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag $install_flag"
+            cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $non_interactive $flag"
             ;;
         yarn)
-            cmd="yarn dlx -p $PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag $install_flag"
+            cmd="yarn dlx -p $PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $non_interactive $flag"
             ;;
         pnpm)
-            cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $flag $install_flag"
+            cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $non_interactive $flag"
             ;;
     esac
     
@@ -184,31 +188,16 @@ run_test() {
 
 # Run tests
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
-echo -e "${BLUE}Running Basic Tests (no install)${NC}"
-echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
-echo ""
-
-# Test each template with different package managers
-for template in ui uiresource apps_sdk; do
-    run_test "NPM-$template" npm "$template" "" ""
-    echo ""
-    run_test "Yarn-$template" yarn "$template" "" ""
-    echo ""
-    run_test "PNPM-$template" pnpm "$template" "" ""
-    echo ""
-done
-
-echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo -e "${BLUE}Running Flag Tests${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
 echo ""
 
 # Test package manager flags
-run_test "Flag-Yarn" npm ui "--yarn" ""
+run_test "Flag-Yarn" npm starter "--yarn" ""
 echo ""
-run_test "Flag-NPM" npm ui "--npm" ""
+run_test "Flag-NPM" npm starter "--npm" ""
 echo ""
-run_test "Flag-PNPM" npm ui "--pnpm" ""
+run_test "Flag-PNPM" npm starter "--pnpm" ""
 echo ""
 
 echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
@@ -217,11 +206,11 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Test version flags
-run_test "Version-Dev" npm ui "--dev" ""
+run_test "Version-Dev" npm starter "--dev" ""
 echo ""
-run_test "Version-Canary" npm ui "--canary" ""
+run_test "Version-Canary" npm starter "--canary" ""
 echo ""
-run_test "Version-Latest" npm ui "" ""
+run_test "Version-Latest" npm starter "" ""
 echo ""
 
 # Optional: Test with installation (slower)
@@ -231,9 +220,9 @@ if [ "${RUN_INSTALL_TESTS:-no}" == "yes" ]; then
     echo -e "${BLUE}═══════════════════════════════════════════════${NC}"
     echo ""
     
-    run_test "Install-NPM" npm ui "--npm" "yes"
+    run_test "Install-NPM" npm starter "--npm" "yes"
     echo ""
-    run_test "Install-Yarn" yarn ui "--yarn" "yes"
+    run_test "Install-Yarn" yarn starter "--yarn" "yes"
     echo ""
 fi
 
