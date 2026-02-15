@@ -26,6 +26,9 @@ Extended ServerSession that routes initialize requests through middleware.
     - Log connection attempts and protocol versions
     - Reject connections early based on initialization parameters
 
+    It also tracks all active sessions so the server can broadcast notifications
+    (e.g., ``notifications/resources/updated``) to all connected clients.
+
     The class is injected via monkey-patching of ``mcp.server.session.ServerSession``
     to intercept session creation within the MCP SDK.
 
@@ -41,6 +44,7 @@ Extended ServerSession that routes initialize requests through middleware.
             Injected by MCPServer during initialization.
         _transport_type: The transport type (e.g., "stdio", "streamable-http").
             Injected by MCPServer during initialization.
+        _active_sessions: Weak set of all active sessions for broadcasting notifications.
 
 </div>
 </RandomGradientBackground>
@@ -52,14 +56,12 @@ from mcp_use.server.middleware.server_session import MiddlewareServerSession
 ### `method` __init__
 
 **Parameters**
-><ParamField body="read_stream" type="anyio.streams.memory.MemoryObjectReceiveStream" required="True" >   String value </ParamField>
-><ParamField body="write_stream" type="anyio.streams.memory.MemoryObjectSendStream" required="True" >   String value </ParamField>
-><ParamField body="init_options" type="mcp.server.models.InitializationOptions" required="True" >   Parameter value </ParamField>
-><ParamField body="stateless" type="bool" default="False" >   Boolean flag </ParamField>
+><ParamField body="args" required="True" >   Parameter value </ParamField>
+><ParamField body="kwargs" required="True" >   Parameter value </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(read_stream: anyio.streams.memory.MemoryObjectReceiveStream, write_stream: anyio.streams.memory.MemoryObjectSendStream, init_options: mcp.server.models.InitializationOptions, stateless: bool = False):
+def __init__(args, kwargs):
 ```
 
 </Card>

@@ -109,4 +109,26 @@ def include_router(router: MCPRouter, prefix: str = "", enabled: bool = True):
 
 </Card>
 
+<Card type="info">
+### `method` notify_resource_updated
+
+Notify all subscribed sessions that a resource has been updated.
+
+        Broadcasts a ``notifications/resources/updated`` message to every session
+        that called ``resources/subscribe`` for this URI.
+
+        Can be called from within a tool handler or from any async context.
+
+
+
+**Parameters**
+><ParamField body="uri" type="str" required="True" >   The URI of the resource that was updated. </ParamField>
+
+**Signature**
+```python wrap
+def notify_resource_updated(uri: str):
+```
+
+</Card>
+
 </div>

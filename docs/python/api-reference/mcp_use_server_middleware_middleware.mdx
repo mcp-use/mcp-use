@@ -110,6 +110,28 @@ context: ServerMiddlewareContext[CallToolRequestParams],
 </Card>
 
 <Card type="info">
+### `method` on_complete
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[CompleteRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[CompleteRequestParams, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_complete(
+context: ServerMiddlewareContext[CompleteRequestParams],
+    call_next: CallNext[CompleteRequestParams,
+    Any]
+):
+```
+
+</Card>
+
+<Card type="info">
 ### `method` on_get_prompt
 
 
@@ -255,6 +277,72 @@ context: ServerMiddlewareContext[ReadResourceRequestParams],
 **Signature**
 ```python wrap
 def on_request(context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_set_logging_level
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[SetLevelRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[SetLevelRequestParams, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_set_logging_level(
+context: ServerMiddlewareContext[SetLevelRequestParams],
+    call_next: CallNext[SetLevelRequestParams,
+    Any]
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_subscribe_resource
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[SubscribeRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[SubscribeRequestParams, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_subscribe_resource(
+context: ServerMiddlewareContext[SubscribeRequestParams],
+    call_next: CallNext[SubscribeRequestParams,
+    Any]
+):
+```
+
+</Card>
+
+<Card type="info">
+### `method` on_unsubscribe_resource
+
+
+**Parameters**
+><ParamField body="context" type="ServerMiddlewareContext[UnsubscribeRequestParams]" required="True" >   Parameter value </ParamField>
+><ParamField body="call_next" type="CallNext[UnsubscribeRequestParams, Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Any" />
+
+**Signature**
+```python wrap
+def on_unsubscribe_resource(
+context: ServerMiddlewareContext[UnsubscribeRequestParams],
+    call_next: CallNext[UnsubscribeRequestParams,
+    Any]
+):
 ```
 
 </Card>

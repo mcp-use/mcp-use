@@ -22,6 +22,8 @@ from mcp.types import (
     ReadResourceRequest,
     ServerResult,
     SetLevelRequest,
+    SubscribeRequest,
+    UnsubscribeRequest,
 )
 
 # Import auth components
@@ -290,9 +292,9 @@ class MCPServer(FastMCP):
     def _register_default_protocol_handlers(self) -> None:
         """Register default handlers for MCP protocol methods not covered by FastMCP.
 
-        Registers logging/setLevel and completion/complete so the server advertises
-        these capabilities and responds to requests. Users can override completion
-        behavior via the inherited `completion()` decorator.
+        Registers logging/setLevel, resources/subscribe, resources/unsubscribe,
+        and completion/complete so the server advertises these capabilities and
+        responds to requests correctly.
         """
 
         # logging/setLevel — store the level so Context.log() can filter
@@ -302,10 +304,62 @@ class MCPServer(FastMCP):
         async def _handle_set_logging_level(level: Any) -> None:
             self._client_log_level = str(level)
 
+        # resources/subscribe + unsubscribe — track per-URI subscriptions
+        self._resource_subscriptions: dict[str, set[int]] = {}  # uri -> set of session ids
+
+        @self._mcp_server.subscribe_resource()
+        async def _handle_subscribe(uri: Any) -> None:
+            session = self._current_session()
+            if session:
+                self._resource_subscriptions.setdefault(str(uri), set()).add(id(session))
+
+        @self._mcp_server.unsubscribe_resource()
+        async def _handle_unsubscribe(uri: Any) -> None:
+            session = self._current_session()
+            if session:
+                subscribers = self._resource_subscriptions.get(str(uri))
+                if subscribers:
+                    subscribers.discard(id(session))
+                    if not subscribers:
+                        del self._resource_subscriptions[str(uri)]
+
+        # Patch capabilities to advertise subscribe support
+        original_get_capabilities = self._mcp_server.get_capabilities
+
+        def _patched_get_capabilities(notification_options: Any, experimental_capabilities: Any) -> Any:
+            caps = original_get_capabilities(notification_options, experimental_capabilities)
+            if caps.resources is not None:
+                caps.resources.subscribe = True
+            return caps
+
+        self._mcp_server.get_capabilities = _patched_get_capabilities  # type: ignore[assignment]
+
         # completion/complete — default empty completions (override via mcp.completion())
         @self._mcp_server.completion()
         async def _handle_completion(_ref: Any, _argument: Any, _context: Any = None) -> Completion:
             return Completion(values=[], total=0, hasMore=False)
+
+    async def notify_resource_updated(self, uri: str) -> None:
+        """Notify all subscribed sessions that a resource has been updated.
+
+        Broadcasts a ``notifications/resources/updated`` message to every session
+        that called ``resources/subscribe`` for this URI.
+
+        Can be called from within a tool handler or from any async context.
+
+        Args:
+            uri: The URI of the resource that was updated.
+        """
+        subscribers = self._resource_subscriptions.get(uri)
+        if not subscribers:
+            return
+
+        for session in list(MiddlewareServerSession._active_sessions):
+            if id(session) in subscribers:
+                try:
+                    await session.send_resource_updated(uri=uri)
+                except Exception:
+                    pass  # Session may have disconnected
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
@@ -380,6 +434,8 @@ class MCPServer(FastMCP):
         wrap_request(ListResourcesRequest, "resources/list")
         wrap_request(ListPromptsRequest, "prompts/list")
         wrap_request(SetLevelRequest, "logging/setLevel")
+        wrap_request(SubscribeRequest, "resources/subscribe")
+        wrap_request(UnsubscribeRequest, "resources/unsubscribe")
         wrap_request(CompleteRequest, "completion/complete")
 
     def run(  # type: ignore[override]

@@ -380,31 +380,8 @@ def get_template_resource(id: str) -> str:
 
 
 # resources-subscribe / resources-unsubscribe
-# Register subscribe/unsubscribe handlers on the lowlevel server for this conformance server.
-# The MCPServer SDK does not register these by default since it doesn't yet have
-# a proper multi-session subscription broadcast implementation.
-@mcp._mcp_server.subscribe_resource()
-async def _handle_subscribe(_uri):
-    pass
-
-
-@mcp._mcp_server.unsubscribe_resource()
-async def _handle_unsubscribe(_uri):
-    pass
-
-
-# Patch capabilities to advertise subscribe support for this conformance server
-_original_get_capabilities = mcp._mcp_server.get_capabilities
-
-
-def _patched_get_capabilities(notification_options, experimental_capabilities):
-    caps = _original_get_capabilities(notification_options, experimental_capabilities)
-    if caps.resources is not None:
-        caps.resources.subscribe = True
-    return caps
-
-
-mcp._mcp_server.get_capabilities = _patched_get_capabilities  # type: ignore[assignment]
+# Subscribe/unsubscribe are handled by MCPServer automatically.
+# notify_resource_updated broadcasts to all subscribed sessions.
 
 _subscribable_value = "Initial value"
 
@@ -420,9 +397,7 @@ async def update_subscribable_resource(newValue: str = "Updated value") -> str:
     """Update the subscribable resource and notify subscribers."""
     global _subscribable_value
     _subscribable_value = newValue
-    session = mcp._current_session()
-    if session:
-        await session.send_resource_updated(uri="test://subscribable")
+    await mcp.notify_resource_updated("test://subscribable")
     return f"Resource updated to: {newValue}"
 
 
