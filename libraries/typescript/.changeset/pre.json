@@ -8,6 +8,7 @@
     "mcp-use": "1.17.4"
   },
   "changesets": [
+    "orange-stars-pull",
     "slimy-rockets-clean"
   ]
 }
