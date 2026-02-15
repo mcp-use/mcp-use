@@ -9,12 +9,12 @@
  * Required: OPENAI_API_KEY environment variable
  *
  * Usage:
- *   node examples/client/commonjs_example.cjs
+ *   pnpm run example:commonjs
+ *   node examples/client/browser/commonjs/commonjs_example.cjs
  */
 
-// CommonJS imports using require()
-const { MCPClient } = require("../../../dist/src/client.cjs");
-const { MCPAgent } = require("../../../dist/src/agents.cjs");
+// CommonJS imports using require() (from package root: ../../../../ = examples/client/browser/commonjs -> root)
+const { MCPClient, MCPAgent } = require("../../../../dist/index.cjs");
 const { ChatOpenAI } = require("@langchain/openai");
 
 async function runCommonJSExample() {

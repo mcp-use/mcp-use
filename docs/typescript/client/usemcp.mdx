@@ -241,6 +241,7 @@ interface McpServerOptions {
   preventAutoAuth?: boolean; // Prevent automatic OAuth popup (default: true)
   useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
   callbackUrl?: string; // OAuth callback URL
+  authProvider?: OAuthClientProvider; // Optional external OAuth provider (headless/custom runtimes)
   clientInfo?: {
     name: string;
     version: string;
@@ -555,7 +556,7 @@ function NotificationPanel({ serverId }: { serverId: string }) {
 
 ## Sampling & Elicitation
 
-Handle interactive server requests (AI sampling, form elicitation):
+Handle interactive server requests (AI sampling, form elicitation). For elicitation, you can use helpers from `mcp-use` (e.g. `acceptWithDefaults`, `validate`) inside your callback; see [Elicitation](/typescript/client/elicitation).
 
 ```typescript
 function SamplingHandler() {
@@ -771,6 +772,18 @@ function SimpleApp() {
     </div>
   );
 }
+```
+
+With elicitation (same pattern as the Node client):
+
+```typescript
+import { useMcp } from "mcp-use/react";
+import { acceptWithDefaults } from "mcp-use";
+
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  onElicitation: async (params) => acceptWithDefaults(params),
+});
 ```
 
 <Note>

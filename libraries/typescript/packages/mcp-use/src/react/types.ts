@@ -10,6 +10,7 @@ import type {
   ResourceTemplate,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 export type UseMcpOptions = {
@@ -174,6 +175,12 @@ export type UseMcpOptions = {
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
   /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+  /**
    * Client information sent to the MCP server in the initialize request.
    * If not provided, defaults to mcp-use client info.
    */
@@ -189,6 +196,14 @@ export type UseMcpOptions = {
     }>;
     websiteUrl?: string;
   };
+  /**
+   * Optional external OAuth client provider.
+   *
+   * When provided, useMcp will use this provider directly instead of creating
+   * BrowserOAuthClientProvider internally. This is useful for headless/testing
+   * runtimes where popup/redirect flows are not available.
+   */
+  authProvider?: OAuthClientProvider;
   /**
    * Initial server info to use from cache (internal use).
    * This will be displayed immediately while the actual server info is being fetched.

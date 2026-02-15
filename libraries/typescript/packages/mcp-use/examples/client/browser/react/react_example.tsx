@@ -17,6 +17,7 @@ const MCPTools: React.FC = () => {
     clearStorage,
   } = useMcp({
     url: "https://mcp.linear.app/mcp",
+    enabled: enableConnection,
     preventAutoAuth: true,
   });
 
@@ -469,12 +470,14 @@ const ReactExample: React.FC = () => {
         <h3>🔐 OAuth Authentication with Linear MCP</h3>
         <p>
           This example demonstrates the new <code>useMcp</code> hook with OAuth
-          authentication to Linear's MCP server. The hook will automatically
-          handle the OAuth flow when you connect.
+          authentication to Linear's MCP server. By default, authentication is
+          user-triggered when the connection enters <code>pending_auth</code>.
         </p>
         <h4>Features:</h4>
         <ul>
-          <li>✅ Automatic OAuth flow handling with popup support</li>
+          <li>
+            ✅ Manual OAuth trigger via <code>authenticate()</code>
+          </li>
           <li>✅ Fallback manual authentication link if popup is blocked</li>
           <li>✅ Auto-reconnect on connection loss</li>
           <li>
@@ -486,8 +489,8 @@ const ReactExample: React.FC = () => {
         </ul>
         <p>
           <strong>Note:</strong> The Linear MCP server requires OAuth
-          authentication. The hook will automatically initiate the OAuth flow
-          when connecting.
+          authentication. Click <em>Start Authentication</em> when the state is{" "}
+          <code>pending_auth</code>.
         </p>
       </div>
     </div>

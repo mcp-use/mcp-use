@@ -31,7 +31,7 @@ For information on sending notifications from your MCP server, see the [Server N
 
 ## Receiving Notifications (Server → Client)
 
-Register a notification handler on your session using the `on` method:
+You can set a default `onNotification` handler at the client level (root config or the second argument to `new MCPClient(config, options)`); all servers will use it unless they override it. You can also register a notification handler per session using the `on` method:
 
 ```typescript
 import { MCPClient } from "mcp-use";

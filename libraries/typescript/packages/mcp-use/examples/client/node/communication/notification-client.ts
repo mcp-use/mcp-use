@@ -1,7 +1,7 @@
 /**
- * MCP Client Notification Example
+ * MCP Client Notification Example (Node)
  *
- * This example demonstrates bidirectional notifications:
+ * Demonstrates bidirectional notifications:
  *
  * 1. **Server → Client**: Receives notifications from the server:
  *    - notifications/tools/list_changed (auto-handled + logged)
@@ -12,12 +12,13 @@
  * 2. **Client → Server**: Sends notifications to the server:
  *    - notifications/roots/list_changed (via session.setRoots())
  *
- * How to test:
- *   pnpm run example:notifications
+ * Run:
+ *   pnpm run example:client:notification
+ *   pnpm run example:notifications   (starts server then client)
  *
- * Or manually:
+ * Manually:
  *   1. Start the notification server: pnpm run example:server:notification
- *   2. Run this client: tsx examples/client/notification-client.ts
+ *   2. Run this client: tsx examples/client/node/communication/notification-client.ts
  */
 
 import {
@@ -25,33 +26,27 @@ import {
   MCPSession,
   type Notification,
   type Root,
-} from "../../../dist/index.js";
+} from "mcp-use";
 
-const SERVER_URL = process.env.MCP_SERVER_URL || "http://localhost:3000/mcp";
+const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
 
 async function main() {
   console.log("🔔 MCP Notification Client Example");
   console.log("═".repeat(50));
   console.log();
 
-  // Create connector with initial roots
   const initialRoots: Root[] = [
     { uri: "file:///home/user/projects", name: "Projects" },
   ];
 
   console.log("[Setup] Creating HTTP connector...");
-  // Configure clientInfo to identify this client to the server
-  // This is sent in the MCP initialize request and helps with server-side logging/observability
   const connector = new HttpConnector(SERVER_URL, {
     clientInfo: { name: "notification-client", version: "1.0.0" },
     roots: initialRoots,
   });
 
-  // Create session
   const session = new MCPSession(connector, false);
 
-  // Register notification handler BEFORE connecting
-  // This ensures we catch all notifications from the start
   session.on("notification", async (notification: Notification) => {
     const timestamp = new Date().toISOString().split("T")[1].split(".")[0];
 
@@ -59,8 +54,6 @@ async function main() {
       case "notifications/tools/list_changed":
         console.log(`\n[${timestamp}] ⚡ NOTIFICATION: tools/list_changed`);
         console.log("  → Tools cache will be auto-refreshed");
-        // The BaseConnector automatically refreshes the tools cache
-        // After refresh, we can access the updated tools
         setTimeout(() => {
           try {
             const tools = session.tools;
@@ -89,7 +82,7 @@ async function main() {
         );
         break;
 
-      case "custom/heartbeat":
+      case "custom/heartbeat": {
         const hb = notification.params as any;
         console.log(
           `\n[${timestamp}] 💓 NOTIFICATION: custom/heartbeat #${hb?.count}`
@@ -98,12 +91,14 @@ async function main() {
           `  → Mode: ${hb?.currentMode}, Clients: ${hb?.connectedClients}`
         );
         break;
+      }
 
-      case "custom/broadcast":
+      case "custom/broadcast": {
         const bc = notification.params as any;
         console.log(`\n[${timestamp}] 📢 NOTIFICATION: custom/broadcast`);
         console.log(`  → Message: "${bc?.message}"`);
         break;
+      }
 
       default:
         console.log(`\n[${timestamp}] 📨 NOTIFICATION: ${notification.method}`);
@@ -111,7 +106,6 @@ async function main() {
     }
   });
 
-  // Connect to the server
   console.log(`[Connect] Connecting to ${SERVER_URL}...`);
   try {
     await session.connect();
@@ -123,19 +117,16 @@ async function main() {
     process.exit(1);
   }
 
-  // Initialize the session
   console.log("[Init] Initializing session...");
   await session.initialize();
 
   const serverInfo = session.serverInfo;
   console.log(`[Init] ✓ Server: ${serverInfo?.name} v${serverInfo?.version}`);
 
-  // Show initial tools
   const tools = session.tools;
   console.log(`[Init] ✓ Initial tools: ${tools.length}`);
   tools.forEach((t) => console.log(`  - ${t.name}: ${t.description}`));
 
-  // Show initial roots
   const roots = session.getRoots();
   console.log(`[Init] ✓ Initial roots: ${roots.length}`);
   roots.forEach((r) => console.log(`  - ${r.name || "unnamed"}: ${r.uri}`));
@@ -144,11 +135,9 @@ async function main() {
   console.log("📋 Demonstration Flow");
   console.log("═".repeat(50));
 
-  // Wait a moment for the server's welcome notification
   console.log("\n[Demo] Waiting for server welcome notification...");
   await sleep(6000);
 
-  // Demonstrate client → server notification: update roots
   console.log("\n[Demo] 📤 CLIENT → SERVER: Setting new roots...");
   const newRoots: Root[] = [
     { uri: "file:///home/user/projects", name: "Projects" },
@@ -161,10 +150,8 @@ async function main() {
   );
   newRoots.forEach((r) => console.log(`  - ${r.name}: ${r.uri}`));
 
-  // Wait a moment
   await sleep(2000);
 
-  // Demonstrate calling a tool that triggers tools/list_changed
   console.log(
     "\n[Demo] 🔧 Calling 'toggle-mode' tool (triggers tools/list_changed)..."
   );
@@ -176,10 +163,8 @@ async function main() {
     console.error("[Demo] ✗ Tool call failed:", error);
   }
 
-  // Wait for the notification to arrive
   await sleep(1000);
 
-  // Call ping-pong to see the new mode
   console.log("\n[Demo] 🏓 Calling 'ping-pong' tool to verify mode change...");
   try {
     const result = await session.callTool("ping-pong", {});
@@ -189,7 +174,6 @@ async function main() {
     console.error("[Demo] ✗ Tool call failed:", error);
   }
 
-  // Keep running to receive periodic notifications
   console.log("\n" + "═".repeat(50));
   console.log("🔄 Listening for notifications (Ctrl+C to exit)");
   console.log("═".repeat(50));
@@ -198,7 +182,6 @@ async function main() {
     "You can also use the Inspector to trigger more notifications.\n"
   );
 
-  // Handle graceful shutdown
   process.on("SIGINT", async () => {
     console.log("\n[Shutdown] Disconnecting...");
     await session.disconnect();
@@ -206,8 +189,7 @@ async function main() {
     process.exit(0);
   });
 
-  // Keep the process alive
-  await new Promise(() => {}); // Never resolves
+  await new Promise(() => {});
 }
 
 function sleep(ms: number): Promise<void> {
