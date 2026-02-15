@@ -8,7 +8,7 @@ When a client sends logging/setLevel with a minimum level, the server should onl
 send log notifications at or above that level.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -39,9 +39,9 @@ class FakeRequestContext:
 
 def make_context(client_log_level: str = "debug") -> Context:
     """Create a Context with a fake server and session for testing."""
-    ctx = object.__new__(Context)
-    ctx._fastmcp = FakeMCPServer(client_log_level)
-    ctx._request_context = FakeRequestContext()
+    server = FakeMCPServer(client_log_level)
+    request_context = FakeRequestContext()
+    ctx = Context(request_context=request_context, fastmcp=server)
     return ctx
 
 
