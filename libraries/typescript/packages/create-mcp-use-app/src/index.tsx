@@ -122,10 +122,6 @@ export async function addSkillsToProject(
   projectPath: string,
   presets: IdePreset[]
 ): Promise<void> {
-  if (presets.length === 0) {
-    return;
-  }
-
   const REPO_OWNER = "mcp-use";
   const REPO_NAME = "mcp-use";
   const REPO_COMMIT = "main";
