@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.18.0-canary.0
+
+### Minor Changes
+
+- c3a452a: feat(server): added DNS rebinding protection support and updated documentation
+
+### Patch Changes
+
+- @mcp-use/cli@2.13.7-canary.0
+- @mcp-use/inspector@0.18.10-canary.0
+
 ## 1.17.4
 
 ### Patch Changes

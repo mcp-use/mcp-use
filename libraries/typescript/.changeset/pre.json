@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.18.9",
     "mcp-use": "1.17.4"
   },
-  "changesets": []
+  "changesets": [
+    "slimy-rockets-clean"
+  ]
 }
