@@ -62,22 +62,18 @@ run_test() {
     # Remove existing test app
     rm -rf "$app_name"
     
-    # Non-interactive: skip install/skills prompts
-    local non_interactive="--no-install --ide none"
-    [ "$install" == "yes" ] && non_interactive="--install --ide none"
-    
     # Build command
     local cmd=""
     
     case "$pm" in
         npm)
-            cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $non_interactive $flag"
+            cmd="npx --yes --package=$PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
         yarn)
-            cmd="yarn dlx -p $PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $non_interactive $flag"
+            cmd="yarn dlx -p $PACKAGE_FULL_PATH create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
         pnpm)
-            cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $non_interactive $flag"
+            cmd="pnpm --package=$PACKAGE_FULL_PATH dlx create-mcp-use-app $app_name --template $template $flag --no-skills"
             ;;
     esac
     

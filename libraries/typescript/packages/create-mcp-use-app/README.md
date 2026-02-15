@@ -128,9 +128,8 @@ npx create-mcp-use-app my-project --install
 npx create-mcp-use-app my-project --no-install
 
 # Skills presets for Claude Code / Cursor (omit to prompt)
-npx create-mcp-use-app my-project --ide claude-code
-npx create-mcp-use-app my-project --ide cursor
-npx create-mcp-use-app my-project --ide claude-code,cursor
+npx create-mcp-use-app my-project --skills
+npx create-mcp-use-app my-project --no-skills
 
 # List all available templates
 npx create-mcp-use-app --list-templates

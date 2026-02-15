@@ -114,14 +114,40 @@ function getInstallArgs(packageManager: string): string[] {
   }
 }
 
+// Send telemetry event for vercel skills.sh
+// Necessary for ranking and discoverability of skills
+function sendInstallTelemetryEvent(agents: string, skills: string): void {
+  const TELEMETRY_URL = "https://add-skill.vercel.sh/t";
+  const SOURCE_REPO = "mcp-use/mcp-use";
+  const telemetryData: InstallTelemetryData = {
+    event: "install",
+    source: SOURCE_REPO,
+    skills,
+    agents,
+    sourceType: "github",
+  };
+  try {
+    const params = new URLSearchParams();
+
+    // Add event data
+    for (const [key, value] of Object.entries(telemetryData)) {
+      if (value !== undefined && value !== null) {
+        params.set(key, String(value));
+      }
+    }
+
+    // Fire and forget - don't await, silently ignore errors
+    fetch(`${TELEMETRY_URL}?${params.toString()}`).catch(() => {});
+  } catch {
+    // Silently fail - telemetry should never break the CLI
+  }
+}
+
 // Type-safe enum for IDE presets
-type IdePreset = "cursor" | "claude-code";
+type AgentPreset = "cursor" | "claude-code" | "codex";
 
 // Download and extract skills folder from GitHub repository
-export async function addSkillsToProject(
-  projectPath: string,
-  presets: IdePreset[]
-): Promise<void> {
+async function addSkillsToProject(projectPath: string): Promise<void> {
   const REPO_OWNER = "mcp-use";
   const REPO_NAME = "mcp-use";
   const REPO_COMMIT = "main";
@@ -156,9 +182,11 @@ export async function addSkillsToProject(
     }
 
     // Copy to each requested preset location
-    const presetFolders: Record<IdePreset, string> = {
+    const presets: AgentPreset[] = ["cursor", "claude-code", "codex"];
+    const presetFolders: Record<AgentPreset, string> = {
       cursor: ".cursor",
       "claude-code": ".claude",
+      codex: ".agent",
     };
 
     for (const preset of presets) {
@@ -168,6 +196,13 @@ export async function addSkillsToProject(
       // Use cpSync with recursive flag (Node 16.7+)
       cpSync(skillsPath, outputPath, { recursive: true });
     }
+
+    // Get skill names from extracted directory
+    const skillNames = readdirSync(skillsPath, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
+
+    sendInstallTelemetryEvent(presets.join(","), skillNames.join(","));
   } catch (error) {
     console.log(
       chalk.yellow(
@@ -185,13 +220,21 @@ export async function addSkillsToProject(
   }
 }
 
-// Parse --ide option: "claude-code", "cursor", or "claude-code,cursor"
-function parseIdeOption(ide: string): IdePreset[] {
-  const normalized = ide
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter((s) => s === "claude-code" || s === "cursor") as IdePreset[];
-  return [...new Set(normalized)];
+// Telemetry data defined in https://github.com/vercel-labs/skills/blob/main/src/telemetry.ts
+interface InstallTelemetryData {
+  event: "install";
+  source: string;
+  skills: string;
+  agents: string;
+  global?: "1";
+  skillFiles?: string; // JSON stringified { skillName: relativePath }
+  /**
+   * Source type for different hosts:
+   * - 'github': GitHub repository (default, uses raw.githubusercontent.com)
+   * - 'raw': Direct URL to SKILL.md (generic raw URL)
+   * - Provider IDs like 'mintlify', 'huggingface', etc.
+   */
+  sourceType?: string;
 }
 
 const program = new Command();
@@ -400,11 +443,9 @@ program
   )
   .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
-  .option("--no-install", "Skip installing dependencies (and skip prompt)")
-  .option(
-    "--ide <presets>",
-    "Skills presets: claude-code, cursor, or comma-separated (e.g. claude-code,cursor). Omit to prompt."
-  )
+  .option("--no-install", "Skip installing dependencies")
+  .option("--skills", "Install skills for all agents")
+  .option("--no-skills", "Skip installing skills")
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
   .option("--canary", "Use canary versions of packages")
@@ -418,7 +459,7 @@ program
         template?: string;
         listTemplates?: boolean;
         install?: boolean;
-        ide?: string;
+        skills?: boolean;
         git: boolean;
         dev: boolean;
         canary: boolean;
@@ -550,6 +591,20 @@ program
 
         // Update index.ts with project name
         updateIndexTs(projectPath, sanitizedProjectName);
+
+        // Non-interactive defaults when template is specified via flag
+        // Enables usage in CI/tests without blocking prompts
+        if (options.template !== undefined) {
+          // Default to not installing
+          if (options.install === undefined) {
+            options.install = false;
+          }
+
+          // Default to both agents
+          if (options.skills === undefined) {
+            options.skills = true;
+          }
+        }
 
         // Ask to install dependencies if not explicitly set
         console.log("");
@@ -697,17 +752,17 @@ program
           }
         }
 
-        // Ask for skills presets if not set via --ide, then run npx skills add from project root
+        // Ask to install skills if not explicitly set
         console.log("");
-        const skillsPresets =
-          options.ide !== undefined
-            ? parseIdeOption(options.ide)
+        const shouldInstallSkills =
+          options.skills !== undefined
+            ? options.skills
             : await promptForSkillsPresets();
-        if (skillsPresets.length > 0) {
+        if (shouldInstallSkills) {
           console.log("");
           console.log(chalk.cyan("📚 Installing skills..."));
           try {
-            await addSkillsToProject(projectPath, skillsPresets);
+            await addSkillsToProject(projectPath);
             console.log(chalk.green("✅ Skills installed successfully!"));
           } catch (err) {
             console.log(
@@ -1207,47 +1262,44 @@ async function promptForInstall(): Promise<boolean> {
   });
 }
 
-// Ink component for skills preset selection (Claude Code, Cursor, Both, None)
-function SkillsPresetSelector({
-  onSelect,
+// Ink component for skills preset prompt (Y/n)
+function SkillsPresetPrompt({
+  onSubmit,
 }: {
-  onSelect: (presets: IdePreset[]) => void;
+  onSubmit: (install: boolean) => void;
 }) {
-  const items = [
-    { label: "Claude Code", value: "claude-code" },
-    { label: "Cursor", value: "cursor" },
-    { label: "Both (Claude Code + Cursor)", value: "both" },
-    { label: "None", value: "none" },
-  ];
+  const [value, setValue] = useState("");
+
+  const handleSubmit = (val: string) => {
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed === "" || trimmed === "y" || trimmed === "yes") {
+      onSubmit(true); // Install all skills
+    } else if (trimmed === "n" || trimmed === "no") {
+      onSubmit(false); // No skills
+    }
+  };
 
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>
-          Install skills for Claude Code or Cursor? (select one):
+        <Text bold>Install skills (Recommended)? (Y/n)</Text>
+        <Text dimColor>
+          The skills help the agent to assist you write mcp-use code.
         </Text>
       </Box>
-      <SelectInput
-        items={items}
-        onSelect={(item) => {
-          const presets: IdePreset[] =
-            item.value === "none"
-              ? []
-              : item.value === "both"
-                ? ["claude-code", "cursor"]
-                : [item.value as IdePreset];
-          onSelect(presets);
-        }}
-      />
+      <Box>
+        <Text color="cyan">❯ </Text>
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      </Box>
     </Box>
   );
 }
 
-async function promptForSkillsPresets(): Promise<IdePreset[]> {
+async function promptForSkillsPresets(): Promise<boolean> {
   return new Promise((resolve) => {
     const { unmount } = render(
-      <SkillsPresetSelector
-        onSelect={(presets) => {
+      <SkillsPresetPrompt
+        onSubmit={(presets) => {
           unmount();
           resolve(presets);
         }}
