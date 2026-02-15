@@ -111,8 +111,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled = true,
     callbackUrl = typeof window !== "undefined"
       ? sanitizeUrl(
-          new URL("/oauth/callback", window.location.origin).toString()
-        )
+        new URL("/oauth/callback", window.location.origin).toString()
+      )
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
     clientConfig = {},
@@ -188,7 +188,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (clientConfig && Object.keys(clientConfig).length > 0) {
       console.warn(
         "[useMcp] The 'clientConfig' option is deprecated and will be removed in a future version. " +
-          "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
+        "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
       );
       // Merge derived config with explicit config (explicit takes precedence for backward compatibility)
       return { ...derivedClientConfig, ...clientConfig };
@@ -214,6 +214,40 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         "https://inspector.mcp-use.com/inspector/api/proxy",
     };
   }, [autoProxyFallback]);
+
+  // Normalize autoReconnect configuration
+  const autoReconnectConfig = useMemo(() => {
+    if (autoReconnect === false) {
+      return {
+        enabled: false,
+        initialDelay: 0,
+        healthCheckInterval: false as const,
+        healthCheckTimeout: 30000,
+      };
+    }
+    if (autoReconnect === true) {
+      return {
+        enabled: true,
+        initialDelay: DEFAULT_RECONNECT_DELAY,
+        healthCheckInterval: 10000,
+        healthCheckTimeout: 30000,
+      };
+    }
+    if (typeof autoReconnect === "number") {
+      return {
+        enabled: true,
+        initialDelay: autoReconnect,
+        healthCheckInterval: 10000,
+        healthCheckTimeout: 30000,
+      };
+    }
+    return {
+      enabled: autoReconnect.enabled !== false,
+      initialDelay: autoReconnect.initialDelay ?? DEFAULT_RECONNECT_DELAY,
+      healthCheckInterval: autoReconnect.healthCheckInterval ?? 10000,
+      healthCheckTimeout: autoReconnect.healthCheckTimeout ?? 30000,
+    };
+  }, [autoReconnect]);
 
   // Track whether we've already tried proxy fallback
   const hasTriedProxyFallbackRef = useRef(false);
@@ -475,7 +509,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             hasSampling: !!onSampling,
             hasElicitation: !!onElicitation,
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       return false; // Not retrying, connection actually failed
@@ -620,6 +654,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
+          reconnectionOptions: {
+            initialReconnectionDelay: autoReconnectConfig.initialDelay,
+          },
         };
 
         // Add gateway URL if using proxy
@@ -685,14 +722,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           elicitationCallback: onElicitation, // ← Pass elicitation callback to connector
           wrapTransport: wrapTransport
             ? (transport: any) => {
-                console.log(
-                  "[useMcp] Applying transport wrapper for server:",
-                  serverName,
-                  "url:",
-                  url
-                );
-                return wrapTransport(transport, url);
-              }
+              console.log(
+                "[useMcp] Applying transport wrapper for server:",
+                serverName,
+                "url:",
+                url
+              );
+              return wrapTransport(transport, url);
+            }
             : undefined,
         });
 
@@ -784,8 +821,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const setupConnectionMonitoring = () => {
           let healthCheckInterval: NodeJS.Timeout | null = null;
           let lastSuccessfulCheck = Date.now();
-          const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
-          const HEALTH_CHECK_TIMEOUT = 30000; // Consider dead after 30 seconds of no response
+          const HEALTH_CHECK_INTERVAL =
+            autoReconnectConfig.healthCheckInterval || 10000; // Check every 10 seconds (default)
+          const HEALTH_CHECK_TIMEOUT =
+            autoReconnectConfig.healthCheckTimeout || 30000; // Consider dead after 30 seconds (default)
+
+          if (autoReconnectConfig.healthCheckInterval === false) {
+            addLog("debug", "Health check monitoring disabled.");
+            return () => { };
+          }
 
           const checkConnectionHealth = async () => {
             if (!isMountedRef.current || stateRef.current !== "ready") {
@@ -828,24 +872,19 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                 }
 
                 // Trigger reconnection if autoReconnect is enabled
-                if (autoReconnectRef.current && isMountedRef.current) {
+                if (autoReconnectConfig.enabled && isMountedRef.current) {
                   setState("discovering");
                   addLog("info", "Auto-reconnecting to MCP server...");
 
                   // Small delay before reconnecting
-                  setTimeout(
-                    () => {
-                      if (
-                        isMountedRef.current &&
-                        stateRef.current === "discovering"
-                      ) {
-                        connect();
-                      }
-                    },
-                    typeof autoReconnectRef.current === "number"
-                      ? autoReconnectRef.current
-                      : DEFAULT_RECONNECT_DELAY
-                  );
+                  setTimeout(() => {
+                    if (
+                      isMountedRef.current &&
+                      stateRef.current === "discovering"
+                    ) {
+                      connect();
+                    }
+                  }, autoReconnectConfig.initialDelay);
                 }
               }
             }
@@ -884,7 +923,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             hasSampling: !!onSampling,
             hasElicitation: !!onElicitation,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         // Get tools, resources, prompts from session connector
         setTools(session.connector.tools || []);
@@ -1048,7 +1087,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         ) {
           failConnection(
             "Authentication failed (HTTP 401). Server does not support OAuth. " +
-              "Check your Authorization header value is correct."
+            "Check your Authorization header value is correct."
           );
           return "failed";
         }
@@ -1063,8 +1102,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         ) {
           failConnection(
             "Authentication required (HTTP 401). Server does not support OAuth. " +
-              "Add an Authorization header in the Custom Headers section " +
-              "(e.g., Authorization: Bearer YOUR_API_KEY)."
+            "Add an Authorization header in the Custom Headers section " +
+            "(e.g., Authorization: Bearer YOUR_API_KEY)."
           );
           return "failed";
         }
@@ -1077,8 +1116,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             // No OAuth support and no custom headers - suggest adding API key
             failConnection(
               "Authentication required (HTTP 401). Server does not support OAuth. " +
-                "Add an Authorization header in the Custom Headers section " +
-                "(e.g., Authorization: Bearer YOUR_API_KEY)."
+              "Add an Authorization header in the Custom Headers section " +
+              "(e.g., Authorization: Bearer YOUR_API_KEY)."
             );
             return "failed";
           }
@@ -1120,7 +1159,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           if (headers && Object.keys(headers).length > 0) {
             failConnection(
               "Authentication failed: Server returned 401 Unauthorized. " +
-                "Check your Authorization header value is correct."
+              "Check your Authorization header value is correct."
             );
             return "failed";
           }
@@ -1128,8 +1167,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // No OAuth and no custom headers - suggest adding them
           failConnection(
             "Authentication required: Server returned 401 Unauthorized. " +
-              "Add an Authorization header in the Custom Headers section " +
-              "(e.g., Authorization: Bearer YOUR_API_KEY)."
+            "Add an Authorization header in the Custom Headers section " +
+            "(e.g., Authorization: Bearer YOUR_API_KEY)."
           );
           return "failed";
         }
@@ -1280,7 +1319,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             success: true,
             executionTimeMs: Date.now() - startTime,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         return result;
       } catch (err) {
@@ -1294,7 +1333,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             errorType: err instanceof Error ? err.name : "UnknownError",
             executionTimeMs: Date.now() - startTime,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         throw err;
       }
@@ -1560,7 +1599,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             resourceUri: uri,
             success: true,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         return result;
       } catch (err) {
@@ -1573,7 +1612,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             success: false,
             errorType: err instanceof Error ? err.name : "UnknownError",
           })
-          .catch(() => {});
+          .catch(() => { });
 
         throw err;
       }

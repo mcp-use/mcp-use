@@ -72,6 +72,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       clientInfo,
       gatewayUrl,
       serverId,
+      reconnectionOptions,
     } = serverConfig;
 
     if (!url) {
@@ -96,6 +97,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       clientInfo, // ← Pass client info (name, version) to connector
       gatewayUrl, // ← Pass gateway/proxy URL to connector
       serverId, // ← Pass server ID for gateway observability
+      reconnectionOptions, // ← Pass reconnection options to connector
     };
 
     // Debug: Log if clientOptions are being passed
