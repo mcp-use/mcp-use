@@ -207,10 +207,10 @@ async def main():
         pre_client_id = context.get("client_id")
         pre_client_secret = context.get("client_secret")
 
-        # CIMD scenarios: use a metadata URL as client_id
+        # CIMD scenarios: use the conformance test's expected metadata URL as client_id
         client_metadata_url = None
         if scenario == "auth/basic-cimd":
-            client_metadata_url = "https://client.example.com/.well-known/oauth-client"
+            client_metadata_url = "https://conformance-test.local/client-metadata.json"
 
         server_config["auth"] = create_headless_oauth_provider(
             server_url,
