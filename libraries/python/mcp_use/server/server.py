@@ -13,12 +13,17 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import (
     AnyFunction,
     CallToolRequest,
+    CompleteRequest,
+    Completion,
     GetPromptRequest,
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
     ReadResourceRequest,
     ServerResult,
+    SetLevelRequest,
+    SubscribeRequest,
+    UnsubscribeRequest,
 )
 
 # Import auth components
@@ -103,6 +108,9 @@ class MCPServer(FastMCP):
 
         if version:
             self._mcp_server.version = version
+
+        # Register default protocol handlers for full MCP spec compliance
+        self._register_default_protocol_handlers()
 
         # Store auth provider
         self._auth = auth
@@ -257,6 +265,56 @@ class MCPServer(FastMCP):
                 description=prompt.description,
             )(prompt.fn)
 
+    def _register_default_protocol_handlers(self) -> None:
+        """Register default handlers for MCP protocol methods not covered by FastMCP.
+
+        This ensures the server advertises full protocol capabilities (logging,
+        resource subscriptions, completions) and responds correctly to these requests.
+        Users can override completion behavior via the inherited `completion()` decorator.
+        """
+
+        # logging/setLevel — accept any level (enables logging capability advertisement)
+        @self._mcp_server.set_logging_level()
+        async def _handle_set_logging_level(_level: Any) -> None:
+            pass
+
+        # resources/subscribe + unsubscribe — track subscriptions
+        self._resource_subscriptions: dict[str, set[str]] = {}
+
+        @self._mcp_server.subscribe_resource()
+        async def _handle_subscribe(uri: Any) -> None:
+            self._resource_subscriptions.setdefault(str(uri), set())
+
+        @self._mcp_server.unsubscribe_resource()
+        async def _handle_unsubscribe(uri: Any) -> None:
+            self._resource_subscriptions.pop(str(uri), None)
+
+        # completion/complete — default empty completions (override via mcp.completion())
+        @self._mcp_server.completion()
+        async def _handle_completion(_ref: Any, _argument: Any, _context: Any = None) -> Completion:
+            return Completion(values=[], total=0, hasMore=False)
+
+        # Fix subscribe capability: the upstream lowlevel server hardcodes subscribe=False
+        original_get_capabilities = self._mcp_server.get_capabilities
+
+        def _patched_get_capabilities(notification_options: Any, experimental_capabilities: Any) -> Any:
+            caps = original_get_capabilities(notification_options, experimental_capabilities)
+            if caps.resources is not None:
+                caps.resources.subscribe = True
+            return caps
+
+        self._mcp_server.get_capabilities = _patched_get_capabilities  # type: ignore[assignment]
+
+    async def notify_resource_updated(self, uri: str) -> None:
+        """Notify subscribers that a resource has been updated.
+
+        Args:
+            uri: The URI of the resource that was updated.
+        """
+        session = self._current_session()
+        if session:
+            await session.send_resource_updated(uri=uri)
+
     def streamable_http_app(self):
         """Override to add our custom middleware."""
         from starlette.middleware.cors import CORSMiddleware
@@ -329,6 +387,10 @@ class MCPServer(FastMCP):
         wrap_request(ListToolsRequest, "tools/list")
         wrap_request(ListResourcesRequest, "resources/list")
         wrap_request(ListPromptsRequest, "prompts/list")
+        wrap_request(SetLevelRequest, "logging/setLevel")
+        wrap_request(SubscribeRequest, "resources/subscribe")
+        wrap_request(UnsubscribeRequest, "resources/unsubscribe")
+        wrap_request(CompleteRequest, "completion/complete")
 
     def run(  # type: ignore[override]
         self,
@@ -368,6 +430,9 @@ class MCPServer(FastMCP):
                 )
             else:
                 self.settings.transport_security = None
+            # Reset session manager so it gets recreated with new security settings
+            # (FastMCP caches _session_manager on first streamable_http_app() call)
+            self._session_manager = None
             # Rebuild app with new security settings
             self.app = self.streamable_http_app()
 
