@@ -543,11 +543,11 @@
               {
                 "group": "MCP Server",
                 "icon": "server",
-                "tag": "Beta",
                 "pages": [
                   "typescript/server/index",
                   "typescript/server/configuration",
                   "typescript/server/cli-reference",
+                  "typescript/server/examples",
                   {
                     "group": "Core Components",
                     "icon": "box",

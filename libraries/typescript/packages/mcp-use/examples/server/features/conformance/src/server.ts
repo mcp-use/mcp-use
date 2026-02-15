@@ -23,12 +23,19 @@ import {
 } from "mcp-use/server";
 import { z } from "zod";
 
+const SERVER_PORT = process.env.PORT || "3000";
+
 // Create server instance
 const server = new MCPServer({
   name: "ConformanceTestServer",
   version: "1.0.0",
   description:
     "MCP Conformance Test Server implementing all supported features.",
+  // Keep DNS rebinding protection enabled for conformance runs.
+  allowedOrigins: [
+    `http://localhost:${SERVER_PORT}`,
+    `http://127.0.0.1:${SERVER_PORT}`,
+  ],
 });
 
 // 1x1 red PNG pixel as base64

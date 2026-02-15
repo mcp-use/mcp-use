@@ -629,6 +629,9 @@ importers:
       react:
         specifier: ^19.2.0
         version: 19.2.4
+      react-test-renderer:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -741,6 +744,19 @@ importers:
       vite:
         specifier: ^7.3.0
         version: 7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/mcp-use/examples/server/features/dns-rebinding:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.2.0
 
   packages/mcp-use/examples/server/features/elicitation:
     dependencies:
@@ -6031,6 +6047,9 @@ packages:
     peerDependencies:
       react: ^19.2.0
 
+  react-is@19.2.4:
+    resolution: {integrity: sha512-W+EWGn2v0ApPKgKKCy/7s7WHXkboGcsrXE+2joLyVxkbyVQfO3MUEaUQDHoSmb8TFFrSKYa9mw64WZHNHSDzYA==}
+
   react-markdown@9.1.0:
     resolution: {integrity: sha512-xaijuJB0kzGiUdG7nc2MOMDUDBWPyGAjZtUrow9XxUeua8IqeP+VlIfAZ3bphpcLTnSZXz6z9jcVC/TCwbfgdw==}
     peerDependencies:
@@ -6106,6 +6125,11 @@ packages:
   react-syntax-highlighter@16.1.0:
     resolution: {integrity: sha512-E40/hBiP5rCNwkeBN1vRP+xow1X0pndinO+z3h7HLsHyjztbyjfzNWNKuAsJj+7DLam9iT4AaaOZnueCU+Nplg==}
     engines: {node: '>= 16.20.2'}
+    peerDependencies:
+      react: ^19.2.0
+
+  react-test-renderer@19.2.4:
+    resolution: {integrity: sha512-Ttl5D7Rnmi6JGMUpri4UjB4BAN0FPs4yRDnu2XSsigCWOLm11o8GwRlVsh27ER+4WFqsGtrBuuv5zumUaRCmKw==}
     peerDependencies:
       react: ^19.2.0
 
@@ -12736,6 +12760,8 @@ snapshots:
       react: 19.2.4
       scheduler: 0.27.0
 
+  react-is@19.2.4: {}
+
   react-markdown@9.1.0(@types/react@19.2.10)(react@19.2.4):
     dependencies:
       '@types/hast': 3.0.4
@@ -12818,6 +12844,12 @@ snapshots:
       prismjs: 1.30.0
       react: 19.2.4
       refractor: 5.0.0
+
+  react-test-renderer@19.2.4(react@19.2.4):
+    dependencies:
+      react: 19.2.4
+      react-is: 19.2.4
+      scheduler: 0.27.0
 
   react@19.2.4: {}
 

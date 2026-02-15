@@ -3,6 +3,7 @@
  */
 
 import type { OAuthProvider } from "../oauth/providers/types.js";
+import type { cors } from "hono/cors";
 import type { z } from "zod";
 
 /**
@@ -42,26 +43,40 @@ export interface ServerConfig {
   host?: string; // Hostname for widget URLs and server endpoints (defaults to 'localhost')
   baseUrl?: string; // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
   /**
-   * Allowed origins for DNS rebinding protection
+   * Custom CORS options for the server.
    *
-   * **Development mode** (NODE_ENV !== "production"):
-   * - If not set: All origins are allowed (DNS rebinding protection disabled)
-   * - This enables direct browser connections from any origin for easier development
-   *
-   * **Production mode** (NODE_ENV === "production"):
-   * - If not set: DNS rebinding protection is disabled (not recommended for production)
-   * - If set to empty array: DNS rebinding protection is disabled
-   * - If set with origins: DNS rebinding protection is enabled with those specific origins
+   * By default, mcp-use enables permissive CORS (`origin: "*"`) for development ergonomics.
+   * Set this to customize allowed origins, headers, methods, credentials, etc.
    *
    * @example
    * ```typescript
-   * // Development: No need to set (allows all origins)
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   cors: {
+   *     origin: ['https://app.mycompany.com'],
+   *     allowMethods: ['GET', 'POST', 'OPTIONS'],
+   *   },
+   * });
+   * ```
+   */
+  cors?: Partial<Parameters<typeof cors>[0]>;
+  /**
+   * Allowed origins for DNS rebinding protection
+   *
+   * - If not set: DNS rebinding protection is disabled (all Host values accepted)
+   * - If set to empty array: DNS rebinding protection is disabled
+   * - If set with origins: Host validation is enabled globally for the server
+   *
+   * @example
+   * ```typescript
+   * // Default behavior (no host validation)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0'
    * });
    *
-   * // Production: Explicitly set allowed origins
+   * // Explicit protection (applies to all routes)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0',
