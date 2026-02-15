@@ -114,6 +114,23 @@ function getInstallArgs(packageManager: string): string[] {
   }
 }
 
+// Telemetry data defined in https://github.com/vercel-labs/skills/blob/main/src/telemetry.ts
+interface InstallTelemetryData {
+  event: "install";
+  source: string;
+  skills: string;
+  agents: string;
+  global?: "1";
+  skillFiles?: string; // JSON stringified { skillName: relativePath }
+  /**
+   * Source type for different hosts:
+   * - 'github': GitHub repository (default, uses raw.githubusercontent.com)
+   * - 'raw': Direct URL to SKILL.md (generic raw URL)
+   * - Provider IDs like 'mintlify', 'huggingface', etc.
+   */
+  sourceType?: string;
+}
+
 // Send telemetry event for vercel skills.sh
 // Necessary for ranking and discoverability of skills
 function sendInstallTelemetryEvent(agents: string, skills: string): void {
@@ -218,23 +235,6 @@ async function addSkillsToProject(projectPath: string): Promise<void> {
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
-}
-
-// Telemetry data defined in https://github.com/vercel-labs/skills/blob/main/src/telemetry.ts
-interface InstallTelemetryData {
-  event: "install";
-  source: string;
-  skills: string;
-  agents: string;
-  global?: "1";
-  skillFiles?: string; // JSON stringified { skillName: relativePath }
-  /**
-   * Source type for different hosts:
-   * - 'github': GitHub repository (default, uses raw.githubusercontent.com)
-   * - 'raw': Direct URL to SKILL.md (generic raw URL)
-   * - Provider IDs like 'mintlify', 'huggingface', etc.
-   */
-  sourceType?: string;
 }
 
 const program = new Command();
