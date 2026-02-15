@@ -204,6 +204,30 @@ Test and manage pre-configured prompts:
 
 > **Note**: Not all servers provide prompts. If none are available, you'll see "No prompts available".
 
+### Elicitation Tab
+
+The Elicitation tab handles tool requests that require user input during execution.
+
+**Features:**
+
+- View pending elicitation requests in a dedicated queue
+- Fill and submit form-mode responses directly in the inspector
+- Accept, decline, or cancel requests
+- Jump back to tool results after responding
+
+**Supported field types:**
+
+- Text, number/integer, and boolean fields
+- Single-select enum dropdowns:
+  - `type: "string" + enum`
+  - `type: "string" + oneOf[{ const, title }]`
+  - `type: "string" + enum + enumNames` (legacy)
+- Multi-select enum groups:
+  - `type: "array" + items.enum`
+  - `type: "array" + items.anyOf[{ const, title }]`
+
+This aligns with SEP-1330 enum schema variants used by MCP conformance scenarios.
+
 ### Chat Tab
 
 The Chat tab provides an interactive interface to test the MCP server with an LLM using **BYOK (Bring Your Own Key)**.

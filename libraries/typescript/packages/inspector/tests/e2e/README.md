@@ -117,6 +117,22 @@ pnpm test:e2e:codegen
 
 Tests use the **real MCP conformance server** from `examples/server/features/conformance` instead of mocks.
 
+### Elicitation Tests
+
+`connection.test.ts` includes elicitation coverage for:
+
+- `test_elicitation`: baseline form-mode elicitation flow
+- `test_elicitation_sep1034_defaults`: default values for primitive fields
+- `test_elicitation_sep1330_enums`: all SEP-1330 enum schema variants
+
+The SEP-1330 test verifies inspector rendering and submission behavior for:
+
+- `string + enum` (untitled single-select)
+- `string + oneOf[{ const, title }]` (titled single-select)
+- `string + enum + enumNames` (legacy titled enum)
+- `array + items.enum` (untitled multi-select)
+- `array + items.anyOf[{ const, title }]` (titled multi-select)
+
 ## Writing Tests
 
 ### Best Practices
