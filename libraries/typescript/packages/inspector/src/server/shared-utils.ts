@@ -618,19 +618,26 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     theme,
   } = data;
 
-  console.log("[Widget Store] Received request for toolId:", toolId);
-  console.log("[Widget Store] Fields:", {
-    serverId,
-    uri,
-    hasResourceData: !!resourceData,
-    hasToolInput: !!toolInput,
-    hasToolOutput: !!toolOutput,
-    hasToolResponseMetadata: !!toolResponseMetadata,
-    toolResponseMetadata,
-    hasWidgetCSP: !!widgetCSP,
-    devWidgetUrl,
-    devServerBaseUrl,
-  });
+  const debugWidget =
+    process.env.DEBUG != null &&
+    process.env.DEBUG !== "" &&
+    process.env.DEBUG !== "0" &&
+    process.env.DEBUG.toLowerCase() !== "false";
+  if (debugWidget) {
+    console.log("[Widget Store] Received request for toolId:", toolId);
+    console.log("[Widget Store] Fields:", {
+      serverId,
+      uri,
+      hasResourceData: !!resourceData,
+      hasToolInput: !!toolInput,
+      hasToolOutput: !!toolOutput,
+      hasToolResponseMetadata: !!toolResponseMetadata,
+      toolResponseMetadata,
+      hasWidgetCSP: !!widgetCSP,
+      devWidgetUrl,
+      devServerBaseUrl,
+    });
+  }
 
   if (!serverId || !uri || !toolId || !resourceData) {
     const missingFields = [];
@@ -662,7 +669,9 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     theme,
   });
 
-  console.log("[Widget Store] Data stored successfully for toolId:", toolId);
+  if (debugWidget) {
+    console.log("[Widget Store] Data stored successfully for toolId:", toolId);
+  }
   return { success: true };
 }
 
@@ -734,10 +743,17 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     playground,
   } = widgetData;
 
-  console.log("[Widget Content] Using pre-fetched resource for:", {
-    serverId,
-    uri,
-  });
+  const debugWidget =
+    process.env.DEBUG != null &&
+    process.env.DEBUG !== "" &&
+    process.env.DEBUG !== "0" &&
+    process.env.DEBUG.toLowerCase() !== "false";
+  if (debugWidget) {
+    console.log("[Widget Content] Using pre-fetched resource for:", {
+      serverId,
+      uri,
+    });
+  }
 
   // Extract HTML content from the pre-fetched resource data
   let htmlContent = "";
@@ -1107,7 +1123,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 </html>`;
   }
 
-  console.log("[Widget Content] Generated HTML length:", modifiedHtml.length);
+  if (debugWidget) {
+    console.log("[Widget Content] Generated HTML length:", modifiedHtml.length);
+  }
 
   return { html: modifiedHtml };
 }

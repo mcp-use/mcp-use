@@ -6,6 +6,16 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.17.4" description="February 2026">
+  ## Widget Resource Propagation & Log Noise Reduction
+  Patch release improving HMR reliability for widget resources and reducing dev server log noise.
+
+- **Fix**: Reduced noisy logs in the dev server
+- **Fix**: Propagated widget resources and resource templates to already-connected MCP sessions during HMR to avoid `Resource ui://widget/... not found` errors without reconnecting
+- **Update**: Updated @mcp-use/inspector to v0.18.9
+- **Update**: Updated @mcp-use/cli to v2.13.6
+</Update>
+
 <Update label="v1.17.3" description="February 2026">
   ## Inspector Reliability Alignment
   Patch release aligning TypeScript packages with the latest inspector reliability fixes.

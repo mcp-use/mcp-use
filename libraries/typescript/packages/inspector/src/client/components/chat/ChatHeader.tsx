@@ -25,6 +25,18 @@ interface ChatHeaderProps {
   onApiKeyChange: (apiKey: string) => void;
   onSaveConfig: () => void;
   onClearConfig: () => void;
+  /** When true, hides the API key config badge/button and dialog. */
+  hideConfigButton?: boolean;
+  /** Label for the clear/new-chat button. Default: "New Chat". */
+  clearButtonLabel?: string;
+  /** When true, hides the "Chat" title in the header. */
+  hideTitle?: boolean;
+  /** When true, hides the icon on the clear/new-chat button. */
+  clearButtonHideIcon?: boolean;
+  /** When true, hides the keyboard shortcut (⌘O) on the clear/new-chat button. */
+  clearButtonHideShortcut?: boolean;
+  /** Button variant for the clear/new-chat button. Default: "default". */
+  clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
 }
 
 export function ChatHeader({
@@ -41,12 +53,18 @@ export function ChatHeader({
   onApiKeyChange,
   onSaveConfig,
   onClearConfig,
+  hideConfigButton,
+  clearButtonLabel,
+  hideTitle,
+  clearButtonHideIcon,
+  clearButtonHideShortcut,
+  clearButtonVariant,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
       <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4 bg-background/40 backdrop-blur-sm">
-        <h3 className="text-xl sm:text-3xl font-base">Chat</h3>
-        {llmConfig && (
+        {!hideTitle && <h3 className="text-xl sm:text-3xl font-base">Chat</h3>}
+        {llmConfig && !hideConfigButton && (
           <>
             {/* Desktop: Show badge with text */}
             <Tooltip>
@@ -73,7 +91,7 @@ export function ChatHeader({
       </div>
       <div className="flex items-center gap-2 pr-2 sm:pr-3 pt-0 sm:pt-2 shrink-0">
         {/* Mobile: Show provider icon button when config exists (leftmost on mobile) */}
-        {llmConfig && (
+        {llmConfig && !hideConfigButton && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -94,42 +112,51 @@ export function ChatHeader({
             </TooltipContent>
           </Tooltip>
         )}
-        {/* New Chat button - rightmost on mobile, primary style */}
+        {/* New Chat / Clear button */}
         {hasMessages && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
+                variant={clearButtonVariant ?? "default"}
                 size="default"
-                className="p-2 sm:pr-1 sm:pl-3 cursor-pointer"
+                className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
                 onClick={onClearChat}
               >
-                <SquarePen className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">New Chat</span>
-                <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                  ⌘O
+                {!clearButtonHideIcon && (
+                  <SquarePen className="h-4 w-4 sm:mr-2" />
+                )}
+                <span className="hidden sm:inline">
+                  {clearButtonLabel ?? "New Chat"}
                 </span>
+                {!clearButtonHideShortcut && (
+                  <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                    ⌘O
+                  </span>
+                )}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>New Chat</p>
+              <p>{clearButtonLabel ?? "New Chat"}</p>
             </TooltipContent>
           </Tooltip>
         )}
-        {/* Always render the dialog for when it's opened */}
-        <ConfigurationDialog
-          open={configDialogOpen}
-          onOpenChange={onConfigDialogOpenChange}
-          tempProvider={tempProvider}
-          tempModel={tempModel}
-          tempApiKey={tempApiKey}
-          onProviderChange={onProviderChange}
-          onModelChange={onModelChange}
-          onApiKeyChange={onApiKeyChange}
-          onSave={onSaveConfig}
-          onClear={onClearConfig}
-          showClearButton={!!llmConfig}
-          buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
-        />
+        {/* Always render the dialog for when it's opened (hidden when externally managed) */}
+        {!hideConfigButton && (
+          <ConfigurationDialog
+            open={configDialogOpen}
+            onOpenChange={onConfigDialogOpenChange}
+            tempProvider={tempProvider}
+            tempModel={tempModel}
+            tempApiKey={tempApiKey}
+            onProviderChange={onProviderChange}
+            onModelChange={onModelChange}
+            onApiKeyChange={onApiKeyChange}
+            onSave={onSaveConfig}
+            onClear={onClearConfig}
+            showClearButton={!!llmConfig}
+            buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
+          />
+        )}
       </div>
     </div>
   );

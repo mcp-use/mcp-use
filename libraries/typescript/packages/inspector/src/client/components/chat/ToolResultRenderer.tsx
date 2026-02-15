@@ -20,6 +20,8 @@ interface ToolResultRendererProps {
   onSendFollowUp?: (text: string) => void;
   /** Partial/streaming tool arguments (forwarded to widget as partialToolInput) */
   partialToolArgs?: Record<string, unknown>;
+  /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
+  serverBaseUrl?: string;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ToolResultRenderer({
   toolMeta,
   onSendFollowUp,
   partialToolArgs,
+  serverBaseUrl,
 }: ToolResultRendererProps) {
   const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
@@ -227,6 +230,7 @@ export function ToolResultRenderer({
             readResource={readResource}
             noWrapper={true}
             onSendFollowUp={onSendFollowUp}
+            serverBaseUrl={serverBaseUrl}
           />
         )}
 
@@ -240,6 +244,7 @@ export function ToolResultRenderer({
             readResource={readResource}
             noWrapper={true}
             showConsole={false}
+            serverBaseUrl={serverBaseUrl}
           />
         )}
       </div>
@@ -263,6 +268,7 @@ export function ToolResultRenderer({
         className="my-4"
         noWrapper={true}
         onSendFollowUp={onSendFollowUp}
+        serverBaseUrl={serverBaseUrl}
       />
     );
   }
@@ -286,6 +292,7 @@ export function ToolResultRenderer({
         noWrapper={true}
         className="my-4"
         showConsole={false}
+        serverBaseUrl={serverBaseUrl}
       />
     );
   }

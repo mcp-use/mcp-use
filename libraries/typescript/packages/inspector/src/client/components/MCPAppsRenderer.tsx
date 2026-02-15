@@ -62,6 +62,8 @@ interface MCPAppsRendererProps {
   onDisplayModeChange?: (mode: DisplayMode) => void;
   noWrapper?: boolean;
   customProps?: Record<string, string>;
+  /** When provided, used directly instead of looking up via useMcpClient(). */
+  serverBaseUrl?: string;
 }
 
 /**
@@ -88,7 +90,8 @@ export function MCPAppsRenderer({
   const bridgeRef = useRef<AppBridge | null>(null);
   const { resolvedTheme } = useTheme();
   const { servers } = useMcpClient();
-  const server = servers.find((s) => s.id === serverId);
+  const serverFromContext = servers.find((s) => s.id === serverId);
+  const server = serverFromContext;
 
   const {
     playground,

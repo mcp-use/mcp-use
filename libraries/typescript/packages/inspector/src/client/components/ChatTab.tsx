@@ -17,14 +17,37 @@ import { useConfig } from "./chat/useConfig";
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
 
-interface ChatTabProps {
+export interface ChatTabProps {
   connection: MCPConnection;
   isConnected: boolean;
   useClientSide?: boolean;
+  /** Enable global keyboard shortcuts (Cmd+O for new chat). Default: true.
+   *  Set to false when embedding to avoid conflicts with host app shortcuts. */
+  enableKeyboardShortcuts?: boolean;
   prompts: Prompt[];
   serverId: string;
   readResource?: (uri: string) => Promise<any>;
   callPrompt: (name: string, args?: Record<string, unknown>) => Promise<any>;
+  /** Custom API endpoint URL for server-side chat streaming (used when useClientSide=false).
+   *  Defaults to "/inspector/api/chat/stream". */
+  chatApiUrl?: string;
+  /** Externally-managed LLM config. When provided, bypasses localStorage-based config
+   *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
+  managedLlmConfig?: import("./chat/types").LLMConfig;
+  /** Label for the clear/new-chat button. Default: "New Chat". */
+  clearButtonLabel?: string;
+  /** When true, hides the "Chat" title in the header. Default: false. */
+  hideTitle?: boolean;
+  /** When true, hides the model badge on the landing form. Default: false. */
+  hideModelBadge?: boolean;
+  /** When true, hides the MCP server URL on the landing form. Default: false. */
+  hideServerUrl?: boolean;
+  /** When true, hides the icon on the clear/new-chat button. */
+  clearButtonHideIcon?: boolean;
+  /** When true, hides the keyboard shortcut (⌘O) on the clear/new-chat button. */
+  clearButtonHideShortcut?: boolean;
+  /** Button variant for the clear/new-chat button. Default: "default". */
+  clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -36,10 +59,20 @@ export function ChatTab({
   connection,
   isConnected,
   useClientSide = true,
+  enableKeyboardShortcuts = true,
   prompts,
   serverId,
   callPrompt,
   readResource,
+  chatApiUrl,
+  managedLlmConfig,
+  clearButtonLabel,
+  hideTitle,
+  hideModelBadge,
+  hideServerUrl,
+  clearButtonHideIcon,
+  clearButtonHideShortcut,
+  clearButtonVariant,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -50,7 +83,7 @@ export function ChatTab({
 
   // Use custom hooks for configuration, chat messages and mcp prompts handling
   const {
-    llmConfig,
+    llmConfig: localLlmConfig,
     authConfig: userAuthConfig,
     configDialogOpen,
     setConfigDialogOpen,
@@ -63,6 +96,10 @@ export function ChatTab({
     saveLLMConfig,
     clearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
+
+  // If a managed LLM config is provided externally, use it instead of localStorage config
+  const llmConfig = managedLlmConfig ?? localLlmConfig;
+  const isManaged = !!managedLlmConfig;
 
   // Use client-side or server-side chat implementation
   const chatHookParams = {
@@ -77,6 +114,7 @@ export function ChatTab({
     llmConfig,
     authConfig: userAuthConfig,
     isConnected,
+    chatApiUrl,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
@@ -106,10 +144,10 @@ export function ChatTab({
     serverId,
   });
 
-  // Register keyboard shortcuts (only active when ChatTab is mounted)
-  useKeyboardShortcuts({
-    onNewChat: clearMessages,
-  });
+  // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
+  useKeyboardShortcuts(
+    enableKeyboardShortcuts ? { onNewChat: clearMessages } : {}
+  );
 
   const clearPromptsUIState = useCallback(() => {
     setPromptFocusedIndex(-1);
@@ -271,23 +309,25 @@ export function ChatTab({
   if (llmConfig && messages.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        {/* Header with config dialog */}
-        <div className="absolute top-4 right-4 z-10">
-          <ConfigurationDialog
-            open={configDialogOpen}
-            onOpenChange={setConfigDialogOpen}
-            tempProvider={tempProvider}
-            tempModel={tempModel}
-            tempApiKey={tempApiKey}
-            onProviderChange={setTempProvider}
-            onModelChange={setTempModel}
-            onApiKeyChange={setTempApiKey}
-            onSave={saveLLMConfig}
-            onClear={handleClearConfig}
-            showClearButton
-            buttonLabel="Change API Key"
-          />
-        </div>
+        {/* Header with config dialog (hidden when externally managed) */}
+        {!isManaged && (
+          <div className="absolute top-4 right-4 z-10">
+            <ConfigurationDialog
+              open={configDialogOpen}
+              onOpenChange={setConfigDialogOpen}
+              tempProvider={tempProvider}
+              tempModel={tempModel}
+              tempApiKey={tempApiKey}
+              onProviderChange={setTempProvider}
+              onModelChange={setTempModel}
+              onApiKeyChange={setTempApiKey}
+              onSave={saveLLMConfig}
+              onClear={handleClearConfig}
+              showClearButton
+              buttonLabel="Change API Key"
+            />
+          </div>
+        )}
 
         {/* Landing Form */}
         <ChatLandingForm
@@ -316,6 +356,8 @@ export function ChatTab({
           onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
+          hideModelBadge={hideModelBadge}
+          hideServerUrl={hideServerUrl}
         />
       </div>
     );
@@ -323,12 +365,12 @@ export function ChatTab({
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header */}
+      {/* Header (hide config controls when externally managed) */}
       <ChatHeader
         llmConfig={llmConfig}
         hasMessages={messages.length > 0}
-        configDialogOpen={configDialogOpen}
-        onConfigDialogOpenChange={setConfigDialogOpen}
+        configDialogOpen={isManaged ? false : configDialogOpen}
+        onConfigDialogOpenChange={isManaged ? () => {} : setConfigDialogOpen}
         onClearChat={clearMessages}
         tempProvider={tempProvider}
         tempModel={tempModel}
@@ -338,6 +380,12 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
+        hideConfigButton={isManaged}
+        clearButtonLabel={clearButtonLabel}
+        hideTitle={hideTitle}
+        clearButtonHideIcon={clearButtonHideIcon}
+        clearButtonHideShortcut={clearButtonHideShortcut}
+        clearButtonVariant={clearButtonVariant}
       />
 
       {/* Messages Area */}
@@ -353,7 +401,8 @@ export function ChatTab({
             serverId={connection.url}
             readResource={readResource}
             tools={connection.tools}
-            sendMessage={sendMessage}
+            sendMessage={(msg) => sendMessage(msg, [])}
+            serverBaseUrl={connection.url}
           />
         )}
       </div>
