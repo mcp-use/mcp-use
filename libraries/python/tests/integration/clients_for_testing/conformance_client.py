@@ -13,44 +13,92 @@ Usage: python conformance_client.py <server_url>
 import asyncio
 import os
 import sys
-import webbrowser
+from urllib.parse import parse_qs, urlparse
 
 import httpx
+from mcp.client.auth import OAuthClientProvider
+from mcp.client.auth.oauth2 import OAuthClientMetadata
 from mcp.types import ElicitRequestParams, ElicitResult
 
 from mcp_use import MCPClient
 
 # =============================================================================
-# Headless browser mock for OAuth (conformance test servers auto-approve)
+# Headless OAuth provider for conformance test servers (auto-approve)
 # =============================================================================
 
 
-def _headless_browser_open(url, *args, **kwargs):
-    """Replace webbrowser.open with an HTTP GET that follows the auth URL.
+class InMemoryTokenStorage:
+    """Simple in-memory token storage for conformance tests."""
 
-    Conformance test servers auto-approve authorization requests and redirect
-    back to the callback URL with the code. We just need to follow the redirect
-    so the callback server captures the auth code.
+    def __init__(self):
+        self._tokens = {}
+
+    async def get_tokens(self):
+        return self._tokens.get("default")
+
+    async def set_tokens(self, tokens):
+        self._tokens["default"] = tokens
+
+    async def get_client_info(self):
+        return self._tokens.get("client_info")
+
+    async def set_client_info(self, client_info):
+        self._tokens["client_info"] = client_info
+
+
+def create_headless_oauth_provider(server_url: str) -> OAuthClientProvider:
+    """Create an OAuthClientProvider that handles auth headlessly.
+
+    Conformance test servers auto-approve authorization requests, so the
+    redirect_handler follows the auth URL via httpx (instead of opening a browser)
+    and the callback_handler extracts the code from the redirect.
+
+    This is passed directly to MCPClient as an httpx.Auth instance.
     """
+    auth_code_future: asyncio.Future | None = None
 
-    async def _follow():
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
-            await client.get(url)
+    async def redirect_handler(authorization_url: str) -> None:
+        nonlocal auth_code_future
+        auth_code_future = asyncio.get_event_loop().create_future()
 
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_follow())
-        else:
-            loop.run_until_complete(_follow())
-    except Exception:
-        pass  # If it fails, the OAuth flow will timeout naturally
+        try:
+            async with httpx.AsyncClient(follow_redirects=False) as client:
+                response = await client.get(authorization_url)
 
-    return True
+                if response.status_code in (301, 302, 303, 307, 308):
+                    redirect_url = str(response.headers["location"])
+                    parsed = urlparse(redirect_url)
+                    params = parse_qs(parsed.query)
+                    code = params.get("code", [None])[0]
+                    state = params.get("state", [None])[0]
+                    if code:
+                        auth_code_future.set_result((code, state))
+                        return
 
+            auth_code_future.set_exception(Exception("No auth code in redirect"))
+        except Exception as e:
+            if auth_code_future and not auth_code_future.done():
+                auth_code_future.set_exception(e)
 
-# Patch webbrowser.open globally so mcp-use OAuth uses headless flow
-webbrowser.open = _headless_browser_open
+    async def callback_handler() -> tuple[str, str | None]:
+        if auth_code_future is None:
+            raise Exception("redirect_handler was not called")
+        return await auth_code_future
+
+    return OAuthClientProvider(
+        server_url=server_url,
+        client_metadata=OAuthClientMetadata(
+            client_name="mcp-use-conformance-client",
+            redirect_uris=["http://127.0.0.1:19823/callback"],
+            grant_types=["authorization_code", "refresh_token"],
+            response_types=["code"],
+            token_endpoint_auth_method="client_secret_post",
+        ),
+        storage=InMemoryTokenStorage(),
+        redirect_handler=redirect_handler,
+        callback_handler=callback_handler,
+        timeout=10.0,
+    )
 
 
 # =============================================================================
@@ -58,7 +106,7 @@ webbrowser.open = _headless_browser_open
 # =============================================================================
 
 
-async def handle_elicitation(ctx, params: ElicitRequestParams) -> ElicitResult:
+async def handle_elicitation(_ctx, params: ElicitRequestParams) -> ElicitResult:
     """Accept elicitation requests, applying schema defaults from the server."""
     content = {}
     if hasattr(params, "requestedSchema") and params.requestedSchema:
@@ -75,7 +123,7 @@ async def handle_elicitation(ctx, params: ElicitRequestParams) -> ElicitResult:
 # =============================================================================
 
 
-async def run_initialize(session):
+async def run_initialize(_session):
     """Just connect and initialize — the framework validates the handshake."""
     pass
 
@@ -124,10 +172,10 @@ async def main():
     server_url = sys.argv[1]
     scenario = os.environ.get("MCP_CONFORMANCE_SCENARIO", "")
 
-    # Build config — auth scenarios get OAuth config
+    # Build config — auth scenarios pass a headless OAuthClientProvider as httpx.Auth
     server_config: dict = {"url": server_url}
     if scenario.startswith("auth/"):
-        server_config["auth"] = {}  # Trigger mcp-use OAuth discovery
+        server_config["auth"] = create_headless_oauth_provider(server_url)
 
     config = {"mcpServers": {"test": server_config}}
     client = MCPClient(config=config, elicitation_callback=handle_elicitation)
@@ -145,9 +193,7 @@ async def main():
         elif scenario == "sse-retry":
             await asyncio.sleep(5)
         elif scenario.startswith("auth/"):
-            # Auth scenarios just need to connect successfully
-            # The framework validates the OAuth protocol exchanges
-            pass
+            pass  # The framework validates OAuth protocol exchanges
         else:
             await run_tools_call(session)
     finally:
