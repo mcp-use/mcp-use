@@ -1,5 +1,90 @@
 # @mcp-use/inspector
 
+## 0.18.9
+
+### Patch Changes
+
+- 32b19dc: fix(logs): reduces the amount of noisy logs in the dev server
+- Updated dependencies [32b19dc]
+- Updated dependencies [32b19dc]
+  - mcp-use@1.17.4
+
+## 0.18.9-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix(logs): reduces the amount of noisy logs in the dev server
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - mcp-use@1.17.4-canary.0
+
+## 0.18.8
+
+### Patch Changes
+
+- af55041: fix(inspector): enhance iframe global updates handling and cleanup
+- af55041: fix(inspector): reset readiness state on widget URL change and enhance tool output handling
+  - mcp-use@1.17.3
+
+## 0.18.8-canary.1
+
+### Patch Changes
+
+- f437838: fix(inspector): enhance iframe global updates handling and cleanup
+  - mcp-use@1.17.3-canary.1
+
+## 0.18.8-canary.0
+
+### Patch Changes
+
+- a872832: fix(inspector): reset readiness state on widget URL change and enhance tool output handling
+  - mcp-use@1.17.3-canary.0
+
+## 0.18.7
+
+### Patch Changes
+
+- 5760a10: fix(inspector): copy button copies error text instead of null
+- 5760a10: fix(chat): enhance message conversion logic to handle empty content and attachments
+  - Updated `convertMessagesToLangChain` to fall back on `m.parts` when `m.content` is empty, ensuring text is retrieved from streamed assistant messages.
+  - Modified `useChatMessages` to prioritize `m.parts` for message content, improving message handling consistency.
+  - Adjusted `handleChatRequestStream` to utilize `externalHistory` for better context management during agent interactions, preventing message duplication.
+
+- Updated dependencies [5760a10]
+  - mcp-use@1.17.2
+
+## 0.18.7-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3644a26]
+  - mcp-use@1.17.2-canary.1
+
+## 0.18.7-canary.0
+
+### Patch Changes
+
+- 316870a: fix(inspector): copy button copies error text instead of null
+- 3d48e19: fix(chat): enhance message conversion logic to handle empty content and attachments
+  - Updated `convertMessagesToLangChain` to fall back on `m.parts` when `m.content` is empty, ensuring text is retrieved from streamed assistant messages.
+  - Modified `useChatMessages` to prioritize `m.parts` for message content, improving message handling consistency.
+  - Adjusted `handleChatRequestStream` to utilize `externalHistory` for better context management during agent interactions, preventing message duplication.
+  - mcp-use@1.17.2-canary.0
+
+## 0.18.6
+
+### Patch Changes
+
+- Updated dependencies [df428ca]
+  - mcp-use@1.17.1
+
+## 0.18.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [637edaf]
+  - mcp-use@1.17.1-canary.0
+
 ## 0.18.5
 
 ### Patch Changes

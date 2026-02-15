@@ -397,7 +397,9 @@ export function ToolsTab({
         const hasChanges =
           JSON.stringify(updatedTool.inputSchema) !==
             JSON.stringify(selectedTool.inputSchema) ||
-          updatedTool.description !== selectedTool.description;
+          updatedTool.description !== selectedTool.description ||
+          JSON.stringify((updatedTool as any)?._meta) !==
+            JSON.stringify((selectedTool as any)?._meta);
         if (hasChanges) {
           setSelectedTool(updatedTool);
         }
@@ -540,11 +542,11 @@ export function ToolsTab({
       });
       const duration = Date.now() - startTime;
 
-      // Update toolMeta with result's _meta if present (for dynamic metadata from tool execution)
-      // This is important for HMR where tool results may have updated metadata
-      const updatedToolMeta = result?._meta
-        ? { ...toolMeta, ...result._meta }
-        : toolMeta;
+      // Use result's _meta if present (full replacement, not merge).
+      // After HMR, the tool may have lost widget metadata — a shallow merge
+      // would preserve old keys that no longer apply (e.g. openai/outputTemplate).
+      // If result has _meta, it fully replaces the tool-level _meta.
+      const updatedToolMeta = result?._meta ?? toolMeta;
 
       // Track successful tool execution
       const telemetry = Telemetry.getInstance();
@@ -694,9 +696,9 @@ export function ToolsTab({
     }
   }, [selectedTool, toolArgs, isExecuting, callTool, readResource, serverId]);
 
-  const handleCopyResult = useCallback(async (index: number, result: any) => {
+  const handleCopyResult = useCallback(async (index: number, text: string) => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+      await navigator.clipboard.writeText(text);
       setCopiedResult(index);
       setTimeout(() => setCopiedResult(null), 2000);
     } catch (error) {

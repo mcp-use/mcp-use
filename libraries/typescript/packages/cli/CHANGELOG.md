@@ -1,5 +1,93 @@
 # @mcp-use/cli
 
+## 2.13.6
+
+### Patch Changes
+
+- 32b19dc: fix: increased threshold for bundle size warning
+- Updated dependencies [32b19dc]
+- Updated dependencies [32b19dc]
+  - @mcp-use/inspector@0.18.9
+  - mcp-use@1.17.4
+
+## 2.13.6-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix: increased threshold for bundle size warning
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - @mcp-use/inspector@0.18.9-canary.0
+  - mcp-use@1.17.4-canary.0
+
+## 2.13.5
+
+### Patch Changes
+
+- Updated dependencies [af55041]
+- Updated dependencies [af55041]
+  - @mcp-use/inspector@0.18.8
+  - mcp-use@1.17.3
+
+## 2.13.5-canary.1
+
+### Patch Changes
+
+- Updated dependencies [f437838]
+  - @mcp-use/inspector@0.18.8-canary.1
+  - mcp-use@1.17.3-canary.1
+
+## 2.13.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a872832]
+  - @mcp-use/inspector@0.18.8-canary.0
+  - mcp-use@1.17.3-canary.0
+
+## 2.13.4
+
+### Patch Changes
+
+- Updated dependencies [5760a10]
+- Updated dependencies [5760a10]
+- Updated dependencies [5760a10]
+  - @mcp-use/inspector@0.18.7
+  - mcp-use@1.17.2
+
+## 2.13.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3644a26]
+  - mcp-use@1.17.2-canary.1
+  - @mcp-use/inspector@0.18.7-canary.1
+
+## 2.13.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [316870a]
+- Updated dependencies [3d48e19]
+  - @mcp-use/inspector@0.18.7-canary.0
+  - mcp-use@1.17.2-canary.0
+
+## 2.13.3
+
+### Patch Changes
+
+- Updated dependencies [df428ca]
+  - mcp-use@1.17.1
+  - @mcp-use/inspector@0.18.6
+
+## 2.13.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [637edaf]
+  - mcp-use@1.17.1-canary.0
+  - @mcp-use/inspector@0.18.6-canary.0
+
 ## 2.13.2
 
 ### Patch Changes

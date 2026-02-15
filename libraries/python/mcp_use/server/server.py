@@ -13,12 +13,17 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import (
     AnyFunction,
     CallToolRequest,
+    CompleteRequest,
+    Completion,
     GetPromptRequest,
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
     ReadResourceRequest,
     ServerResult,
+    SetLevelRequest,
+    SubscribeRequest,
+    UnsubscribeRequest,
 )
 
 # Import auth components
@@ -72,6 +77,7 @@ class MCPServer(FastMCP):
         pretty_print_jsonrpc: bool = False,
         host: str = "0.0.0.0",
         port: int = 8000,
+        dns_rebinding_protection: bool = False,
     ):
         """Initialize an MCP server.
 
@@ -87,13 +93,14 @@ class MCPServer(FastMCP):
             openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
             show_inspector_logs: Show inspector-related logs
             pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
-            host: Default host for server binding. Also controls DNS rebinding protection:
-                  - "0.0.0.0" (default): Disables DNS protection, suitable for cloud/proxy deployments
-                  - "127.0.0.1": Enables DNS protection, suitable for local development
-                  Can be overridden in run().
+            host: Default host for server binding (default: "0.0.0.0"). Can be overridden in run().
             port: Default port for server binding (default: 8000). Can be overridden in run().
+            dns_rebinding_protection: Enable DNS rebinding protection by validating Host/Origin
+                  headers. When True, only requests from localhost origins are accepted.
+                  Recommended for local development servers. Default: False.
         """
         self._start_time = time.time()
+        self._dns_rebinding_protection = dns_rebinding_protection
         super().__init__(
             name=name or "mcp-use server",
             instructions=instructions,
@@ -101,8 +108,15 @@ class MCPServer(FastMCP):
             port=port,
         )
 
+        # Apply DNS rebinding protection if requested
+        if dns_rebinding_protection:
+            self._apply_dns_rebinding_protection(host)
+
         if version:
             self._mcp_server.version = version
+
+        # Register default protocol handlers for full MCP spec compliance
+        self._register_default_protocol_handlers()
 
         # Store auth provider
         self._auth = auth
@@ -257,6 +271,96 @@ class MCPServer(FastMCP):
                 description=prompt.description,
             )(prompt.fn)
 
+    def _apply_dns_rebinding_protection(self, host: str) -> None:
+        """Configure transport security to reject non-localhost Host/Origin headers."""
+        from mcp.server.transport_security import TransportSecuritySettings
+
+        localhost_host = host if host in ("127.0.0.1", "localhost", "::1") else "127.0.0.1"
+        self.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[f"{localhost_host}:*", "localhost:*", "127.0.0.1:*", "[::1]:*"],
+            allowed_origins=[
+                f"http://{localhost_host}:*",
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://[::1]:*",
+            ],
+        )
+        # Reset session manager so it picks up new security settings
+        self._session_manager = None
+
+    def _register_default_protocol_handlers(self) -> None:
+        """Register default handlers for MCP protocol methods not covered by FastMCP.
+
+        Registers logging/setLevel, resources/subscribe, resources/unsubscribe,
+        and completion/complete so the server advertises these capabilities and
+        responds to requests correctly.
+        """
+
+        # logging/setLevel — store the level so Context.log() can filter
+        self._client_log_level: str = "debug"  # Default: send all levels
+
+        @self._mcp_server.set_logging_level()
+        async def _handle_set_logging_level(level: Any) -> None:
+            self._client_log_level = str(level)
+
+        # resources/subscribe + unsubscribe — track per-URI subscriptions
+        self._resource_subscriptions: dict[str, set[int]] = {}  # uri -> set of session ids
+
+        @self._mcp_server.subscribe_resource()
+        async def _handle_subscribe(uri: Any) -> None:
+            session = self._current_session()
+            if session:
+                self._resource_subscriptions.setdefault(str(uri), set()).add(id(session))
+
+        @self._mcp_server.unsubscribe_resource()
+        async def _handle_unsubscribe(uri: Any) -> None:
+            session = self._current_session()
+            if session:
+                subscribers = self._resource_subscriptions.get(str(uri))
+                if subscribers:
+                    subscribers.discard(id(session))
+                    if not subscribers:
+                        del self._resource_subscriptions[str(uri)]
+
+        # Patch capabilities to advertise subscribe support
+        original_get_capabilities = self._mcp_server.get_capabilities
+
+        def _patched_get_capabilities(notification_options: Any, experimental_capabilities: Any) -> Any:
+            caps = original_get_capabilities(notification_options, experimental_capabilities)
+            if caps.resources is not None:
+                caps.resources.subscribe = True
+            return caps
+
+        self._mcp_server.get_capabilities = _patched_get_capabilities  # type: ignore[assignment]
+
+        # completion/complete — default empty completions (override via mcp.completion())
+        @self._mcp_server.completion()
+        async def _handle_completion(_ref: Any, _argument: Any, _context: Any = None) -> Completion:
+            return Completion(values=[], total=0, hasMore=False)
+
+    async def notify_resource_updated(self, uri: str) -> None:
+        """Notify all subscribed sessions that a resource has been updated.
+
+        Broadcasts a ``notifications/resources/updated`` message to every session
+        that called ``resources/subscribe`` for this URI.
+
+        Can be called from within a tool handler or from any async context.
+
+        Args:
+            uri: The URI of the resource that was updated.
+        """
+        subscribers = self._resource_subscriptions.get(uri)
+        if not subscribers:
+            return
+
+        for session in list(MiddlewareServerSession._active_sessions):
+            if id(session) in subscribers:
+                try:
+                    await session.send_resource_updated(uri=uri)
+                except Exception:
+                    pass  # Session may have disconnected
+
     def streamable_http_app(self):
         """Override to add our custom middleware."""
         from starlette.middleware.cors import CORSMiddleware
@@ -329,6 +433,10 @@ class MCPServer(FastMCP):
         wrap_request(ListToolsRequest, "tools/list")
         wrap_request(ListResourcesRequest, "resources/list")
         wrap_request(ListPromptsRequest, "prompts/list")
+        wrap_request(SetLevelRequest, "logging/setLevel")
+        wrap_request(SubscribeRequest, "resources/subscribe")
+        wrap_request(UnsubscribeRequest, "resources/unsubscribe")
+        wrap_request(CompleteRequest, "completion/complete")
 
     def run(  # type: ignore[override]
         self,
@@ -353,22 +461,14 @@ class MCPServer(FastMCP):
         final_host = host if host is not None else self.settings.host
         final_port = port if port is not None else self.settings.port
 
-        # If host changed, update settings and rebuild app to reconfigure DNS protection
+        # If host changed, update settings and rebuild app
         if final_host != self.settings.host:
             self.settings.host = final_host
             self.settings.port = final_port
-            # Reconfigure transport security based on new host (FastMCP logic)
-            if final_host in ("127.0.0.1", "localhost", "::1"):
-                from mcp.server.transport_security import TransportSecuritySettings
-
-                self.settings.transport_security = TransportSecuritySettings(
-                    enable_dns_rebinding_protection=True,
-                    allowed_hosts=[f"{final_host}:*", "localhost:*", "[::1]:*"],
-                    allowed_origins=[f"http://{final_host}:*", "http://localhost:*", "http://[::1]:*"],
-                )
-            else:
-                self.settings.transport_security = None
-            # Rebuild app with new security settings
+            if self._dns_rebinding_protection:
+                self._apply_dns_rebinding_protection(final_host)
+            # Rebuild app with updated settings
+            self._session_manager = None
             self.app = self.streamable_http_app()
 
         # Override debug_level if debug=True is passed to run()

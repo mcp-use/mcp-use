@@ -77,44 +77,51 @@ function enrichDefinitionWithServerOrigin(
   definition: UIResourceDefinition,
   serverOrigin: string | null
 ): UIResourceDefinition {
-  if (!serverOrigin || definition.type !== "mcpApps" || !definition.metadata) {
+  if (!serverOrigin || definition.type !== "mcpApps") {
     return definition;
   }
 
-  const enrichedMetadata = { ...definition.metadata };
+  // Create metadata if it doesn't exist
+  const enrichedMetadata = definition.metadata
+    ? { ...definition.metadata }
+    : ({} as NonNullable<typeof definition.metadata>);
 
-  if (enrichedMetadata.csp) {
+  // Always ensure CSP exists so the server origin is injected even when
+  // the widget author didn't explicitly declare a csp config
+  if (!enrichedMetadata.csp) {
+    enrichedMetadata.csp = {};
+  } else {
     enrichedMetadata.csp = { ...enrichedMetadata.csp };
+  }
 
-    // Add server origin to resourceDomains (for loading scripts/styles)
-    if (!enrichedMetadata.csp.resourceDomains) {
-      enrichedMetadata.csp.resourceDomains = [serverOrigin];
-    } else if (!enrichedMetadata.csp.resourceDomains.includes(serverOrigin)) {
-      enrichedMetadata.csp.resourceDomains = [
-        ...enrichedMetadata.csp.resourceDomains,
-        serverOrigin,
-      ];
-    }
+  // Add server origin to resourceDomains (for loading scripts/styles)
+  if (!enrichedMetadata.csp.resourceDomains) {
+    enrichedMetadata.csp.resourceDomains = [serverOrigin];
+  } else if (!enrichedMetadata.csp.resourceDomains.includes(serverOrigin)) {
+    enrichedMetadata.csp.resourceDomains = [
+      ...enrichedMetadata.csp.resourceDomains,
+      serverOrigin,
+    ];
+  }
 
-    // Add server origin to connectDomains (for fetch/XHR/WebSocket)
-    if (!enrichedMetadata.csp.connectDomains) {
-      enrichedMetadata.csp.connectDomains = [serverOrigin];
-    } else if (!enrichedMetadata.csp.connectDomains.includes(serverOrigin)) {
-      enrichedMetadata.csp.connectDomains = [
-        ...enrichedMetadata.csp.connectDomains,
-        serverOrigin,
-      ];
-    }
+  // Add server origin to connectDomains (for fetch/XHR/WebSocket)
+  if (!enrichedMetadata.csp.connectDomains) {
+    enrichedMetadata.csp.connectDomains = [serverOrigin];
+  } else if (!enrichedMetadata.csp.connectDomains.includes(serverOrigin)) {
+    enrichedMetadata.csp.connectDomains = [
+      ...enrichedMetadata.csp.connectDomains,
+      serverOrigin,
+    ];
+  }
 
-    // Add server origin to baseUriDomains (for <base> tag)
-    if (!enrichedMetadata.csp.baseUriDomains) {
-      enrichedMetadata.csp.baseUriDomains = [serverOrigin];
-    } else if (!enrichedMetadata.csp.baseUriDomains.includes(serverOrigin)) {
-      enrichedMetadata.csp.baseUriDomains = [
-        ...enrichedMetadata.csp.baseUriDomains,
-        serverOrigin,
-      ];
-    }
+  // Add server origin to baseUriDomains (for <base> tag)
+  if (!enrichedMetadata.csp.baseUriDomains) {
+    enrichedMetadata.csp.baseUriDomains = [serverOrigin];
+  } else if (!enrichedMetadata.csp.baseUriDomains.includes(serverOrigin)) {
+    enrichedMetadata.csp.baseUriDomains = [
+      ...enrichedMetadata.csp.baseUriDomains,
+      serverOrigin,
+    ];
   }
 
   return {
@@ -344,6 +351,17 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     | undefined;
   const exposeAsTool =
     enrichedDefinition.exposeAsTool ?? widgetMetadata?.exposeAsTool ?? true;
+
+  // FIX: Propagate newly registered resources to existing sessions independently of tool registration
+  // Previously, resource propagation was only done inside addWidgetTool (which requires exposeAsTool=true).
+  // Resources must be pushed to existing sessions regardless of whether the widget exposes a tool.
+  if (
+    !isUpdate &&
+    (server as any).sessions &&
+    typeof (server as any).propagateWidgetResourcesToSessions === "function"
+  ) {
+    (server as any).propagateWidgetResourcesToSessions(enrichedDefinition.name);
+  }
 
   // Register the tool only if exposeAsTool is not false
   // Note: Resources and resource templates are always registered regardless of exposeAsTool

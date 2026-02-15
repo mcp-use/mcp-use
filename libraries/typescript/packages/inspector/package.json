@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.18.5",
+  "version": "0.18.9",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -45,7 +45,7 @@
     "dev:standalone": "tsx watch src/server/server.ts",
     "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli",
     "build:client": "vite build",
-    "build:client-exports": "tsup src/client/index.ts --format esm --out-dir dist/client --tsconfig tsconfig.client.json --external react --external react-dom --external lucide-react --no-splitting && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
+    "build:client-exports": "tsup --config tsup.client.ts && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
     "build:server": "tsup src/server/*.ts --format esm --out-dir dist/server && tsc -p tsconfig.server.json --emitDeclarationOnly --declaration",
     "build:cli": "tsup src/server/cli.ts --format esm --out-dir dist/",
     "prepublishOnly": "pnpm --filter mcp-use build && pnpm build",

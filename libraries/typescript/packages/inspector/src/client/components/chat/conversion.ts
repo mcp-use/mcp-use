@@ -50,7 +50,7 @@ export function convertMessagesToLangChain(
     }
 
     // Handle regular messages (text only)
-    const raw =
+    let raw =
       typeof m.content === "string"
         ? m.content
         : Array.isArray(m.content)
@@ -58,6 +58,16 @@ export function convertMessagesToLangChain(
               .map((x) => x?.text ?? "")
               .join("\n")
           : JSON.stringify(m.content ?? "");
+
+    // Fall back to parts when content is empty (streamed assistant messages
+    // store their text in parts, not content)
+    if (!raw.trim() && m.parts && m.parts.length > 0) {
+      raw = m.parts
+        .filter((p) => p.type === "text" && p.text)
+        .map((p) => p.text!)
+        .join("");
+    }
+
     const content = raw.trim() || "[no content]";
     return m.role === "user"
       ? new HumanMessage(content)

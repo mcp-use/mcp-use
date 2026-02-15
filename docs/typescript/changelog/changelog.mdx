@@ -6,6 +6,45 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.17.4" description="February 2026">
+  ## Widget Resource Propagation & Log Noise Reduction
+  Patch release improving HMR reliability for widget resources and reducing dev server log noise.
+
+- **Fix**: Reduced noisy logs in the dev server
+- **Fix**: Propagated widget resources and resource templates to already-connected MCP sessions during HMR to avoid `Resource ui://widget/... not found` errors without reconnecting
+- **Update**: Updated @mcp-use/inspector to v0.18.9
+- **Update**: Updated @mcp-use/cli to v2.13.6
+</Update>
+
+<Update label="v1.17.3" description="February 2026">
+  ## Inspector Reliability Alignment
+  Patch release aligning TypeScript packages with the latest inspector reliability fixes.
+
+- **Enhancement**: Pulled in inspector fixes for widget readiness resets and safer iframe global update handling
+- **Update**: Updated @mcp-use/inspector to v0.18.8
+- **Update**: Updated @mcp-use/cli to v2.13.5
+</Update>
+
+<Update label="v1.17.2" description="February 2026">
+  ## UI Resource Metadata & CSP Injection Fixes
+  Patch release improving server-origin metadata enrichment for UI resources.
+
+- **Fix**: UI resource metadata enrichment now guarantees metadata initialization before applying origin-based updates
+- **Enhancement**: Server origin is now consistently injected into widget CSP fields (`resourceDomains`, `connectDomains`, `baseUriDomains`)
+- **Update**: Updated @mcp-use/inspector to v0.18.7
+- **Update**: Updated @mcp-use/cli to v2.13.4
+</Update>
+
+<Update label="v1.17.1" description="February 2026">
+  ## useWidget Type Inference Improvements
+  Patch release improving `useWidget` typing precision for pending vs ready states.
+
+- **Enhancement**: `UseWidgetResult` now uses a discriminated union on `isPending` for more accurate TypeScript inference
+- **Enhancement**: Added `UseWidgetResultBase` to separate shared fields from pending-state-specific props
+- **Update**: Updated @mcp-use/inspector to v0.18.6
+- **Update**: Updated @mcp-use/cli to v2.13.3
+</Update>
+
 <Update label="v1.17.0" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.17.0&title=Resource%20Template%20Completion%20%26%20Reverse%20Proxy%20Support&date=2026-02&lang=typescript" alt="Release 1.17.0" />

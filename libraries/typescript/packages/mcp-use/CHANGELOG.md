@@ -1,5 +1,112 @@
 # mcp-use
 
+## 1.17.4
+
+### Patch Changes
+
+- 32b19dc: fix(logs): reduces the amount of noisy logs in the dev server
+- 32b19dc: fix: propagate widget resources and resource templates to existing MCP sessions during HMR
+
+  Widget resources added via the file watcher (e.g. creating a new file in `resources/`) were registered in the server wrapper but never pushed to already-connected sessions. This caused "Resource ui://widget/... not found" errors when tools referencing those widgets were executed without reconnecting.
+  - Added `propagateWidgetResourcesToSessions()` to push newly registered widget resources and templates to all active sessions independently of tool registration
+  - Fixed resource template lookup key mismatch in `addWidgetTool` and `propagateWidgetResourcesToSessions` — templates are stored by name only, not `name:uri`
+  - Track propagated resources in `sessionRegisteredRefs` so `syncPrimitive` preserves them across subsequent HMR cycles
+
+- Updated dependencies [32b19dc]
+- Updated dependencies [32b19dc]
+  - @mcp-use/cli@2.13.6
+  - @mcp-use/inspector@0.18.9
+
+## 1.17.4-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix(logs): reduces the amount of noisy logs in the dev server
+- 4a118cc: fix: propagate widget resources and resource templates to existing MCP sessions during HMR
+
+  Widget resources added via the file watcher (e.g. creating a new file in `resources/`) were registered in the server wrapper but never pushed to already-connected sessions. This caused "Resource ui://widget/... not found" errors when tools referencing those widgets were executed without reconnecting.
+  - Added `propagateWidgetResourcesToSessions()` to push newly registered widget resources and templates to all active sessions independently of tool registration
+  - Fixed resource template lookup key mismatch in `addWidgetTool` and `propagateWidgetResourcesToSessions` — templates are stored by name only, not `name:uri`
+  - Track propagated resources in `sessionRegisteredRefs` so `syncPrimitive` preserves them across subsequent HMR cycles
+
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - @mcp-use/cli@2.13.6-canary.0
+  - @mcp-use/inspector@0.18.9-canary.0
+
+## 1.17.3
+
+### Patch Changes
+
+- Updated dependencies [af55041]
+- Updated dependencies [af55041]
+  - @mcp-use/inspector@0.18.8
+  - @mcp-use/cli@2.13.5
+
+## 1.17.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [f437838]
+  - @mcp-use/inspector@0.18.8-canary.1
+  - @mcp-use/cli@2.13.5-canary.1
+
+## 1.17.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a872832]
+  - @mcp-use/inspector@0.18.8-canary.0
+  - @mcp-use/cli@2.13.5-canary.0
+
+## 1.17.2
+
+### Patch Changes
+
+- 5760a10: fix(ui-resource-registration): improve metadata handling for server origin injection
+  - Simplified the logic for enriching UI resource definitions with server origin by ensuring metadata is created if it doesn't exist.
+  - Enhanced the handling of Content Security Policy (CSP) to always include server origin in resourceDomains, connectDomains, and baseUriDomains, improving security and functionality for widget loading.
+
+- Updated dependencies [5760a10]
+- Updated dependencies [5760a10]
+  - @mcp-use/inspector@0.18.7
+  - @mcp-use/cli@2.13.4
+
+## 1.17.2-canary.1
+
+### Patch Changes
+
+- 3644a26: fix(ui-resource-registration): improve metadata handling for server origin injection
+  - Simplified the logic for enriching UI resource definitions with server origin by ensuring metadata is created if it doesn't exist.
+  - Enhanced the handling of Content Security Policy (CSP) to always include server origin in resourceDomains, connectDomains, and baseUriDomains, improving security and functionality for widget loading.
+  - @mcp-use/cli@2.13.4-canary.1
+  - @mcp-use/inspector@0.18.7-canary.1
+
+## 1.17.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [316870a]
+- Updated dependencies [3d48e19]
+  - @mcp-use/inspector@0.18.7-canary.0
+  - @mcp-use/cli@2.13.4-canary.0
+
+## 1.17.1
+
+### Patch Changes
+
+- df428ca: fix(useWidget): enhance type definitions for useWidget result
+  - @mcp-use/cli@2.13.3
+  - @mcp-use/inspector@0.18.6
+
+## 1.17.1-canary.0
+
+### Patch Changes
+
+- 637edaf: fix(useWidget): enhance type definitions for useWidget result
+  - @mcp-use/cli@2.13.3-canary.0
+  - @mcp-use/inspector@0.18.6-canary.0
+
 ## 1.17.0
 
 ### Minor Changes

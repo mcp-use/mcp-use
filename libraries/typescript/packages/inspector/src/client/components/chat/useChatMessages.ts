@@ -14,6 +14,8 @@ interface UseChatMessagesProps {
   llmConfig: LLMConfig | null;
   authConfig: AuthConfig | null;
   isConnected: boolean;
+  /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
+  chatApiUrl?: string;
 }
 
 export function useChatMessages({
@@ -21,6 +23,7 @@ export function useChatMessages({
   llmConfig,
   authConfig,
   isConnected,
+  chatApiUrl,
 }: UseChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,23 +95,32 @@ export function useChatMessages({
         }
 
         // Call the streaming chat API endpoint
-        const response = await fetch("/inspector/api/chat/stream", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          signal: abortControllerRef.current.signal,
-          body: JSON.stringify({
-            mcpServerUrl,
-            llmConfig,
-            authConfig: authConfigWithTokens,
-            messages: [...messages, ...userMessages].map((m) => ({
-              role: m.role,
-              content: m.content,
-              attachments: m.attachments,
-            })),
-          }),
-        });
+        const response = await fetch(
+          chatApiUrl ?? "/inspector/api/chat/stream",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            signal: abortControllerRef.current.signal,
+            body: JSON.stringify({
+              mcpServerUrl,
+              llmConfig,
+              authConfig: authConfigWithTokens,
+              messages: [...messages, ...userMessages].map((m) => ({
+                role: m.role,
+                content:
+                  m.content ||
+                  (m.parts
+                    ?.filter((p) => p.type === "text")
+                    .map((p) => p.text)
+                    .join("") ??
+                    ""),
+                attachments: m.attachments,
+              })),
+            }),
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -124,7 +136,7 @@ export function useChatMessages({
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
-            state?: string;
+            state?: "pending" | "result" | "error";
           };
         }> = [];
 
@@ -364,7 +376,15 @@ export function useChatMessages({
         abortControllerRef.current = null;
       }
     },
-    [llmConfig, isConnected, mcpServerUrl, messages, authConfig, attachments]
+    [
+      llmConfig,
+      isConnected,
+      mcpServerUrl,
+      messages,
+      authConfig,
+      attachments,
+      chatApiUrl,
+    ]
   );
 
   const clearMessages = useCallback(() => {

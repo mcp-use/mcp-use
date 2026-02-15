@@ -564,7 +564,7 @@ export function useWidget<
     // Availability
     isAvailable: isOpenAiAvailable || isMcpAppsConnected,
     isPending,
-  };
+  } as UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput>;
 }
 
 /**

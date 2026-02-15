@@ -771,6 +771,8 @@ export default {
           sourcemap: false,
           // Minify for smaller bundle size
           minify: "esbuild",
+          // Widgets bundle React+Zod; suppress expected chunk size warning
+          chunkSizeWarningLimit: 1024,
           // For inline builds, disable CSS code splitting and inline all assets
           ...(inline
             ? {
@@ -1183,12 +1185,21 @@ program
 
       const chokidarModule = await import("chokidar");
       const chokidar = (chokidarModule as any).default || chokidarModule;
-      const { pathToFileURL } = await import("node:url");
+      const { pathToFileURL, fileURLToPath } = await import("node:url");
       const { createRequire } = await import("node:module");
 
       // Try to get tsx's tsImport function for TypeScript support
       let tsImport:
-        | ((specifier: string, parentUrl: string) => Promise<any>)
+        | ((
+            specifier: string,
+            parentUrlOrOptions:
+              | string
+              | {
+                  parentURL: string;
+                  onImport?: (file: string) => void;
+                  tsconfig?: string | false;
+                }
+          ) => Promise<any>)
         | null = null;
       try {
         const projectRequire = createRequire(
@@ -1217,21 +1228,68 @@ program
 
       // Helper to import server module with cache busting
       const importServerModule = async () => {
+        // Clear the global reference so we can detect if a new instance was created
+        const previousServer = (globalThis as any).__mcpUseLastServer;
+        (globalThis as any).__mcpUseLastServer = null;
+
         // Use tsx's tsImport if available for TypeScript support
         // Otherwise fall back to native import (for JS files or if tsx is globally loaded)
         if (tsImport) {
-          // tsImport handles TypeScript compilation
-          // Add cache-busting timestamp to force re-import
-          await tsImport(`${serverFilePath}?t=${Date.now()}`, import.meta.url);
+          // tsImport handles TypeScript compilation and does not cache loaded modules,
+          // so the entire dependency tree is re-evaluated on each call.
+          // The ?t= timestamp is kept as a safety measure for edge cases.
+          await tsImport(`${serverFilePath}?t=${Date.now()}`, {
+            parentURL: import.meta.url,
+            onImport: (file: string) => {
+              const filePath = file.startsWith("file://")
+                ? fileURLToPath(file)
+                : file;
+              if (
+                !filePath.includes("node_modules") &&
+                filePath.startsWith(projectPath)
+              ) {
+                console.debug(`[HMR] Loaded: ${file}`);
+              }
+            },
+          });
         } else {
-          // Native import - works for JS files or if tsx is already loaded via --import
+          // Native import - works for JS files or if tsx is already loaded via --import.
+          // WARNING: Native import() caches modules by URL. The ?t= timestamp busts
+          // the cache for the entry file only; sub-imports will use cached versions.
           await import(`${serverFileUrl}?t=${Date.now()}`);
         }
 
         // Get the server instance from the global registry
         // No export required - MCPServer tracks itself when created via globalThis
         const instance = (globalThis as any).__mcpUseLastServer;
-        return instance || null;
+
+        if (!instance) {
+          // No new instance was created - restore the previous one
+          (globalThis as any).__mcpUseLastServer = previousServer;
+          console.warn(
+            chalk.yellow(
+              "[HMR] Warning: Module re-import did not create a new MCPServer instance. " +
+                "The module may be cached. Check that your server file creates an MCPServer."
+            )
+          );
+          return null;
+        }
+
+        if (instance === previousServer) {
+          // Same instance reference - the module was cached and not re-evaluated
+          console.warn(
+            chalk.yellow(
+              "[HMR] Warning: Module re-import returned the same server instance. " +
+                "The module may not have been re-evaluated. " +
+                (!tsImport
+                  ? "Install tsx as a devDependency for reliable TypeScript HMR."
+                  : "This may be a tsx caching issue.")
+            )
+          );
+          return null;
+        }
+
+        return instance;
       };
 
       // Initial import
@@ -1420,15 +1478,62 @@ program
             }
 
             // Sync registrations from the new server to the running server
-            runningServer.syncRegistrationsFrom(newServer);
+            const syncResult = runningServer.syncRegistrationsFrom(newServer);
 
-            console.log(
-              chalk.green(
-                `[HMR] ✓ Reloaded: ${runningServer.registeredTools?.length || 0} tools, ` +
-                  `${runningServer.registeredPrompts?.length || 0} prompts, ` +
-                  `${runningServer.registeredResources?.length || 0} resources`
-              )
-            );
+            if (syncResult && syncResult.totalChanges > 0) {
+              const parts: string[] = [];
+              if (
+                syncResult.tools.updated > 0 ||
+                syncResult.tools.added > 0 ||
+                syncResult.tools.removed > 0
+              ) {
+                const details: string[] = [];
+                if (syncResult.tools.updated > 0)
+                  details.push(`${syncResult.tools.updated} updated`);
+                if (syncResult.tools.added > 0)
+                  details.push(`${syncResult.tools.added} added`);
+                if (syncResult.tools.removed > 0)
+                  details.push(`${syncResult.tools.removed} removed`);
+                parts.push(`tools (${details.join(", ")})`);
+              }
+              if (
+                syncResult.prompts.updated > 0 ||
+                syncResult.prompts.added > 0 ||
+                syncResult.prompts.removed > 0
+              ) {
+                const details: string[] = [];
+                if (syncResult.prompts.updated > 0)
+                  details.push(`${syncResult.prompts.updated} updated`);
+                if (syncResult.prompts.added > 0)
+                  details.push(`${syncResult.prompts.added} added`);
+                if (syncResult.prompts.removed > 0)
+                  details.push(`${syncResult.prompts.removed} removed`);
+                parts.push(`prompts (${details.join(", ")})`);
+              }
+              if (
+                syncResult.resources.updated > 0 ||
+                syncResult.resources.added > 0 ||
+                syncResult.resources.removed > 0
+              ) {
+                const details: string[] = [];
+                if (syncResult.resources.updated > 0)
+                  details.push(`${syncResult.resources.updated} updated`);
+                if (syncResult.resources.added > 0)
+                  details.push(`${syncResult.resources.added} added`);
+                if (syncResult.resources.removed > 0)
+                  details.push(`${syncResult.resources.removed} removed`);
+                parts.push(`resources (${details.join(", ")})`);
+              }
+              console.log(chalk.green(`[HMR] ✓ Reloaded: ${parts.join(", ")}`));
+            } else {
+              console.log(
+                chalk.gray(
+                  `[HMR] No changes detected (${runningServer.registeredTools?.length || 0} tools, ` +
+                    `${runningServer.registeredPrompts?.length || 0} prompts, ` +
+                    `${runningServer.registeredResources?.length || 0} resources registered)`
+                )
+              );
+            }
           } catch (error: any) {
             console.error(chalk.red(`[HMR] Reload failed: ${error.message}`));
             // Keep running with old registrations

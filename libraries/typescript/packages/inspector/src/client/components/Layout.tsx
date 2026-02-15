@@ -1,6 +1,10 @@
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
-import { useInspector, type TabType } from "@/client/context/InspectorContext";
+import {
+  useInspector,
+  type EmbeddedConfig,
+  type TabType,
+} from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
@@ -95,7 +99,7 @@ export function Layout({ children }: LayoutProps) {
     const embeddedConfigParam = urlParams.get("embeddedConfig");
 
     if (embedded) {
-      let config: { backgroundColor?: string; padding?: string } = {};
+      let config: EmbeddedConfig = {};
       if (embeddedConfigParam) {
         try {
           config = JSON.parse(embeddedConfigParam);
@@ -104,6 +108,11 @@ export function Layout({ children }: LayoutProps) {
         }
       }
       setEmbeddedMode(true, config);
+
+      // Apply defaultTab from embeddedConfig (overrides ?tab= param)
+      if (config.defaultTab) {
+        setActiveTab(config.defaultTab);
+      }
     }
   }, []); // Only run once on mount
 
@@ -540,34 +549,44 @@ export function Layout({ children }: LayoutProps) {
   }
 
   // Apply embedded styling
+  const isSingleTab = isEmbedded && embeddedConfig.singleTab;
+
   const containerStyle: React.CSSProperties = isEmbedded
     ? {
         backgroundColor: embeddedConfig.backgroundColor || "#f3f3f3",
-        padding: embeddedConfig.padding || "0.5rem",
+        padding: isSingleTab ? "0" : embeddedConfig.padding || "0.5rem",
       }
     : {};
 
   const containerClassName = isEmbedded
-    ? "h-screen flex flex-col gap-2 sm:gap-4"
+    ? isSingleTab
+      ? "h-screen flex flex-col"
+      : "h-screen flex flex-col gap-2 sm:gap-4"
     : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+
+  const mainClassName = isSingleTab
+    ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
+    : "flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto";
 
   return (
     <TooltipProvider>
       <div className={containerClassName} style={containerStyle}>
-        {/* Header */}
-        <LayoutHeader
-          connections={connections}
-          selectedServer={selectedServer}
-          activeTab={activeTab}
-          onServerSelect={handleServerSelect}
-          onTabChange={setActiveTab}
-          onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-          onOpenConnectionOptions={handleOpenConnectionOptions}
-          embedded={isEmbedded}
-        />
+        {/* Header - hidden in single-tab mode */}
+        {!isSingleTab && (
+          <LayoutHeader
+            connections={connections}
+            selectedServer={selectedServer}
+            activeTab={activeTab}
+            onServerSelect={handleServerSelect}
+            onTabChange={setActiveTab}
+            onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
+            onOpenConnectionOptions={handleOpenConnectionOptions}
+            embedded={isEmbedded}
+          />
+        )}
 
         {/* Main Content */}
-        <main className="flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto">
+        <main className={mainClassName}>
           <LayoutContent
             selectedServer={selectedServer}
             activeTab={activeTab}

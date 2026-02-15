@@ -108,7 +108,9 @@ describe("HMR CLI Integration", () => {
     });
   };
 
-  const waitForHMR = (): Promise<string> => {
+  const waitForHMR = (options?: {
+    allowNoChanges?: boolean;
+  }): Promise<string> => {
     return new Promise((resolve, reject) => {
       if (!serverProcess) {
         reject(new Error("No server process"));
@@ -122,7 +124,11 @@ describe("HMR CLI Integration", () => {
 
       const dataHandler = (data: Buffer) => {
         output += data.toString();
-        if (output.includes("[HMR] ✓ Reloaded")) {
+        const sawReload = output.includes("[HMR] ✓ Reloaded");
+        const sawNoChanges =
+          options?.allowNoChanges &&
+          output.includes("[HMR] No changes detected");
+        if (sawReload || sawNoChanges) {
           clearTimeout(timeout);
           serverProcess?.stdout?.off("data", dataHandler);
           resolve(output);
@@ -333,7 +339,7 @@ describe("HMR CLI Integration", () => {
 
     // Fix the error
     await writeFile(filePath, validContent);
-    await waitForHMR();
+    await waitForHMR({ allowNoChanges: true });
 
     // Verify recovery
     const recoveredTools = await listTools();

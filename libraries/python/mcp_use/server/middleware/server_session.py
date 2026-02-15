@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import weakref
 from datetime import datetime
 
 import mcp.types as types
@@ -16,6 +19,9 @@ class MiddlewareServerSession(ServerSession):
     - Log connection attempts and protocol versions
     - Reject connections early based on initialization parameters
 
+    It also tracks all active sessions so the server can broadcast notifications
+    (e.g., ``notifications/resources/updated``) to all connected clients.
+
     The class is injected via monkey-patching of ``mcp.server.session.ServerSession``
     to intercept session creation within the MCP SDK.
 
@@ -31,10 +37,16 @@ class MiddlewareServerSession(ServerSession):
             Injected by MCPServer during initialization.
         _transport_type: The transport type (e.g., "stdio", "streamable-http").
             Injected by MCPServer during initialization.
+        _active_sessions: Weak set of all active sessions for broadcasting notifications.
     """
 
     _middleware_manager: MiddlewareManager | None = None
     _transport_type: str = "unknown"
+    _active_sessions: weakref.WeakSet[MiddlewareServerSession] = weakref.WeakSet()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        MiddlewareServerSession._active_sessions.add(self)
 
     async def _received_request(self, responder: RequestResponder[types.ClientRequest, types.ServerResult]) -> None:
         if responder.request.root.method and responder.request.root.method == "initialize":
