@@ -22,8 +22,6 @@ from mcp.types import (
     ReadResourceRequest,
     ServerResult,
     SetLevelRequest,
-    SubscribeRequest,
-    UnsubscribeRequest,
 )
 
 # Import auth components
@@ -292,9 +290,9 @@ class MCPServer(FastMCP):
     def _register_default_protocol_handlers(self) -> None:
         """Register default handlers for MCP protocol methods not covered by FastMCP.
 
-        This ensures the server advertises full protocol capabilities (logging,
-        resource subscriptions, completions) and responds correctly to these requests.
-        Users can override completion behavior via the inherited `completion()` decorator.
+        Registers logging/setLevel and completion/complete so the server advertises
+        these capabilities and responds to requests. Users can override completion
+        behavior via the inherited `completion()` decorator.
         """
 
         # logging/setLevel — accept any level (enables logging capability advertisement)
@@ -302,51 +300,10 @@ class MCPServer(FastMCP):
         async def _handle_set_logging_level(_level: Any) -> None:
             pass
 
-        # resources/subscribe + unsubscribe — accept subscription requests
-        # Note: the MCP SDK's streamable HTTP transport handles per-session subscription
-        # tracking and notification routing internally. These handlers register the
-        # capability so the server advertises subscribe support.
-        @self._mcp_server.subscribe_resource()
-        async def _handle_subscribe(_uri: Any) -> None:
-            pass
-
-        @self._mcp_server.unsubscribe_resource()
-        async def _handle_unsubscribe(_uri: Any) -> None:
-            pass
-
         # completion/complete — default empty completions (override via mcp.completion())
         @self._mcp_server.completion()
         async def _handle_completion(_ref: Any, _argument: Any, _context: Any = None) -> Completion:
             return Completion(values=[], total=0, hasMore=False)
-
-        # Fix subscribe capability: the upstream lowlevel server hardcodes subscribe=False
-        original_get_capabilities = self._mcp_server.get_capabilities
-
-        def _patched_get_capabilities(notification_options: Any, experimental_capabilities: Any) -> Any:
-            caps = original_get_capabilities(notification_options, experimental_capabilities)
-            if caps.resources is not None:
-                caps.resources.subscribe = True
-            return caps
-
-        self._mcp_server.get_capabilities = _patched_get_capabilities  # type: ignore[assignment]
-
-    async def notify_resource_updated(self, uri: str) -> None:
-        """Send a resource update notification to the current session.
-
-        This sends a ``notifications/resources/updated`` message to the session
-        that is currently handling a request. Call this from within a tool handler
-        to notify the client that a resource has changed.
-
-        Note: This notifies only the current request's session. For multi-session
-        broadcasting, the MCP SDK's streamable HTTP transport handles subscription
-        routing at the transport layer.
-
-        Args:
-            uri: The URI of the resource that was updated.
-        """
-        session = self._current_session()
-        if session:
-            await session.send_resource_updated(uri=uri)
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
@@ -421,8 +378,6 @@ class MCPServer(FastMCP):
         wrap_request(ListResourcesRequest, "resources/list")
         wrap_request(ListPromptsRequest, "prompts/list")
         wrap_request(SetLevelRequest, "logging/setLevel")
-        wrap_request(SubscribeRequest, "resources/subscribe")
-        wrap_request(UnsubscribeRequest, "resources/unsubscribe")
         wrap_request(CompleteRequest, "completion/complete")
 
     def run(  # type: ignore[override]

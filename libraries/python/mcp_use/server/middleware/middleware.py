@@ -74,7 +74,7 @@ class Middleware:
                 handler = partial(self.on_list_resources, call_next=handler)
             case "prompts/list":
                 handler = partial(self.on_list_prompts, call_next=handler)
-            case "logging/setLevel" | "resources/subscribe" | "resources/unsubscribe" | "completion/complete":
+            case "logging/setLevel" | "completion/complete":
                 pass  # Route through on_request only
 
         handler = partial(self.on_request, call_next=handler)

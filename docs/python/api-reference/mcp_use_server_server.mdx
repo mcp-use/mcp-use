@@ -109,29 +109,4 @@ def include_router(router: MCPRouter, prefix: str = "", enabled: bool = True):
 
 </Card>
 
-<Card type="info">
-### `method` notify_resource_updated
-
-Send a resource update notification to the current session.
-
-        This sends a ``notifications/resources/updated`` message to the session
-        that is currently handling a request. Call this from within a tool handler
-        to notify the client that a resource has changed.
-
-        Note: This notifies only the current request's session. For multi-session
-        broadcasting, the MCP SDK's streamable HTTP transport handles subscription
-        routing at the transport layer.
-
-
-
-**Parameters**
-><ParamField body="uri" type="str" required="True" >   The URI of the resource that was updated. </ParamField>
-
-**Signature**
-```python wrap
-def notify_resource_updated(uri: str):
-```
-
-</Card>
-
 </div>
