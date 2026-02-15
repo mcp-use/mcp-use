@@ -135,7 +135,8 @@
                       "python/server/sampling",
                       "python/server/elicitation",
                       "python/server/roots",
-                      "python/server/notifications"
+                      "python/server/notifications",
+                      "python/server/dependency-injection"
                     ]
                   },
                   {
