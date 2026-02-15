@@ -1283,9 +1283,6 @@ function SkillsPresetPrompt({
     <Box flexDirection="column">
       <Box marginBottom={1}>
         <Text bold>Install skills (Recommended)? (Y/n)</Text>
-        <Text dimColor>
-          The skills help the agent to assist you write mcp-use code.
-        </Text>
       </Box>
       <Box>
         <Text color="cyan">❯ </Text>
