@@ -150,9 +150,11 @@ async def run_tools_call(session):
 
 
 async def run_elicitation_defaults(session):
-    """Call tools — the framework checks that client returns defaults."""
+    """Call elicitation tools — the framework checks that client returns defaults."""
     tools = await session.list_tools()
     for tool in tools:
+        if "elicit" not in (tool.name or "").lower():
+            continue
         try:
             await session.call_tool(name=tool.name, arguments={})
         except Exception:

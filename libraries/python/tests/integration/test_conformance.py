@@ -7,6 +7,7 @@ Starts the conformance server, then validates both server-side protocol complian
 """
 
 import asyncio
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,19 @@ CONFORMANCE_CLIENT_PATH = Path(__file__).parent / "clients_for_testing" / "confo
 SERVER_PORT = 8765  # Use a non-default port to avoid conflicts
 
 
+async def _wait_for_server(host: str, port: int, timeout: float = 10.0) -> None:
+    """Poll TCP port until the server is accepting connections."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while asyncio.get_event_loop().time() < deadline:
+        try:
+            sock = socket.create_connection((host, port), timeout=0.5)
+            sock.close()
+            return
+        except OSError:
+            await asyncio.sleep(0.2)
+    raise TimeoutError(f"Server on {host}:{port} did not start within {timeout}s")
+
+
 @pytest.fixture(scope="module")
 async def conformance_server():
     """Start the conformance server as a subprocess."""
@@ -34,13 +48,12 @@ async def conformance_server():
             "--port",
             str(SERVER_PORT),
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         env={**__import__("os").environ, "MCP_USE_ANONYMIZED_TELEMETRY": "false"},
     )
 
-    await asyncio.sleep(3)
+    await _wait_for_server("127.0.0.1", SERVER_PORT)
 
     yield f"http://127.0.0.1:{SERVER_PORT}"
 

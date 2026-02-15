@@ -278,16 +278,17 @@ class MCPServer(FastMCP):
         async def _handle_set_logging_level(_level: Any) -> None:
             pass
 
-        # resources/subscribe + unsubscribe — track subscriptions
-        self._resource_subscriptions: dict[str, set[str]] = {}
-
+        # resources/subscribe + unsubscribe — accept subscription requests
+        # Note: the MCP SDK's streamable HTTP transport handles per-session subscription
+        # tracking and notification routing internally. These handlers register the
+        # capability so the server advertises subscribe support.
         @self._mcp_server.subscribe_resource()
-        async def _handle_subscribe(uri: Any) -> None:
-            self._resource_subscriptions.setdefault(str(uri), set())
+        async def _handle_subscribe(_uri: Any) -> None:
+            pass
 
         @self._mcp_server.unsubscribe_resource()
-        async def _handle_unsubscribe(uri: Any) -> None:
-            self._resource_subscriptions.pop(str(uri), None)
+        async def _handle_unsubscribe(_uri: Any) -> None:
+            pass
 
         # completion/complete — default empty completions (override via mcp.completion())
         @self._mcp_server.completion()
@@ -306,7 +307,15 @@ class MCPServer(FastMCP):
         self._mcp_server.get_capabilities = _patched_get_capabilities  # type: ignore[assignment]
 
     async def notify_resource_updated(self, uri: str) -> None:
-        """Notify subscribers that a resource has been updated.
+        """Send a resource update notification to the current session.
+
+        This sends a ``notifications/resources/updated`` message to the session
+        that is currently handling a request. Call this from within a tool handler
+        to notify the client that a resource has changed.
+
+        Note: This notifies only the current request's session. For multi-session
+        broadcasting, the MCP SDK's streamable HTTP transport handles subscription
+        routing at the transport layer.
 
         Args:
             uri: The URI of the resource that was updated.
