@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import MISSING, fields, is_dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from mcp.server.elicitation import ElicitationResult, ElicitSchemaModelT
 from mcp.server.fastmcp import Context as FastMCPContext
@@ -14,8 +14,51 @@ from mcp_use.telemetry.telemetry import Telemetry
 
 _telemetry = Telemetry()
 
+# MCP log levels ordered by severity (lowest to highest)
+_LOG_LEVEL_ORDER = {
+    "debug": 0,
+    "info": 1,
+    "notice": 2,
+    "warning": 3,
+    "error": 4,
+    "critical": 5,
+    "alert": 6,
+    "emergency": 7,
+}
+
 
 class Context(FastMCPContext):
+    async def log(
+        self,
+        level: Literal["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"],
+        message: str,
+        *,
+        logger_name: str | None = None,
+    ) -> None:
+        """Send a log message to the client, respecting the client's log level.
+
+        The server filters messages based on the minimum level set by the client
+        via ``logging/setLevel``. Messages below the client's requested level are
+        suppressed. Log levels follow RFC 5424 syslog severity levels.
+
+        See: https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging
+
+        Args:
+            level: Log severity level (debug, info, notice, warning, error, critical, alert, emergency).
+            message: Log message content.
+            logger_name: Optional logger name for categorizing messages.
+        """
+        client_level = self._fastmcp._client_log_level  # type: ignore[attr-defined]
+        if _LOG_LEVEL_ORDER.get(level, 0) < _LOG_LEVEL_ORDER.get(client_level, 0):
+            return
+
+        await self.request_context.session.send_log_message(
+            level=level,
+            data=message,
+            logger=logger_name,
+            related_request_id=self.request_id,
+        )
+
     async def sample(
         self,
         messages: str | SamplingMessage | Sequence[SamplingMessage | str],

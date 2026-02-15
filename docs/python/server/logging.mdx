@@ -242,6 +242,63 @@ server.run(transport="streamable-http")
 
 This makes it much easier to understand what's happening with your MCP server and debug any issues in both production and development environments.
 
+## Client Log Messages (MCP Protocol)
+
+In addition to server-side logging, MCP servers can send structured log messages to clients using the [MCP logging protocol](https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging). This lets clients display or process server activity in their UI.
+
+### Sending Log Messages
+
+Use `ctx.log()` or the convenience methods inside tool handlers:
+
+```python
+@mcp.tool()
+async def process_data(ctx: Context, data: str) -> str:
+    await ctx.debug("Starting data processing")
+    await ctx.info("Processing 1000 records")
+    await ctx.warning("Skipping 3 malformed records")
+
+    try:
+        result = do_work(data)
+    except Exception as e:
+        await ctx.error(f"Processing failed: {e}")
+        raise
+
+    return result
+```
+
+### Log Levels
+
+Log levels follow [RFC 5424](https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1) syslog severity, from lowest to highest:
+
+| Level | Description | Use Case |
+|-------|-------------|----------|
+| `debug` | Detailed debugging info | Function entry/exit |
+| `info` | Informational messages | Progress updates |
+| `notice` | Normal but significant | Config changes |
+| `warning` | Warning conditions | Deprecated usage |
+| `error` | Error conditions | Operation failures |
+| `critical` | Critical conditions | Component failures |
+| `alert` | Immediate action needed | Data corruption |
+| `emergency` | System unusable | Complete failure |
+
+### Client-Controlled Filtering
+
+Clients can set a minimum log level via `logging/setLevel`. When a client sets the level to `warning`, the server automatically suppresses `debug`, `info`, and `notice` messages — only `warning` and above are sent:
+
+```
+Client → Server:  logging/setLevel { level: "warning" }
+Server → Client:  ✗ ctx.debug("...")     # suppressed
+Server → Client:  ✗ ctx.info("...")      # suppressed
+Server → Client:  ✓ ctx.warning("...")   # sent
+Server → Client:  ✓ ctx.error("...")     # sent
+```
+
+This filtering happens automatically — you don't need to check the level yourself. Just call `ctx.log()` at the appropriate level and the server handles the rest.
+
+<Tip>
+The default level is `debug` (all messages sent). Clients opt in to filtering by calling `logging/setLevel`.
+</Tip>
+
 ## Next Steps
 
 - [Inspector UI](/python/server/inspector) - Monitor logs in real-time
