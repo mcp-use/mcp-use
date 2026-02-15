@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import MISSING, fields, is_dataclass
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from mcp.server.elicitation import ElicitationResult, ElicitSchemaModelT
 from mcp.server.fastmcp import Context as FastMCPContext
@@ -11,9 +11,6 @@ from pydantic import BaseModel, Field, create_model
 from starlette.requests import Request
 
 from mcp_use.telemetry.telemetry import Telemetry
-
-if TYPE_CHECKING:
-    from mcp_use.server.server import MCPServer
 
 _telemetry = Telemetry()
 
@@ -42,11 +39,9 @@ class Context(FastMCPContext):
 
         Messages below the level set by the client via logging/setLevel are suppressed.
         """
-        server: MCPServer | None = getattr(self, "_fastmcp", None)
-        if server is not None:
-            client_level = getattr(server, "_client_log_level", "debug")
-            if _LOG_LEVEL_ORDER.get(level, 0) < _LOG_LEVEL_ORDER.get(client_level, 0):
-                return
+        client_level = self._fastmcp._client_log_level  # type: ignore[attr-defined]
+        if _LOG_LEVEL_ORDER.get(level, 0) < _LOG_LEVEL_ORDER.get(client_level, 0):
+            return
 
         await self.request_context.session.send_log_message(
             level=level,
