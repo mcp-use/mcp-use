@@ -6,6 +6,20 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.19.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.19.0&title=Tool%20Arguments%20%26%20Streaming%20Input&date=2026-02&lang=inspector" alt="Release 0.19.0" />
+  </Frame>
+  ## Tool Arguments, Streaming Input & Elicitation Enum Support
+  Minor release with tool argument handling, streaming input support, and elicitation enum variants.
+
+- **New**: Tool argument type coercion and schema resolution (boolean, array, object); ToolsTab and ToolInputForm use new schema utilities; validation server tool and E2E tests for typed arguments
+- **New**: Partial tool input handling for streaming arguments in MCPAppsRenderer; MessageList and ToolResultRenderer support streaming states; useChatMessagesClientSide handles streaming tool call arguments; useWidget types for partial/streaming state
+- **New**: Elicitation support for SEP-1330 enum schema variants (single-select, multi-select); client and server handling; Elicitation tab docs and tests
+- **Fix**: Readiness state reset when widget URL changes in OpenAIComponentRenderer; improved tool output and response metadata handling for pending-to-ready transitions
+- **Update**: Updated mcp-use to v1.18.0
+</Update>
+
 <Update label="v0.18.9" description="February 2026">
   ## Log Noise Reduction
   Patch release reducing dev server log noise and aligning dependencies.

@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.18.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.18.0&title=DNS%20Rebinding%20%26%20Deferred%20Callbacks&date=2026-02&lang=typescript" alt="Release 1.18.0" />
+  </Frame>
+  ## DNS Rebinding Protection & Deferred Client Callbacks
+  Minor release adding DNS rebinding protection and deferred React client callbacks.
+
+- **New**: `allowedOrigins` configuration on `MCPServer` for DNS rebinding protection and host validation; docs and example (curl tests) added
+- **Enhancement**: `McpClientProvider` defers `onServerAdded` and `onServerStateChange` callbacks via `queueMicrotask` to avoid render-phase updates and improve stability
+- **Update**: Updated @mcp-use/inspector to v0.19.0
+- **Update**: Updated @mcp-use/cli to v2.13.7
+</Update>
+
 <Update label="v1.17.4" description="February 2026">
   ## Widget Resource Propagation & Log Noise Reduction
   Patch release improving HMR reliability for widget resources and reducing dev server log noise.
