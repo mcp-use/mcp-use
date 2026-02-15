@@ -32,6 +32,11 @@ import {
   ToolsList,
   ToolsTabHeader,
 } from "./tools";
+import {
+  coerceExecutionArgByType,
+  coerceTextInputValueByType,
+  getToolPropertyType,
+} from "./tools/schema-utils";
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -214,21 +219,23 @@ export function ToolsTab({
     setSelectedTool(tool);
     // Initialize args with default values based on tool input schema
     const initialArgs: Record<string, unknown> = {};
+    const rootSchema = (tool.inputSchema || {}) as Record<string, unknown>;
     if (tool.inputSchema?.properties) {
       Object.entries(tool.inputSchema.properties).forEach(([key, prop]) => {
         const typedProp = prop as any;
+        const effectiveType = getToolPropertyType(prop, rootSchema);
         if (typedProp.default !== undefined) {
           initialArgs[key] = typedProp.default;
-        } else if (typedProp.type === "string") {
+        } else if (effectiveType === "string") {
           initialArgs[key] = "";
-        } else if (typedProp.type === "number") {
+        } else if (effectiveType === "number" || effectiveType === "integer") {
           initialArgs[key] = 0;
-        } else if (typedProp.type === "boolean") {
+        } else if (effectiveType === "boolean") {
           initialArgs[key] = false;
-        } else if (typedProp.type === "array") {
+        } else if (effectiveType === "array") {
           // Initialize as empty JSON string to preserve formatting
           initialArgs[key] = "[]";
-        } else if (typedProp.type === "object") {
+        } else if (effectiveType === "object") {
           // Initialize as empty JSON string to preserve formatting
           initialArgs[key] = "{}";
         }
@@ -411,10 +418,14 @@ export function ToolsTab({
     (key: string, value: string) => {
       setToolArgs((prev) => {
         const newArgs = { ...prev };
+        const rootSchema = (selectedTool?.inputSchema || {}) as Record<
+          string,
+          unknown
+        >;
 
         if (selectedTool?.inputSchema?.properties?.[key]) {
-          const prop = selectedTool.inputSchema.properties[key] as any;
-          const expectedType = prop.type;
+          const prop = selectedTool.inputSchema.properties[key];
+          const expectedType = getToolPropertyType(prop, rootSchema);
 
           // Keep object/array types as strings to preserve formatting and cursor position
           if (expectedType === "object" || expectedType === "array") {
@@ -422,12 +433,7 @@ export function ToolsTab({
           } else if (expectedType === "string") {
             newArgs[key] = value;
           } else {
-            // For other types (number, boolean, etc.), try to parse
-            try {
-              newArgs[key] = JSON.parse(value);
-            } catch {
-              newArgs[key] = value;
-            }
+            newArgs[key] = coerceTextInputValueByType(value, expectedType);
           }
         } else {
           // If no schema info, keep as string to be safe
@@ -450,27 +456,18 @@ export function ToolsTab({
     const startTime = Date.now();
 
     try {
-      // Parse JSON strings for object/array types before execution
+      // Parse values by resolved schema type before execution
       const parsedArgs = { ...toolArgs };
+      const rootSchema = (selectedTool.inputSchema || {}) as Record<
+        string,
+        unknown
+      >;
       if (selectedTool.inputSchema?.properties) {
         Object.entries(selectedTool.inputSchema.properties).forEach(
           ([key, prop]) => {
-            const typedProp = prop as any;
-            const expectedType = typedProp.type;
+            const expectedType = getToolPropertyType(prop, rootSchema);
             const value = parsedArgs[key];
-
-            // Parse JSON strings for object/array types
-            if (
-              (expectedType === "object" || expectedType === "array") &&
-              typeof value === "string"
-            ) {
-              try {
-                parsedArgs[key] = JSON.parse(value);
-              } catch {
-                // If parsing fails, keep the string value
-                // The tool execution will handle the error
-              }
-            }
+            parsedArgs[key] = coerceExecutionArgByType(value, expectedType);
           }
         );
       }

@@ -268,6 +268,45 @@ test.describe("Inspector MCP Server Connections", () => {
     ).toContainText("Echo: Hello from test");
   });
 
+  test("test_typed_arguments - should submit boolean/array/object as typed values", async ({
+    page,
+  }) => {
+    await page.getByTestId("tool-item-test_typed_arguments").click();
+    await expect(
+      page.getByTestId("tool-execution-execute-button")
+    ).toBeVisible();
+
+    await expect(page.getByTestId("tool-param-flag")).toBeVisible();
+    await page.getByTestId("tool-param-flag").fill("true");
+
+    await expect(page.getByTestId("tool-param-tags")).toBeVisible();
+    await page.getByTestId("tool-param-tags").fill('["alpha","beta"]');
+
+    await expect(page.getByTestId("tool-param-config")).toBeVisible();
+    await page
+      .getByTestId("tool-param-config")
+      .fill('{"mode":"strict","count":2}');
+
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    await expect(page.getByText("Text Content (JSON)")).toBeVisible({
+      timeout: 10000,
+    });
+    const resultsContent = page.getByTestId("tool-execution-results-content");
+    await expect(
+      resultsContent.getByText('"flagType": "boolean"')
+    ).toBeVisible();
+    await expect(resultsContent.getByText('"tagsIsArray": true')).toBeVisible();
+    await expect(
+      resultsContent.getByText('"configIsObject": true')
+    ).toBeVisible();
+    await expect(resultsContent.getByText('"flag": true')).toBeVisible();
+    await expect(resultsContent.getByText('"alpha",')).toBeVisible();
+    await expect(resultsContent.getByText('"beta"')).toBeVisible();
+    await expect(resultsContent.getByText('"mode": "strict",')).toBeVisible();
+    await expect(resultsContent.getByText('"count": 2')).toBeVisible();
+  });
+
   test("test_image_content - should return image content", async ({ page }) => {
     await page.getByTestId("tool-item-test_image_content").click();
     await expect(
