@@ -8,6 +8,7 @@ import TextInput from "ink-text-input";
 import { spawn, spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -18,9 +19,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import ora from "ora";
 import React, { useState } from "react";
+import { extract } from "tar";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,39 +114,87 @@ function getInstallArgs(packageManager: string): string[] {
   }
 }
 
-// Run npx skills add in the project directory (for Claude Code / Cursor presets)
-function runSkillsAdd(projectPath: string, presets: string[]): Promise<void> {
-  if (presets.length === 0) return Promise.resolve();
-  const args = [
-    "--yes",
-    "--package",
-    "skills@latest",
-    "--",
-    "skills",
-    "add",
-    "mcp-use/mcp-use",
-    ...presets.flatMap((p) => ["-a", p]),
-  ];
-  return new Promise((resolve, reject) => {
-    const child = spawn("npx", args, {
-      cwd: projectPath,
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
-    child.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`skills add exited with code ${code}`));
-    });
-    child.on("error", reject);
-  });
+// Type-safe enum for IDE presets
+type IdePreset = "cursor" | "claude-code";
+
+// Download and extract skills folder from GitHub repository
+export async function addSkillsToProject(
+  projectPath: string,
+  presets: IdePreset[]
+): Promise<void> {
+  if (presets.length === 0) {
+    return;
+  }
+
+  const REPO_OWNER = "mcp-use";
+  const REPO_NAME = "mcp-use";
+  const REPO_COMMIT = "main";
+
+  const tarballUrl = `https://codeload.github.com/${REPO_OWNER}/${REPO_NAME}/tar.gz/${REPO_COMMIT}`;
+
+  // Create temp directory for extraction
+  const tempDir = mkdtempSync(join(tmpdir(), "mcp-use-skills-"));
+
+  try {
+    // Download tarball
+    const response = await fetch(tarballUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download tarball: ${response.statusText}`);
+    }
+
+    // Extract only the skills folder from the tarball
+    // Tarball structure: mcp-use-{commit}/skills/...
+    await pipeline(
+      Readable.fromWeb(response.body as any),
+      extract({
+        cwd: tempDir,
+        filter: (path) => path.includes("/skills/"),
+        strip: 1, // Removes 'mcp-use-{commit}/' prefix
+      })
+    );
+
+    const skillsPath = join(tempDir, "skills");
+
+    if (!existsSync(skillsPath)) {
+      throw new Error("Skills folder not found in tarball");
+    }
+
+    // Copy to each requested preset location
+    const presetFolders: Record<IdePreset, string> = {
+      cursor: ".cursor",
+      "claude-code": ".claude",
+    };
+
+    for (const preset of presets) {
+      const folderName = presetFolders[preset];
+      const outputPath = join(projectPath, folderName, "skills");
+
+      // Use cpSync with recursive flag (Node 16.7+)
+      cpSync(skillsPath, outputPath, { recursive: true });
+    }
+  } catch (error) {
+    console.log(
+      chalk.yellow(
+        "⚠️  Failed to download skills from GitHub. Continuing without skills..."
+      )
+    );
+    console.log(
+      chalk.yellow(
+        `   Error: ${error instanceof Error ? error.message : String(error)}`
+      )
+    );
+    return;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 // Parse --ide option: "claude-code", "cursor", or "claude-code,cursor"
-function parseIdeOption(ide: string): string[] {
+function parseIdeOption(ide: string): IdePreset[] {
   const normalized = ide
     .split(",")
     .map((s) => s.trim().toLowerCase())
-    .filter((s) => s === "claude-code" || s === "cursor");
+    .filter((s) => s === "claude-code" || s === "cursor") as IdePreset[];
   return [...new Set(normalized)];
 }
 
@@ -658,18 +710,8 @@ program
         if (skillsPresets.length > 0) {
           console.log("");
           console.log(chalk.cyan("📚 Installing skills..."));
-          // Cursor does not support symlinking
-          // Remove this when Cursor supports symlinking
-          // https://forum.cursor.com/t/cursor-doesnt-follow-symlinks-to-discover-skills/149693
-          if (skillsPresets.includes("cursor")) {
-            console.log(
-              chalk.yellow(
-                "⚠️  When prompted for Installation Method, choose Copy instead of Symlink."
-              )
-            );
-          }
           try {
-            await runSkillsAdd(projectPath, skillsPresets);
+            await addSkillsToProject(projectPath, skillsPresets);
             console.log(chalk.green("✅ Skills installed successfully!"));
           } catch (err) {
             console.log(
@@ -1173,7 +1215,7 @@ async function promptForInstall(): Promise<boolean> {
 function SkillsPresetSelector({
   onSelect,
 }: {
-  onSelect: (presets: string[]) => void;
+  onSelect: (presets: IdePreset[]) => void;
 }) {
   const items = [
     { label: "Claude Code", value: "claude-code" },
@@ -1185,17 +1227,19 @@ function SkillsPresetSelector({
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>Install skills for Claude Code or Cursor? (select one):</Text>
+        <Text bold>
+          Install skills for Claude Code or Cursor? (select one):
+        </Text>
       </Box>
       <SelectInput
         items={items}
         onSelect={(item) => {
-          const presets =
+          const presets: IdePreset[] =
             item.value === "none"
               ? []
               : item.value === "both"
                 ? ["claude-code", "cursor"]
-                : [item.value];
+                : [item.value as IdePreset];
           onSelect(presets);
         }}
       />
@@ -1203,7 +1247,7 @@ function SkillsPresetSelector({
   );
 }
 
-async function promptForSkillsPresets(): Promise<string[]> {
+async function promptForSkillsPresets(): Promise<IdePreset[]> {
   return new Promise((resolve) => {
     const { unmount } = render(
       <SkillsPresetSelector
