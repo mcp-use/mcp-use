@@ -295,10 +295,12 @@ class MCPServer(FastMCP):
         behavior via the inherited `completion()` decorator.
         """
 
-        # logging/setLevel — accept any level (enables logging capability advertisement)
+        # logging/setLevel — store the level so Context.log() can filter
+        self._client_log_level: str = "debug"  # Default: send all levels
+
         @self._mcp_server.set_logging_level()
-        async def _handle_set_logging_level(_level: Any) -> None:
-            pass
+        async def _handle_set_logging_level(level: Any) -> None:
+            self._client_log_level = str(level)
 
         # completion/complete — default empty completions (override via mcp.completion())
         @self._mcp_server.completion()
