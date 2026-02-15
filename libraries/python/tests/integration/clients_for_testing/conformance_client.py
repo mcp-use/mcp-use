@@ -6,11 +6,13 @@ Uses MCPClient for all scenarios to validate the mcp-use client SDK.
 
 The conformance test framework starts a test server and passes its URL as argv[1].
 The scenario name is in the MCP_CONFORMANCE_SCENARIO env var.
+The MCP_CONFORMANCE_CONTEXT env var contains scenario-specific data (e.g., pre-registered creds).
 
 Usage: python conformance_client.py <server_url>
 """
 
 import asyncio
+import json
 import os
 import sys
 from urllib.parse import parse_qs, urlparse
@@ -18,9 +20,13 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 from mcp.client.auth import OAuthClientProvider
 from mcp.client.auth.oauth2 import OAuthClientMetadata
+from mcp.shared.auth import OAuthClientInformationFull
 from mcp.types import ElicitRequestParams, ElicitResult
 
 from mcp_use import MCPClient
+
+REDIRECT_URI = "http://127.0.0.1:19823/callback"
+
 
 # =============================================================================
 # Headless OAuth provider for conformance test servers (auto-approve)
@@ -32,6 +38,7 @@ class InMemoryTokenStorage:
 
     def __init__(self):
         self._tokens = {}
+        self._client_info = None
 
     async def get_tokens(self):
         return self._tokens.get("default")
@@ -40,30 +47,35 @@ class InMemoryTokenStorage:
         self._tokens["default"] = tokens
 
     async def get_client_info(self):
-        return self._tokens.get("client_info")
+        return self._client_info
 
     async def set_client_info(self, client_info):
-        self._tokens["client_info"] = client_info
+        self._client_info = client_info
 
 
-def create_headless_oauth_provider(server_url: str) -> OAuthClientProvider:
+def create_headless_oauth_provider(
+    server_url: str,
+    *,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    client_metadata_url: str | None = None,
+) -> OAuthClientProvider:
     """Create an OAuthClientProvider that handles auth headlessly.
 
     Conformance test servers auto-approve authorization requests, so the
     redirect_handler follows the auth URL via httpx (instead of opening a browser)
     and the callback_handler extracts the code from the redirect.
-
-    This is passed directly to MCPClient as an httpx.Auth instance.
     """
     auth_code_future: asyncio.Future | None = None
 
     async def redirect_handler(authorization_url: str) -> None:
         nonlocal auth_code_future
-        auth_code_future = asyncio.get_event_loop().create_future()
+        loop = asyncio.get_running_loop()
+        auth_code_future = loop.create_future()
 
         try:
-            async with httpx.AsyncClient(follow_redirects=False) as client:
-                response = await client.get(authorization_url)
+            async with httpx.AsyncClient(follow_redirects=False) as http_client:
+                response = await http_client.get(authorization_url)
 
                 if response.status_code in (301, 302, 303, 307, 308):
                     redirect_url = str(response.headers["location"])
@@ -85,19 +97,31 @@ def create_headless_oauth_provider(server_url: str) -> OAuthClientProvider:
             raise Exception("redirect_handler was not called")
         return await auth_code_future
 
+    storage = InMemoryTokenStorage()
+
+    # Pre-populate storage with client info for pre-registered clients
+    if client_id:
+        storage._client_info = OAuthClientInformationFull(
+            client_id=client_id,
+            client_secret=client_secret,
+            redirect_uris=[REDIRECT_URI],
+            token_endpoint_auth_method="client_secret_basic",
+        )
+
     return OAuthClientProvider(
         server_url=server_url,
         client_metadata=OAuthClientMetadata(
             client_name="mcp-use-conformance-client",
-            redirect_uris=["http://127.0.0.1:19823/callback"],
+            redirect_uris=[REDIRECT_URI],
             grant_types=["authorization_code", "refresh_token"],
             response_types=["code"],
             token_endpoint_auth_method="client_secret_post",
         ),
-        storage=InMemoryTokenStorage(),
+        storage=storage,
         redirect_handler=redirect_handler,
         callback_handler=callback_handler,
         timeout=10.0,
+        client_metadata_url=client_metadata_url,
     )
 
 
@@ -173,11 +197,27 @@ async def main():
 
     server_url = sys.argv[1]
     scenario = os.environ.get("MCP_CONFORMANCE_SCENARIO", "")
+    context_str = os.environ.get("MCP_CONFORMANCE_CONTEXT", "")
+    context = json.loads(context_str) if context_str else {}
 
     # Build config — auth scenarios pass a headless OAuthClientProvider as httpx.Auth
     server_config: dict = {"url": server_url}
     if scenario.startswith("auth/"):
-        server_config["auth"] = create_headless_oauth_provider(server_url)
+        # Check for pre-registered credentials from conformance context
+        pre_client_id = context.get("client_id")
+        pre_client_secret = context.get("client_secret")
+
+        # CIMD scenarios: use a metadata URL as client_id
+        client_metadata_url = None
+        if scenario == "auth/basic-cimd":
+            client_metadata_url = "https://client.example.com/.well-known/oauth-client"
+
+        server_config["auth"] = create_headless_oauth_provider(
+            server_url,
+            client_id=pre_client_id,
+            client_secret=pre_client_secret,
+            client_metadata_url=client_metadata_url,
+        )
 
     config = {"mcpServers": {"test": server_config}}
     client = MCPClient(config=config, elicitation_callback=handle_elicitation)
