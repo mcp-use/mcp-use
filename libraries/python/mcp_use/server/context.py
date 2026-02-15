@@ -30,14 +30,23 @@ _LOG_LEVEL_ORDER = {
 class Context(FastMCPContext):
     async def log(
         self,
-        level: Literal["debug", "info", "warning", "error"],
+        level: Literal["debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"],
         message: str,
         *,
         logger_name: str | None = None,
     ) -> None:
         """Send a log message to the client, respecting the client's log level.
 
-        Messages below the level set by the client via logging/setLevel are suppressed.
+        The server filters messages based on the minimum level set by the client
+        via ``logging/setLevel``. Messages below the client's requested level are
+        suppressed. Log levels follow RFC 5424 syslog severity levels.
+
+        See: https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging
+
+        Args:
+            level: Log severity level (debug, info, notice, warning, error, critical, alert, emergency).
+            message: Log message content.
+            logger_name: Optional logger name for categorizing messages.
         """
         client_level = self._fastmcp._client_log_level  # type: ignore[attr-defined]
         if _LOG_LEVEL_ORDER.get(level, 0) < _LOG_LEVEL_ORDER.get(client_level, 0):
