@@ -149,6 +149,7 @@
     "example:client:notification": "tsx examples/typescript/client/communication/notification-client.ts",
     "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/typescript/server/features/notifications/src/server.ts & sleep 3 && tsx examples/typescript/client/communication/notification-client.ts",
     "example:server:dns-rebinding": "pnpm --dir examples/server/features/dns-rebinding dev",
+    "example:server:streaming-props": "pnpm --dir examples/server/features/streaming-props dev",
     "example:server:sampling": "tsx examples/typescript/server/features/sampling/src/server.ts",
     "example:client:sampling": "tsx examples/typescript/client/communication/sampling-client.ts",
     "example:server:elicitation": "tsx examples/typescript/server/features/elicitation/src/server.ts",

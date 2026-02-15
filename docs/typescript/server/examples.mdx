@@ -24,6 +24,20 @@ This example also includes copy-paste `curl` commands to verify:
 - spoofed `Host` is rejected (`403`)
 - valid localhost `Host` is accepted (`2xx`)
 
+## Streaming Tool Props Example
+
+Demonstrates **streaming tool arguments** to widgets: when an LLM streams tool call arguments, the widget receives partial input in real time via `partialToolInput` and `isStreaming` from [useWidget](/typescript/server/widget-components/usewidget#streaming-tool-arguments), enabling live code or JSON previews as the model generates them.
+
+**Example location:** `libraries/typescript/packages/mcp-use/examples/server/features/streaming-props`
+
+**Run from package root (mcp-use package):**
+
+```bash
+pnpm run example:server:streaming-props
+```
+
+Tools include `generate-code` and `generate-json` with a code-preview widget that updates live while arguments stream. Test in the [MCP Inspector](/inspector/index) by invoking those tools and watching the widget.
+
 ## Weather Service Server
 
 A complete weather information server with tools, resources, and UI widgets.

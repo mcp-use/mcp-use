@@ -419,6 +419,8 @@ Widgets render **before** the tool execution completes. This allows you to show 
 - `isPending = true`: Widget just mounted, `props` is empty `{}`
 - `isPending = false`: Tool completed, `props` contains actual data
 
+When the host supports it (MCP Apps, MCP Inspector), you can also show **streaming** tool arguments in real time via `partialToolInput` and `isStreaming` from `useWidget` for live previews while the LLM generates the tool call. See [Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) in the useWidget docs.
+
 **Pattern 1: Early return with loading state**
 
 ```tsx
