@@ -27,8 +27,11 @@ export interface StdioServerConfig extends BaseServerConfig {
 export interface HttpServerConfig extends BaseServerConfig {
   url: string;
   headers?: Record<string, string>;
+  fetch?: typeof fetch;
   authToken?: string;
-  auth_token?: string; // Alternative naming for backward compatibility
+  /** @deprecated Use `authToken` instead. */
+  auth_token?: string;
+  authProvider?: unknown;
   transport?: "http" | "sse";
   preferSse?: boolean;
   disableSseFallback?: boolean;
@@ -99,7 +102,9 @@ export function createConnectorFromConfig(
 
     return new HttpConnector(serverConfig.url, {
       headers: serverConfig.headers,
+      fetch: serverConfig.fetch,
       authToken: serverConfig.auth_token || serverConfig.authToken,
+      authProvider: serverConfig.authProvider,
       // Only force SSE if explicitly requested
       preferSse: serverConfig.preferSse || transport === "sse",
       // Disable SSE fallback if explicitly disabled in config

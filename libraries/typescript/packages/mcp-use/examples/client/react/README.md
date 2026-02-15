@@ -22,43 +22,36 @@ Demonstrates the `McpClientProvider` for managing multiple MCP servers:
 ## Features
 
 The examples showcase:
-- Import and initialize the MCPClient from `mcp-use/browser`
-- Connect to MCP servers via HTTP/SSE
+- Use React-first APIs from `mcp-use/react` (`useMcp`, `McpClientProvider`, `useMcpClient`)
+- Connect to MCP servers via Streamable HTTP (with SSE compatibility fallback where needed)
 - Display available tools from connected servers
 - Handle loading states and errors
 - OAuth authentication with automatic token management
 
 ## Browser Compatibility
 
-The browser version (`mcp-use/browser`) supports:
+The React examples rely on the browser-compatible client under the hood and support:
 
-- ✅ **WebSocket connections**: Connect to MCP servers via WebSocket
-- ✅ **HTTP/SSE connections**: Connect to MCP servers via HTTP or Server-Sent Events
-- ❌ **Stdio connections**: Not supported (requires Node.js child_process)
+- ✅ **HTTP/Streamable MCP connections** for browser-hosted clients
+- ✅ **OAuth authentication flows** (popup/redirect) with callback handling
+- ❌ **Stdio connections**: Not supported in browser environments
 
 Example configurations:
 
 ```typescript
-// WebSocket connection
-const config = {
-  mcpServers: {
-    myServer: {
-      ws_url: 'ws://localhost:8080',
-      authToken: 'optional-token'
-    }
-  }
-}
+// useMcp (single server)
+const mcp = useMcp({
+  url: "https://mcp.linear.app/mcp",
+  preventAutoAuth: true,
+});
 
-// HTTP connection (with automatic SSE fallback)
-const config = {
-  mcpServers: {
-    myServer: {
-      url: 'http://localhost:8080',
-      authToken: 'optional-token',
-      preferSse: false // Set to true to force SSE
-    }
-  }
-}
+// McpClientProvider (multi-server)
+addServer("my-server", {
+  url: "https://api.example.com/mcp",
+  headers: {
+    Authorization: "Bearer YOUR_TOKEN",
+  },
+});
 ```
 
 ## Setup
@@ -116,7 +109,7 @@ The React example includes:
 
 ## Configuration
 
-The example uses a default configuration with a filesystem server. You can modify the `exampleConfig` in `react_example.tsx` to use different MCP servers.
+The single-server example connects to Linear MCP (`https://mcp.linear.app/mcp`) and demonstrates manual OAuth triggering. Update `url` in `react_example.tsx` to target a different MCP server.
 
 ## File Structure
 
@@ -151,9 +144,9 @@ These definitions ensure that Node.js-specific code paths are properly handled i
 
 ### Real MCP Client
 
-This example uses the **actual** MCP client code from `mcp-use/browser`, not mocks. It includes:
+This example uses the real MCP client stack from `mcp-use` (through `mcp-use/react`), not mocks. It includes:
 
-- Real WebSocket and HTTP/SSE connectors
+- Real HTTP/Streamable MCP connectors
 - Full MCP protocol implementation
 - Actual tool listing and execution capabilities
 - Browser-safe logging (falls back to console)

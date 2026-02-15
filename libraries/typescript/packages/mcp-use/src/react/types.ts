@@ -10,6 +10,7 @@ import type {
   ResourceTemplate,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 export type UseMcpOptions = {
@@ -189,6 +190,14 @@ export type UseMcpOptions = {
     }>;
     websiteUrl?: string;
   };
+  /**
+   * Optional external OAuth client provider.
+   *
+   * When provided, useMcp will use this provider directly instead of creating
+   * BrowserOAuthClientProvider internally. This is useful for headless/testing
+   * runtimes where popup/redirect flows are not available.
+   */
+  authProvider?: OAuthClientProvider;
   /**
    * Initial server info to use from cache (internal use).
    * This will be displayed immediately while the actual server info is being fetched.

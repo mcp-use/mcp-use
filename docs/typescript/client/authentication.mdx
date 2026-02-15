@@ -43,6 +43,24 @@ function MyComponent() {
 }
 ```
 
+### Custom OAuth Provider (Headless/Testing)
+
+If you run in non-browser environments (tests, headless runners, custom redirects), you can inject your own OAuth provider.
+
+```typescript
+import { useMcp } from "mcp-use/react";
+import { MyOAuthClientProvider } from "./my-oauth-provider";
+
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  authProvider: new MyOAuthClientProvider(),
+});
+```
+
+<Note>
+  When `authProvider` is provided, `useMcp` uses that provider directly instead of creating the default browser OAuth provider internally.
+</Note>
+
 ### Bearer Token Authentication
 
 For servers requiring API keys or bearer tokens:

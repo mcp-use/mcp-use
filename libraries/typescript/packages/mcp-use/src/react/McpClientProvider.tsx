@@ -89,6 +89,7 @@ export interface McpServerOptions extends Omit<
   "samplingCallback" | "onElicitation" | "onNotification"
 > {
   name?: string;
+  authProvider?: UseMcpOptions["authProvider"];
   // Optional callbacks for app-specific handling (e.g., toasts)
   onSamplingRequest?: (request: PendingSamplingRequest) => void;
   onElicitationRequest?: (request: PendingElicitationRequest) => void;

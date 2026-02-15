@@ -60,6 +60,7 @@ export class BrowserMCPClient extends BaseMCPClient {
     const {
       url,
       headers,
+      fetch,
       authToken,
       authProvider,
       wrapTransport,
@@ -84,6 +85,7 @@ export class BrowserMCPClient extends BaseMCPClient {
     // Prepare connector options
     const connectorOptions = {
       headers,
+      fetch,
       authToken,
       authProvider, // ← Pass OAuth provider to connector
       wrapTransport, // ← Pass transport wrapper if provided
@@ -98,17 +100,9 @@ export class BrowserMCPClient extends BaseMCPClient {
       serverId, // ← Pass server ID for gateway observability
     };
 
-    // Debug: Log if clientOptions are being passed
-    if (clientOptions) {
-      console.log(
-        "[BrowserMCPClient] Passing clientOptions to connector:",
-        JSON.stringify(clientOptions, null, 2)
-      );
-    } else {
-      console.warn(
-        "[BrowserMCPClient] No clientOptions provided to connector!"
-      );
-    }
+    logger.debug(
+      `[BrowserMCPClient] Connector options prepared (clientOptions: ${clientOptions ? "provided" : "none"})`
+    );
 
     // Use HTTP connector for browser
     return new HttpConnector(url, connectorOptions);

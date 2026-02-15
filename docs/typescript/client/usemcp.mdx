@@ -241,6 +241,7 @@ interface McpServerOptions {
   preventAutoAuth?: boolean; // Prevent automatic OAuth popup (default: true)
   useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
   callbackUrl?: string; // OAuth callback URL
+  authProvider?: OAuthClientProvider; // Optional external OAuth provider (headless/custom runtimes)
   clientInfo?: {
     name: string;
     version: string;
