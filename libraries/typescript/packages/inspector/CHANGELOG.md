@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.19.0-canary.2
+
+### Minor Changes
+
+- 4a2b65e: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+
+### Patch Changes
+
+- Updated dependencies [4a2b65e]
+  - mcp-use@1.18.0-canary.2
+
 ## 0.18.10-canary.1
 
 ### Patch Changes

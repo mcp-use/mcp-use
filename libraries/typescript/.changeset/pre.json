@@ -8,6 +8,7 @@
     "mcp-use": "1.17.4"
   },
   "changesets": [
+    "new-times-yawn",
     "orange-stars-pull",
     "slimy-rockets-clean"
   ]
