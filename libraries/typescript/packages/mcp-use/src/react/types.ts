@@ -86,7 +86,11 @@ export type UseMcpOptions = {
    * Custom headers that can be used to bypass auth
    */
   customHeaders?: Record<string, string>;
-  /** Whether to enable verbose debug logging to the console and the log state */
+  /**
+   * @deprecated Use `logLevel` instead. This option will be removed in a future version.
+   * Whether to enable verbose debug logging to the console and the log state.
+   * When `logLevel` is also set, `logLevel` takes precedence.
+   */
   debug?: boolean;
   /**
    * Log level for console output. When set, takes precedence over the `debug` option.
