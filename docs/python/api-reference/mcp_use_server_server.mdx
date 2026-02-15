@@ -108,4 +108,21 @@ def include_router(router: MCPRouter, prefix: str = "", enabled: bool = True):
 
 </Card>
 
+<Card type="info">
+### `method` notify_resource_updated
+
+Notify subscribers that a resource has been updated.
+
+
+
+**Parameters**
+><ParamField body="uri" type="str" required="True" >   The URI of the resource that was updated. </ParamField>
+
+**Signature**
+```python wrap
+def notify_resource_updated(uri: str):
+```
+
+</Card>
+
 </div>
