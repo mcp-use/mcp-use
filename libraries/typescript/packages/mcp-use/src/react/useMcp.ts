@@ -101,7 +101,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     onNotification,
     onSampling: onSamplingOption,
     samplingCallback: samplingCallbackOption,
-    onElicitation,
+    onElicitation: onElicitationOption,
+    elicitationCallback: elicitationCallbackOption,
   } = options;
 
   // Support both new and deprecated names with deprecation warnings
@@ -116,6 +117,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   if (samplingCallbackOption && !onSamplingOption) {
     logger.warn(
       '[useMcp] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+    );
+  }
+
+  const onElicitation = onElicitationOption ?? elicitationCallbackOption;
+  if (elicitationCallbackOption && !onElicitationOption) {
+    logger.warn(
+      '[useMcp] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
     );
   }
 
@@ -637,10 +645,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Include wrapTransport if provided
         clientRef.current.addServer(serverName, {
           ...serverConfig,
-          authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
-          onSampling: onSampling, // ← Pass sampling callback to connector
-          samplingCallback: onSampling, // ← Backward compatibility: also pass as old name
-          elicitationCallback: onElicitation, // ← Pass elicitation callback to connector
+          authProvider: authProviderRef.current,
+          onSampling,
+          onElicitation,
           wrapTransport: wrapTransport
             ? (transport: any) => {
                 addLog(

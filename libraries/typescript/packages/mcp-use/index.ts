@@ -12,7 +12,12 @@
 import { MCPAgent } from "./src/agents/mcp_agent.js";
 import { RemoteAgent } from "./src/agents/remote.js";
 import { MCPClient } from "./src/client.js";
-import { loadConfigFile } from "./src/config.js";
+import {
+  loadConfigFile,
+  type OnElicitationCallback,
+  type OnNotificationCallback,
+  type OnSamplingCallback,
+} from "./src/config.js";
 import type { NotificationHandler } from "./src/connectors/base.js";
 import { BaseConnector } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
@@ -129,3 +134,26 @@ export type {
  * Convenience type for sampling callback functions.
  */
 export type CreateMessageRequestParams = CreateMessageRequest["params"];
+
+/** Callback types so handlers can be typed without importing MCP SDK types. */
+export type {
+  OnElicitationCallback,
+  OnNotificationCallback,
+  OnSamplingCallback,
+};
+
+// Elicitation helpers (defaults, validation, accept/decline/cancel)
+export {
+  accept,
+  acceptWithDefaults,
+  applyDefaults,
+  cancel,
+  decline,
+  getDefaults,
+  reject,
+  validate,
+} from "./src/client/elicitation-helpers.js";
+export type {
+  ElicitContent,
+  ElicitValidationResult,
+} from "./src/client/elicitation-helpers.js";

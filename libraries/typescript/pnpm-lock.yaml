@@ -646,39 +646,11 @@ importers:
         specifier: ^5.10.0
         version: 5.10.0
 
-  packages/mcp-use/examples/client/features/conformance:
+  packages/mcp-use/examples/client/browser/react:
     dependencies:
-      jsdom:
-        specifier: ^27.0.0
-        version: 27.4.0
       mcp-use:
         specifier: workspace:*
         version: link:../../../..
-      react:
-        specifier: ^19.2.0
-        version: 19.2.4
-      react-test-renderer:
-        specifier: ^19.2.0
-        version: 19.2.4(react@19.2.4)
-    devDependencies:
-      '@types/jsdom':
-        specifier: ^27.0.0
-        version: 27.0.0
-      '@types/node':
-        specifier: ^25.0.2
-        version: 25.2.0
-      '@types/react-test-renderer':
-        specifier: ^19.1.0
-        version: 19.1.0
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-
-  packages/mcp-use/examples/client/react:
-    dependencies:
-      mcp-use:
-        specifier: workspace:*
-        version: link:../../..
       react:
         specifier: ^19.2.0
         version: 19.2.4
@@ -701,6 +673,34 @@ importers:
       vite:
         specifier: ^7.3.0
         version: 7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/mcp-use/examples/client/conformance:
+    dependencies:
+      jsdom:
+        specifier: ^27.0.0
+        version: 27.4.0
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../..
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-test-renderer:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/jsdom':
+        specifier: ^27.0.0
+        version: 27.0.0
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.2.0
+      '@types/react-test-renderer':
+        specifier: ^19.1.0
+        version: 19.1.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
 
   packages/mcp-use/examples/server/basic/simple:
     dependencies:

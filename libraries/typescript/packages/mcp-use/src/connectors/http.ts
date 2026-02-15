@@ -107,7 +107,7 @@ export class HttpConnector extends BaseConnector {
         ...(this.opts.clientOptions?.capabilities || {}),
         roots: { listChanged: true },
         ...(this.opts.onSampling ? { sampling: {} } : {}),
-        ...(this.opts.elicitationCallback
+        ...((this.opts.onElicitation ?? this.opts.elicitationCallback)
           ? { elicitation: { form: {}, url: {} } }
           : {}),
       },

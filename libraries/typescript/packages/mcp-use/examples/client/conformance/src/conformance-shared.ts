@@ -3,6 +3,7 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import { acceptWithDefaults } from "mcp-use";
 
 type Tool = {
   name: string;
@@ -23,20 +24,7 @@ export function isAuthScenario(scenario: string): boolean {
 export async function handleElicitation(
   params: ElicitRequestFormParams | ElicitRequestURLParams
 ): Promise<ElicitResult> {
-  const content: Record<string, unknown> = {};
-
-  if ("requestedSchema" in params && params.requestedSchema) {
-    const schema = params.requestedSchema as Record<string, unknown>;
-    const properties = (schema.properties || {}) as Record<string, unknown>;
-    for (const [fieldName, fieldSchema] of Object.entries(properties)) {
-      const field = fieldSchema as Record<string, unknown>;
-      if ("default" in field) {
-        content[fieldName] = field.default;
-      }
-    }
-  }
-
-  return { action: "accept", content } as ElicitResult;
+  return acceptWithDefaults(params);
 }
 
 function buildToolArgs(tool: Tool): Record<string, unknown> {

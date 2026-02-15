@@ -1,3 +1,11 @@
+import type {
+  CreateMessageRequest,
+  CreateMessageResult,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { Notification } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync } from "node:fs";
 import type { BaseConnector, ConnectorInitOptions } from "./connectors/base.js";
 import type { ClientInfo } from "./connectors/http.js";
@@ -5,10 +13,79 @@ import { HttpConnector } from "./connectors/http.js";
 import { StdioConnector } from "./connectors/stdio.js";
 import { getPackageVersion } from "./version.js";
 
+/** Callback for sampling requests (canonical name). */
+export type OnSamplingCallback = (
+  params: CreateMessageRequest["params"]
+) => Promise<CreateMessageResult>;
+
+/** Callback for elicitation requests (canonical name). */
+export type OnElicitationCallback = (
+  params: ElicitRequestFormParams | ElicitRequestURLParams
+) => Promise<ElicitResult>;
+
+/** Callback for notifications (canonical name). */
+export type OnNotificationCallback = (
+  notification: Notification
+) => void | Promise<void>;
+
+/**
+ * Callback options shared by per-server config and global defaults.
+ * Canonical names: onSampling, onElicitation, onNotification.
+ * Deprecated aliases: samplingCallback, elicitationCallback.
+ */
+export interface CallbackConfig {
+  /** Callback for sampling requests from servers. */
+  onSampling?: OnSamplingCallback;
+  /**
+   * @deprecated Use `onSampling` instead. Will be removed in a future version.
+   */
+  samplingCallback?: OnSamplingCallback;
+  /** Callback for elicitation requests from servers. */
+  onElicitation?: OnElicitationCallback;
+  /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
+  elicitationCallback?: OnElicitationCallback;
+  /** Callback for notifications from servers. */
+  onNotification?: OnNotificationCallback;
+}
+
+/**
+ * Resolves effective callbacks from per-server and global config with precedence:
+ * per-server canonical > per-server deprecated alias > global canonical > global deprecated alias.
+ */
+export function resolveCallbacks(
+  perServer: CallbackConfig | undefined,
+  globalDefaults: CallbackConfig | undefined
+): {
+  onSampling?: OnSamplingCallback;
+  onElicitation?: OnElicitationCallback;
+  onNotification?: OnNotificationCallback;
+} {
+  const pickSampling =
+    perServer?.onSampling ??
+    perServer?.samplingCallback ??
+    globalDefaults?.onSampling ??
+    globalDefaults?.samplingCallback;
+  const pickElicitation =
+    perServer?.onElicitation ??
+    perServer?.elicitationCallback ??
+    globalDefaults?.onElicitation ??
+    globalDefaults?.elicitationCallback;
+  const pickNotification =
+    perServer?.onNotification ?? globalDefaults?.onNotification;
+
+  return {
+    onSampling: pickSampling,
+    onElicitation: pickElicitation,
+    onNotification: pickNotification,
+  };
+}
+
 /**
  * Base server configuration with common optional fields
  */
-interface BaseServerConfig {
+interface BaseServerConfig extends CallbackConfig {
   clientInfo?: ClientInfo;
 }
 
@@ -43,6 +120,16 @@ export interface HttpServerConfig extends BaseServerConfig {
 export type ServerConfig = StdioServerConfig | HttpServerConfig;
 
 /**
+ * Top-level MCP client configuration shape.
+ * May include global callback defaults and clientInfo applied when per-server config omits them.
+ */
+export interface MCPClientConfigShape extends CallbackConfig {
+  /** Default clientInfo for all servers; overridable per server. */
+  clientInfo?: ClientInfo;
+  mcpServers?: Record<string, ServerConfig>;
+}
+
+/**
  * Default clientInfo for mcp-use
  */
 function getDefaultClientInfo(): ClientInfo {
@@ -65,7 +152,7 @@ function getDefaultClientInfo(): ClientInfo {
  * Normalizes and validates clientInfo from config.
  * Ensures required fields (name, version) are present and merges with defaults.
  */
-function normalizeClientInfo(input: unknown): ClientInfo {
+export function normalizeClientInfo(input: unknown): ClientInfo {
   const fallback = getDefaultClientInfo();
   if (!input || typeof input !== "object") return fallback;
   const ci = input as Partial<ClientInfo>;

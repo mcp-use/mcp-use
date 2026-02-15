@@ -175,6 +175,12 @@ export type UseMcpOptions = {
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
   /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+  /**
    * Client information sent to the MCP server in the initialize request.
    * If not provided, defaults to mcp-use client info.
    */
