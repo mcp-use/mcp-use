@@ -34,6 +34,7 @@ on:
       - 'libraries/python/mcp_use/client/**'
       - 'libraries/python/pyproject.toml'
       - 'libraries/typescript/packages/mcp-use/src/server/**'
+      - 'libraries/typescript/packages/mcp-use/src/client/**'
       - 'libraries/typescript/packages/mcp-use/package.json'
       - 'libraries/python/tests/integration/servers_for_testing/conformance_server.py'
       - 'libraries/python/tests/integration/clients_for_testing/conformance_client.py'
@@ -114,6 +115,12 @@ jobs:
           CLIENTS='['
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.typescript_only }}" != "true" ]; then
             CLIENTS+='{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
+          fi
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.python_only }}" != "true" ]; then
+            if [[ $CLIENTS != '[' ]]; then
+              CLIENTS+=','
+            fi
+            CLIENTS+='{"name":"typescript-client","command":"libraries/typescript/packages/mcp-use/examples/server/features/conformance/run-conformance-client.sh"}'
           fi
           CLIENTS+=']'
           echo "clients=$CLIENTS" >> $GITHUB_OUTPUT
