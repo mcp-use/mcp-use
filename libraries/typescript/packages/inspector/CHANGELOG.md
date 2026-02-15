@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 0.18.9
+
+### Patch Changes
+
+- 32b19dc: fix(logs): reduces the amount of noisy logs in the dev server
+- Updated dependencies [32b19dc]
+- Updated dependencies [32b19dc]
+  - mcp-use@1.17.4
+
 ## 0.18.9-canary.0
 
 ### Patch Changes
