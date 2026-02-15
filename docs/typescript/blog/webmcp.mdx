@@ -1,0 +1,182 @@
+---
+title: "Bridging MCP Servers to Chrome's AI Agent with One React Component"
+description: "How the WebMCP component exposes your existing MCP tools to in-browser AI agents—no re-implementation, no duplicate APIs"
+date: "2026-02-15"
+---
+
+# Bridging MCP Servers to Chrome's AI Agent with One React Component
+
+You already run an MCP server. It exposes tools with clear names, descriptions, and JSON Schema parameters. Now Chrome is adding **WebMCP**: a browser API that lets websites register tools so in-browser AI agents can discover and call them. The catch? Without a bridge, you’d have to re-implement every tool again in WebMCP’s shape.
+
+mcp-use’s **`<WebMCP />`** component is that bridge. Drop it into your app, point it at your MCP server, and every tool your server exposes becomes available to Chrome’s agent. One component, zero re-implementation.
+
+This post walks through why that matters, how it works under the hood, and how to use it.
+
+## The WebMCP Opportunity
+
+WebMCP ([Chrome docs](https://developer.chrome.com/docs/webmcp)) gives sites a standard way to expose **structured tools** to in-browser AI agents. Instead of the agent guessing your UI—clicking buttons, filling forms by scraping the DOM—you register tools with the browser. The agent then calls them by name with typed arguments and gets back structured results.
+
+**Without a bridge:** You’d maintain two surfaces: your MCP server (for programmatic clients, IDEs, other agents) and a separate WebMCP registration (for the browser agent). Same capabilities, duplicate definitions, and drift over time.
+
+**With `<WebMCP />`:** Your MCP server stays the single source of truth. The component connects to it, reads the tool list, and registers each tool with `navigator.modelContext`. The agent sees the same tools your CLI and IDE see.
+
+## One Component, Full Tool Surface
+
+```typescript
+import { WebMCP } from "mcp-use/react";
+
+function App() {
+  return (
+    <WebMCP url="https://my-mcp-server.com/mcp" />
+  );
+}
+```
+
+When the MCP connection is ready, all server tools are registered with WebMCP. Chrome’s agent can discover and invoke them. No extra endpoints, no duplicate schemas.
+
+If your server is behind auth, pass the same options you’d use with `useMcp`:
+
+```typescript
+<WebMCP
+  url="https://api.example.com/mcp"
+  headers={{ Authorization: `Bearer ${token}` }}
+/>
+```
+
+OAuth, proxy fallback, and the rest of the connection behavior are unchanged; the component uses the same client under the hood.
+
+## How the Mapping Works
+
+MCP and WebMCP are aligned by design. Both use:
+
+- A **name** and **description** per tool
+- **inputSchema** as JSON Schema (`type: "object"`, `properties`, `required`)
+
+So the bridge is mostly pass-through. The only new piece is **execute**: WebMCP expects each tool to have an `execute(args)` that returns `{ content: [{ type: "text", text: "..." }] }`. The component registers an `execute` that:
+
+1. Calls your MCP server’s `callTool(name, args)`
+2. Takes the result (which already has a `content` array when the server returns MCP-style content)
+3. Normalizes it to WebMCP’s `content` format and returns it
+
+So your server’s tool implementations don’t change. The component handles the small translation layer.
+
+```text
+Agent calls "search_flights" with { origin: "LON", destination: "NYC" }
+    → WebMCP execute("search_flights", { origin: "LON", destination: "NYC" })
+    → mcp.callTool("search_flights", { origin: "LON", destination: "NYC" })
+    → Your MCP server runs the real tool
+    → Result (content array) is converted to WebMCP content and returned to the agent
+```
+
+## Control What the Agent Sees
+
+You can narrow or rename what’s exposed without changing the server:
+
+```typescript
+<WebMCP
+  url="https://api.example.com/mcp"
+  filter={(tool) => tool.name.startsWith("public_")}
+  prefix="acme_"
+  onToolCall={(name, args, result) => {
+    analytics.track("agent_tool_call", { name, args });
+  }}
+/>
+```
+
+- **filter**: Only tools for which the function returns `true` are registered. Internal or dangerous tools can stay on the server but stay hidden from the agent.
+- **prefix**: Prepended to every registered name (e.g. `acme_searchFlights`). Helps avoid collisions when the page has multiple WebMCP sources.
+- **onToolCall**: Fired whenever the agent invokes a tool; use it for logging, analytics, or debugging.
+
+## Using the Hook Directly
+
+When you need the connection state or want to drive UI from registration status, use **useWebMCP**:
+
+```typescript
+import { useWebMCP } from "mcp-use/react";
+
+function Dashboard() {
+  const {
+    state,
+    tools,
+    isWebMCPSupported,
+    webMCPRegistered,
+  } = useWebMCP({
+    url: "https://api.example.com/mcp",
+    filter: (t) => !t.name.startsWith("internal_"),
+  });
+
+  return (
+    <div>
+      {state === "ready" && (
+        <p>
+          {isWebMCPSupported
+            ? `Tools registered with browser agent: ${webMCPRegistered ? "yes" : "no"}`
+            : "WebMCP not available (use Chrome 146+ with WebMCP flag)"}
+        </p>
+      )}
+      <p>Server tools: {tools.length}</p>
+    </div>
+  );
+}
+```
+
+You get everything `useMcp` returns, plus `isWebMCPSupported` and `webMCPRegistered`, so you can adapt messaging or UI when the agent isn’t able to use WebMCP.
+
+## Lifecycle in One Diagram
+
+```text
+Mount
+  → useMcp connects to your MCP server
+  → state: discovering → ready
+  → tools list is available
+  → navigator.modelContext.provideContext({ tools: [ ...mapped tools ] })
+  → Agent can list and call tools
+
+Tools list changes (e.g. list_changed notification)
+  → useMcp refreshes tools
+  → provideContext called again with updated list
+
+Unmount (or disconnect)
+  → navigator.modelContext.clearContext()
+  → Agent no longer sees these tools
+```
+
+Re-registration on tool list changes is handled inside the hook; you don’t have to wire notifications yourself.
+
+## Why This Matters for the Ecosystem
+
+Many teams already run MCP servers for IDEs, CLIs, or server-side agents. Until now, making the same capabilities available to a **browser** agent would mean either:
+
+- Re-implementing tools in WebMCP, or
+- Building and maintaining a separate “agent-facing” API
+
+With `<WebMCP />`, the same server that powers your IDE integration can power the in-browser agent. One tool graph, one schema, one place to fix bugs and add features. The MCP ecosystem and the WebMCP surface stay in sync by construction.
+
+## Graceful Degradation
+
+WebMCP is only available in Chrome 146+ with the “WebMCP for testing” flag enabled. In other browsers (or with the flag off), `navigator.modelContext` is undefined. The component:
+
+- Still connects to your MCP server
+- Still exposes the full `useMcp` surface (tools, callTool, etc.) if you use the hook or children
+- Does not call `provideContext` or `clearContext`
+- Logs a single console warning so you know WebMCP isn’t active
+
+So your app keeps working everywhere; the agent only gets the extra tools when the browser supports WebMCP.
+
+## What’s Next
+
+Possible extensions we’re considering:
+
+- **Declarative forms**: Generate WebMCP-style `<form toolname="...">` markup from MCP tool schemas so the same tools work for both the agent and human-filled forms.
+- **Consumer hook**: A hook that *reads* tools already registered on the page (e.g. by other libraries or declarative forms) so your own UI or agent logic can discover and call them.
+- **Server-side landing**: For MCP servers built with mcp-use, optionally serve a small page that mounts `<WebMCP />` so visiting the server URL in Chrome immediately exposes its tools to the agent.
+
+For now, `<WebMCP />` and `useWebMCP` give you a minimal path from “I have an MCP server” to “Chrome’s agent can use my tools.” Try it with your existing server and the [Chrome WebMCP demo](https://developer.chrome.com/docs/webmcp); if you run into limits or have ideas for the next iteration, we’d love to hear them.
+
+---
+
+**References:**
+
+- [WebMCP Integration (docs)](/docs/typescript/client/webmcp)
+- [Chrome WebMCP early preview](https://developer.chrome.com/docs/webmcp)
+- [React integration (useMcp & Provider)](/docs/typescript/client/usemcp)

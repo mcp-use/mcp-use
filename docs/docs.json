@@ -537,6 +537,7 @@
                   },
                   "typescript/client/authentication",
                   "typescript/client/usemcp",
+                  "typescript/client/webmcp",
                   "typescript/client/code-mode"
                 ]
               },
@@ -672,7 +673,8 @@
                 "group": "Blog",
                 "pages": [
                   "typescript/blog/client_side",
-                  "typescript/blog/client-vs-sdk"
+                  "typescript/blog/client-vs-sdk",
+                  "typescript/blog/webmcp"
                 ]
               }
             ]

@@ -11,6 +11,12 @@ export { BrowserMCPClient as MCPClient } from "./client/browser.js";
 export { MCPAgent } from "./agents/mcp_agent.js";
 export { RemoteAgent } from "./agents/remote.js";
 
+// WebMCP (navigator.modelContext) - beta, requires Chrome 146+ and feature flag
+export {
+  getModelContext,
+  isModelContextAvailable,
+} from "./client/model-context.js";
+
 // Export adapters
 export { BaseAdapter } from "./adapters/index.js";
 

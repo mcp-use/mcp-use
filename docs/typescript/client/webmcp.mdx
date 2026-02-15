@@ -1,0 +1,136 @@
+---
+title: "WebMCP Integration"
+description: "Expose MCP server tools to Chrome's in-browser AI agent via the WebMCP API"
+icon: "globe"
+tag: "New"
+---
+
+The **WebMCP** component and **useWebMCP** hook bridge your MCP server's tools to the [WebMCP](https://developer.chrome.com/docs/webmcp) browser API (`navigator.modelContext`). When your app runs in a supporting browser (Chrome 146+ with the WebMCP flag), in-browser AI agents can discover and invoke your MCP tools without any extra implementation on your part.
+
+## What is WebMCP?
+
+WebMCP is a proposed web standard that lets websites expose structured tools to in-browser AI agents. Instead of agents "screen-scraping" your UI, you register tools with the browser; the agent then calls them by name with structured arguments. mcp-use's `<WebMCP />` component connects your existing MCP server to this API so every tool your server exposes becomes available to the browser agent automatically.
+
+## Quick Start
+
+```typescript
+import { WebMCP } from "mcp-use/react";
+
+function App() {
+  return (
+    <WebMCP url="https://my-mcp-server.com/mcp" />
+  );
+}
+```
+
+That's it. When the MCP connection is ready, all server tools are registered with WebMCP. Chrome's agent can discover and call them.
+
+## How It Works
+
+1. **Connect**: `<WebMCP />` uses the same connection logic as `useMcp` (same `url`, `headers`, OAuth, etc.).
+2. **Discover**: Once the connection is `ready`, the hook reads the server's tool list.
+3. **Register**: Each MCP tool is mapped to WebMCP's format and registered via `navigator.modelContext.provideContext({ tools })`.
+4. **Execute**: When the browser agent invokes a tool, the component's registered `execute` callback calls your MCP server's `callTool` and converts the result to WebMCP's content format.
+5. **Cleanup**: On unmount or disconnect, `navigator.modelContext.clearContext()` is called.
+
+MCP and WebMCP both use JSON Schema for tool parameters, so the mapping is straightforward: `name`, `description`, and `inputSchema` pass through; only the `execute` wrapper is added to proxy to your MCP server.
+
+## Props Reference
+
+`WebMCP` accepts all [useMcp options](/docs/typescript/client/usemcp) (e.g. `url`, `headers`, `enabled`, OAuth-related options) plus:
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `filter` | `(tool: Tool) => boolean` | Include only tools for which the function returns `true`. |
+| `prefix` | `string` | Prepended to each tool name (e.g. `"mcp_"` → `mcp_searchFlights`). Useful when multiple sources register tools. |
+| `onToolCall` | `(toolName, args, result) => void` | Called whenever the browser agent invokes a tool. |
+| `onRegistered` | `(tools: Tool[]) => void` | Called when tools are registered or updated in WebMCP. |
+| `children` | `ReactNode` | Optional. If provided, the component renders `children`; otherwise it renders nothing. |
+
+## useWebMCP Hook
+
+For more control (e.g. custom UI or conditional registration), use the hook directly:
+
+```typescript
+import { useWebMCP } from "mcp-use/react";
+
+function MyComponent() {
+  const {
+    state,
+    tools,
+    callTool,
+    isWebMCPSupported,
+    webMCPRegistered,
+    ...rest
+  } = useWebMCP({
+    url: "https://my-mcp-server.com/mcp",
+    filter: (tool) => tool.name.startsWith("public_"),
+    prefix: "app_",
+    onToolCall: (name, args, result) => {
+      console.log("Agent called", name, args, result);
+    },
+  });
+
+  return (
+    <div>
+      {state === "ready" && (
+        <p>
+          {isWebMCPSupported
+            ? `WebMCP registered: ${webMCPRegistered ? "yes" : "no"}`
+            : "WebMCP not available in this browser"}
+        </p>
+      )}
+    </div>
+  );
+}
+```
+
+The hook returns everything `useMcp` returns, plus:
+
+- **isWebMCPSupported**: `true` if `navigator.modelContext` is available.
+- **webMCPRegistered**: `true` when tools have been successfully registered with WebMCP.
+
+## Multi-Server Example
+
+You can combine `<WebMCP />` with `McpClientProvider` and multiple server URLs. Each `<WebMCP />` instance replaces the full WebMCP tool set when it updates, so if you mount multiple components, the last one to register "wins." To expose tools from multiple MCP servers under one WebMCP context, use a single `useWebMCP` (or a single `<WebMCP />`) that connects to one server, or build a small wrapper that aggregates tools from several `useMcp` connections and registers them together via `navigator.modelContext.provideContext` (e.g. by fetching tools from each server and merging the lists).
+
+For a single server per page, this is sufficient:
+
+```typescript
+import { McpClientProvider, WebMCP } from "mcp-use/react";
+
+function App() {
+  return (
+    <McpClientProvider>
+      <WebMCP
+        url="https://api.example.com/mcp"
+        headers={{ Authorization: `Bearer ${token}` }}
+        filter={(t) => !t.name.startsWith("internal_")}
+        prefix="example_"
+      />
+    </McpClientProvider>
+  );
+}
+```
+
+## Advanced: Filtering and Prefixing
+
+- **filter**: Use to expose only a subset of tools (e.g. public-facing tools) or to hide internal tools from the agent.
+- **prefix**: Use to avoid name collisions when the same page has multiple WebMCP sources (e.g. declarative forms plus MCP bridge). The agent will see names like `prefix_toolName`.
+
+## Browser Requirements
+
+- **Chrome**: Version 146.0.7672.0 or higher.
+- **Flag**: Enable "WebMCP for testing" at `chrome://flags/#enable-webmcp-testing`, then relaunch Chrome.
+
+In unsupported browsers, `navigator.modelContext` is undefined. The component still connects to your MCP server (so your app can use `useMcp`/tools as usual), but it does not register with WebMCP and logs a single warning to the console. No errors are thrown.
+
+## Graceful Degradation
+
+When WebMCP is not available:
+
+- The MCP connection and tool list work as with plain `useMcp`.
+- `provideContext` is never called; `clearContext` is not called.
+- `isWebMCPSupported` is `false`; `webMCPRegistered` remains `false`.
+
+Your app can branch on `isWebMCPSupported` or `webMCPRegistered` to show different UI or messaging (e.g. "Agent tools available in Chrome with WebMCP enabled").
