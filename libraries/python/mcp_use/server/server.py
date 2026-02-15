@@ -77,6 +77,7 @@ class MCPServer(FastMCP):
         pretty_print_jsonrpc: bool = False,
         host: str = "0.0.0.0",
         port: int = 8000,
+        dns_rebinding_protection: bool = False,
     ):
         """Initialize an MCP server.
 
@@ -92,19 +93,24 @@ class MCPServer(FastMCP):
             openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
             show_inspector_logs: Show inspector-related logs
             pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
-            host: Default host for server binding. Also controls DNS rebinding protection:
-                  - "0.0.0.0" (default): Disables DNS protection, suitable for cloud/proxy deployments
-                  - "127.0.0.1": Enables DNS protection, suitable for local development
-                  Can be overridden in run().
+            host: Default host for server binding (default: "0.0.0.0"). Can be overridden in run().
             port: Default port for server binding (default: 8000). Can be overridden in run().
+            dns_rebinding_protection: Enable DNS rebinding protection by validating Host/Origin
+                  headers. When True, only requests from localhost origins are accepted.
+                  Recommended for local development servers. Default: False.
         """
         self._start_time = time.time()
+        self._dns_rebinding_protection = dns_rebinding_protection
         super().__init__(
             name=name or "mcp-use server",
             instructions=instructions,
             host=host,
             port=port,
         )
+
+        # Apply DNS rebinding protection if requested
+        if dns_rebinding_protection:
+            self._apply_dns_rebinding_protection(host)
 
         if version:
             self._mcp_server.version = version
@@ -265,6 +271,24 @@ class MCPServer(FastMCP):
                 description=prompt.description,
             )(prompt.fn)
 
+    def _apply_dns_rebinding_protection(self, host: str) -> None:
+        """Configure transport security to reject non-localhost Host/Origin headers."""
+        from mcp.server.transport_security import TransportSecuritySettings
+
+        localhost_host = host if host in ("127.0.0.1", "localhost", "::1") else "127.0.0.1"
+        self.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[f"{localhost_host}:*", "localhost:*", "127.0.0.1:*", "[::1]:*"],
+            allowed_origins=[
+                f"http://{localhost_host}:*",
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://[::1]:*",
+            ],
+        )
+        # Reset session manager so it picks up new security settings
+        self._session_manager = None
+
     def _register_default_protocol_handlers(self) -> None:
         """Register default handlers for MCP protocol methods not covered by FastMCP.
 
@@ -424,25 +448,14 @@ class MCPServer(FastMCP):
         final_host = host if host is not None else self.settings.host
         final_port = port if port is not None else self.settings.port
 
-        # If host changed, update settings and rebuild app to reconfigure DNS protection
+        # If host changed, update settings and rebuild app
         if final_host != self.settings.host:
             self.settings.host = final_host
             self.settings.port = final_port
-            # Reconfigure transport security based on new host (FastMCP logic)
-            if final_host in ("127.0.0.1", "localhost", "::1"):
-                from mcp.server.transport_security import TransportSecuritySettings
-
-                self.settings.transport_security = TransportSecuritySettings(
-                    enable_dns_rebinding_protection=True,
-                    allowed_hosts=[f"{final_host}:*", "localhost:*", "[::1]:*"],
-                    allowed_origins=[f"http://{final_host}:*", "http://localhost:*", "http://[::1]:*"],
-                )
-            else:
-                self.settings.transport_security = None
-            # Reset session manager so it gets recreated with new security settings
-            # (FastMCP caches _session_manager on first streamable_http_app() call)
+            if self._dns_rebinding_protection:
+                self._apply_dns_rebinding_protection(final_host)
+            # Rebuild app with updated settings
             self._session_manager = None
-            # Rebuild app with new security settings
             self.app = self.streamable_http_app()
 
         # Override debug_level if debug=True is passed to run()

@@ -32,6 +32,7 @@ mcp = MCPServer(
     name="ConformanceTestServer",
     version="1.0.0",
     instructions="MCP Conformance Test Server implementing all supported features.",
+    dns_rebinding_protection=True,
 )
 
 # =============================================================================
@@ -468,4 +469,4 @@ if __name__ == "__main__":
 
     print(f"Starting MCP Conformance Test Server with transport: {args.transport}")
 
-    mcp.run(transport=args.transport, host="127.0.0.1", port=args.port)
+    mcp.run(transport=args.transport, port=args.port)
