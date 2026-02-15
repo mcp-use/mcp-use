@@ -116,7 +116,7 @@ export class HttpConnector extends BaseConnector {
       await this.connectWithStreamableHttp(baseUrl);
       logger.info("✅ Successfully connected via streamable HTTP");
     } catch (err: unknown) {
-      console.log("error in http connector connect", err);
+      logger.error("Error in http connector connect", err);
       // Check if this is a 4xx error that indicates we should try SSE fallback
       let fallbackReason = "Unknown error";
       let is401Error = false;
@@ -136,7 +136,7 @@ export class HttpConnector extends BaseConnector {
       if (streamableErr) {
         is401Error = streamableErr.code === 401;
         httpStatusCode = streamableErr.code; // Capture the status code for later use
-        console.log("Captured HTTP status code:", httpStatusCode);
+        logger.debug("Captured HTTP status code:", httpStatusCode);
 
         // Check for "Missing session ID" error (HTTP 400 from FastMCP)
         if (
@@ -204,9 +204,9 @@ export class HttpConnector extends BaseConnector {
       try {
         await this.connectWithSse(baseUrl);
       } catch (sseErr: any) {
-        console.error(`Failed to connect with both transports:`);
-        console.error(`  Streamable HTTP: ${fallbackReason}`);
-        console.error(`  SSE: ${sseErr}`);
+        logger.error(`Failed to connect with both transports:`);
+        logger.error(`  Streamable HTTP: ${fallbackReason}`);
+        logger.error(`  SSE: ${sseErr}`);
         await this.cleanupResources();
 
         // Preserve 401 error code if SSE also failed with 401
@@ -246,14 +246,14 @@ export class HttpConnector extends BaseConnector {
   private async connectWithStreamableHttp(baseUrl: string): Promise<void> {
     try {
       // Log configuration for debugging
-      console.log(`[HttpConnector] Connecting with Streamable HTTP:`);
-      console.log(`  Base URL: ${baseUrl}`);
-      console.log(`  Original URL: ${this.baseUrl}`);
-      console.log(`  Gateway URL: ${this.gatewayUrl || "none"}`);
-      console.log(
+      logger.debug(`[HttpConnector] Connecting with Streamable HTTP:`);
+      logger.debug(`  Base URL: ${baseUrl}`);
+      logger.debug(`  Original URL: ${this.baseUrl}`);
+      logger.debug(`  Gateway URL: ${this.gatewayUrl || "none"}`);
+      logger.debug(
         `  Auth Provider URL: ${this.opts.authProvider?.serverUrl || "none"}`
       );
-      console.log(`  Headers: ${JSON.stringify(this.headers)}`);
+      logger.debug(`  Headers: ${JSON.stringify(this.headers)}`);
 
       // Create StreamableHTTPClientTransport directly
       // The official SDK's StreamableHTTPClientTransport automatically handles session IDs

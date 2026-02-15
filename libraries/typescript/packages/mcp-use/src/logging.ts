@@ -1,4 +1,5 @@
 export type LogLevel =
+  | "silent"
   | "error"
   | "warn"
   | "info"
@@ -75,7 +76,10 @@ class SimpleConsoleLogger {
   }
 
   private shouldLog(level: LogLevel): boolean {
+    if (this._level === "silent") return false;
+
     const levels = [
+      "silent",
       "error",
       "warn",
       "info",
@@ -99,6 +103,7 @@ class SimpleConsoleLogger {
         return `${timestamp} [${this.name}] ${level.toUpperCase()}: ${fullMessage}`;
       case "emoji": {
         const emojiMap: Record<LogLevel, string> = {
+          silent: "",
           error: "❌",
           warn: "⚠️",
           info: "ℹ️",

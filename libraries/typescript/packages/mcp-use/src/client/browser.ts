@@ -100,12 +100,12 @@ export class BrowserMCPClient extends BaseMCPClient {
 
     // Debug: Log if clientOptions are being passed
     if (clientOptions) {
-      console.log(
+      logger.debug(
         "[BrowserMCPClient] Passing clientOptions to connector:",
         JSON.stringify(clientOptions, null, 2)
       );
     } else {
-      console.warn(
+      logger.warn(
         "[BrowserMCPClient] No clientOptions provided to connector!"
       );
     }

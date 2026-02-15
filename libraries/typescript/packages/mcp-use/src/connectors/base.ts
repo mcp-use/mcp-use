@@ -107,7 +107,7 @@ export abstract class BaseConnector {
       onSampling: opts.onSampling ?? opts.samplingCallback,
     };
     if (opts.samplingCallback && !opts.onSampling) {
-      console.warn(
+      logger.warn(
         '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
       );
     }
