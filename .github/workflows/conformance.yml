@@ -113,7 +113,7 @@ jobs:
         run: |
           CLIENTS='['
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.typescript_only }}" != "true" ]; then
-            CLIENTS+='{"name":"python-client","command":"source .venv/bin/activate && python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
+            CLIENTS+='{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
           fi
           CLIENTS+=']'
           echo "clients=$CLIENTS" >> $GITHUB_OUTPUT
