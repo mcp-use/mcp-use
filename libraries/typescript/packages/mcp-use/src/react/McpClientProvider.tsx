@@ -1011,6 +1011,8 @@ export function McpClientProvider({
         }
       );
 
+      const callbacksToRun: Array<() => void> = [];
+
       setServers((prev) => {
         const index = prev.findIndex((s) => s.id === updatedServer.id);
         const isNewServer = index === -1;
@@ -1019,8 +1021,11 @@ export function McpClientProvider({
           console.log(
             `[McpClientProvider] Adding new server ${updatedServer.id} to state`
           );
-          // New server - call onServerAdded callback
-          onServerAdded?.(updatedServer.id, updatedServer);
+          // Defer callbacks outside the state updater to avoid triggering
+          // render-phase updates in user-provided handlers.
+          callbacksToRun.push(() =>
+            onServerAdded?.(updatedServer.id, updatedServer)
+          );
           return [...prev, updatedServer];
         }
 
@@ -1068,7 +1073,9 @@ export function McpClientProvider({
 
         // State changed - call callback
         if (stateChanged) {
-          onServerStateChange?.(updatedServer.id, updatedServer.state);
+          callbacksToRun.push(() =>
+            onServerStateChange?.(updatedServer.id, updatedServer.state)
+          );
         }
 
         // Server info changed - update cached metadata
@@ -1105,6 +1112,12 @@ export function McpClientProvider({
         newServers[index] = updatedServer;
         return newServers;
       });
+
+      if (callbacksToRun.length > 0) {
+        queueMicrotask(() => {
+          callbacksToRun.forEach((callback) => callback());
+        });
+      }
     },
     [onServerAdded, onServerStateChange, storageProvider]
   );
