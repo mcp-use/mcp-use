@@ -70,6 +70,38 @@ server.tool(
     text(`Echo: ${message}`)
 );
 
+// tools-call-typed-arguments
+// Optional fields are used so generated schemas can include anyOf/null patterns.
+server.tool(
+  {
+    name: "test_typed_arguments",
+    description:
+      "Validates argument typing for boolean, array, and object parameters",
+    schema: z.object({
+      flag: z.boolean().optional(),
+      tags: z.array(z.string()).optional(),
+      config: z
+        .object({
+          mode: z.string(),
+          count: z.number(),
+        })
+        .optional(),
+    }),
+  },
+  async ({ flag = false, tags = [], config = { mode: "default", count: 0 } }) =>
+    text(
+      JSON.stringify({
+        flagType: typeof flag,
+        tagsIsArray: Array.isArray(tags),
+        configIsObject:
+          typeof config === "object" &&
+          config !== null &&
+          !Array.isArray(config),
+        values: { flag, tags, config },
+      })
+    )
+);
+
 // tools-call-image
 server.tool(
   {
