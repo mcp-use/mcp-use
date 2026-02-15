@@ -1,0 +1,28 @@
+{
+  "name": "dns-rebinding-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server example demonstrating DNS rebinding protection options",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "example",
+    "dns-rebinding",
+    "security"
+  ],
+  "main": "dist/src/server.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2"
+  }
+}

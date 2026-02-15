@@ -1998,7 +1998,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.oauth - Optional OAuth provider configuration
    * @param config.stateless - Whether to use stateless mode (auto-detected for Deno)
    * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 86400000 = 1 day)
-   * @param config.allowedOrigins - Allowed CORS origins (see {@link ServerConfig.allowedOrigins})
+   * @param config.cors - Optional CORS configuration overrides
+   * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation
    *
    * @returns Proxied server instance supporting both MCP and Hono methods
    *
@@ -2120,7 +2121,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Create and configure Hono app with default middleware
-    this.app = createHonoApp(requestLogger);
+    this.app = createHonoApp(requestLogger, {
+      cors: this.config.cors,
+      allowedOrigins: this.config.allowedOrigins,
+    });
 
     // Install the custom routes middleware FIRST (before any other routes).
     // This single middleware dispatches from the mutable _customRoutes map,
@@ -3770,9 +3774,9 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  * @param config.description - Server description
  * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
  * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
- * @param config.allowedOrigins - Allowed origins for DNS rebinding protection
- *   - **Development mode** (NODE_ENV !== "production"): If not set, all origins are allowed
- *   - **Production mode** (NODE_ENV === "production"): Only uses explicitly configured origins
+ * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation (global when configured)
+ *   - If not set: host validation is disabled
+ *   - If set: host validation is enabled for all routes
  *   - See {@link ServerConfig.allowedOrigins} for detailed documentation
  * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
  * @returns McpServerInstance with both MCP and Hono methods

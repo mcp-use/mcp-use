@@ -8,6 +8,22 @@ icon: "code"
 
 This page provides complete, production-ready examples of MCP servers built with the `mcp-use/server` framework. Each example demonstrates different capabilities and best practices.
 
+## DNS Rebinding Protection Example
+
+Use the dedicated DNS rebinding example to understand default permissive behavior and explicit `allowedOrigins` protection.
+
+**Example location:** `libraries/typescript/packages/mcp-use/examples/server/features/dns-rebinding`
+
+**Run from package root:**
+
+```bash
+pnpm run example:server:dns-rebinding
+```
+
+This example also includes copy-paste `curl` commands to verify:
+- spoofed `Host` is rejected (`403`)
+- valid localhost `Host` is accepted (`2xx`)
+
 ## Weather Service Server
 
 A complete weather information server with tools, resources, and UI widgets.

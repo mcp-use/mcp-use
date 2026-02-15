@@ -148,6 +148,7 @@
     "example:server:notification": "tsx examples/typescript/server/features/notifications/src/server.ts",
     "example:client:notification": "tsx examples/typescript/client/communication/notification-client.ts",
     "example:notifications": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/typescript/server/features/notifications/src/server.ts & sleep 3 && tsx examples/typescript/client/communication/notification-client.ts",
+    "example:server:dns-rebinding": "pnpm --dir examples/server/features/dns-rebinding dev",
     "example:server:sampling": "tsx examples/typescript/server/features/sampling/src/server.ts",
     "example:client:sampling": "tsx examples/typescript/client/communication/sampling-client.ts",
     "example:server:elicitation": "tsx examples/typescript/server/features/elicitation/src/server.ts",
@@ -226,6 +227,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "react": "^19.2.3",
+    "react-test-renderer": "^19.2.4",
     "tsx": "^4.21.0",
     "vitest": "^4.0.17"
   },
