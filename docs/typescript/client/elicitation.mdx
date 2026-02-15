@@ -250,6 +250,43 @@ async function handleFormElicitation(
   solely on client-side validation.
 </Note>
 
+### Handling SEP-1330 Enum Schema Variants
+
+For form-mode elicitation, clients should support these enum schema shapes:
+
+| Variant | Schema Shape | Recommended UI |
+|---|---|---|
+| Untitled single-select | `type: "string"` + `enum` | Single-select dropdown |
+| Titled single-select | `type: "string"` + `oneOf[{ const, title }]` | Single-select dropdown with labels from `title` |
+| Legacy titled enum | `type: "string"` + `enum` + `enumNames` | Single-select dropdown using `enumNames` as labels |
+| Untitled multi-select | `type: "array"` + `items.enum` | Multi-select checkbox group |
+| Titled multi-select | `type: "array"` + `items.anyOf[{ const, title }]` | Multi-select checkbox group with labels from `title` |
+
+When returning accepted form values:
+
+- Single-select fields should return a string.
+- Multi-select fields should return an array of strings.
+- Use the `const`/`enum` values as submitted data, even when displaying a different label.
+
+```typescript
+function getChoices(field: Record<string, any>): Array<{ value: string; label: string }> {
+  if (Array.isArray(field.oneOf)) {
+    return field.oneOf
+      .filter((x) => typeof x?.const === "string")
+      .map((x) => ({ value: x.const, label: x.title ?? x.const }));
+  }
+
+  if (Array.isArray(field.enum)) {
+    return field.enum.map((value: string, i: number) => ({
+      value,
+      label: field.enumNames?.[i] ?? value,
+    }));
+  }
+
+  return [];
+}
+```
+
 ## URL Mode Elicitation
 
 URL mode directs users to external URLs for sensitive operations. **This mode MUST be used for:**

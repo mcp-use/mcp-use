@@ -181,6 +181,60 @@ const result = await ctx.elicit(
 // result.data will be: { theme: 'light', notifications: true }
 ```
 
+<Note>
+Default values (SEP-1034) and enum schema improvements (SEP-1330) are complementary. Use `.default()` for straightforward Zod-based forms, and use the verbose JSON Schema API when you need titled enum variants or multi-select enum arrays.
+</Note>
+
+#### SEP-1330 Enum Schema Patterns
+
+When you need advanced enum shapes like titled enums (`oneOf`/`anyOf`) or legacy `enumNames`, use the verbose API:
+
+```typescript
+import {
+  enumSchema,
+  legacyEnum,
+  titledEnum,
+  titledMultiEnum,
+  untitledEnum,
+  untitledMultiEnum,
+} from 'mcp-use/server';
+
+const result = await ctx.elicit({
+  message: 'Choose your options',
+  requestedSchema: enumSchema({
+    untitledSingle: untitledEnum(['option1', 'option2', 'option3']),
+    titledSingle: titledEnum([
+      { value: 'value1', title: 'First Option' },
+      { value: 'value2', title: 'Second Option' },
+      { value: 'value3', title: 'Third Option' },
+    ]),
+    legacyEnum: legacyEnum([
+      { value: 'opt1', name: 'Option One' },
+      { value: 'opt2', name: 'Option Two' },
+      { value: 'opt3', name: 'Option Three' },
+    ]),
+    untitledMulti: untitledMultiEnum(['option1', 'option2', 'option3']),
+    titledMulti: titledMultiEnum([
+      { value: 'value1', title: 'First Choice' },
+      { value: 'value2', title: 'Second Choice' },
+      { value: 'value3', title: 'Third Choice' },
+    ]),
+  }),
+});
+
+if (result.action === 'accept') {
+  return text(`Selected: ${JSON.stringify(result.data)}`);
+}
+```
+
+Supported SEP-1330 variants:
+
+- Untitled single-select: `type: "string" + enum`
+- Titled single-select: `type: "string" + oneOf[{ const, title }]`
+- Legacy titled enum: `type: "string" + enum + enumNames`
+- Untitled multi-select: `type: "array" + items.enum`
+- Titled multi-select: `type: "array" + items.anyOf[{ const, title }]`
+
 #### Example: Simple Contact Form
 
 ```typescript
@@ -401,6 +455,8 @@ This example includes:
 - Form mode with JSON schema validation
 - URL mode for OAuth-like flows
 - Conformance test tool
+- SEP-1330 conformance pattern via `test_elicitation_sep1330_enums` in the conformance feature server:
+  [examples/server/features/conformance/](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/conformance)
 - Working test client
 
 To run the example:

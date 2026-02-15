@@ -12,13 +12,19 @@ import {
   audio,
   binary,
   completable,
+  enumSchema,
   error,
   image,
+  legacyEnum,
   MCPServer,
   mix,
   object,
   resource,
   text,
+  titledEnum,
+  titledMultiEnum,
+  untitledEnum,
+  untitledMultiEnum,
   widget,
 } from "mcp-use/server";
 import { z } from "zod";
@@ -218,6 +224,52 @@ server.tool(
           verified: z.boolean().default(true),
         })
       );
+
+      if (result.action === "accept") {
+        return text(
+          `Elicitation completed: action=accept, content=${JSON.stringify(result.data)}`
+        );
+      } else if (result.action === "decline") {
+        return text("Elicitation completed: action=decline");
+      }
+      return text("Elicitation completed: action=cancel");
+    } catch (err: any) {
+      return error(`Elicitation error: ${err.message || String(err)}`);
+    }
+  }
+);
+
+// tools-call-elicitation-sep1330-enums
+server.tool(
+  {
+    name: "test_elicitation_sep1330_enums",
+    description:
+      "A tool that uses elicitation with all 5 enum variants (SEP-1330)",
+  },
+  async (params, ctx) => {
+    try {
+      const result = await ctx.elicit({
+        message: "Please choose your options",
+        requestedSchema: enumSchema({
+          untitledSingle: untitledEnum(["option1", "option2", "option3"]),
+          titledSingle: titledEnum([
+            { value: "value1", title: "First Option" },
+            { value: "value2", title: "Second Option" },
+            { value: "value3", title: "Third Option" },
+          ]),
+          legacyEnum: legacyEnum([
+            { value: "opt1", name: "Option One" },
+            { value: "opt2", name: "Option Two" },
+            { value: "opt3", name: "Option Three" },
+          ]),
+          untitledMulti: untitledMultiEnum(["option1", "option2", "option3"]),
+          titledMulti: titledMultiEnum([
+            { value: "value1", title: "First Choice" },
+            { value: "value2", title: "Second Choice" },
+            { value: "value3", title: "Third Choice" },
+          ]),
+        }),
+      });
 
       if (result.action === "accept") {
         return text(
