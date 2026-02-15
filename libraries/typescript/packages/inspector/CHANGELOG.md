@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.19.0-canary.3
+
+### Patch Changes
+
+- c93a061: fix(inspector): enhance tool argument handling with type coercion and schema resolution
+  - mcp-use@1.18.0-canary.3
+
 ## 0.19.0-canary.2
 
 ### Minor Changes
