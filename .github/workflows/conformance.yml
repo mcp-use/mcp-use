@@ -1,5 +1,4 @@
 name: MCP Conformance Tests
-# Test badge update with delay fix
 
 on:
   workflow_dispatch:
