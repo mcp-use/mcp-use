@@ -96,7 +96,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
                 await self._http_ctx.__aexit__(None, None, None)
             except Exception as e:
                 # Only log if it's not a normal connection termination
-                logger.debug(f"Streamable HTTP context cleanup: {e}")
+                logger.warning(f"Streamable HTTP context cleanup: {e}")
             finally:
                 self._http_ctx = None
 
@@ -104,6 +104,6 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
             try:
                 await self._http_client.__aexit__(None, None, None)
             except Exception as e:
-                logger.debug(f"HTTP client cleanup: {e}")
+                logger.warning(f"HTTP client cleanup: {e}")
             finally:
                 self._http_client = None
