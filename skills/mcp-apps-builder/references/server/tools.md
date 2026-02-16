@@ -140,6 +140,9 @@ server.tool(
     // Structured logging
     await ctx.log("info", `Processed ${file.size} bytes`);
 
+    // Structured logging with additional context (optional third parameter)
+    await ctx.log("info", "Processing complete", `fileSize: ${file.size} bytes, duration: 2.5s`);
+
     // Check client capabilities
     if (ctx.client.can("sampling")) {
       // Ask the LLM to help analyze results
@@ -154,10 +157,10 @@ server.tool(
 ```
 
 **Context methods:**
-- `ctx.reportProgress(current, total, message)` - Show progress to user
-- `ctx.log(level, message, data?)` - Structured logging ("debug", "info", "warn", "error")
-- `ctx.sample(prompt)` - Ask the LLM for help (requires client support)
-- `ctx.client.can(capability)` - Check if client supports a feature
+- `ctx.reportProgress(current: number, total: number, message: string)` - Show progress to user
+- `ctx.log(level: "debug" | "info" | "warn" | "error", message: string, data?: string)` - Structured logging with optional additional context as a string
+- `ctx.sample(prompt: string)` - Ask the LLM for help (requires client support)
+- `ctx.client.can(capability: string)` - Check if client supports a feature
 
 ---
 
