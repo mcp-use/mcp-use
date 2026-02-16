@@ -32,6 +32,12 @@ export function ToolsList({
     );
   }
 
+  const atLeastOneToolHasParams = tools.some(
+    (t) =>
+      t.inputSchema?.properties &&
+      Object.keys(t.inputSchema.properties).length > 0
+  );
+
   return (
     <div className="overflow-y-auto flex-1 overscroll-contain">
       {tools.map((tool, index) => {
@@ -40,12 +46,14 @@ export function ToolsList({
           toolMeta as Record<string, unknown> | undefined,
           undefined
         );
-        const paramsBadge = tool.inputSchema?.properties && (
+        const properties = tool.inputSchema?.properties;
+        const paramCount = properties ? Object.keys(properties).length : 0;
+        const paramsBadge = atLeastOneToolHasParams && paramCount > 0 && (
           <Badge
             variant="outline"
             className="text-xs border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-400"
           >
-            {Object.keys(tool.inputSchema.properties).length} params
+            {paramCount} params
           </Badge>
         );
         const hasWidgetIcons =

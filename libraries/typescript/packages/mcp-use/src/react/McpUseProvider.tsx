@@ -247,15 +247,10 @@ export function McpUseProvider({
     };
   }, [autoSize, containerElement, debouncedNotifyHeight]);
 
-  // Show loading state while router is being loaded
+  // Show minimal state while router is being loaded (usually very fast)
+  // Return null to avoid flash of "Loading..." text
   if (isRouterLoading) {
-    return (
-      <StrictMode>
-        <ThemeProvider>
-          <div style={{ padding: "20px", textAlign: "center" }}>Loading...</div>
-        </ThemeProvider>
-      </StrictMode>
-    );
+    return null;
   }
 
   // Throw error if router failed to load

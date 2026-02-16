@@ -8,6 +8,7 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
+import { Spinner } from "./ui/spinner";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -104,7 +105,8 @@ function OpenAIComponentRendererBase({
   > | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
-  const [isWidgetMounted, setIsWidgetMounted] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const hasLoadedOnceRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
 
@@ -347,11 +349,11 @@ function OpenAIComponentRendererBase({
     serverId,
     toolId,
     customProps,
-    // Re-run when toolArgs or toolResult materially change (e.g., from empty
-    // to populated when streaming tool-call → tool-result arrives).
+    // Re-run when toolArgs materially change (e.g., from empty to populated when streaming).
     // Serialized to avoid re-runs from object reference changes.
     JSON.stringify(toolArgs),
-    JSON.stringify(toolResult?._meta),
+    // Note: toolResult._meta is intentionally excluded - it's updated dynamically
+    // via updateIframeGlobals() (see effect at line ~504) without reloading the widget.
     // Note: readResource, serverBaseUrl, playground are intentionally excluded.
     // resolvedTheme and playground are captured at mount time for initialization,
     // then updated dynamically via updateIframeGlobals() without reloading the widget.
@@ -558,8 +560,11 @@ function OpenAIComponentRendererBase({
     if (!widgetUrl) return;
 
     // Reset readiness whenever we load a new widget URL.
+    // Only show skeleton on first load, not on prop updates
     setIsReady(false);
-    setIsWidgetMounted(false);
+    if (!hasLoadedOnceRef.current) {
+      setShowSkeleton(true);
+    }
     setError(null);
 
     let hasHandledLoad = false;
@@ -635,11 +640,6 @@ function OpenAIComponentRendererBase({
       }
 
       switch (event.data.type) {
-        case "mcp-inspector:widget:ready":
-          // Widget React component has mounted and is ready
-          setIsWidgetMounted(true);
-          break;
-
         case "openai:setWidgetState":
           try {
             // Widget state is already handled by the server-injected script
@@ -933,6 +933,24 @@ function OpenAIComponentRendererBase({
     updateIframeGlobals({ theme: resolvedTheme });
   }, [resolvedTheme, isReady, isSameOrigin, updateIframeGlobals]);
 
+  // Hide skeleton after iframe loads + brief delay for widget to render
+  useEffect(() => {
+    if (!isReady || !showSkeleton) {
+      return;
+    }
+
+    // Give the widget 300ms to render after iframe loads
+    // This handles cold Vite starts without requiring widget code changes
+    const timer = setTimeout(() => {
+      setShowSkeleton(false);
+      hasLoadedOnceRef.current = true;
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isReady, showSkeleton]);
+
   // Dynamically resize iframe height to its content, capped at 100vh
   // Only works for same-origin iframes; cross-origin iframes rely on
   // notifyIntrinsicHeight() postMessage from the widget.
@@ -1047,10 +1065,8 @@ function OpenAIComponentRendererBase({
   if (!widgetUrl) {
     return (
       <Wrapper className={className} noWrapper={noWrapper}>
-        <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
-          <div className="relative w-full max-w-[768px] h-[400px] bg-muted rounded-md overflow-hidden">
-            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          </div>
+        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
+          <Spinner className="size-5" />
         </div>
       </Wrapper>
     );
@@ -1058,11 +1074,9 @@ function OpenAIComponentRendererBase({
 
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
-      {(!isReady || !isWidgetMounted) && (
-        <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
-          <div className="relative w-full max-w-[768px] h-[400px] bg-muted rounded-md overflow-hidden">
-            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          </div>
+      {showSkeleton && (
+        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-0">
+          <Spinner className="size-5" />
         </div>
       )}
 
@@ -1129,7 +1143,7 @@ function OpenAIComponentRendererBase({
 
         <div
           className={cn(
-            "flex-1 w-full flex justify-center items-center",
+            "flex-1 w-full flex justify-center items-center relative z-10",
             displayMode === "fullscreen" && "pt-14",
             centerVertically && "items-center"
           )}
