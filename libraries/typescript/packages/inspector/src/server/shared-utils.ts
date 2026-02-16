@@ -1310,14 +1310,10 @@ export function getWidgetSecurityHeaders(
     frameSrc = `'self' blob: ${frameDomains.join(" ")}`;
   }
 
-  // Determine frame-ancestors policy
-  let frameAncestorsPolicy = "'self'"; // Default: same-origin only
-
-  // In dev mode with no explicit override, allow all origins for easier embedding
-  if (devServerOrigin && !frameAncestors) {
-    frameAncestorsPolicy = "*";
-  } else if (frameAncestors) {
-    frameAncestorsPolicy = frameAncestors;
+  // When frameAncestors param is set (e.g. MCP_INSPECTOR_FRAME_ANCESTORS): extend 'self' with it. When unset: allow all (*).
+  let frameAncestorsPolicy = "*";
+  if (frameAncestors) {
+    frameAncestorsPolicy = `'self' ${frameAncestors}`.trim();
   }
 
   const headers: Record<string, string> = {

@@ -473,25 +473,24 @@ export function registerMcpAppsRoutes(app: Hono) {
     c.header("Content-Type", "text/html; charset=utf-8");
     c.header("Cache-Control", "no-cache, no-store, must-revalidate");
 
-    // Allow cross-origin framing between localhost and 127.0.0.1 for double-iframe architecture
-    // Uses wildcard ports so it works regardless of which port the server runs on
-    // Also includes production domain wildcards and optional custom domains via env var
+    // When FRAME_ANCESTORS is set: extend the built-in list (backward compatible). When unset: allow all (*).
     const additionalFrameAncestors = process.env.FRAME_ANCESTORS || "";
-    const frameAncestors = [
-      "'self'",
-      // Local development
-      "http://localhost:*",
-      "http://127.0.0.1:*",
-      "https://localhost:*",
-      "https://127.0.0.1:*",
-      // Production - allow mcp-use.com subdomain pattern (sandbox-* convention)
-      "https://*.mcp-use.com",
-      "http://*.mcp-use.com",
-      // Custom domains from environment variable
-      additionalFrameAncestors,
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const frameAncestors = additionalFrameAncestors
+      ? [
+          "'self'",
+          "http://localhost:*",
+          "http://127.0.0.1:*",
+          "https://localhost:*",
+          "https://127.0.0.1:*",
+          "https://*.mcp-use.com",
+          "https://*.manufact.com",
+          "https://manufact.com",
+          "http://*.mcp-use.com",
+          additionalFrameAncestors,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : "*";
 
     c.header("Content-Security-Policy", `frame-ancestors ${frameAncestors}`);
     // Remove X-Frame-Options as it doesn't support multiple origins (CSP frame-ancestors takes precedence)
