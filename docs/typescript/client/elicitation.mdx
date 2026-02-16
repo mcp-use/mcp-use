@@ -50,7 +50,7 @@ Direct users to external URLs. Required for:
 
 ### With MCPClient
 
-Provide an `elicitationCallback` function when initializing the MCPClient:
+Provide an `onElicitation` function when initializing the MCPClient. The `elicitationCallback` name is still supported but deprecated; use `onElicitation`.
 
 ```typescript
 import { MCPClient } from "mcp-use";
@@ -60,7 +60,7 @@ import type {
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 
-async function elicitationCallback(
+async function onElicitation(
   params: ElicitRequestFormParams | ElicitRequestURLParams
 ): Promise<ElicitResult> {
   if (params.mode === "url") {
@@ -99,12 +99,12 @@ async function elicitationCallback(
 
     return {
       action: "accept",
-      data: userData,
+      content: userData,
     };
   }
 }
 
-const client = new MCPClient(config, { elicitationCallback });
+const client = new MCPClient(config, { onElicitation });
 ```
 
 ### With React Hook
@@ -149,7 +149,7 @@ function MyComponent() {
 
         return {
           action: formData ? "accept" : "cancel",
-          data: formData,
+          content: formData ?? undefined,
         };
       }
     },
@@ -157,6 +157,54 @@ function MyComponent() {
 
   // ... rest of component
 }
+```
+
+### Client helpers
+
+mcp-use provides helpers so you don't have to hand-roll defaults, validation, or result building. Import them (and types) from `mcp-use` or `mcp-use/client`. For a typed callback without importing the SDK, use `OnElicitationCallback` from `mcp-use`.
+
+- **Defaults**: `getDefaults(params)` — default values from the request schema; `applyDefaults(params, partial?)` — merge partial content with defaults; `acceptWithDefaults(params)` — return an accept result using schema defaults.
+- **Result builders**: `accept(content)`, `decline(reason?)`, `cancel()`, `reject(reason?)` (reject is an alias for decline).
+- **Validation**: `validate(params, content)` returns `{ valid: boolean; errors?: string[] }` (Zod-based; uses `requestedSchema`). Types: `ElicitContent`, `ElicitValidationResult`.
+
+Minimal form-mode example using `acceptWithDefaults`:
+
+```typescript
+import {
+  acceptWithDefaults,
+  type OnElicitationCallback,
+  MCPClient,
+} from "mcp-use";
+
+const onElicitation: OnElicitationCallback = async (params) => {
+  return acceptWithDefaults(params);
+};
+
+const client = new MCPClient(config, { onElicitation });
+```
+
+Optional: validate user input before accepting:
+
+```typescript
+import {
+  accept,
+  decline,
+  validate,
+  type OnElicitationCallback,
+  MCPClient,
+} from "mcp-use";
+
+const onElicitation: OnElicitationCallback = async (params) => {
+  const formData = await collectFormFromUser(params);
+  const { valid, errors } = validate(params, formData);
+  if (!valid) {
+    await showErrors(errors);
+    return decline(errors?.join("; "));
+  }
+  return accept(formData);
+};
+
+const client = new MCPClient(config, { onElicitation });
 ```
 
 ## Form Mode Elicitation
@@ -195,53 +243,18 @@ Form mode collects structured data from users with JSON schema validation.
 
 ### Client-Side Validation (Optional but Recommended)
 
-While the server always validates data, implementing client-side validation improves UX by catching errors before the round-trip:
+While the server always validates data, implementing client-side validation improves UX by catching errors before the round-trip. You can use the built-in `validate(params, content)` helper from `mcp-use` (Zod-based); no need to implement `validateAgainstSchema` yourself unless you need custom logic.
 
 ```typescript
-async function handleFormElicitation(
-  params: ElicitRequestFormParams
-): Promise<ElicitResult> {
-  const schema = params.requestedSchema;
+import { validate, accept, cancel } from "mcp-use";
 
-  if (schema.type === "object" && schema.properties) {
-    const formData: Record<string, any> = {};
-
-    // Build form based on schema
-    for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
-      const value = await showInputField({
-        name: fieldName,
-        title: fieldDef.title || fieldName,
-        description: fieldDef.description,
-        type: fieldDef.type, // 'string', 'number', 'boolean', etc.
-        default: fieldDef.default,
-        required: schema.required?.includes(fieldName),
-        // Optional: Add client-side validation
-        min: fieldDef.minimum || fieldDef.minLength,
-        max: fieldDef.maximum || fieldDef.maxLength,
-        pattern: fieldDef.pattern,
-        format: fieldDef.format,
-      });
-
-      formData[fieldName] = value;
-    }
-
-    // Optional: Validate before sending
-    // This improves UX but server will validate anyway
-    const validationErrors = validateAgainstSchema(formData, schema);
-    if (validationErrors.length > 0) {
-      // Show errors to user, let them fix
-      await showValidationErrors(validationErrors);
-      // Retry or cancel
-    }
-
-    return {
-      action: "accept",
-      data: formData,
-    };
-  }
-
-  return { action: "cancel" };
+// After collecting formData from the user:
+const { valid, errors } = validate(params, formData);
+if (!valid) {
+  await showErrorsToUser(errors ?? []);
+  return cancel();
 }
+return accept(formData);
 ```
 
 <Note>
@@ -249,6 +262,43 @@ async function handleFormElicitation(
   remember that the server always validates as the final authority. Never rely
   solely on client-side validation.
 </Note>
+
+### Handling SEP-1330 Enum Schema Variants
+
+For form-mode elicitation, clients should support these enum schema shapes:
+
+| Variant | Schema Shape | Recommended UI |
+|---|---|---|
+| Untitled single-select | `type: "string"` + `enum` | Single-select dropdown |
+| Titled single-select | `type: "string"` + `oneOf[{ const, title }]` | Single-select dropdown with labels from `title` |
+| Legacy titled enum | `type: "string"` + `enum` + `enumNames` | Single-select dropdown using `enumNames` as labels |
+| Untitled multi-select | `type: "array"` + `items.enum` | Multi-select checkbox group |
+| Titled multi-select | `type: "array"` + `items.anyOf[{ const, title }]` | Multi-select checkbox group with labels from `title` |
+
+When returning accepted form values:
+
+- Single-select fields should return a string.
+- Multi-select fields should return an array of strings.
+- Use the `const`/`enum` values as submitted data, even when displaying a different label.
+
+```typescript
+function getChoices(field: Record<string, any>): Array<{ value: string; label: string }> {
+  if (Array.isArray(field.oneOf)) {
+    return field.oneOf
+      .filter((x) => typeof x?.const === "string")
+      .map((x) => ({ value: x.const, label: x.title ?? x.const }));
+  }
+
+  if (Array.isArray(field.enum)) {
+    return field.enum.map((value: string, i: number) => ({
+      value,
+      label: field.enumNames?.[i] ?? value,
+    }));
+  }
+
+  return [];
+}
+```
 
 ## URL Mode Elicitation
 
@@ -316,26 +366,28 @@ The elicitation callback must return an `ElicitResult` object:
 ```typescript
 interface ElicitResult {
   action: "accept" | "decline" | "cancel";
-  data?: any; // Only for 'accept' action in form mode
+  content?: ElicitContent; // Only for 'accept' action in form mode
 }
 ```
 
+`ElicitContent` is `Record<string, string | number | boolean | string[]>`.
+
 ### Response Actions
 
-| Action      | When to Use                                        | Data Field                                    |
+| Action      | When to Use                                        | Field                                         |
 | ----------- | -------------------------------------------------- | --------------------------------------------- |
-| **accept**  | User provided valid input                          | Required for form mode, optional for URL mode |
-| **decline** | User explicitly declined to provide information    | Omit                                          |
+| **accept**  | User provided valid input                          | `content` required for form mode when accepting |
+| **decline** | User explicitly declined to provide information   | Omit                                          |
 | **cancel**  | User dismissed the request without making a choice | Omit                                          |
 
 ## Error Handling
 
-If no elicitation callback is provided but a tool requests user input, the tool call will fail:
+If no `onElicitation` handler is provided but a tool requests user input, the tool call will fail:
 
 ```typescript
-// Without elicitation callback
+// Without onElicitation handler
 const client = new MCPClient(config);
-// No elicitationCallback provided
+// No onElicitation provided
 
 // Tool that requires elicitation will fail
 const session = await client.createSession("server-name");
@@ -350,6 +402,6 @@ try {
 ## Next Steps
 
 - Learn how to [create tools with elicitation](/typescript/server/elicitation) on the server side
-- See the [example server](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/elicitation) for working implementations
+- See the [example server](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/elicitation) for working implementations
 - Explore [sampling](/typescript/client/sampling) for LLM completions
 - Check out [notifications](/typescript/client/notifications) for server-to-client messages

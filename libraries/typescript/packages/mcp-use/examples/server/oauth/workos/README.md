@@ -55,7 +55,7 @@ In the [WorkOS Dashboard](https://dashboard.workos.com):
 2. Enable **Dynamic Client Registration**
 3. Save your changes
 
-![Dynamic Client Registration](https://workos.com/docs/images/authkit/dynamic-client-registration.png)
+Dynamic Client Registration settings screenshot: [WorkOS AuthKit MCP docs](https://workos.com/docs/authkit/mcp)
 
 **Note**: Without this setting enabled, MCP clients will fail during the OAuth flow with CORS errors when attempting to register.
 

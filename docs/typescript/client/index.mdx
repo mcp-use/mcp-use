@@ -13,6 +13,7 @@ icon: "list-start"
 - **Multi-server support**: Connect to multiple MCP servers simultaneously
 - **Multiple connection types**: STDIO, HTTP, and SSE transports
 - **Full MCP protocol**: Complete support for tools, resources, prompts, and notifications
+- **Sampling and elicitation**: Handle LLM sampling and form/URL elicitation with optional helpers (defaults, validation, typed results)
 - **Type-safe**: Full TypeScript support with automatic type inference
 - **Middleware support**: Add logging, metrics, and custom middleware
 - **Sandbox mode**: Secure execution environment for untrusted code
@@ -81,6 +82,12 @@ await client.closeAllSessions()
   </Card>
   <Card title="Configuration" icon="cog" href="/typescript/client/client-configuration">
     Configure your client and understand connection types (STDIO, HTTP, SSE)
+  </Card>
+  <Card title="Elicitation" icon="check" href="/typescript/client/elicitation">
+    Handle form and URL elicitation with optional helpers (defaults, validation)
+  </Card>
+  <Card title="Sampling" icon="pipette" href="/typescript/client/sampling">
+    Enable tools to request LLM completions via client callbacks
   </Card>
   <Card title="Tools" icon="wrench" href="/typescript/client/tools">
     Invoke server functions and handle results

@@ -371,7 +371,7 @@ MCP_URL=https://myserver.com mcp-use build
 
 #### Deployment & Cloud
 
-For deploying to mcp-use cloud, see [ENVIRONMENT.md](./ENVIRONMENT.md) for detailed configuration:
+For deploying to mcp-use cloud, see the environment variables in this section for detailed configuration:
 
 ```bash
 # Frontend URL (where /auth/cli page is)
@@ -387,7 +387,7 @@ mcp-use login
 mcp-use deploy
 ```
 
-See [ENVIRONMENT.md](./ENVIRONMENT.md) for more examples and configuration options.
+See the [CLI reference docs](https://docs.mcp-use.com/typescript/server/cli-reference#environment-variables) for more examples and configuration options.
 
 ### Docker Deployment
 

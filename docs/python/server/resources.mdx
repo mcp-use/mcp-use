@@ -208,6 +208,51 @@ if __name__ == "__main__":
     server.run(transport="streamable-http", debug=True)
 ```
 
+## Resource Subscriptions
+
+Clients can subscribe to resources and receive notifications when they change. This follows the [MCP resource subscriptions spec](https://modelcontextprotocol.io/specification/2025-11-25/server/resources#subscriptions).
+
+### How It Works
+
+1. Client sends `resources/subscribe` with a resource URI
+2. Your server updates the resource and calls `notify_resource_updated()`
+3. All subscribed clients receive a `notifications/resources/updated` notification
+4. Clients re-read the resource to get the new content
+
+MCPServer handles subscribe/unsubscribe tracking automatically — you just need to call `notify_resource_updated()` when your resource changes.
+
+### Example
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(name="Live Data Server")
+
+current_price = 100.0
+
+@server.resource(uri="data://price", name="stock_price", mime_type="text/plain")
+def get_price() -> str:
+    return str(current_price)
+
+@server.tool()
+async def update_price(new_price: float) -> str:
+    """Update the stock price and notify subscribers."""
+    global current_price
+    current_price = new_price
+    await server.notify_resource_updated("data://price")
+    return f"Price updated to {new_price}"
+```
+
+When a client subscribes to `data://price` and then any client calls `update_price`, all subscribers receive the notification and can re-read the resource.
+
+### Broadcasting
+
+`notify_resource_updated()` broadcasts to **all sessions** that subscribed to the URI, not just the current session. This means if multiple clients are connected and subscribed, they all get notified.
+
+<Note>
+Subscriptions are session-scoped — they're automatically cleaned up when a client disconnects. If the server restarts, clients need to re-subscribe.
+</Note>
+
 ## Resources vs Tools
 
 | Aspect | Resources | Tools |

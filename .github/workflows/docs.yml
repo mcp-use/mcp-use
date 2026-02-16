@@ -79,45 +79,6 @@ jobs:
             echo "✅ API documentation is up to date"
           fi
 
-      - name: Comment on PR
-        if: steps.check_docs.outputs.docs_outdated == 'true' && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const comment = `## ❌ API Documentation Out of Date
-
-            The API documentation needs to be regenerated. Please run the following commands:
-
-            \`\`\`bash
-            cd docs
-            python generate_docs.py ../libraries/python/mcp_use python/api-reference docs.json
-            \`\`\`
-
-            Then commit the changes:
-
-            \`\`\`bash
-            git add docs/
-            git commit -m "docs: update API documentation"
-            \`\`\`
-
-            <details>
-            <summary>Modified files</summary>
-
-            \`\`\`
-            ${process.env.MODIFIED_FILES}
-            \`\`\`
-            </details>`;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-        env:
-          MODIFIED_FILES: ${{ steps.check_docs.outputs.modified_files }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Fail if docs are outdated
         if: steps.check_docs.outputs.docs_outdated == 'true'
         run: |

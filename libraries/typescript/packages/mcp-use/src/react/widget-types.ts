@@ -171,6 +171,10 @@ interface UseWidgetResultBase<
 
   /** Whether the widget API is available */
   isAvailable: boolean;
+  /** Partial/streaming tool arguments, updated in real-time as the LLM generates them. Null when not streaming. */
+  partialToolInput: Partial<TToolInput> | null;
+  /** Whether tool arguments are currently being streamed (partial input received but complete input not yet available) */
+  isStreaming: boolean;
 }
 
 /**

@@ -53,6 +53,23 @@ export {
   type Completable,
   type CompletionContext,
 } from "./utils/completion-helpers.js";
+export {
+  enumSchema,
+  legacyEnum,
+  titledEnum,
+  titledMultiEnum,
+  untitledEnum,
+  untitledMultiEnum,
+  type ElicitationEnumFieldSchema,
+  type ElicitationEnumObjectSchema,
+  type EnumOption,
+  type LegacyEnumOption,
+  type LegacyEnumSchema,
+  type TitledEnumSchema,
+  type TitledMultiEnumSchema,
+  type UntitledEnumSchema,
+  type UntitledMultiEnumSchema,
+} from "./utils/elicitation-helpers.js";
 
 // OAuth utilities for authentication and authorization
 export {

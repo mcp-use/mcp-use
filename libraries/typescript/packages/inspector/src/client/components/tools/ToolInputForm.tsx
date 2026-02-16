@@ -9,61 +9,12 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { extractEnumValues, resolveToolPropertySchema } from "./schema-utils";
 
 interface ToolInputFormProps {
   selectedTool: Tool;
   toolArgs: Record<string, unknown>;
   onArgChange: (key: string, value: string) => void;
-}
-
-// Helper function to resolve $ref references in JSON schema
-function resolveRef(schema: any, rootSchema: any): any {
-  if (!schema?.$ref) return schema;
-
-  const ref = schema.$ref;
-  if (ref.startsWith("#/")) {
-    const path = ref.substring(2).split("/"); // ["$defs", "Priority"]
-    let current = rootSchema;
-
-    for (const segment of path) {
-      if (current && typeof current === "object" && segment in current) {
-        current = current[segment];
-      } else {
-        console.warn(`Could not resolve $ref: ${ref}`);
-        return schema; // Can't resolve, return original
-      }
-    }
-    return current;
-  }
-  return schema;
-}
-
-// Helper function to normalize anyOf union types (FastMCP pattern)
-function normalizeUnionType(schema: any, rootSchema: any): any {
-  // Handle anyOf patterns (FastMCP uses this for optional fields)
-  if (schema.anyOf && Array.isArray(schema.anyOf)) {
-    // Find the non-null option
-    const nonNullOption = schema.anyOf.find((opt: any) => {
-      if (opt.type === "null") return false;
-      return true; // This could be { type: "string" } or { $ref: "..." }
-    });
-
-    if (nonNullOption) {
-      // If the non-null option is a $ref, resolve it first
-      const resolved = resolveRef(nonNullOption, rootSchema);
-      return { ...resolved, nullable: true };
-    }
-  }
-
-  return schema;
-}
-
-// Helper function to extract enum values from schema
-function extractEnum(schema: any): string[] | null {
-  if (Array.isArray(schema.enum)) {
-    return schema.enum as string[];
-  }
-  return null;
 }
 
 export function ToolInputForm({
@@ -88,14 +39,11 @@ export function ToolInputForm({
       {Object.entries(properties).map(([key, prop]) => {
         const inputSchema = selectedTool?.inputSchema || {};
 
-        // Step 1: Normalize anyOf unions (handles FastMCP optional fields with $ref)
-        let resolvedProp = normalizeUnionType(prop, inputSchema);
-
-        // Step 2: Resolve any remaining $refs at top level
-        resolvedProp = resolveRef(resolvedProp, inputSchema);
-
-        // Step 3: Extract enum values
-        const enumValues = extractEnum(resolvedProp);
+        const resolvedProp = resolveToolPropertySchema(
+          prop,
+          inputSchema as any
+        );
+        const enumValues = extractEnumValues(resolvedProp);
         const isEnum = resolvedProp.type === "string" && enumValues !== null;
 
         // Type checking

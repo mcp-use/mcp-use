@@ -149,6 +149,65 @@ When using `mcp-use/server`, `devMode` is automatically set to `true` in develop
 
 Override the sandbox origin used for MCP Apps widget iframes. Use this when you have a specific domain configured for sandboxed content in production.
 
+## Embeddable Chat Components
+
+The inspector also exports client-side chat UI components from `@mcp-use/inspector/client` for embedding into your own React app.
+
+### `ChatTab` Quick Start
+
+Use `ChatTab` when you want the full chat experience with the smallest integration surface.
+
+```typescript
+import { ChatTab } from '@mcp-use/inspector/client'
+
+<ChatTab
+  connection={connection}
+  isConnected={isConnected}
+  prompts={prompts}
+  serverId={serverId}
+  callPrompt={callPrompt}
+  readResource={readResource}
+  hideTitle
+  hideModelBadge
+  hideServerUrl
+  clearButtonLabel="Start over"
+  clearButtonHideShortcut
+  clearButtonVariant="ghost"
+/>
+```
+
+### `ChatTab` Customization Props
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `hideTitle` | `boolean` | Hides the chat header title (`Chat`) |
+| `hideModelBadge` | `boolean` | Hides the selected model badge in the landing state |
+| `hideServerUrl` | `boolean` | Hides the MCP server URL shown in the landing state |
+| `clearButtonLabel` | `string` | Custom label for the clear/new-chat button |
+| `clearButtonHideIcon` | `boolean` | Hides the clear/new-chat button icon |
+| `clearButtonHideShortcut` | `boolean` | Hides the keyboard shortcut hint on the clear/new-chat button |
+| `clearButtonVariant` | `"default" \| "secondary" \| "ghost" \| "outline"` | Visual button variant for the clear/new-chat button |
+
+### Advanced Composition (`MessageList` / `ChatHeader` / `ChatLandingForm`)
+
+For custom layouts, compose lower-level exports from `@mcp-use/inspector/client`.
+
+When using `MessageList`, pass `serverBaseUrl` from your MCP connection URL so widget resource rendering uses the correct server origin:
+
+```typescript
+import { MessageList } from '@mcp-use/inspector/client'
+
+<MessageList
+  messages={messages}
+  isLoading={isLoading}
+  serverId={connection.url}
+  serverBaseUrl={connection.url}
+  tools={connection.tools}
+  readResource={readResource}
+  sendMessage={(text) => sendMessage(text, [])}
+/>
+```
+
 ### Environment Detection
 
 The inspector automatically detects the framework:

@@ -110,6 +110,10 @@ export function useWidget<
     string,
     unknown
   > | null>(null);
+  const [mcpAppsPartialToolInput, setMcpAppsPartialToolInput] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [mcpAppsHostContext, setMcpAppsHostContext] = useState<any>(null);
 
   // Re-check for window.openai availability after mount (in case it's injected asynchronously)
@@ -181,8 +185,11 @@ export function useWidget<
         const toolOutput = bridge.getToolOutput();
         const hostContext = bridge.getHostContext();
 
+        const partialToolInput = bridge.getPartialToolInput();
+
         if (toolInput) setMcpAppsToolInput(toolInput);
         if (toolOutput) setMcpAppsToolOutput(toolOutput);
+        if (partialToolInput) setMcpAppsPartialToolInput(partialToolInput);
         if (hostContext) setMcpAppsHostContext(hostContext);
       })
       .catch((error) => {
@@ -192,10 +199,19 @@ export function useWidget<
     // Subscribe to updates
     const unsubToolInput = bridge.onToolInput((input) => {
       setMcpAppsToolInput(input);
+      // Don't clear partialToolInput here -- React batches both updates
+      // and isStreaming would never be true during a render. Instead,
+      // clear it when tool-result arrives (tool execution is complete).
+    });
+
+    const unsubToolInputPartial = bridge.onToolInputPartial((input) => {
+      setMcpAppsPartialToolInput(input);
     });
 
     const unsubToolResult = bridge.onToolResult((result) => {
       setMcpAppsToolOutput(result);
+      // Now that the tool is complete, clear the streaming partial
+      setMcpAppsPartialToolInput(null);
     });
 
     const unsubHostContext = bridge.onHostContextChange((context) => {
@@ -205,6 +221,7 @@ export function useWidget<
 
     return () => {
       unsubToolInput();
+      unsubToolInputPartial();
       unsubToolResult();
       unsubHostContext();
     };
@@ -528,6 +545,28 @@ export function useWidget<
     return false;
   }, [provider, toolResponseMetadata, mcpAppsToolOutput, toolOutput]);
 
+  // Partial/streaming tool input (available during LLM argument generation)
+  const partialToolInput = useMemo(() => {
+    if (provider === "mcp-apps" && mcpAppsPartialToolInput) {
+      return mcpAppsPartialToolInput as Partial<TToolInput>;
+    }
+    // OpenAI Apps SDK and URL params don't support streaming tool input
+    return null;
+  }, [provider, mcpAppsPartialToolInput]);
+
+  // Whether tool arguments are currently being streamed
+  const isStreaming = useMemo(() => {
+    if (provider === "mcp-apps") {
+      // Streaming when we have partial input data available.
+      // Don't gate on mcpAppsToolInput === null — React batches state updates
+      // from tool-input-partial and tool-input together, so toolInput is often
+      // already set by the time React renders. partialToolInput being non-null
+      // is the authoritative signal that streaming data exists.
+      return mcpAppsPartialToolInput !== null;
+    }
+    return false;
+  }, [provider, mcpAppsPartialToolInput]);
+
   return {
     // Props and state (with defaults)
     props: widgetProps,
@@ -564,6 +603,10 @@ export function useWidget<
     // Availability
     isAvailable: isOpenAiAvailable || isMcpAppsConnected,
     isPending,
+
+    // Streaming
+    partialToolInput,
+    isStreaming,
   } as UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput>;
 }
 

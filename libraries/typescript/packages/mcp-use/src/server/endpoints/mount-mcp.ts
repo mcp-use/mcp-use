@@ -399,10 +399,18 @@ export async function mountMcp(
               metadata.protocolVersion = String(protocolVersion);
               await sessionStore.set(sid, metadata);
 
-              console.log(
-                `[MCP] Captured client capabilities for session ${sid}:`,
-                clientCapabilities ? Object.keys(clientCapabilities) : "none"
-              );
+              const debugEnv = process.env.DEBUG;
+              const isDebug =
+                debugEnv != null &&
+                debugEnv !== "" &&
+                debugEnv !== "0" &&
+                debugEnv.toLowerCase() !== "false";
+              if (isDebug) {
+                console.log(
+                  `[MCP] Captured client capabilities for session ${sid}:`,
+                  clientCapabilities ? Object.keys(clientCapabilities) : "none"
+                );
+              }
             }
 
             // Update in-memory session data

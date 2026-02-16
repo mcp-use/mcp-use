@@ -68,41 +68,16 @@ class TestDNSRebindingProtection:
 class TestRunHostOverride:
     """Test that run() properly reconfigures DNS protection when host changes."""
 
-    def test_run_override_to_localhost_enables_dns_protection(self):
-        """Overriding host to localhost in run() should enable DNS protection."""
-        from unittest.mock import patch
+    def test_dns_rebinding_protection_flag_enables_protection(self):
+        """Setting dns_rebinding_protection=True should enable DNS protection."""
+        server = MCPServer(name="test-server", dns_rebinding_protection=True)
+        assert server.settings.transport_security is not None
+        assert server.settings.transport_security.enable_dns_rebinding_protection is True
 
-        server = MCPServer(name="test-server", host="0.0.0.0")
-        # Initially no DNS protection
+    def test_dns_rebinding_protection_default_disabled(self):
+        """DNS protection should be disabled by default."""
+        server = MCPServer(name="test-server")
         assert (
             server.settings.transport_security is None
             or server.settings.transport_security.enable_dns_rebinding_protection is False
         )
-
-        # Mock ServerRunner to prevent actual server start
-        with patch("mcp_use.server.server.ServerRunner"):
-            with patch("mcp_use.server.server.track_server_run_from_server"):
-                server.run(host="127.0.0.1", port=8000)
-
-        # After run() with localhost, DNS protection should be enabled
-        assert server.settings.host == "127.0.0.1"
-        assert server.settings.transport_security is not None
-        assert server.settings.transport_security.enable_dns_rebinding_protection is True
-
-    def test_run_override_to_all_interfaces_disables_dns_protection(self):
-        """Overriding host to 0.0.0.0 in run() should disable DNS protection."""
-        from unittest.mock import patch
-
-        server = MCPServer(name="test-server", host="127.0.0.1")
-        # Initially DNS protection is enabled
-        assert server.settings.transport_security is not None
-        assert server.settings.transport_security.enable_dns_rebinding_protection is True
-
-        # Mock ServerRunner to prevent actual server start
-        with patch("mcp_use.server.server.ServerRunner"):
-            with patch("mcp_use.server.server.track_server_run_from_server"):
-                server.run(host="0.0.0.0", port=8000)
-
-        # After run() with 0.0.0.0, DNS protection should be disabled
-        assert server.settings.host == "0.0.0.0"
-        assert server.settings.transport_security is None

@@ -53,13 +53,36 @@ This pattern is useful for:
 
 ## Configuration
 
-To enable sampling, provide an `onSampling` function when initializing the MCPClient:
+To enable sampling, provide an `onSampling` function when initializing the MCPClient. You can import `OnSamplingCallback`, `CreateMessageRequestParams`, and `CreateMessageResult` from `mcp-use` so you don't need to import from the MCP SDK.
 
 <Info>
   **Deprecated:** The `samplingCallback` name is still supported for backward
   compatibility but will be removed in a future version. Use `onSampling`
   instead.
 </Info>
+
+Minimal example:
+
+```typescript
+import { MCPClient, type OnSamplingCallback } from "mcp-use";
+
+const onSampling: OnSamplingCallback = async (params) => {
+  const lastMessage = params.messages?.[params.messages.length - 1];
+  const text = typeof lastMessage?.content === "object" && lastMessage?.content && "text" in lastMessage.content
+    ? (lastMessage.content as { text?: string }).text
+    : "";
+  return {
+    role: "assistant",
+    content: { type: "text", text: (await yourLLM.complete(text)) ?? "" },
+    model: "your-model",
+    stopReason: "endTurn",
+  };
+};
+
+const client = new MCPClient(config, { onSampling });
+```
+
+For a full runnable example, see [sampling-client.ts](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/client/node/communication/sampling-client.ts).
 
 <CodeGroup>
 ```typescript TypeScript
@@ -198,3 +221,5 @@ async function onSampling(
   To check how to create sampling-enabled tools, see the [Server Tools
   Guide](../server/sampling).
 </Tip>
+
+For runnable client examples, see the [client examples](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client) (e.g. `node/communication/sampling-client.ts`, `node/full-features-example.ts`).

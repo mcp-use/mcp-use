@@ -68,7 +68,7 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
   - [WorkOS](../libraries/typescript/packages/mcp-use/examples/server/oauth/workos/)
 - **[Deployment](../libraries/typescript/packages/mcp-use/examples/server/deployment/)** - Deployment examples
 - **[UI Examples](../libraries/typescript/packages/mcp-use/examples/server/ui/)** - UI components
-  - [Apps SDK](../libraries/typescript/packages/mcp-use/examples/server/ui/apps-sdk/)
+- [Apps SDK](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/apps-sdk/)
   - [MCP UI](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-ui/)
 
 ### Agent Examples

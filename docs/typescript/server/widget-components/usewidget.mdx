@@ -103,10 +103,12 @@ useWidget<
 
 ### Availability
 
-| Property      | Type      | Description                                                                    |
-| ------------- | --------- | ------------------------------------------------------------------------------ |
-| `isAvailable` | `boolean` | Whether the `window.openai` API is available                                   |
-| `isPending`   | `boolean` | Whether the tool is currently executing. When `true`, props will be empty `{}` |
+| Property            | Type                 | Description                                                                                                                                 |
+| ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailable`       | `boolean`            | Whether the `window.openai` API is available                                                                                                |
+| `isPending`         | `boolean`            | Whether the tool is currently executing. When `true`, props will be empty `{}`                                                             |
+| `partialToolInput`  | `Partial<TProps> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
+| `isStreaming`       | `boolean`            | Whether tool arguments are currently being streamed (partial input received but complete input not yet available). `false` in ChatGPT Apps SDK or when the host does not stream. |
 
 ## Complete Example
 
@@ -189,6 +191,8 @@ Widgets render **before** the tool execution completes. This means:
    - `output` and `metadata` are available
    - Widget re-renders with full data
 
+When the host supports **streaming tool arguments** (e.g. MCP Inspector, MCP Apps clients that send `tool-input-partial`), an optional phase occurs between (1) and (2): the widget receives partial tool input in real time via `partialToolInput` while `isStreaming` is `true`, then transitions to full `props` when the tool input is complete. See [Streaming tool arguments](#streaming-tool-arguments) below.
+
 **Example:**
 
 ```tsx
@@ -224,6 +228,40 @@ const MyWidget: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+```
+
+### Streaming tool arguments
+
+When the host streams tool arguments (e.g. MCP Inspector or MCP Apps clients that send `ui/notifications/tool-input-partial`), the widget can show a **live preview** of the incoming data. Use `partialToolInput` and `isStreaming` from `useWidget`:
+
+- **`isStreaming`** is `true` while the LLM is still generating the tool call arguments.
+- **`partialToolInput`** contains the partial arguments parsed so far (may be incomplete or invalid JSON until streaming finishes).
+- When streaming ends, the host sends the final tool input and `props` is populated; `isStreaming` becomes `false` and `partialToolInput` is cleared.
+
+This is only available when the host supports it; in ChatGPT Apps SDK or when using URL params, `partialToolInput` stays `null` and `isStreaming` stays `false`.
+
+**Example: live preview while streaming**
+
+```tsx
+const CodePreviewWidget: React.FC = () => {
+  const { props, isPending, isStreaming, partialToolInput } = useWidget<{ code: string; language: string }>();
+
+  if (isPending && !partialToolInput) {
+    return <LoadingSpinner />;
+  }
+
+  // Show live preview during streaming, then final props when complete
+  const displayCode = isStreaming && partialToolInput?.code != null
+    ? partialToolInput.code
+    : props.code ?? "";
+  const displayLang = (isStreaming ? partialToolInput?.language : props.language) ?? "text";
+
+  return (
+    <pre data-language={displayLang}>
+      {displayCode || "Waiting for input..."}
+    </pre>
   );
 };
 ```

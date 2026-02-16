@@ -25,6 +25,25 @@ import type {
 
 const TMP_MCP_USE_DIR = ".mcp-use";
 
+const DEFAULT_HMR_PORT = 24678;
+
+async function findAvailablePort(startPort: number): Promise<number> {
+  const net = await import("node:net");
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    // Listen without specifying a host so Node binds to `::` (all interfaces,
+    // both IPv4 and IPv6). This matches how Vite creates its WebSocket server,
+    // so we detect conflicts regardless of address family.
+    server.listen(startPort, () => {
+      const port = (server.address() as { port: number }).port;
+      server.close(() => resolve(port));
+    });
+    server.on("error", () => {
+      findAvailablePort(startPort + 1).then(resolve);
+    });
+  });
+}
+
 /**
  * Configuration for development widget mounting
  */
@@ -850,6 +869,8 @@ export default PostHog;
     },
   };
 
+  const hmrPort = await findAvailablePort(DEFAULT_HMR_PORT);
+
   const viteServer = await createServer({
     root: tempDir,
     base: baseRoute + "/",
@@ -890,8 +911,8 @@ export default PostHog;
         // Explicitly set the internal HMR WebSocket port so we can proxy to it.
         // In middleware mode, Vite creates a standalone WebSocket server.
         // We need to know this port to forward upgrade requests from the main server.
-        // Using 24678 (Vite's default) to avoid surprises.
-        port: 24678,
+        // Port is chosen dynamically so multiple dev servers can run (e.g. 24678, 24679, ...).
+        port: hmrPort,
         // Configure the CLIENT to connect to the main server port instead of Vite's
         // standalone port. Our WebSocket proxy on the main server forwards
         // to Vite's internal port. This enables HMR through reverse proxies.
@@ -944,8 +965,10 @@ export default PostHog;
   // Reverse proxies (ngrok, E2B) only forward traffic on the main port.
   // This proxy intercepts WebSocket upgrade requests on the main server at the widget
   // base path and forwards them to Vite's internal WebSocket server.
-  // Read HMR port from resolved config (we set it explicitly above to 24678)
-  const viteHmrPort = (viteServer.config.server.hmr as any)?.port || 24678;
+  // Read HMR port from resolved config (we set it explicitly above)
+  const viteHmrPort =
+    (viteServer.config.server.hmr as { port?: number })?.port ??
+    DEFAULT_HMR_PORT;
   if (viteHmrPort) {
     console.log(
       `[WIDGETS] Vite HMR WebSocket on port ${viteHmrPort}, setting up proxy on main server`

@@ -84,9 +84,28 @@ export function useChatMessagesClientSide({
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
-            state?: "pending" | "result" | "error";
+            state?: "pending" | "streaming" | "result" | "error";
+            partialArgs?: Record<string, unknown>;
           };
         }> = [];
+
+        // Accumulated partial JSON strings per tool call index (for streaming tool args)
+        const toolCallArgBuffers = new Map<
+          number,
+          { name: string; accumulatedJson: string }
+        >();
+
+        // Throttled yield: allows React to flush re-renders during streaming
+        // Without this, React batches all setMessages calls and the UI never sees intermediate states
+        let lastYieldTime = 0;
+        const YIELD_INTERVAL_MS = 80; // yield every 80ms for ~12fps updates
+        const maybeYield = async () => {
+          const now = Date.now();
+          if (now - lastYieldTime >= YIELD_INTERVAL_MS) {
+            lastYieldTime = now;
+            await new Promise<void>((r) => setTimeout(r, 0));
+          }
+        };
 
         // Add empty assistant message to start
         setMessages((prev) => [
@@ -183,33 +202,193 @@ export function useChatMessagesClientSide({
             break;
           }
 
-          // Handle text streaming
-          if (
-            event.event === "on_chat_model_stream" &&
-            event.data?.chunk?.text
-          ) {
-            const text = event.data.chunk.text;
-            if (typeof text === "string" && text.length > 0) {
-              currentTextPart += text;
+          // Handle text streaming and tool call argument streaming
+          if (event.event === "on_chat_model_stream") {
+            const chunk = event.data?.chunk;
 
-              // Update or add text part
-              const lastPart = parts[parts.length - 1];
-              if (lastPart && lastPart.type === "text") {
-                lastPart.text = currentTextPart;
-              } else {
-                parts.push({
-                  type: "text",
-                  text: currentTextPart,
-                });
+            // Handle text tokens
+            if (chunk?.text) {
+              const text = chunk.text;
+              if (typeof text === "string" && text.length > 0) {
+                currentTextPart += text;
+
+                // Update or add text part
+                const lastPart = parts[parts.length - 1];
+                if (lastPart && lastPart.type === "text") {
+                  lastPart.text = currentTextPart;
+                } else {
+                  parts.push({
+                    type: "text",
+                    text: currentTextPart,
+                  });
+                }
+
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, parts: [...parts] }
+                      : msg
+                  )
+                );
+              }
+            }
+
+            // Handle streaming tool call argument chunks
+            // LangChain AIMessageChunk may expose tool call data in several places:
+            // - tool_call_chunks (standard LangChain AIMessageChunk property)
+            // - kwargs.tool_call_chunks (serialized format)
+            // - lc_kwargs.tool_call_chunks (LC serialization format)
+            // - additional_kwargs.tool_calls (OpenAI raw format)
+            // - tool_calls (accumulated tool calls on the chunk)
+            const toolCallChunks =
+              chunk?.tool_call_chunks ||
+              chunk?.kwargs?.tool_call_chunks ||
+              chunk?.lc_kwargs?.tool_call_chunks ||
+              chunk?.additional_kwargs?.tool_calls ||
+              chunk?.tool_calls;
+            if (
+              toolCallChunks &&
+              Array.isArray(toolCallChunks) &&
+              toolCallChunks.length > 0
+            ) {
+              // Finalize any pending text part before tool streaming begins
+              if (currentTextPart) {
+                currentTextPart = "";
               }
 
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, parts: [...parts] }
-                    : msg
-                )
-              );
+              for (const tc of toolCallChunks) {
+                const idx = tc.index ?? 0;
+                const name = tc.name || "";
+                const argsFragment = tc.args || "";
+
+                // Accumulate partial JSON for this tool call index
+                let buffer = toolCallArgBuffers.get(idx);
+                if (!buffer) {
+                  buffer = { name: name || "unknown", accumulatedJson: "" };
+                  toolCallArgBuffers.set(idx, buffer);
+                }
+                if (name && buffer.name === "unknown") {
+                  buffer.name = name;
+                }
+
+                // Best-effort parse the accumulated partial JSON
+                let partialArgs: Record<string, unknown> | undefined;
+
+                // If args is already an object (e.g. from chunk.tool_calls), use directly
+                if (typeof argsFragment === "object" && argsFragment !== null) {
+                  partialArgs = argsFragment as Record<string, unknown>;
+                } else if (typeof argsFragment === "string" && argsFragment) {
+                  // Accumulate JSON string fragments (from tool_call_chunks)
+                  buffer.accumulatedJson += argsFragment;
+
+                  try {
+                    partialArgs = JSON.parse(buffer.accumulatedJson);
+                  } catch {
+                    // Best-effort recovery: try to close the JSON gracefully
+                    // Strategy: strip the last incomplete key-value pair, close open strings/brackets/braces
+                    const strategies = [
+                      // Strategy 1 (preferred): Close unclosed strings and braces
+                      // This PRESERVES the last key-value even if incomplete (e.g. streaming "code" field)
+                      () => {
+                        let r = buffer.accumulatedJson;
+                        const quotes = (r.match(/(?<!\\)"/g) || []).length;
+                        if (quotes % 2 !== 0) r += '"';
+                        const ob =
+                          (r.match(/{/g) || []).length -
+                          (r.match(/}/g) || []).length;
+                        const oq =
+                          (r.match(/\[/g) || []).length -
+                          (r.match(/]/g) || []).length;
+                        for (let i = 0; i < oq; i++) r += "]";
+                        for (let i = 0; i < ob; i++) r += "}";
+                        return JSON.parse(r);
+                      },
+                      // Strategy 2 (fallback): Strip last incomplete key-value, close braces
+                      () => {
+                        let r = buffer.accumulatedJson;
+                        r = r.replace(
+                          /,\s*"[^"]*"?\s*:\s*("([^"\\]|\\.)*)?$/,
+                          ""
+                        );
+                        r = r.replace(/,\s*"[^"]*$/, "");
+                        const quotes = (r.match(/(?<!\\)"/g) || []).length;
+                        if (quotes % 2 !== 0) r += '"';
+                        const ob =
+                          (r.match(/{/g) || []).length -
+                          (r.match(/}/g) || []).length;
+                        const oq =
+                          (r.match(/\[/g) || []).length -
+                          (r.match(/]/g) || []).length;
+                        for (let i = 0; i < oq; i++) r += "]";
+                        for (let i = 0; i < ob; i++) r += "}";
+                        return JSON.parse(r);
+                      },
+                    ];
+                    for (const strategy of strategies) {
+                      try {
+                        partialArgs = strategy();
+                        break;
+                      } catch {
+                        // Try next strategy
+                      }
+                    }
+                  }
+                }
+
+                if (partialArgs) {
+                  // Find or create the streaming tool-invocation part
+                  const toolPart = parts.find(
+                    (p) =>
+                      p.type === "tool-invocation" &&
+                      p.toolInvocation?.state === "streaming" &&
+                      p.toolInvocation?.toolName === buffer!.name
+                  );
+
+                  if (toolPart && toolPart.toolInvocation) {
+                    // Only update if the new parse is better (more keys or longer
+                    // string values). This prevents flickering when the JSON recovery
+                    // alternates between strategies that include/exclude trailing keys.
+                    const prev = toolPart.toolInvocation.partialArgs;
+                    const prevKeys = prev ? Object.keys(prev) : [];
+                    const newKeys = Object.keys(partialArgs);
+                    const prevTotal = prevKeys.reduce(
+                      (s, k) => s + String(prev![k] ?? "").length,
+                      0
+                    );
+                    const newTotal = newKeys.reduce(
+                      (s, k) => s + String(partialArgs[k] ?? "").length,
+                      0
+                    );
+                    if (
+                      newKeys.length > prevKeys.length ||
+                      newTotal >= prevTotal
+                    ) {
+                      toolPart.toolInvocation.partialArgs = partialArgs;
+                    }
+                  } else {
+                    parts.push({
+                      type: "tool-invocation",
+                      toolInvocation: {
+                        toolName: buffer.name,
+                        args: {},
+                        state: "streaming",
+                        partialArgs,
+                      },
+                    });
+                  }
+
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, parts: [...parts] }
+                        : msg
+                    )
+                  );
+
+                  // Yield to event loop so React can flush the streaming update
+                  await maybeYield();
+                }
+              }
             }
           }
           // Handle tool start
@@ -237,14 +416,34 @@ export function useChatMessagesClientSide({
             // Count tool calls for telemetry
             toolCallsCount++;
 
-            parts.push({
-              type: "tool-invocation",
-              toolInvocation: {
-                toolName: event.name || "unknown",
-                args,
-                state: "pending",
-              },
-            });
+            // Check if we already have a streaming part for this tool (from tool_call_chunks)
+            const streamingPart = parts.find(
+              (p) =>
+                p.type === "tool-invocation" &&
+                p.toolInvocation?.state === "streaming" &&
+                p.toolInvocation?.toolName === (event.name || "unknown")
+            );
+
+            if (streamingPart && streamingPart.toolInvocation) {
+              // Transition from streaming to pending with complete args
+              streamingPart.toolInvocation.args = args;
+              streamingPart.toolInvocation.state = "pending";
+              // Keep partialArgs around - the widget iframe may still be loading
+              // and needs them when it becomes ready. They'll be ignored once
+              // the full toolInput is sent via sendToolInput.
+            } else {
+              parts.push({
+                type: "tool-invocation",
+                toolInvocation: {
+                  toolName: event.name || "unknown",
+                  args,
+                  state: "pending",
+                },
+              });
+            }
+
+            // Clear tool call arg buffers for this tool
+            toolCallArgBuffers.clear();
 
             setMessages((prev) =>
               prev.map((msg) =>

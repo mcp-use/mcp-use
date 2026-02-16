@@ -153,13 +153,23 @@ export function LayoutHeader({
   onOpenConnectionOptions,
   embedded = false,
 }: LayoutHeaderProps) {
-  const { tunnelUrl } = useInspector();
+  const { tunnelUrl, embeddedConfig } = useInspector();
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
   const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
   const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
 
   const [collapsed, setCollapsed] = useState(true);
+
+  // In single-tab mode, hide the entire header
+  if (embeddedConfig.singleTab) {
+    return null;
+  }
+
+  // Filter tabs based on visibleTabs config
+  const filteredTabs = embeddedConfig.visibleTabs
+    ? tabs.filter((t) => embeddedConfig.visibleTabs!.includes(t.id as TabType))
+    : tabs;
 
   const handleCopy = async () => {
     if (!tunnelUrl) return;
@@ -329,7 +339,7 @@ export function LayoutHeader({
               onCollapsedChange={setCollapsed}
             >
               <TabsList className="w-full justify-center">
-                {tabs.map((tab) => {
+                {filteredTabs.map((tab) => {
                   const count = getTabCount(tab.id, selectedServer);
                   const showDot = shouldShowDot(tab.id, count, collapsed);
 
@@ -391,7 +401,7 @@ export function LayoutHeader({
                 onCollapsedChange={setCollapsed}
               >
                 <TabsList className="overflow-x-auto" collapsible>
-                  {tabs.map((tab) => {
+                  {filteredTabs.map((tab) => {
                     const count = getTabCount(tab.id, selectedServer);
                     const tooltipText =
                       count > 0 ? `${tab.label} (${count})` : tab.label;
