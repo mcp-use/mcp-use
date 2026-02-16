@@ -4,6 +4,9 @@ import type {
   MessageExtraInfo,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { TransportSendOptions } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { Logger } from "../logging.js";
+
+const logger = Logger.get("RpcLogger");
 
 export interface RpcLogEntry {
   serverId: string;
@@ -22,7 +25,7 @@ class RpcLogStore {
   private maxLogs = 1000;
 
   publish(entry: RpcLogEntry): void {
-    console.log(
+    logger.debug(
       "[RPC Logger] Publishing log:",
       entry.direction,
       entry.serverId,
@@ -35,7 +38,7 @@ class RpcLogStore {
       this.logs = this.logs.slice(-this.maxLogs);
     }
 
-    console.log(
+    logger.debug(
       "[RPC Logger] Total logs:",
       this.logs.length,
       "Listeners:",
@@ -47,7 +50,7 @@ class RpcLogStore {
       try {
         listener(entry);
       } catch (err) {
-        console.error("[RPC Logger] Listener error:", err);
+        logger.error("[RPC Logger] Listener error:", err);
       }
     });
   }

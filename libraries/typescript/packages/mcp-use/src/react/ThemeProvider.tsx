@@ -14,7 +14,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { theme, isAvailable } = useWidget();
-  console.log("theme", theme);
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
       if (typeof window === "undefined") return "light";

@@ -142,11 +142,11 @@ interface McpServerWrapperProps {
     headers?: Record<string, string>;
   };
   defaultAutoProxyFallback?:
-  | boolean
-  | {
-    enabled?: boolean;
-    proxyAddress?: string;
-  };
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
   clientInfo?: {
     name: string;
     title?: string;
@@ -616,9 +616,9 @@ function McpServerWrapper({
       prevServer.notifications.length !== server.notifications.length ||
       prevServer.unreadNotificationCount !== server.unreadNotificationCount ||
       prevServer.pendingSamplingRequests.length !==
-      server.pendingSamplingRequests.length ||
+        server.pendingSamplingRequests.length ||
       prevServer.pendingElicitationRequests.length !==
-      server.pendingElicitationRequests.length ||
+        server.pendingElicitationRequests.length ||
       !prevServer.client
     ) {
       prevServerRef.current = server;
@@ -698,11 +698,11 @@ export interface McpClientProviderProps {
    * @default true
    */
   defaultAutoProxyFallback?:
-  | boolean
-  | {
-    enabled?: boolean;
-    proxyAddress?: string;
-  };
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
 
   /**
    * Client info for all servers (used for OAuth registration and server capabilities)
@@ -865,7 +865,10 @@ export function McpClientProvider({
         setRpcLoggingReady(true); // RPC logging loaded, mark as ready
       })
       .catch((err) => {
-        providerLogger.error("[McpClientProvider] Failed to load RPC logger:", err);
+        providerLogger.error(
+          "[McpClientProvider] Failed to load RPC logger:",
+          err
+        );
         setRpcWrapTransport(undefined);
         setRpcLoggingReady(true); // Failed to load, but still mark as ready to unblock
       });
@@ -1002,7 +1005,10 @@ export function McpClientProvider({
 
         await Promise.resolve(storageProvider.setServers(serversToSave));
       } catch (error) {
-        providerLogger.error("[McpClientProvider] Failed to save to storage:", error);
+        providerLogger.error(
+          "[McpClientProvider] Failed to save to storage:",
+          error
+        );
       }
     };
 
@@ -1063,11 +1069,11 @@ export function McpClientProvider({
           current.client === updatedServer.client &&
           current.notifications === updatedServer.notifications &&
           current.unreadNotificationCount ===
-          updatedServer.unreadNotificationCount &&
+            updatedServer.unreadNotificationCount &&
           current.pendingSamplingRequests.length ===
-          updatedServer.pendingSamplingRequests.length &&
+            updatedServer.pendingSamplingRequests.length &&
           current.pendingElicitationRequests.length ===
-          updatedServer.pendingElicitationRequests.length
+            updatedServer.pendingElicitationRequests.length
         ) {
           providerLogger.debug(
             `[McpClientProvider] No changes detected for server ${updatedServer.id}, skipping update`
@@ -1093,14 +1099,14 @@ export function McpClientProvider({
           storageProvider?.setServerMetadata
         ) {
           const metadata: import("./storage/StorageProvider.js").CachedServerMetadata =
-          {
-            name: updatedServer.serverInfo.name,
-            version: updatedServer.serverInfo.version,
-            title: updatedServer.serverInfo.title,
-            websiteUrl: updatedServer.serverInfo.websiteUrl,
-            icons: updatedServer.serverInfo.icons,
-            icon: updatedServer.serverInfo.icon,
-          };
+            {
+              name: updatedServer.serverInfo.name,
+              version: updatedServer.serverInfo.version,
+              title: updatedServer.serverInfo.title,
+              websiteUrl: updatedServer.serverInfo.websiteUrl,
+              icons: updatedServer.serverInfo.icons,
+              icon: updatedServer.serverInfo.icon,
+            };
 
           // Update cached metadata ref
           cachedMetadataRef.current[updatedServer.id] = metadata;
@@ -1140,7 +1146,10 @@ export function McpClientProvider({
         );
         return prev;
       }
-      providerLogger.debug("[McpClientProvider] Adding new server to configs:", id);
+      providerLogger.debug(
+        "[McpClientProvider] Adding new server to configs:",
+        id
+      );
       return [...prev, { id, options }];
     });
   }, []);
