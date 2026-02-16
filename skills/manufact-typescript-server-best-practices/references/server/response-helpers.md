@@ -2,7 +2,7 @@
 
 Response helpers format output from tools, resources, and prompts. Always use helpers instead of returning raw values.
 
-**Available helpers:** `text()`, `object()`, `markdown()`, `image()`, `error()`, `widget()`, `mix()`
+**Available helpers:** `text()`, `object()`, `markdown()`, `image()`, `error()`, `widget()`, `mix()`, `resource()`
 
 ---
 
@@ -50,7 +50,15 @@ server.tool(
 
 // Multi-line text
 server.tool(
-  { name: "format-address", schema: z.object({ address: z.object({}) }) },
+  { name: "format-address", schema: z.object({
+    address: z.object({
+      street: z.string(),
+      city: z.string(),
+      state: z.string(),
+      zip: z.string(),
+      country: z.string()
+    })
+  }) },
   async ({ address }) => {
     return text(
       `${address.street}\n` +
@@ -607,6 +615,7 @@ return widget({
 | `error(msg)` | Error | Failures | `error("Not found")` |
 | `widget(config)` | UI + data | Visual interfaces | `widget({ props, output })` |
 | `mix(...results)` | Multiple | Rich responses | `mix(text(), image())` |
+| `resource(uri, mime)` | Resource ref | Embed resources | `resource("docs://guide", "text/markdown")` |
 
 ---
 

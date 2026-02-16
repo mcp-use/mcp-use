@@ -505,13 +505,7 @@ useEffect(() => {
 }, [props.categories, selectedCategory]);
 ```
 
-Or use lazy initialization:
-
-```tsx
-const [selectedCategory, setSelectedCategory] = useState(() => {
-  return props.categories?.[0] || "all";
-});
-```
+**Note:** Lazy initialization like `useState(() => props.categories?.[0] || "all")` won't work here — on the first render `isPending` is `true` and `props` is `{}`, so the initializer always resolves to `"all"`. The `useEffect` pattern above is the correct approach for props that arrive asynchronously.
 
 ---
 

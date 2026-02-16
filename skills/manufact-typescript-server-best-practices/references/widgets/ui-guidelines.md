@@ -696,7 +696,6 @@ export default function ThemedProductList() {
               onClick={() => setSelectedCategory(cat)}
               style={{
                 padding: "8px 16px",
-                border: "none",
                 borderRadius: 4,
                 cursor: "pointer",
                 backgroundColor: selectedCategory === cat ? colors.primary : "transparent",

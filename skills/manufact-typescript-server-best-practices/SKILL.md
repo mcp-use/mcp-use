@@ -277,4 +277,5 @@ export default function WeatherDisplay() {
 | `widget()` | Visual UI | `widget({ props: {...}, output: text(...) })` |
 | `mix()` | Multiple contents | `mix(text("Hi"), image(url))` |
 | `error()` | Error responses | `error("Failed to fetch data")` |
+| `resource()` | Embed resource refs | `resource("docs://guide", "text/markdown")` |
 

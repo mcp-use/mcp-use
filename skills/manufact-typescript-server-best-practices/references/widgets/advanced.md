@@ -12,6 +12,7 @@ Catch React errors and display fallback UI:
 
 ```tsx
 import { Component, ReactNode } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -79,6 +80,7 @@ Memoize expensive computations:
 
 ```tsx
 import { useMemo } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 export default function OptimizedWidget() {
   const { props, isPending } = useWidget();
@@ -133,6 +135,7 @@ Prevent unnecessary re-renders:
 
 ```tsx
 import { useCallback, useState } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 export default function CallbackWidget() {
   const { props, isPending, callTool } = useWidget();
@@ -191,6 +194,7 @@ Fetch additional data from widget:
 
 ```tsx
 import { useState, useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 export default function AsyncWidget() {
   const { props, isPending } = useWidget();
@@ -252,6 +256,7 @@ Use useReducer for complex state:
 
 ```tsx
 import { useReducer } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 type State = {
   selectedIds: Set<string>;
@@ -348,6 +353,7 @@ Render only visible items:
 
 ```tsx
 import { useState, useRef, useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 export default function VirtualizedList() {
   const { props, isPending } = useWidget();
@@ -412,6 +418,7 @@ Delay search to avoid excessive calls:
 
 ```tsx
 import { useState, useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -486,6 +493,7 @@ Load more items as user scrolls:
 
 ```tsx
 import { useState, useRef, useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 interface Item {
   id: string;
@@ -574,6 +582,7 @@ Persist widget state across sessions:
 
 ```tsx
 import { useState, useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
@@ -637,6 +646,7 @@ Reorder items with drag and drop:
 
 ```tsx
 import { useState, useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 interface Item {
   id: string;
@@ -716,6 +726,7 @@ export default function DraggableList() {
 
 ```tsx
 import { useEffect } from "react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
 export default function KeyboardWidget() {
   const { props, isPending, callTool } = useWidget();
