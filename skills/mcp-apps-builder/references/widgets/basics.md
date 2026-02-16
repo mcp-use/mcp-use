@@ -73,19 +73,23 @@ server.tool(
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
 
+const propsSchema = z.object({
+  city: z.string(),
+  temp: z.number(),
+  conditions: z.string(),
+  icon: z.string()
+});
+
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather information for a city",
-  props: z.object({
-    city: z.string(),
-    temp: z.number(),
-    conditions: z.string(),
-    icon: z.string()
-  }),
+  props: propsSchema,
   exposeAsTool: false  // ← Critical: prevents duplicate tool registration
 };
 
+type Props = z.infer<typeof propsSchema>;
+
 export default function WeatherDisplay() {
-  const { props, isPending } = useWidget();
+  const { props, isPending } = useWidget<Props>();
 
   if (isPending) {
     return (
@@ -110,9 +114,10 @@ export default function WeatherDisplay() {
 
 **Key requirements:**
 1. Export `widgetMetadata` with props schema
-2. Set `exposeAsTool: false` to avoid duplicate registration
-3. Wrap root in `<McpUseProvider autoSize>`
-4. **Always check `isPending` before accessing `props`**
+2. Infer type from schema and pass to `useWidget<Props>()`
+3. Set `exposeAsTool: false` to avoid duplicate registration
+4. Wrap root in `<McpUseProvider autoSize>`
+5. **Always check `isPending` before accessing `props`**
 
 ---
 
@@ -410,6 +415,8 @@ my-server/
 
 For type safety, infer props type from schema:
 
+⚠️ **CRITICAL:** Always define your Zod schema in a separate constant before `widgetMetadata`. Never infer types from `widgetMetadata.props` - TypeScript will lose type information and the result will be `unknown`.
+
 ```typescript
 import { z } from "zod";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
@@ -517,6 +524,72 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false  // Prevents duplicate
 };
 ```
+
+### ❌ Missing Type Parameter on useWidget
+```typescript
+// ❌ Bad - props is UnknownObject, no autocomplete or type safety
+const propsSchema = z.object({
+  title: z.string(),
+  count: z.number()
+});
+
+export default function BadWidget() {
+  const { props } = useWidget();  // props is UnknownObject
+  return <div>{props.title}</div>;  // No IDE support, runtime errors possible
+}
+
+// ✅ Good - props is fully typed with IDE support
+const propsSchema = z.object({
+  title: z.string(),
+  count: z.number()
+});
+
+type Props = z.infer<typeof propsSchema>;
+
+export default function GoodWidget() {
+  const { props } = useWidget<Props>();  // props is properly typed
+  return <div>{props.title}</div>;  // Full autocomplete and type checking
+}
+```
+
+### ❌ Inferring Type from widgetMetadata.props
+```typescript
+// ❌ Bad - Type inference fails, Props is unknown
+export const widgetMetadata: WidgetMetadata = {
+  description: "...",
+  props: z.object({
+    title: z.string(),
+    count: z.number()
+  })  // Inline schema definition
+};
+
+type Props = z.infer<typeof widgetMetadata.props>;  // Props is unknown!
+
+export default function BadWidget() {
+  const { props } = useWidget<Props>();
+  return <div>{props.title}</div>;  // No autocomplete, no type safety
+}
+
+// ✅ Good - Extract schema first for proper type inference
+const propsSchema = z.object({
+  title: z.string(),
+  count: z.number()
+});
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "...",
+  props: propsSchema  // Reference the schema variable
+};
+
+type Props = z.infer<typeof propsSchema>;  // Props is properly typed!
+
+export default function GoodWidget() {
+  const { props } = useWidget<Props>();
+  return <div>{props.title}</div>;  // Full autocomplete and type checking
+}
+```
+
+**Why this happens:** The `WidgetMetadata` type is generic, so TypeScript can't preserve the specific Zod schema type when defined inline. Always extract your schema to a separate constant before using it in `widgetMetadata`.
 
 ---
 

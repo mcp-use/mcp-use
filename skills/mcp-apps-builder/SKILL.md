@@ -1,14 +1,18 @@
 ---
 name: mcp-apps-builder
 description: |
-  Best practices for building MCP servers with mcp-use framework.
+  **MANDATORY for ALL MCP server work** - mcp-use framework best practices and patterns.
 
-  Use when:
-  - Creating new MCP servers or tools/resources/prompts/widgets
-  - Architecting server structure and deciding between primitives
-  - User asks about MCP development, best practices, or mcp-use patterns
-  - Debugging MCP server issues or improving existing implementations
-  - Reviewing code for security, performance, or architectural concerns
+  **READ THIS FIRST** before any MCP server work, including:
+  - Creating new MCP servers
+  - Modifying existing MCP servers (adding/updating tools, resources, prompts, widgets)
+  - Debugging MCP server issues or errors
+  - Reviewing MCP server code for quality, security, or performance
+  - Answering questions about MCP development or mcp-use patterns
+  - Making ANY changes to server.tool(), server.resource(), server.prompt(), or widgets
+
+  This skill contains critical architecture decisions, security patterns, and common pitfalls.
+  Always consult the relevant reference files BEFORE implementing MCP features.
 ---
 
 # IMPORTANT: How to Use This Skill
@@ -184,13 +188,34 @@ UI state lives in the widget, not in separate tools:
 
 ### 4. Use `exposeAsTool: false` for Custom Widget Tools
 Prevent duplicate tool registration:
+
 ```typescript
+// ✅ ALL 4 STEPS REQUIRED for proper type inference:
+
+// Step 1: Define schema separately
+const propsSchema = z.object({
+  title: z.string(),
+  items: z.array(z.string())
+});
+
+// Step 2: Reference schema variable in metadata
 export const widgetMetadata: WidgetMetadata = {
   description: "...",
-  props: z.object({...}),
-  exposeAsTool: false  // ← Critical for custom tools
+  props: propsSchema,  // ← NOT inline z.object()
+  exposeAsTool: false
 };
+
+// Step 3: Infer Props type from schema variable
+type Props = z.infer<typeof propsSchema>;
+
+// Step 4: Use typed Props with useWidget
+export default function MyWidget() {
+  const { props, isPending } = useWidget<Props>();  // ← Add <Props>
+  // ...
+}
 ```
+
+⚠️ **Common mistake:** Only doing steps 1-2 but skipping 3-4 (loses type safety)
 
 ### 5. Validate at Boundaries Only
 - Trust internal code and framework guarantees
