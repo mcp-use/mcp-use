@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.19.0-canary.5
+
+### Patch Changes
+
+- 5823280: Fix error() return type to be compatible with tool callbacks that use outputSchema
+  - @mcp-use/cli@2.13.8-canary.5
+  - @mcp-use/inspector@0.20.0-canary.5
+
 ## 1.19.0-canary.4
 
 ### Patch Changes
