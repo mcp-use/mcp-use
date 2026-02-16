@@ -124,8 +124,14 @@ export function MCPAppsRenderer({
   // Calculate dimensions based on device type
   const { maxWidth, maxHeight } = useDeviceViewport(deviceType, customViewport);
 
-  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width
-  const inlineMaxWidth = deviceType === "mobile" ? maxWidth : 768;
+  // Calculate inline max-width:
+  // When noWrapper is true (e.g. Chat tab), allow the widget to fill available width.
+  // Otherwise use 768px (ChatGPT chat width) for desktop, device width for mobile.
+  const inlineMaxWidth = noWrapper
+    ? undefined
+    : deviceType === "mobile"
+      ? maxWidth
+      : 768;
 
   // Get the tool definition from the server's tool list (memoized to prevent infinite re-renders)
   // Stringify toolName to ensure stable reference if it's passed as an object
@@ -432,6 +438,15 @@ export function MCPAppsRenderer({
       const to: Keyframe = {};
 
       if (adjustedWidth !== undefined) {
+        // When in noWrapper mode (e.g. Chat tab), don't shrink the iframe
+        // below the parent container width - the widget may report a narrow
+        // content width (e.g. "Creating..." text) that shouldn't constrain
+        // the chat layout.
+        if (noWrapper) {
+          const parentWidth =
+            iframeEl.parentElement?.offsetWidth ?? iframeEl.offsetWidth;
+          adjustedWidth = Math.max(adjustedWidth, parentWidth);
+        }
         from.width = `${iframeEl.offsetWidth}px`;
         iframeEl.style.width = to.width = `min(${adjustedWidth}px, 100%)`;
       }
@@ -537,6 +552,14 @@ export function MCPAppsRenderer({
 
     if (partialToolInput) {
       // Partials are also present - the partial effect (above) will fire first.
+      // If toolInput is empty (streaming phase: args not yet finalized), skip
+      // sending the complete input entirely — the partial already provides
+      // streaming data and sending an empty {} would override it, telling the
+      // widget that the final input is empty and breaking its rendering.
+      const hasToolInput = Object.keys(mergedArgs).length > 0;
+      if (!hasToolInput) {
+        return;
+      }
       // Delay the complete input by one frame so the widget can render the
       // streaming state before transitioning to the final state.
       const frame = requestAnimationFrame(() => {
@@ -692,8 +715,16 @@ export function MCPAppsRenderer({
       isFullscreen || isPip
         ? "100%"
         : `${MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT}px`,
+    // Prevent onsizechange from shrinking the iframe below a sensible minimum.
+    // Some widgets report a tiny height during their initial loading state.
+    minHeight: isFullscreen || isPip ? undefined : "100px",
     width: "100%",
-    maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
+    maxWidth:
+      displayMode === "inline"
+        ? inlineMaxWidth
+          ? `${inlineMaxWidth}px`
+          : "100%"
+        : "100%",
     transition:
       isFullscreen || isPip
         ? undefined
