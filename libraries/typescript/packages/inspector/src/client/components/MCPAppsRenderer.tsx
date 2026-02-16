@@ -101,7 +101,7 @@ export function MCPAppsRenderer({
     setWidgetModelContext,
   } = useWidgetDebug();
 
-  const [isReady, setIsReady] = useState(false);
+  const [initCount, setInitCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [widgetHtml, setWidgetHtml] = useState<string | null>(null);
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
@@ -282,7 +282,7 @@ export function MCPAppsRenderer({
     const iframe = sandboxRef.current.getIframeElement();
     if (!iframe?.contentWindow) return;
 
-    setIsReady(false);
+    setInitCount(0);
 
     // Create a custom transport that posts messages through the SandboxedIframe
     // The SandboxedIframe will relay them to the correct nested iframe
@@ -330,7 +330,7 @@ export function MCPAppsRenderer({
     // Register bridge handlers
     bridge.oninitialized = () => {
       console.log("[MCPAppsRenderer] Widget initialized");
-      setIsReady(true);
+      setInitCount((c) => c + 1);
     };
 
     bridge.onmessage = async ({ content }) => {
@@ -573,19 +573,19 @@ export function MCPAppsRenderer({
   // Update host context when it changes
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || !isReady) return;
+    if (!bridge || initCount === 0) return;
     console.log("[MCPAppsRenderer] setHostContext called with:", hostContext);
     bridge.setHostContext(hostContext);
-  }, [hostContext, isReady]);
+  }, [hostContext, initCount]);
 
   // Send partial/streaming tool input when available
   // This must be defined BEFORE the sendToolInput effect so it fires first
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || !isReady || !partialToolInput) return;
+    if (!bridge || initCount === 0 || !partialToolInput) return;
 
     bridge.sendToolInputPartial({ arguments: partialToolInput });
-  }, [isReady, partialToolInput]);
+  }, [initCount, partialToolInput]);
 
   // Send tool input when ready
   // Also resend when toolCallId changes (indicates re-execution)
@@ -594,7 +594,7 @@ export function MCPAppsRenderer({
   // the partial first and show the streaming state
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || !isReady) return;
+    if (!bridge || initCount === 0) return;
 
     // Merge customProps with toolInput
     const mergedArgs = {
@@ -613,20 +613,20 @@ export function MCPAppsRenderer({
     } else {
       bridge.sendToolInput({ arguments: mergedArgs });
     }
-  }, [isReady, toolInput, customProps, toolCallId, partialToolInput]);
+  }, [initCount, toolInput, customProps, toolCallId, partialToolInput]);
 
   // Send tool output when ready
   // Allow sending null to reset widget to pending state (Issue #930)
   useEffect(() => {
     const bridge = bridgeRef.current;
-    if (!bridge || !isReady) return;
+    if (!bridge || initCount === 0) return;
 
     // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
       bridge.sendToolResult(toolOutput as CallToolResult);
     }
     // Note: When toolOutput is null, widget stays in pending state (isPending=true)
-  }, [isReady, toolOutput, toolCallId]);
+  }, [initCount, toolOutput, toolCallId]);
 
   // Handle CSP violations
   const handleSandboxMessage = useCallback(
