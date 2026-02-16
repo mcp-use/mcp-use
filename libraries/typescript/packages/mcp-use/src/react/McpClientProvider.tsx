@@ -16,9 +16,13 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import { Logger } from "../logging.js";
 import type { StorageProvider } from "./storage/StorageProvider.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 import { useMcp } from "./useMcp.js";
+
+// Module-level logger for McpClientProvider & friends
+const providerLogger = Logger.get("McpClientProvider");
 
 // ===== Types =====
 
@@ -625,7 +629,7 @@ function McpServerWrapper({
       };
       onUpdateRef.current(server);
     } else {
-      console.log(
+      providerLogger.debug(
         `[McpServerWrapper ${id}] No meaningful changes detected, skipping onUpdate`
       );
     }
@@ -856,12 +860,15 @@ export function McpClientProvider({
     // Load the RPC logger dynamically
     import("./rpc-logger.js")
       .then((module) => {
-        console.log("[McpClientProvider] RPC logger loaded");
+        providerLogger.debug("[McpClientProvider] RPC logger loaded");
         setRpcWrapTransport(() => module.wrapTransportForLogging);
         setRpcLoggingReady(true); // RPC logging loaded, mark as ready
       })
       .catch((err) => {
-        console.error("[McpClientProvider] Failed to load RPC logger:", err);
+        providerLogger.error(
+          "[McpClientProvider] Failed to load RPC logger:",
+          err
+        );
         setRpcWrapTransport(undefined);
         setRpcLoggingReady(true); // Failed to load, but still mark as ready to unblock
       });
@@ -871,14 +878,14 @@ export function McpClientProvider({
   // Wait for RPC logging to be ready before loading servers
   useEffect(() => {
     if (!rpcLoggingReady) {
-      console.log(
+      providerLogger.debug(
         "[McpClientProvider] Waiting for RPC logging to be ready before loading servers"
       );
       return;
     }
 
     const loadServers = async () => {
-      console.log(
+      providerLogger.debug(
         "[McpClientProvider] Loading servers, storageProvider:",
         !!storageProvider,
         "mcpServers:",
@@ -892,7 +899,7 @@ export function McpClientProvider({
             id,
             options,
           }));
-          console.log(
+          providerLogger.debug(
             "[McpClientProvider] Loaded from mcpServers prop:",
             configs.length
           );
@@ -908,7 +915,7 @@ export function McpClientProvider({
           storageProvider.getServers()
         );
 
-        console.log(
+        providerLogger.debug(
           "[McpClientProvider] Loaded from storage:",
           Object.keys(storedServers).length
         );
@@ -934,13 +941,13 @@ export function McpClientProvider({
                 ] => entry[1] !== undefined
               )
             );
-            console.log(
+            providerLogger.debug(
               "[McpClientProvider] Loaded cached metadata for",
               Object.keys(cachedMetadataRef.current).length,
               "servers"
             );
           } catch (metadataError) {
-            console.warn(
+            providerLogger.warn(
               "[McpClientProvider] Failed to load cached metadata:",
               metadataError
             );
@@ -956,14 +963,14 @@ export function McpClientProvider({
           options,
         }));
 
-        console.log(
+        providerLogger.debug(
           "[McpClientProvider] Total servers after merge:",
           configs.length
         );
         setServerConfigs(configs);
         setStorageLoaded(true);
       } catch (error) {
-        console.error(
+        providerLogger.error(
           "[McpClientProvider] Failed to load from storage:",
           error
         );
@@ -998,7 +1005,10 @@ export function McpClientProvider({
 
         await Promise.resolve(storageProvider.setServers(serversToSave));
       } catch (error) {
-        console.error("[McpClientProvider] Failed to save to storage:", error);
+        providerLogger.error(
+          "[McpClientProvider] Failed to save to storage:",
+          error
+        );
       }
     };
 
@@ -1007,7 +1017,7 @@ export function McpClientProvider({
 
   const handleServerUpdate = useCallback(
     (updatedServer: McpServer) => {
-      console.log(
+      providerLogger.debug(
         `[McpClientProvider] handleServerUpdate called for server ${updatedServer.id}`,
         {
           toolCount: updatedServer.tools.length,
@@ -1022,7 +1032,7 @@ export function McpClientProvider({
         const isNewServer = index === -1;
 
         if (isNewServer) {
-          console.log(
+          providerLogger.debug(
             `[McpClientProvider] Adding new server ${updatedServer.id} to state`
           );
           // Defer callbacks outside the state updater to avoid triggering
@@ -1039,7 +1049,7 @@ export function McpClientProvider({
         const serverInfoChanged =
           current.serverInfo !== updatedServer.serverInfo;
 
-        console.log(
+        providerLogger.debug(
           `[McpClientProvider] Comparing server ${updatedServer.id}:`,
           {
             toolsChanged: current.tools !== updatedServer.tools,
@@ -1065,13 +1075,13 @@ export function McpClientProvider({
           current.pendingElicitationRequests.length ===
             updatedServer.pendingElicitationRequests.length
         ) {
-          console.log(
+          providerLogger.debug(
             `[McpClientProvider] No changes detected for server ${updatedServer.id}, skipping update`
           );
           return prev;
         }
 
-        console.log(
+        providerLogger.debug(
           `[McpClientProvider] Updating server ${updatedServer.id} in state`
         );
 
@@ -1105,7 +1115,7 @@ export function McpClientProvider({
           Promise.resolve(
             storageProvider.setServerMetadata(updatedServer.id, metadata)
           ).catch((err) => {
-            console.error(
+            providerLogger.error(
               "[McpClientProvider] Failed to save server metadata:",
               err
             );
@@ -1127,16 +1137,19 @@ export function McpClientProvider({
   );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
-    console.log("[McpClientProvider] addServer called:", id, options);
+    providerLogger.debug("[McpClientProvider] addServer called:", id, options);
     setServerConfigs((prev) => {
       // Check if already exists
       if (prev.find((s) => s.id === id)) {
-        console.warn(
+        providerLogger.warn(
           `[McpClientProvider] Server with id "${id}" already exists`
         );
         return prev;
       }
-      console.log("[McpClientProvider] Adding new server to configs:", id);
+      providerLogger.debug(
+        "[McpClientProvider] Adding new server to configs:",
+        id
+      );
       return [...prev, { id, options }];
     });
   }, []);
@@ -1169,7 +1182,7 @@ export function McpClientProvider({
         // Find the current server configuration
         const currentConfig = serverConfigs.find((s) => s.id === id);
         if (!currentConfig) {
-          console.warn(
+          providerLogger.warn(
             `[McpClientProvider] Cannot update server "${id}" - not found`
           );
           resolve();
