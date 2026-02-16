@@ -31,16 +31,19 @@ Comprehensive guide for building production-ready MCP servers with tools, resour
 
 **Choose your path based on what you're building:**
 
-### 🚀 Just Getting Started?
-**When:** You're new to mcp-use typescript server sdk and want to understand the fundamentals 
+### 🚀 Foundations
+**When:** ALWAYS read these first when starting MCP work in a new conversation. Reference later for architecture/concept clarification.
 
-1. **[concepts.md](references/foundations/concepts.md)** - Understand the 4 MCP primitives (Tool, Resource, Prompt, Widget) and when to use each
-2. **[quickstart.md](references/foundations/quickstart.md)** - Build your first tool in 5 minutes with hands-on examples
+1. **[concepts.md](references/foundations/concepts.md)** - MCP primitives (Tool, Resource, Prompt, Widget) and when to use each
+2. **[architecture.md](references/foundations/architecture.md)** - Server structure (Hono-based), middleware system, server.use() vs server.app
+3. **[quickstart.md](references/foundations/quickstart.md)** - Basic server setup patterns and first tool example
+
+Load these before diving into tools/resources/widgets sections.
 
 ---
 
 ### 🔧 Building Server Backend (No UI)?
-**When:** Creating tools, resources, or prompts without visual widgets
+**When:** Implementing MCP features (actions, data, templates). Read the specific file for the primitive you're building.
 
 - **[tools.md](references/server/tools.md)**
   - When: Creating backend actions the AI can call (send-email, fetch-data, create-user)
@@ -48,11 +51,11 @@ Comprehensive guide for building production-ready MCP servers with tools, resour
 
 - **[resources.md](references/server/resources.md)**
   - When: Exposing read-only data clients can fetch (config, user profiles, documentation)
-  - Covers: Static resources, dynamic resources, parameterized resource templates
+  - Covers: Static resources, dynamic resources, parameterized resource templates, URI completion
 
 - **[prompts.md](references/server/prompts.md)**
   - When: Creating reusable message templates for AI interactions (code-review, summarize)
-  - Covers: Prompt definition, parameterization, prompt best practices
+  - Covers: Prompt definition, parameterization, argument completion, prompt best practices
 
 - **[response-helpers.md](references/server/response-helpers.md)**
   - When: Formatting responses from tools/resources (text, JSON, markdown, images, errors)
@@ -225,56 +228,6 @@ server.tool(
 );
 
 server.listen();
-```
-
-### With Widget
-```typescript
-// Tool with widget
-server.tool(
-  {
-    name: "show-weather",
-    schema: z.object({ city: z.string() }),
-    widget: { name: "weather-display" }
-  },
-  async ({ city }) => widget({
-    props: { city, temp: 22, conditions: "Sunny" },
-    output: text(`Weather in ${city}: 22°C, Sunny`)
-  })
-);
-```
-
-```tsx
-// resources/weather-display.tsx
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
-
-export const widgetMetadata: WidgetMetadata = {
-  description: "Display weather information",
-  props: z.object({
-    city: z.string(),
-    temp: z.number(),
-    conditions: z.string()
-  }),
-  exposeAsTool: false
-};
-
-export default function WeatherDisplay() {
-  const { props, isPending } = useWidget();
-
-  if (isPending) {
-    return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
-  }
-
-  return (
-    <McpUseProvider autoSize>
-      <div style={{ padding: 20 }}>
-        <h2>{props.city}</h2>
-        <div style={{ fontSize: 48 }}>{props.temp}°C</div>
-        <p>{props.conditions}</p>
-      </div>
-    </McpUseProvider>
-  );
-}
 ```
 
 ---

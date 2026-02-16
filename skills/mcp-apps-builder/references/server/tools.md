@@ -369,7 +369,7 @@ server.tool(
 
 ### Rate Limiting
 
-Prevent abuse with Express-compatible middleware:
+Prevent abuse using middleware packages:
 
 ```typescript
 import rateLimit from "express-rate-limit";
@@ -387,6 +387,8 @@ server.use(limiter);
 // Or scope to specific paths
 server.use("/api/", limiter);
 ```
+
+**Note:** mcp-use is built on Hono. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
 
 ---
 
