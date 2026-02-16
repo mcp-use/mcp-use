@@ -47,11 +47,11 @@ Initialize a new streamable HTTP connection manager.
 ><ParamField body="timeout" type="float" default="5" >   Timeout for HTTP operations in seconds </ParamField>
 ><ParamField body="read_timeout" type="float" default="300" >   Timeout for HTTP read operations in seconds </ParamField>
 ><ParamField body="auth" type="httpx.Auth | None" default="None" >   Optional httpx.Auth instance for authentication </ParamField>
-><ParamField body="httpx_client_factory" type="mcp.shared._httpx_utils.McpHttpClientFactory" default="<function create_mcp_http_client at 0x10b073380>" >   Custom HTTPX client factory for MCP </ParamField>
+><ParamField body="httpx_client_factory" type="mcp.shared._httpx_utils.McpHttpClientFactory | None" default="None" >   Custom HTTPX client factory for MCP </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(url: str, headers: dict[str, str] | None = None, timeout: float = 5, read_timeout: float = 300, auth: httpx.Auth | None = None, httpx_client_factory: mcp.shared._httpx_utils.McpHttpClientFactory = <function create_mcp_http_client at 0x10b073380>):
+def __init__(url: str, headers: dict[str, str] | None = None, timeout: float = 5, read_timeout: float = 300, auth: httpx.Auth | None = None, httpx_client_factory: mcp.shared._httpx_utils.McpHttpClientFactory | None = None):
 ```
 
 </Card>

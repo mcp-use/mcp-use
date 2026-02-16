@@ -31,7 +31,7 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         timeout: float = 5,
         read_timeout: float = 60 * 5,
         auth: httpx.Auth | None = None,
-        httpx_client_factory: McpHttpClientFactory = create_mcp_http_client,
+        httpx_client_factory: McpHttpClientFactory | None = None,
     ):
         """Initialize a new streamable HTTP connection manager.
 
@@ -66,7 +66,8 @@ class StreamableHttpConnectionManager(ConnectionManager[tuple[Any, Any]]):
         read_timeout_seconds = self.read_timeout.total_seconds()
 
         # Create the httpx client with auth, headers, and timeouts
-        self._http_client = self.httpx_client_factory(
+        factory = self.httpx_client_factory or create_mcp_http_client
+        self._http_client = factory(
             headers=self.headers,
             timeout=httpx.Timeout(timeout_seconds, read=read_timeout_seconds),
             auth=self.auth,
