@@ -18,21 +18,18 @@ The fastest way to scaffold a new MCP server project is to use `create-mcp-use-a
 ```bash npm
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
-npm install
 npm run dev
 ```
 
 ```bash pnpm
 pnpm create mcp-use-app my-mcp-server
 cd my-mcp-server
-pnpm install
 pnpm dev
 ```
 
 ```bash yarn
 yarn create mcp-use-app my-mcp-server
 cd my-mcp-server
-yarn install
 yarn dev
 ```
 </CodeGroup>
@@ -41,7 +38,8 @@ This command will:
 - Create a new directory with your project name
 - Initialize a TypeScript project with mcp-use configured
 - Set up a basic MCP server template with example tools
-- Install all dependencies automatically
+- Optionally install all dependencies
+- Optionally install skills for agent support
 
 <Tip>
 Check out [UI Widgets](/typescript/server/ui-widgets) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.

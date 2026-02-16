@@ -8,6 +8,7 @@ import TextInput from "ink-text-input";
 import { spawn, spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -18,9 +19,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import ora from "ora";
 import React, { useState } from "react";
+import { extract } from "tar";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -107,6 +111,129 @@ function getInstallArgs(packageManager: string): string[] {
     default:
       // npm: prefer offline cache, skip audit and funding messages
       return ["install"];
+  }
+}
+
+// Telemetry data defined in https://github.com/vercel-labs/skills/blob/main/src/telemetry.ts
+interface InstallTelemetryData {
+  event: "install";
+  source: string;
+  skills: string;
+  agents: string;
+  global?: "1";
+  skillFiles?: string; // JSON stringified { skillName: relativePath }
+  /**
+   * Source type for different hosts:
+   * - 'github': GitHub repository (default, uses raw.githubusercontent.com)
+   * - 'raw': Direct URL to SKILL.md (generic raw URL)
+   * - Provider IDs like 'mintlify', 'huggingface', etc.
+   */
+  sourceType?: string;
+}
+
+// Send telemetry event for vercel skills.sh
+// Necessary for ranking and discoverability of skills
+function sendInstallTelemetryEvent(agents: string, skills: string): void {
+  const TELEMETRY_URL = "https://add-skill.vercel.sh/t";
+  const SOURCE_REPO = "mcp-use/mcp-use";
+  const telemetryData: InstallTelemetryData = {
+    event: "install",
+    source: SOURCE_REPO,
+    skills,
+    agents,
+    sourceType: "github",
+  };
+  try {
+    const params = new URLSearchParams();
+
+    // Add event data
+    for (const [key, value] of Object.entries(telemetryData)) {
+      if (value !== undefined && value !== null) {
+        params.set(key, String(value));
+      }
+    }
+
+    // Fire and forget - don't await, silently ignore errors
+    fetch(`${TELEMETRY_URL}?${params.toString()}`).catch(() => {});
+  } catch {
+    // Silently fail - telemetry should never break the CLI
+  }
+}
+
+// Type-safe enum for IDE presets
+type AgentPreset = "cursor" | "claude-code" | "codex";
+
+// Download and extract skills folder from GitHub repository
+async function addSkillsToProject(projectPath: string): Promise<void> {
+  const REPO_OWNER = "mcp-use";
+  const REPO_NAME = "mcp-use";
+  const REPO_COMMIT = "main";
+
+  const tarballUrl = `https://codeload.github.com/${REPO_OWNER}/${REPO_NAME}/tar.gz/${REPO_COMMIT}`;
+
+  // Create temp directory for extraction
+  const tempDir = mkdtempSync(join(tmpdir(), "mcp-use-skills-"));
+
+  try {
+    // Download tarball
+    const response = await fetch(tarballUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download tarball: ${response.statusText}`);
+    }
+
+    // Extract only the skills folder from the tarball
+    // Tarball structure: mcp-use-{commit}/skills/...
+    await pipeline(
+      Readable.fromWeb(response.body as any),
+      extract({
+        cwd: tempDir,
+        filter: (path) => path.includes("/skills/"),
+        strip: 1, // Removes 'mcp-use-{commit}/' prefix
+      })
+    );
+
+    const skillsPath = join(tempDir, "skills");
+
+    if (!existsSync(skillsPath)) {
+      throw new Error("Skills folder not found in tarball");
+    }
+
+    // Copy to each requested preset location
+    const presets: AgentPreset[] = ["cursor", "claude-code", "codex"];
+    const presetFolders: Record<AgentPreset, string> = {
+      cursor: ".cursor",
+      "claude-code": ".claude",
+      codex: ".agent",
+    };
+
+    for (const preset of presets) {
+      const folderName = presetFolders[preset];
+      const outputPath = join(projectPath, folderName, "skills");
+
+      // Use cpSync with recursive flag (Node 16.7+)
+      cpSync(skillsPath, outputPath, { recursive: true });
+    }
+
+    // Get skill names from extracted directory
+    const skillNames = readdirSync(skillsPath, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .map((dirent) => dirent.name);
+
+    sendInstallTelemetryEvent(presets.join(","), skillNames.join(","));
+  } catch (error) {
+    console.log(
+      chalk.yellow(
+        "⚠️  Failed to download skills from GitHub. Continuing without skills..."
+      )
+    );
+    console.log(
+      chalk.yellow(
+        `   Error: ${error instanceof Error ? error.message : String(error)}`
+      )
+    );
+    return;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
   }
 }
 
@@ -316,6 +443,9 @@ program
   )
   .option("--list-templates", "List all available templates")
   .option("--install", "Install dependencies after creating project")
+  .option("--no-install", "Skip installing dependencies")
+  .option("--skills", "Install skills for all agents")
+  .option("--no-skills", "Skip installing skills")
   .option("--no-git", "Skip initializing a git repository")
   .option("--dev", "Use workspace dependencies for development")
   .option("--canary", "Use canary versions of packages")
@@ -329,6 +459,7 @@ program
         template?: string;
         listTemplates?: boolean;
         install?: boolean;
+        skills?: boolean;
         git: boolean;
         dev: boolean;
         canary: boolean;
@@ -461,6 +592,27 @@ program
         // Update index.ts with project name
         updateIndexTs(projectPath, sanitizedProjectName);
 
+        // Non-interactive defaults when template is specified via flag
+        // Enables usage in CI/tests without blocking prompts
+        if (options.template !== undefined) {
+          // Default to not installing
+          if (options.install === undefined) {
+            options.install = false;
+          }
+
+          // Default to both agents
+          if (options.skills === undefined) {
+            options.skills = true;
+          }
+        }
+
+        // Ask to install dependencies if not explicitly set
+        console.log("");
+        const shouldInstall =
+          options.install !== undefined
+            ? options.install
+            : await promptForInstall();
+
         // Determine which package manager to use
         let usedPackageManager = "npm";
 
@@ -484,8 +636,8 @@ program
           }
         }
 
-        // Install dependencies if requested (default is false)
-        if (options.install === true) {
+        // Install dependencies if requested or chosen via prompt
+        if (shouldInstall) {
           // Always show a message before installing
           console.log("");
           console.log(chalk.cyan("📦 Installing dependencies..."));
@@ -600,6 +752,27 @@ program
           }
         }
 
+        // Ask to install skills if not explicitly set
+        console.log("");
+        const shouldInstallSkills =
+          options.skills !== undefined
+            ? options.skills
+            : await promptForSkillsPresets();
+        if (shouldInstallSkills) {
+          console.log("");
+          console.log(chalk.cyan("📚 Installing skills..."));
+          try {
+            await addSkillsToProject(projectPath);
+            console.log(chalk.green("✅ Skills installed successfully!"));
+          } catch (err) {
+            console.log(
+              chalk.yellow(
+                "⚠️  Skills install failed. Run `npx skills add mcp-use/mcp-use` manually in root directory."
+              )
+            );
+          }
+        }
+
         // Note: Git initialization is skipped to avoid delays when scanning node_modules.
         // Users can run `git init` themselves when ready.
 
@@ -639,7 +812,7 @@ program
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
         console.log(chalk.cyan(`   cd ${sanitizedProjectName}`));
-        if (!options.install) {
+        if (!shouldInstall) {
           console.log(
             chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`)
           );
@@ -1048,6 +1221,88 @@ function updateIndexTs(projectPath: string, projectName: string) {
   content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
 
   writeFileSync(indexPath, content);
+}
+
+// Ink component for install dependencies prompt (Y/n)
+function InstallPrompt({ onSubmit }: { onSubmit: (install: boolean) => void }) {
+  const [value, setValue] = useState("");
+
+  const handleSubmit = (val: string) => {
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed === "" || trimmed === "y" || trimmed === "yes") {
+      onSubmit(true);
+    } else if (trimmed === "n" || trimmed === "no") {
+      onSubmit(false);
+    }
+  };
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Install dependencies now? (Y/n)</Text>
+      </Box>
+      <Box>
+        <Text color="cyan">❯ </Text>
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      </Box>
+    </Box>
+  );
+}
+
+async function promptForInstall(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <InstallPrompt
+        onSubmit={(install) => {
+          unmount();
+          resolve(install);
+        }}
+      />
+    );
+  });
+}
+
+// Ink component for skills preset prompt (Y/n)
+function SkillsPresetPrompt({
+  onSubmit,
+}: {
+  onSubmit: (install: boolean) => void;
+}) {
+  const [value, setValue] = useState("");
+
+  const handleSubmit = (val: string) => {
+    const trimmed = val.trim().toLowerCase();
+    if (trimmed === "" || trimmed === "y" || trimmed === "yes") {
+      onSubmit(true); // Install all skills
+    } else if (trimmed === "n" || trimmed === "no") {
+      onSubmit(false); // No skills
+    }
+  };
+
+  return (
+    <Box flexDirection="column">
+      <Box marginBottom={1}>
+        <Text bold>Install skills (Recommended)? (Y/n)</Text>
+      </Box>
+      <Box>
+        <Text color="cyan">❯ </Text>
+        <TextInput value={value} onChange={setValue} onSubmit={handleSubmit} />
+      </Box>
+    </Box>
+  );
+}
+
+async function promptForSkillsPresets(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const { unmount } = render(
+      <SkillsPresetPrompt
+        onSubmit={(presets) => {
+          unmount();
+          resolve(presets);
+        }}
+      />
+    );
+  });
 }
 
 // Ink component for project name input
