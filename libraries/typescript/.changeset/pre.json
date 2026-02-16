@@ -9,6 +9,7 @@
   },
   "changesets": [
     "clear-paws-act",
+    "fix-mcp-apps-mime-telemetry",
     "flat-things-report"
   ]
 }
