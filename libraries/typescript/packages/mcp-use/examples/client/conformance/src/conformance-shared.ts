@@ -17,6 +17,31 @@ export type ConformanceSession = {
   callTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
 };
 
+export type PreRegistrationContext = {
+  client_id: string;
+  client_secret: string;
+};
+
+export function parseConformanceContext():
+  | ({ name: string } & PreRegistrationContext)
+  | undefined {
+  const raw = process.env.MCP_CONFORMANCE_CONTEXT;
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed?.name === "auth/pre-registration" &&
+      parsed.client_id &&
+      parsed.client_secret
+    ) {
+      return parsed;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function isAuthScenario(scenario: string): boolean {
   return scenario.startsWith("auth/");
 }

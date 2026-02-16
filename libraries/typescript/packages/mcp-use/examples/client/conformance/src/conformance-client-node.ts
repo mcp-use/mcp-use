@@ -7,6 +7,7 @@ import { MCPClient } from "mcp-use";
 import {
   handleElicitation,
   isAuthScenario,
+  parseConformanceContext,
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
@@ -24,7 +25,9 @@ async function main(): Promise<void> {
 
   const serverConfig: Record<string, unknown> = { url: serverUrl };
   const authProvider = isAuthScenario(scenario)
-    ? createHeadlessConformanceOAuthProvider()
+    ? await createHeadlessConformanceOAuthProvider({
+        preRegistrationContext: parseConformanceContext(),
+      })
     : undefined;
 
   if (authProvider) {

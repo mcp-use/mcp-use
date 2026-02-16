@@ -5,6 +5,7 @@ import type {
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { PreRegistrationContext } from "./conformance-shared.js";
 
 export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
   private clientInfo?: OAuthClientInformationFull;
@@ -111,15 +112,33 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
   }
 }
 
-export function createHeadlessConformanceOAuthProvider(): HeadlessConformanceOAuthProvider {
-  return new HeadlessConformanceOAuthProvider(
-    "http://127.0.0.1:19823/callback",
-    {
-      client_name: "mcp-use-conformance-client",
-      redirect_uris: ["http://127.0.0.1:19823/callback"],
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-    },
-    "https://conformance-test.local/client-metadata.json"
+const REDIRECT_URI = "http://127.0.0.1:19823/callback";
+
+const DEFAULT_CLIENT_METADATA: OAuthClientMetadata = {
+  client_name: "mcp-use-conformance-client",
+  redirect_uris: [REDIRECT_URI],
+  grant_types: ["authorization_code", "refresh_token"],
+  response_types: ["code"],
+};
+
+export async function createHeadlessConformanceOAuthProvider(options?: {
+  preRegistrationContext?: PreRegistrationContext;
+}): Promise<HeadlessConformanceOAuthProvider> {
+  const usePreRegistration = options?.preRegistrationContext != null;
+  const provider = new HeadlessConformanceOAuthProvider(
+    REDIRECT_URI,
+    DEFAULT_CLIENT_METADATA,
+    usePreRegistration
+      ? undefined
+      : "https://conformance-test.local/client-metadata.json"
   );
+  if (options?.preRegistrationContext) {
+    const { client_id, client_secret } = options.preRegistrationContext;
+    await provider.saveClientInformation({
+      client_id,
+      client_secret,
+      redirect_uris: [REDIRECT_URI],
+    });
+  }
+  return provider;
 }

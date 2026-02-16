@@ -7,6 +7,7 @@ import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
 import {
   handleElicitation,
   isAuthScenario,
+  parseConformanceContext,
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
@@ -29,7 +30,9 @@ async function main(): Promise<void> {
   };
 
   const authProvider = isAuthScenario(scenario)
-    ? createHeadlessConformanceOAuthProvider()
+    ? await createHeadlessConformanceOAuthProvider({
+        preRegistrationContext: parseConformanceContext(),
+      })
     : undefined;
 
   if (authProvider) {

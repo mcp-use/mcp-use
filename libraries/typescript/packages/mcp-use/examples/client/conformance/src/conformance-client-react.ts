@@ -13,6 +13,7 @@ import TestRenderer, { act } from "react-test-renderer";
 import {
   handleElicitation,
   isAuthScenario,
+  parseConformanceContext,
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
@@ -144,7 +145,9 @@ async function main(): Promise<void> {
   const scenario = process.env.MCP_CONFORMANCE_SCENARIO || "";
   const teardownDom = setupReactRuntimeDom();
   const authProvider = isAuthScenario(scenario)
-    ? createHeadlessConformanceOAuthProvider()
+    ? await createHeadlessConformanceOAuthProvider({
+        preRegistrationContext: parseConformanceContext(),
+      })
     : undefined;
   const mcpServers: Record<string, any> = {
     test: {
