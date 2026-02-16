@@ -540,10 +540,26 @@ export function useWidget<
     }
     // For mcp-ui (URL params), check if toolOutput is null (tool hasn't completed)
     if (provider === "mcp-ui") {
+      // If we're in an iframe without actual URL params, we're in a transitional
+      // state before the MCP Apps bridge connects. Stay pending to avoid rendering
+      // with empty props.
+      if (
+        typeof window !== "undefined" &&
+        window !== window.parent &&
+        !urlParams.toolId
+      ) {
+        return true;
+      }
       return toolOutput === null || toolOutput === undefined;
     }
     return false;
-  }, [provider, toolResponseMetadata, mcpAppsToolOutput, toolOutput]);
+  }, [
+    provider,
+    toolResponseMetadata,
+    mcpAppsToolOutput,
+    toolOutput,
+    urlParams.toolId,
+  ]);
 
   // Partial/streaming tool input (available during LLM argument generation)
   const partialToolInput = useMemo(() => {

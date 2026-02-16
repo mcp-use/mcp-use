@@ -721,8 +721,12 @@ export function MCPAppsRenderer({
   );
 
   // Hide spinner after iframe loads + brief delay for widget to render (first load only)
+  // Also hide when bridge initializes (initCount > 0), which proves the iframe is loaded
+  // even if the onLoad event was missed during a rapid remount/re-render cycle.
+  const iframeEffectivelyReady = isReady || initCount > 0;
+
   useEffect(() => {
-    if (!isReady || !showSpinner) return;
+    if (!iframeEffectivelyReady || !showSpinner) return;
 
     const timer = setTimeout(() => {
       setShowSpinner(false);
@@ -730,7 +734,7 @@ export function MCPAppsRenderer({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [isReady, showSpinner]);
+  }, [iframeEffectivelyReady, showSpinner]);
 
   // Loading states
   if (loadError) {
@@ -845,7 +849,7 @@ export function MCPAppsRenderer({
               displayMode === "fullscreen" && "w-full h-full rounded-none",
               displayMode === "pip" && "w-full h-full",
               displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
-              "overflow-hidden",
+              "overflow-hidden relative z-20",
               prefersBorder && "border border-zinc-200 dark:border-zinc-700"
             )}
             style={iframeStyle}
