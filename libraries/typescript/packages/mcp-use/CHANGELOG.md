@@ -1,5 +1,58 @@
 # mcp-use
 
+## 1.19.0
+
+### Minor Changes
+
+- f4e2a70: fix(client): ensure client is 100% conformant
+
+### Patch Changes
+
+- f4e2a70: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- f4e2a70: fix(logging): enhance logging consistency and add tests for logLevel behavior
+  - Improved logging consistency across React components by ensuring all console calls are routed through the Logger class.
+  - Added comprehensive tests for Logger configuration, including log level filtering and silent mode behavior.
+  - Updated useMcp hook tests to validate logLevel options and their interactions.
+
+- f4e2a70: feat(mcp): implement direct stdio connector handling in Node.js client
+  - Added support for handling the stdio connector directly within the Node.js MCPClient, allowing for command and argument configuration
+  - Updated the loadConfigFile function to dynamically import the fs module, preventing unnecessary inclusion in browser bundles
+  - Enhanced error handling to ensure that the stdio connector is only utilized in the appropriate environment, improving compatibility and clarity
+
+- f4e2a70: Fix prompt method to use generic type inference for callback parameters, matching the pattern used by the tool method
+- f4e2a70: fix(inspector): enhance MCPAppsRenderer and OpenAIComponentRenderer with loading states and spinner
+  - Updated MCPAppsRenderer to include a loading spinner during widget initialization, improving user feedback.
+  - Introduced a new `isReady` state to manage the loading state effectively.
+  - Enhanced OpenAIComponentRenderer to adjust display properties based on the new configuration for better responsiveness.
+  - Added a maximum width for the Picture-in-Picture mode in MCP_APPS_CONFIG for improved layout control.
+  - Refactored iframe loading handling to ensure proper state management and user experience during loading phases.
+
+- f4e2a70: fix(vitest): add support for additional file extensions in Vitest configuration
+- f4e2a70: Fix error() return type to be compatible with tool callbacks that use outputSchema
+- f4e2a70: feat(inspector): improve loading state and UI feedback in OpenAIComponentRenderer
+  - Replaced shimmer animation with a Spinner component for a more consistent loading experience
+  - Introduced a skeleton loading state that only displays on the initial load of the widget
+  - Updated ToolResultDisplay to adjust the order of view checks for better clarity
+  - Enhanced ToolsList to conditionally display parameter counts based on tool input schemas
+
+- f4e2a70: Fix TypedCallToolResult type inference by replacing Omit<CallToolResult, "structuredContent"> with explicit property declarations
+- f4e2a70: feat(inspector): add log copying functionality and enhance theme handling
+  - Implemented a new feature in IframeConsole to copy all logs to the clipboard, providing users with an easy way to access console logs
+  - Enhanced OpenAIComponentRenderer to manage widget readiness state and apply theme changes dynamically, improving user experience and visual consistency
+  - Updated ThemeProvider to synchronize theme application with Tailwind dark mode and OpenAI Apps SDK design tokens, ensuring a seamless theme transition
+  - Added a message signaling to the parent window when the widget is ready, enhancing communication between components
+
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+  - @mcp-use/inspector@0.20.0
+  - @mcp-use/cli@2.13.8
+
 ## 1.19.0-canary.6
 
 ### Patch Changes

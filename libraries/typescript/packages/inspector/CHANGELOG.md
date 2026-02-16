@@ -1,5 +1,62 @@
 # @mcp-use/inspector
 
+## 0.20.0
+
+### Minor Changes
+
+- f4e2a70: feat(inspector): add quick questions and followups support to ChatTab
+  - Added support for `chatQuickQuestions` and `chatFollowups` props in `ChatTab`, `ChatLandingForm`, and `ChatInputArea` components to improve user interaction
+  - Implemented functionality to handle quick question and followup selection, enhancing the chat experience
+  - Updated `InspectorContext` to include new configuration options for quick questions and followups
+  - Enhanced message handling and event posting for better integration with the chat system
+
+### Patch Changes
+
+- f4e2a70: feat(inspector): enhance error handling and logging for widget components
+  - Implemented error logging functionality in MCPAppsRenderer and OpenAIComponentRenderer to capture and post error messages and stack traces to the parent window
+  - Added global error and unhandled promise rejection listeners in shared-utils to emit runtime errors with detailed context
+  - Enhanced console error handling in mcp-apps route to serialize and send console errors to the parent window, improving debugging capabilities
+  - Refactored MCPAppsRenderer to replace `isReady` state with `initCount` for better tracking of initialization events
+
+- f4e2a70: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- f4e2a70: fix(inspector): enhance MCPAppsRenderer and OpenAIComponentRenderer with loading states and spinner
+  - Updated MCPAppsRenderer to include a loading spinner during widget initialization, improving user feedback.
+  - Introduced a new `isReady` state to manage the loading state effectively.
+  - Enhanced OpenAIComponentRenderer to adjust display properties based on the new configuration for better responsiveness.
+  - Added a maximum width for the Picture-in-Picture mode in MCP_APPS_CONFIG for improved layout control.
+  - Refactored iframe loading handling to ensure proper state management and user experience during loading phases.
+
+- f4e2a70: fix(csp): allow permissive frame ancestors by default
+- f4e2a70: feat(inspector): improve loading state and UI feedback in OpenAIComponentRenderer
+  - Replaced shimmer animation with a Spinner component for a more consistent loading experience
+  - Introduced a skeleton loading state that only displays on the initial load of the widget
+  - Updated ToolResultDisplay to adjust the order of view checks for better clarity
+  - Enhanced ToolsList to conditionally display parameter counts based on tool input schemas
+
+- f4e2a70: feat(inspector): enhance ToolsList with metadata display and tool type icons
+  - Updated ListItem component to conditionally render metadata
+  - Enhanced ToolsList to include tool metadata with icons for MCP and OpenAI, utilizing tool detection logic
+  - Introduced McpIcon and OpenAIIcon components for better visual representation of tool types
+
+- f4e2a70: feat(inspector): add log copying functionality and enhance theme handling
+  - Implemented a new feature in IframeConsole to copy all logs to the clipboard, providing users with an easy way to access console logs
+  - Enhanced OpenAIComponentRenderer to manage widget readiness state and apply theme changes dynamically, improving user experience and visual consistency
+  - Updated ThemeProvider to synchronize theme application with Tailwind dark mode and OpenAI Apps SDK design tokens, ensuring a seamless theme transition
+  - Added a message signaling to the parent window when the widget is ready, enhancing communication between components
+
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+  - mcp-use@1.19.0
+
 ## 0.20.0-canary.6
 
 ### Patch Changes
