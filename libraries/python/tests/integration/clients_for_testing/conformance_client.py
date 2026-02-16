@@ -235,7 +235,8 @@ async def main():
         elif scenario == "sse-retry":
             await asyncio.sleep(5)
         elif scenario.startswith("auth/"):
-            pass  # The framework validates OAuth protocol exchanges
+            # Exercise the connection so scope step-up can trigger on 403
+            await run_tools_call(session)
         else:
             await run_tools_call(session)
     finally:
