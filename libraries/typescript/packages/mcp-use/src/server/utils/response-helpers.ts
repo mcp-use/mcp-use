@@ -340,7 +340,7 @@ export function resource(
  * })
  * ```
  */
-export function error(message: string): CallToolResult {
+export function error(message: string): TypedCallToolResult<never> {
   return {
     isError: true,
     content: [
