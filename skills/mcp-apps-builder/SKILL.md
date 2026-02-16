@@ -1,5 +1,5 @@
 ---
-name: manufact-typescript-server-best-practices
+name: mcp-apps-builder
 description: |
   Best practices for building MCP servers with mcp-use framework.
 
