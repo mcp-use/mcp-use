@@ -8,6 +8,7 @@
     "mcp-use": "1.18.0"
   },
   "changesets": [
+    "clear-paws-act",
     "flat-things-report"
   ]
 }
