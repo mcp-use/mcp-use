@@ -51,4 +51,4 @@ For the latest status, see our [GitHub Issues](https://github.com/mcp-use/mcp-us
 
 ## How to Contribute
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines. Issues labeled [`good first issue`](https://github.com/mcp-use/mcp-use/labels/good%20first%20issue) are a great starting point.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines. Issues labeled [`good first issue`](https://github.com/mcp-use/mcp-use/labels/good%20first%20issue) are a great starting point.
