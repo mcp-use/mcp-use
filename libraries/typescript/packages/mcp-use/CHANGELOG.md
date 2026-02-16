@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.19.0-canary.0
+
+### Minor Changes
+
+- df8d269: fix(client): ensure client is 100% conformant
+
+### Patch Changes
+
+- @mcp-use/cli@2.13.8-canary.0
+- @mcp-use/inspector@0.19.1-canary.0
+
 ## 1.18.0
 
 ### Minor Changes

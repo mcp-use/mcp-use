@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.19.0",
     "mcp-use": "1.18.0"
   },
-  "changesets": []
+  "changesets": [
+    "flat-things-report"
+  ]
 }
