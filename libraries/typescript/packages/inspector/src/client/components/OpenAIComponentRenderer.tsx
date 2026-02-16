@@ -2,6 +2,7 @@ import { cn } from "@/client/lib/utils";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { MCP_APPS_CONFIG } from "../constants/mcp-apps";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
@@ -1084,7 +1085,7 @@ function OpenAIComponentRendererBase({
         isSameOrigin &&
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
             {/* Use advanced debug controls for Apps SDK (same as MCP Apps) */}
             <MCPAppsDebugControls
               displayMode={displayMode}
@@ -1109,8 +1110,13 @@ function OpenAIComponentRendererBase({
           centerVertically && "items-center",
           displayMode === "fullscreen" && "bg-background",
           displayMode === "pip" &&
-            "fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-fit min-w-[300px] max-w-[min(90vw,1200px)] h-[400px] shadow-2xl border overflow-hidden"
+            `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px] shadow-2xl border overflow-hidden`
         )}
+        style={
+          displayMode === "pip"
+            ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
+            : undefined
+        }
         onMouseEnter={() => displayMode === "pip" && setIsPipHovered(true)}
         onMouseLeave={() => displayMode === "pip" && setIsPipHovered(false)}
       >

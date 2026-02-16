@@ -41,6 +41,7 @@ import { cn } from "../lib/utils";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
 import { SandboxedIframe } from "./ui/SandboxedIframe";
+import { Spinner } from "./ui/spinner";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
@@ -104,6 +105,9 @@ export function MCPAppsRenderer({
   const [initCount, setInitCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [widgetHtml, setWidgetHtml] = useState<string | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [showSpinner, setShowSpinner] = useState(true);
+  const hasLoadedOnceRef = useRef(false);
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
   const [prefersBorder, setPrefersBorder] = useState<boolean>(true);
@@ -251,6 +255,10 @@ export function MCPAppsRenderer({
         }
 
         setWidgetHtml(html);
+        setIsReady(false);
+        if (!hasLoadedOnceRef.current) {
+          setShowSpinner(true);
+        }
         setWidgetCsp(csp);
         setWidgetPermissions(permissions);
         setPrefersBorder(mcpAppsPrefersBorder);
@@ -712,6 +720,18 @@ export function MCPAppsRenderer({
     [onDisplayModeChange]
   );
 
+  // Hide spinner after iframe loads + brief delay for widget to render (first load only)
+  useEffect(() => {
+    if (!isReady || !showSpinner) return;
+
+    const timer = setTimeout(() => {
+      setShowSpinner(false);
+      hasLoadedOnceRef.current = true;
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [isReady, showSpinner]);
+
   // Loading states
   if (loadError) {
     return (
@@ -728,8 +748,8 @@ export function MCPAppsRenderer({
   if (!widgetHtml) {
     return (
       <WidgetWrapper className={className} noWrapper={noWrapper}>
-        <div className="border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          Preparing MCP App widget...
+        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
+          <Spinner className="size-5" />
         </div>
       </WidgetWrapper>
     );
@@ -745,7 +765,7 @@ export function MCPAppsRenderer({
 
     if (isPip) {
       return [
-        `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-fit min-w-[300px] max-w-[min(90vw,1200px)] h-[${MCP_APPS_CONFIG.DIMENSIONS.PIP_HEIGHT}px]`,
+        `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px]`,
         "shadow-2xl border overflow-hidden",
         "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
       ].join(" ");
@@ -769,7 +789,15 @@ export function MCPAppsRenderer({
 
   return (
     <WidgetWrapper className={className} noWrapper={noWrapper}>
-      <div ref={containerRef} className={containerClassName}>
+      <div
+        ref={containerRef}
+        className={containerClassName}
+        style={
+          isPip
+            ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
+            : undefined
+        }
+      >
         {isFullscreen && (
           <FullscreenNavbar
             title={toolName}
@@ -793,10 +821,15 @@ export function MCPAppsRenderer({
         {/* Main content with centering like Apps SDK */}
         <div
           className={cn(
-            "flex-1 w-full flex justify-center items-center",
+            "flex-1 w-full h-full flex justify-center items-center relative",
             isFullscreen && "pt-14"
           )}
         >
+          {showSpinner && (
+            <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-10">
+              <Spinner className="size-5" />
+            </div>
+          )}
           <SandboxedIframe
             ref={sandboxRef}
             html={widgetHtml}
@@ -804,6 +837,7 @@ export function MCPAppsRenderer({
             csp={widgetCsp}
             permissions={widgetPermissions}
             permissive={cspMode === "permissive"}
+            onLoad={() => setIsReady(true)}
             onMessage={handleSandboxMessage}
             title={`MCP App: ${toolName}`}
             className={cn(

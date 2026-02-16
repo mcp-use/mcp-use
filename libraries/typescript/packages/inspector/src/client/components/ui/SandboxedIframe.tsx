@@ -51,6 +51,8 @@ interface SandboxedIframeProps {
   permissive?: boolean;
   /** Callback when sandbox proxy is ready */
   onProxyReady?: () => void;
+  /** Callback when the outer iframe has loaded */
+  onLoad?: () => void;
   /** Callback for messages from guest UI (excluding sandbox-internal messages) */
   onMessage: (event: MessageEvent) => void;
   /** CSS class for the outer iframe */
@@ -80,6 +82,7 @@ export const SandboxedIframe = forwardRef<
     permissions,
     permissive,
     onProxyReady,
+    onLoad,
     onMessage,
     className,
     style,
@@ -217,6 +220,7 @@ export const SandboxedIframe = forwardRef<
       title={title}
       sandbox={sandbox}
       allow="web-share"
+      onLoad={onLoad}
     />
   );
 });
