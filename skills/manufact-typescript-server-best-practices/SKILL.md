@@ -11,6 +11,18 @@ description: |
   - Reviewing code for security, performance, or architectural concerns
 ---
 
+# IMPORTANT: How to Use This Skill
+
+This file provides a NAVIGATION GUIDE ONLY. Before implementing any MCP server features, you MUST:
+
+1. Read this overview to understand which reference files are relevant
+2. **ALWAYS read the specific reference file(s)** for the features you're implementing
+3. Apply the detailed patterns from those files to your implementation
+
+**Do NOT rely solely on the quick reference examples in this file** - they are minimal examples only. The reference files contain critical best practices, security considerations, and advanced patterns.
+
+---
+
 # MCP Server Best Practices
 
 Comprehensive guide for building production-ready MCP servers with tools, resources, prompts, and widgets using mcp-use.
@@ -209,7 +221,7 @@ server.tool(
     description: "Greet a user",
     schema: z.object({ name: z.string().describe("User's name") })
   },
-  async ({ name }) => text(`Hello, ${name}!`)
+  async ({ name }) => text("Hello " + name + "!"),
 );
 
 server.listen();

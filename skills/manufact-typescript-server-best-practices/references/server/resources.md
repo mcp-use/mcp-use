@@ -199,7 +199,10 @@ server.resourceTemplate(
     title: "User Profile",
     description: "Get user profile by ID"
   },
-  async (uri, { userId }) => {
+  async (uri: URL, params: Record<string, string>) => {
+    // Extract parameters from params object
+    const { userId } = params;
+
     const user = await fetchUser(userId);
 
     if (!user) {
@@ -236,11 +239,18 @@ server.resourceTemplate(
 
 **Handler signature:**
 ```typescript
-async (uri: string, params: Record<string, string>) => {
-  // uri: Full matched URI
-  // params: Extracted parameters from template
+async (uri: URL, params: Record<string, string>) => {
+  // uri: URL object of the matched URI
+  // params: Record<string, string> with extracted template parameters
+
+  // Extract the parameters you need
+  const { userId } = params;
 }
 ```
+
+**⚠️ TypeScript Best Practice:**
+- **Recommended:** Use explicit types and extract params inside the function body (as shown above)
+- **Not recommended:** Parameter destructuring like `async (uri, { userId }) => {}` works at runtime but TypeScript has trouble matching it against the `Record<string, string>` type, potentially causing compilation errors
 
 ---
 
@@ -418,7 +428,8 @@ server.resourceTemplate(
     description: "Get documentation by ID",
     mimeType: "text/markdown"
   },
-  async (uri, { docId }) => {
+  async (uri: URL, params: Record<string, string>) => {
+    const { docId } = params;
     const doc = await fetchDocument(docId);
 
     if (!doc) {
