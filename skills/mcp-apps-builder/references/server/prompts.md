@@ -406,6 +406,60 @@ server.prompt(
 
 ---
 
+## Completion (Autocomplete)
+
+Add autocomplete suggestions to prompt arguments using `completable()`:
+
+```typescript
+import { MCPServer, text, completable } from "mcp-use/server";
+import { z } from "zod";
+
+// Static list of suggestions
+server.prompt(
+  {
+    name: "code-review",
+    schema: z.object({
+      language: completable(z.string().describe("Programming language"), ["python", "typescript", "go", "rust"]),
+      code: z.string().describe("Code to review")
+    })
+  },
+  async ({ language, code }) => text(`Review this ${language} code...`)
+);
+```
+
+### Dynamic Completion
+
+Use a callback for suggestions that depend on context or external data:
+
+```typescript
+server.prompt(
+  {
+    name: "analyze-project",
+    schema: z.object({
+      userId: completable(z.string().describe("User ID"), async (value) => {
+        const users = await fetchUsers();
+        return users.map(u => u.id).filter(id => id.startsWith(value));
+      }),
+      projectId: completable(z.string().describe("Project ID"), async (value, ctx) => {
+        // Use other argument values for contextual suggestions
+        const userId = ctx?.arguments?.userId;
+        const projects = await fetchProjects(userId);
+        return projects.map(p => p.id).filter(id => id.startsWith(value));
+      })
+    })
+  },
+  async ({ userId, projectId }) => text(`Analyzing project ${projectId}...`)
+);
+```
+
+**Key points:**
+- `completable(schema, values)` — static list, prefix-matched automatically
+- `completable(schema, callback)` — dynamic, receives `(value, ctx)` where `ctx.arguments` has other field values
+- Works with `z.string()`, `z.number()`, and `z.enum()` schemas
+- Clients request suggestions via MCP `completion/complete`
+
+---
+
 ## Best Practices
 
 ### 1. Clear Instructions

@@ -254,6 +254,56 @@ async (uri: URL, params: Record<string, string>) => {
 
 ---
 
+## Completion (Autocomplete) for Templates
+
+Add autocomplete suggestions for resource template variables using the `callbacks.complete` option:
+
+```typescript
+// Static list of suggestions per variable
+server.resourceTemplate(
+  {
+    uriTemplate: "docs://{docId}",
+    name: "Documentation",
+    description: "Get documentation by ID",
+    callbacks: {
+      complete: {
+        docId: ["getting-started", "api-reference", "faq", "changelog"]
+      }
+    }
+  },
+  async (uri: URL, params: Record<string, string>) => {
+    const { docId } = params;
+    return markdown(await fetchDoc(docId));
+  }
+);
+
+// Dynamic suggestions via callback
+server.resourceTemplate(
+  {
+    uriTemplate: "user://{userId}/profile",
+    name: "User Profile",
+    callbacks: {
+      complete: {
+        userId: async (value: string) => {
+          const users = await searchUsers(value);
+          return users.map(u => u.id);
+        }
+      }
+    }
+  },
+  async (uri: URL, params: Record<string, string>) => {
+    const { userId } = params;
+    return object(await fetchUser(userId));
+  }
+);
+```
+
+**Key points:**
+- `complete` maps each template variable to either a `string[]` (prefix-matched automatically) or a callback `(value: string) => Promise<string[]>`
+- Clients request suggestions via MCP `completion/complete`
+
+---
+
 ## Error Handling
 
 Resources can fail - handle errors gracefully with `error()` helper:
