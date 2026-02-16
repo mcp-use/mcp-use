@@ -10,11 +10,12 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in mcp-use, please report it responsibly:
+If you discover a security vulnerability in mcp-use, please report it through [GitHub's private vulnerability reporting](https://github.com/mcp-use/mcp-use/security/advisories/new). This is our supported and preferred method for receiving security reports.
 
-1. **Do NOT open a public GitHub issue** for security vulnerabilities
-2. Email **security@mcp-use.io** with details of the vulnerability
-3. Include steps to reproduce, impact assessment, and any suggested fixes
+When reporting, please include:
+- Steps to reproduce
+- Impact assessment
+- Any suggested fixes
 
 We will acknowledge receipt within **2 business days** and provide an initial assessment within **7 days**.
 
