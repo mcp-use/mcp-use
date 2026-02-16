@@ -10,6 +10,7 @@ import {
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
+import { probeAuthParams } from "mcp-use";
 import { createHeadlessConformanceOAuthProvider } from "./headless-oauth-provider.js";
 
 async function main(): Promise<void> {
@@ -27,10 +28,15 @@ async function main(): Promise<void> {
     : undefined;
 
   if (authProvider) {
+    // Probe for WWW-Authenticate params (scope, resource_metadata) from 401
+    const { resourceMetadataUrl, scope } = await probeAuthParams(serverUrl);
+
     // Pre-authenticate using SDK's auth() function
     // Step 1: Trigger OAuth discovery and redirectToAuthorization
     const authResult = await auth(authProvider, {
       serverUrl,
+      resourceMetadataUrl,
+      scope,
     });
 
     if (authResult === "REDIRECT") {
@@ -40,6 +46,8 @@ async function main(): Promise<void> {
       // Step 3: Exchange code for tokens
       await auth(authProvider, {
         serverUrl,
+        resourceMetadataUrl,
+        scope,
         authorizationCode: authCode,
       });
     }

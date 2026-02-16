@@ -56,7 +56,9 @@ export { getPackageVersion, VERSION } from "./src/version.js";
 export {
   BrowserOAuthClientProvider,
   onMcpAuthorization,
+  probeAuthParams,
 } from "./src/auth/index.js";
+export type { ProbeAuthParamsResult } from "./src/auth/index.js";
 export type { StoredState } from "./src/auth/types.js";
 
 // Export React hooks

@@ -1,6 +1,7 @@
 // useMcp.ts
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { probeAuthParams } from "../auth/probe-www-auth.js";
 import type {
   Prompt,
   Resource,
@@ -1002,9 +1003,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               );
 
               try {
+                // Probe for WWW-Authenticate params (scope, resource_metadata) from 401
+                const { resourceMetadataUrl, scope } =
+                  await probeAuthParams(url);
+
                 // Step 1: Call auth() to trigger redirectToAuthorization and OAuth discovery
                 const authResult = await auth(authProviderRef.current, {
                   serverUrl: url,
+                  ...(resourceMetadataUrl && { resourceMetadataUrl }),
+                  ...(scope && { scope }),
                 });
 
                 if (authResult === "REDIRECT") {
@@ -1021,6 +1028,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                   // Step 3: Complete the OAuth flow by exchanging code for tokens
                   await auth(authProviderRef.current, {
                     serverUrl: url,
+                    ...(resourceMetadataUrl && { resourceMetadataUrl }),
+                    ...(scope && { scope }),
                     authorizationCode: authCode,
                   });
                 }
