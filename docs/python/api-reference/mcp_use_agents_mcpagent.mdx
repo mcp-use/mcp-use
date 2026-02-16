@@ -67,11 +67,16 @@ Initialize a new MCPAgent instance.
 ><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for remote API calls. </ParamField>
 ><ParamField body="callbacks" type="list | None" default="None" >   List of LangChain callbacks to use. If None and Langfuse is configured, uses langfuse_handler. </ParamField>
 ><ParamField body="chat_id" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="metadata" type="dict[str, Any]" default="None" > Optional metadata to attach to each run, such as user identifiers
+  or request context. This is passed through to tools and logging
+  layers where supported. </ParamField>
+><ParamField body="message_id" type="str" default="None" >  Optional unique identifier for the initial message or run. Useful
+  for correlating logs and tool calls across systems. </ParamField>
 ><ParamField body="retry_on_error" type="bool" default="True" >   Whether to enable automatic error handling for tool calls. When True, tool errors </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.client.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.agents.managers.base.BaseServerManager | None = None, verbose: bool = False, pretty_print: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True):
+def __init__(llm: langchain_core.language_models.base.BaseLanguageModel | None = None, client: mcp_use.client.client.MCPClient | None = None, connectors: list[mcp_use.client.connectors.base.BaseConnector] | None = None, max_steps: int = 5, auto_initialize: bool = False, memory_enabled: bool = True, system_prompt: str | None = None, system_prompt_template: str | None = None, additional_instructions: str | None = None, disallowed_tools: list[str] | None = None, tools_used_names: list[str] | None = None, use_server_manager: bool = False, server_manager: mcp_use.agents.managers.base.BaseServerManager | None = None, verbose: bool = False, pretty_print: bool = False, agent_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com", callbacks: list | None = None, chat_id: str | None = None, retry_on_error: bool = True, metadata: dict[str, Any] | None = None, message_id: str | None = None):
 ```
 
 </Card>

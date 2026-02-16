@@ -552,7 +552,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: [agent_run, agent_stream, agent_structured_output, server_manager]
+        test:
+          [
+            agent_run,
+            agent_stream,
+            agent_structured_output,
+            runnable_config,
+            server_manager,
+          ]
     defaults:
       run:
         working-directory: libraries/python
