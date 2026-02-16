@@ -1,41 +1,35 @@
 /**
- * Example client demonstrating sampling support
+ * MCP Client Sampling Example (Node)
  *
- * This example shows how to:
- * 1. Create an MCP client with a sampling callback
+ * Shows how to:
+ * 1. Create an MCP client with an onSampling callback
  * 2. Connect to a server that uses sampling
  * 3. Call tools that request LLM completions
  *
- * To run this example:
- * 1. Start the sampling server: cd examples/server/sampling && npm run dev
- * 2. Run this client: tsx examples/client/sampling-client.ts
+ * Run:
+ *   pnpm run example:client:sampling
+ *   pnpm run example:sampling   (starts server then client)
  *
- * Note: This example uses `onSampling`. The deprecated `samplingCallback` name
- * is still supported for backward compatibility but will be removed in a future version.
+ * Manually:
+ *   1. Start the sampling server: pnpm run example:server:sampling
+ *   2. Run: tsx examples/client/node/communication/sampling-client.ts
  */
 
-import type {
-  CreateMessageRequest,
-  TextContent,
-} from "@modelcontextprotocol/sdk/types";
-import { MCPClient } from "../../../dist/src/client";
+import { MCPClient, type OnSamplingCallback } from "mcp-use";
 
-// Mock LLM function - replace this with your actual LLM integration
+const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
+
 async function mockLLM(prompt: string): Promise<string> {
-  // In a real implementation, you would call your LLM API here
-  // For example: OpenAI, Anthropic, etc.
-
-  // Simulate some processing time
   await new Promise((resolve) => setTimeout(resolve, 100));
 
-  // Simple mock responses based on prompt content
   if (prompt.includes("sentiment")) {
     if (
       prompt.toLowerCase().includes("love") ||
       prompt.toLowerCase().includes("great")
     ) {
       return "positive";
-    } else if (
+    }
+    if (
       prompt.toLowerCase().includes("hate") ||
       prompt.toLowerCase().includes("terrible")
     ) {
@@ -49,36 +43,34 @@ async function mockLLM(prompt: string): Promise<string> {
   }
 
   if (prompt.includes("Translate")) {
-    if (prompt.includes("Spanish")) {
-      return "Hola, mundo!";
-    }
+    if (prompt.includes("Spanish")) return "Hola, mundo!";
     return "Translation would appear here";
   }
 
   return "Mock LLM response";
 }
 
-// Create sampling callback
-// Note: The function name can be anything, but we use `onSampling` to match the option name
-async function onSampling(
-  params: CreateMessageRequest["params"]
-): Promise<import("@modelcontextprotocol/sdk/types.js").CreateMessageResult> {
+const onSampling: OnSamplingCallback = async (params) => {
   console.log("📥 Received sampling request:");
-  console.log("   Messages:", params.messages.length);
+  console.log("   Messages:", params.messages?.length ?? 0);
   console.log("   Model preferences:", params.modelPreferences);
 
-  // Extract the last message content
-  const lastMessage = params.messages[params.messages.length - 1];
-  const content = Array.isArray(lastMessage.content)
+  const lastMessage = params.messages?.[params.messages.length - 1];
+  const content = Array.isArray(lastMessage?.content)
     ? lastMessage.content[0]
-    : lastMessage.content;
+    : lastMessage?.content;
 
-  if (content.type !== "text") {
+  if (
+    !content ||
+    typeof content !== "object" ||
+    !("type" in content) ||
+    content.type !== "text"
+  ) {
     throw new Error("Only text content is supported in this example");
   }
 
-  // Call your LLM (replace with actual LLM call)
-  const response = await mockLLM(content.text);
+  const text = "text" in content ? (content as { text: string }).text : "";
+  const response = await mockLLM(text);
 
   console.log("📤 Sending sampling response:", response);
 
@@ -88,36 +80,28 @@ async function onSampling(
     model: "mock-llm-v1",
     stopReason: "endTurn",
   };
-}
+};
 
 async function main() {
   console.log("🚀 Starting Sampling Client Example\n");
 
-  // Create client with sampling callback
-  // Configure clientInfo to identify this client to the server
-  // This is sent in the MCP initialize request and helps with server-side logging/observability
   const client = new MCPClient(
     {
       mcpServers: {
         sampling: {
-          url: "http://localhost:3000/mcp",
+          url: SERVER_URL,
           clientInfo: { name: "sampling-client", version: "1.0.0" },
         },
       },
     },
-    {
-      onSampling,
-      // Note: The deprecated `samplingCallback` name is still supported for backward compatibility
-    }
+    { onSampling }
   );
 
   try {
-    // Create and initialize session
     console.log("📡 Connecting to sampling server...");
     await client.createAllSessions();
     console.log("✅ Connected!\n");
 
-    // List available tools
     const session = client.getSession("sampling");
     if (!session) {
       throw new Error("Failed to get session");
@@ -131,30 +115,36 @@ async function main() {
     });
     console.log();
 
-    // Test analyze-sentiment tool
     console.log("🧪 Testing analyze-sentiment tool...");
     const sentimentResult = await connector.callTool("analyze-sentiment", {
       text: "I love this product! It's amazing!",
     });
-    console.log("   Result:", (sentimentResult.content[0] as TextContent).text);
+    console.log(
+      "   Result:",
+      (sentimentResult.content[0] as { text: string }).text
+    );
     console.log();
 
-    // Test summarize-text tool
     console.log("🧪 Testing summarize-text tool...");
     const summaryResult = await connector.callTool("summarize-text", {
       text: "This is a long piece of text that needs to be summarized. It contains multiple sentences and ideas that should be condensed into a shorter form while preserving the key information.",
       maxLength: 20,
     });
-    console.log("   Result:", (summaryResult.content[0] as TextContent).text);
+    console.log(
+      "   Result:",
+      (summaryResult.content[0] as { text: string }).text
+    );
     console.log();
 
-    // Test translate-text tool
     console.log("🧪 Testing translate-text tool...");
     const translateResult = await connector.callTool("translate-text", {
       text: "Hello, world!",
       targetLanguage: "Spanish",
     });
-    console.log("   Result:", (translateResult.content[0] as TextContent).text);
+    console.log(
+      "   Result:",
+      (translateResult.content[0] as { text: string }).text
+    );
     console.log();
 
     console.log("✅ All tests completed successfully!");
@@ -165,11 +155,9 @@ async function main() {
     }
     process.exit(1);
   } finally {
-    // Clean up
     await client.closeAllSessions();
     console.log("\n👋 Client disconnected");
   }
 }
 
-// Run the example
 main().catch(console.error);

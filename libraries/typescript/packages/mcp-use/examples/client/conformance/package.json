@@ -1,0 +1,29 @@
+{
+  "name": "conformance-client",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP Conformance Test Clients for mcp-use TypeScript",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "client",
+    "conformance",
+    "testing"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jsdom": "^27.0.0",
+    "mcp-use": "workspace:*",
+    "react": "^19.2.3",
+    "react-test-renderer": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^25.0.2",
+    "@types/react-test-renderer": "^19.1.0",
+    "tsx": "^4.21.0"
+  }
+}

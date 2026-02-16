@@ -18,6 +18,9 @@ import { CodeModeConnector } from "./client/connectors/codeMode.js";
 import {
   createConnectorFromConfig,
   loadConfigFile,
+  resolveCallbacks,
+  type CallbackConfig,
+  type MCPClientConfigShape,
   type ServerConfig,
 } from "./config.js";
 import type { BaseConnector } from "./connectors/base.js";
@@ -111,9 +114,22 @@ export interface MCPClientOptions {
    * - Form mode: Collect structured data with JSON schema validation
    * - URL mode: Direct users to external URLs for sensitive interactions
    */
+  onElicitation?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+  /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
   elicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+  /**
+   * Optional callback function for server notifications.
+   * Applied as default when per-server config does not specify one.
+   */
+  onNotification?: (
+    notification: import("@modelcontextprotocol/sdk/types.js").Notification
+  ) => void | Promise<void>;
 }
 
 // Export executor classes and utilities for external use
@@ -123,6 +139,22 @@ export {
   isVMAvailable,
   VMCodeExecutor,
 } from "./client/codeExecutor.js";
+
+// Export elicitation helpers for client-side form/URL elicitation
+export {
+  accept,
+  acceptWithDefaults,
+  applyDefaults,
+  cancel,
+  decline,
+  getDefaults,
+  reject,
+  validate,
+} from "./client/elicitation-helpers.js";
+export type {
+  ElicitContent,
+  ElicitValidationResult,
+} from "./client/elicitation-helpers.js";
 
 // Export MCPSession and related types for CLI and other consumers
 export { MCPSession } from "./session.js";
@@ -218,12 +250,7 @@ export class MCPClient extends BaseMCPClient {
     | CodeExecutorFunction
     | BaseCodeExecutor = "vm";
   private _executorOptions?: ExecutorOptions;
-  private _samplingCallback?: (
-    params: CreateMessageRequest["params"]
-  ) => Promise<CreateMessageResult>;
-  private _elicitationCallback?: (
-    params: ElicitRequestFormParams | ElicitRequestURLParams
-  ) => Promise<ElicitResult>;
+  private _globalCallbacks: CallbackConfig;
 
   /**
    * Creates a new MCPClient instance.
@@ -315,14 +342,35 @@ export class MCPClient extends BaseMCPClient {
     this.codeMode = codeModeEnabled;
     this._codeExecutorConfig = executorConfig;
     this._executorOptions = executorOptions;
-    // Support both new and deprecated names
-    this._samplingCallback = options?.onSampling ?? options?.samplingCallback;
+    // Build global callback defaults: config root merged with options (options win)
+    const configRoot = this.config as MCPClientConfigShape;
+    this._globalCallbacks = {
+      onSampling:
+        options?.onSampling ??
+        options?.samplingCallback ??
+        configRoot?.onSampling ??
+        configRoot?.samplingCallback,
+      samplingCallback:
+        options?.samplingCallback ?? configRoot?.samplingCallback,
+      onElicitation:
+        options?.onElicitation ??
+        options?.elicitationCallback ??
+        configRoot?.onElicitation ??
+        configRoot?.elicitationCallback,
+      elicitationCallback:
+        options?.elicitationCallback ?? configRoot?.elicitationCallback,
+      onNotification: options?.onNotification ?? configRoot?.onNotification,
+    };
     if (options?.samplingCallback && !options?.onSampling) {
       console.warn(
         '[MCPClient] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
       );
     }
-    this._elicitationCallback = options?.elicitationCallback;
+    if (options?.elicitationCallback && !options?.onElicitation) {
+      console.warn(
+        '[MCPClient] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
+      );
+    }
 
     if (this.codeMode) {
       this._setupCodeModeConnector();
@@ -333,8 +381,13 @@ export class MCPClient extends BaseMCPClient {
 
   private _trackClientInit(): void {
     const servers = Object.keys(this.config.mcpServers ?? {});
-    const hasSamplingCallback = !!this._samplingCallback;
-    const hasElicitationCallback = !!this._elicitationCallback;
+    const hasSamplingCallback = !!(
+      this._globalCallbacks.onSampling ?? this._globalCallbacks.samplingCallback
+    );
+    const hasElicitationCallback = !!(
+      this._globalCallbacks.onElicitation ??
+      this._globalCallbacks.elicitationCallback
+    );
 
     Tel.getInstance()
       .trackMCPClientInit({
@@ -454,9 +507,18 @@ export class MCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
-    return createConnectorFromConfig(serverConfig as ServerConfig, {
-      samplingCallback: this._samplingCallback,
-      elicitationCallback: this._elicitationCallback,
+    const resolved = resolveCallbacks(
+      serverConfig as CallbackConfig,
+      this._globalCallbacks
+    );
+    const merged = {
+      ...serverConfig,
+      clientInfo: serverConfig.clientInfo ?? this.config.clientInfo,
+    };
+    return createConnectorFromConfig(merged as ServerConfig, {
+      onSampling: resolved.onSampling,
+      onElicitation: resolved.onElicitation,
+      onNotification: resolved.onNotification,
     });
   }
 
