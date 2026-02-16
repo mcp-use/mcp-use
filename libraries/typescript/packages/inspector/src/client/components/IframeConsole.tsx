@@ -1,6 +1,7 @@
 import { cn } from "@/client/lib/utils";
-import { TerminalIcon, TrashIcon } from "lucide-react";
+import { Copy, TerminalIcon, TrashIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   useIframeConsole,
   type ConsoleLogEntry,
@@ -182,6 +183,41 @@ export function IframeConsole({
     }
   }, [logs, isOpen]);
 
+  // Copy all logs to clipboard
+  const copyAllLogs = async () => {
+    try {
+      const formatArg = (arg: any): string => {
+        if (arg === null) return "null";
+        if (arg === undefined) return "undefined";
+        if (typeof arg === "string") return arg;
+        if (typeof arg === "object") {
+          try {
+            return JSON.stringify(arg, null, 2);
+          } catch {
+            return String(arg);
+          }
+        }
+        return String(arg);
+      };
+
+      const formattedLogs = logs
+        .map((log) => {
+          const timestamp = new Date(log.timestamp).toLocaleTimeString();
+          const level = log.level.toUpperCase();
+          const url = log.url ? ` ${log.url}` : "";
+          const args = log.args.map(formatArg).join("\n");
+
+          return `[${level}] ${timestamp}${url}\n${args}`;
+        })
+        .join("\n\n");
+
+      await navigator.clipboard.writeText(formattedLogs);
+      toast.success(`Copied ${logs.length} logs to clipboard`);
+    } catch {
+      toast.error("Failed to copy logs to clipboard");
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
@@ -255,15 +291,26 @@ export function IframeConsole({
                 </Label>
               </div>
               {logs.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearLogs}
-                  className="-my-2"
-                >
-                  <TrashIcon className="size-4 mr-1" />
-                  Clear
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={copyAllLogs}
+                    className="-my-2"
+                  >
+                    <Copy className="size-4 mr-1" />
+                    Copy All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearLogs}
+                    className="-my-2"
+                  >
+                    <TrashIcon className="size-4 mr-1" />
+                    Clear
+                  </Button>
+                </>
               )}
             </div>
           </div>

@@ -8,7 +8,6 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
-import { Spinner } from "./ui/spinner";
 
 interface OpenAIComponentRendererProps {
   componentUrl: string;
@@ -105,6 +104,7 @@ function OpenAIComponentRendererBase({
   > | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isWidgetMounted, setIsWidgetMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
 
@@ -402,6 +402,9 @@ function OpenAIComponentRendererBase({
             htmlElement.setAttribute("data-theme", updates.theme);
             // Also set inline style as fallback
             htmlElement.style.colorScheme = updates.theme;
+            // Add theme as a class for Tailwind dark mode (class-based strategy)
+            htmlElement.classList.remove("light", "dark");
+            htmlElement.classList.add(updates.theme);
           }
 
           if (iframeWindow.openai) {
@@ -556,6 +559,7 @@ function OpenAIComponentRendererBase({
 
     // Reset readiness whenever we load a new widget URL.
     setIsReady(false);
+    setIsWidgetMounted(false);
     setError(null);
 
     let hasHandledLoad = false;
@@ -631,6 +635,11 @@ function OpenAIComponentRendererBase({
       }
 
       switch (event.data.type) {
+        case "mcp-inspector:widget:ready":
+          // Widget React component has mounted and is ready
+          setIsWidgetMounted(true);
+          break;
+
         case "openai:setWidgetState":
           try {
             // Widget state is already handled by the server-injected script
@@ -915,6 +924,9 @@ function OpenAIComponentRendererBase({
       htmlElement.setAttribute("data-theme", resolvedTheme);
       // Also set inline style as fallback
       htmlElement.style.colorScheme = resolvedTheme;
+      // Add theme as a class for Tailwind dark mode (class-based strategy)
+      htmlElement.classList.remove("light", "dark");
+      htmlElement.classList.add(resolvedTheme);
     } catch {
       // Cross-origin access denied — fall through to postMessage
     }
@@ -1035,8 +1047,10 @@ function OpenAIComponentRendererBase({
   if (!widgetUrl) {
     return (
       <Wrapper className={className} noWrapper={noWrapper}>
-        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
-          <Spinner className="size-5" />
+        <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
+          <div className="relative w-full max-w-[768px] h-[400px] bg-muted rounded-md overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </div>
         </div>
       </Wrapper>
     );
@@ -1044,9 +1058,11 @@ function OpenAIComponentRendererBase({
 
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
-      {!isReady && (
-        <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
-          <Spinner className="size-5" />
+      {(!isReady || !isWidgetMounted) && (
+        <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
+          <div className="relative w-full max-w-[768px] h-[400px] bg-muted rounded-md overflow-hidden">
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+          </div>
         </div>
       )}
 
