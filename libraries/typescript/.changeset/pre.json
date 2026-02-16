@@ -10,6 +10,8 @@
   "changesets": [
     "clear-paws-act",
     "fix-mcp-apps-mime-telemetry",
-    "flat-things-report"
+    "flat-things-report",
+    "lucky-actors-knock",
+    "tidy-impalas-watch"
   ]
 }

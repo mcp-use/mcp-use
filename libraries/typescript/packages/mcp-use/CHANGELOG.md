@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.19.0-canary.2
+
+### Patch Changes
+
+- e8383a7: Fix prompt method to use generic type inference for callback parameters, matching the pattern used by the tool method
+- 1a8a2a6: Fix TypedCallToolResult type inference by replacing Omit<CallToolResult, "structuredContent"> with explicit property declarations
+  - @mcp-use/cli@2.13.8-canary.2
+  - @mcp-use/inspector@0.19.1-canary.2
+
 ## 1.19.0-canary.1
 
 ### Patch Changes
