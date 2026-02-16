@@ -1,3 +1,5 @@
+import type { CallbackConfig } from "../config.js";
+import { normalizeClientInfo, resolveCallbacks } from "../config.js";
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { logger } from "../logging.js";
@@ -60,16 +62,13 @@ export class BrowserMCPClient extends BaseMCPClient {
     const {
       url,
       headers,
+      fetch,
       authToken,
       authProvider,
       wrapTransport,
       clientOptions,
-      onSampling,
-      samplingCallback,
-      elicitationCallback,
       disableSseFallback,
       preferSse,
-      clientInfo,
       gatewayUrl,
       serverId,
     } = serverConfig;
@@ -78,39 +77,40 @@ export class BrowserMCPClient extends BaseMCPClient {
       throw new Error("Server URL is required");
     }
 
-    // Support both new and deprecated name
-    const finalOnSampling = onSampling ?? samplingCallback;
+    // Resolve callbacks: per-server overrides global (from config root)
+    const globalDefaults = this.config as CallbackConfig;
+    const resolved = resolveCallbacks(
+      serverConfig as CallbackConfig,
+      globalDefaults
+    );
+
+    // Root clientInfo as fallback when server config omits it
+    const clientInfo = normalizeClientInfo(
+      serverConfig.clientInfo ?? this.config.clientInfo
+    );
 
     // Prepare connector options
     const connectorOptions = {
       headers,
+      fetch,
       authToken,
-      authProvider, // ← Pass OAuth provider to connector
-      wrapTransport, // ← Pass transport wrapper if provided
-      clientOptions, // ← Pass client options (capabilities, etc.) to connector
-      onSampling: finalOnSampling, // ← Pass sampling callback to connector (new name)
-      samplingCallback: finalOnSampling, // ← Backward compatibility: also pass as old name
-      elicitationCallback, // ← Pass elicitation callback to connector
-      disableSseFallback, // ← Disable automatic SSE fallback
-      preferSse, // ← Use SSE transport directly
-      clientInfo, // ← Pass client info (name, version) to connector
-      gatewayUrl, // ← Pass gateway/proxy URL to connector
-      serverId, // ← Pass server ID for gateway observability
+      authProvider,
+      wrapTransport,
+      clientOptions,
+      onSampling: resolved.onSampling,
+      onElicitation: resolved.onElicitation,
+      onNotification: resolved.onNotification,
+      disableSseFallback,
+      preferSse,
+      clientInfo,
+      gatewayUrl,
+      serverId,
     };
 
-    // Debug: Log if clientOptions are being passed
-    if (clientOptions) {
-      logger.debug(
-        "[BrowserMCPClient] Passing clientOptions to connector:",
-        JSON.stringify(clientOptions, null, 2)
-      );
-    } else {
-      logger.warn(
-        "[BrowserMCPClient] No clientOptions provided to connector!"
-      );
-    }
+    logger.debug(
+      `[BrowserMCPClient] Connector options prepared (clientOptions: ${clientOptions ? "provided" : "none"})`
+    );
 
-    // Use HTTP connector for browser
     return new HttpConnector(url, connectorOptions);
   }
 }

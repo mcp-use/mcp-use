@@ -72,6 +72,8 @@ While both protocols enable interactive widgets, they have key differences:
 
 ## Creating an MCP Apps Widget
 
+Widgets can receive partial tool arguments in real time (`partialToolInput` / `isStreaming`) when the host streams them, enabling live previews as the LLM generates the tool call. See [useWidget — Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for details.
+
 ### Using Dual-Protocol Type (Recommended)
 
 The `mcpApps` type enables your widgets to work with both MCP Apps clients and ChatGPT:

@@ -1,0 +1,15 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.13.7",
+    "create-mcp-use-app": "0.12.3",
+    "@mcp-use/inspector": "0.19.0",
+    "mcp-use": "1.18.0"
+  },
+  "changesets": [
+    "clear-paws-act",
+    "fix-mcp-apps-mime-telemetry",
+    "flat-things-report"
+  ]
+}

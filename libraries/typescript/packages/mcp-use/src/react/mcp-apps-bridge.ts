@@ -67,6 +67,10 @@ interface ToolInputNotification {
   arguments: Record<string, unknown>;
 }
 
+interface ToolInputPartialNotification {
+  arguments: Record<string, unknown>;
+}
+
 interface ToolResultNotification {
   content?: Array<{
     type: string;
@@ -92,12 +96,16 @@ class McpAppsBridge {
 
   // State
   private toolInput: Record<string, unknown> | null = null;
+  private partialToolInput: Record<string, unknown> | null = null;
   private toolOutput: Record<string, unknown> | null = null;
   private hostContext: HostContext | null = null;
   private initialized = false;
 
   // Event handlers
   private toolInputHandlers = new Set<
+    (input: Record<string, unknown>) => void
+  >();
+  private toolInputPartialHandlers = new Set<
     (input: Record<string, unknown>) => void
   >();
   private toolResultHandlers = new Set<
@@ -311,7 +319,23 @@ class McpAppsBridge {
         const params = notification.params as unknown as ToolInputNotification;
         console.log("[MCP Apps Bridge] Tool input received:", params.arguments);
         this.toolInput = params.arguments;
+        // Don't clear partialToolInput here — React batches state updates from
+        // both tool-input-partial and tool-input handlers, so isStreaming would
+        // never be true during a render. Let tool-result clear it instead.
         this.toolInputHandlers.forEach((handler) => handler(params.arguments));
+        break;
+      }
+      case "ui/notifications/tool-input-partial": {
+        const params =
+          notification.params as unknown as ToolInputPartialNotification;
+        console.log(
+          "[MCP Apps Bridge] Partial tool input received:",
+          params.arguments
+        );
+        this.partialToolInput = params.arguments;
+        this.toolInputPartialHandlers.forEach((handler) =>
+          handler(params.arguments)
+        );
         break;
       }
       case "ui/notifications/tool-result": {
@@ -321,6 +345,8 @@ class McpAppsBridge {
           params.structuredContent || this.parseTextContent(params);
         console.log("[MCP Apps Bridge] Tool result received:", output);
         this.toolOutput = output;
+        // Clear streaming partial now that tool execution is complete
+        this.partialToolInput = null;
         this.toolResultHandlers.forEach((handler) => handler(output));
         break;
       }
@@ -470,6 +496,13 @@ class McpAppsBridge {
   }
 
   /**
+   * Get current partial/streaming tool input
+   */
+  getPartialToolInput(): Record<string, unknown> | null {
+    return this.partialToolInput;
+  }
+
+  /**
    * Get current tool output
    */
   getToolOutput(): Record<string, unknown> | null {
@@ -489,6 +522,16 @@ class McpAppsBridge {
   onToolInput(handler: (input: Record<string, unknown>) => void): () => void {
     this.toolInputHandlers.add(handler);
     return () => this.toolInputHandlers.delete(handler);
+  }
+
+  /**
+   * Subscribe to partial/streaming tool input changes
+   */
+  onToolInputPartial(
+    handler: (input: Record<string, unknown>) => void
+  ): () => void {
+    this.toolInputPartialHandlers.add(handler);
+    return () => this.toolInputPartialHandlers.delete(handler);
   }
 
   /**
@@ -562,6 +605,7 @@ class McpAppsBridge {
     this.listeners.clear();
     this.pendingRequests.clear();
     this.toolInputHandlers.clear();
+    this.toolInputPartialHandlers.clear();
     this.toolResultHandlers.clear();
     this.hostContextHandlers.clear();
     this.connected = false;
@@ -584,4 +628,9 @@ export function getMcpAppsBridge(): McpAppsBridge {
 /**
  * Type exports
  */
-export type { HostContext, ToolInputNotification, ToolResultNotification };
+export type {
+  HostContext,
+  ToolInputNotification,
+  ToolInputPartialNotification,
+  ToolResultNotification,
+};

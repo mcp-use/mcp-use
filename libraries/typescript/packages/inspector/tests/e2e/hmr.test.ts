@@ -8,8 +8,10 @@ import {
   CONFORMANCE_SERVER_PATH,
   CONFORMANCE_WEATHER_WIDGET_PATH,
   readConformanceFile,
+  removeConformanceResourceDir,
   restoreFile,
   writeConformanceFile,
+  writeConformanceResourceFile,
 } from "./helpers/file-utils";
 import { skipIfNotSupported } from "./helpers/test-matrix";
 
@@ -19,6 +21,8 @@ test.describe("HMR (Hot Module Reload)", () => {
 
   let originalServerContent: string | null = null;
   let originalWidgetContent: string | null = null;
+  let hmrTestWidgetCreated = false;
+  let hmrReaddWidgetCreated = false;
 
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
@@ -33,6 +37,14 @@ test.describe("HMR (Hot Module Reload)", () => {
     if (originalWidgetContent !== null) {
       await restoreFile(originalWidgetContent, CONFORMANCE_WEATHER_WIDGET_PATH);
       originalWidgetContent = null;
+    }
+    if (hmrTestWidgetCreated) {
+      await removeConformanceResourceDir("hmr-test-widget");
+      hmrTestWidgetCreated = false;
+    }
+    if (hmrReaddWidgetCreated) {
+      await removeConformanceResourceDir("hmr-readd-widget");
+      hmrReaddWidgetCreated = false;
     }
     // Wait for HMR to complete after file restoration
     // This ensures the server is stable before the next test starts
@@ -132,6 +144,165 @@ server.tool(
     // Execute the tool to verify it still works after HMR
     await page.getByTestId("tool-execution-execute-button").click();
     await expect(page.getByText(/Echo:/)).toBeVisible({ timeout: 5000 });
+  });
+
+  test("tool handler logic change - new logic runs after HMR", async ({
+    page,
+  }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    const content = await readConformanceFile();
+    // Change only the handler logic: add .toUpperCase() to the message
+    // Name, description, and schema remain identical
+    const newContent = content.replace(
+      /text\(`Echo: \$\{message\}`\)/,
+      // eslint-disable-next-line no-template-curly-in-string
+      "text(`Echo: ${message.toUpperCase()}`)"
+    );
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    await page.getByTestId("tool-item-test_simple_text").click();
+    await page.getByTestId("tool-param-message").fill("hello");
+    await page.getByTestId("tool-execution-execute-button").click();
+    await expect(page.getByText("Echo: HELLO")).toBeVisible({ timeout: 5000 });
+  });
+
+  test("tool handler change - text to widget after HMR", async ({ page }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    const content = await readConformanceFile();
+    // Replace the test_simple_text tool: change from returning text() to widget()
+    // Reuses the existing weather-display widget build
+    const oldToolBlock = `// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().optional(),
+    }),
+  },
+  async ({ message = "Hello, World!" }: { message?: string }) =>
+    text(\`Echo: \${message}\`)
+);`;
+    const newToolBlock = `// tools-call-simple-text (message is optional)
+server.tool(
+  {
+    name: "test_simple_text",
+    description: "A simple tool that returns text content",
+    schema: z.object({
+      message: z.string().optional(),
+    }),
+    widget: {
+      name: "weather-display",
+    },
+  },
+  async ({ message = "Hello, World!" }: { message?: string }) =>
+    widget({ props: { city: message, temperature: 99, conditions: "HMR Test", humidity: 50, windSpeed: 5 }, message: \`Widget: \${message}\` })
+);`;
+    const newContent = content.replace(oldToolBlock, newToolBlock);
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    await page.getByTestId("tool-item-test_simple_text").click();
+    await page.getByTestId("tool-param-message").fill("hmr-city");
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    // The tool now returns a widget, so the widget view tabs should appear
+    await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Verify widget loads in MCP Apps iframe
+    await page.getByTestId("tool-result-view-mcp-apps").click();
+    const mcpAppsOuter = page.frameLocator(
+      'iframe[title^="MCP App: test_simple_text"]'
+    );
+    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+    await expect(mcpAppsGuest.getByText("HMR Test")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
+  test("tool handler change - widget to text after HMR", async ({ page }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    const content = await readConformanceFile();
+    // Replace get-weather-delayed: change from returning widget() to text()
+    // Remove the widget config and simplify the handler
+    const oldToolBlock = `server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city, delay }) => {
+    await sleep(delay);
+
+    const cityLower = city.toLowerCase();
+    const weather = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "Unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    return widget({
+      props: {
+        city,
+        ...weather,
+      },
+      message: \`Current weather in \${city}: \${weather.conditions}, \${weather.temperature}°C (fetched after \${delay}ms delay)\`,
+    });
+  }
+);`;
+    const newToolBlock = `server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+  },
+  async ({ city }) => {
+    return text(\`Weather for \${city}: sunny\`);
+  }
+);`;
+    const newContent = content.replace(oldToolBlock, newToolBlock);
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    await page.getByTestId("tool-item-get-weather-delayed").click();
+    await page.getByTestId("tool-param-city").fill("tokyo");
+    await page.getByTestId("tool-param-delay").fill("100");
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    // The tool now returns text, not a widget
+    await expect(page.getByText("Weather for tokyo: sunny")).toBeVisible({
+      timeout: 10000,
+    });
+    // Widget view tabs should not appear
+    await expect(
+      page.getByTestId("tool-result-view-chatgpt-app")
+    ).not.toBeVisible({ timeout: 3000 });
   });
 
   test("tool schema change - add parameter and test execution", async ({
@@ -957,6 +1128,196 @@ server.resource(
       await expect(page.getByText("This is static text content")).toBeVisible({
         timeout: 5000,
       });
+    });
+  });
+
+  // ==========================================================================
+  // HMR - Widget Resource Propagation (regression test for session propagation fix)
+  // ==========================================================================
+
+  test.describe("HMR - Widget Resource Propagation", () => {
+    test("widget resource addition - new widget file triggers resource registration, then tool with widget works", async ({
+      page,
+    }) => {
+      originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+      // Step 1: Add a new widget file to the resources directory while the server is running.
+      // This triggers the file watcher which should register the widget resource and
+      // propagate it to existing sessions (the bug we fixed).
+      const widgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import React from "react";
+import { z } from "zod";
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "HMR test widget",
+  props: z.object({
+    message: z.string().describe("Message to display"),
+  }),
+};
+
+function Inner() {
+  const { props } = useWidget();
+  return <div>HMR Widget: {props?.message || "no message"}</div>;
+}
+
+export default function HmrTestWidget() {
+  return (
+    <McpUseProvider>
+      <Inner />
+    </McpUseProvider>
+  );
+}
+`;
+      await writeConformanceResourceFile(
+        "hmr-test-widget",
+        "widget.tsx",
+        widgetContent
+      );
+      hmrTestWidgetCreated = true;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      // Step 2: Verify the widget resource appears in the Resources tab.
+      // This is the core regression assertion: previously, resources were registered
+      // in the MCPServer wrapper but never pushed to existing sessions, so the
+      // inspector would not see them until a reconnect.
+      await page
+        .getByRole("tab", { name: /Resources/ })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Resources" })
+      ).toBeVisible();
+
+      await expect(
+        page.getByTestId("resource-item-hmr-test-widget")
+      ).toBeVisible({ timeout: 15000 });
+
+      // Step 3: Edit server.ts to add a tool that returns this widget
+      const content = await readConformanceFile();
+      const hmrToolSnippet = `
+server.tool(
+  {
+    name: "hmr-widget-tool",
+    description: "Tool using dynamically added widget",
+    schema: z.object({
+      message: z.string().describe("Message to display"),
+    }),
+    widget: { name: "hmr-test-widget" },
+  },
+  async ({ message }: { message: string }) =>
+    widget({ props: { message }, message: \`Widget: \${message}\` })
+);
+`;
+      const newContent = content.replace(
+        "await server.listen();",
+        `${hmrToolSnippet}\nawait server.listen();`
+      );
+      await writeConformanceFile(newContent);
+      await waitForHMRReload(page);
+
+      // Step 4: Navigate to Tools tab and execute the tool
+      await page.getByRole("tab", { name: /Tools/ }).first().click();
+      await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+
+      await expect(page.getByTestId("tool-item-hmr-widget-tool")).toBeVisible({
+        timeout: 10000,
+      });
+
+      await page.getByTestId("tool-item-hmr-widget-tool").click();
+      await page.getByTestId("tool-param-message").fill("hello from HMR");
+      await page.getByTestId("tool-execution-execute-button").click();
+
+      // The tool returns a widget, so the widget view tabs should appear
+      await expect(
+        page.getByTestId("tool-result-view-chatgpt-app")
+      ).toBeVisible({ timeout: 15000 });
+
+      // Verify widget renders in MCP Apps iframe
+      await page.getByTestId("tool-result-view-mcp-apps").click();
+      const mcpAppsOuter = page.frameLocator(
+        'iframe[title^="MCP App: hmr-widget-tool"]'
+      );
+      const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+      await expect(
+        mcpAppsGuest.getByText("HMR Widget: hello from HMR")
+      ).toBeVisible({ timeout: 15000 });
+    });
+
+    test("widget resource deletion and re-addition re-registers resource for existing session", async ({
+      page,
+    }) => {
+      const widgetName = "hmr-readd-widget";
+      const firstWidgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import React from "react";
+import { z } from "zod";
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "HMR re-add test widget",
+  props: z.object({
+    message: z.string().describe("Message to display"),
+  }),
+};
+
+function Inner() {
+  const { props } = useWidget();
+  return <div>Readd Widget V1: {props?.message || "no message"}</div>;
+}
+
+export default function HmrReaddWidget() {
+  return (
+    <McpUseProvider>
+      <Inner />
+    </McpUseProvider>
+  );
+}
+`;
+
+      const secondWidgetContent = firstWidgetContent.replace(
+        "Readd Widget V1:",
+        "Readd Widget V2:"
+      );
+
+      // Step 1: add widget and verify it appears as a resource.
+      await writeConformanceResourceFile(
+        widgetName,
+        "widget.tsx",
+        firstWidgetContent
+      );
+      hmrReaddWidgetCreated = true;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      await page
+        .getByRole("tab", { name: /Resources/ })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Resources" })
+      ).toBeVisible();
+      await expect(
+        page.getByTestId("resource-item-hmr-readd-widget")
+      ).toBeVisible({ timeout: 15000 });
+
+      // Step 2: delete widget and verify resource disappears.
+      await removeConformanceResourceDir(widgetName);
+      hmrReaddWidgetCreated = false;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      await expect(
+        page.getByTestId("resource-item-hmr-readd-widget")
+      ).not.toBeVisible({ timeout: 15000 });
+
+      // Step 3: re-add same widget name; resource must re-appear for the same session.
+      await writeConformanceResourceFile(
+        widgetName,
+        "widget.tsx",
+        secondWidgetContent
+      );
+      hmrReaddWidgetCreated = true;
+      await waitForHMRReload(page, { minMs: 5000 });
+
+      await expect(
+        page.getByTestId("resource-item-hmr-readd-widget")
+      ).toBeVisible({ timeout: 15000 });
     });
   });
 });

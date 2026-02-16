@@ -41,8 +41,10 @@ export interface WidgetInfo {
   widgetState?: any;
 }
 
+export type DeviceType = "mobile" | "tablet" | "desktop" | "custom";
+
 export interface PlaygroundSettings {
-  deviceType: "mobile" | "tablet" | "desktop" | "custom";
+  deviceType: DeviceType;
   customViewport: { width: number; height: number };
   cspMode: "permissive" | "widget-declared";
   displayModeOverride: "inline" | "pip" | "fullscreen" | null;

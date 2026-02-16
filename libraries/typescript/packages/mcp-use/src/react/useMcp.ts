@@ -1,4 +1,7 @@
 // useMcp.ts
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { probeAuthParams } from "../auth/probe-www-auth.js";
 import type {
   Prompt,
   Resource,
@@ -6,15 +9,21 @@ import type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
 import { BrowserMCPClient } from "../client/browser.js";
-import { Logger, type LogLevel } from "../logging.js";
+import { Logger, type LogLevel, logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
 import { applyProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { getPackageVersion } from "../version.js";
+import {
+  createBrowserOAuthProvider,
+  deriveOAuthClientConfigFromClientInfo,
+  isOAuthDiscoveryFailure,
+  startConnectionHealthMonitoring,
+  USE_MCP_SERVER_NAME,
+} from "./useMcp-helpers.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
@@ -23,56 +32,15 @@ const DEFAULT_RETRY_DELAY = 5000;
 // Define Transport types literal for clarity
 type TransportType = "http" | "sse";
 
-/**
- * Derives clientConfig from clientInfo for OAuth registration.
- * This allows clientInfo to be the single source of truth.
- */
-function deriveClientConfigFromClientInfo(clientInfo: {
-  name: string;
-  title?: string;
-  version: string;
-  description?: string;
-  icons?: Array<{
-    src: string;
-    mimeType?: string;
-    sizes?: string[];
-  }>;
-  websiteUrl?: string;
-}): {
-  name?: string;
-  version?: string;
-  uri?: string;
-  logo_uri?: string;
-} {
-  return {
-    name: clientInfo.name,
-    version: clientInfo.version,
-    uri: clientInfo.websiteUrl,
-    logo_uri: clientInfo.icons?.[0]?.src,
-  };
-}
-
-/**
- * Detects if an error is related to OAuth discovery failure.
- * OAuth discovery failures typically occur when the SDK tries to auto-discover
- * OAuth endpoints (like /.well-known/oauth-authorization-server) and gets 404s.
- */
-function isOAuthDiscoveryFailure(error: Error | unknown): boolean {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const msg = errorMessage.toLowerCase();
-
-  return (
-    msg.includes("oauth discovery failed") ||
-    msg.includes("oauth-authorization-server") ||
-    msg.includes("not valid json") ||
-    (msg.includes("404") &&
-      (msg.includes("openid-configuration") ||
-        msg.includes("oauth-protected-resources") ||
-        msg.includes("oauth-authorization-url") ||
-        msg.includes("register"))) ||
-    (msg.includes("invalid oauth error response") && msg.includes("not found"))
-  );
-}
+type UseMcpAuthProvider = OAuthClientProvider & {
+  tokens?: () => Promise<
+    { access_token?: string; [key: string]: unknown } | undefined
+  >;
+  clearStorage?: () => number;
+  getLastAttemptedAuthUrl?: () => string | null | undefined;
+  installFetchInterceptor?: () => void;
+  serverUrl?: string;
+};
 
 /**
  * React hook for connecting to and interacting with MCP servers
@@ -116,6 +84,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
     clientConfig = {},
+    authProvider: providedAuthProvider,
     headers: headersOption,
     customHeaders: customHeadersOption,
     proxyConfig,
@@ -131,10 +100,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
+    fetch: customFetch,
     onNotification,
     onSampling: onSamplingOption,
     samplingCallback: samplingCallbackOption,
-    onElicitation,
+    onElicitation: onElicitationOption,
+    elicitationCallback: elicitationCallbackOption,
   } = options;
 
   // Create a per-instance logger so multiple useMcp instances don't clobber each other's log level.
@@ -166,6 +137,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     );
   }
 
+  const onElicitation = onElicitationOption ?? elicitationCallbackOption;
+  if (elicitationCallbackOption && !onElicitationOption) {
+    logger.warn(
+      '[useMcp] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
+    );
+  }
+
   // Build clientInfo with defaults, merging with provided clientInfo
   const defaultClientInfo = useMemo(
     () => ({
@@ -192,24 +170,24 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     [options.clientInfo, defaultClientInfo]
   );
 
-  // Derive clientConfig from clientInfo (deprecate explicit clientConfig)
-  const derivedClientConfig = useMemo(
-    () => deriveClientConfigFromClientInfo(mergedClientInfo),
+  // Derive OAuth client registration config from clientInfo.
+  const derivedOAuthClientConfig = useMemo(
+    () => deriveOAuthClientConfigFromClientInfo(mergedClientInfo),
     [mergedClientInfo]
   );
 
-  // Use explicit clientConfig if provided (with deprecation warning), otherwise use derived
-  const finalClientConfig = useMemo(() => {
+  // Use explicit clientConfig if provided (with deprecation warning), otherwise use derived.
+  const oauthClientConfig = useMemo(() => {
     if (clientConfig && Object.keys(clientConfig).length > 0) {
       instanceLogger.warn(
         "[useMcp] The 'clientConfig' option is deprecated and will be removed in a future version. " +
         "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
       );
       // Merge derived config with explicit config (explicit takes precedence for backward compatibility)
-      return { ...derivedClientConfig, ...clientConfig };
+      return { ...derivedOAuthClientConfig, ...clientConfig };
     }
-    return derivedClientConfig;
-  }, [clientConfig, derivedClientConfig]);
+    return derivedOAuthClientConfig;
+  }, [clientConfig, derivedOAuthClientConfig]);
 
   // Parse autoProxyFallback configuration
   const autoProxyFallbackConfig = useMemo(() => {
@@ -283,7 +261,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useState<UseMcpResult["authTokens"]>(undefined);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
-  const authProviderRef = useRef<BrowserOAuthClientProvider | null>(null);
+  const authProviderRef = useRef<UseMcpAuthProvider | null>(
+    (providedAuthProvider as UseMcpAuthProvider | undefined) ?? null
+  );
   const iconLoadingPromiseRef = useRef<Promise<string | null> | null>(null);
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
@@ -309,6 +289,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     stateRef.current = state;
     autoReconnectRef.current = autoReconnect;
   }, [state, autoReconnect]);
+
+  useEffect(() => {
+    authProviderRef.current =
+      (providedAuthProvider as UseMcpAuthProvider | undefined) ?? null;
+  }, [providedAuthProvider]);
 
   // --- Stable Callbacks ---
   /**
@@ -369,7 +354,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
       if (clientRef.current) {
         try {
-          const serverName = "inspector-server";
+          const serverName = USE_MCP_SERVER_NAME;
           const session = clientRef.current.getSession(serverName);
 
           // Clean up health check monitoring if it exists
@@ -455,9 +440,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           `Direct connection failed with ${errorType}. Trying with proxy...`
         );
 
-        // Clear client and auth provider refs to force fresh initialization with proxy
+        // Clear client/auth refs to force fresh initialization with proxy.
+        // Keep externally provided auth providers intact.
         clientRef.current = null;
-        authProviderRef.current = null;
+        if (!providedAuthProvider) {
+          authProviderRef.current = null;
+        }
         addLog("debug", "Cleared client and auth provider for proxy fallback");
 
         // Set proxy configuration and trigger reconnect
@@ -486,7 +474,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         instanceLogger.info("[useMcp] Setting state to FAILED:", errorMessage);
         setState("failed");
         setError(errorMessage);
-        const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
+        const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl?.();
         if (manualUrl) {
           setAuthUrl(manualUrl);
           addLog(
@@ -523,6 +511,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       onElicitation,
       autoProxyFallbackConfig,
       effectiveProxyConfig,
+      providedAuthProvider,
     ]
   );
 
@@ -574,47 +563,28 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     // - By the state expiry check in the callback handler
 
     if (!authProviderRef.current) {
-      // Determine OAuth proxy URL based on gateway configuration
-      // If a proxy is configured, use the same base URL with /oauth path
-      let oauthProxyUrl: string | undefined;
-      if (gatewayUrl) {
-        // Extract base URL from gateway URL (e.g., "http://localhost:3001/inspector/api/proxy" -> "http://localhost:3001/inspector/api/oauth")
-        const gatewayUrlObj = new URL(gatewayUrl);
-        const basePath = gatewayUrlObj.pathname.replace(/\/proxy\/?$/, "");
-        oauthProxyUrl = `${gatewayUrlObj.origin}${basePath}/oauth`;
+      const { provider, oauthProxyUrl } = createBrowserOAuthProvider({
+        effectiveOAuthUrl,
+        storageKeyPrefix,
+        oauthClientConfig,
+        callbackUrl,
+        preventAutoAuth,
+        useRedirectFlow,
+        gatewayUrl,
+        onPopupWindow,
+        installFetchInterceptor: true,
+      });
+      authProviderRef.current = provider;
+      if (oauthProxyUrl) {
         addLog(
           "debug",
           `OAuth proxy URL derived from gateway: ${oauthProxyUrl}`
         );
       }
-
-      authProviderRef.current = new BrowserOAuthClientProvider(
-        effectiveOAuthUrl,
-        {
-          storageKeyPrefix,
-          clientName: finalClientConfig.name,
-          clientUri: finalClientConfig.uri,
-          logoUri: finalClientConfig.logo_uri || "https://mcp-use.com/logo.png",
-          callbackUrl,
-          preventAutoAuth,
-          useRedirectFlow,
-          oauthProxyUrl,
-          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
-          onPopupWindow,
-        }
-      );
       addLog(
         "debug",
         `BrowserOAuthClientProvider initialized with URL: ${effectiveOAuthUrl}, proxy: ${oauthProxyUrl ? "enabled" : "disabled"}, gateway: ${gatewayUrl ? "enabled" : "disabled"}`
       );
-
-      // Install fetch interceptor for OAuth requests if using proxy
-      // This is needed even when using MCP gateway because OAuth requests
-      // go to the ORIGINAL target URLs, not through the gateway
-      if (oauthProxyUrl) {
-        authProviderRef.current.installFetchInterceptor();
-        addLog("debug", "Installed OAuth fetch interceptor");
-      }
     }
     if (!clientRef.current) {
       clientRef.current = new BrowserMCPClient();
@@ -624,8 +594,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
 
     const tryConnectWithTransport = async (
-      transportTypeParam: TransportType,
-      isAuthRetry = false
+      transportTypeParam: TransportType
     ): Promise<"success" | "fallback" | "auth_redirect" | "failed"> => {
       // Check if component unmounted
       if (!isMountedRef.current) {
@@ -643,7 +612,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       );
 
       try {
-        const serverName = "inspector-server";
+        const serverName = USE_MCP_SERVER_NAME;
 
         // Build server config
         const serverConfig: any = {
@@ -655,6 +624,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
+          // Pass custom fetch if provided (e.g., OAuth retry fetch for scope-step-up)
+          ...(customFetch && { fetch: customFetch }),
         };
 
         // Add gateway URL if using proxy
@@ -673,7 +644,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Add OAuth token if available
         if (authProviderRef.current) {
-          const tokens = await authProviderRef.current.tokens();
+          const tokens = await authProviderRef.current.tokens?.();
           if (!isMountedRef.current) {
             addLog(
               "debug",
@@ -711,14 +682,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Add server to client with OAuth provider
         // Include wrapTransport if provided
-        // Pass derived clientConfig as clientOptions so connector can set up capabilities
         clientRef.current.addServer(serverName, {
           ...serverConfig,
-          authProvider: authProviderRef.current, // ← SDK handles OAuth automatically!
-          clientOptions: finalClientConfig, // ← Pass client config (derived from clientInfo) to connector
-          onSampling: onSampling, // ← Pass sampling callback to connector
-          samplingCallback: onSampling, // ← Backward compatibility: also pass as old name
-          elicitationCallback: onElicitation, // ← Pass elicitation callback to connector
+          authProvider: authProviderRef.current,
+          onSampling,
+          onElicitation,
           wrapTransport: wrapTransport
             ? (transport: any) => {
               addLog(
@@ -809,96 +777,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
-        // Set up connection health monitoring
-        // This detects when the SSE stream is broken (e.g., server restart) and triggers reconnection
-        const setupConnectionMonitoring = () => {
-          let healthCheckInterval: NodeJS.Timeout | null = null;
-          let lastSuccessfulCheck = Date.now();
-          const HEALTH_CHECK_INTERVAL = 10000; // Check every 10 seconds
-          const HEALTH_CHECK_TIMEOUT = 30000; // Consider dead after 30 seconds of no response
-
-          const checkConnectionHealth = async () => {
-            if (!isMountedRef.current || stateRef.current !== "ready") {
-              if (healthCheckInterval) {
-                clearInterval(healthCheckInterval);
-                healthCheckInterval = null;
-              }
-              return;
-            }
-
-            try {
-              // Perform a HEAD request to check if server is responsive
-              // This avoids MCP protocol overhead and is truly lightweight
-              const healthCheckUrl = gatewayUrl || url;
-              const response = await fetch(healthCheckUrl, {
-                method: "HEAD",
-                headers: allHeaders,
-                signal: AbortSignal.timeout(5000), // 5 second timeout for health check
-              });
-
-              if (response.ok || response.status < 500) {
-                // Any non-5xx response means server is reachable
-                lastSuccessfulCheck = Date.now();
-              } else {
-                throw new Error(`Server returned ${response.status}`);
-              }
-            } catch (err) {
-              const timeSinceLastSuccess = Date.now() - lastSuccessfulCheck;
-
-              // If we haven't had a successful check in a while, consider connection dead
-              if (timeSinceLastSuccess > HEALTH_CHECK_TIMEOUT) {
-                addLog(
-                  "warn",
-                  `Connection appears to be broken (no response for ${Math.round(timeSinceLastSuccess / 1000)}s), attempting to reconnect...`
-                );
-
-                if (healthCheckInterval) {
-                  clearInterval(healthCheckInterval);
-                  healthCheckInterval = null;
-                }
-
-                // Trigger reconnection if autoReconnect is enabled
-                if (autoReconnectRef.current && isMountedRef.current) {
-                  setState("discovering");
-                  addLog("info", "Auto-reconnecting to MCP server...");
-
-                  // Small delay before reconnecting
-                  setTimeout(
-                    () => {
-                      if (
-                        isMountedRef.current &&
-                        stateRef.current === "discovering"
-                      ) {
-                        connect();
-                      }
-                    },
-                    typeof autoReconnectRef.current === "number"
-                      ? autoReconnectRef.current
-                      : DEFAULT_RECONNECT_DELAY
-                  );
-                }
-              }
-            }
-          };
-
-          // Start health check interval
-          healthCheckInterval = setInterval(
-            checkConnectionHealth,
-            HEALTH_CHECK_INTERVAL
-          );
-
-          // Return cleanup function
-          return () => {
-            if (healthCheckInterval) {
-              clearInterval(healthCheckInterval);
-              healthCheckInterval = null;
-            }
-          };
-        };
-
         // Only set up monitoring if autoReconnect is enabled
         if (autoReconnect) {
-          const cleanup = setupConnectionMonitoring();
+          const cleanup = startConnectionHealthMonitoring({
+            gatewayUrl,
+            url,
+            allHeaders,
+            isMountedRef,
+            stateRef,
+            autoReconnectRef,
+            setState,
+            addLog,
+            connect,
+            defaultReconnectDelay: DEFAULT_RECONNECT_DELAY,
+          });
 
           // Store cleanup function for later
           (session as any)._healthCheckCleanup = cleanup;
@@ -1026,7 +918,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Get OAuth tokens if authentication was used
         if (authProviderRef.current) {
-          const tokens = await authProviderRef.current.tokens();
+          const tokens = await authProviderRef.current.tokens?.();
           if (!isMountedRef.current) {
             addLog(
               "debug",
@@ -1116,34 +1008,92 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // OAuth discovery didn't fail, so OAuth might be available
           // Check if OAuth provider is configured
           if (authProviderRef.current) {
-            // OAuth is configured - enter pending_auth state
+            // OAuth is configured
             addLog(
               "info",
               "Authentication required. OAuth provider available."
             );
 
-            // Don't trigger auth flow automatically - let the user click "Authenticate"
-            // This prevents unnecessary metadata discovery requests that may fail with CORS/404
-            addLog(
-              "info",
-              "Waiting for user to initiate authentication flow..."
-            );
+            // Check if we should trigger auth automatically or wait for user
+            if (preventAutoAuth) {
+              // Don't trigger auth flow automatically - let the user click "Authenticate"
+              // This prevents unnecessary metadata discovery requests that may fail with CORS/404
+              addLog(
+                "info",
+                "Waiting for user to initiate authentication flow..."
+              );
 
-            if (isMountedRef.current) {
-              setState("pending_auth");
-              // Retrieve the stored auth URL if it was prepared during OAuth discovery
-              const storedAuthUrl =
-                authProviderRef.current?.getLastAttemptedAuthUrl();
-              if (storedAuthUrl) {
-                setAuthUrl(storedAuthUrl);
-                addLog(
-                  "info",
-                  "Retrieved stored auth URL for manual authentication"
+              if (isMountedRef.current) {
+                setState("pending_auth");
+                // Retrieve the stored auth URL if it was prepared during OAuth discovery
+                const storedAuthUrl =
+                  authProviderRef.current?.getLastAttemptedAuthUrl?.();
+                if (storedAuthUrl) {
+                  setAuthUrl(storedAuthUrl);
+                  addLog(
+                    "info",
+                    "Retrieved stored auth URL for manual authentication"
+                  );
+                }
+              }
+              connectingRef.current = false;
+              return "auth_redirect";
+            } else {
+              // preventAutoAuth is false - trigger auth flow automatically
+              addLog(
+                "info",
+                "Triggering automatic OAuth authentication flow..."
+              );
+
+              try {
+                // Probe for WWW-Authenticate params (scope, resource_metadata) from 401
+                const { resourceMetadataUrl, scope } =
+                  await probeAuthParams(url);
+
+                // Step 1: Call auth() to trigger redirectToAuthorization and OAuth discovery
+                const authResult = await auth(authProviderRef.current, {
+                  serverUrl: url,
+                  ...(resourceMetadataUrl && { resourceMetadataUrl }),
+                  ...(scope && { scope }),
+                });
+
+                if (authResult === "REDIRECT") {
+                  // Step 2: Get the authorization code that was captured during redirectToAuthorization
+                  const authCode = await (
+                    authProviderRef.current as any
+                  ).getAuthorizationCode?.();
+                  if (!authCode) {
+                    throw new Error(
+                      "Authorization code not captured by headless provider"
+                    );
+                  }
+
+                  // Step 3: Complete the OAuth flow by exchanging code for tokens
+                  await auth(authProviderRef.current, {
+                    serverUrl: url,
+                    ...(resourceMetadataUrl && { resourceMetadataUrl }),
+                    ...(scope && { scope }),
+                    authorizationCode: authCode,
+                  });
+                }
+
+                addLog("info", "OAuth flow completed, reconnecting...");
+                // Reconnect after successful auth
+                return await tryConnectWithTransport(transportTypeParam);
+              } catch (authError) {
+                const authErrorMessage =
+                  authError instanceof Error
+                    ? authError.message
+                    : String(authError);
+                failConnection(
+                  `Automatic OAuth authentication failed: ${authErrorMessage}`,
+                  authError instanceof Error
+                    ? authError
+                    : new Error(String(authError))
                 );
+                return "failed";
               }
             }
-            connectingRef.current = false;
-            return "auth_redirect";
           }
 
           // Check if custom headers were provided (invalid credentials)
@@ -1219,10 +1169,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     url,
     storageKeyPrefix,
     callbackUrl,
-    finalClientConfig.name,
-    finalClientConfig.version,
-    finalClientConfig.uri,
-    finalClientConfig.logo_uri,
+    oauthClientConfig.name,
+    oauthClientConfig.version,
+    oauthClientConfig.uri,
+    oauthClientConfig.logo_uri,
     headers,
     transportType,
     preventAutoAuth,
@@ -1291,7 +1241,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       addLog("info", `Calling tool: ${name}`, args);
       const startTime = Date.now();
       try {
-        const serverName = "inspector-server";
+        const serverName = USE_MCP_SERVER_NAME;
         const session = clientRef.current.getSession(serverName);
         if (!session) {
           throw new Error("No active session found");
@@ -1381,8 +1331,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
         assert(url, "Server URL is required for authentication");
 
+        if (providedAuthProvider) {
+          addLog(
+            "info",
+            "Using provided authProvider for manual authentication"
+          );
+          const baseUrl = new URL(url).origin;
+          await auth(authProviderRef.current, {
+            serverUrl: baseUrl,
+          });
+          connectRef.current?.();
+          return;
+        }
+
         // Clear OAuth storage to ensure fresh authentication flow
-        const clearedCount = authProviderRef.current.clearStorage();
+        const clearedCount = authProviderRef.current.clearStorage?.() ?? 0;
         addLog(
           "info",
           `Cleared ${clearedCount} OAuth storage item(s) for fresh authentication`
@@ -1391,35 +1354,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Update state to authenticating before redirect
         setState("authenticating");
 
-        // Determine OAuth proxy URL
-        let oauthProxyUrl: string | undefined;
-        if (gatewayUrl) {
-          const gatewayUrlObj = new URL(gatewayUrl);
-          const basePath = gatewayUrlObj.pathname.replace(/\/proxy\/?$/, "");
-          oauthProxyUrl = `${gatewayUrlObj.origin}${basePath}/oauth`;
-        }
-
         // Recreate the auth provider WITHOUT preventAutoAuth
-        const freshAuthProvider = new BrowserOAuthClientProvider(
-          effectiveOAuthUrl,
-          {
+        const { provider: freshAuthProvider, oauthProxyUrl } =
+          createBrowserOAuthProvider({
+            effectiveOAuthUrl,
             storageKeyPrefix,
-            clientName: finalClientConfig.name,
-            clientUri: finalClientConfig.uri,
-            logoUri:
-              finalClientConfig.logo_uri || "https://mcp-use.com/logo.png",
+            oauthClientConfig,
             callbackUrl,
-            preventAutoAuth: false, // ← Allow OAuth to proceed
+            preventAutoAuth: false,
             useRedirectFlow,
-            oauthProxyUrl,
-            connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
+            gatewayUrl,
             onPopupWindow,
-          }
-        );
+            installFetchInterceptor: !gatewayUrl,
+          });
 
-        // Install fetch interceptor ONLY if using OAuth proxy AND NOT using MCP gateway
         if (oauthProxyUrl && !gatewayUrl) {
-          freshAuthProvider.installFetchInterceptor();
           addLog("info", "Installed OAuth fetch interceptor for manual auth");
         } else if (oauthProxyUrl && gatewayUrl) {
           addLog(
@@ -1434,10 +1383,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         addLog("info", "Triggering fresh OAuth authorization...");
 
         // Generate a fresh authorization URL and redirect immediately
-        // We need to manually trigger what the SDK would do
-        const { auth } =
-          await import("@modelcontextprotocol/sdk/client/auth.js");
-
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const baseUrl = new URL(url).origin;
@@ -1457,7 +1402,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Update authUrl with the new URL from the fresh provider
         // This is critical for the fallback link when popup is blocked
-        const newAuthUrl = freshAuthProvider.getLastAttemptedAuthUrl();
+        const newAuthUrl = freshAuthProvider.getLastAttemptedAuthUrl?.();
         if (newAuthUrl) {
           setAuthUrl(newAuthUrl);
           addLog("info", "Updated auth URL for fallback:", newAuthUrl);
@@ -1475,7 +1420,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         "warn",
         "Already attempting authentication. Check for blocked popups or wait for timeout."
       );
-      const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl();
+      const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl?.();
       if (manualUrl && !authUrl) {
         setAuthUrl(manualUrl);
         addLog("info", "Manual authentication URL retrieved:", manualUrl);
@@ -1494,11 +1439,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useRedirectFlow,
     onPopupWindow,
     storageKeyPrefix,
-    finalClientConfig.name,
-    finalClientConfig.uri,
-    finalClientConfig.logo_uri,
+    oauthClientConfig.name,
+    oauthClientConfig.uri,
+    oauthClientConfig.logo_uri,
     callbackUrl,
     mergedClientInfo,
+    providedAuthProvider,
   ]);
 
   /**
@@ -1512,7 +1458,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    * ```
    */
   const clearStorage = useCallback(() => {
-    if (authProviderRef.current) {
+    if (authProviderRef.current?.clearStorage) {
       const count = authProviderRef.current.clearStorage();
       addLog("info", `Cleared ${count} item(s) from localStorage for ${url}.`);
       setAuthUrl(undefined);
@@ -1544,7 +1490,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
     addLog("info", "Listing resources");
     try {
-      const serverName = "inspector-server";
+      const serverName = USE_MCP_SERVER_NAME;
       const session = clientRef.current.getSession(serverName);
       if (!session) {
         throw new Error("No active session found");
@@ -1580,7 +1526,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       }
       addLog("info", `Reading resource: ${uri}`);
       try {
-        const serverName = "inspector-server";
+        const serverName = USE_MCP_SERVER_NAME;
         const session = clientRef.current.getSession(serverName);
         if (!session) {
           throw new Error("No active session found");
@@ -1637,7 +1583,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
     addLog("info", "Listing prompts");
     try {
-      const serverName = "inspector-server";
+      const serverName = USE_MCP_SERVER_NAME;
       const session = clientRef.current.getSession(serverName);
       if (!session) {
         throw new Error("No active session found");
@@ -1662,7 +1608,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
     addLog("debug", "Refreshing tools list");
     try {
-      const serverName = "inspector-server";
+      const serverName = USE_MCP_SERVER_NAME;
       const session = clientRef.current.getSession(serverName);
       if (!session) {
         addLog("warn", "No active session found for tools refresh");
@@ -1690,7 +1636,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
     addLog("debug", "Refreshing resources list");
     try {
-      const serverName = "inspector-server";
+      const serverName = USE_MCP_SERVER_NAME;
       const session = clientRef.current.getSession(serverName);
       if (!session) {
         addLog("warn", "No active session found for resources refresh");
@@ -1715,7 +1661,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
     addLog("debug", "Refreshing prompts list");
     try {
-      const serverName = "inspector-server";
+      const serverName = USE_MCP_SERVER_NAME;
       const session = clientRef.current.getSession(serverName);
       if (!session) {
         addLog("warn", "No active session found for prompts refresh");
@@ -1764,7 +1710,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       }
       addLog("info", `Getting prompt: ${name}`, args);
       try {
-        const serverName = "inspector-server";
+        const serverName = USE_MCP_SERVER_NAME;
         const session = clientRef.current.getSession(serverName);
         if (!session) {
           throw new Error("No active session found");
@@ -1873,51 +1819,35 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
     addLog("debug", "useMcp mounted, initiating connection.");
     connectAttemptRef.current = 0;
-    if (
+    if (providedAuthProvider) {
+      authProviderRef.current = providedAuthProvider as UseMcpAuthProvider;
+      addLog("debug", "Using externally provided authProvider");
+    } else if (
       !authProviderRef.current ||
       authProviderRef.current.serverUrl !== effectiveOAuthUrl
     ) {
-      // Determine OAuth proxy URL based on gateway configuration
-      // If a proxy is configured, use the same base URL with /oauth path
-      let oauthProxyUrl: string | undefined;
-      if (gatewayUrl) {
-        // Extract base URL from gateway URL (e.g., "http://localhost:3001/inspector/api/proxy" -> "http://localhost:3001/inspector/api/oauth")
-        const gatewayUrlObj = new URL(gatewayUrl);
-        const basePath = gatewayUrlObj.pathname.replace(/\/proxy\/?$/, "");
-        oauthProxyUrl = `${gatewayUrlObj.origin}${basePath}/oauth`;
+      const { provider, oauthProxyUrl } = createBrowserOAuthProvider({
+        effectiveOAuthUrl,
+        storageKeyPrefix,
+        oauthClientConfig,
+        callbackUrl,
+        preventAutoAuth,
+        useRedirectFlow,
+        gatewayUrl,
+        onPopupWindow,
+        installFetchInterceptor: true,
+      });
+      authProviderRef.current = provider;
+      if (oauthProxyUrl) {
         addLog(
           "debug",
           `OAuth proxy URL derived from gateway: ${oauthProxyUrl}`
         );
       }
-
-      authProviderRef.current = new BrowserOAuthClientProvider(
-        effectiveOAuthUrl,
-        {
-          storageKeyPrefix,
-          clientName: finalClientConfig.name,
-          clientUri: finalClientConfig.uri,
-          logoUri: finalClientConfig.logo_uri || "https://mcp-use.com/logo.png",
-          callbackUrl,
-          preventAutoAuth,
-          useRedirectFlow,
-          oauthProxyUrl,
-          connectionUrl: gatewayUrl, // Pass gateway URL for resource field rewriting
-          onPopupWindow,
-        }
-      );
       addLog(
         "debug",
         `BrowserOAuthClientProvider initialized/updated with URL: ${effectiveOAuthUrl}, proxy: ${oauthProxyUrl ? "enabled" : "disabled"}, gateway: ${gatewayUrl ? "enabled" : "disabled"}`
       );
-
-      // Install fetch interceptor for OAuth requests if using proxy
-      // This is needed even when using MCP gateway because OAuth requests
-      // go to the ORIGINAL target URLs, not through the gateway
-      if (oauthProxyUrl) {
-        authProviderRef.current.installFetchInterceptor();
-        addLog("debug", "Installed OAuth fetch interceptor");
-      }
     }
     connect();
     return () => {
@@ -1933,7 +1863,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         authProviderRef.current
       ) {
         try {
-          const count = authProviderRef.current.clearStorage();
+          const count = authProviderRef.current.clearStorage?.() ?? 0;
           if (count > 0) {
             addLog(
               "debug",
@@ -1952,14 +1882,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled,
     storageKeyPrefix,
     callbackUrl,
-    finalClientConfig.name,
-    finalClientConfig.version,
-    finalClientConfig.uri,
-    finalClientConfig.logo_uri,
+    oauthClientConfig.name,
+    oauthClientConfig.version,
+    oauthClientConfig.uri,
+    oauthClientConfig.logo_uri,
     useRedirectFlow,
     mergedClientInfo,
     effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL
     proxyConfig, // Triggers reconnection when proxy config (including headers) changes
+    providedAuthProvider,
   ]);
 
   /**

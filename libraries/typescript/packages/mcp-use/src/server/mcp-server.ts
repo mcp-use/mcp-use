@@ -466,7 +466,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       "{id}"
     );
     const resourceKey = `${widgetName}:${resourceUri}`;
-    const resourceTemplateKey = `${widgetName}-dynamic:${resourceTemplateUri}`;
+    // Resource templates are stored by name only (no URI suffix)
+    const resourceTemplateKey = `${widgetName}-dynamic`;
     const resourceReg = this.registrations.resources.get(resourceKey);
     const resourceTemplateReg =
       this.registrations.resourceTemplates.get(resourceTemplateKey);
@@ -550,64 +551,82 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         );
       }
 
-      // Add widget resources to this session
+      // Add widget resources to this session (skip if already propagated)
+      const sessionRefs = this.sessionRegisteredRefs.get(sessionId);
       if (resourceReg && session.server) {
-        try {
-          const _registeredResource = session.server.registerResource(
-            resourceReg.config.name,
-            resourceReg.config.uri,
-            {
-              title: resourceReg.config.title,
-              description: resourceReg.config.description,
-              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
-            } as any,
-            resourceReg.handler as any
-          );
-          console.log(
-            `[MCP-Server] Added resource ${resourceUri} to session ${sessionId}`
-          );
-        } catch (e) {
-          console.warn(
-            `[MCP-Server] Failed to register resource ${resourceUri} for session ${sessionId}:`,
-            e
-          );
+        if (sessionRefs?.resources?.has(resourceKey)) {
+          // Already registered by propagateWidgetResourcesToSessions
+        } else {
+          try {
+            const registered = session.server.registerResource(
+              resourceReg.config.name,
+              resourceReg.config.uri,
+              {
+                title: resourceReg.config.title,
+                description: resourceReg.config.description,
+                mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+              } as any,
+              resourceReg.handler as any
+            );
+            if (sessionRefs?.resources) {
+              sessionRefs.resources.set(resourceKey, registered);
+            }
+            console.log(
+              `[MCP-Server] Added resource ${resourceUri} to session ${sessionId}`
+            );
+          } catch (e) {
+            console.warn(
+              `[MCP-Server] Failed to register resource ${resourceUri} for session ${sessionId}:`,
+              e
+            );
+          }
         }
       }
 
-      // Add widget resource template to this session (for Apps SDK)
+      // Add widget resource template to this session (skip if already propagated)
       if (resourceTemplateReg && session.server) {
-        try {
-          const uriTemplate =
-            resourceTemplateReg.config.resourceTemplate.uriTemplate;
-          const resourceCallbacks =
-            resourceTemplateReg.config.resourceTemplate.callbacks;
-          const template = new ResourceTemplate(uriTemplate, {
-            list: undefined,
-            complete: toResourceTemplateCompleteCallbacks(
-              resourceCallbacks?.complete
-            ),
-          });
+        if (sessionRefs?.resourceTemplates?.has(resourceTemplateKey)) {
+          // Already registered by propagateWidgetResourcesToSessions
+        } else {
+          try {
+            const uriTemplate =
+              resourceTemplateReg.config.resourceTemplate.uriTemplate;
+            const resourceCallbacks =
+              resourceTemplateReg.config.resourceTemplate.callbacks;
+            const template = new ResourceTemplate(uriTemplate, {
+              list: undefined,
+              complete: toResourceTemplateCompleteCallbacks(
+                resourceCallbacks?.complete
+              ),
+            });
 
-          const _registeredTemplate = session.server.registerResource(
-            resourceTemplateReg.config.name,
-            template,
-            {
-              title: resourceTemplateReg.config.title,
-              description: resourceTemplateReg.config.description,
-              mimeType:
-                resourceTemplateReg.config.resourceTemplate.mimeType ||
-                "text/html+skybridge",
-            } as any,
-            resourceTemplateReg.handler as any
-          );
-          console.log(
-            `[MCP-Server] Added resource template ${resourceTemplateUri} to session ${sessionId}`
-          );
-        } catch (e) {
-          console.warn(
-            `[MCP-Server] Failed to register resource template ${resourceTemplateUri} for session ${sessionId}:`,
-            e
-          );
+            const registered = session.server.registerResource(
+              resourceTemplateReg.config.name,
+              template,
+              {
+                title: resourceTemplateReg.config.title,
+                description: resourceTemplateReg.config.description,
+                mimeType:
+                  resourceTemplateReg.config.resourceTemplate.mimeType ||
+                  "text/html+skybridge",
+              } as any,
+              resourceTemplateReg.handler as any
+            );
+            if (sessionRefs?.resourceTemplates) {
+              sessionRefs.resourceTemplates.set(
+                resourceTemplateKey,
+                registered as unknown as RegisteredResourceTemplate
+              );
+            }
+            console.log(
+              `[MCP-Server] Added resource template ${resourceTemplateUri} to session ${sessionId}`
+            );
+          } catch (e) {
+            console.warn(
+              `[MCP-Server] Failed to register resource template ${resourceTemplateUri} for session ${sessionId}:`,
+              e
+            );
+          }
         }
       }
     }
@@ -641,6 +660,118 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           console.debug(
             `[MCP-Server] Session ${sessionId}: Failed to send resources notification`
           );
+        }
+      }
+    }
+  }
+
+  /**
+   * Propagate widget resources (static + template) to all existing sessions.
+   *
+   * Called from uiResourceRegistration after resource/resourceTemplate have been
+   * added to wrapper-level registrations. This ensures existing sessions see
+   * newly discovered widgets without requiring a reconnect, even when the widget
+   * does not expose an auto-generated tool (exposeAsTool=false).
+   *
+   * @param widgetName - Name of the widget whose resources should be pushed
+   * @internal
+   */
+  public propagateWidgetResourcesToSessions(widgetName: string): void {
+    const resourceUri = generateWidgetUri(widgetName, this.buildId, ".html");
+    const resourceKey = `${widgetName}:${resourceUri}`;
+    const resourceReg = this.registrations.resources.get(resourceKey);
+
+    const resourceTemplateUri = generateWidgetUri(
+      widgetName,
+      this.buildId,
+      ".html",
+      "{id}"
+    );
+    // Resource templates are stored by name only (no URI suffix)
+    const resourceTemplateKey = `${widgetName}-dynamic`;
+    const resourceTemplateReg =
+      this.registrations.resourceTemplates.get(resourceTemplateKey);
+
+    if (!resourceReg && !resourceTemplateReg) return;
+
+    for (const [sessionId, session] of this.sessions) {
+      if (!session.server) continue;
+
+      // Get session refs for tracking (ensures syncPrimitive can track these during HMR)
+      const sessionRefs = this.sessionRegisteredRefs.get(sessionId);
+
+      // Add static resource
+      if (resourceReg) {
+        try {
+          const registered = session.server.registerResource(
+            resourceReg.config.name,
+            resourceReg.config.uri,
+            {
+              title: resourceReg.config.title,
+              description: resourceReg.config.description,
+              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+            } as any,
+            resourceReg.handler as any
+          );
+          // Track in session refs so syncPrimitive preserves it during HMR
+          if (sessionRefs?.resources) {
+            sessionRefs.resources.set(resourceKey, registered);
+          }
+          console.log(
+            `[MCP-Server] Propagated resource ${resourceUri} to session ${sessionId}`
+          );
+        } catch (_e) {
+          // Resource may already be registered by addWidgetTool
+        }
+      }
+
+      // Add resource template
+      if (resourceTemplateReg) {
+        try {
+          const uriTemplate =
+            resourceTemplateReg.config.resourceTemplate.uriTemplate;
+          const resourceCallbacks =
+            resourceTemplateReg.config.resourceTemplate.callbacks;
+          const template = new ResourceTemplate(uriTemplate, {
+            list: undefined,
+            complete: toResourceTemplateCompleteCallbacks(
+              resourceCallbacks?.complete
+            ),
+          });
+
+          const registered = session.server.registerResource(
+            resourceTemplateReg.config.name,
+            template,
+            {
+              title: resourceTemplateReg.config.title,
+              description: resourceTemplateReg.config.description,
+              mimeType:
+                resourceTemplateReg.config.resourceTemplate.mimeType ||
+                "text/html+skybridge",
+            } as any,
+            resourceTemplateReg.handler as any
+          );
+          // Track in session refs so syncPrimitive preserves it during HMR
+          if (sessionRefs?.resourceTemplates) {
+            sessionRefs.resourceTemplates.set(
+              resourceTemplateKey,
+              registered as unknown as RegisteredResourceTemplate
+            );
+          }
+          console.log(
+            `[MCP-Server] Propagated resource template ${resourceTemplateUri} to session ${sessionId}`
+          );
+        } catch (_e) {
+          // Resource template may already be registered by addWidgetTool
+        }
+      }
+
+      // Send resource list changed notification
+      if (session.server?.sendResourceListChanged) {
+        try {
+          session.server.sendResourceListChanged();
+        } catch (_e) {
+          // Session may be disconnected
         }
       }
     }
@@ -783,11 +914,40 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       ".html",
       "{id}"
     );
+    const resourceKey = `${toolName}:${resourceUri}`;
+    // Resource templates are stored by name only (no URI suffix)
+    const resourceTemplateKey = `${toolName}-dynamic`;
     this.registrations.tools.delete(toolName);
-    this.registrations.resources.delete(`${toolName}:${resourceUri}`);
-    this.registrations.resourceTemplates.delete(
-      `${toolName}-dynamic:${resourceTemplateUri}`
-    );
+    this.registrations.resources.delete(resourceKey);
+    this.registrations.resourceTemplates.delete(resourceTemplateKey);
+
+    // Remove from the root native server registry as well.
+    // Widgets are registered through wrapper methods that also touch native server state;
+    // if we only clean per-session state, re-adding the same widget can fail with
+    // "Resource ... is already registered".
+    const rootNativeServer = this.nativeServer as any;
+    if (rootNativeServer._registeredTools?.[toolName]) {
+      delete rootNativeServer._registeredTools[toolName];
+    }
+    if (rootNativeServer._registeredResources?.[resourceUri]) {
+      delete rootNativeServer._registeredResources[resourceUri];
+    }
+    if (rootNativeServer._registeredResources?.[resourceTemplateUri]) {
+      delete rootNativeServer._registeredResources[resourceTemplateUri];
+    }
+    // Some SDK internals also track templates by name; clear both shapes defensively.
+    if (rootNativeServer._registeredResourceTemplates?.[resourceTemplateKey]) {
+      delete rootNativeServer._registeredResourceTemplates[resourceTemplateKey];
+    }
+    if (
+      rootNativeServer._registeredResourceTemplateNames &&
+      typeof rootNativeServer._registeredResourceTemplateNames.delete ===
+        "function"
+    ) {
+      rootNativeServer._registeredResourceTemplateNames.delete(
+        resourceTemplateKey
+      );
+    }
 
     // Remove from SDK's internal state for all sessions
     for (const [, session] of this.sessions) {
@@ -808,13 +968,25 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       if (nativeServer._registeredResources?.[resourceTemplateUri]) {
         delete nativeServer._registeredResources[resourceTemplateUri];
       }
+      if (nativeServer._registeredResourceTemplates?.[resourceTemplateKey]) {
+        delete nativeServer._registeredResourceTemplates[resourceTemplateKey];
+      }
+      if (
+        nativeServer._registeredResourceTemplateNames &&
+        typeof nativeServer._registeredResourceTemplateNames.delete ===
+          "function"
+      ) {
+        nativeServer._registeredResourceTemplateNames.delete(
+          resourceTemplateKey
+        );
+      }
     }
 
-    // Remove from sessionRegisteredRefs (using slugified URIs)
+    // Remove from sessionRegisteredRefs (using registration key formats)
     for (const [, refs] of this.sessionRegisteredRefs) {
       refs.tools.delete(toolName);
-      refs.resources.delete(resourceUri);
-      refs.resourceTemplates.delete(resourceTemplateUri);
+      refs.resources.delete(resourceKey);
+      refs.resourceTemplates.delete(resourceTemplateKey);
     }
 
     // Send notifications to all sessions
@@ -862,7 +1034,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * runningServer.syncRegistrationsFrom(newServer.server);
    * ```
    */
-  public syncRegistrationsFrom(other: MCPServerClass<boolean>): void {
+  public syncRegistrationsFrom(other: MCPServerClass<boolean>): {
+    totalChanges: number;
+    tools: { added: number; removed: number; updated: number };
+    prompts: { added: number; removed: number; updated: number };
+    resources: { added: number; removed: number; updated: number };
+  } {
     // Build session contexts array (shared across all primitives)
     const sessionContexts = Array.from(this.sessions.entries()).map(
       ([sessionId, session]) => ({
@@ -872,12 +1049,87 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       })
     );
 
+    // Helper to wrap a raw user callback with session context, enhanced context,
+    // and AsyncLocalStorage - mirroring what toolRegistration() does at initial registration.
+    // Without this wrapping, HMR-updated tools would lose access to context features
+    // like ctx.log(), ctx.sample(), ctx.elicit(), etc.
+    const wrapHandler = (
+      rawHandler: unknown,
+      session: { server?: any }
+    ): ((
+      params: Record<string, unknown>,
+      extra?: {
+        _meta?: { progressToken?: number };
+        sendNotification?: (notification: {
+          method: string;
+          params: Record<string, unknown>;
+        }) => Promise<void>;
+      }
+    ) => Promise<any>) => {
+      // Capture references needed by the closure (avoids aliasing `this`)
+      const sessions = this.sessions;
+      const createMessageFn = this.createMessage.bind(this);
+      const actualCallback = rawHandler as any;
+
+      return async (
+        params: Record<string, unknown>,
+        extra?: {
+          _meta?: { progressToken?: number };
+          sendNotification?: (notification: {
+            method: string;
+            params: Record<string, unknown>;
+          }) => Promise<void>;
+        }
+      ) => {
+        const initialRequestContext = getRequestContext();
+        const extraProgressToken = extra?._meta?.progressToken;
+        const extraSendNotification = extra?.sendNotification;
+
+        const {
+          requestContext,
+          session: foundSession,
+          progressToken,
+          sendNotification,
+        } = findSessionContext(
+          sessions,
+          initialRequestContext,
+          extraProgressToken,
+          extraSendNotification
+        );
+
+        const nativeServer = session.server;
+        const enhancedContext = createEnhancedContext(
+          requestContext,
+          createMessageFn,
+          nativeServer?.server?.elicitInput?.bind(nativeServer.server) ??
+            (async () => ({ action: "decline" as const })),
+          progressToken,
+          sendNotification,
+          foundSession?.logLevel,
+          foundSession?.clientCapabilities
+        );
+
+        const executeCallback = async () => {
+          if (actualCallback.length >= 2) {
+            return await actualCallback(params, enhancedContext);
+          }
+          return await actualCallback(params);
+        };
+
+        if (requestContext) {
+          return await runWithContext(requestContext, executeCallback);
+        }
+        return await executeCallback();
+      };
+    };
+
     // Helper to create tool entry for SDK
     const createToolEntry = (
       name: string,
       config: ToolDefinition,
       handler: unknown,
-      nativeServer: any
+      nativeServer: any,
+      session?: { server?: any }
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
@@ -892,6 +1144,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         inputSchema = z.object({});
       }
 
+      // Wrap the raw handler with session context so that ctx.log(), ctx.sample(),
+      // ctx.elicit(), etc. work correctly after HMR updates
+      const wrappedHandler = session?.server
+        ? wrapHandler(handler, session)
+        : handler;
+
       return {
         title: config.title,
         description: config.description ?? "",
@@ -900,7 +1158,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         annotations: config.annotations,
         execution: { taskSupport: "forbidden" },
         _meta: config._meta,
-        handler: handler,
+        handler: wrappedHandler,
         enabled: true,
         disable: function (this: RegisteredTool) {
           this.enabled = false;
@@ -1036,7 +1294,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             key,
             config as ToolDefinition,
             handler,
-            nativeServer
+            nativeServer,
+            session
           );
           nativeServer._registeredTools[key] = newEntry;
           if (refs?.tools) {
@@ -1677,6 +1936,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     } else {
       console.log("[HMR] No registration changes detected");
     }
+
+    return {
+      totalChanges,
+      tools: {
+        added: toolsResult.changes.added.length,
+        removed: toolsResult.changes.removed.length,
+        updated: toolsResult.changes.updated.length,
+      },
+      prompts: {
+        added: promptsResult.changes.added.length,
+        removed: promptsResult.changes.removed.length,
+        updated: promptsResult.changes.updated.length,
+      },
+      resources: {
+        added:
+          resourcesResult.changes.added.length +
+          templatesResult.changes.added.length,
+        removed:
+          resourcesResult.changes.removed.length +
+          templatesResult.changes.removed.length,
+        updated:
+          resourcesResult.changes.updated.length +
+          templatesResult.changes.updated.length,
+      },
+    };
   }
 
   /**
@@ -1714,7 +1998,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.oauth - Optional OAuth provider configuration
    * @param config.stateless - Whether to use stateless mode (auto-detected for Deno)
    * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 86400000 = 1 day)
-   * @param config.allowedOrigins - Allowed CORS origins (see {@link ServerConfig.allowedOrigins})
+   * @param config.cors - Optional CORS configuration overrides
+   * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation
    *
    * @returns Proxied server instance supporting both MCP and Hono methods
    *
@@ -1836,7 +2121,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Create and configure Hono app with default middleware
-    this.app = createHonoApp(requestLogger);
+    this.app = createHonoApp(requestLogger, {
+      cors: this.config.cors,
+      allowedOrigins: this.config.allowedOrigins,
+    });
 
     // Install the custom routes middleware FIRST (before any other routes).
     // This single middleware dispatches from the mutable _customRoutes map,
@@ -3486,9 +3774,9 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  * @param config.description - Server description
  * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
  * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
- * @param config.allowedOrigins - Allowed origins for DNS rebinding protection
- *   - **Development mode** (NODE_ENV !== "production"): If not set, all origins are allowed
- *   - **Production mode** (NODE_ENV === "production"): Only uses explicitly configured origins
+ * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation (global when configured)
+ *   - If not set: host validation is disabled
+ *   - If set: host validation is enabled for all routes
  *   - See {@link ServerConfig.allowedOrigins} for detailed documentation
  * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
  * @returns McpServerInstance with both MCP and Hono methods

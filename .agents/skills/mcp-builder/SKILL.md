@@ -549,7 +549,7 @@ For comprehensive examples and advanced patterns, connect to the **mcp-use MCP s
 - **Widget Guide**: https://docs.mcp-use.com/typescript/server/ui-widgets
 - **Examples**: https://github.com/mcp-use/mcp-use/tree/main/examples
 - **Tunneling Guide**: https://mcp-use.com/docs/tunneling
-- **Discord**: https://mcp-use.com/discord
+- **Discord**: https://discord.gg/XkNkSkMz3V
 - **GitHub**: https://github.com/mcp-use/mcp-use
 
 ## Quick Reference

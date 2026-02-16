@@ -34,11 +34,12 @@ export function isMcpUIResource(resource: any): boolean {
  * Helper function to convert MCP SDK Resource to MCP UI Resource format
  */
 function convertToMcpUIResource(resource: Resource): any {
+  const r = resource as Resource & { text?: string; blob?: string };
   return {
     uri: resource.uri,
     mimeType: resource.mimeType,
-    text: resource.text,
-    blob: resource.blob,
+    text: r.text,
+    blob: r.blob,
   };
 }
 

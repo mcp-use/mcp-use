@@ -99,13 +99,19 @@ async function fetchWithRetry(
   url: string,
   options?: RequestInit,
   maxRetries = 3,
-  initialDelay = 500
+  initialDelay = 500,
+  perRequestTimeoutMs = 8_000
 ): Promise<Response> {
   let lastError: Error | unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch(url, options);
+      // Each attempt gets a per-request timeout so we fail fast and retry
+      // rather than hanging until the gateway (e.g. E2B reverse proxy) kills us with 504
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(perRequestTimeoutMs),
+      });
 
       // If successful, return immediately
       if (response.ok || response.status < 500) {
@@ -119,13 +125,15 @@ async function fetchWithRetry(
     } catch (error) {
       lastError = error;
 
-      // Check if this is a retriable error (connection timeout or refused)
+      // Check if this is a retriable error (connection timeout, refused, or aborted)
       const isRetriable =
         error instanceof Error &&
         (error.message.includes("ETIMEDOUT") ||
           error.message.includes("ECONNREFUSED") ||
           error.message.includes("fetch failed") ||
-          error.message.includes("Failed to fetch"));
+          error.message.includes("Failed to fetch") ||
+          error.name === "TimeoutError" ||
+          error.name === "AbortError");
 
       // If not retriable or this was the last attempt, throw immediately
       if (!isRetriable || attempt === maxRetries) {
@@ -135,12 +143,10 @@ async function fetchWithRetry(
       // Calculate delay with exponential backoff
       const delay = initialDelay * Math.pow(2, attempt);
 
-      // Log retry attempt (only on first retry to avoid spam)
-      if (attempt === 0) {
-        console.log(
-          `[Dev Widget Proxy] Dev server not ready, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
-        );
-      }
+      // Log retry attempt
+      console.log(
+        `[Dev Widget Proxy] Dev server not ready, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
+      );
 
       // Wait before retrying
       await new Promise((resolve) => setTimeout(resolve, delay));
@@ -345,10 +351,18 @@ export function registerInspectorRoutes(
         c.req.url
       );
 
+      const debugWidget =
+        process.env.DEBUG != null &&
+        process.env.DEBUG !== "" &&
+        process.env.DEBUG !== "0" &&
+        process.env.DEBUG.toLowerCase() !== "false";
+
       // Fetch HTML from dev server with retry logic for cold starts
-      console.log(
-        `[Dev Widget Proxy] Fetching from: ${localDevWidgetUrl} (original: ${widgetData.devWidgetUrl})`
-      );
+      if (debugWidget) {
+        console.log(
+          `[Dev Widget Proxy] Fetching from: ${localDevWidgetUrl} (original: ${widgetData.devWidgetUrl})`
+        );
+      }
       const response = await fetchWithRetry(localDevWidgetUrl);
       if (!response.ok) {
         const status = response.status as 400 | 404 | 500 | 502 | 503;
@@ -482,11 +496,12 @@ export function registerInspectorRoutes(
         c.header(key, value);
       });
 
-      // Debug: log script URLs in final HTML
-      const scriptUrls = [...html.matchAll(/src\s*=\s*["']([^"']+)["']/g)].map(
-        (m) => m[1]
-      );
-      console.log(`[Dev Widget Proxy] Final HTML script URLs:`, scriptUrls);
+      if (debugWidget) {
+        const scriptUrls = [
+          ...html.matchAll(/src\s*=\s*["']([^"']+)["']/g),
+        ].map((m) => m[1]);
+        console.log(`[Dev Widget Proxy] Final HTML script URLs:`, scriptUrls);
+      }
 
       return c.html(html);
     } catch (error) {

@@ -36,6 +36,10 @@ const server = new MCPServer({
   allowedOrigins: process.env.NODE_ENV === 'production' 
     ? ['https://myapp.com']      // Production: explicit origins
     : undefined,                 // Development: allows all origins
+  cors: {
+    origin: ['https://myapp.com'],
+    credentials: true
+  },                             // Optional CORS override
   sessionIdleTimeoutMs: 86400000,  // Session idle timeout (default: 1 day)
   autoCreateSessionOnInvalidId: true  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
 })
@@ -121,104 +125,49 @@ if (config.features.enableInspector) {
 server.listen(config.server.port)
 ```
 
-## Express Middleware Configuration
+## Middleware Configuration
 
-### CORS Configuration
+`MCPServer` is Hono-based and supports `server.use(...)` for adding middleware to custom routes.
 
-Configure Cross-Origin Resource Sharing:
+### CORS Customization
+
+By default, CORS is permissive (`origin: "*"`) for developer ergonomics. Override with `server` config when needed.
 
 ```typescript
-import cors from 'cors'
-
-// Custom CORS configuration
-server.use(cors({
-  origin: (origin, callback) => {
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'https://app.example.com'
-    ]
-
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'mcp-protocol-version']
-}))
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  cors: {
+    origin: ['https://app.example.com'],
+    allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'mcp-protocol-version'],
+    exposeHeaders: ['mcp-session-id']
+  }
+})
 ```
 
-### Rate Limiting
-
-Implement rate limiting for API protection:
+### Route-Scoped Middleware
 
 ```typescript
-import rateLimit from 'express-rate-limit'
+import { MCPServer } from 'mcp-use/server'
 
-// General rate limiter
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP'
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
 })
 
-// Apply to all routes
-server.use('/api/', limiter)
-
-// Stricter limit for specific endpoints
-const strictLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10
-})
-
-server.use('/api/expensive-operation', strictLimiter)
-```
-
-### Authentication Middleware
-
-Add authentication to your server:
-
-```typescript
-// Basic API key authentication
-function authenticateApiKey(req, res, next) {
-  const apiKey = req.headers['x-api-key']
-
+server.use('/api/admin/*', async (c, next) => {
+  const apiKey = c.req.header('x-api-key')
   if (!apiKey || apiKey !== process.env.API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' })
+    return c.json({ error: 'Unauthorized' }, 401)
   }
-
-  next()
-}
-
-// Apply to specific routes
-server.use('/api/admin', authenticateApiKey)
-
-// JWT authentication
-import jwt from 'jsonwebtoken'
-
-function authenticateJWT(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1]
-
-  if (!token) {
-    return res.status(401).json({ error: 'No token provided' })
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    req.user = decoded
-    next()
-  } catch (error) {
-    return res.status(403).json({ error: 'Invalid token' })
-  }
-}
-
-// Protected routes
-server.get('/api/protected', authenticateJWT, (req, res) => {
-  res.json({ user: req.user })
+  await next()
 })
 ```
+
+### DNS Rebinding Configuration
+
+Use the `allowedOrigins` server config property as the single way to enable DNS rebinding protection.
 
 ### Logging Configuration
 
@@ -264,34 +213,34 @@ For comprehensive logging configuration and log level details, see the [Server L
 
 ### DNS Rebinding Protection
 
-The server supports DNS rebinding protection through the `allowedOrigins` configuration option. This is important for security when exposing MCP servers over HTTP.
+The server supports DNS rebinding protection via host-header validation. This applies globally across server routes when enabled.
 
 **Development vs Production Behavior:**
 
-- **Development mode** (NODE_ENV !== "production"):
-  - If `allowedOrigins` is not set: All origins are allowed (DNS rebinding protection disabled)
-  - This enables direct browser connections from any origin for easier development
-  - Perfect for local development with tools like the MCP Inspector
+- **Default behavior** (`allowedOrigins` not set):
+  - DNS rebinding host validation is disabled (same behavior as before)
+  - All `Host` values are accepted
 
-- **Production mode** (NODE_ENV === "production"):
-  - If `allowedOrigins` is not set: DNS rebinding protection is disabled (not recommended)
-  - If set to empty array: DNS rebinding protection is disabled
-  - If set with origins: DNS rebinding protection is enabled with those specific origins
-  - **Always explicitly set allowed origins in production**
+- **Custom `allowedOrigins` set**:
+  - Values are normalized to hostnames and used as the allow list for `Host` validation
+  - Protection applies to all routes, including inspector and static assets
+  - Use this for explicit production allow lists
+
+- **Empty list** (`allowedOrigins: []`):
+  - DNS rebinding host validation remains disabled
 
 **Example Configuration:**
 
 ```typescript
 import { MCPServer } from 'mcp-use/server'
 
-// Development: No configuration needed (allows all origins)
+// Default behavior: no host validation
 const devServer = new MCPServer({
   name: 'dev-server',
   version: '1.0.0'
 })
-// Works with direct browser connections, inspector, etc.
 
-// Production: Explicitly set allowed origins
+// Production: explicit allow list
 const prodServer = new MCPServer({
   name: 'prod-server',
   version: '1.0.0',
@@ -301,7 +250,7 @@ const prodServer = new MCPServer({
     'https://admin.myapp.com'
   ]
 })
-// Only allows connections from these specific origins
+// Host header must match one of the configured hostnames
 
 // Environment-based configuration
 const server = new MCPServer({
@@ -309,19 +258,19 @@ const server = new MCPServer({
   version: '1.0.0',
   allowedOrigins: process.env.NODE_ENV === 'production'
     ? process.env.ALLOWED_ORIGINS?.split(',') || []
-    : undefined // Development: allow all origins
+    : undefined
 })
 ```
 
 **Security Best Practices:**
 
-1. **Always set `allowedOrigins` in production** - Never leave it undefined in production environments
+1. **Set `allowedOrigins` in production** - Do not rely on the default permissive behavior for public deployments
 2. **Use environment variables** - Store allowed origins in environment variables, not in code
-3. **Be specific** - Only include origins that actually need access
-4. **Include protocol** - Always specify the full origin including protocol (http/https)
-5. **Test in production mode** - Test your server with `NODE_ENV=production` to ensure proper origin validation
+3. **Be specific** - Only include hosts that actually need access
+4. **Include protocol in config values** - `allowedOrigins` accepts full origin values and normalizes them to hostnames
+5. **Test with spoofed Host headers** - Verify invalid hosts are rejected before deployment
 
-**Note:** The server exposes MCP endpoints at both `/mcp` and `/sse` for compatibility. Both endpoints respect the same `allowedOrigins` configuration.
+**Note:** If `allowedOrigins` is configured, host validation applies to the entire server.
 
 ### Session Management
 

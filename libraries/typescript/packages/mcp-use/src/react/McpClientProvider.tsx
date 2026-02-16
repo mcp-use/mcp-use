@@ -90,9 +90,13 @@ export interface McpServer extends UseMcpResult {
  */
 export interface McpServerOptions extends Omit<
   UseMcpOptions,
-  "samplingCallback" | "onElicitation" | "onNotification"
+  | "samplingCallback"
+  | "onElicitation"
+  | "elicitationCallback"
+  | "onNotification"
 > {
   name?: string;
+  authProvider?: UseMcpOptions["authProvider"];
   // Optional callbacks for app-specific handling (e.g., toasts)
   onSamplingRequest?: (request: PendingSamplingRequest) => void;
   onElicitationRequest?: (request: PendingElicitationRequest) => void;
@@ -527,6 +531,7 @@ function McpServerWrapper({
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
+          _meta: (t as any)._meta,
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
@@ -1014,6 +1019,8 @@ export function McpClientProvider({
         }
       );
 
+      const callbacksToRun: Array<() => void> = [];
+
       setServers((prev) => {
         const index = prev.findIndex((s) => s.id === updatedServer.id);
         const isNewServer = index === -1;
@@ -1022,8 +1029,11 @@ export function McpClientProvider({
           providerLogger.debug(
             `[McpClientProvider] Adding new server ${updatedServer.id} to state`
           );
-          // New server - call onServerAdded callback
-          onServerAdded?.(updatedServer.id, updatedServer);
+          // Defer callbacks outside the state updater to avoid triggering
+          // render-phase updates in user-provided handlers.
+          callbacksToRun.push(() =>
+            onServerAdded?.(updatedServer.id, updatedServer)
+          );
           return [...prev, updatedServer];
         }
 
@@ -1071,7 +1081,9 @@ export function McpClientProvider({
 
         // State changed - call callback
         if (stateChanged) {
-          onServerStateChange?.(updatedServer.id, updatedServer.state);
+          callbacksToRun.push(() =>
+            onServerStateChange?.(updatedServer.id, updatedServer.state)
+          );
         }
 
         // Server info changed - update cached metadata
@@ -1108,6 +1120,12 @@ export function McpClientProvider({
         newServers[index] = updatedServer;
         return newServers;
       });
+
+      if (callbacksToRun.length > 0) {
+        queueMicrotask(() => {
+          callbacksToRun.forEach((callback) => callback());
+        });
+      }
     },
     [onServerAdded, onServerStateChange, storageProvider]
   );

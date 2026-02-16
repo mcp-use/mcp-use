@@ -32,14 +32,17 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-interface AssistantMessageProps {
+export interface AssistantMessageProps {
   content: string;
   timestamp?: Date | number;
+  /** Internal: indicates the message is currently being streamed */
+  _isStreaming?: boolean;
 }
 
 export function AssistantMessage({
   content,
   timestamp,
+  _isStreaming: _,
 }: AssistantMessageProps) {
   if (!content || content.length === 0) {
     return null;

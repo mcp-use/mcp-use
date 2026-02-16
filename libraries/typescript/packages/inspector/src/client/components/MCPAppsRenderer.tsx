@@ -52,6 +52,8 @@ interface MCPAppsRendererProps {
   toolInput?: Record<string, unknown>;
   toolOutput?: unknown;
   toolMetadata?: Record<string, unknown>;
+  /** Partial/streaming tool arguments (forwarded to widget via sendToolInputPartial) */
+  partialToolInput?: Record<string, unknown>;
   resourceUri: string;
   readResource: (uri: string) => Promise<any>;
   onSendFollowUp?: (text: string) => void;
@@ -60,6 +62,8 @@ interface MCPAppsRendererProps {
   onDisplayModeChange?: (mode: DisplayMode) => void;
   noWrapper?: boolean;
   customProps?: Record<string, string>;
+  /** When provided, used directly instead of looking up via useMcpClient(). */
+  serverBaseUrl?: string;
 }
 
 /**
@@ -72,6 +76,7 @@ export function MCPAppsRenderer({
   toolInput,
   toolOutput,
   toolMetadata,
+  partialToolInput,
   resourceUri,
   readResource,
   onSendFollowUp,
@@ -85,7 +90,8 @@ export function MCPAppsRenderer({
   const bridgeRef = useRef<AppBridge | null>(null);
   const { resolvedTheme } = useTheme();
   const { servers } = useMcpClient();
-  const server = servers.find((s) => s.id === serverId);
+  const serverFromContext = servers.find((s) => s.id === serverId);
+  const server = serverFromContext;
 
   const {
     playground,
@@ -505,8 +511,20 @@ export function MCPAppsRenderer({
     bridge.setHostContext(hostContext);
   }, [hostContext, isReady]);
 
+  // Send partial/streaming tool input when available
+  // This must be defined BEFORE the sendToolInput effect so it fires first
+  useEffect(() => {
+    const bridge = bridgeRef.current;
+    if (!bridge || !isReady || !partialToolInput) return;
+
+    bridge.sendToolInputPartial({ arguments: partialToolInput });
+  }, [isReady, partialToolInput]);
+
   // Send tool input when ready
   // Also resend when toolCallId changes (indicates re-execution)
+  // When partialToolInput is also available (streaming just finished), delay
+  // sending the complete input by one frame so the widget has time to process
+  // the partial first and show the streaming state
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || !isReady) return;
@@ -517,8 +535,18 @@ export function MCPAppsRenderer({
       ...customProps,
     };
 
-    bridge.sendToolInput({ arguments: mergedArgs });
-  }, [isReady, toolInput, customProps, toolCallId]);
+    if (partialToolInput) {
+      // Partials are also present - the partial effect (above) will fire first.
+      // Delay the complete input by one frame so the widget can render the
+      // streaming state before transitioning to the final state.
+      const frame = requestAnimationFrame(() => {
+        bridge.sendToolInput({ arguments: mergedArgs });
+      });
+      return () => cancelAnimationFrame(frame);
+    } else {
+      bridge.sendToolInput({ arguments: mergedArgs });
+    }
+  }, [isReady, toolInput, customProps, toolCallId, partialToolInput]);
 
   // Send tool output when ready
   // Allow sending null to reset widget to pending state (Issue #930)

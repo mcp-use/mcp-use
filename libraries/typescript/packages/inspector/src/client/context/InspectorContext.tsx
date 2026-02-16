@@ -1,3 +1,4 @@
+import type { LLMConfig } from "@/client/components/chat/types";
 import type { ReactNode } from "react";
 import { createContext, use, useCallback, useState } from "react";
 
@@ -10,9 +11,36 @@ export type TabType =
   | "elicitation"
   | "notifications";
 
-interface EmbeddedConfig {
+export interface EmbeddedConfig {
   backgroundColor?: string;
   padding?: string;
+  /** Show only a single tab with no tab bar / header chrome */
+  singleTab?: boolean;
+  /** Which tabs to show. If omitted, all tabs are visible. */
+  visibleTabs?: TabType[];
+  /** Override the default tab to open on load */
+  defaultTab?: TabType;
+  /** Custom API URL for the Chat tab's server-side streaming */
+  chatApiUrl?: string;
+  /** Externally-managed LLM config passed to ChatTab (bypasses config UI) */
+  managedLlmConfig?: LLMConfig;
+  // --- Chat UI customization ---
+  /** Hide the "Chat" title in the header */
+  chatHideTitle?: boolean;
+  /** Hide the model badge on the landing form and header */
+  chatHideModelBadge?: boolean;
+  /** Hide the MCP server URL on the landing form */
+  chatHideServerUrl?: boolean;
+  /** Hide the API key / provider configuration dialog */
+  chatHideConfigButton?: boolean;
+  /** Custom label for the clear / new-chat button */
+  chatClearButtonLabel?: string;
+  /** Hide the icon on the clear / new-chat button */
+  chatClearButtonHideIcon?: boolean;
+  /** Hide the keyboard shortcut (⌘O) on the clear / new-chat button */
+  chatClearButtonHideShortcut?: boolean;
+  /** Button variant for the clear / new-chat button (e.g. "secondary", "ghost") */
+  chatClearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
 }
 
 interface InspectorState {

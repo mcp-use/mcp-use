@@ -20,7 +20,8 @@ interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "result" | "error";
+      state?: "pending" | "streaming" | "result" | "error";
+      partialArgs?: Record<string, unknown>;
     };
   }>;
   toolCalls?: Array<{
@@ -37,6 +38,8 @@ interface MessageListProps {
   readResource?: (uri: string) => Promise<any>;
   tools?: any[];
   sendMessage?: (message: string) => Promise<void>;
+  /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
+  serverBaseUrl?: string;
 }
 
 export const MessageList = memo(
@@ -47,6 +50,7 @@ export const MessageList = memo(
     readResource,
     tools,
     sendMessage,
+    serverBaseUrl,
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -179,14 +183,17 @@ export const MessageList = memo(
                             state={
                               part.toolInvocation.state === "error"
                                 ? "error"
-                                : part.toolInvocation.state === "pending"
+                                : part.toolInvocation.state === "streaming"
                                   ? "call"
-                                  : "result"
+                                  : part.toolInvocation.state === "pending"
+                                    ? "call"
+                                    : "result"
                             }
                           />
-                          {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                          {/* Render immediately for widget tools, even if result is null */}
+                          {/* Render tool result / widget */}
+                          {/* Render immediately for widget tools or streaming tools, even if result is null */}
                           {(part.toolInvocation.result ||
+                            part.toolInvocation.state === "streaming" ||
                             isWidgetTool(part.toolInvocation.toolName)) && (
                             <ToolResultRenderer
                               toolName={part.toolInvocation.toolName}
@@ -194,10 +201,12 @@ export const MessageList = memo(
                               result={part.toolInvocation.result || null}
                               serverId={serverId}
                               readResource={readResource}
+                              serverBaseUrl={serverBaseUrl}
                               toolMeta={getToolMeta(
                                 part.toolInvocation.toolName
                               )}
                               onSendFollowUp={sendMessage}
+                              partialToolArgs={part.toolInvocation.partialArgs}
                             />
                           )}
                         </div>
@@ -237,6 +246,7 @@ export const MessageList = memo(
                                   result={toolCall.result || null}
                                   serverId={serverId}
                                   readResource={readResource}
+                                  serverBaseUrl={serverBaseUrl}
                                   toolMeta={getToolMeta(toolCall.toolName)}
                                   onSendFollowUp={sendMessage}
                                 />

@@ -1,5 +1,113 @@
 # mcp-use
 
+## 1.19.0-canary.1
+
+### Patch Changes
+
+- 8e3cfb8: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- Updated dependencies [8e3cfb8]
+  - @mcp-use/cli@2.13.8-canary.1
+  - @mcp-use/inspector@0.19.1-canary.1
+
+## 1.19.0-canary.0
+
+### Minor Changes
+
+- df8d269: fix(client): ensure client is 100% conformant
+
+### Patch Changes
+
+- @mcp-use/cli@2.13.8-canary.0
+- @mcp-use/inspector@0.19.1-canary.0
+
+## 1.18.0
+
+### Minor Changes
+
+- 3334a67: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+- 3334a67: feat(server): added DNS rebinding protection support and updated documentation
+
+### Patch Changes
+
+- 3334a67: feat(mcp): defer server callbacks to avoid render-phase updates
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+  - @mcp-use/inspector@0.19.0
+  - @mcp-use/cli@2.13.7
+
+## 1.18.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [c93a061]
+  - @mcp-use/inspector@0.19.0-canary.3
+  - @mcp-use/cli@2.13.7-canary.3
+
+## 1.18.0-canary.2
+
+### Minor Changes
+
+- 4a2b65e: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+
+### Patch Changes
+
+- Updated dependencies [4a2b65e]
+  - @mcp-use/inspector@0.19.0-canary.2
+  - @mcp-use/cli@2.13.7-canary.2
+
+## 1.18.0-canary.1
+
+### Patch Changes
+
+- 52cd2a8: feat(mcp): defer server callbacks to avoid render-phase updates
+  - @mcp-use/cli@2.13.7-canary.1
+  - @mcp-use/inspector@0.18.10-canary.1
+
+## 1.18.0-canary.0
+
+### Minor Changes
+
+- c3a452a: feat(server): added DNS rebinding protection support and updated documentation
+
+### Patch Changes
+
+- @mcp-use/cli@2.13.7-canary.0
+- @mcp-use/inspector@0.18.10-canary.0
+
+## 1.17.4
+
+### Patch Changes
+
+- 32b19dc: fix(logs): reduces the amount of noisy logs in the dev server
+- 32b19dc: fix: propagate widget resources and resource templates to existing MCP sessions during HMR
+
+  Widget resources added via the file watcher (e.g. creating a new file in `resources/`) were registered in the server wrapper but never pushed to already-connected sessions. This caused "Resource ui://widget/... not found" errors when tools referencing those widgets were executed without reconnecting.
+  - Added `propagateWidgetResourcesToSessions()` to push newly registered widget resources and templates to all active sessions independently of tool registration
+  - Fixed resource template lookup key mismatch in `addWidgetTool` and `propagateWidgetResourcesToSessions` — templates are stored by name only, not `name:uri`
+  - Track propagated resources in `sessionRegisteredRefs` so `syncPrimitive` preserves them across subsequent HMR cycles
+
+- Updated dependencies [32b19dc]
+- Updated dependencies [32b19dc]
+  - @mcp-use/cli@2.13.6
+  - @mcp-use/inspector@0.18.9
+
+## 1.17.4-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix(logs): reduces the amount of noisy logs in the dev server
+- 4a118cc: fix: propagate widget resources and resource templates to existing MCP sessions during HMR
+
+  Widget resources added via the file watcher (e.g. creating a new file in `resources/`) were registered in the server wrapper but never pushed to already-connected sessions. This caused "Resource ui://widget/... not found" errors when tools referencing those widgets were executed without reconnecting.
+  - Added `propagateWidgetResourcesToSessions()` to push newly registered widget resources and templates to all active sessions independently of tool registration
+  - Fixed resource template lookup key mismatch in `addWidgetTool` and `propagateWidgetResourcesToSessions` — templates are stored by name only, not `name:uri`
+  - Track propagated resources in `sessionRegisteredRefs` so `syncPrimitive` preserves them across subsequent HMR cycles
+
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - @mcp-use/cli@2.13.6-canary.0
+  - @mcp-use/inspector@0.18.9-canary.0
+
 ## 1.17.3
 
 ### Patch Changes

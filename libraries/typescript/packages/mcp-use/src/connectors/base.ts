@@ -81,9 +81,20 @@ export interface ConnectorInitOptions {
    * - Form mode: Collect structured data with JSON schema validation
    * - URL mode: Direct users to external URLs for sensitive interactions
    */
+  onElicitation?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+  /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
   elicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+  /**
+   * Optional callback for server notifications.
+   * When provided, registered as initial notification handler.
+   */
+  onNotification?: NotificationHandler;
 }
 
 /**
@@ -101,20 +112,30 @@ export abstract class BaseConnector {
   protected rootsCache: Root[] = [];
 
   constructor(opts: ConnectorInitOptions = {}) {
-    // Support both new and deprecated name
+    // Support canonical and deprecated names
     const finalOpts = {
       ...opts,
       onSampling: opts.onSampling ?? opts.samplingCallback,
+      onElicitation: opts.onElicitation ?? opts.elicitationCallback,
     };
     if (opts.samplingCallback && !opts.onSampling) {
       logger.warn(
         '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
       );
     }
+    if (opts.elicitationCallback && !opts.onElicitation) {
+      console.warn(
+        '[BaseConnector] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
+      );
+    }
     this.opts = finalOpts;
     // Initialize roots from options
     if (finalOpts.roots) {
       this.rootsCache = [...finalOpts.roots];
+    }
+    // Register initial notification handler if provided
+    if (finalOpts.onNotification) {
+      this.notificationHandlers.push(finalOpts.onNotification);
     }
   }
 
@@ -320,7 +341,9 @@ export abstract class BaseConnector {
       logger.debug("setupElicitationHandler: No client available");
       return;
     }
-    if (!this.opts.elicitationCallback) {
+    const elicitationCallback =
+      this.opts.onElicitation ?? this.opts.elicitationCallback;
+    if (!elicitationCallback) {
       logger.debug("setupElicitationHandler: No elicitation callback provided");
       return;
     }
@@ -336,7 +359,7 @@ export abstract class BaseConnector {
         _extra: unknown
       ) => {
         logger.debug("Server requested elicitation, forwarding to callback");
-        return await this.opts.elicitationCallback!(request.params);
+        return await elicitationCallback(request.params);
       }
     );
     logger.debug(

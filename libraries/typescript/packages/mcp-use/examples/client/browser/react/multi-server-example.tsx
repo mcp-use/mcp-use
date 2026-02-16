@@ -163,14 +163,11 @@ const ServerManager: React.FC = () => {
                 )}
 
                 {/* Authentication Actions */}
-                {server.state === "pending_auth" && server.authUrl && (
+                {server.state === "pending_auth" && (
                   <div style={{ marginTop: "10px" }}>
-                    <a
-                      href={server.authUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => server.authenticate()}
                       style={{
-                        display: "inline-block",
                         padding: "10px 20px",
                         marginRight: "10px",
                         backgroundColor: "#28a745",
@@ -178,11 +175,28 @@ const ServerManager: React.FC = () => {
                         border: "none",
                         borderRadius: "4px",
                         cursor: "pointer",
-                        textDecoration: "none",
                       }}
                     >
                       Start Authentication
-                    </a>
+                    </button>
+
+                    {server.authUrl && (
+                      <a
+                        href={server.authUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "inline-block",
+                          padding: "10px 20px",
+                          backgroundColor: "#6c757d",
+                          color: "white",
+                          borderRadius: "4px",
+                          textDecoration: "none",
+                        }}
+                      >
+                        Open Auth URL
+                      </a>
+                    )}
                   </div>
                 )}
 
