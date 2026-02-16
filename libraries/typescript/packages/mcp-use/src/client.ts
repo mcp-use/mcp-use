@@ -515,6 +515,23 @@ export class MCPClient extends BaseMCPClient {
       ...serverConfig,
       clientInfo: serverConfig.clientInfo ?? this.config.clientInfo,
     };
+
+    // Handle stdio connector directly in Node.js client (avoid pulling it into browser bundles)
+    if ("command" in merged && "args" in merged) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { StdioConnector } = require("./connectors/stdio.js");
+      const stdioConfig = merged as any; // Type assertion needed for dynamic require
+      return new StdioConnector({
+        command: stdioConfig.command,
+        args: stdioConfig.args,
+        env: stdioConfig.env,
+        clientInfo: stdioConfig.clientInfo,
+        onSampling: resolved.onSampling,
+        onElicitation: resolved.onElicitation,
+        onNotification: resolved.onNotification,
+      });
+    }
+
     return createConnectorFromConfig(merged as ServerConfig, {
       onSampling: resolved.onSampling,
       onElicitation: resolved.onElicitation,
