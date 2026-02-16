@@ -414,6 +414,8 @@ export default function VirtualizedList() {
 
 ## Debounced Search
 
+> **Prerequisites:** For interactive widgets (buttons, forms, tool calls), read [interactivity.md](interactivity.md) first for foundational patterns.
+
 Delay search to avoid excessive calls:
 
 ```tsx
