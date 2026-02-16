@@ -1,0 +1,177 @@
+---
+title: "Dependency Injection"
+description: "Inject dependencies into MCP tools with Depends()"
+icon: "syringe"
+---
+
+`Depends()` lets you inject dependencies into your MCP tools, just like FastAPI. Dependencies are resolved at call time and hidden from the MCP tool schema, so clients never see them.
+
+## Quick Start
+
+```python
+from mcp_use.server import MCPServer
+from mcp_use.server.dependencies import Depends
+
+server = MCPServer(name="my-server")
+
+def get_api_key() -> str:
+    return "sk-secret-key"
+
+@server.tool()
+def call_api(query: str, api_key: str = Depends(get_api_key)) -> str:
+    """Call an external API."""
+    return f"Called API with query={query}, key={api_key}"
+```
+
+The client sees `call_api(query: str)` and the `api_key` parameter is resolved automatically and excluded from the schema.
+
+## How It Works
+
+1. You mark parameters with `Depends(callable)` as their default value
+2. When the tool is called, each dependency callable is invoked to produce the value
+3. The resolved values are injected into the function
+4. `Depends` parameters are stripped from the MCP tool schema, clients don't know they exist
+
+<Tip>
+This is useful for injecting database connections, configuration, authenticated clients, or any setup logic that shouldn't be exposed to the LLM.
+</Tip>
+
+## Dependency Types
+
+<Tabs>
+  <Tab title="Sync Function">
+    The simplest form, a plain function that returns a value:
+
+    ```python
+    def get_config() -> dict:
+        return {"model": "gpt-4", "temperature": 0.7}
+
+    @server.tool()
+    def generate(prompt: str, config: dict = Depends(get_config)) -> str:
+        """Generate text with config."""
+        return f"Generating with {config['model']}: {prompt}"
+    ```
+  </Tab>
+
+  <Tab title="Async Function">
+    For dependencies that need async I/O:
+
+    ```python
+    async def get_user() -> dict:
+        # e.g. fetch from database
+        return {"id": 1, "name": "Alice"}
+
+    @server.tool()
+    async def greet_user(message: str, user: dict = Depends(get_user)) -> str:
+        """Greet the current user."""
+        return f"Hello {user['name']}! {message}"
+    ```
+  </Tab>
+
+  <Tab title="Sync Generator">
+    Use a generator for setup/cleanup (like a context manager):
+
+    ```python
+    def get_db_connection():
+        conn = create_connection()
+        yield conn         # value injected into the tool
+        conn.close()       # cleanup runs after the tool returns
+
+    @server.tool()
+    def query_db(sql: str, db = Depends(get_db_connection)) -> str:
+        """Run a database query."""
+        return db.execute(sql)
+    ```
+  </Tab>
+
+  <Tab title="Async Generator">
+    Async setup/cleanup for async resources:
+
+    ```python
+    async def get_async_client():
+        client = await AsyncHTTPClient.create()
+        yield client
+        await client.close()
+
+    @server.tool()
+    async def fetch_data(url: str, client = Depends(get_async_client)) -> str:
+        """Fetch data from a URL."""
+        response = await client.get(url)
+        return response.text
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+Generator dependencies always run their cleanup code, even if the tool raises an exception. This ensures resources like database connections are properly released.
+</Note>
+
+## Multiple Dependencies
+
+A single tool can have multiple injected dependencies:
+
+```python
+def get_db():
+    conn = create_connection()
+    yield conn
+    conn.close()
+
+def get_settings() -> dict:
+    return {"max_results": 100, "timeout": 30}
+
+@server.tool()
+def search(
+    query: str,
+    db = Depends(get_db),
+    settings: dict = Depends(get_settings),
+) -> str:
+    """Search the database."""
+    results = db.execute(query, limit=settings["max_results"])
+    return str(results)
+```
+
+The client only sees `search(query: str)`. Both `db` and `settings` are resolved and injected automatically.
+
+## Real World Example
+
+A complete server using dependency injection for database access and configuration:
+
+```python
+import sqlite3
+from mcp_use.server import MCPServer
+from mcp_use.server.dependencies import Depends
+
+server = MCPServer(name="notes-server")
+
+def get_db():
+    conn = sqlite3.connect("notes.db")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, text TEXT)"
+    )
+    yield conn
+    conn.close()
+
+def get_config() -> dict:
+    return {"max_notes": 1000}
+
+@server.tool()
+def add_note(text: str, db: sqlite3.Connection = Depends(get_db)) -> str:
+    """Add a new note."""
+    db.execute("INSERT INTO notes (text) VALUES (?)", (text,))
+    db.commit()
+    return "Note added."
+
+@server.tool()
+def list_notes(
+    db: sqlite3.Connection = Depends(get_db),
+    config: dict = Depends(get_config),
+) -> str:
+    """List all notes."""
+    rows = db.execute(
+        "SELECT text FROM notes LIMIT ?", (config["max_notes"],)
+    ).fetchall()
+    return "\n".join(row[0] for row in rows)
+
+if __name__ == "__main__":
+    server.run()
+```

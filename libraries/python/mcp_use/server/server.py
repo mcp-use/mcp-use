@@ -29,6 +29,7 @@ from mcp.types import (
 # Import auth components
 from mcp_use.server.auth import AuthMiddleware, BearerAuthProvider
 from mcp_use.server.context import Context as MCPContext
+from mcp_use.server.dependencies import wrap_tool_with_dependencies
 from mcp_use.server.logging import MCPLoggingMiddleware
 from mcp_use.server.middleware import (
     Middleware,
@@ -155,6 +156,11 @@ class MCPServer(FastMCP):
         # Inject middleware in the ServerSession
         MiddlewareServerSession._middleware_manager = self.middleware_manager
         MiddlewareServerSession._transport_type = self._transport_type
+
+    def add_tool(self, fn: AnyFunction, **kwargs: Any) -> None:
+        """Override to resolve Depends() parameters before registration."""
+        wrapped = wrap_tool_with_dependencies(fn)
+        super().add_tool(wrapped, **kwargs)
 
     @property
     def debug(self) -> bool:
