@@ -181,3 +181,4 @@ conf.yaml
 .cursorrules
 .claude
 .mcp-use/
+.agents/

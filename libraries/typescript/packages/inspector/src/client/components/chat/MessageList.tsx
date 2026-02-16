@@ -104,7 +104,22 @@ export const MessageList = memo(
                 : JSON.stringify(lastMessage.content);
 
           const hasContent = contentStr && contentStr.trim().length > 0;
-          return !hasContent;
+
+          // Also check the LAST part - if it indicates active work (text
+          // streaming or a tool invocation that hasn't completed), we're not
+          // in "thinking" state. Completed tool invocations DON'T count —
+          // the model is likely thinking about the next step.
+          const lastPart = lastMessage.parts?.[lastMessage.parts.length - 1];
+          const hasActiveWork =
+            lastPart &&
+            ((lastPart.type === "text" &&
+              lastPart.text &&
+              lastPart.text.trim().length > 0) ||
+              (lastPart.type === "tool-invocation" &&
+                lastPart.toolInvocation?.state !== "result" &&
+                lastPart.toolInvocation?.state !== "error"));
+
+          return !(hasContent || hasActiveWork);
         }
 
         return false;
