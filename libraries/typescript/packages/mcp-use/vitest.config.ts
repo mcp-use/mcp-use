@@ -13,6 +13,9 @@ export default defineConfig({
     },
     testTimeout: 60000,
     hookTimeout: 60000,
+    env: {
+      MCP_USE_ANONYMIZED_TELEMETRY: "false",
+    },
   },
   resolve: {
     alias: {

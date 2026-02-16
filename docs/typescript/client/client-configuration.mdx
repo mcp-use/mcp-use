@@ -187,7 +187,7 @@ The MCPClient uses a flexible configuration system that supports any MCP server,
 
 ### Configuration Structure
 
-Server configuration is defined as a JavaScript object:
+Server configuration is defined as a JavaScript object. The constructor can also take a second argument for options such as `onSampling`, `onElicitation`, `onNotification`, and `clientInfo`; see [Root-level options](#root-level-options) below.
 
 ```json
 {
@@ -297,6 +297,31 @@ If `clientInfo` is not specified, mcp-use automatically uses:
 - `description`: `"mcp-use is a complete TypeScript framework for building and using MCP"`
 - `icons`: `[{"src": "https://mcp-use.com/logo.png"}]`
 - `websiteUrl`: `"https://mcp-use.com"`
+
+### Root-level options
+
+The constructor accepts a second argument for options that apply as defaults to all servers: `new MCPClient(config, options)`. You can set:
+
+- **Root-level `clientInfo`**: Optional. Used as fallback when a server entry does not specify `clientInfo`. Same structure as per-server `clientInfo`.
+- **Root-level callbacks**: `onSampling`, `onElicitation`, `onNotification`. When provided, they act as defaults for all servers that do not override them. See [Sampling](/typescript/client/sampling) and [Elicitation](/typescript/client/elicitation) for details.
+
+```typescript
+import { acceptWithDefaults, MCPClient } from "mcp-use";
+
+const client = new MCPClient(
+  {
+    mcpServers: {
+      myServer: { url: "http://localhost:3000/mcp" },
+    },
+  },
+  {
+    clientInfo: { name: "my-app", version: "1.0.0" },
+    onElicitation: async (params) => acceptWithDefaults(params),
+    onNotification: (n) => console.log(n.method, n.params),
+    // onSampling: optional; see Sampling docs
+  }
+);
+```
 
 ### Example Configuration
 

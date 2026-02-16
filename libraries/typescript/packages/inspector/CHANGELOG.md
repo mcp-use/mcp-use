@@ -1,5 +1,20 @@
 # @mcp-use/inspector
 
+## 0.19.1-canary.1
+
+### Patch Changes
+
+- 8e3cfb8: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- Updated dependencies [8e3cfb8]
+  - mcp-use@1.19.0-canary.1
+
+## 0.19.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [df8d269]
+  - mcp-use@1.19.0-canary.0
+
 ## 0.19.0
 
 ### Minor Changes

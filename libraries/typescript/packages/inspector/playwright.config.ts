@@ -13,6 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
  * - TEST_SERVER_URL: Custom MCP endpoint URL (optional)
  */
 
+// Disable telemetry during test runs
+process.env.MCP_USE_ANONYMIZED_TELEMETRY = "false";
+
 const testMode = process.env.TEST_MODE || "dev";
 const serverMode = process.env.TEST_SERVER_MODE || "external-built";
 

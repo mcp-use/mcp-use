@@ -285,7 +285,6 @@ Build your own MCP server with custom tools, resources, and prompts.
 ```bash
 npx create-mcp-use-app my-server
 cd my-server
-npm install
 ```
 
 ```typescript

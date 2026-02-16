@@ -21,7 +21,7 @@
  *
  * Or manually:
  * 1. Start this server: pnpm run example:server:notification
- * 2. In another terminal: tsx examples/client/notification-client.ts
+ * 2. In another terminal: tsx examples/client/node/communication/notification-client.ts
  * 3. Or open the Inspector at http://localhost:3000/inspector
  */
 
@@ -220,7 +220,7 @@ To run the full demo:
 
 Or manually:
    1. Start this server: pnpm run example:server:notification
-   2. Run the client: tsx examples/client/notification-client.ts
+   2. Run the client: tsx examples/client/node/communication/notification-client.ts
    3. Or open the Inspector: http://localhost:${PORT}/inspector
 
 📤 SERVER → CLIENT notifications:
