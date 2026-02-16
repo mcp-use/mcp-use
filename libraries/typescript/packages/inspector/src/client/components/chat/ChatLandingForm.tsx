@@ -162,7 +162,7 @@ export function ChatLandingForm({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="rounded-full bg-white/70 dark:bg-black/50"
+                  className="rounded-full bg-white/70 dark:bg-black/50 text-gray-900 dark:text-white"
                   onClick={() => onQuickQuestionSelect?.(question)}
                   disabled={isLoading || !isConnected}
                 >
