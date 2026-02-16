@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="36" viewBox="0 0 80 36">
+  <rect x="0.5" y="0.5" width="79" height="35" rx="4" fill="#161616" stroke="#333333" stroke-width="1"/>
+  <g transform="translate(14, 10) scale(0.67)">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="none" stroke="#888888" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M14 2v6h6" fill="none" stroke="#888888" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="38" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#cccccc">Docs</text>
+</svg>

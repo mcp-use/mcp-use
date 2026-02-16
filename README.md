@@ -1,63 +1,38 @@
+<!-- Top frame + logo + title + tagline + install -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./static/header_dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./static/header_light.svg">
+  <img alt="mcp-use — The fullstack MCP framework" src="./static/header_light.svg" width="full">
+</picture>
+
+<!-- Downloads counter -->
 <div align="center">
-&nbsp;
-<div align="center">
-  <a href="https://mcp-use.com">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="./static/logo_white.svg">
-      <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
-      <img alt="mcp use logo" src="./static/logo_black.svg" width="50%" >
-    </picture>
-  </a>
-</div>
-&nbsp;
-<p align="center" style="max-width:600px; margin-bottom:40px">
-  <b>mcp-use</b> provides everything you need to build with <a href="https://modelcontextprotocol.io">Model Context Protocol</a> <br/> MCP servers, MCP clients and AI agents in 6 lines of code, in both <b>Python</b> and <b>TypeScript</b>.</p>
-<p align="center">
-    <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
-        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
-    <a href="https://mcp-use.com/docs" alt="Documentation">
-        <img src="https://img.shields.io/badge/mcp--use-docs-red" /></a>
-    <a href="https://mcp-use.com" alt="Website">
-        <img src="https://img.shields.io/badge/cloud-mcp--use.com-blue" /></a>
-    <a href="https://x.com/mcpuse" alt="X follow mcp-use">
-        <img src="https://img.shields.io/twitter/follow/mcp-use?style=social" /></a>
-    <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
-        <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
-    <br/>
-    <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/python" alt="Python repository">
-        <img src="https://img.shields.io/badge/pyhton-repo-grey?labelColor=white&logo=python" alt="Badge"></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
-        <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
-    <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
-        <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <a href="https://mcp-use.com/docs/python" alt="Python Documentation">
-        <img src="https://img.shields.io/badge/python-docs-red" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" /></a>
-    <br/>
-    <a href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript" alt="Typescript Documentation">
-        <img src="https://img.shields.io/badge/typescript-repo-grey?labelColor=white&logo=typescript" alt="Badge"></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Version">
-        <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
-    <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
-        <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
-    <a href="https://mcp-use.com/docs/typescript" alt="Typescript Documentation">
-        <img src="https://img.shields.io/badge/typescript-docs-red" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" /></a>
-    <a href="https://pkg.pr.new/~/mcp-use/mcp-use" alt="Open PR Package Preview">
-        <img src="https://pkg.pr.new/badge/mcp-use/mcp-use" /></a>
-    <br/>
-    <a href="https://inspector.mcp-use.com" alt="MCP Inspector Online">
-      <img src="https://img.shields.io/badge/MCP%20Inspector-black" /></a>
-    <a href="https://mcp-use.com" alt="MCP Deploy">
-      <img src="https://img.shields.io/badge/Deploy%20MCP-black" /></a>
-</p>
+<a href="https://pypi.org/project/mcp_use/"><img src="./static/badges/downloads.svg" height="32" alt="Total Downloads"></a>
 </div>
 
----
+<!-- Nav badges -->
+<div align="center">
+<a href="https://mcp-use.com/docs"><img src="./static/badges/docs.svg" height="24" alt="Docs"></a>
+<img width="8" height="1" alt="">
+<a href="https://inspector.mcp-use.com"><img src="./static/badges/inspector.svg" height="24" alt="Inspector"></a>
+<img width="8" height="1" alt="">
+<a href="https://mcp-use.com/docs/python/examples"><img src="./static/badges/examples.svg" height="24" alt="Examples"></a>
+<img width="8" height="1" alt="">
+<a href="https://mcp-use.com"><img src="./static/badges/cloud-cta.svg" height="24" alt="Cloud"></a>
+<img width="8" height="1" alt="">
+<a href="https://github.com/mcp-use/mcp-use"><img src="./static/badges/github.svg" height="24" alt="GitHub Stars"></a>
+<img width="8" height="1" alt="">
+<a href="https://x.com/mcpuse"><img src="./static/badges/twitter.svg" height="24" alt="Follow us"></a>
+<img width="8" height="1" alt="">
+<a href="https://discord.gg/XkNkSkMz3V"><img src="./static/badges/discord.svg" height="24" alt="Join Discord"></a>
+</div>
+
+<!-- Bottom frame -->
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./static/footer_dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="./static/footer_light.svg">
+  <img alt="" src="./static/footer_light.svg" width="full">
+</picture>
 
 ## Stack
 

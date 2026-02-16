@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="115" height="36" viewBox="0 0 115 36">
+  <rect x="0.5" y="0.5" width="114" height="35" rx="4" fill="#161616" stroke="#333333" stroke-width="1"/>
+  <g transform="translate(16, 12) scale(0.024)">
+    <path d="M283.94 167.31l186.7-217.15h-44.28L265.36 140.91 153.04-49.84H0l195.84 285.04L0 459.84h44.28l171.26-199.14 136.76 199.14h153.04L283.94 167.31zm-60.62 70.48l-19.86-28.4L64.96-21.82h67.98L243.18 181.1l19.86 28.4 165.72 237.12h-67.98L223.32 237.79z" fill="#cccccc"/>
+  </g>
+  <text x="38" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#cccccc">Follow us</text>
+</svg>

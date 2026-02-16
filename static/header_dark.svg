@@ -1,0 +1,25 @@
+<svg width="1200" height="310" viewBox="0 0 1200 310" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Top frame corners only -->
+  <line x1="40" y1="0" x2="40" y2="40" stroke="#333333" stroke-width="1"/>
+  <line x1="0" y1="40" x2="40" y2="40" stroke="#333333" stroke-width="1"/>
+  <line x1="1160" y1="0" x2="1160" y2="40" stroke="#333333" stroke-width="1"/>
+  <line x1="1160" y1="40" x2="1200" y2="40" stroke="#333333" stroke-width="1"/>
+  <circle cx="40" cy="40" r="2.5" fill="#444444"/>
+  <circle cx="1160" cy="40" r="2.5" fill="#444444"/>
+
+  <!-- Logo icon -->
+  <g transform="translate(552, 20) scale(0.2)">
+    <path d="M101.695 0C157.859 0 203.389 45.7023 203.39 102.079C203.39 126.557 202.073 152.071 212.226 174.344L219.814 190.989C233.838 221.756 258.492 246.431 289.248 260.482L303.509 266.996C326.537 277.516 352.987 275.841 378.305 275.841C434.47 275.841 480 321.544 480 377.921C480 434.297 434.47 480 378.305 480C322.141 480 276.611 434.297 276.61 377.921C276.61 354.218 277.672 329.551 267.834 307.986L259.76 290.284C245.708 259.478 221.002 234.782 190.19 220.742L172.955 212.888C150.989 202.878 125.834 204.159 101.695 204.159C45.5304 204.159 0 158.456 0 102.079C0.000190044 45.7023 45.5304 3.62652e-05 101.695 0Z" fill="white"/>
+    <path d="M96.4085 480.001C149.653 480.001 192.817 436.837 192.817 383.592C192.817 330.347 149.653 287.184 96.4085 287.184C43.1635 287.184 0 330.347 0 383.592C0 436.837 43.1635 480.001 96.4085 480.001Z" fill="white"/>
+    <path d="M480 96.4085C480 149.653 436.836 192.817 383.592 192.817C330.347 192.817 287.184 149.653 287.184 96.4085C287.184 43.1635 330.347 0 383.592 0C436.836 0 480 43.1635 480 96.4085Z" fill="white"/>
+  </g>
+
+  <!-- "mcp-use" wordmark -->
+  <text x="600" y="180" text-anchor="middle" font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="80" font-weight="700" fill="white" letter-spacing="-3">mcp-use</text>
+
+  <!-- Tagline -->
+  <text x="600" y="230" text-anchor="middle" font-family="'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="24" font-weight="400" fill="#888888">The fullstack MCP framework</text>
+
+  <!-- Install commands -->
+  <text x="600" y="280" text-anchor="middle" font-family="'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace" font-size="15" fill="#555555">pip install mcp-use&#160;&#160;&#160;&#160;&#x2022;&#160;&#160;&#160;&#160;npm install mcp-use</text>
+</svg>

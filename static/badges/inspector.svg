@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="115" height="36" viewBox="0 0 115 36">
+  <rect x="0.5" y="0.5" width="114" height="35" rx="4" fill="#161616" stroke="#333333" stroke-width="1"/>
+  <g transform="translate(14, 10) scale(0.67)">
+    <circle cx="11" cy="11" r="8" fill="none" stroke="#888888" stroke-width="1.8"/>
+    <path d="M21 21l-4.35-4.35" fill="none" stroke="#888888" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <text x="38" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#cccccc">Inspector</text>
+</svg>

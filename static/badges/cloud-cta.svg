@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="87" height="36" viewBox="0 0 87 36">
+  <rect x="0.5" y="0.5" width="86" height="35" rx="4" fill="#161616" stroke="#333333" stroke-width="1"/>
+  <g transform="translate(14, 10) scale(0.67)">
+    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" fill="none" stroke="#888888" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="38" y="23" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#cccccc">Cloud</text>
+</svg>
