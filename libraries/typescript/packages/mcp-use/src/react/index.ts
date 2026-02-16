@@ -6,6 +6,20 @@
 export type { UseMcpOptions, UseMcpResult } from "./types.js";
 export { useMcp } from "./useMcp.js";
 
+// WebMCP integration (Chrome 146+ navigator.modelContext)
+export { WebMCP } from "./WebMCP.js";
+export { useWebMCP } from "./useWebMCP.js";
+export type { UseWebMCPOptions, UseWebMCPResult } from "./useWebMCP.js";
+export type { WebMCPProps } from "./WebMCP.js";
+export type {
+  ModelContext,
+  WebMCPContentItem,
+  WebMCPExecuteResult,
+  WebMCPProvideContextOptions,
+  WebMCPToolAnnotations,
+  WebMCPToolDefinition,
+} from "./webmcp-types.js";
+
 // Re-export auth callback handler for OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
 
