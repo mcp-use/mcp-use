@@ -2,6 +2,7 @@
  * MCP Conformance Test Client (TypeScript / BrowserMCPClient path)
  */
 
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
 import {
   handleElicitation,
@@ -26,8 +27,29 @@ async function main(): Promise<void> {
     elicitationCallback: handleElicitation,
   };
 
-  if (isAuthScenario(scenario)) {
-    serverConfig.authProvider = createHeadlessConformanceOAuthProvider();
+  const authProvider = isAuthScenario(scenario)
+    ? createHeadlessConformanceOAuthProvider()
+    : undefined;
+
+  if (authProvider) {
+    // Pre-authenticate using SDK's auth() function
+    // Step 1: Trigger OAuth discovery and redirectToAuthorization
+    const authResult = await auth(authProvider, {
+      serverUrl,
+    });
+
+    if (authResult === "REDIRECT") {
+      // Step 2: Get the authorization code that was captured
+      const authCode = await authProvider.getAuthorizationCode();
+
+      // Step 3: Exchange code for tokens
+      await auth(authProvider, {
+        serverUrl,
+        authorizationCode: authCode,
+      });
+    }
+
+    serverConfig.authProvider = authProvider;
   }
 
   const client = new BrowserMCPClient({

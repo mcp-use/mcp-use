@@ -89,6 +89,26 @@ export class HeadlessConformanceOAuthProvider implements OAuthClientProvider {
     }
     return this.authorizationCode;
   }
+
+  /**
+   * Prepare token request parameters for authorization code exchange.
+   * This is called by the SDK's auth() function to get the authorization code.
+   */
+  async prepareTokenRequest(): Promise<URLSearchParams | undefined> {
+    if (!this.authorizationCode) {
+      return undefined;
+    }
+    if (!this.storedCodeVerifier) {
+      throw new Error("No code verifier available");
+    }
+
+    const params = new URLSearchParams();
+    params.set("grant_type", "authorization_code");
+    params.set("code", this.authorizationCode);
+    params.set("code_verifier", this.storedCodeVerifier);
+    params.set("redirect_uri", this.redirectUri);
+    return params;
+  }
 }
 
 export function createHeadlessConformanceOAuthProvider(): HeadlessConformanceOAuthProvider {

@@ -29,6 +29,7 @@ function ScenarioDriver({ scenario, resolve, reject }: DriverProps): null {
   const doneRef = useRef(false);
   const scenarioStartedRef = useRef(false);
   const handledElicitationIdsRef = useRef<Set<string>>(new Set());
+  const authTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!storageLoaded || doneRef.current) return;
@@ -54,6 +55,23 @@ function ScenarioDriver({ scenario, resolve, reject }: DriverProps): null {
 
     return () => clearInterval(interval);
   }, [servers, storageLoaded]);
+
+  useEffect(() => {
+    if (!storageLoaded || doneRef.current) return;
+    const server = servers.find((s) => s.id === "test");
+    if (!server) return;
+    if (
+      isAuthScenario(scenario) &&
+      server.state === "pending_auth" &&
+      !authTriggeredRef.current
+    ) {
+      authTriggeredRef.current = true;
+      server.authenticate().catch((err) => {
+        doneRef.current = true;
+        reject(err instanceof Error ? err : new Error(String(err)));
+      });
+    }
+  }, [servers, storageLoaded, scenario, reject]);
 
   useEffect(() => {
     if (!storageLoaded || doneRef.current) return;
@@ -137,6 +155,8 @@ async function main(): Promise<void> {
       // some scenarios keep long-lived requests open and do not handle HEAD probes.
       autoReconnect: false,
       autoRetry: false,
+      // Allow automatic OAuth flow in conformance tests (headless provider)
+      preventAutoAuth: false,
     },
   };
   try {

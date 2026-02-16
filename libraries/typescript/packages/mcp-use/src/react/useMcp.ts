@@ -964,34 +964,84 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // OAuth discovery didn't fail, so OAuth might be available
           // Check if OAuth provider is configured
           if (authProviderRef.current) {
-            // OAuth is configured - enter pending_auth state
+            // OAuth is configured
             addLog(
               "info",
               "Authentication required. OAuth provider available."
             );
 
-            // Don't trigger auth flow automatically - let the user click "Authenticate"
-            // This prevents unnecessary metadata discovery requests that may fail with CORS/404
-            addLog(
-              "info",
-              "Waiting for user to initiate authentication flow..."
-            );
+            // Check if we should trigger auth automatically or wait for user
+            if (preventAutoAuth) {
+              // Don't trigger auth flow automatically - let the user click "Authenticate"
+              // This prevents unnecessary metadata discovery requests that may fail with CORS/404
+              addLog(
+                "info",
+                "Waiting for user to initiate authentication flow..."
+              );
 
-            if (isMountedRef.current) {
-              setState("pending_auth");
-              // Retrieve the stored auth URL if it was prepared during OAuth discovery
-              const storedAuthUrl =
-                authProviderRef.current?.getLastAttemptedAuthUrl?.();
-              if (storedAuthUrl) {
-                setAuthUrl(storedAuthUrl);
-                addLog(
-                  "info",
-                  "Retrieved stored auth URL for manual authentication"
+              if (isMountedRef.current) {
+                setState("pending_auth");
+                // Retrieve the stored auth URL if it was prepared during OAuth discovery
+                const storedAuthUrl =
+                  authProviderRef.current?.getLastAttemptedAuthUrl?.();
+                if (storedAuthUrl) {
+                  setAuthUrl(storedAuthUrl);
+                  addLog(
+                    "info",
+                    "Retrieved stored auth URL for manual authentication"
+                  );
+                }
+              }
+              connectingRef.current = false;
+              return "auth_redirect";
+            } else {
+              // preventAutoAuth is false - trigger auth flow automatically
+              addLog(
+                "info",
+                "Triggering automatic OAuth authentication flow..."
+              );
+
+              try {
+                // Step 1: Call auth() to trigger redirectToAuthorization and OAuth discovery
+                const authResult = await auth(authProviderRef.current, {
+                  serverUrl: url,
+                });
+
+                if (authResult === "REDIRECT") {
+                  // Step 2: Get the authorization code that was captured during redirectToAuthorization
+                  const authCode = await (
+                    authProviderRef.current as any
+                  ).getAuthorizationCode?.();
+                  if (!authCode) {
+                    throw new Error(
+                      "Authorization code not captured by headless provider"
+                    );
+                  }
+
+                  // Step 3: Complete the OAuth flow by exchanging code for tokens
+                  await auth(authProviderRef.current, {
+                    serverUrl: url,
+                    authorizationCode: authCode,
+                  });
+                }
+
+                addLog("info", "OAuth flow completed, reconnecting...");
+                // Reconnect after successful auth
+                return await tryConnectWithTransport(transportTypeParam);
+              } catch (authError) {
+                const authErrorMessage =
+                  authError instanceof Error
+                    ? authError.message
+                    : String(authError);
+                failConnection(
+                  `Automatic OAuth authentication failed: ${authErrorMessage}`,
+                  authError instanceof Error
+                    ? authError
+                    : new Error(String(authError))
                 );
+                return "failed";
               }
             }
-            connectingRef.current = false;
-            return "auth_redirect";
           }
 
           // Check if custom headers were provided (invalid credentials)
