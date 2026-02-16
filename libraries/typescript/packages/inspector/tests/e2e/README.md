@@ -65,6 +65,22 @@ pnpm test:e2e:mix tests/e2e/chat.test.ts --debug
 
 **Note:** The `-g` or `--grep` flag filters tests by name. You can use partial matches or regex patterns.
 
+### Python server E2E
+
+Runs a subset of E2E tests against the Python MCP server (from `libraries/python/examples/server/server_example.py`). The runner builds the inspector, serves `dist/web` with `npx http-server` (so the Python server can load the inspector from that URL when `INSPECTOR_CDN_BASE_URL` is set), starts the Python server, then runs `tests/e2e/python.test.ts`.
+
+**Requirements:** Python with `mcp_use` installed (e.g. `pip install -e .` from `libraries/python`).
+
+```bash
+pnpm test:e2e:python
+```
+
+With Infisical for secrets (e.g. `OPENAI_API_KEY` for the chat test):
+
+```bash
+infisical run --env=dev --projectId=13272018-648f-41fd-911c-908a27c9901e -- pnpm test:e2e:python
+```
+
 **Note on HMR tests:**
 
 HMR tests (`hmr.test.ts`) modify the conformance server source files during testing. The test runner automatically:

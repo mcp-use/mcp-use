@@ -64,6 +64,7 @@
     "test:e2e:prod:ui": "TEST_MODE=production playwright test --ui",
     "test:e2e:codegen": "playwright codegen http://localhost:3000/inspector",
     "test:e2e:report": "playwright show-report",
+    "test:e2e:python": "node tests/e2e/scripts/run-python-e2e.mjs",
     "install:yarn": "yarn install",
     "install:pnpm": "pnpm install",
     "install:npm": "npm install",

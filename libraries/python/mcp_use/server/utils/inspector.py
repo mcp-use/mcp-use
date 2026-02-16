@@ -1,4 +1,5 @@
 import logging
+import os
 
 import httpx
 from starlette.requests import Request
@@ -6,8 +7,12 @@ from starlette.responses import HTMLResponse, RedirectResponse
 
 logger = logging.getLogger(__name__)
 
-CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector@latest/dist/web"
-INDEX_URL = f"{CDN_BASE_URL}/index.html"
+# Override with INSPECTOR_CDN_BASE_URL (e.g. http://localhost:2967) for E2E or local dev
+INSPECTOR_CDN_BASE_URL = os.environ.get(
+    "INSPECTOR_CDN_BASE_URL",
+    "https://unpkg.com/@mcp-use/inspector@latest/dist/web",
+).rstrip("/")
+INDEX_URL = f"{INSPECTOR_CDN_BASE_URL}/index.html"
 
 
 async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
@@ -57,7 +62,7 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
 async def _inspector_static(request: Request):
     """Serve static files from the CDN."""
     path = request.path_params.get("path", "")
-    cdn_url = f"{CDN_BASE_URL}/{path}"
+    cdn_url = f"{INSPECTOR_CDN_BASE_URL}/{path}"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(cdn_url, follow_redirects=True)
