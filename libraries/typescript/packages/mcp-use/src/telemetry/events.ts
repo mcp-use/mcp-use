@@ -1,3 +1,5 @@
+import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps";
+
 export abstract class BaseTelemetryEvent {
   abstract get name(): string;
   abstract get properties(): Record<string, any>;
@@ -257,7 +259,7 @@ export function createServerRunEventData(
     (r) => r.mime_type === "text/uri-list" || r.mime_type === "text/html"
   );
   const mcpAppsResources = allResources.filter(
-    (r) => r.mime_type === "text/html+mcp"
+    (r) => r.mime_type === RESOURCE_MIME_TYPE
   );
 
   return {
