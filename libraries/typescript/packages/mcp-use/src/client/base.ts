@@ -236,7 +236,7 @@ export abstract class BaseMCPClient {
    */
   protected abstract createConnectorFromConfig(
     serverConfig: Record<string, any>
-  ): BaseConnector;
+  ): BaseConnector | Promise<BaseConnector>;
 
   /**
    * Creates a new session for connecting to an MCP server.
@@ -283,7 +283,9 @@ export abstract class BaseMCPClient {
       throw new Error(`Server '${serverName}' not found in config`);
     }
 
-    const connector = this.createConnectorFromConfig(servers[serverName]);
+    const connector = await Promise.resolve(
+      this.createConnectorFromConfig(servers[serverName])
+    );
     const session = new MCPSession(connector);
 
     if (autoInitialize) {

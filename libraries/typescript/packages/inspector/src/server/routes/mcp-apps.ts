@@ -122,6 +122,76 @@ document.addEventListener('securitypolicyviolation', function(e) {
   console.warn('[MCP Apps CSP Violation]', violation.directive, ':', violation.blockedUri);
   window.parent.postMessage(violation, '*');
 });
+
+function serializeConsoleArgs(args) {
+  try {
+    return Array.from(args || []).map(function(arg) {
+      if (arg instanceof Error) {
+        return {
+          type: 'Error',
+          message: arg.message,
+          stack: arg.stack,
+          name: arg.name,
+        };
+      }
+      if (typeof arg === 'object' && arg !== null) {
+        try {
+          return JSON.parse(JSON.stringify(arg));
+        } catch (e) {
+          return String(arg);
+        }
+      }
+      return arg;
+    });
+  } catch (e) {
+    return [String(args)];
+  }
+}
+
+function sendConsoleToParent(level, args) {
+  try {
+    window.parent.postMessage({
+      type: 'iframe-console-log',
+      level: level,
+      args: serializeConsoleArgs(args),
+      timestamp: new Date().toISOString(),
+      url: window.location.href,
+    }, '*');
+  } catch (e) {}
+}
+
+var originalConsoleError = console.error.bind(console);
+console.error = function() {
+  var args = Array.from(arguments);
+  originalConsoleError.apply(console, args);
+  sendConsoleToParent('error', args);
+};
+
+window.addEventListener('error', function(event) {
+  sendConsoleToParent('error', [{
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    error: event.error ? {
+      message: event.error.message,
+      stack: event.error.stack,
+      name: event.error.name,
+    } : null,
+  }]);
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+  sendConsoleToParent('error', [{
+    message: 'Unhandled Promise Rejection',
+    reason: event.reason ? String(event.reason) : 'Unknown',
+    error: event.reason instanceof Error ? {
+      message: event.reason.message,
+      stack: event.reason.stack,
+      name: event.reason.name,
+    } : null,
+  }]);
+});
 </\` + \`script>\`;
       }
 

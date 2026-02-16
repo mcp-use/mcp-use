@@ -41,6 +41,10 @@ export interface EmbeddedConfig {
   chatClearButtonHideShortcut?: boolean;
   /** Button variant for the clear / new-chat button (e.g. "secondary", "ghost") */
   chatClearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
+  /** Initial quick questions shown below the landing input. */
+  chatQuickQuestions?: string[];
+  /** Initial followup suggestions shown above input in chat mode. */
+  chatFollowups?: string[];
 }
 
 interface InspectorState {

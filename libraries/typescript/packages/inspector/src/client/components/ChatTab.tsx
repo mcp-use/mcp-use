@@ -16,6 +16,7 @@ import { useConfig } from "./chat/useConfig";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
+type ChatMessage = import("./chat/types").Message;
 
 export interface ChatTabProps {
   connection: MCPConnection;
@@ -48,6 +49,10 @@ export interface ChatTabProps {
   clearButtonHideShortcut?: boolean;
   /** Button variant for the clear/new-chat button. Default: "default". */
   clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
+  /** Initial quick questions shown below the landing input. */
+  chatQuickQuestions?: string[];
+  /** Initial followups shown above input in active chat mode. */
+  chatFollowups?: string[];
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -73,10 +78,15 @@ export function ChatTab({
   clearButtonHideIcon,
   clearButtonHideShortcut,
   clearButtonVariant,
+  chatQuickQuestions = [],
+  chatFollowups = [],
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
   const [promptFocusedIndex, setPromptFocusedIndex] = useState(-1);
+  const [quickQuestions, setQuickQuestions] =
+    useState<string[]>(chatQuickQuestions);
+  const [followups, setFollowups] = useState<string[]>(chatFollowups);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
@@ -143,6 +153,182 @@ export function ChatTab({
     callPrompt,
     serverId,
   });
+
+  const sanitizeStringList = useCallback((input: unknown): string[] => {
+    if (!Array.isArray(input)) return [];
+    return input
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+  }, []);
+
+  const serializeMessageContent = useCallback((message: ChatMessage) => {
+    if (typeof message.content === "string") return message.content;
+    if (Array.isArray(message.content)) {
+      return message.content
+        .map((item) => (typeof item === "string" ? item : (item.text ?? "")))
+        .join("");
+    }
+    return "";
+  }, []);
+
+  const getSerializedMessages = useCallback(() => {
+    return messages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: serializeMessageContent(message),
+      timestamp: message.timestamp,
+    }));
+  }, [messages, serializeMessageContent]);
+
+  const postBridgeEvent = useCallback(
+    (type: string, payload: Record<string, unknown> = {}) => {
+      if (typeof window === "undefined" || window.parent === window) return;
+      window.parent.postMessage(
+        {
+          type,
+          serverId,
+          ...payload,
+        },
+        "*"
+      );
+    },
+    [serverId]
+  );
+
+  useEffect(() => {
+    postBridgeEvent("mcp-inspector:chat:ready", {
+      capabilities: {
+        send: true,
+        clear: true,
+        getState: true,
+        setQuickQuestions: true,
+        setFollowups: true,
+      },
+    });
+  }, [postBridgeEvent]);
+
+  useEffect(() => {
+    postBridgeEvent("mcp-inspector:chat:state_changed", {
+      isLoading,
+      messageCount: messages.length,
+      messages: getSerializedMessages(),
+      quickQuestions,
+      followups,
+    });
+  }, [
+    followups,
+    getSerializedMessages,
+    isLoading,
+    messages.length,
+    postBridgeEvent,
+    quickQuestions,
+  ]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== "object") return;
+
+      const data = event.data as {
+        type?: string;
+        requestId?: string;
+        serverId?: string;
+        message?: string;
+        prompt?: string;
+        questions?: unknown;
+        followups?: unknown;
+      };
+
+      if (!data.type?.startsWith("mcp-inspector:chat:")) return;
+      if (data.serverId && data.serverId !== serverId) return;
+
+      const requestId = data.requestId;
+      const postResult = (ok: boolean, extra: Record<string, unknown> = {}) => {
+        postBridgeEvent("mcp-inspector:chat:command_result", {
+          requestId,
+          ok,
+          ...extra,
+        });
+      };
+
+      if (data.type === "mcp-inspector:chat:send") {
+        const text = (data.message ?? data.prompt ?? "").trim();
+        if (!text) {
+          postResult(false, { error: "Missing message" });
+          return;
+        }
+        if (!llmConfig || !isConnected) {
+          postResult(false, { error: "Chat is not ready to send messages" });
+          return;
+        }
+        void sendMessage(text, [])
+          .then(() => {
+            postBridgeEvent("mcp-inspector:chat:message_sent", {
+              requestId,
+              message: text,
+              source: "bridge",
+            });
+            postResult(true);
+          })
+          .catch((error: unknown) => {
+            postResult(false, {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:clear") {
+        clearMessages();
+        postBridgeEvent("mcp-inspector:chat:cleared", { requestId });
+        postResult(true);
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:get_state") {
+        postBridgeEvent("mcp-inspector:chat:state", {
+          requestId,
+          isLoading,
+          messageCount: messages.length,
+          messages: getSerializedMessages(),
+          quickQuestions,
+          followups,
+        });
+        postResult(true);
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:set_quick_questions") {
+        const values = sanitizeStringList(data.questions);
+        setQuickQuestions(values);
+        postResult(true, { quickQuestions: values });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:set_followups") {
+        const values = sanitizeStringList(data.followups);
+        setFollowups(values);
+        postResult(true, { followups: values });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [
+    clearMessages,
+    followups,
+    getSerializedMessages,
+    isLoading,
+    messages.length,
+    postBridgeEvent,
+    quickQuestions,
+    sanitizeStringList,
+    sendMessage,
+    serverId,
+    llmConfig,
+    isConnected,
+  ]);
 
   // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
   useKeyboardShortcuts(
@@ -305,6 +491,34 @@ export function ChatTab({
     clearMessages();
   }, [clearConfig, clearMessages]);
 
+  const handleQuickQuestionSelect = useCallback(
+    (question: string) => {
+      if (!question.trim()) return;
+      if (!llmConfig || !isConnected) return;
+      void sendMessage(question, []).then(() => {
+        postBridgeEvent("mcp-inspector:chat:message_sent", {
+          message: question,
+          source: "quick_question",
+        });
+      });
+    },
+    [postBridgeEvent, sendMessage, llmConfig, isConnected]
+  );
+
+  const handleFollowupSelect = useCallback(
+    (followup: string) => {
+      if (!followup.trim()) return;
+      if (!llmConfig || !isConnected) return;
+      void sendMessage(followup, []).then(() => {
+        postBridgeEvent("mcp-inspector:chat:message_sent", {
+          message: followup,
+          source: "followup",
+        });
+      });
+    },
+    [postBridgeEvent, sendMessage, llmConfig, isConnected]
+  );
+
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
     return (
@@ -358,6 +572,8 @@ export function ChatTab({
           onAttachmentRemove={removeAttachment}
           hideModelBadge={hideModelBadge}
           hideServerUrl={hideServerUrl}
+          quickQuestions={quickQuestions}
+          onQuickQuestionSelect={handleQuickQuestionSelect}
         />
       </div>
     );
@@ -430,6 +646,8 @@ export function ChatTab({
           onStopStreaming={stop}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
+          followups={followups}
+          onFollowupSelect={handleFollowupSelect}
         />
       )}
     </div>

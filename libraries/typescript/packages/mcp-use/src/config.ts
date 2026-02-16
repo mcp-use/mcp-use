@@ -6,11 +6,9 @@ import type {
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Notification } from "@modelcontextprotocol/sdk/types.js";
-import { readFileSync } from "node:fs";
 import type { BaseConnector, ConnectorInitOptions } from "./connectors/base.js";
 import type { ClientInfo } from "./connectors/http.js";
 import { HttpConnector } from "./connectors/http.js";
-import { StdioConnector } from "./connectors/stdio.js";
 import { getPackageVersion } from "./version.js";
 
 /** Callback for sampling requests (canonical name). */
@@ -162,6 +160,9 @@ export function normalizeClientInfo(input: unknown): ClientInfo {
 }
 
 export function loadConfigFile(filepath: string): Record<string, any> {
+  // Dynamic import to avoid pulling fs into browser bundles
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { readFileSync } = require("node:fs");
   const raw = readFileSync(filepath, "utf-8");
   return JSON.parse(raw);
 }
@@ -174,13 +175,10 @@ export function createConnectorFromConfig(
   const clientInfo = normalizeClientInfo(serverConfig.clientInfo);
 
   if ("command" in serverConfig && "args" in serverConfig) {
-    return new StdioConnector({
-      command: serverConfig.command,
-      args: serverConfig.args,
-      env: serverConfig.env,
-      clientInfo,
-      ...connectorOptions,
-    });
+    throw new Error(
+      "Stdio connector is not supported in this environment. " +
+        "Stdio connections require Node.js and are only available in the Node.js MCPClient."
+    );
   }
 
   if ("url" in serverConfig) {

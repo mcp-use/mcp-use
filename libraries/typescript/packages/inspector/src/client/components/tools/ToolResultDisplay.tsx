@@ -559,14 +559,14 @@ export function ToolResultDisplay({
   const availableViews = useMemo(() => {
     const views: Array<{ mode: ViewMode; label: string }> = [];
 
-    // Check for ChatGPT Apps SDK
-    if (hasAppsSdkResource || (supportsBothProtocols && openaiOutputTemplate)) {
-      views.push({ mode: "chatgpt-app", label: "Component (Apps SDK)" });
-    }
-
-    // Check for MCP Apps (SEP-1865)
+    // Check for MCP Apps (SEP-1865) - Add first as default
     if (hasMcpAppsResource || (supportsBothProtocols && mcpAppsResourceUri)) {
       views.push({ mode: "mcp-apps", label: "Component (MCP Apps)" });
+    }
+
+    // Check for ChatGPT Apps SDK - Add second
+    if (hasAppsSdkResource || (supportsBothProtocols && openaiOutputTemplate)) {
+      views.push({ mode: "chatgpt-app", label: "Component (Apps SDK)" });
     }
 
     // Check for MCP-UI
