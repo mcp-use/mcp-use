@@ -249,9 +249,8 @@ If you want more control over how tools are created, you can work with the adapt
 
 ```python
 import asyncio
-from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
 
 from mcp_use.client import MCPClient
 from mcp_use.adapters import LangChainAdapter
@@ -267,19 +266,18 @@ async def main():
     tools = await adapter.create_tools(client)
 
     # Use the tools with any LangChain agent
-    llm = ChatOpenAI(model="gpt-4o")
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant with access to powerful tools."),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
+    model = init_chat_model("gpt-4o", temperature=0.5)
 
-    agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = create_agent(
+        model=model,
+        tools=tools,
+        system_prompt="You are a helpful assistant with access to powerful tools.",
+    )
 
-    result = await agent_executor.ainvoke({"input": "Search for information about climate change"})
-    print(result["output"])
+    result = await agent.ainvoke(
+        {"messages": [{"role": "user", "content": "Search for information about climate change"}]}
+    )
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())
