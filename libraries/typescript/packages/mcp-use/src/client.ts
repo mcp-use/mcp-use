@@ -18,6 +18,7 @@ import { CodeModeConnector } from "./client/connectors/codeMode.js";
 import {
   createConnectorFromConfig,
   loadConfigFile,
+  normalizeClientInfo,
   resolveCallbacks,
   type CallbackConfig,
   type MCPClientConfigShape,
@@ -502,11 +503,11 @@ export class MCPClient extends BaseMCPClient {
 
   /**
    * Create a connector from server configuration (Node.js version)
-   * Supports all connector types including StdioConnector
+   * Supports all connector types including StdioConnector (lazy-loaded to avoid pulling Node-only code into browser bundles).
    */
-  protected createConnectorFromConfig(
+  protected async createConnectorFromConfig(
     serverConfig: Record<string, any>
-  ): BaseConnector {
+  ): Promise<BaseConnector> {
     const resolved = resolveCallbacks(
       serverConfig as CallbackConfig,
       this._globalCallbacks
@@ -516,16 +517,18 @@ export class MCPClient extends BaseMCPClient {
       clientInfo: serverConfig.clientInfo ?? this.config.clientInfo,
     };
 
-    // Handle stdio connector directly in Node.js client (avoid pulling it into browser bundles)
     if ("command" in merged && "args" in merged) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { StdioConnector } = require("./connectors/stdio.js");
-      const stdioConfig = merged as any; // Type assertion needed for dynamic require
+      const { StdioConnector } = await import("./connectors/stdio.js");
+      const stdioConfig = merged as ServerConfig & {
+        command: string;
+        args: string[];
+        env?: Record<string, string>;
+      };
       return new StdioConnector({
         command: stdioConfig.command,
         args: stdioConfig.args,
         env: stdioConfig.env,
-        clientInfo: stdioConfig.clientInfo,
+        clientInfo: normalizeClientInfo(merged.clientInfo),
         onSampling: resolved.onSampling,
         onElicitation: resolved.onElicitation,
         onNotification: resolved.onNotification,
