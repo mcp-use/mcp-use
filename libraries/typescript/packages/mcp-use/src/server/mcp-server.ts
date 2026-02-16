@@ -77,7 +77,11 @@ import {
   isValidLogLevel,
 } from "./tools/tool-execution-helpers.js";
 import type { ServerConfig } from "./types/index.js";
-import type { PromptCallback, PromptDefinition } from "./types/prompt.js";
+import type {
+  InferPromptInput,
+  PromptCallback,
+  PromptDefinition,
+} from "./types/prompt.js";
 import type {
   ReadResourceCallback,
   ReadResourceTemplateCallback,
@@ -2376,11 +2380,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       return originalTool.call(self, toolDefinition, actualCallback as any);
     }) as any;
 
-    this.prompt = ((
-      promptDefinition:
+    this.prompt = (<
+      T extends
         | import("./types/index.js").PromptDefinition<any, HasOAuth>
         | import("./types/index.js").PromptDefinitionWithoutCallback,
-      callback?: import("./types/index.js").PromptCallback<any, HasOAuth>
+    >(
+      promptDefinition: T,
+      callback?: import("./types/index.js").PromptCallback<
+        import("./types/index.js").InferPromptInput<T>,
+        HasOAuth
+      >
     ) => {
       // First call originalPrompt which creates the wrapped handler with conversion logic
       const result = originalPrompt.call(
@@ -3212,11 +3221,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @see {@link PromptDefinition} for all configuration options
    */
-  public prompt!: (
-    promptDefinition:
+  public prompt!: <
+    T extends
       | PromptDefinition<any, HasOAuth>
       | import("./types/index.js").PromptDefinitionWithoutCallback,
-    callback?: PromptCallback<any, HasOAuth>
+  >(
+    promptDefinition: T,
+    callback?: PromptCallback<InferPromptInput<T>, HasOAuth>
   ) => this;
 
   /**
