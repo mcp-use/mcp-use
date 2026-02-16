@@ -197,6 +197,21 @@ export type UseMcpOptions = {
     websiteUrl?: string;
   };
   /**
+   * Optional custom fetch function to use for all MCP HTTP requests.
+   *
+   * When provided, this replaces the default global `fetch` for transport-level
+   * requests. Useful for adding custom auth retry logic, logging, or proxying.
+   *
+   * @example
+   * ```typescript
+   * useMcp({
+   *   url: 'http://localhost:3000/mcp',
+   *   fetch: myCustomFetch,
+   * })
+   * ```
+   */
+  fetch?: typeof globalThis.fetch;
+  /**
    * Optional external OAuth client provider.
    *
    * When provided, useMcp will use this provider directly instead of creating

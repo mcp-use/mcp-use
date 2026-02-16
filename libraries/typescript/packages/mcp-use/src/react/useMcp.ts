@@ -99,6 +99,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout = 30000, // 30 seconds default for connection timeout
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
+    fetch: customFetch,
     onNotification,
     onSampling: onSamplingOption,
     samplingCallback: samplingCallbackOption,
@@ -588,6 +589,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
+          // Pass custom fetch if provided (e.g., OAuth retry fetch for scope-step-up)
+          ...(customFetch && { fetch: customFetch }),
         };
 
         // Add gateway URL if using proxy

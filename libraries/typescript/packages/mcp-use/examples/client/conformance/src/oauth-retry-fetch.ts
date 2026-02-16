@@ -95,7 +95,19 @@ export function createOAuthRetryFetch(
         max403Retries !== undefined &&
         num403Retries >= max403Retries
       ) {
-        return response;
+        // Strip WWW-Authenticate header so the SDK's transport does not
+        // attempt its own scope-escalation auth flow on top of ours.
+        const body = await response.text();
+        const strippedHeaders = new Headers();
+        response.headers.forEach((v, k) => {
+          if (k.toLowerCase() !== "www-authenticate")
+            strippedHeaders.append(k, v);
+        });
+        return new Response(body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: strippedHeaders,
+        });
       }
 
       await response.text();
