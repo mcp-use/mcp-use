@@ -1,5 +1,19 @@
 # @mcp-use/inspector
 
+## 0.19.0
+
+### Minor Changes
+
+- 3334a67: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+
+### Patch Changes
+
+- 3334a67: fix(inspector): enhance tool argument handling with type coercion and schema resolution
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+  - mcp-use@1.18.0
+
 ## 0.19.0-canary.3
 
 ### Patch Changes

@@ -1,5 +1,20 @@
 # mcp-use
 
+## 1.18.0
+
+### Minor Changes
+
+- 3334a67: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+- 3334a67: feat(server): added DNS rebinding protection support and updated documentation
+
+### Patch Changes
+
+- 3334a67: feat(mcp): defer server callbacks to avoid render-phase updates
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+  - @mcp-use/inspector@0.19.0
+  - @mcp-use/cli@2.13.7
+
 ## 1.18.0-canary.3
 
 ### Patch Changes
