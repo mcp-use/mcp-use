@@ -6,6 +6,36 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.19.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.19.0&title=Client%20Conformance%20%26%20Type%20Safety%20Improvements&date=2026-02&lang=typescript" alt="Release 1.19.0" />
+  </Frame>
+  ## Client Conformance & Type Safety Improvements
+  Minor release with full MCP client conformance, direct stdio connector support, and type inference fixes.
+
+- **New**: Client implementation is now 100% conformant with the MCP spec
+- **Enhancement**: Node.js client handles stdio connector directly with command/argument configuration
+- **Fix**: `error()` return type now compatible with tool callbacks using `outputSchema`
+- **Fix**: Fixed `TypedCallToolResult` type inference with explicit properties instead of Omit
+- **Fix**: Enhanced `prompt()` method generic type inference to match `tool()` pattern
+- **Enhancement**: Console output routes through Logger class with improved consistency; added tests for logLevel
+- **Enhancement**: Added support for additional Vitest file extensions in config
+- **Fix**: Correct MIME type for mcp_apps resource counting; disabled telemetry in local tests
+- **Update**: Updated @mcp-use/inspector to v0.20.0
+- **Update**: Updated @mcp-use/cli to v2.13.8
+
+### @mcp-use/cli v2.13.8
+
+- **Enhancement**: Improved loading states with spinner component
+- **Fix**: Correct MIME type for mcp_apps resource counting
+
+### create-mcp-use-app v0.13.0
+
+- **New**: Interactive prompts for optional skills installation (claude-code, cursor, codex)
+- **New**: `--install` and `--no-install` CLI flags for non-interactive mode
+- **Fix**: Corrected template reference in test-cli.sh
+</Update>
+
 <Update label="v1.18.0" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.18.0&title=DNS%20Rebinding%20%26%20Deferred%20Callbacks&date=2026-02&lang=typescript" alt="Release 1.18.0" />

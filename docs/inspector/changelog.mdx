@@ -6,6 +6,37 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.20.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.20.0&title=Chat%20Quick%20Questions%20%26%20Enhanced%20UX&date=2026-02&lang=inspector" alt="Release 0.20.0" />
+  </Frame>
+  ## Chat Quick Questions & Enhanced UX
+  Minor release with chat quick questions and followups, improved loading states, and developer experience enhancements.
+
+### Chat Enhancements
+
+- **New**: Support for `chatQuickQuestions` and `chatFollowups` in ChatTab components
+
+### Loading & Error Handling
+
+- **Enhancement**: MCPAppsRenderer shows loading spinner with `isReady` state management
+- **Enhancement**: Replaced shimmer with Spinner component for better initial widget load UX
+- **Enhancement**: Added skeleton loading state for widgets
+- **Enhancement**: Global error listeners and improved error logging in widget components
+
+### Developer Experience
+
+- **New**: Copy all logs to clipboard feature
+- **Enhancement**: Enhanced theme handling in OpenAIComponentRenderer
+- **Enhancement**: ToolsList displays metadata and icons differentiating MCP/OpenAI tool types
+- **Fix**: Allow permissive CSP frame ancestors by default
+- **Fix**: Correct MIME type for mcp_apps resource counting
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.19.0
+</Update>
+
 <Update label="v0.19.0" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=0.19.0&title=Tool%20Arguments%20%26%20Streaming%20Input&date=2026-02&lang=inspector" alt="Release 0.19.0" />
