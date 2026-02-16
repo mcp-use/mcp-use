@@ -8,10 +8,18 @@
     "mcp-use": "1.18.0"
   },
   "changesets": [
+    "brave-lions-sleep",
+    "chatty-owls-glow",
     "clear-paws-act",
     "fix-mcp-apps-mime-telemetry",
     "flat-things-report",
+    "happy-sharks-dance",
     "lucky-actors-knock",
-    "tidy-impalas-watch"
+    "public-houses-chew",
+    "short-pillows-stare",
+    "six-groups-fry",
+    "tidy-impalas-watch",
+    "tiny-trains-smile",
+    "tough-dragons-wave"
   ]
 }

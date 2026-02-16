@@ -1,5 +1,20 @@
 # @mcp-use/cli
 
+## 2.13.8-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [dea387a]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+  - @mcp-use/inspector@0.20.0-canary.3
+  - mcp-use@1.19.0-canary.3
+
 ## 2.13.8-canary.2
 
 ### Patch Changes

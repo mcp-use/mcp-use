@@ -1,5 +1,36 @@
 # mcp-use
 
+## 1.19.0-canary.3
+
+### Patch Changes
+
+- aa81040: feat(mcp): implement direct stdio connector handling in Node.js client
+  - Added support for handling the stdio connector directly within the Node.js MCPClient, allowing for command and argument configuration
+  - Updated the loadConfigFile function to dynamically import the fs module, preventing unnecessary inclusion in browser bundles
+  - Enhanced error handling to ensure that the stdio connector is only utilized in the appropriate environment, improving compatibility and clarity
+
+- aa81040: fix(vitest): add support for additional file extensions in Vitest configuration
+- aa81040: feat(inspector): improve loading state and UI feedback in OpenAIComponentRenderer
+  - Replaced shimmer animation with a Spinner component for a more consistent loading experience
+  - Introduced a skeleton loading state that only displays on the initial load of the widget
+  - Updated ToolResultDisplay to adjust the order of view checks for better clarity
+  - Enhanced ToolsList to conditionally display parameter counts based on tool input schemas
+
+- aa81040: feat(inspector): add log copying functionality and enhance theme handling
+  - Implemented a new feature in IframeConsole to copy all logs to the clipboard, providing users with an easy way to access console logs
+  - Enhanced OpenAIComponentRenderer to manage widget readiness state and apply theme changes dynamically, improving user experience and visual consistency
+  - Updated ThemeProvider to synchronize theme application with Tailwind dark mode and OpenAI Apps SDK design tokens, ensuring a seamless theme transition
+  - Added a message signaling to the parent window when the widget is ready, enhancing communication between components
+
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [dea387a]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+  - @mcp-use/inspector@0.20.0-canary.3
+  - @mcp-use/cli@2.13.8-canary.3
+
 ## 1.19.0-canary.2
 
 ### Patch Changes
