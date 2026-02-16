@@ -5,10 +5,19 @@ import { fsHelpers, isDeno } from "./runtime.js";
  * Typed CallToolResult that constrains the structuredContent property
  * to match a specific type T. Used for output schema validation.
  * T must be a record type (object) to match the SDK's CallToolResult interface.
+ *
+ * Note:
+ * Properties are listed explicitly instead of using `extends Omit<CallToolResult, "structuredContent">`
+ * to avoid breaking type inference. This is a known issue with Zod .passthrough() and TypeScript Omit.
+ * https://github.com/colinhacks/zod/issues/2304
  */
 export interface TypedCallToolResult<
   T extends Record<string, unknown> = Record<string, unknown>,
-> extends Omit<CallToolResult, "structuredContent"> {
+> {
+  [x: string]: unknown;
+  content: CallToolResult["content"];
+  isError?: CallToolResult["isError"];
+  _meta?: CallToolResult["_meta"];
   structuredContent?: T;
 }
 

@@ -1,4 +1,5 @@
 name: MCP Conformance Tests
+# Test badge update with new GIST_SECRET token
 
 on:
   workflow_dispatch:
