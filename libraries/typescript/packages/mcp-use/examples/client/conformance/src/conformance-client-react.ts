@@ -13,10 +13,12 @@ import TestRenderer, { act } from "react-test-renderer";
 import {
   handleElicitation,
   isAuthScenario,
+  isScopeStepUpScenario,
   parseConformanceContext,
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
+import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
 import { createHeadlessConformanceOAuthProvider } from "./headless-oauth-provider.js";
 
 type DriverProps = {
@@ -149,11 +151,20 @@ async function main(): Promise<void> {
         preRegistrationContext: parseConformanceContext(),
       })
     : undefined;
+  // For scope-step-up we do not pre-auth; the OAuth retry fetch obtains the
+  // first token from the initial 401 so it has only mcp:basic, then handles 403.
   const mcpServers: Record<string, any> = {
     test: {
       name: "test",
       url: serverUrl,
       authProvider,
+      ...(authProvider &&
+        isScopeStepUpScenario(scenario) && {
+          fetch: createOAuthRetryFetch(fetch, serverUrl, authProvider, {
+            max403Retries:
+              scenario === "auth/scope-retry-limit" ? 3 : undefined,
+          }),
+        }),
       // Disable health-check driven reconnects in conformance runs:
       // some scenarios keep long-lived requests open and do not handle HEAD probes.
       autoReconnect: false,

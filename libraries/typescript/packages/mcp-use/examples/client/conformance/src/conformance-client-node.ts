@@ -7,10 +7,12 @@ import { MCPClient } from "mcp-use";
 import {
   handleElicitation,
   isAuthScenario,
+  isScopeStepUpScenario,
   parseConformanceContext,
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
+import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
 import { probeAuthParams } from "mcp-use";
 import { createHeadlessConformanceOAuthProvider } from "./headless-oauth-provider.js";
 
@@ -31,31 +33,40 @@ async function main(): Promise<void> {
     : undefined;
 
   if (authProvider) {
-    // Probe for WWW-Authenticate params (scope, resource_metadata) from 401
-    const { resourceMetadataUrl, scope } = await probeAuthParams(serverUrl);
+    serverConfig.authProvider = authProvider;
 
-    // Pre-authenticate using SDK's auth() function
-    // Step 1: Trigger OAuth discovery and redirectToAuthorization
-    const authResult = await auth(authProvider, {
-      serverUrl,
-      resourceMetadataUrl,
-      scope,
-    });
-
-    if (authResult === "REDIRECT") {
-      // Step 2: Get the authorization code that was captured
-      const authCode = await authProvider.getAuthorizationCode();
-
-      // Step 3: Exchange code for tokens
-      await auth(authProvider, {
+    if (isScopeStepUpScenario(scenario)) {
+      // Do NOT pre-authenticate for scope-step-up: the first token must have
+      // only the scope from the initial 401 (mcp:basic). Pre-auth would get
+      // a token with all PRM scopes (mcp:basic mcp:write), so tools/call would
+      // never get 403 and the client would never make a second auth request.
+      // The OAuth retry fetch handles both 401 (initial) and 403 (escalation).
+      serverConfig.fetch = createOAuthRetryFetch(
+        fetch,
+        serverUrl,
+        authProvider,
+        {
+          max403Retries: scenario === "auth/scope-retry-limit" ? 3 : undefined,
+        }
+      );
+    } else {
+      // Pre-authenticate for other auth scenarios
+      const { resourceMetadataUrl, scope } = await probeAuthParams(serverUrl);
+      const authResult = await auth(authProvider, {
         serverUrl,
         resourceMetadataUrl,
         scope,
-        authorizationCode: authCode,
       });
+      if (authResult === "REDIRECT") {
+        const authCode = await authProvider.getAuthorizationCode();
+        await auth(authProvider, {
+          serverUrl,
+          resourceMetadataUrl,
+          scope,
+          authorizationCode: authCode,
+        });
+      }
     }
-
-    serverConfig.authProvider = authProvider;
   }
 
   const client = new MCPClient(

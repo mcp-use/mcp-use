@@ -7,10 +7,12 @@ import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
 import {
   handleElicitation,
   isAuthScenario,
+  isScopeStepUpScenario,
   parseConformanceContext,
   runScenario,
   type ConformanceSession,
 } from "./conformance-shared.js";
+import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
 import { probeAuthParams } from "mcp-use";
 import { createHeadlessConformanceOAuthProvider } from "./headless-oauth-provider.js";
 
@@ -36,31 +38,36 @@ async function main(): Promise<void> {
     : undefined;
 
   if (authProvider) {
-    // Probe for WWW-Authenticate params (scope, resource_metadata) from 401
-    const { resourceMetadataUrl, scope } = await probeAuthParams(serverUrl);
+    serverConfig.authProvider = authProvider;
 
-    // Pre-authenticate using SDK's auth() function
-    // Step 1: Trigger OAuth discovery and redirectToAuthorization
-    const authResult = await auth(authProvider, {
-      serverUrl,
-      resourceMetadataUrl,
-      scope,
-    });
-
-    if (authResult === "REDIRECT") {
-      // Step 2: Get the authorization code that was captured
-      const authCode = await authProvider.getAuthorizationCode();
-
-      // Step 3: Exchange code for tokens
-      await auth(authProvider, {
+    if (isScopeStepUpScenario(scenario)) {
+      // Do not pre-authenticate for scope-step-up so the first token has only
+      // the scope from the initial 401; the OAuth retry fetch handles 401 and 403.
+      serverConfig.fetch = createOAuthRetryFetch(
+        fetch,
+        serverUrl,
+        authProvider,
+        {
+          max403Retries: scenario === "auth/scope-retry-limit" ? 3 : undefined,
+        }
+      );
+    } else {
+      const { resourceMetadataUrl, scope } = await probeAuthParams(serverUrl);
+      const authResult = await auth(authProvider, {
         serverUrl,
         resourceMetadataUrl,
         scope,
-        authorizationCode: authCode,
       });
+      if (authResult === "REDIRECT") {
+        const authCode = await authProvider.getAuthorizationCode();
+        await auth(authProvider, {
+          serverUrl,
+          resourceMetadataUrl,
+          scope,
+          authorizationCode: authCode,
+        });
+      }
     }
-
-    serverConfig.authProvider = authProvider;
   }
 
   const client = new BrowserMCPClient({

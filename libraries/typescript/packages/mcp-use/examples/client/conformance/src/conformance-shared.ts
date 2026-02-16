@@ -46,6 +46,13 @@ export function isAuthScenario(scenario: string): boolean {
   return scenario.startsWith("auth/");
 }
 
+/** Scenarios that require listTools + callTool so server can return 403 and client can do scope escalation. */
+export function isScopeStepUpScenario(scenario: string): boolean {
+  return (
+    scenario === "auth/scope-step-up" || scenario === "auth/scope-retry-limit"
+  );
+}
+
 export async function handleElicitation(
   params: ElicitRequestFormParams | ElicitRequestURLParams
 ): Promise<ElicitResult> {
@@ -120,6 +127,12 @@ export async function runScenario(
       await runToolsCall(session);
       return;
     default:
+      if (isScopeStepUpScenario(scenario)) {
+        // Run listTools then callTool so server can return 403 on tools/call;
+        // client must re-auth with escalated scope and retry (via OAuth retry fetch).
+        await runToolsCall(session);
+        return;
+      }
       if (isAuthScenario(scenario)) {
         // OAuth exchange is validated by the conformance harness during session creation.
         return;
