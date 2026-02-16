@@ -35,6 +35,8 @@ export const MCP_APPS_CONFIG = {
   DIMENSIONS: {
     /** Picture-in-picture width */
     PIP_WIDTH: 768,
+    /** Picture-in-picture max width (cap so widget can expand up to this) */
+    PIP_MAX_WIDTH: 700,
     /** Picture-in-picture height */
     PIP_HEIGHT: 400,
     /** Default iframe height for inline mode */

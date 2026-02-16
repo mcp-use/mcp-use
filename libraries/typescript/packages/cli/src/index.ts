@@ -1140,9 +1140,9 @@ program
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const startTime = Date.now();
-          const ready = await waitForServer(port, host);
+          const browserHost = normalizeBrowserHost(host);
+          const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const browserHost = normalizeBrowserHost(host);
             const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
             const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
@@ -1326,9 +1326,9 @@ program
 
         // Auto-open inspector if enabled
         if (options.open !== false) {
-          const ready = await waitForServer(port, host);
+          const browserHost = normalizeBrowserHost(host);
+          const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const browserHost = normalizeBrowserHost(host);
             const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
             const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
 
