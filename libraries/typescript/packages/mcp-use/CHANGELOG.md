@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.19.1-canary.0
+
+### Patch Changes
+
+- 344dc29: fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+- Updated dependencies [344dc29]
+  - @mcp-use/inspector@0.20.1-canary.0
+  - @mcp-use/cli@2.13.9-canary.0
+
 ## 1.19.0
 
 ### Minor Changes
