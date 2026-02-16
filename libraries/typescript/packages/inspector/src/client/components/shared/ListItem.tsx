@@ -70,7 +70,6 @@ export function ListItem({
             <h3 className={cn("font-medium truncate font-mono text-sm")}>
               {title}
             </h3>
-            {/* {metadata} */}
           </div>
           {description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
@@ -78,6 +77,11 @@ export function ListItem({
             </p>
           )}
         </div>
+        {metadata && (
+          <div className="flex-shrink-0 flex items-center self-center">
+            {metadata}
+          </div>
+        )}
       </div>
     </button>
   );
