@@ -55,11 +55,11 @@ export type UseMcpOptions = {
    * ```
    */
   autoProxyFallback?:
-    | boolean
-    | {
-        enabled?: boolean;
-        proxyAddress?: string;
-      };
+  | boolean
+  | {
+    enabled?: boolean;
+    proxyAddress?: string;
+  };
   /** Custom callback URL for OAuth redirect (defaults to /oauth/callback on the current origin) */
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
@@ -87,8 +87,18 @@ export type UseMcpOptions = {
    * Custom headers that can be used to bypass auth
    */
   customHeaders?: Record<string, string>;
-  /** Whether to enable verbose debug logging to the console and the log state */
+  /**
+   * @deprecated Use `logLevel` instead. This option will be removed in a future version.
+   * Whether to enable verbose debug logging to the console and the log state.
+   * When `logLevel` is also set, `logLevel` takes precedence.
+   */
   debug?: boolean;
+  /**
+   * Log level for console output. When set, takes precedence over the `debug` option.
+   * Set to 'silent' to suppress ALL console logging (the `mcp.log` state array is still populated).
+   * @default undefined (falls back to 'info' or 'debug' when `debug: true`)
+   */
+  logLevel?: "silent" | "error" | "warn" | "info" | "http" | "verbose" | "debug" | "silly";
   /** Auto retry connection if initial connection fails, with delay in ms (default: false) */
   autoRetry?: boolean | number;
   /** Auto reconnect if an established connection is lost, with delay in ms (default: 3000) */
@@ -370,7 +380,7 @@ export type UseMcpResult = {
   ) => Promise<{
     messages: Array<{
       role: "user" | "assistant";
-      content: { type: string; text?: string; [key: string]: any };
+      content: { type: string; text?: string;[key: string]: any };
     }>;
   }>;
   /**

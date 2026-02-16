@@ -10,7 +10,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
-import { logger } from "../logging.js";
+import { Logger, type LogLevel, logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
@@ -79,8 +79,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     enabled = true,
     callbackUrl = typeof window !== "undefined"
       ? sanitizeUrl(
-          new URL("/oauth/callback", window.location.origin).toString()
-        )
+        new URL("/oauth/callback", window.location.origin).toString()
+      )
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
     clientConfig = {},
@@ -90,6 +90,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     proxyConfig,
     autoProxyFallback = true,
     debug: _debug = false,
+    logLevel: logLevelOption,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
     transportType = "auto",
@@ -107,17 +108,31 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     elicitationCallback: elicitationCallbackOption,
   } = options;
 
+  // Create a per-instance logger so multiple useMcp instances don't clobber each other's log level.
+  // Each instance gets its own named logger keyed by URL (or a fallback).
+  const instanceLogger = useMemo(() => {
+    const name = `useMcp:${url || "no-url"}`;
+    const inst = Logger.get(name);
+    // Determine effective level: logLevel > debug > default ('info')
+    if (logLevelOption) {
+      inst.level = logLevelOption as LogLevel;
+    } else if (_debug) {
+      inst.level = "debug";
+    }
+    return inst;
+  }, [url, logLevelOption, _debug]);
+
   // Support both new and deprecated names with deprecation warnings
   const headers = headersOption ?? customHeadersOption ?? {};
   if (customHeadersOption && !headersOption) {
-    logger.warn(
+    instanceLogger.warn(
       '[useMcp] The "customHeaders" option is deprecated. Use "headers" instead.'
     );
   }
 
   const onSampling = onSamplingOption ?? samplingCallbackOption;
   if (samplingCallbackOption && !onSamplingOption) {
-    logger.warn(
+    instanceLogger.warn(
       '[useMcp] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
     );
   }
@@ -164,9 +179,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   // Use explicit clientConfig if provided (with deprecation warning), otherwise use derived.
   const oauthClientConfig = useMemo(() => {
     if (clientConfig && Object.keys(clientConfig).length > 0) {
-      logger.warn(
+      instanceLogger.warn(
         "[useMcp] The 'clientConfig' option is deprecated and will be removed in a future version. " +
-          "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
+        "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
       );
       // Merge derived config with explicit config (explicit takes precedence for backward compatibility)
       return { ...derivedOAuthClientConfig, ...clientConfig };
@@ -282,7 +297,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
   // --- Stable Callbacks ---
   /**
-   * Add a log entry to the connection log
+   * Add a log entry to the connection log.
+   * Console output is routed through the per-instance logger so that
+   * the configured logLevel / silent mode is respected.
+   * The log state array is always populated for programmatic access.
    * @internal
    */
   const addLog = useCallback(
@@ -295,15 +313,32 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         args.length > 0
           ? `${message} ${args.map((arg) => JSON.stringify(arg)).join(" ")}`
           : message;
-      console[level](`[useMcp] ${fullMessage}`);
+      // Route through per-instance logger so logLevel/silent is respected
+      const logMsg = `[useMcp] ${fullMessage}`;
+      switch (level) {
+        case "error":
+          instanceLogger.error(logMsg);
+          break;
+        case "warn":
+          instanceLogger.warn(logMsg);
+          break;
+        case "info":
+          instanceLogger.info(logMsg);
+          break;
+        case "debug":
+          instanceLogger.debug(logMsg);
+          break;
+        default:
+          instanceLogger.info(logMsg);
+      }
       if (isMountedRef.current) {
-        setLog((prevLog) => [
+        setLog((prevLog: UseMcpResult["log"]) => [
           ...prevLog.slice(-100),
           { level, message: fullMessage, timestamp: Date.now() },
         ]);
       }
     },
-    []
+    [instanceLogger]
   );
 
   /**
@@ -436,7 +471,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
       // Normal failure handling
       if (isMountedRef.current) {
-        addLog("debug", "Setting state to FAILED:", errorMessage);
+        instanceLogger.info("[useMcp] Setting state to FAILED:", errorMessage);
         setState("failed");
         setError(errorMessage);
         const manualUrl = authProviderRef.current?.getLastAttemptedAuthUrl?.();
@@ -463,7 +498,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             hasSampling: !!onSampling,
             hasElicitation: !!onElicitation,
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       return false; // Not retrying, connection actually failed
@@ -654,12 +689,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           onElicitation,
           wrapTransport: wrapTransport
             ? (transport: any) => {
-                addLog(
-                  "debug",
-                  `Applying transport wrapper for server: ${serverName} url: ${url}`
-                );
-                return wrapTransport(transport, url);
-              }
+              addLog(
+                "debug",
+                "Applying transport wrapper for server:",
+                serverName,
+                "url:",
+                url
+              );
+              return wrapTransport(transport, url);
+            }
             : undefined,
         });
 
@@ -681,16 +719,17 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Wire up notification handler BEFORE initializing
         // This ensures the handler is registered before setupNotificationHandler() is called during connect()
         session.on("notification", (notification) => {
-          addLog("debug", "Notification received:", notification.method);
+          addLog(
+            "debug",
+            "Notification received:",
+            notification.method,
+            notification
+          );
           // Call user's callback first
           onNotification?.(notification);
 
           // Auto-refresh lists on list_changed notifications
           if (notification.method === "notifications/tools/list_changed") {
-            addLog(
-              "debug",
-              "Tools list changed notification - triggering refresh"
-            );
             addLog("info", "Tools list changed, auto-refreshing...");
             refreshTools().catch((err) => {
               addLog("warn", "Auto-refresh tools failed:", err);
@@ -730,6 +769,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           "Server capabilities:",
           session.connector.serverCapabilities
         );
+
         if (!isMountedRef.current) {
           addLog("debug", "Skipping state update - component unmounted");
           return "failed";
@@ -766,7 +806,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             hasSampling: !!onSampling,
             hasElicitation: !!onElicitation,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         // Get tools, resources, prompts from session connector
         setTools(session.connector.tools || []);
@@ -930,7 +970,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         ) {
           failConnection(
             "Authentication failed (HTTP 401). Server does not support OAuth. " +
-              "Check your Authorization header value is correct."
+            "Check your Authorization header value is correct."
           );
           return "failed";
         }
@@ -945,8 +985,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         ) {
           failConnection(
             "Authentication required (HTTP 401). Server does not support OAuth. " +
-              "Add an Authorization header in the Custom Headers section " +
-              "(e.g., Authorization: Bearer YOUR_API_KEY)."
+            "Add an Authorization header in the Custom Headers section " +
+            "(e.g., Authorization: Bearer YOUR_API_KEY)."
           );
           return "failed";
         }
@@ -959,8 +999,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             // No OAuth support and no custom headers - suggest adding API key
             failConnection(
               "Authentication required (HTTP 401). Server does not support OAuth. " +
-                "Add an Authorization header in the Custom Headers section " +
-                "(e.g., Authorization: Bearer YOUR_API_KEY)."
+              "Add an Authorization header in the Custom Headers section " +
+              "(e.g., Authorization: Bearer YOUR_API_KEY)."
             );
             return "failed";
           }
@@ -1060,7 +1100,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           if (headers && Object.keys(headers).length > 0) {
             failConnection(
               "Authentication failed: Server returned 401 Unauthorized. " +
-                "Check your Authorization header value is correct."
+              "Check your Authorization header value is correct."
             );
             return "failed";
           }
@@ -1068,8 +1108,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // No OAuth and no custom headers - suggest adding them
           failConnection(
             "Authentication required: Server returned 401 Unauthorized. " +
-              "Add an Authorization header in the Custom Headers section " +
-              "(e.g., Authorization: Bearer YOUR_API_KEY)."
+            "Add an Authorization header in the Custom Headers section " +
+            "(e.g., Authorization: Bearer YOUR_API_KEY)."
           );
           return "failed";
         }
@@ -1220,7 +1260,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             success: true,
             executionTimeMs: Date.now() - startTime,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         return result;
       } catch (err) {
@@ -1234,7 +1274,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             errorType: err instanceof Error ? err.name : "UnknownError",
             executionTimeMs: Date.now() - startTime,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         throw err;
       }
@@ -1500,7 +1540,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             resourceUri: uri,
             success: true,
           })
-          .catch(() => {});
+          .catch(() => { });
 
         return result;
       } catch (err) {
@@ -1513,7 +1553,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             success: false,
             errorType: err instanceof Error ? err.name : "UnknownError",
           })
-          .catch(() => {});
+          .catch(() => { });
 
         throw err;
       }
@@ -1563,21 +1603,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    */
   const refreshTools = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
-      addLog(
-        "debug",
-        "Cannot refresh tools - client not ready. State:",
-        stateRef.current
-      );
-      addLog("debug", "Cannot refresh tools - client not ready");
+      addLog("debug", "Cannot refresh tools - client not ready. State:", stateRef.current);
       return;
     }
-    addLog("debug", "Starting tools refresh...");
     addLog("debug", "Refreshing tools list");
     try {
       const serverName = USE_MCP_SERVER_NAME;
       const session = clientRef.current.getSession(serverName);
       if (!session) {
-        addLog("debug", "No active session found for tools refresh");
         addLog("warn", "No active session found for tools refresh");
         return;
       }
@@ -1586,10 +1619,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       const toolsResult = await session.connector.listTools();
       addLog("debug", "listTools returned:", toolsResult?.length, "tools");
       setTools(toolsResult || []);
-      addLog("debug", "setTools called with", toolsResult?.length, "tools");
       addLog("info", "Tools list refreshed successfully");
     } catch (err) {
-      addLog("warn", "Failed to refresh tools:", err);
+      addLog("error", "Failed to refresh tools:", err);
     }
   }, [addLog]);
 
