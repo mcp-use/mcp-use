@@ -8,6 +8,7 @@
     "mcp-use": "1.19.2"
   },
   "changesets": [
+    "chubby-emus-scream",
     "red-sails-shave"
   ]
 }
