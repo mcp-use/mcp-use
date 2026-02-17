@@ -136,6 +136,9 @@ importers:
       react-router-dom:
         specifier: ^7.12.0
         version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tar:
+        specifier: ^7.4.3
+        version: 7.5.7
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -152,6 +155,9 @@ importers:
         specifier: 4.3.5
         version: 4.3.5
     devDependencies:
+      '@types/tar':
+        specifier: ^6.1.13
+        version: 6.1.13
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
@@ -6801,6 +6807,7 @@ packages:
   tar@7.5.7:
     resolution: {integrity: sha512-fov56fJiRuThVFXD6o6/Q354S7pnWMJIVlDBYijsTNx6jKSE4pvrDTs6lUnmGvNyfJwFQQwWy3owKz1ucIhveQ==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   term-size@2.2.1:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}

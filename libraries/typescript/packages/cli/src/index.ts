@@ -14,6 +14,7 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
+import { createSkillsCommand } from "./commands/skills.js";
 
 const program = new Command();
 
@@ -1870,6 +1871,9 @@ program.addCommand(createClientCommand());
 
 // Deployments command
 program.addCommand(createDeploymentsCommand());
+
+// Skills command
+program.addCommand(createSkillsCommand());
 
 // Generate types command
 program
