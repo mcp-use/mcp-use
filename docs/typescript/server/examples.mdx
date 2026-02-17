@@ -44,7 +44,6 @@ A complete weather information server with tools, resources, and UI widgets.
 
 ```typescript
 import { MCPServer } from 'mcp-use/server'
-import express from 'express'
 import axios from 'axios'
 
 // Types
@@ -280,28 +279,30 @@ server.uiResource({
 })
 
 // API endpoints for widget data
-server.get('/api/weather/:city', async (req, res) => {
+server.get('/api/weather/:city', async (c) => {
   try {
-    const weather = await weatherService.getCurrentWeather(req.params.city)
-    res.json(weather)
+    const city = c.req.param('city')
+    const weather = await weatherService.getCurrentWeather(city)
+    return c.json(weather)
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return c.json({ error: error.message }, 500)
   }
 })
 
-server.get('/api/forecast/:city', async (req, res) => {
-  const days = parseInt(req.query.days as string) || 3
+server.get('/api/forecast/:city', async (c) => {
+  const city = c.req.param('city')
+  const days = parseInt(c.req.query('days') || '3')
   try {
-    const forecast = await weatherService.getForecast(req.params.city, days)
-    res.json(forecast)
+    const forecast = await weatherService.getForecast(city, days)
+    return c.json(forecast)
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return c.json({ error: error.message }, 500)
   }
 })
 
 // Health check
-server.get('/health', (req, res) => {
-  res.json({
+server.get('/health', (c) => {
+  return c.json({
     status: 'healthy',
     service: 'weather-service',
     version: '2.0.0',
@@ -554,22 +555,22 @@ SELECT * FROM users LIMIT 10;
 })
 
 // API endpoint for query execution
-server.post('/api/query', async (req, res) => {
-  const { query } = req.body
+server.post('/api/query', async (c) => {
+  const { query } = await c.req.json()
 
   // Security: Only allow SELECT
   if (!query.trim().toLowerCase().startsWith('select')) {
-    return res.status(400).json({ error: 'Only SELECT queries allowed' })
+    return c.json({ error: 'Only SELECT queries allowed' }, 400)
   }
 
   try {
     const result = await pool.query(query)
-    res.json({
+    return c.json({
       rowCount: result.rowCount,
       rows: result.rows
     })
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return c.json({ error: error.message }, 500)
   }
 })
 

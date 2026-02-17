@@ -205,12 +205,12 @@ When you run this server, it will be available at:
 
 ## Architecture Overview
 
-The mcp-use server framework is designed around a modular architecture that seamlessly integrates MCP protocol features with Express.js flexibility. Understanding this architecture helps you build powerful, production-ready MCP servers.
+The mcp-use server framework is designed around a modular architecture that seamlessly integrates MCP protocol features with Hono's flexibility. Understanding this architecture helps you build powerful, production-ready MCP servers.
 
 The framework is built on six fundamental components that work together:
 
 ### **Server Instance**
-The main `MCPServer` class created via `new MCPServer()`. It orchestrates all MCP functionality, manages the Express application, and handles client connections.
+The main `MCPServer` class created via `new MCPServer()`. It orchestrates all MCP functionality, manages the Hono application, and handles client connections.
 
 **Learn more**: See [Configuration](/typescript/server/configuration) for server setup options.
 
@@ -244,12 +244,12 @@ Rich, interactive React components that render in chat clients. Widgets are auto
 **Learn more**: [UI Widgets Guide →](/typescript/server/ui-widgets)
 
 ### **Custom Endpoints Integration**
-Full Express.js and Hono functionality for custom routes, middleware, authentication, static file serving, and more. The server instance is also an Express app.
+Full Hono functionality for custom routes, middleware, authentication, static file serving, and more. The server instance is also a Hono app.
 
 ```typescript
 // Add custom routes
-server.get('/api/mango', (req, res) => {
-  res.json({ fruit: 'mango' })
+server.get('/api/mango', (c) => {
+  return c.json({ fruit: 'mango' })
 })
 ```
 
@@ -271,8 +271,8 @@ class McpServer {
   
   listen(port?: number): Promise<void>
 
-  // Hono/Express proxy - all HTTP methods available
-  // Examples: get(), post(), use(), static(), route()
+  // Hono proxy - all HTTP methods available
+  // Examples: get(), post(), use(), route()
 }
 ```
 

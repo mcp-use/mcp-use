@@ -734,31 +734,24 @@ docker build -t my-mcp-server .
 docker run -p 3000:3000 my-mcp-server
 ```
 
-### Integration with Express
+### Custom Routes
 
-You can also integrate MCP server into existing Express applications:
+The MCPServer instance is a Hono app, so you can add custom routes directly:
 
 ```ts
-import express from "express";
-import { mountMCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use/server";
 
-const app = express();
-
-// Your existing routes
-app.get("/api/health", (req, res) => res.send("OK"));
-
-// Mount MCP server
-const mcpServer = new MCPServer({
-  name: "integrated-server",
-  /* ... */
-});
-mountMCPServer(app, mcpServer, {
-  basePath: "/mcp-service", // Optional custom base path
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
 });
 
-app.listen(3000);
-// Inspector at: http://localhost:3000/mcp-service/inspector
-// MCP endpoint: http://localhost:3000/mcp-service/mcp
+// Add custom routes
+server.get("/api/health", (c) => c.text("OK"));
+
+await server.listen(3000);
+// MCP endpoint: http://localhost:3000/mcp
+// Inspector: http://localhost:3000/inspector
 ```
 
 ## 👥 Contributors

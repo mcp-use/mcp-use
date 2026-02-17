@@ -154,10 +154,10 @@ When debugging an MCP server that requires authentication:
 
 ```typescript
 // Your MCP server
-server.use((req, res, next) => {
-  const apiKey = req.headers["authorization"];
-  if (!apiKey) return res.status(401).json({ error: "Unauthorized" });
-  next();
+server.use(async (c, next) => {
+  const apiKey = c.req.header("authorization");
+  if (!apiKey) return c.json({ error: "Unauthorized" }, 401);
+  await next();
 });
 ```
 

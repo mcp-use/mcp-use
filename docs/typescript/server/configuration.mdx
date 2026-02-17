@@ -426,35 +426,29 @@ const cache = new NodeCache({
 
 // Cache middleware
 function cacheMiddleware(key: string, ttl?: number) {
-  return (req, res, next) => {
-    const cacheKey = `${key}:${JSON.stringify(req.params)}:${JSON.stringify(req.query)}`
+  return async (c, next) => {
+    const url = new URL(c.req.url)
+    const cacheKey = `${key}:${url.pathname}:${url.search}`
     const cached = cache.get(cacheKey)
 
     if (cached) {
-      return res.json(cached)
+      return c.json(cached)
     }
 
-    // Store original json method
-    const originalJson = res.json.bind(res)
+    await next()
 
-    // Override json method to cache response
-    res.json = (data) => {
-      cache.set(cacheKey, data, ttl)
-      return originalJson(data)
-    }
-
-    next()
+    // Cache the response body
+    const body = await c.res.clone().json()
+    cache.set(cacheKey, body, ttl)
   }
 }
 
 // Use cache middleware
-server.get('/api/expensive',
-  cacheMiddleware('expensive-operation', 300),
-  async (req, res) => {
-    const result = await performExpensiveOperation()
-    res.json(result)
-  }
-)
+server.use('/api/expensive', cacheMiddleware('expensive-operation', 300))
+server.get('/api/expensive', async (c) => {
+  const result = await performExpensiveOperation()
+  return c.json(result)
+})
 ```
 
 ### Database Connection Pooling
@@ -660,7 +654,7 @@ spec:
 Implement comprehensive health checks:
 
 ```typescript
-server.get('/health', async (req, res) => {
+server.get('/health', async (c) => {
   const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -690,7 +684,7 @@ server.get('/health', async (req, res) => {
 
   // Return appropriate status code
   const statusCode = health.status === 'healthy' ? 200 : 503
-  res.status(statusCode).json(health)
+  return c.json(health, statusCode)
 })
 ```
 
@@ -717,24 +711,19 @@ const httpRequestDuration = new promClient.Histogram({
 register.registerMetric(httpRequestDuration)
 
 // Middleware to track metrics
-server.use((req, res, next) => {
+server.use(async (c, next) => {
   const start = Date.now()
-
-  res.on('finish', () => {
-    const duration = (Date.now() - start) / 1000
-    httpRequestDuration
-      .labels(req.method, req.route?.path || 'unknown', res.statusCode.toString())
-      .observe(duration)
-  })
-
-  next()
+  await next()
+  const duration = (Date.now() - start) / 1000
+  httpRequestDuration
+    .labels(c.req.method, c.req.path, c.res.status.toString())
+    .observe(duration)
 })
 
 // Metrics endpoint
-server.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType)
+server.get('/metrics', async (c) => {
   const metrics = await register.metrics()
-  res.end(metrics)
+  return c.text(metrics, 200, { 'Content-Type': register.contentType })
 })
 ```
 

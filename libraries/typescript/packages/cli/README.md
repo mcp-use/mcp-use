@@ -403,20 +403,20 @@ EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
-### Integration with Existing Express Apps
+### Serving Built Widgets
 
-If you have an existing Express app, you can mount the built widgets:
+You can serve the built widgets from any Hono app using `serveStatic`:
 
 ```ts
-import express from "express";
-import path from "path";
+import { Hono } from "hono";
+import { serveStatic } from "hono/node-server/serve-static";
 
-const app = express();
+const app = new Hono();
 
 // Serve MCP widgets
 app.use(
-  "/widgets",
-  express.static(path.join(__dirname, "../dist/resources/mcp-use/widgets"))
+  "/widgets/*",
+  serveStatic({ root: "./dist/resources/mcp-use/widgets" })
 );
 
 // Your other routes...
