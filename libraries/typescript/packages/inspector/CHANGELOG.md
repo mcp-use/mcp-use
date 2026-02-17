@@ -1,5 +1,23 @@
 # @mcp-use/inspector
 
+## 0.21.0-canary.1
+
+### Minor Changes
+
+- 894d21a: feat(inspector): enhance ToolsTab with bulk paste functionality and auto-fill dialog
+  - Implemented a new bulk paste feature in the ToolsTab component, allowing users to paste JSON or JavaScript object syntax directly into input fields.
+  - Added an auto-fill dialog to confirm updates when pasted data would overwrite existing values, improving user experience and data integrity.
+  - Introduced utility functions for parsing pasted text and converting JavaScript object syntax to valid JSON.
+  - Updated ToolInputForm and ToolExecutionPanel components to support the new bulk paste functionality and visual feedback for auto-filled fields.
+
+### Patch Changes
+
+- 894d21a: feat(inspector): update ToolExecutionPanel to copy full tool definition
+  fix(server): correctly convert nested inpout schema args for tools
+- Updated dependencies [894d21a]
+- Updated dependencies [894d21a]
+  - mcp-use@1.19.2-canary.1
+
 ## 0.20.2-canary.0
 
 ### Patch Changes

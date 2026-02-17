@@ -8,6 +8,8 @@
     "mcp-use": "1.19.1"
   },
   "changesets": [
+    "bright-spies-shop",
+    "red-geese-repair",
     "six-zoos-sleep"
   ]
 }
