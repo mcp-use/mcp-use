@@ -296,6 +296,55 @@ Removes authentication credentials from `~/.mcp-use/config.json`.
 
 ---
 
+### Skills Commands
+
+#### `skills add` - Install AI Agent Skills
+
+```bash
+mcp-use skills add [options]
+```
+
+Downloads the latest mcp-use skills from [github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use) and installs them into all agent preset directories.
+
+**What happens:**
+
+1. Downloads the latest skills from GitHub
+2. Installs them into all agent preset directories:
+   - `.cursor/skills/` (Cursor)
+   - `.claude/skills/` (Claude Code)
+   - `.agent/skills/` (Codex)
+
+**Options:**
+
+| Option              | Description       | Default           |
+| ------------------- | ----------------- | ----------------- |
+| `-p, --path <path>` | Project directory | Current directory |
+
+**Examples:**
+
+```bash
+# Install skills in current project
+mcp-use skills add
+
+# Install skills in a specific project
+mcp-use skills add -p ./my-server
+```
+
+#### `skills install` - Alias for `skills add`
+
+```bash
+mcp-use skills install [options]
+```
+
+Identical to `skills add`. Use whichever you prefer.
+
+<Tip>
+  Skills are also installed automatically when creating a new project with
+  `create-mcp-use-app` (unless `--no-skills` is passed).
+</Tip>
+
+---
+
 ## Build Artifacts & Generated Files
 
 The CLI generates several files during build, deployment, and development. Understanding these files helps with debugging and advanced configuration.
