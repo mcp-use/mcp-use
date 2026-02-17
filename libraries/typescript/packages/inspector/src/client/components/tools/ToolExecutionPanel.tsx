@@ -74,12 +74,8 @@ export function ToolExecutionPanel({
   // Copy metadata to clipboard
   const copyMetadataToClipboard = () => {
     if (!selectedTool) return;
-    const metadata = {
-      name: selectedTool.name,
-      description: selectedTool.description || "",
-      _meta: (selectedTool as any)._meta,
-    };
-    navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
+    // Copy the full tool definition instead of cherry-picking fields
+    navigator.clipboard.writeText(JSON.stringify(selectedTool, null, 2));
     setCopiedMetadata(true);
     setTimeout(() => setCopiedMetadata(false), 2000);
   };
@@ -336,11 +332,7 @@ export function ToolExecutionPanel({
           </DialogHeader>
 
           <JSONDisplay
-            data={{
-              name: selectedTool.name,
-              description: selectedTool.description || "(no description)",
-              _meta: (selectedTool as any)._meta || null,
-            }}
+            data={selectedTool}
             filename={`tool-definition-${selectedTool.name}-${Date.now()}.json`}
           />
         </DialogContent>
