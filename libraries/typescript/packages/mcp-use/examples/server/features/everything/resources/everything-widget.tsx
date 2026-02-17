@@ -238,7 +238,7 @@ class CustomErrorBoundary extends Component<CustomErrorBoundaryProps, CustomErro
 // ============================================================================
 
 export default function EverythingWidget() {
-  // Core hook with generic type parameter
+  // Core hook with generic type parameter — UseWidgetResult<Props> validates return type
   const {
     props,
     isPending,
@@ -255,7 +255,7 @@ export default function EverythingWidget() {
     locale,
     mcp_url,
     isAvailable,
-  } = useWidget<Props>();
+  }: UseWidgetResult<Props> = useWidget<Props>();
 
   // Standalone hooks — exercises their type signatures
   const standaloneProps = useWidgetProps<Props>();
