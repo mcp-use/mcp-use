@@ -369,26 +369,25 @@ server.tool(
 
 ### Rate Limiting
 
-Prevent abuse using middleware packages:
+Prevent abuse using `hono-rate-limiter`:
 
 ```typescript
-import rateLimit from "express-rate-limit";
+import { rateLimiter } from "hono-rate-limiter";
 
-// General rate limiter
-const limiter = rateLimit({
+server.use(rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window per IP
-  message: "Too many requests, please try again later"
-});
-
-// Apply to all routes
-server.use(limiter);
-
-// Or scope to specific paths
-server.use("/api/", limiter);
+  limit: 100, // 100 requests per window per key
+  keyGenerator: (c) =>
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req.header("cf-connecting-ip") ??
+    c.req.header("x-real-ip") ??
+    "unknown",
+}));
 ```
 
-**Note:** mcp-use is built on Hono. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
+> Adjust the key generator depending on your hosting environment.
+
+**Note:** mcp-use is built on Hono. Use Hono-compatible middleware — Express middleware (e.g., `express-rate-limit`) is **not** compatible. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
 
 ---
 

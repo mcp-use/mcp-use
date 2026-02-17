@@ -107,16 +107,23 @@ server.app.use(async (c, next) => {
 
 ### Using Middleware Packages
 
-Many Express middleware packages work via compatibility:
+Use Hono-compatible middleware packages. Express middleware (e.g., `express-rate-limit`, `helmet`) is **not** compatible with `server.use()`.
 
 ```typescript
-import rateLimit from "express-rate-limit";
+import { rateLimiter } from "hono-rate-limiter";
 
-// These packages adapt to Hono automatically
-server.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+server.use(rateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  keyGenerator: (c) =>
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    c.req.header("cf-connecting-ip") ??
+    c.req.header("x-real-ip") ??
+    "unknown",
+}));
 ```
 
-**Recommended:** Use established packages rather than writing custom middleware.
+**Recommended:** Use established Hono-compatible packages rather than writing custom middleware.
 
 ---
 
@@ -251,10 +258,10 @@ server.use(async (c, next) => {
 
 ## Best Practices
 
-### 1. Use Middleware Packages
+### 1. Use Hono-Compatible Middleware Packages
 ```typescript
-✅ import rateLimit from "express-rate-limit";
-✅ server.use(rateLimit({ ... }));
+✅ import { rateLimiter } from "hono-rate-limiter";
+✅ server.use(rateLimiter({ ... }));
 
 ❌ Writing custom rate limiting logic
 ```
