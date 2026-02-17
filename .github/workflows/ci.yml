@@ -649,6 +649,10 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
+      - name: Type-check everything example
+        working-directory: libraries/typescript/packages/mcp-use/examples/server/features/everything
+        run: pnpm lint
+
   typescript-test-mcp-use:
     needs: typescript-lint
     name: "typescript/mcp-use (node-${{ matrix.node-version }})"
