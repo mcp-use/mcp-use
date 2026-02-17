@@ -4,7 +4,7 @@
 
 name: mcp-use
 display_name: mcp-use
-version: "0.1.0"
+manifest_version: "1.0"
 description: >
   The easiest way to interact with MCP servers using custom agents.
   Connect any LLM to any MCP server with minimal setup — supports
@@ -43,9 +43,9 @@ runtime:
   language: python
   min_python: "3.10"
 
-discovery:
-  protocol: mcp
+protocols:
+  - mcp
   role: client
-  transport:
+transport:
     - stdio
     - sse
