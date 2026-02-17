@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.21.0",
     "mcp-use": "1.19.2"
   },
-  "changesets": []
+  "changesets": [
+    "red-sails-shave"
+  ]
 }
