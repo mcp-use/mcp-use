@@ -38,26 +38,42 @@ export function buildDualProtocolMetadata(
   const mcpAppsToolMeta = adapters.mcpApps.buildToolMetadata(definition, uri);
   const appsSdkToolMeta = adapters.appsSdk.buildToolMetadata(definition, uri);
 
-  // Build resource metadata for both protocols
-  const mcpAppsResourceMeta =
-    adapters.mcpApps.buildResourceMetadata(definition);
+  // Apps SDK resource metadata (openai/widgetCSP, openai/description) goes on tool
+  // metadata because ChatGPT reads these from the tool definition.
   const appsSdkResourceMeta =
     adapters.appsSdk.buildResourceMetadata(definition);
 
-  // Deep merge the ui metadata (resource metadata first, tool metadata last to preserve resourceUri)
-  const mergedUiMeta = {
-    ...(mcpAppsResourceMeta._meta?.ui || {}),
-    ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
-  };
+  // Per MCP Apps spec (SEP-1865): tool _meta.ui should only contain
+  // resourceUri and visibility. CSP, prefersBorder, domain, and description
+  // belong on the resource _meta.ui (in resources/list and resources/read),
+  // NOT on the tool definition. So we don't merge mcpAppsResourceMeta here.
 
-  // Combine all metadata
   return {
     ...existingMetadata,
-    ...mcpAppsToolMeta,
-    ...appsSdkToolMeta,
-    ...(appsSdkResourceMeta._meta || {}),
-    ui: mergedUiMeta,
+    ...mcpAppsToolMeta, // ui: { resourceUri }, "ui/resourceUri"
+    ...appsSdkToolMeta, // "openai/outputTemplate"
+    ...(appsSdkResourceMeta._meta || {}), // "openai/widgetCSP", "openai/description"
   };
+}
+
+/**
+ * Build MCP Apps resource metadata with CSP, prefersBorder, domain etc.
+ *
+ * Per MCP Apps spec (SEP-1865), these fields belong on the resource _meta.ui,
+ * not on the tool definition.
+ *
+ * @param definition - UI resource definition
+ * @returns Resource metadata with _meta.ui containing CSP etc.
+ */
+export function buildResourceUiMeta(
+  definition: UIResourceDefinition
+): Record<string, unknown> | undefined {
+  const adapters = createProtocolAdapters();
+  const mcpAppsResourceMeta =
+    adapters.mcpApps.buildResourceMetadata(definition);
+  return (
+    (mcpAppsResourceMeta._meta?.ui as Record<string, unknown>) || undefined
+  );
 }
 
 /**

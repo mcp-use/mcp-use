@@ -37,6 +37,7 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
+import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
 // Import and re-export tool context types for public API
@@ -833,10 +834,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       registration.config.description = updates.description;
     }
     if (updates._meta !== undefined) {
-      // Merge _meta to preserve existing fields like openai/outputTemplate
+      // Deep-merge _meta: shallow spread for top-level keys, but deep-merge
+      // the `ui` object so nested fields (e.g. resourceUri) are preserved
+      const existingMeta = registration.config._meta || {};
+      const incomingMeta = updates._meta;
+      const mergedUi =
+        existingMeta.ui || incomingMeta.ui
+          ? {
+              ...(existingMeta.ui as Record<string, unknown> | undefined),
+              ...(incomingMeta.ui as Record<string, unknown> | undefined),
+            }
+          : undefined;
       registration.config._meta = {
-        ...registration.config._meta,
-        ...updates._meta,
+        ...existingMeta,
+        ...incomingMeta,
+        ...(mergedUi !== undefined ? { ui: mergedUi } : {}),
       };
     }
     if ("schema" in updates) {
@@ -853,10 +865,25 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           toolEntry.description = updates.description;
         }
         if (updates._meta !== undefined) {
-          // Merge _meta to preserve existing fields like openai/outputTemplate
+          // Deep-merge _meta: shallow spread for top-level keys, but deep-merge
+          // the `ui` object so nested CSP/description/resourceUri fields are preserved
+          const existingEntryMeta = toolEntry._meta || {};
+          const incomingEntryMeta = updates._meta;
+          const mergedEntryUi =
+            existingEntryMeta.ui || incomingEntryMeta.ui
+              ? {
+                  ...(existingEntryMeta.ui as
+                    | Record<string, unknown>
+                    | undefined),
+                  ...(incomingEntryMeta.ui as
+                    | Record<string, unknown>
+                    | undefined),
+                }
+              : undefined;
           toolEntry._meta = {
-            ...toolEntry._meta,
-            ...updates._meta,
+            ...existingEntryMeta,
+            ...incomingEntryMeta,
+            ...(mergedEntryUi !== undefined ? { ui: mergedEntryUi } : {}),
           };
         }
         if ("schema" in updates) {
@@ -1294,9 +1321,40 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
         // Update in place to preserve order
         if (nativeServer._registeredTools?.[key]) {
+          let enrichedConfig = config as ToolDefinition;
+
+          // Check if this is a widget tool
+          const isWidgetTool = !!(config as any)?.widget;
+
+          // For widget tools, preserve dual-protocol metadata from the existing tool
+          // The new config from HMR only has basic metadata from server.tool() call
+          // We need to preserve ui/*, openai/widgetCSP, etc. from the initial registration
+          const oldEntry = nativeServer._registeredTools?.[key];
+          if (isWidgetTool && oldEntry?._meta) {
+            const oldMeta = oldEntry._meta || {};
+            const newMeta = enrichedConfig._meta || {};
+
+            // Deep merge: preserve dual-protocol metadata, update basic fields.
+            // IMPORTANT: Mutate config._meta directly (not create a new object) so that
+            // the change is reflected in syncPrimitive's updatedRegistrations map, which
+            // holds a reference to the same config object. If we create a detached object,
+            // syncPrimitive replaces this.registrations.tools and the enrichment is lost.
+            const mergedMeta = {
+              ...oldMeta, // Keep all dual-protocol metadata
+              ...newMeta, // Update with new basic metadata
+              // Deep merge the ui object specifically to preserve both old and new fields
+              ui: {
+                ...((oldMeta.ui as Record<string, unknown>) || {}),
+                ...((newMeta.ui as Record<string, unknown>) || {}),
+              },
+            };
+            (config as any)._meta = mergedMeta;
+            enrichedConfig = config as ToolDefinition;
+          }
+
           const newEntry = createToolEntry(
             key,
-            config as ToolDefinition,
+            enrichedConfig,
             handler,
             nativeServer,
             session
@@ -1854,6 +1912,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
     this.registeredResources = Array.from(this.registrations.resources.keys());
 
+    // Regenerate tool registry types if tools changed
+    if (
+      process.env.NODE_ENV !== "production" &&
+      (toolsResult.changes.added.length ||
+        toolsResult.changes.removed.length ||
+        toolsResult.changes.updated.length)
+    ) {
+      // Dynamic import to avoid issues in browser/edge environments
+      import("./utils/tool-registry-generator.js")
+        .then(({ generateToolRegistryTypes }) =>
+          generateToolRegistryTypes(this.registrations.tools)
+        )
+        .catch((error) => {
+          console.debug(
+            "[TypeGen] Failed to regenerate tool registry:",
+            error instanceof Error ? error.message : String(error)
+          );
+        });
+    }
+
     // --- CUSTOM HTTP ROUTES ---
     // Sync custom HTTP route handlers (registered via server.get(), server.post(), etc.)
     // The middleware installed at startup reads from _customRoutes at request time,
@@ -2198,11 +2276,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           | undefined;
 
         if (widgetType === "mcpApps") {
-          // Generate dual-protocol metadata for mcpApps widgets
-          const mcpAppsAdapter = new McpAppsAdapter();
-          const appsSdkAdapter = new AppsSdkAdapter();
-
-          // Create a definition for adapter calls with metadata field
+          // Create a definition for the dual-protocol metadata builder
           const adapterDef = {
             type: "mcpApps" as const,
             name: widgetName,
@@ -2210,34 +2284,18 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
           };
 
-          // Build both tool and resource metadata
-          const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
+          // Build dual-protocol tool metadata using the shared helper.
+          // Per MCP Apps spec (SEP-1865): tool _meta.ui only has resourceUri.
+          // CSP belongs on the resource, not the tool. Apps SDK fields (openai/*)
+          // DO go on the tool for ChatGPT compatibility.
+          const dualMeta = buildDualProtocolMetadata(
             adapterDef as any,
-            outputTemplate
+            outputTemplate,
+            toolDefinition._meta
           );
-          const mcpAppsResourceMeta = mcpAppsAdapter.buildResourceMetadata(
-            adapterDef as any
-          );
-          const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
-            adapterDef as any,
-            outputTemplate
-          );
-          const appsSdkResourceMeta = appsSdkAdapter.buildResourceMetadata(
-            adapterDef as any
-          );
-
-          // Deep merge the ui metadata
-          const mergedUiMeta = {
-            ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
-            ...(mcpAppsResourceMeta._meta?.ui || {}),
-          };
 
           toolDefinition._meta = {
-            ...toolDefinition._meta,
-            ...mcpAppsToolMeta,
-            ...appsSdkToolMeta,
-            ...(appsSdkResourceMeta._meta || {}),
-            ui: mergedUiMeta,
+            ...dualMeta,
             "openai/toolInvocation/invoking":
               widgetConfig.invoking ?? `Loading ${widgetName}...`,
             "openai/toolInvocation/invoked":
@@ -3579,6 +3637,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Log registered items before starting server
     this.logRegisteredItems();
+
+    // Generate tool registry types for development
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const { generateToolRegistryTypes } =
+          await import("./utils/tool-registry-generator.js");
+        await generateToolRegistryTypes(this.registrations.tools);
+      } catch (error) {
+        // Don't crash if type generation fails
+        console.debug(
+          "[TypeGen] Failed to generate tool registry:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
 
     // Track server run event
     this._trackServerRun("http");

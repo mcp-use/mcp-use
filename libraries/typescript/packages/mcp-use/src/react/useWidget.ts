@@ -12,6 +12,7 @@ import {
 } from "react";
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { WIDGET_DEFAULTS } from "./constants.js";
+import { normalizeCallToolResponse } from "./widget-utils.js";
 import type {
   CallToolResponse,
   DisplayMode,
@@ -433,17 +434,15 @@ export function useWidget<
     ): Promise<CallToolResponse> => {
       if (provider === "mcp-apps") {
         const bridge = getMcpAppsBridge();
-        const result = await bridge.callTool(name, args);
-        // Convert to CallToolResponse format
-        return {
-          content: [{ type: "text", text: JSON.stringify(result) }],
-        };
+        const raw = await bridge.callTool(name, args);
+        return normalizeCallToolResponse(raw);
       }
 
       if (!window.openai?.callTool) {
         throw new Error("window.openai.callTool is not available");
       }
-      return window.openai.callTool(name, args);
+      const raw = await window.openai.callTool(name, args);
+      return normalizeCallToolResponse(raw);
     },
     [provider]
   );

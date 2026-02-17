@@ -696,6 +696,89 @@ mcp-use dev --no-open
 
 ---
 
+### `generate-types` - Type Generation
+
+Generate TypeScript type definitions for your MCP tools from Zod schemas.
+
+```bash
+mcp-use generate-types [options]
+```
+
+**What it does:**
+
+1. Scans your server's tool registrations
+2. Converts Zod schemas to TypeScript types
+3. Generates `.mcp-use/tool-registry.d.ts` with type augmentation
+4. Enables full TypeScript IntelliSense in widget code
+
+**Options:**
+
+| Option              | Description                | Default           |
+| ------------------- | -------------------------- | ----------------- |
+| `-p, --path <path>` | Project directory          | Current directory |
+| `--server <file>`   | Server entry file          | `index.ts`        |
+
+**Examples:**
+
+```bash
+# Generate types for current project
+mcp-use generate-types
+
+# Custom project path
+mcp-use generate-types -p ./my-server
+
+# Custom server entry file
+mcp-use generate-types --server src/server.ts
+```
+
+**Generated output:**
+
+Creates `.mcp-use/tool-registry.d.ts` that augments the `ToolRegistry` interface:
+
+```typescript
+// .mcp-use/tool-registry.d.ts (auto-generated - DO NOT EDIT)
+declare module "mcp-use/react" {
+  interface ToolRegistry {
+    "search-flights": {
+      input: { destination: string; date?: string };
+      output: { flights: Array<{ id: string; price: number }> };
+    };
+    "book-flight": {
+      input: { flightId: string };
+      output: { confirmation: string };
+    };
+  }
+}
+```
+
+**When to use:**
+
+<Tip>
+Type generation is **automatic** during `mcp-use dev`. You typically don't need to run this command manually.
+</Tip>
+
+Run manually when:
+- Setting up CI/CD pipelines
+- After pulling changes that modify tool schemas
+- Troubleshooting type inference issues
+- Building without running dev server
+
+**TypeScript configuration:**
+
+Ensure your `tsconfig.json` includes the generated types:
+
+```json
+{
+  "include": ["index.ts", "src/**/*", "resources/**/*", ".mcp-use/**/*"]
+}
+```
+
+**How it works:**
+
+The CLI introspects your server's tool registrations and converts Zod schemas to TypeScript type strings. The generated file uses TypeScript's module augmentation to add types to the `ToolRegistry` interface, which `useCallTool` uses for automatic type inference.
+
+---
+
 ## Next Steps
 
 - [Server Configuration](/typescript/server/configuration) - Advanced server configuration

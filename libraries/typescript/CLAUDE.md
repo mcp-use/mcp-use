@@ -83,6 +83,47 @@ Select affected packages, choose semver bump (patch/minor/major), write summary.
 - **Zod Validation**: Schema validation for tool inputs
 - **Workspace Dependencies**: Use `workspace:*` for internal deps
 
+### Type Generation System
+
+**Core files:**
+- `packages/mcp-use/src/server/utils/tool-registry-generator.ts` - Main type generation logic
+- `packages/mcp-use/src/server/utils/zod-to-ts.ts` - Zod → TypeScript conversion
+- `packages/mcp-use/src/react/generateHelpers.ts` - Manual type generation for advanced use
+- `packages/mcp-use/src/react/useCallTool.ts` - Type-safe React hook for calling tools
+
+**Trigger points:**
+- Server initialization (development only, skipped in production)
+- Tool registration changes (HMR)
+- Widget file changes (dev server)
+- Manual: `mcp-use generate-types` CLI command
+
+**How it works:**
+1. Collects all registered tools with Zod schemas
+2. Converts each schema to TypeScript type string using `zodToTsType()`
+3. Generates module augmentation for `ToolRegistry` interface
+4. Writes to `.mcp-use/tool-registry.d.ts`
+5. TypeScript compiler picks up changes automatically
+6. `useCallTool` hook uses augmented `ToolRegistry` for type inference
+
+**Output format:**
+```typescript
+// .mcp-use/tool-registry.d.ts
+declare module "mcp-use/react" {
+  interface ToolRegistry {
+    "tool-name": {
+      input: { /* Zod schema converted to TS type */ };
+      output: { /* Inferred from structuredContent */ };
+    };
+  }
+}
+```
+
+**Key features:**
+- Deterministic: Sorts tools alphabetically for consistent output
+- Safe: Compares content before writing (avoids unnecessary file writes)
+- Non-blocking: Type generation failures don't crash the server
+- Production-safe: Automatically skipped in `NODE_ENV=production`
+
 ## Code Style
 
 - ESLint + Prettier (auto-run via Husky pre-commit)

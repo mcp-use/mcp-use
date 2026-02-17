@@ -66,6 +66,10 @@ my-widget-server/
   out of the box using `type: "mcpApps"`.
 </Note>
 
+<Tip>
+**Type Generation**: When you run `mcp-use dev`, TypeScript types are automatically generated from your tool definitions. This gives your widgets full IntelliSense for tool calls.
+</Tip>
+
 ## Step 2: Understanding the Server Setup
 
 Let's examine the server entry point (`index.ts`):
@@ -253,7 +257,111 @@ server.tool(
 // The LLM can now call 'user-profile' tool with the data
 ```
 
-## Step 5: Configure Apps SDK Metadata
+## Step 5: Create Interactive Widgets with useCallTool
+
+Widgets can call MCP tools to perform actions and fetch data. The `useCallTool` hook provides type-safe tool calling with automatic IntelliSense.
+
+Create `resources/search-widget.tsx`:
+
+```tsx
+import React from "react";
+import { z } from "zod";
+import { useWidget, useCallTool, type WidgetMetadata } from "mcp-use/react";
+
+const propSchema = z.object({
+  query: z.string().describe("Search query"),
+});
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "Interactive search widget with live results",
+  props: propSchema,
+};
+
+type SearchWidgetProps = z.infer<typeof propSchema>;
+
+const SearchWidget: React.FC = () => {
+  const { props, isPending: propsPending } = useWidget<SearchWidgetProps>();
+  const { callTool, data, isPending, isError, error } = 
+    useCallTool("perform-search");
+
+  React.useEffect(() => {
+    if (props.query && !propsPending) {
+      // Automatically search when query changes
+      callTool({ query: props.query });
+    }
+  }, [props.query, propsPending]);
+
+  if (propsPending) {
+    return <div className="animate-pulse">Loading...</div>;
+  }
+
+  return (
+    <div className="search-widget p-4">
+      <h3 className="text-lg font-semibold mb-2">
+        Searching for: {props.query}
+      </h3>
+      
+      {isPending && (
+        <p className="text-gray-600">Loading results...</p>
+      )}
+      
+      {isError && (
+        <p className="text-red-600">Error: {error.message}</p>
+      )}
+      
+      {data && (
+        <ul className="space-y-2">
+          {data.structuredContent.results.map((result, i) => (
+            <li key={i} className="border-b pb-2">
+              <h4 className="font-medium">{result.title}</h4>
+              <p className="text-sm text-gray-600">{result.description}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+export default SearchWidget;
+```
+
+**Add the corresponding tool:**
+
+```typescript
+server.tool(
+  {
+    name: "perform-search",
+    description: "Search for items",
+    schema: z.object({ 
+      query: z.string().describe("Search query") 
+    }),
+  },
+  async ({ query }) => {
+    // Simulate search
+    const results = [
+      { title: `Result 1 for "${query}"`, description: "First result" },
+      { title: `Result 2 for "${query}"`, description: "Second result" },
+    ];
+
+    return text(JSON.stringify(results));
+  },
+);
+```
+
+**Key features:**
+- Receives initial `query` via props (from tool input)
+- Uses `useCallTool` to call another tool for data
+- Automatically typed with IntelliSense
+- Real-time search results with loading states
+
+<Info>
+**Type Safety**: Because `mcp-use dev` generates types automatically, you get full autocomplete for tool names, inputs, and outputs. The `callTool` function knows exactly what parameters `"perform-search"` expects!
+</Info>
+
+See [useCallTool()](/typescript/server/widget-components/usecalltool) for more patterns including callbacks, async/await, and error handling.
+
+## Step 6: Configure Apps SDK Metadata
 
 For production widgets, you may want to customize Apps SDK metadata. You can do this manually:
 
@@ -304,7 +412,7 @@ See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documenta
 
 </Note>
 
-## Step 6: Testing Your Server
+## Step 7: Testing Your Server
 
 ### Start the Development Server
 
@@ -340,7 +448,7 @@ This starts:
 2. Ask ChatGPT: "Show me a user profile for Jane Smith, email jane@example.com, role admin"
 3. ChatGPT will call the `user-profile` tool and display the widget
 
-## Step 7: Advanced Widget Features
+## Step 8: Advanced Widget Features
 
 ### Accessing Tool Output
 
@@ -391,7 +499,7 @@ const MyWidget: React.FC = () => {
 };
 ```
 
-## Step 8: Production Configuration
+## Step 9: Production Configuration
 
 ### Environment Variables
 
@@ -435,7 +543,7 @@ This ensures:
 - CSP includes your server domain
 - Works behind proxies and custom domains
 
-## Step 9: Deployment
+## Step 10: Deployment
 
 ### Deploy to mcp-use Cloud
 

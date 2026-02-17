@@ -593,6 +593,8 @@ if (container && Component) {
           // Import helpers for widget registration
           const { slugifyWidgetName, processWidgetHtml } =
             await import("./widget-helpers.js");
+          const { buildDualProtocolMetadata, getBuildIdPart } =
+            await import("./protocol-helpers.js");
 
           // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
           const widgetType =
@@ -600,11 +602,7 @@ if (container && Component) {
               ? "appsSdk"
               : "mcpApps";
           const slugifiedName = slugifyWidgetName(widgetName);
-
-          // Debug logging
-          console.log(
-            `[WIDGET-HMR] ${widgetName} - Type: ${widgetType}, Has metadata: ${!!metadata.metadata}`
-          );
+          const description = metadata.description || `Widget: ${widgetName}`;
 
           // Re-read and process HTML for the update
           const htmlPath = pathHelpers.join(
@@ -627,26 +625,70 @@ if (container && Component) {
             );
           }
 
-          // Use the update callback to update tool in place with complete metadata
-          // Pass the raw Zod schema - the server will convert it internally
-          const updated = updateWidgetTool(widgetName, {
-            description: metadata.description || `Widget: ${widgetName}`,
-            schema: schemaField,
-            _meta: {
-              "mcp-use/widget": {
-                name: widgetName,
-                slugifiedName: slugifiedName,
-                title: metadata.title || widgetName,
-                description: metadata.description,
-                type: widgetType,
-                props: schemaField,
-                html: html,
-                dev: true,
-                exposeAsTool: metadata.exposeAsTool ?? true,
-              },
-              // Include unified metadata for dual-protocol support (MCP Apps)
-              ...(metadata.metadata ? { ui: metadata.metadata } : { ui: {} }),
+          // Build the resource URI (same as initial registration)
+          const buildIdPart = getBuildIdPart(undefined); // dev mode has no buildId
+          const resourceUri = `ui://widget/${widgetName}${buildIdPart}.html`;
+
+          // Enrich CSP with server origin for the Apps SDK openai/widgetCSP field.
+          // Per MCP Apps spec: CSP doesn't go on tool _meta.ui (that's resource-only),
+          // but the Apps SDK protocol (openai/widgetCSP) DOES put CSP on the tool.
+          const serverOrigin = serverConfig.serverBaseUrl
+            ? new URL(serverConfig.serverBaseUrl).origin
+            : null;
+          let enrichedCspMetadata = metadata.metadata as
+            | Record<string, any>
+            | undefined;
+          if (serverOrigin && enrichedCspMetadata?.csp) {
+            const csp = { ...enrichedCspMetadata.csp };
+            for (const field of [
+              "connectDomains",
+              "resourceDomains",
+              "baseUriDomains",
+            ] as const) {
+              if (csp[field] && !csp[field].includes(serverOrigin)) {
+                csp[field] = [...csp[field], serverOrigin];
+              } else if (!csp[field]) {
+                csp[field] = [serverOrigin];
+              }
+            }
+            enrichedCspMetadata = { ...enrichedCspMetadata, csp };
+          }
+
+          const hmrDefinition = {
+            name: widgetName,
+            type: widgetType,
+            description: description as string,
+            metadata: enrichedCspMetadata,
+          };
+
+          // Build dual-protocol _meta for the tool definition:
+          // - MCP Apps: ui.resourceUri, ui/resourceUri (deprecated)
+          // - Apps SDK: openai/outputTemplate, openai/widgetCSP, openai/description
+          const dualProtocolMeta = buildDualProtocolMetadata(
+            hmrDefinition as any,
+            resourceUri
+          );
+
+          // Assemble full _meta: mcp-use/widget + dual-protocol fields
+          const fullMeta: Record<string, unknown> = {
+            "mcp-use/widget": {
+              name: widgetName,
+              slugifiedName: slugifiedName,
+              title: metadata.title || widgetName,
+              description: description,
+              type: widgetType,
+              props: schemaField,
+              html: html,
+              dev: true,
+              exposeAsTool: metadata.exposeAsTool ?? true,
             },
+            ...dualProtocolMeta,
+          };
+
+          const updated = updateWidgetTool(widgetName, {
+            description: description,
+            schema: schemaField,
+            _meta: fullMeta,
           });
 
           if (updated) {
@@ -719,6 +761,15 @@ if (container && Component) {
                 true // isHmrUpdate
               );
               console.log(`[WIDGETS] Reloaded metadata for ${widget.name}`);
+
+              // Regenerate tool registry types
+              import("../utils/tool-registry-generator.js")
+                .then(({ generateToolRegistryTypes }) =>
+                  generateToolRegistryTypes(server.registrations.tools)
+                )
+                .catch(() => {
+                  /* Ignore errors */
+                });
             } catch (error) {
               console.warn(
                 `[WIDGET] Failed to reload metadata for ${widget.name}:`,
@@ -755,6 +806,15 @@ if (container && Component) {
               await extractAndRegisterWidget(widgetName, filePath);
 
               console.log(`[WIDGETS] New widget added: ${widgetName}`);
+
+              // Regenerate tool registry types
+              import("../utils/tool-registry-generator.js")
+                .then(({ generateToolRegistryTypes }) =>
+                  generateToolRegistryTypes(server.registrations.tools)
+                )
+                .catch(() => {
+                  /* Ignore errors */
+                });
             } catch (error) {
               console.warn(
                 `[WIDGET] Failed to add new widget ${widgetName}:`,
@@ -787,6 +847,15 @@ if (container && Component) {
                 await extractAndRegisterWidget(widgetName, filePath);
 
                 console.log(`[WIDGETS] New widget added: ${widgetName}`);
+
+                // Regenerate tool registry types
+                import("../utils/tool-registry-generator.js")
+                  .then(({ generateToolRegistryTypes }) =>
+                    generateToolRegistryTypes(server.registrations.tools)
+                  )
+                  .catch(() => {
+                    /* Ignore errors */
+                  });
               } catch (error) {
                 console.warn(
                   `[WIDGET] Failed to add new widget ${widgetName}:`,

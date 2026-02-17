@@ -26,6 +26,7 @@ import {
 } from "./widget-helpers.js";
 import {
   buildDualProtocolMetadata,
+  buildResourceUiMeta,
   generateToolOutput,
   getBuildIdPart,
 } from "./protocol-helpers.js";
@@ -193,9 +194,11 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       enrichedDefinition.type === "mcpApps") &&
     enrichedDefinition._meta
   ) {
+    // Store the entire enrichedDefinition for HMR metadata regeneration
     server.widgetDefinitions.set(enrichedDefinition.name, {
       ...enrichedDefinition._meta,
       "mcp-use/widgetType": enrichedDefinition.type,
+      "mcp-use/fullDefinition": enrichedDefinition, // Store full definition for HMR
     } as Record<string, unknown>);
 
     // Update any existing tools that reference this widget
@@ -273,6 +276,17 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
   // Skip resource registration if this is an update (resources don't change, only metadata)
   if (!isUpdate) {
+    // Per MCP Apps spec (SEP-1865): resource _meta.ui should contain CSP,
+    // prefersBorder, domain, permissions. Build it from the enriched definition.
+    const resourceUiMeta =
+      enrichedDefinition.type === "mcpApps"
+        ? buildResourceUiMeta(enrichedDefinition)
+        : undefined;
+    const resourceMeta = {
+      ...enrichedDefinition._meta,
+      ...(resourceUiMeta ? { ui: resourceUiMeta } : {}),
+    };
+
     // Register the resource
     server.resource({
       name: enrichedDefinition.name,
@@ -280,7 +294,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       title: enrichedDefinition.title,
       description: enrichedDefinition.description,
       mimeType,
-      _meta: enrichedDefinition._meta,
+      _meta: resourceMeta,
       annotations: enrichedDefinition.annotations,
       readCallback: async () => {
         // For externalUrl type, use default props. For others, use empty params
@@ -321,7 +335,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           description: enrichedDefinition.description,
           mimeType,
         },
-        _meta: enrichedDefinition._meta,
+        _meta: resourceMeta,
         title: enrichedDefinition.title,
         description: enrichedDefinition.description,
         annotations: enrichedDefinition.annotations,
@@ -486,12 +500,6 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         server.registrations?.tools?.get(enrichedDefinition.name)?.config
           ?._meta || toolMetadata;
 
-      // Debug logging
-      console.log(
-        `[TOOL CALLBACK] ${enrichedDefinition.name} - currentToolMeta.ui:`,
-        currentToolMeta.ui ? "present" : "missing"
-      );
-
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         enrichedDefinition,
@@ -560,25 +568,14 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           uniqueUri
         );
 
-        // Deep merge to preserve ui.csp and other nested fields from current tool metadata
-        const existingUi = currentToolMeta.ui as
-          | Record<string, unknown>
-          | undefined;
-        const mcpAppsUi = mcpAppsUniqueMeta.ui as
-          | Record<string, unknown>
-          | undefined;
-
+        // Per MCP Apps spec: tool _meta.ui only has resourceUri (+ visibility).
+        // CSP lives on the resource, not the tool call result.
         const uniqueToolMetadata: Record<string, unknown> = {
           ...currentToolMeta,
           ...mcpAppsUniqueMeta,
           ...appsSdkUniqueMeta,
           "mcp-use/props": params, // Pass params as widget props
         };
-
-        // Deep merge ui field to preserve CSP, prefersBorder, autoResize
-        if (existingUi && mcpAppsUi) {
-          uniqueToolMetadata.ui = { ...existingUi, ...mcpAppsUi };
-        }
 
         // Generate tool output (what the model sees)
         const toolOutputResult = enrichedDefinition.toolOutput
