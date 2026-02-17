@@ -35,6 +35,8 @@ interface ToolExecutionPanelProps {
   onExecute: () => void;
   onSave: () => void;
   onCancel?: () => void;
+  onBulkPaste?: (pastedText: string, fieldKey: string) => Promise<boolean>;
+  autoFilledFields?: Set<string>;
 }
 
 export function ToolExecutionPanel({
@@ -46,10 +48,13 @@ export function ToolExecutionPanel({
   onExecute,
   onSave,
   onCancel,
+  onBulkPaste,
+  autoFilledFields,
 }: ToolExecutionPanelProps) {
   const [showCancelButton, setShowCancelButton] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [copiedMetadata, setCopiedMetadata] = useState(false);
+  const [copiedPayload, setCopiedPayload] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
@@ -77,6 +82,14 @@ export function ToolExecutionPanel({
     navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
     setCopiedMetadata(true);
     setTimeout(() => setCopiedMetadata(false), 2000);
+  };
+
+  // Copy payload to clipboard
+  const copyPayloadToClipboard = () => {
+    if (!selectedTool) return;
+    navigator.clipboard.writeText(JSON.stringify(toolArgs, null, 2));
+    setCopiedPayload(true);
+    setTimeout(() => setCopiedPayload(false), 2000);
   };
 
   // Handle Cmd/Ctrl + Enter keyboard shortcut
@@ -143,6 +156,31 @@ export function ToolExecutionPanel({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View tool definition metadata</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    data-testid="tool-execution-copy-payload-button"
+                    variant="outline"
+                    onClick={copyPayloadToClipboard}
+                    disabled={isExecuting}
+                    size="sm"
+                    className="lg:size-default gap-2"
+                    title="Copy payload as JSON"
+                  >
+                    {copiedPayload ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {copiedPayload ? "Copied!" : "Payload"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Copy payload as JSON</p>
                 </TooltipContent>
               </Tooltip>
               <Button
@@ -271,6 +309,8 @@ export function ToolExecutionPanel({
           selectedTool={selectedTool}
           toolArgs={toolArgs}
           onArgChange={onArgChange}
+          onBulkPaste={onBulkPaste}
+          autoFilledFields={autoFilledFields}
         />
       </div>
 

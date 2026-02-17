@@ -192,6 +192,17 @@ export function toolRegistration<
           extraSendNotification
         );
 
+      // Extract sessionId from sessions Map
+      let sessionId: string | undefined;
+      if (session) {
+        for (const [sid, s] of this.sessions.entries()) {
+          if (s === session) {
+            sessionId = sid;
+            break;
+          }
+        }
+      }
+
       // Create enhanced context with sample, elicit, and reportProgress methods
       const enhancedContext = createEnhancedContext(
         requestContext,
@@ -200,7 +211,9 @@ export function toolRegistration<
         progressToken,
         sendNotification,
         session?.logLevel,
-        session?.clientCapabilities
+        session?.clientCapabilities,
+        sessionId,
+        this.sessions
       );
 
       // Execute callback

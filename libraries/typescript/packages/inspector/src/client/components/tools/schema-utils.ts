@@ -141,3 +141,102 @@ export function coerceExecutionArgByType(
 
   return value;
 }
+
+/**
+ * Converts JavaScript object syntax with template literals to valid JSON
+ * Handles backtick strings and special characters in keys
+ */
+function convertJSObjectToJSON(text: string): string {
+  // State machine to track if we're inside a template literal
+  let result = "";
+  let i = 0;
+  let inBacktick = false;
+  let escaped = false;
+
+  while (i < text.length) {
+    const char = text[i];
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      i++;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      result += char;
+      i++;
+      continue;
+    }
+
+    // Handle backtick transitions
+    if (char === "`") {
+      if (!inBacktick) {
+        // Start of template literal - replace with double quote
+        result += '"';
+        inBacktick = true;
+      } else {
+        // End of template literal - replace with double quote
+        result += '"';
+        inBacktick = false;
+      }
+      i++;
+      continue;
+    }
+
+    // Inside template literal - escape double quotes
+    if (inBacktick && char === '"') {
+      result += '\\"';
+      i++;
+      continue;
+    }
+
+    // Pass through all other characters
+    result += char;
+    i++;
+  }
+
+  return result;
+}
+
+/**
+ * Attempts to parse pasted text as a JSON or JavaScript object
+ * Returns the parsed object or null if parsing fails
+ */
+export function parseObjectFromPaste(
+  text: string
+): Record<string, unknown> | null {
+  if (!text || typeof text !== "string") {
+    return null;
+  }
+
+  const trimmed = text.trim();
+
+  // Must start with { to be an object
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  // First try standard JSON.parse
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // If JSON.parse fails, try converting JS syntax to JSON
+    try {
+      const converted = convertJSObjectToJSON(trimmed);
+      const parsed = JSON.parse(converted);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Both attempts failed
+      return null;
+    }
+  }
+
+  return null;
+}

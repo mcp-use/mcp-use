@@ -18,6 +18,7 @@ export default [
       "packages/*/dist/**",
       "packages/*/build/**",
       "packages/*/node_modules/**",
+      "test_app/**",
     ],
   },
   {

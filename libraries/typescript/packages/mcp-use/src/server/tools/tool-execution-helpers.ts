@@ -74,29 +74,28 @@ export function findSessionContext(
   }
 
   // Second pass: find session matching context or use first session
-  if (!progressToken || !sendNotification) {
-    if (requestContext) {
-      for (const [, s] of sessions.entries()) {
-        if (s.context === requestContext) {
-          session = s;
-          break;
-        }
-      }
-    } else {
-      const firstSession = sessions.values().next().value;
-      if (firstSession) {
-        session = firstSession;
+  // We ALWAYS need to find the session (for sessionId), not just when metadata is missing
+  if (requestContext) {
+    for (const [, s] of sessions.entries()) {
+      if (s.context === requestContext) {
+        session = s;
+        break;
       }
     }
+  } else {
+    const firstSession = sessions.values().next().value;
+    if (firstSession) {
+      session = firstSession;
+    }
+  }
 
-    // Extract missing metadata from session
-    if (session) {
-      if (!progressToken && session.progressToken) {
-        progressToken = session.progressToken;
-      }
-      if (!sendNotification && session.sendNotification) {
-        sendNotification = session.sendNotification;
-      }
+  // Extract missing metadata from session
+  if (session) {
+    if (!progressToken && session.progressToken) {
+      progressToken = session.progressToken;
+    }
+    if (!sendNotification && session.sendNotification) {
+      sendNotification = session.sendNotification;
     }
   }
 
