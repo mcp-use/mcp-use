@@ -209,6 +209,41 @@ export default WeatherDisplay;
 - ✅ Any MCP Apps-compatible client
 - ✅ Future clients supporting either protocol
 
+## Interactive Widgets with Tool Calling
+
+Widgets can call MCP tools using the `useCallTool` hook for interactive functionality:
+
+```tsx
+import { useWidget, useCallTool } from "mcp-use/react";
+
+const InteractiveWidget = () => {
+  const { props, isPending: propsPending } = useWidget();
+  const { callTool, data, isPending } = useCallTool("fetch-data");
+
+  if (propsPending) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div>
+      <button onClick={() => callTool({ id: props.itemId })}>
+        {isPending ? "Loading..." : "Fetch Data"}
+      </button>
+      {data && (
+        <div>{JSON.stringify(data.structuredContent)}</div>
+      )}
+    </div>
+  );
+};
+```
+
+**Benefits:**
+- ✅ **Type-safe**: Automatic TypeScript inference for tool inputs and outputs
+- ✅ **State management**: Built-in loading, success, and error states
+- ✅ **Cross-protocol**: Works identically in MCP Apps and ChatGPT
+
+See [useCallTool()](/typescript/server/widget-components/usecalltool) for complete documentation.
+
 ## MCP Apps Bridge API
 
 For widgets that need direct protocol access, mcp-use provides the MCP Apps bridge:

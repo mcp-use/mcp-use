@@ -156,6 +156,9 @@ export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 // Landing page generator for browser requests
 export { generateLandingPage } from "./landing.js";
 
+// Tool registry type generator (for CLI generate-types command)
+export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
+
 export type {
   AppsSdkUIResource,
   DiscoverWidgetsOptions,

@@ -7,6 +7,32 @@
 
 export type UnknownObject = Record<string, unknown>;
 
+/**
+ * Registry for tool type definitions. This interface is automatically augmented
+ * by the dev server when you use `mcp-use dev`. Type definitions are generated
+ * from your tool schemas and written to `.mcp-use/tool-registry.d.ts`.
+ *
+ * You can also manually augment this interface for custom typing:
+ *
+ * @example
+ * ```typescript
+ * // Automatically augmented by mcp-use dev (preferred)
+ * // No action needed - just run `mcp-use dev`
+ *
+ * // Or manually augment for custom typing:
+ * declare module "mcp-use/react" {
+ *   interface ToolRegistry {
+ *     "my-tool": {
+ *       input: { query: string };
+ *       output: { results: string[] };
+ *     };
+ *   }
+ * }
+ * ```
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ToolRegistry {}
+
 export type Theme = "light" | "dark";
 
 export type DisplayMode = "pip" | "inline" | "fullscreen";
@@ -38,7 +64,10 @@ export type CallToolResponse = {
     text?: string;
     [key: string]: any;
   }>;
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
+  result: string; // text content joined as convenience
+  _meta?: Record<string, unknown>;
 };
 
 export interface OpenAiGlobals<

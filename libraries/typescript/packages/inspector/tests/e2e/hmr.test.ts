@@ -1320,4 +1320,95 @@ export default function HmrReaddWidget() {
       ).toBeVisible({ timeout: 15000 });
     });
   });
+
+  // ==========================================================================
+  // HMR - Widget Tool Metadata Preservation (Regression Test)
+  // ==========================================================================
+
+  test("widget tool metadata preserved after HMR and page reload", async ({
+    page,
+  }) => {
+    originalServerContent = await backupFile(CONFORMANCE_SERVER_PATH);
+
+    // Step 1: Fetch initial tool metadata via MCP protocol
+    const getToolMeta = async (toolName: string) => {
+      const response = await page.evaluate(async (name) => {
+        const res = await fetch("http://localhost:3000/mcp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: Date.now(),
+            method: "tools/list",
+          }),
+        });
+        const data = await res.json();
+        const tools = data.result?.tools || [];
+        return tools.find((t: any) => t.name === name)?._meta || {};
+      }, toolName);
+      return response;
+    };
+
+    const initialMeta = await getToolMeta("get-weather-delayed");
+
+    // Verify initial metadata has dual-protocol fields
+    expect(initialMeta).toHaveProperty("ui");
+    expect(initialMeta).toHaveProperty("openai/widgetCSP");
+    expect(initialMeta).toHaveProperty("ui/resourceUri");
+    expect(initialMeta).toHaveProperty("openai/description");
+
+    // Step 2: Trigger HMR by changing tool description
+    const content = await readConformanceFile();
+    const newContent = content.replace(
+      'description:\n      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)"',
+      'description:\n      "Get weather with delay (HMR metadata test)"'
+    );
+    await writeConformanceFile(newContent);
+    await waitForHMRReload(page);
+
+    // Step 3: Check same session still has full metadata
+    const afterHmrMeta = await getToolMeta("get-weather-delayed");
+    expect(afterHmrMeta).toHaveProperty("ui");
+    expect(afterHmrMeta).toHaveProperty("openai/widgetCSP");
+    expect(afterHmrMeta).toHaveProperty("ui/resourceUri");
+    expect(afterHmrMeta).toHaveProperty("openai/description");
+
+    // Step 4: Simulate page reload by creating new MCP session
+    await page.evaluate(async () => {
+      const res = await fetch("http://localhost:3000/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 999,
+          method: "initialize",
+          params: {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "test-reload", version: "1.0.0" },
+          },
+        }),
+      });
+      return res.json();
+    });
+
+    // Step 5: Fetch metadata in new session - THIS is the critical check
+    const newSessionMeta = await getToolMeta("get-weather-delayed");
+    expect(newSessionMeta).toHaveProperty("ui");
+    expect(newSessionMeta).toHaveProperty("openai/widgetCSP");
+    expect(newSessionMeta).toHaveProperty("ui/resourceUri");
+    expect(newSessionMeta).toHaveProperty("openai/description");
+
+    // Step 6: Execute the tool to verify it still renders widgets correctly
+    await page.getByTestId("tool-item-get-weather-delayed").click();
+    await page.getByTestId("tool-param-city").fill("tokyo");
+    await page.getByTestId("tool-param-delay").fill("1500");
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    // Verify widget tabs appear (depends on metadata)
+    await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible();
+  });
 });

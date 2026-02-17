@@ -33,10 +33,13 @@ pnpm test:e2e:mix
 
 - **builtin**: Tests HMR (hot module reload) functionality with the server running in dev mode with built-in inspector on a single port
   - Skips: auth-flows tests, connection tests, setup tests (not applicable for single-port builtin mode)
+  - Execution: Serial (1 worker) - HMR tests modify files and must not run concurrently
 - **prod**: Tests the full production build of both inspector and server, catching build/minification issues
-  - Skips: auth-flows tests
+  - Skips: auth-flows tests, HMR tests
+  - Execution: Parallel (3 workers) - No file modifications, improved test speed
 - **mix**: Tests dev inspector against a built server (default testing mode, fastest iteration)
-  - Skips: auth-flows tests
+  - Skips: auth-flows tests, HMR tests
+  - Execution: Serial (1 worker) - Dev server can be affected by concurrent operations
 
 **Run specific test files or individual tests:**
 
@@ -69,6 +72,16 @@ HMR tests (`hmr.test.ts`) modify the conformance server source files during test
 - Runs HMR tests serially with `--workers=1` to prevent file conflicts
 - Restores modified files after tests complete (using `git restore`)
 - This happens automatically when running `test:e2e:builtin` or when explicitly running `hmr.test.ts`
+
+**Parallelization & Test Isolation:**
+
+Production mode (`test:e2e:prod`) runs tests in parallel (3 workers) for improved speed:
+
+- **Safe parallelization**: Tests in different files run concurrently (e.g., `setup.test.ts` and `chat.test.ts`)
+- **Sequential within files**: Tests within the same file run sequentially (e.g., all tests in `connection.test.ts` run one after another)
+- **Browser isolation**: Each test gets its own browser context with isolated localStorage/cookies
+- **Stateless server**: The conformance MCP server is stateless for most operations, preventing test interference
+- **No file modifications**: Prod mode skips HMR tests, eliminating the risk of concurrent file modifications
 
 ### Manual Testing (Advanced)
 
@@ -247,7 +260,8 @@ See `playwright.config.ts` for configuration options.
 Key settings:
 
 - **Base URL**: `http://localhost:3000/inspector`
-- **Timeout**: 30s default
+- **Timeout**: 90s default (tests with LLM can be slow)
 - **Retries**: 2 in CI, 0 locally
+- **Workers**: 3 for production mode (parallel), 1 for dev/builtin modes (serial)
 - **Artifacts**: Screenshots and videos on failure only
 - **Auto Server**: Automatically starts/stops dev or production server

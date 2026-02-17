@@ -503,7 +503,71 @@ await setState((prev) => ({
 
 ### Calling Other Tools
 
-Widgets can call other MCP tools directly using `callTool`:
+Widgets can call MCP tools to perform actions and fetch data. Use the dedicated `useCallTool` hook for the best developer experience with automatic type inference and state management.
+
+<Info>
+**Automatic Type Inference**: When you run `mcp-use dev`, types are automatically generated from your tool definitions. This gives you autocomplete for tool names, inputs, and outputs.
+</Info>
+
+#### Using useCallTool (Recommended)
+
+The `useCallTool` hook provides TanStack Query-like state management with full TypeScript support:
+
+```tsx
+import { useWidget, useCallTool } from "mcp-use/react";
+
+const InteractiveWidget = () => {
+  const { props } = useWidget();
+  const { callTool, data, isPending, isSuccess, isError, error } = 
+    useCallTool("search-flights");
+
+  const handleSearch = () => {
+    callTool({ destination: "NYC", date: "2024-12-01" });
+  };
+
+  return (
+    <div>
+      <button onClick={handleSearch} disabled={isPending}>
+        {isPending ? "Searching..." : "Search Flights"}
+      </button>
+      {isSuccess && (
+        <ul>
+          {data.structuredContent.flights.map(flight => (
+            <li key={flight.id}>{flight.price}</li>
+          ))}
+        </ul>
+      )}
+      {isError && <p>Error: {error.message}</p>}
+    </div>
+  );
+};
+```
+
+**Benefits:**
+- ✅ **Type-safe**: Autocomplete for tool names, inputs, and outputs
+- ✅ **State management**: Built-in loading, success, and error states
+- ✅ **Callbacks**: Optional `onSuccess`, `onError`, and `onSettled` handlers
+- ✅ **Async/await**: Use `callToolAsync` for promise-based flows
+
+See [useCallTool()](/typescript/server/widget-components/usecalltool) for complete documentation.
+
+#### Type Generation
+
+Types are automatically generated during development:
+
+```bash
+# Types are generated automatically
+mcp-use dev
+
+# Or generate manually
+mcp-use generate-types
+```
+
+This creates `.mcp-use/tool-registry.d.ts` with type definitions for all your tools, enabling full IntelliSense in your widgets.
+
+#### Using useWidget.callTool (Alternative)
+
+You can also call tools directly from `useWidget()`:
 
 ```typescript
 const { callTool } = useWidget();
@@ -521,17 +585,9 @@ const handleSearch = async () => {
 };
 ```
 
-**Return Format:**
-
-```typescript
-const result: CallToolResponse = {
-  content: [
-    { type: 'text', text: '...' },
-    // ... other content items
-  ],
-  isError?: boolean
-};
-```
+<Note>
+While `useWidget().callTool` works, `useCallTool` is recommended for better type safety and state management.
+</Note>
 
 ### Display Mode Control
 

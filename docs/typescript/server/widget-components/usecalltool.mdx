@@ -1,0 +1,361 @@
+---
+title: "useCallTool()"
+description: "Type-safe React hook for calling MCP tools from widgets"
+icon: "function"
+---
+
+The `useCallTool` hook provides a type-safe way to call MCP tools from within your widgets. When paired with automatic type generation, it gives you full TypeScript IntelliSense for tool inputs and outputs.
+
+<Info>
+**Automatic Type Inference**: When using `mcp-use dev`, types are automatically generated from your tool schemas. The `useCallTool` hook uses these types to provide IntelliSense for tool names, inputs, and outputs.
+</Info>
+
+## Import
+
+```typescript
+import { useCallTool } from "mcp-use/react";
+```
+
+## Basic Usage
+
+```tsx
+import { useCallTool } from "mcp-use/react";
+
+const MyWidget = () => {
+  // Tool name is type-checked, input/output are fully typed
+  const { callTool, data, isPending, isSuccess, isError, error } = 
+    useCallTool("search-flights");
+
+  return (
+    <div>
+      <button onClick={() => callTool({ destination: "NYC" })}>
+        Search Flights
+      </button>
+      {isPending && <p>Searching...</p>}
+      {isSuccess && (
+        <ul>
+          {data.structuredContent.flights.map(flight => (
+            <li key={flight.id}>{flight.price}</li>
+          ))}
+        </ul>
+      )}
+      {isError && <p>Error: {error.message}</p>}
+    </div>
+  );
+};
+```
+
+<Note>
+**Type Safety**: The hook automatically infers types from your tool definitions. You get autocomplete for:
+- Available tool names
+- Tool input parameters
+- Tool output structure
+- Error types
+</Note>
+
+## State Management
+
+The hook uses a discriminated union state machine similar to TanStack Query:
+
+```typescript
+type State =
+  | { status: "idle"; data: undefined; error: undefined }
+  | { status: "pending"; data: undefined; error: undefined }
+  | { status: "success"; data: CallToolResult; error: undefined }
+  | { status: "error"; data: undefined; error: Error }
+```
+
+This ensures type-safe access to `data` and `error` based on the current status.
+
+## Return Values
+
+| Property        | Type                                                          | Description                                       |
+| --------------- | ------------------------------------------------------------- | ------------------------------------------------- |
+| `status`        | `"idle" \| "pending" \| "success" \| "error"`                 | Current state of the tool call                    |
+| `isIdle`        | `boolean`                                                     | True when no call has been made                   |
+| `isPending`     | `boolean`                                                     | True while the tool is executing                  |
+| `isSuccess`     | `boolean`                                                     | True when the tool call succeeded                 |
+| `isError`       | `boolean`                                                     | True when the tool call failed                    |
+| `data`          | `CallToolResult \| undefined`                                 | Tool result (only available when `isSuccess`)     |
+| `error`         | `Error \| undefined`                                          | Error object (only available when `isError`)      |
+| `callTool`      | `Function`                                                    | Fire-and-forget method with callbacks             |
+| `callToolAsync` | `Function`                                                    | Promise-based method for async/await              |
+
+## Calling Methods
+
+### Fire-and-Forget with Callbacks
+
+Use `callTool` for non-blocking calls with optional callbacks:
+
+```typescript
+const { callTool } = useCallTool("create-booking");
+
+callTool(
+  { flightId: "123", passenger: "John Doe" },
+  {
+    onSuccess: (data) => {
+      console.log("Booking confirmed:", data.structuredContent);
+      showNotification("Booking successful!");
+    },
+    onError: (error) => {
+      console.error("Booking failed:", error);
+      showError(error.message);
+    },
+    onSettled: (data, error, input) => {
+      console.log("Request complete", { data, error, input });
+      hideLoadingSpinner();
+    }
+  }
+);
+```
+
+**Callback Types:**
+
+| Callback     | Signature                                        | Description                       |
+| ------------ | ------------------------------------------------ | --------------------------------- |
+| `onSuccess`  | `(data: CallToolResult, input: any) => void`     | Called when tool succeeds         |
+| `onError`    | `(error: Error, input: any) => void`             | Called when tool fails            |
+| `onSettled`  | `(data?, error?, input: any) => void`            | Called after success or error     |
+
+### Async/Await Pattern
+
+Use `callToolAsync` for sequential operations:
+
+```typescript
+const { callToolAsync } = useCallTool("search-flights");
+
+const handleSearch = async () => {
+  try {
+    const result = await callToolAsync({ 
+      destination: "Tokyo", 
+      date: "2024-12-01" 
+    });
+    
+    console.log("Found flights:", result.structuredContent.flights);
+    setFlights(result.structuredContent.flights);
+  } catch (error) {
+    console.error("Search failed:", error);
+    showError(error.message);
+  }
+};
+```
+
+<Tip>
+Use `callToolAsync` when you need to:
+- Chain multiple tool calls sequentially
+- Handle results in a try/catch block
+- Perform actions that depend on the result
+</Tip>
+
+## Response Structure
+
+Tool calls return a `CallToolResult` object:
+
+```typescript
+interface CallToolResult {
+  content: Array<TextContent | ImageContent | EmbeddedResource>;
+  isError?: boolean;
+  
+  // Structured content (if tool returned it)
+  structuredContent?: any;
+  
+  // MCP Apps specific
+  metadata?: Record<string, unknown>;
+}
+```
+
+**Accessing structured content:**
+
+```typescript
+const { data } = useCallTool("get-weather");
+
+if (data) {
+  // Structured content is strongly typed based on your tool definition
+  const weather = data.structuredContent;
+  console.log(weather.temperature, weather.conditions);
+}
+```
+
+## Type Generation Integration
+
+The hook automatically uses types from `.mcp-use/tool-registry.d.ts`:
+
+**Server tool definition:**
+
+```typescript
+// index.ts
+server.tool({
+  name: "search-flights",
+  description: "Search for flights",
+  schema: z.object({
+    destination: z.string(),
+    date: z.string().optional(),
+  }),
+  execute: async ({ destination, date }) => {
+    // ... implementation
+    return object({
+      flights: array(object({
+        id: string(),
+        price: number(),
+      })),
+    });
+  }
+});
+```
+
+**Generated types:**
+
+```typescript
+// .mcp-use/tool-registry.d.ts (auto-generated)
+declare module "mcp-use/react" {
+  interface ToolRegistry {
+    "search-flights": {
+      input: { destination: string; date?: string };
+      output: { flights: Array<{ id: string; price: number }> };
+    };
+  }
+}
+```
+
+**Widget with full type safety:**
+
+```tsx
+const { callTool, data } = useCallTool("search-flights");
+//                                      ^ Autocomplete for tool names
+
+// Autocomplete for input parameters
+callTool({ destination: "NYC", date: "2024-12-01" });
+
+// Strongly typed output
+if (data) {
+  data.structuredContent.flights.forEach(flight => {
+    //                   ^ Autocomplete for output structure
+    console.log(flight.id, flight.price);
+  });
+}
+```
+
+## Advanced: Manual Type Generation
+
+For scenarios without `mcp-use dev`, use `generateHelpers()`:
+
+```typescript
+import { generateHelpers } from "mcp-use/react";
+
+type MyToolMap = {
+  "search-flights": {
+    input: { destination: string; date?: string };
+    output: { flights: Array<{ id: string; price: number }> };
+  };
+  "book-flight": {
+    input: { flightId: string };
+    output: { confirmation: string };
+  };
+};
+
+const { useCallTool } = generateHelpers<MyToolMap>();
+
+// Now useCallTool is typed with your custom tool map
+const { callTool, data } = useCallTool("search-flights");
+```
+
+## Environment Support
+
+The hook works in both protocols:
+
+<Tabs>
+  <Tab title="MCP Apps">
+    Uses JSON-RPC over `postMessage` to communicate with the MCP Apps client.
+  </Tab>
+  <Tab title="ChatGPT Apps SDK">
+    Uses `window.openai.callTool()` API provided by the ChatGPT Apps SDK.
+  </Tab>
+</Tabs>
+
+The protocol is detected automatically - your code stays identical.
+
+## Error Handling
+
+Handle errors using the state flags or callbacks:
+
+```typescript
+const { callTool, isError, error } = useCallTool("create-booking");
+
+// State-based error handling
+if (isError) {
+  return <div className="error">{error.message}</div>;
+}
+
+// Callback-based error handling
+callTool(input, {
+  onError: (error) => {
+    if (error.message.includes("unavailable")) {
+      showNotification("Flight is no longer available");
+    } else {
+      showError("An error occurred. Please try again.");
+    }
+  }
+});
+```
+
+## Complete Example
+
+```tsx
+import { useCallTool } from "mcp-use/react";
+import { useState } from "react";
+
+const FlightSearchWidget = () => {
+  const [destination, setDestination] = useState("");
+  const { callTool, data, isPending, isError, error } = 
+    useCallTool("search-flights");
+
+  const handleSearch = () => {
+    callTool(
+      { destination },
+      {
+        onSuccess: (result) => {
+          console.log(`Found ${result.structuredContent.flights.length} flights`);
+        },
+        onError: (err) => {
+          console.error("Search failed:", err);
+        }
+      }
+    );
+  };
+
+  return (
+    <div className="widget">
+      <input
+        type="text"
+        value={destination}
+        onChange={(e) => setDestination(e.target.value)}
+        placeholder="Enter destination"
+        disabled={isPending}
+      />
+      <button onClick={handleSearch} disabled={isPending || !destination}>
+        {isPending ? "Searching..." : "Search Flights"}
+      </button>
+
+      {isError && (
+        <div className="error">Error: {error.message}</div>
+      )}
+
+      {data && (
+        <ul className="results">
+          {data.structuredContent.flights.map((flight) => (
+            <li key={flight.id}>
+              {flight.departure} → {flight.arrival} - ${flight.price}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+```
+
+## See Also
+
+- [useWidget()](/typescript/server/widget-components/usewidget) - For accessing widget props and context
+- [Type Generation CLI](/typescript/server/cli-reference#generate-types-type-generation) - Manual type generation command
+- [Building UI Widgets](/typescript/server/ui-widgets) - Complete widget development guide

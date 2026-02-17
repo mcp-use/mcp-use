@@ -254,21 +254,22 @@ export function createMcpAppsResource(
       connectDomains?: string[];
       resourceDomains?: string[];
       frameDomains?: string[];
+      baseUriDomains?: string[];
     };
     prefersBorder?: boolean;
-    autoResize?: boolean;
     domain?: string;
   }
 ): UIResourceContent {
   // For MCP Apps, we create the resource structure following the official pattern
-  // from https://github.com/modelcontextprotocol/ext-apps
+  // from https://github.com/modelcontextprotocol/ext-apps (SEP-1865)
   const resource: any = {
     uri,
     mimeType: "text/html;profile=mcp-app",
     text: htmlTemplate,
   };
 
-  // Build _meta.ui metadata if provided
+  // Build _meta.ui metadata per MCP Apps spec (SEP-1865):
+  // UIResourceMeta = { csp?, permissions?, domain?, prefersBorder? }
   if (metadata && Object.keys(metadata).length > 0) {
     const uiMeta: Record<string, unknown> = {};
 
@@ -278,10 +279,6 @@ export function createMcpAppsResource(
 
     if (metadata.prefersBorder !== undefined) {
       uiMeta.prefersBorder = metadata.prefersBorder;
-    }
-
-    if (metadata.autoResize !== undefined) {
-      uiMeta.autoResize = metadata.autoResize;
     }
 
     if (metadata.domain) {

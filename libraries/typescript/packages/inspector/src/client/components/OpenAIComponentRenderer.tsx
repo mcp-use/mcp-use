@@ -1085,7 +1085,7 @@ function OpenAIComponentRendererBase({
         isSameOrigin &&
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
-          <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
+          <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
             {/* Use advanced debug controls for Apps SDK (same as MCP Apps) */}
             <MCPAppsDebugControls
               displayMode={displayMode}

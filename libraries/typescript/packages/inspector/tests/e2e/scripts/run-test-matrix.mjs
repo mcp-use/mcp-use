@@ -267,6 +267,11 @@ async function main() {
       console.log(
         "⚙️  Running with --workers=1 (HMR tests modify files and must run serially)\n"
       );
+    } else if (mode === "prod") {
+      // Prod mode uses parallelization (configured in playwright.config.ts)
+      console.log(
+        "⚡ Running with parallel workers (configured in playwright.config.ts for production mode)\n"
+      );
     }
 
     // Use npx to find playwright in node_modules/.bin (works in CI and locally)

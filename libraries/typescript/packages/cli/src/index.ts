@@ -1871,4 +1871,82 @@ program.addCommand(createClientCommand());
 // Deployments command
 program.addCommand(createDeploymentsCommand());
 
+// Generate types command
+program
+  .command("generate-types")
+  .description(
+    "Generate TypeScript type definitions for tools (writes .mcp-use/tool-registry.d.ts)"
+  )
+  .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option("--server <file>", "Server entry file", "index.ts")
+  .action(async (options) => {
+    const projectPath = path.resolve(options.path);
+    const serverFile = path.join(projectPath, options.server);
+
+    try {
+      // Check if server file exists
+      if (
+        !(await access(serverFile)
+          .then(() => true)
+          .catch(() => false))
+      ) {
+        console.error(chalk.red(`Server file not found: ${serverFile}`));
+        process.exit(1);
+      }
+
+      console.log(chalk.blue("Generating tool registry types..."));
+
+      // Set HMR mode to prevent server from actually starting
+      (globalThis as any).__mcpUseHmrMode = true;
+
+      // Import the server using tsx's tsImport
+      const { tsImport } = await import("tsx/esm/api");
+      await tsImport(serverFile, {
+        parentURL: import.meta.url,
+        tsconfig: path.join(projectPath, "tsconfig.json"),
+      });
+
+      // Get the server instance from globalThis (set by MCPServer constructor)
+      const server = (globalThis as any).__mcpUseLastServer;
+
+      if (!server) {
+        console.error(
+          chalk.red(
+            "No MCPServer instance found. Make sure your server file creates an MCPServer instance."
+          )
+        );
+        process.exit(1);
+      }
+
+      // Generate types from registrations
+      // Dynamic import from the user's node_modules
+      const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+      const { generateToolRegistryTypes } = await import(
+        path.join(mcpUsePath, "dist", "src", "server", "index.js")
+      ).then((mod) => mod);
+
+      if (!generateToolRegistryTypes) {
+        throw new Error(
+          "generateToolRegistryTypes not found in mcp-use package"
+        );
+      }
+
+      await generateToolRegistryTypes(server.registrations.tools, projectPath);
+
+      console.log(chalk.green("✓ Tool registry types generated successfully"));
+      process.exit(0);
+    } catch (error) {
+      console.error(
+        chalk.red("Failed to generate types:"),
+        error instanceof Error ? error.message : String(error)
+      );
+      if (error instanceof Error && error.stack) {
+        console.error(chalk.gray(error.stack));
+      }
+      process.exit(1);
+    } finally {
+      (globalThis as any).__mcpUseHmrMode = false;
+    }
+  });
+
 program.parse();

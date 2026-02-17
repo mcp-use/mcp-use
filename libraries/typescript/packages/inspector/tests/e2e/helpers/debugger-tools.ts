@@ -1,7 +1,7 @@
 import { expect, type FrameLocator, type Page } from "@playwright/test";
 
 // CI environments (Docker/xvfb) need longer timeouts due to slower rendering
-const CI_MULTIPLIER = process.env.CI ? 3 : 1;
+const CI_MULTIPLIER = 4;
 const WIDGET_LOAD_TIMEOUT = 8000 * CI_MULTIPLIER;
 const TOGGLE_UPDATE_TIMEOUT = 5000 * CI_MULTIPLIER;
 

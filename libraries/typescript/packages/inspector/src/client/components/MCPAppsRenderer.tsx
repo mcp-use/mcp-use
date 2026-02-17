@@ -814,7 +814,7 @@ export function MCPAppsRenderer({
           <button
             data-testid="debugger-exit-pip-button"
             onClick={() => handleDisplayModeChange("inline")}
-            className="absolute left-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
+            className="absolute left-2 top-2 z-30 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
             aria-label="Close PiP mode"
             title="Close PiP mode"
           >

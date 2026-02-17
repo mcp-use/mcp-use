@@ -566,6 +566,7 @@
                       "typescript/server/mcp-apps",
                       "typescript/server/ui-widgets",
                       "typescript/server/widget-components/usewidget",
+                      "typescript/server/widget-components/usecalltool",
                       "typescript/server/widget-components/mcpuseprovider",
                       "typescript/server/widget-components/widgetcontrols",
                       "typescript/server/widget-components/errorboundary",

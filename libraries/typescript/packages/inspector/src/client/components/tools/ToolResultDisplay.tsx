@@ -905,7 +905,7 @@ export function ToolResultDisplay({
                   return (
                     <div className="flex-1 relative">
                       {/* Floating controls in top-right */}
-                      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                      <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
                         <MCPAppsDebugControls
                           toolCallId={`tool-${result.timestamp}`}
                           displayMode={mcpAppsDisplayMode}
