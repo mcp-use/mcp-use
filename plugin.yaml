@@ -1,0 +1,51 @@
+# plugin.yaml — mcp-use Agent Plugin Manifest
+# This file makes mcp-use discoverable as an agent plugin.
+# Learn more: https://list.agenium.net/plugins
+
+name: mcp-use
+display_name: mcp-use
+version: "0.1.0"
+description: >
+  The easiest way to interact with MCP servers using custom agents.
+  Connect any LLM to any MCP server with minimal setup — supports
+  tool calling, multi-server connections, and autonomous agent workflows.
+
+author:
+  name: mcp-use
+  url: https://github.com/mcp-use
+
+repository: https://github.com/mcp-use/mcp-use
+license: MIT
+
+categories:
+  - mcp-clients
+  - agent-frameworks
+  - developer-tools
+
+tags:
+  - mcp
+  - model-context-protocol
+  - python
+  - langchain
+  - agent-orchestration
+  - llm-tools
+
+capabilities:
+  - mcp-client
+  - multi-server-connection
+  - tool-calling
+  - autonomous-agents
+
+install:
+  pip: mcp-use
+
+runtime:
+  language: python
+  min_python: "3.10"
+
+discovery:
+  protocol: mcp
+  role: client
+  transport:
+    - stdio
+    - sse
