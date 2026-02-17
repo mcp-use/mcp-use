@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.19.2-canary.0
+
+### Patch Changes
+
+- 1921562: Add everything-server example and CI step for compile-time type regression testing
+  - @mcp-use/cli@2.13.10-canary.0
+  - @mcp-use/inspector@0.20.2-canary.0
+
 ## 1.19.1
 
 ### Patch Changes

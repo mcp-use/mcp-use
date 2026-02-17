@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.20.1",
     "mcp-use": "1.19.1"
   },
-  "changesets": []
+  "changesets": [
+    "six-zoos-sleep"
+  ]
 }
