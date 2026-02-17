@@ -1,0 +1,55 @@
+name: Everything Server Type Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - canary
+    paths:
+      - 'libraries/typescript/packages/mcp-use/src/**'
+      - 'libraries/typescript/packages/mcp-use/examples/server/features/everything/**'
+      - '.github/workflows/everything-typecheck.yml'
+  pull_request:
+    branches:
+      - main
+      - canary
+    paths:
+      - 'libraries/typescript/packages/mcp-use/src/**'
+      - 'libraries/typescript/packages/mcp-use/examples/server/features/everything/**'
+      - '.github/workflows/everything-typecheck.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Type-check everything example
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build packages
+        working-directory: libraries/typescript
+        run: pnpm build
+
+      - name: Type-check everything example
+        working-directory: libraries/typescript/packages/mcp-use/examples/server/features/everything
+        run: pnpm lint
