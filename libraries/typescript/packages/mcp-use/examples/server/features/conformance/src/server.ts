@@ -326,6 +326,40 @@ server.tool(
   async () => error("This is an intentional error for testing")
 );
 
+// tools-call-record-schema
+// Tests z.record() schema roundtrip: additionalProperties and descriptions should be preserved
+server.tool(
+  {
+    name: "test_record_schema",
+    description:
+      "Tests z.record() schema roundtrip with additionalProperties and descriptions",
+    schema: z.object({
+      files: z
+        .record(z.string(), z.string())
+        .describe(
+          "REQUIRED. A {path: code} object mapping file paths to source code strings."
+        ),
+      entryFile: z
+        .string()
+        .optional()
+        .describe('Entry file path (default: "/src/Video.tsx").'),
+      title: z.string().optional().describe("Title shown in the video player"),
+      durationInFrames: z
+        .number()
+        .optional()
+        .describe("Total duration in frames (default: 150)"),
+      fps: z.number().optional().describe("Frames per second (default: 30)"),
+      width: z.number().optional().describe("Width in pixels (default: 1920)"),
+      height: z
+        .number()
+        .optional()
+        .describe("Height in pixels (default: 1080)"),
+    }),
+  },
+  async (params: any) =>
+    text(`Received ${Object.keys(params.files || {}).length} files`)
+);
+
 // =============================================================================
 // RESOURCES (exact URIs expected by conformance tests)
 // =============================================================================

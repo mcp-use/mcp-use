@@ -4,6 +4,7 @@ import {
   connectToConformanceServer,
   navigateToTools,
 } from "./helpers/connection";
+import { getTestMatrix } from "./helpers/test-matrix";
 
 test.describe("Inspector MCP Server Connections", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -819,6 +820,62 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-results-text-content")
     ).toContainText("Resource updated to: Test update value");
+  });
+
+  test("test_record_schema - inputSchema should preserve z.record additionalProperties and descriptions", async ({
+    page,
+  }) => {
+    // Get the tools list directly from the MCP server via JSON-RPC
+    const { serverUrl } = getTestMatrix();
+    const toolsList = await page.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+      return response.json();
+    }, serverUrl);
+
+    // Find the test_record_schema tool
+    const tool = toolsList.result.tools.find(
+      (t: any) => t.name === "test_record_schema"
+    );
+    expect(tool).toBeDefined();
+
+    const schema = tool.inputSchema;
+
+    // Verify files property has additionalProperties as schema object (not false)
+    expect(schema.properties.files.additionalProperties).toEqual({
+      type: "string",
+    });
+
+    // Verify propertyNames is present for z.record()
+    expect(schema.properties.files.propertyNames).toEqual({ type: "string" });
+
+    // Verify files has description preserved
+    expect(schema.properties.files.description).toContain(
+      "A {path: code} object"
+    );
+
+    // Verify other properties have descriptions preserved
+    expect(schema.properties.entryFile.description).toContain(
+      "Entry file path"
+    );
+    expect(schema.properties.title.description).toContain("Title shown");
+    expect(schema.properties.durationInFrames.description).toContain(
+      "Total duration"
+    );
+    expect(schema.properties.fps.description).toContain("Frames per second");
+    expect(schema.properties.width.description).toContain("Width in pixels");
+    expect(schema.properties.height.description).toContain("Height in pixels");
+
+    // Verify required array contains "files"
+    expect(schema.required).toContain("files");
   });
 
   // Prompts tests

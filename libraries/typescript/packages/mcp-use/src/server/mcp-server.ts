@@ -2530,6 +2530,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
     for (const [name, registration] of this.registrations.tools) {
       const { config, handler: actualCallback } = registration;
+
       let inputSchema: Record<string, any>;
       if (config.schema) {
         inputSchema = this.convertZodSchemaToParams(config.schema);

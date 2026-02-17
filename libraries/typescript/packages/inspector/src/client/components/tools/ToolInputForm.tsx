@@ -15,16 +15,39 @@ interface ToolInputFormProps {
   selectedTool: Tool;
   toolArgs: Record<string, unknown>;
   onArgChange: (key: string, value: string) => void;
+  onBulkPaste?: (pastedText: string, fieldKey: string) => Promise<boolean>;
+  autoFilledFields?: Set<string>;
 }
 
 export function ToolInputForm({
   selectedTool,
   toolArgs,
   onArgChange,
+  onBulkPaste,
+  autoFilledFields,
 }: ToolInputFormProps) {
   const properties = selectedTool?.inputSchema?.properties || {};
   const requiredFields = (selectedTool?.inputSchema as any)?.required || [];
   const hasInputs = Object.keys(properties).length > 0;
+
+  // Handle paste events to detect and auto-fill from pasted objects
+  const handlePaste = async (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    fieldKey: string
+  ) => {
+    if (!onBulkPaste) return;
+
+    const pastedText = e.clipboardData.getData("text");
+
+    // Try to handle as bulk paste
+    const handled = await onBulkPaste(pastedText, fieldKey);
+
+    // If bulk paste was handled, prevent default paste behavior
+    if (handled) {
+      e.preventDefault();
+    }
+    // Otherwise, let the default paste behavior proceed
+  };
 
   if (!hasInputs) {
     return (
@@ -92,8 +115,9 @@ export function ToolInputForm({
                 data-testid={`tool-param-${key}`}
                 value={stringValue}
                 onChange={(e) => onArgChange(key, e.target.value)}
+                onPaste={(e) => handlePaste(e, key)}
                 placeholder={typedProp?.description || `Enter ${key}`}
-                className="min-h-[100px]"
+                className={`min-h-[100px] ${autoFilledFields?.has(key) ? "animate-pulse ring-2 ring-green-500 dark:ring-green-400" : ""}`}
               />
               {typedProp?.description && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -158,7 +182,13 @@ export function ToolInputForm({
               data-testid={`tool-param-${key}`}
               value={stringValue}
               onChange={(e) => onArgChange(key, e.target.value)}
+              onPaste={(e) => handlePaste(e, key)}
               placeholder={typedProp?.description || `Enter ${key}`}
+              className={
+                autoFilledFields?.has(key)
+                  ? "animate-pulse ring-2 ring-green-500 dark:ring-green-400"
+                  : ""
+              }
             />
             {typedProp?.description && (
               <p className="text-xs text-gray-500 dark:text-gray-400">

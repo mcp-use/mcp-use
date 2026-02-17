@@ -36,7 +36,18 @@ import {
   coerceExecutionArgByType,
   coerceTextInputValueByType,
   getToolPropertyType,
+  parseObjectFromPaste,
 } from "./tools/schema-utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/client/components/ui/alert-dialog";
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -110,6 +121,28 @@ export function ToolsTab({
     "list"
   );
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // Auto-fill state
+  const [autoFillDialog, setAutoFillDialog] = useState<{
+    open: boolean;
+    parsedObject: Record<string, unknown>;
+    fieldsToUpdate: Array<{
+      key: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }>;
+    newFields: string[];
+    resolve: ((value: boolean) => void) | null;
+  }>({
+    open: false,
+    parsedObject: {},
+    fieldsToUpdate: [],
+    newFields: [],
+    resolve: null,
+  });
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
+    new Set()
+  );
 
   const leftPanelRef = usePanelRef();
   const toolParamsPanelRef = usePanelRef();
@@ -445,6 +478,140 @@ export function ToolsTab({
     },
     [selectedTool]
   );
+
+  const handleBulkPaste = useCallback(
+    async (pastedText: string, fieldKey: string): Promise<boolean> => {
+      if (!selectedTool) return false;
+
+      // Try to parse as object
+      const parsedObject = parseObjectFromPaste(pastedText);
+      if (!parsedObject) {
+        // Not a valid object, allow normal paste
+        return false;
+      }
+
+      const properties = selectedTool.inputSchema?.properties || {};
+      const fieldNames = Object.keys(properties);
+      const rootSchema = (selectedTool.inputSchema || {}) as Record<
+        string,
+        unknown
+      >;
+
+      // Find matching fields
+      const fieldsToUpdate: Array<{
+        key: string;
+        oldValue: unknown;
+        newValue: unknown;
+      }> = [];
+      const newFields: string[] = [];
+
+      Object.entries(parsedObject).forEach(([key, value]) => {
+        if (fieldNames.includes(key)) {
+          const prop = properties[key];
+          const expectedType = getToolPropertyType(prop, rootSchema);
+
+          let processedValue: unknown = value;
+
+          // For object/array fields, stringify the value
+          if (expectedType === "object" || expectedType === "array") {
+            if (typeof value === "object" && value !== null) {
+              processedValue = JSON.stringify(value, null, 2);
+            } else if (typeof value === "string") {
+              processedValue = value;
+            }
+          } else if (typeof value === "object" && value !== null) {
+            // Non-object/array field received an object, stringify it
+            processedValue = JSON.stringify(value);
+          } else {
+            processedValue = String(value);
+          }
+
+          const currentValue = toolArgs[key];
+          const hasValue =
+            currentValue !== undefined &&
+            currentValue !== null &&
+            currentValue !== "";
+
+          if (hasValue) {
+            fieldsToUpdate.push({
+              key,
+              oldValue: currentValue,
+              newValue: processedValue,
+            });
+          } else {
+            newFields.push(key);
+            // Apply immediately for empty fields
+            handleArgChange(key, String(processedValue));
+          }
+        }
+      });
+
+      // If there are no matching fields at all, allow normal paste
+      if (fieldsToUpdate.length === 0 && newFields.length === 0) {
+        return false;
+      }
+
+      // If only new fields, no confirmation needed
+      if (fieldsToUpdate.length === 0) {
+        // Mark fields as auto-filled for visual feedback
+        setAutoFilledFields(new Set(newFields));
+        setTimeout(() => setAutoFilledFields(new Set()), 2000);
+        return true;
+      }
+
+      // Show confirmation dialog for fields that would be overridden
+      return new Promise<boolean>((resolve) => {
+        setAutoFillDialog({
+          open: true,
+          parsedObject,
+          fieldsToUpdate,
+          newFields,
+          resolve,
+        });
+      });
+    },
+    [selectedTool, toolArgs, handleArgChange]
+  );
+
+  // Handle auto-fill dialog confirmation
+  const handleAutoFillConfirm = useCallback(() => {
+    if (!autoFillDialog.resolve) return;
+
+    // Apply all updates
+    autoFillDialog.fieldsToUpdate.forEach(({ key, newValue }) => {
+      handleArgChange(key, String(newValue));
+    });
+
+    // Mark all affected fields as auto-filled for visual feedback
+    const allFields = [
+      ...autoFillDialog.fieldsToUpdate.map((f) => f.key),
+      ...autoFillDialog.newFields,
+    ];
+    setAutoFilledFields(new Set(allFields));
+    setTimeout(() => setAutoFilledFields(new Set()), 2000);
+
+    autoFillDialog.resolve(true);
+    setAutoFillDialog({
+      open: false,
+      parsedObject: {},
+      fieldsToUpdate: [],
+      newFields: [],
+      resolve: null,
+    });
+  }, [autoFillDialog, handleArgChange]);
+
+  const handleAutoFillCancel = useCallback(() => {
+    if (!autoFillDialog.resolve) return;
+
+    autoFillDialog.resolve(false);
+    setAutoFillDialog({
+      open: false,
+      parsedObject: {},
+      fieldsToUpdate: [],
+      newFields: [],
+      resolve: null,
+    });
+  }, [autoFillDialog]);
 
   const executeTool = useCallback(async () => {
     if (!selectedTool || isExecuting) return;
@@ -924,6 +1091,8 @@ export function ToolsTab({
                   onArgChange={handleArgChange}
                   onExecute={executeTool}
                   onSave={openSaveDialog}
+                  onBulkPaste={handleBulkPaste}
+                  autoFilledFields={autoFilledFields}
                 />
               </motion.div>
             )}
@@ -959,6 +1128,68 @@ export function ToolsTab({
           onSave={saveRequest}
           onCancel={() => setSaveDialogOpen(false)}
         />
+
+        <AlertDialog
+          open={autoFillDialog.open}
+          onOpenChange={(open) => {
+            if (!open) handleAutoFillCancel();
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                Auto-fill fields from pasted object?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {autoFillDialog.fieldsToUpdate.length > 0 && (
+                  <div className="mb-3">
+                    <p className="font-medium mb-2">
+                      The following fields will be updated:
+                    </p>
+                    <ul className="text-sm space-y-1 max-h-[200px] overflow-y-auto">
+                      {autoFillDialog.fieldsToUpdate.map(
+                        ({ key, oldValue, newValue }) => (
+                          <li key={key} className="font-mono">
+                            <span className="font-semibold">{key}:</span>{" "}
+                            <span className="text-red-600 dark:text-red-400 line-through">
+                              {typeof oldValue === "object"
+                                ? JSON.stringify(oldValue).substring(0, 30) +
+                                  "..."
+                                : String(oldValue).substring(0, 30)}
+                            </span>{" "}
+                            →{" "}
+                            <span className="text-green-600 dark:text-green-400">
+                              {typeof newValue === "string" &&
+                              newValue.length > 30
+                                ? newValue.substring(0, 30) + "..."
+                                : String(newValue).substring(0, 30)}
+                            </span>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                )}
+                {autoFillDialog.newFields.length > 0 && (
+                  <div>
+                    <p className="font-medium mb-1">New fields to be filled:</p>
+                    <p className="text-sm font-mono">
+                      {autoFillDialog.newFields.join(", ")}
+                    </p>
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleAutoFillCancel}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleAutoFillConfirm}>
+                Auto-fill
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -1045,6 +1276,8 @@ export function ToolsTab({
                   abortController.abort();
                 }
               }}
+              onBulkPaste={handleBulkPaste}
+              autoFilledFields={autoFilledFields}
             />
           </ResizablePanel>
 
@@ -1078,6 +1311,68 @@ export function ToolsTab({
         onSave={saveRequest}
         onCancel={() => setSaveDialogOpen(false)}
       />
+
+      <AlertDialog
+        open={autoFillDialog.open}
+        onOpenChange={(open) => {
+          if (!open) handleAutoFillCancel();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Auto-fill fields from pasted object?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {autoFillDialog.fieldsToUpdate.length > 0 && (
+                <div className="mb-3">
+                  <p className="font-medium mb-2">
+                    The following fields will be updated:
+                  </p>
+                  <ul className="text-sm space-y-1 max-h-[200px] overflow-y-auto">
+                    {autoFillDialog.fieldsToUpdate.map(
+                      ({ key, oldValue, newValue }) => (
+                        <li key={key} className="font-mono">
+                          <span className="font-semibold">{key}:</span>{" "}
+                          <span className="text-red-600 dark:text-red-400 line-through">
+                            {typeof oldValue === "object"
+                              ? JSON.stringify(oldValue).substring(0, 30) +
+                                "..."
+                              : String(oldValue).substring(0, 30)}
+                          </span>{" "}
+                          →{" "}
+                          <span className="text-green-600 dark:text-green-400">
+                            {typeof newValue === "string" &&
+                            newValue.length > 30
+                              ? newValue.substring(0, 30) + "..."
+                              : String(newValue).substring(0, 30)}
+                          </span>
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              )}
+              {autoFillDialog.newFields.length > 0 && (
+                <div>
+                  <p className="font-medium mb-1">New fields to be filled:</p>
+                  <p className="text-sm font-mono">
+                    {autoFillDialog.newFields.join(", ")}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleAutoFillCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleAutoFillConfirm}>
+              Auto-fill
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ResizablePanelGroup>
   );
 }
