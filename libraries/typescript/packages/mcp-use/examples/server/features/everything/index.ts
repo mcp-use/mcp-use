@@ -26,18 +26,57 @@ import { z } from "zod";
 // ============================================================================
 
 const users = new Map([
-  ["user-1", { id: "user-1", name: "Alice", email: "alice@example.com", role: "admin", createdAt: "2024-01-15" }],
-  ["user-2", { id: "user-2", name: "Bob", email: "bob@example.com", role: "user", createdAt: "2024-02-20" }],
-  ["user-3", { id: "user-3", name: "Carol", email: "carol@example.com", role: "user", createdAt: "2024-03-10" }],
+  [
+    "user-1",
+    {
+      id: "user-1",
+      name: "Alice",
+      email: "alice@example.com",
+      role: "admin",
+      createdAt: "2024-01-15",
+    },
+  ],
+  [
+    "user-2",
+    {
+      id: "user-2",
+      name: "Bob",
+      email: "bob@example.com",
+      role: "user",
+      createdAt: "2024-02-20",
+    },
+  ],
+  [
+    "user-3",
+    {
+      id: "user-3",
+      name: "Carol",
+      email: "carol@example.com",
+      role: "user",
+      createdAt: "2024-03-10",
+    },
+  ],
 ]);
 
 const items = new Map([
-  ["item-1", { id: "item-1", name: "Widget Pro", category: "widgets", price: 29.99 }],
-  ["item-2", { id: "item-2", name: "Gadget Plus", category: "gadgets", price: 49.99 }],
-  ["item-3", { id: "item-3", name: "Tool Kit", category: "tools", price: 19.99 }],
+  [
+    "item-1",
+    { id: "item-1", name: "Widget Pro", category: "widgets", price: 29.99 },
+  ],
+  [
+    "item-2",
+    { id: "item-2", name: "Gadget Plus", category: "gadgets", price: 49.99 },
+  ],
+  [
+    "item-3",
+    { id: "item-3", name: "Tool Kit", category: "tools", price: 19.99 },
+  ],
 ]);
 
-const cache = new Map<string, { data: Record<string, unknown>; expires: number }>();
+const cache = new Map<
+  string,
+  { data: Record<string, unknown>; expires: number }
+>();
 
 const appSettings = {
   theme: "dark" as const,
@@ -79,7 +118,9 @@ server.use(async (c, next) => {
 });
 
 // Concept: Custom HTTP endpoint via server.app
-server.app.get("/health", (c) => c.json({ status: "ok", uptime: process.uptime() }));
+server.app.get("/health", (c) =>
+  c.json({ status: "ok", uptime: process.uptime() })
+);
 server.app.get("/api/version", (c) => c.json({ version: appSettings.version }));
 
 // ============================================================================
@@ -114,7 +155,11 @@ server.tool(
     description: "Greet a user by name",
     schema: z.object({
       name: z.string().describe("User's name"),
-      formal: z.boolean().optional().default(false).describe("Use formal greeting"),
+      formal: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Use formal greeting"),
     }),
   },
   async ({ name, formal }) => {
@@ -156,7 +201,11 @@ server.tool(
     name: "list-items",
     description: "List all items (read-only, safe to call repeatedly)",
     schema: z.object({
-      category: z.enum(["widgets", "gadgets", "tools", "all"]).optional().default("all").describe("Filter by category"),
+      category: z
+        .enum(["widgets", "gadgets", "tools", "all"])
+        .optional()
+        .default("all")
+        .describe("Filter by category"),
     }),
     annotations: {
       readOnlyHint: true,
@@ -183,10 +232,13 @@ server.tool(
 server.tool(
   {
     name: "process-file",
-    description: "Process a file with progress reporting and structured logging",
+    description:
+      "Process a file with progress reporting and structured logging",
     schema: z.object({
       fileUrl: z.string().url().describe("URL of the file to process"),
-      operation: z.enum(["analyze", "compress", "convert"]).describe("Operation type"),
+      operation: z
+        .enum(["analyze", "compress", "convert"])
+        .describe("Operation type"),
     }),
   },
   async ({ fileUrl, operation }, ctx) => {
@@ -223,8 +275,14 @@ server.tool(
   async ({ content }, ctx) => {
     if (ctx.client.can("sampling")) {
       await ctx.log("info", "Client supports sampling");
-      const result = await ctx.sample(`Summarize: ${content}`, { maxTokens: 200 });
-      return text(typeof result.content === "string" ? result.content : JSON.stringify(result.content));
+      const result = await ctx.sample(`Summarize: ${content}`, {
+        maxTokens: 200,
+      });
+      return text(
+        typeof result.content === "string"
+          ? result.content
+          : JSON.stringify(result.content)
+      );
     }
 
     await ctx.log("info", "No sampling support, returning truncated content");
@@ -264,7 +322,11 @@ server.tool(
     );
 
     if (result.action === "accept" && result.data) {
-      return object({ topic, rating: result.data.rating, comment: result.data.comment });
+      return object({
+        topic,
+        rating: result.data.rating,
+        comment: result.data.comment,
+      });
     }
 
     return text("Feedback collection cancelled");
@@ -286,7 +348,10 @@ server.tool(
   },
   async ({ message }, ctx) => {
     const sessionId = ctx.session.sessionId;
-    await ctx.sendNotification("custom/alert", { message, timestamp: Date.now() });
+    await ctx.sendNotification("custom/alert", {
+      message,
+      timestamp: Date.now(),
+    });
     return text(`Notification sent to session ${sessionId}`);
   }
 );
@@ -359,7 +424,9 @@ server.tool(
     const categories = [...new Set(results.map((i) => i.category))];
     return widget({
       props: { items: results, categories, totalCount: results.length },
-      output: text(`Found ${results.length} items across ${categories.length} categories`),
+      output: text(
+        `Found ${results.length} items across ${categories.length} categories`
+      ),
     });
   }
 );
@@ -375,7 +442,11 @@ server.tool(
     description: "Fetch weather from external API (requires WEATHER_API_KEY)",
     schema: z.object({
       city: z.string().describe("City name"),
-      units: z.enum(["celsius", "fahrenheit"]).optional().default("celsius").describe("Temperature units"),
+      units: z
+        .enum(["celsius", "fahrenheit"])
+        .optional()
+        .default("celsius")
+        .describe("Temperature units"),
     }),
     annotations: {
       readOnlyHint: true,
@@ -408,7 +479,11 @@ server.tool(
     description: "Fetch data with caching (5-minute TTL)",
     schema: z.object({
       key: z.string().describe("Cache key"),
-      forceRefresh: z.boolean().optional().default(false).describe("Bypass cache"),
+      forceRefresh: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Bypass cache"),
     }),
     annotations: { readOnlyHint: true },
   },
@@ -423,7 +498,11 @@ server.tool(
       }
     }
 
-    const freshData = { key, value: Math.random(), computedAt: new Date().toISOString() };
+    const freshData = {
+      key,
+      value: Math.random(),
+      computedAt: new Date().toISOString(),
+    };
     cache.set(cacheKey, { data: freshData, expires: Date.now() + ttl });
     return object({ ...freshData, cached: false });
   }
@@ -439,29 +518,68 @@ server.tool(
 server.tool(
   {
     name: "kitchen-sink-schema",
-    description: "Tool exercising all common Zod schema types for type-checking coverage",
+    description:
+      "Tool exercising all common Zod schema types for type-checking coverage",
     schema: z.object({
-      name: z.string().min(1).max(100).describe("A required string with length constraints"),
+      name: z
+        .string()
+        .min(1)
+        .max(100)
+        .describe("A required string with length constraints"),
       email: z.string().email().describe("A valid email address"),
       website: z.string().url().optional().describe("An optional valid URL"),
-      age: z.number().min(0).max(150).describe("A number with range constraints"),
+      age: z
+        .number()
+        .min(0)
+        .max(150)
+        .describe("A number with range constraints"),
       isActive: z.boolean().describe("A required boolean"),
       role: z.enum(["admin", "user", "guest"]).describe("An enum selection"),
       tags: z.array(z.string()).describe("An array of strings"),
-      scores: z.array(z.number().min(0).max(100)).optional().default([]).describe("Optional array of numbers with defaults"),
-      address: z.object({
-        street: z.string().describe("Street name"),
-        city: z.string().describe("City name"),
-        zip: z.string().optional().describe("Optional zip code"),
-      }).describe("A nested object"),
-      metadata: z.record(z.string(), z.string()).optional().describe("Optional record/dictionary of string values"),
-      priority: z.enum(["low", "medium", "high"]).optional().default("medium").describe("Optional enum with default"),
+      scores: z
+        .array(z.number().min(0).max(100))
+        .optional()
+        .default([])
+        .describe("Optional array of numbers with defaults"),
+      address: z
+        .object({
+          street: z.string().describe("Street name"),
+          city: z.string().describe("City name"),
+          zip: z.string().optional().describe("Optional zip code"),
+        })
+        .describe("A nested object"),
+      metadata: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe("Optional record/dictionary of string values"),
+      priority: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .default("medium")
+        .describe("Optional enum with default"),
     }),
   },
-  async ({ name, email, website, age, isActive, role, tags, scores, address, metadata, priority }) => {
+  async ({
+    name,
+    email,
+    website,
+    age,
+    isActive,
+    role,
+    tags,
+    scores,
+    address,
+    metadata,
+    priority,
+  }) => {
     return object({
       received: {
-        name, email, website, age, isActive, role,
+        name,
+        email,
+        website,
+        age,
+        isActive,
+        role,
         tagCount: tags.length,
         scoreCount: scores.length,
         city: address.city,
@@ -486,7 +604,9 @@ server.tool(
     }),
   },
   async ({ title }) => {
-    return markdown(`# ${title}\n\n## Summary\n\n- Items: ${items.size}\n- Users: ${users.size}\n\n| Metric | Value |\n|--------|-------|\n| Uptime | ${process.uptime().toFixed(0)}s |`);
+    return markdown(
+      `# ${title}\n\n## Summary\n\n- Items: ${items.size}\n- Users: ${users.size}\n\n| Metric | Value |\n|--------|-------|\n| Uptime | ${process.uptime().toFixed(0)}s |`
+    );
   }
 );
 
@@ -496,7 +616,13 @@ server.tool(
     name: "get-placeholder-image",
     description: "Return a placeholder image URL",
     schema: z.object({
-      size: z.number().min(50).max(500).optional().default(200).describe("Image size in pixels"),
+      size: z
+        .number()
+        .min(50)
+        .max(500)
+        .optional()
+        .default(200)
+        .describe("Image size in pixels"),
     }),
   },
   async ({ size }) => {
@@ -512,7 +638,9 @@ server.tool(
     schema: z.object({}),
   },
   async () => {
-    return html("<h1>Hello</h1><p>This is an HTML response from an MCP tool.</p>");
+    return html(
+      "<h1>Hello</h1><p>This is an HTML response from an MCP tool.</p>"
+    );
   }
 );
 
@@ -536,7 +664,9 @@ server.tool(
     schema: z.object({}),
   },
   async () => {
-    return css("body { margin: 0; font-family: system-ui; } .card { padding: 16px; border-radius: 8px; }");
+    return css(
+      "body { margin: 0; font-family: system-ui; } .card { padding: 16px; border-radius: 8px; }"
+    );
   }
 );
 
@@ -584,7 +714,13 @@ server.tool(
     name: "get-number-list",
     description: "Return an array of numbers",
     schema: z.object({
-      count: z.number().min(1).max(20).optional().default(5).describe("How many numbers"),
+      count: z
+        .number()
+        .min(1)
+        .max(20)
+        .optional()
+        .default(5)
+        .describe("How many numbers"),
     }),
   },
   async ({ count }) => {
@@ -619,7 +755,10 @@ server.tool(
     schema: z.object({}),
   },
   async () => {
-    const audioResult = await audio(Buffer.from("fake").toString("base64"), "audio/wav");
+    const audioResult = await audio(
+      Buffer.from("fake").toString("base64"),
+      "audio/wav"
+    );
     return mix(
       text("Plain text"),
       markdown("## Markdown heading"),
@@ -628,10 +767,13 @@ server.tool(
       css("body { margin: 0; }"),
       javascript('console.log("js");'),
       image("https://via.placeholder.com/100", "image/png"),
-      binary(Buffer.from("bytes").toString("base64"), "application/octet-stream"),
+      binary(
+        Buffer.from("bytes").toString("base64"),
+        "application/octet-stream"
+      ),
       audioResult,
       object({ key: "value" }),
-      resource("docs://api", "text/markdown"),
+      resource("docs://api", "text/markdown")
     );
   }
 );
@@ -681,7 +823,9 @@ server.resource(
     mimeType: "text/markdown",
   },
   async () => {
-    return markdown("# API Docs\n\n## Endpoints\n\n- `GET /health` - Health check\n- `GET /api/version` - Server version");
+    return markdown(
+      "# API Docs\n\n## Endpoints\n\n- `GET /health` - Health check\n- `GET /api/version` - Server version"
+    );
   }
 );
 
@@ -753,8 +897,10 @@ server.resourceTemplate(
     const docs: Record<string, string> = {
       api: "# API Docs\n\nREST endpoints for managing resources.",
       auth: "# Auth Guide\n\nUse API keys via the Authorization header.",
-      "getting-started": "# Getting Started\n\n1. Install\n2. Configure\n3. Run",
-      troubleshooting: "# Troubleshooting\n\n## Common Issues\n\n- Check logs\n- Verify config",
+      "getting-started":
+        "# Getting Started\n\n1. Install\n2. Configure\n3. Run",
+      troubleshooting:
+        "# Troubleshooting\n\n## Common Issues\n\n- Check logs\n- Verify config",
     };
 
     const content = docs[params.topic];
@@ -804,11 +950,17 @@ server.prompt(
     description: "Generate a summarization prompt",
     schema: z.object({
       content: z.string().describe("Content to summarize"),
-      maxLength: z.number().optional().default(100).describe("Max summary length in words"),
+      maxLength: z
+        .number()
+        .optional()
+        .default(100)
+        .describe("Max summary length in words"),
     }),
   },
   async ({ content, maxLength }) => {
-    return text(`Please summarize the following in ${maxLength} words or fewer:\n\n${content}`);
+    return text(
+      `Please summarize the following in ${maxLength} words or fewer:\n\n${content}`
+    );
   }
 );
 
@@ -818,18 +970,26 @@ server.prompt(
     name: "code-review",
     description: "Generate a code review prompt with language autocomplete",
     schema: z.object({
-      language: completable(
-        z.string().describe("Programming language"),
-        ["TypeScript", "JavaScript", "Python", "Go", "Rust", "Java"]
-      ),
+      language: completable(z.string().describe("Programming language"), [
+        "TypeScript",
+        "JavaScript",
+        "Python",
+        "Go",
+        "Rust",
+        "Java",
+      ]),
       code: z.string().describe("Code to review"),
-      focus: z.enum(["security", "performance", "style", "all"]).optional().default("all").describe("Review focus area"),
+      focus: z
+        .enum(["security", "performance", "style", "all"])
+        .optional()
+        .default("all")
+        .describe("Review focus area"),
     }),
   },
   async ({ language, code, focus }) => {
     return markdown(
       `# Code Review: ${language}\n\n## Focus: ${focus}\n\n\`\`\`${language.toLowerCase()}\n${code}\n\`\`\`\n\n` +
-      "Review for correctness, bugs, error handling, and best practices."
+        "Review for correctness, bugs, error handling, and best practices."
     );
   }
 );
@@ -838,7 +998,8 @@ server.prompt(
 server.prompt(
   {
     name: "user-report",
-    description: "Generate a report prompt for a specific user with contextual completion",
+    description:
+      "Generate a report prompt for a specific user with contextual completion",
     schema: z.object({
       userId: completable(
         z.string().describe("User ID to generate report for"),
@@ -863,8 +1024,8 @@ server.prompt(
     const name = user?.name || "Unknown User";
     return markdown(
       `# ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report\n\n` +
-      `**User:** ${name} (${userId})\n\n` +
-      `Generate a comprehensive ${reportType} report for this user.`
+        `**User:** ${name} (${userId})\n\n` +
+        `Generate a comprehensive ${reportType} report for this user.`
     );
   }
 );
