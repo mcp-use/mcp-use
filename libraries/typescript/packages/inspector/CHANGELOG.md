@@ -1,5 +1,32 @@
 # @mcp-use/inspector
 
+## 0.21.0
+
+### Minor Changes
+
+- 179e800: feat(inspector): enhance ToolsTab with bulk paste functionality and auto-fill dialog
+  - Implemented a new bulk paste feature in the ToolsTab component, allowing users to paste JSON or JavaScript object syntax directly into input fields.
+  - Added an auto-fill dialog to confirm updates when pasted data would overwrite existing values, improving user experience and data integrity.
+  - Introduced utility functions for parsing pasted text and converting JavaScript object syntax to valid JSON.
+  - Updated ToolInputForm and ToolExecutionPanel components to support the new bulk paste functionality and visual feedback for auto-filled fields.
+
+### Patch Changes
+
+- 179e800: feat(inspector): update ToolExecutionPanel to copy full tool definition
+  fix(server): correctly convert nested inpout schema args for tools
+- 179e800: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+  - mcp-use@1.19.2
+
 ## 0.21.0-canary.2
 
 ### Patch Changes
