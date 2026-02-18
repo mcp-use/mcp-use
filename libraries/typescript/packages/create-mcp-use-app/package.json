@@ -54,7 +54,7 @@
     "ink-text-input": "^6.0.0",
     "ora": "^9.0.0",
     "react": "^19.2.3",
-    "tar": "^7.4.3"
+    "tar": "^7.5.8"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
