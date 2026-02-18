@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.19.3
+
+### Patch Changes
+
+- Updated dependencies [7ebe19a]
+  - @mcp-use/cli@2.14.0
+  - @mcp-use/inspector@0.21.1
+
 ## 1.19.3-canary.0
 
 ### Patch Changes
