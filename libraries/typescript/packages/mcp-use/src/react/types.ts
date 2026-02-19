@@ -1,4 +1,6 @@
 import type {
+  CompleteRequestParams,
+  CompleteResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequestFormParams,
@@ -392,6 +394,13 @@ export type UseMcpResult = {
     }>;
   }>;
   /**
+   * Request completion suggestions for a prompt or resource template argument.
+   * @param params Completion request parameters specifying the ref and argument to complete.
+   * @returns A promise that resolves with completion suggestions from the server.
+   * @throws If the client is not in the 'ready' state or the completion request fails.
+   */
+  complete: (params: CompleteRequestParams) => Promise<CompleteResult>;
+  /**
    * Refresh the tools list from the server.
    * Called automatically when notifications/tools/list_changed is received.
    * Can also be called manually for explicit refresh.
@@ -404,13 +413,18 @@ export type UseMcpResult = {
    */
   refreshResources: () => Promise<void>;
   /**
+   * Refresh the resource templates list from the server.
+   * Can be called manually for explicit refresh.
+   */
+  refreshResourceTemplates: () => Promise<void>;
+  /**
    * Refresh the prompts list from the server.
    * Called automatically when notifications/prompts/list_changed is received.
    * Can also be called manually for explicit refresh.
    */
   refreshPrompts: () => Promise<void>;
   /**
-   * Refresh all lists (tools, resources, prompts) from the server.
+   * Refresh all lists (tools, resources, resource templates, prompts) from the server.
    * Useful after reconnection or for manual refresh.
    */
   refreshAll: () => Promise<void>;

@@ -5,6 +5,8 @@ import type {
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   CallToolResult,
+  CompleteRequestParams,
+  CompleteResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequestFormParams,
@@ -590,6 +592,28 @@ export abstract class BaseConnector {
 
     logger.debug("Listing resource templates");
     return await this.client.listResourceTemplates(undefined, options);
+  }
+
+  /**
+   * Request completion suggestions for a prompt or resource template argument
+   *
+   * @param params - Completion request parameters
+   * @param options - Request options
+   * @returns Completion suggestions from the server
+   */
+  async complete(
+    params: CompleteRequestParams,
+    options?: RequestOptions
+  ): Promise<CompleteResult> {
+    if (!this.client) {
+      throw new Error("MCP client is not connected");
+    }
+    logger.debug("[complete] Requesting completions for:", params.ref);
+    const result = await this.client.complete(params, options);
+    logger.debug(
+      `[complete] Received ${result.completion.values.length} suggestions`
+    );
+    return result;
   }
 
   /** Read a resource by URI. */
