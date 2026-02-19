@@ -212,6 +212,11 @@ export const MessageList = memo(
                               )}
                               onSendFollowUp={sendMessage}
                               partialToolArgs={part.toolInvocation.partialArgs}
+                              cancelled={
+                                part.toolInvocation.state === "error" &&
+                                part.toolInvocation.result ===
+                                  "Cancelled by user"
+                              }
                             />
                           )}
                         </div>
