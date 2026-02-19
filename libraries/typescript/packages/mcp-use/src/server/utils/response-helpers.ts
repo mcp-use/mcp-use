@@ -580,16 +580,32 @@ export function binary(base64Data: string, mimeType: string): CallToolResult {
 }
 
 /**
- * Configuration for widget response utility (runtime data only)
+ * Configuration for widget response utility (runtime data only).
+ * Pass to widget() from a tool handler that has widget config at registration.
  */
 export interface WidgetResponseConfig {
-  /** Widget-only data passed to useWidget().props (hidden from model) */
+  /**
+   * Widget-only data passed to useWidget().props.
+   * Rendered by the widget component; not shown to the model.
+   *
+   * @example { temperature: 22, conditions: "Sunny", city: "Paris" }
+   * @example { query: "mango", results: [{ fruit: "mango", color: "#FBF1E1" }] }
+   */
   props?: Record<string, any>;
   /** @deprecated Use `props` instead - Legacy alias for props */
   data?: Record<string, any>;
-  /** Response helper result that the model sees (text(), json(), etc.) */
+  /**
+   * Response helper result (text(), object(), etc.) that the model sees.
+   * Summarizes the tool result for the conversation.
+   *
+   * @example text(`Weather in Paris: 22°C, Sunny`)
+   * @example object({ count: 16, query: "mango" })
+   */
   output?: CallToolResult | TypedCallToolResult<any>;
-  /** Optional override for the text message */
+  /**
+   * Optional override for the text message in content.
+   * Used when you want to show different text than output provides.
+   */
   message?: string;
 }
 

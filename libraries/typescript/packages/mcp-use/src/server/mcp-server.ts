@@ -3098,7 +3098,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link ToolCallback} for callback signature
    */
   public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
-    toolDefinition: T,
+    toolDefinition: T & ToolDefinition<any, any, HasOAuth>,
     callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
   ) => this;
 
@@ -3285,7 +3285,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       | PromptDefinition<any, HasOAuth>
       | import("./types/index.js").PromptDefinitionWithoutCallback,
   >(
-    promptDefinition: T,
+    promptDefinition: T &
+      (
+        | PromptDefinition<any, HasOAuth>
+        | import("./types/index.js").PromptDefinitionWithoutCallback
+      ),
     callback?: PromptCallback<InferPromptInput<T>, HasOAuth>
   ) => this;
 

@@ -30,9 +30,8 @@ export async function generateToolRegistryTypes(
     const toolEntries: string[] = [];
 
     // Sort tool names for deterministic output
-    const sortedTools = Array.from(registrations.entries()).sort(([a], [b]) =>
-      a.localeCompare(b)
-    );
+    const toolsArray = Array.from(registrations?.entries() || []);
+    const sortedTools = toolsArray.sort(([a], [b]) => a.localeCompare(b));
 
     for (const [toolName, { config }] of sortedTools) {
       const inputType = config.schema ? zodToTypeString(config.schema) : "null";

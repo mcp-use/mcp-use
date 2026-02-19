@@ -64,15 +64,33 @@ export interface PromptDefinition<
   TInput = Record<string, any>,
   HasOAuth extends boolean = false,
 > {
-  /** Unique identifier for the prompt */
+  /**
+   * Unique identifier for the prompt .
+   *
+   * @example "code-review-template"
+   * @example "daily-standup"
+   */
   name: string;
-  /** Human-readable title for the prompt */
+  /**
+   * Human-readable title displayed in prompt lists.
+   *
+   * @example "Code Review Template"
+   */
   title?: string;
-  /** Description of what the prompt does */
+  /**
+   * Description of what the prompt does; helps users choose the right prompt.
+   *
+   * @example "Generate a code review checklist for the given file type"
+   */
   description?: string;
   /** Argument definitions (legacy, use schema instead) */
+  /** @deprecated Use schema instead */
   args?: InputDefinition[];
-  /** Zod schema for input validation (preferred) */
+  /**
+   * Zod schema for input validation. Use .describe() on each field for user guidance.
+   *
+   * @example z.object({ language: z.string().describe("Programming language"), filePath: z.string().optional().describe("Path to file") })
+   */
   schema?: z.ZodObject<any>;
   /** Async callback function that generates the prompt */
   cb: PromptCallback<TInput, HasOAuth>;
@@ -82,14 +100,31 @@ export interface PromptDefinition<
  * Prompt definition without cb callback (new API with separate callback parameter)
  */
 export interface PromptDefinitionWithoutCallback {
-  /** Unique identifier for the prompt */
+  /**
+   * Unique identifier for the prompt .
+   *
+   * @example "code-review-template"
+   */
   name: string;
-  /** Human-readable title for the prompt */
+  /**
+   * Human-readable title displayed in prompt lists.
+   *
+   * @example "Code Review Template"
+   */
   title?: string;
-  /** Description of what the prompt does */
+  /**
+   * Description of what the prompt does.
+   *
+   * @example "Generate a code review checklist for the given file type"
+   */
   description?: string;
   /** Argument definitions (legacy, use schema instead) */
+  /** @deprecated Use schema instead */
   args?: InputDefinition[];
-  /** Zod schema for input validation (preferred) */
+  /**
+   * Zod schema for input validation.
+   *
+   * @example z.object({ language: z.string().describe("Programming language") })
+   */
   schema?: z.ZodObject<any>;
 }

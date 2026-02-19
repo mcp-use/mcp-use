@@ -172,13 +172,30 @@ export interface ResourceTemplateCallbacks {
  * Configuration for a resource template
  */
 export interface ResourceTemplateConfig {
-  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  /**
+   * URI template with {param} placeholders for dynamic resources.
+   *
+   * @example "user://{userId}/profile"
+   * @example "repo://{owner}/{repo}/file/{path}"
+   */
   uriTemplate: string;
-  /** Name of the resource */
+  /**
+   * Unique name for the template.
+   *
+   * @example "user-profile"
+   */
   name?: string;
-  /** MIME type of the resource content */
+  /**
+   * MIME type of the resource content (e.g., "text/plain", "application/json").
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
-  /** Description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
   description?: string;
   /** Complete callback for the resource template */
   callbacks?: ResourceTemplateCallbacks;
@@ -218,15 +235,35 @@ export interface ResourceTemplateDefinitionWithoutCallback {
 export interface FlatResourceTemplateDefinition<
   HasOAuth extends boolean = false,
 > {
-  /** Unique identifier for the template */
+  /**
+   * Unique identifier for the template.
+   *
+   * @example "user-profile"
+   */
   name: string;
-  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  /**
+   * URI template with {param} placeholders.
+   *
+   * @example "user://{userId}/profile"
+   */
   uriTemplate: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "User Profile"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
   description?: string;
-  /** MIME type of the resource content */
+  /**
+   * MIME type of the resource content.
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
@@ -244,15 +281,35 @@ export interface FlatResourceTemplateDefinition<
  * instead of nested in a resourceTemplate property.
  */
 export interface FlatResourceTemplateDefinitionWithoutCallback {
-  /** Unique identifier for the template */
+  /**
+   * Unique identifier for the template.
+   *
+   * @example "user-profile"
+   */
   name: string;
-  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  /**
+   * URI template with {param} placeholders.
+   *
+   * @example "user://{userId}/profile"
+   */
   uriTemplate: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "User Profile"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
   description?: string;
-  /** MIME type of the resource content */
+  /**
+   * MIME type of the resource content.
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
@@ -265,13 +322,30 @@ export interface FlatResourceTemplateDefinitionWithoutCallback {
  * Resource definition with readCallback (old API)
  */
 export interface ResourceDefinition<HasOAuth extends boolean = false> {
-  /** Unique identifier for the resource */
+  /**
+   * Unique identifier for the resource.
+   *
+   * @example "app-settings"
+   */
   name: string;
-  /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
+  /**
+   * URI pattern for accessing the resource. Use a custom scheme (e.g., config://, app://).
+   *
+   * @example "config://app-settings"
+   * @example "app://greeting"
+   */
   uri: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "App Settings"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "Application configuration and user preferences"
+   */
   description?: string;
   /** MIME type of the resource content (required for old API) */
   mimeType: string;
@@ -289,15 +363,36 @@ export interface ResourceDefinition<HasOAuth extends boolean = false> {
  * MIME type is optional when using response helpers - it's inferred from the helper
  */
 export interface ResourceDefinitionWithoutCallback {
-  /** Unique identifier for the resource */
+  /**
+   * Unique identifier for the resource.
+   *
+   * @example "app-settings"
+   */
   name: string;
-  /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
+  /**
+   * URI pattern for accessing the resource.
+   *
+   * @example "config://app-settings"
+   * @example "app://greeting"
+   */
   uri: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "App Settings"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "Application configuration and user preferences"
+   */
   description?: string;
-  /** MIME type (optional - inferred from response helpers like text(), object(), etc.) */
+  /**
+   * MIME type (optional when using text(), object(), etc.—inferred from the helper).
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
@@ -332,21 +427,47 @@ export type RemoteDomFramework = "react" | "webcomponents";
  * Base properties shared by all UI resource types
  */
 interface BaseUIResourceDefinition {
-  /** Unique identifier for the resource */
+  /**
+   * Unique identifier for the resource/widget.
+   *
+   * @example "weather-display"
+   * @example "product-search-result"
+   */
   name: string;
-  /** Human-readable title */
+  /**
+   * Human-readable title for the widget.
+   *
+   * @example "Weather Display"
+   */
   title?: string;
-  /** Description of what the widget does */
+  /**
+   * Description of what the widget does; helps the model understand when to use it.
+   *
+   * @example "Display weather information for a city"
+   */
   description?: string;
-  /** Widget properties/parameters configuration */
+  /**
+   * Widget properties/parameters configuration.
+   * Each key maps to a prop schema with type, required, default, description.
+   */
   props?: WidgetProps;
-  /** Preferred frame size [width, height] (e.g., ['800px', '600px']) */
+  /**
+   * Preferred frame size [width, height].
+   *
+   * @example ["800px", "600px"]
+   */
   size?: [string, string];
   /** Resource annotations for discovery and presentation */
   annotations?: ResourceAnnotations;
-  /** Encoding for the resource content (defaults to 'text') */
+  /**
+   * Encoding for the resource content (defaults to 'text').
+   * Use 'blob' for binary content.
+   */
   encoding?: UIEncoding;
-  /** Control automatic tool registration (defaults to true) */
+  /**
+   * Whether to auto-register this widget as an MCP tool (defaults to true).
+   * Set to false when the widget is paired with a custom server.tool().
+   */
   exposeAsTool?: boolean;
   /** Tool annotations when registered as a tool */
   toolAnnotations?: ToolAnnotations;
@@ -482,12 +603,39 @@ export interface WidgetConfig {
 }
 
 export interface WidgetManifest {
+  /**
+   * Unique widget identifier (must match directory/file name).
+   *
+   * @example "weather-display"
+   */
   name: string;
+  /**
+   * Human-readable title.
+   *
+   * @example "Weather Display"
+   */
   title?: string;
+  /**
+   * Description of what the widget displays.
+   *
+   * @example "Display weather information for a city"
+   */
   description?: string;
+  /**
+   * Semantic version of the widget.
+   *
+   * @example "1.0.0"
+   */
   version?: string;
+  /** Widget props schema (type, required, default per prop) */
   props?: WidgetProps;
+  /**
+   * Preferred frame size [width, height].
+   *
+   * @example ["800px", "600px"]
+   */
   size?: [string, string];
+  /** Asset paths for scripts, styles, main entry */
   assets?: {
     main?: string;
     scripts?: string[];
@@ -496,10 +644,22 @@ export interface WidgetManifest {
 }
 
 export interface DiscoverWidgetsOptions {
-  /** Path to widgets directory (defaults to dist/resources/mcp-use/widgets) */
+  /**
+   * Path to widgets directory.
+   * Defaults to dist/resources/mcp-use/widgets.
+   *
+   * @example "./resources/widgets"
+   */
   path?: string;
-  /** Automatically register widgets without manifests */
+  /**
+   * Automatically register widgets that don't have manifests.
+   * Defaults to false.
+   */
   autoRegister?: boolean;
-  /** Filter widgets by name pattern */
+  /**
+   * Filter widgets by name pattern (string or RegExp).
+   *
+   * @example "weather-*"
+   */
   filter?: string | RegExp;
 }
