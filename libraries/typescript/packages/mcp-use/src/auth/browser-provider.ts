@@ -439,8 +439,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private async _refresh(tokens: OAuthTokens): Promise<OAuthTokens | null> {
     try {
       if (!this._cachedAuthServerUrl || !this._cachedMetadata) {
-        const resourceMetadata =
-          await discoverOAuthProtectedResourceMetadata(this.serverUrl);
+        const resourceMetadata = await discoverOAuthProtectedResourceMetadata(
+          this.serverUrl
+        );
         const authServerUrl = resourceMetadata.authorization_servers?.[0];
         if (!authServerUrl) return null;
         const metadata =
