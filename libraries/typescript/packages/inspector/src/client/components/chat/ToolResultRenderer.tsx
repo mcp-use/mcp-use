@@ -10,6 +10,23 @@ import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
 import { MCPUIResource } from "./MCPUIResource";
 
+function ModelContextBadge({ widgetId }: { widgetId: string }) {
+  const { getWidget } = useWidgetDebug();
+  const widget = getWidget(widgetId);
+  const ctx = widget?.modelContext;
+  if (!ctx?.content?.length && !ctx?.structuredContent) return null;
+  const preview =
+    ctx.content?.map((c: any) => c.text).join(" ") ??
+    JSON.stringify(ctx.structuredContent).slice(0, 80);
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30 border border-border/40 rounded-md mt-1">
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+      <span className="font-medium">State synced to model</span>
+      <span className="truncate opacity-60 max-w-[300px]">{preview}</span>
+    </div>
+  );
+}
+
 interface ToolResultRendererProps {
   toolName: string;
   toolArgs: Record<string, unknown>;
@@ -141,18 +158,11 @@ export function ToolResultRenderer({
     return null;
   }, [hasAppsSdkComponent, parsedResult]);
 
-  // Extract widget props from result metadata (similar to OpenAIComponentRenderer)
-  // Widget props come from the tool result's _meta, not from the original tool arguments
+  // Extract widget props from structuredContent (per SEP-1865, widget data flows via tool-result)
   const widgetProps = useMemo(() => {
-    const props = parsedResult?._meta?.["mcp-use/props"] || null;
-    console.log("[ToolResultRenderer] Widget props extraction:", {
-      hasMetaProps: !!props,
-      widgetProps: props,
-      toolArgs,
-      willUse: props || toolArgs,
-    });
+    const props = parsedResult?.structuredContent || null;
     return props;
-  }, [parsedResult, toolArgs]);
+  }, [parsedResult]);
 
   // Calculate resource URI outside of effect for stable dependency
   const resourceUri = useMemo(() => {
@@ -259,21 +269,24 @@ export function ToolResultRenderer({
   // Render immediately if we have resourceUri from metadata, even if resourceData is still loading
   if (isMcpAppsTool && resourceUri && serverId && readResource) {
     return (
-      <MCPAppsRenderer
-        serverId={serverId}
-        toolCallId={toolCallId}
-        toolName={toolName}
-        toolInput={widgetProps || toolArgs}
-        toolOutput={parsedResult}
-        toolMetadata={toolMeta}
-        partialToolInput={partialToolArgs}
-        resourceUri={resourceData?.uri || resourceUri}
-        readResource={readResource}
-        className="my-4"
-        noWrapper={true}
-        onSendFollowUp={onSendFollowUp}
-        serverBaseUrl={serverBaseUrl}
-      />
+      <>
+        <MCPAppsRenderer
+          serverId={serverId}
+          toolCallId={toolCallId}
+          toolName={toolName}
+          toolInput={widgetProps || toolArgs}
+          toolOutput={parsedResult}
+          toolMetadata={toolMeta}
+          partialToolInput={partialToolArgs}
+          resourceUri={resourceData?.uri || resourceUri}
+          readResource={readResource}
+          className="my-4"
+          noWrapper={true}
+          onSendFollowUp={onSendFollowUp}
+          serverBaseUrl={serverBaseUrl}
+        />
+        <ModelContextBadge widgetId={toolCallId} />
+      </>
     );
   }
 

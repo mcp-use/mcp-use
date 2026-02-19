@@ -235,29 +235,29 @@ export const widgetMetadata: WidgetMetadata = {
   // Required: Human-readable description
   description: string,
 
-  // Required: Zod schema defining the widget's input parameters
+  // Required: Zod schema defining the widget's props shape
   props: z.ZodObject<...>,
 
   // Optional: Control automatic tool registration (defaults to true)
   exposeAsTool?: boolean,
 
-  // Optional: Apps SDK metadata (CSP, widget description, etc.)
+  // Recommended: Unified metadata (works with both MCP Apps and ChatGPT)
+  metadata?: {
+    csp?: { connectDomains?: string[], resourceDomains?: string[] },
+    prefersBorder?: boolean,
+  },
+
+  // Alternative: Apps SDK metadata (ChatGPT-only, legacy format)
   appsSdkMetadata?: {
+    'openai/widgetCSP'?: { connect_domains?: string[], resource_domains?: string[] },
     'openai/widgetDescription'?: string,
-    'openai/widgetCSP'?: {
-      connect_domains?: string[],
-      resource_domains?: string[],
-    },
-    'openai/toolInvocation/invoking'?: string,
-    'openai/toolInvocation/invoked'?: string,
     'openai/widgetAccessible'?: boolean,
-    'openai/resultCanProduceWidget'?: boolean,
   },
 }
 ```
 
 <Note>
-The `inputs` field expects a Zod schema that defines the shape of the parameters passed to your widget. This schema is used to generate the tool's input validation and to type-check the props in your widget component via `useWidget<T>()`.
+The `props` field expects a Zod schema that defines the shape of `structuredContent` returned by the tool. This schema is used to generate the tool's input validation and to type-check the data in your widget via `useWidget<T>()`.
 </Note>
 
 **Apps SDK Metadata Defaults:**
@@ -307,7 +307,7 @@ By default, widgets are automatically registered as both MCP tools and resources
   };
   ```
 
-**Note**: The CSP domains you specify will be merged with default trusted domains (like `*.oaistatic.com`, `*.oaiusercontent.com`, `*.openai.com`, and your server's base URL). This ensures your widget can access both your custom resources and OpenAI's required domains.
+**Note**: Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used.
 
 ## Components & Hooks
 
@@ -386,13 +386,16 @@ const imageUrl = window.__getFile?.("fruits/apple.png");
 
 ## Patterns
 
-### Accessing Tool Input
+### Accessing Widget Data
 
-Widgets are called by the model in the same way as tools. The `useWidget` hook provides access to the tool input, typed based on widget metadata schmea you defined.
+The `useWidget` hook provides access to both the server-computed props and the original tool arguments:
 
 ```typescript
-const { props } = useWidget();
+const { props, toolInput, isPending } = useWidget();
 ```
+
+- **`props`** — Data computed by the server, sent via `structuredContent` (the LLM does **not** see this)
+- **`toolInput`** — The original tool call arguments from the model (e.g. `{ query: "mango" }`)
 
 **Example:**
 
@@ -401,12 +404,21 @@ export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results with filtering',
   props: z.object({
     query: z.string(),
+    results: z.array(z.object({ name: z.string() })),
   }),
 };
 
 const ProductSearchResult: React.FC = () => {
-  const { props } = useWidget();
-  return <div>Query: {props.query}</div>;
+  const { props, toolInput, isPending } = useWidget();
+
+  if (isPending) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <p>You searched for: {toolInput.query}</p>
+      <p>Found {props.results.length} results</p>
+    </div>
+  );
 };
 ```
 
@@ -701,10 +713,11 @@ server.tool(
 **Key Points:**
 
 - **`widget: { name, invoking, invoked, ... }`** on tool definition - Configures all widget metadata at registration time
-- **`widget({ props, output, message })`** helper - Returns runtime data only:
-  - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
-  - `output` - Optional response helper result (text(), object(), etc.) that the model sees
-  - `message` - Optional text message override
+- **`widget({ props, output, metadata, message })`** helper - Returns runtime data only:
+  - `props` - Widget rendering data sent as `structuredContent` (LLM does **not** see). Widget reads via `useWidget().props`.
+  - `output` - Optional response helper (text(), object(), etc.) that the model sees in `content`
+  - `metadata` - Optional extra data in `_meta`. Widget reads via `useWidget().metadata`.
+  - `message` - Optional text message override for `content`
 - **Widget must exist** - The widget name must match a `.tsx` file or folder in `resources/`
 - **Disable auto-registration** - Set `exposeAsTool: false` in the widget's metadata if you only want it accessible through custom tools:
 

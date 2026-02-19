@@ -61,20 +61,26 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
 }
 
 /**
- * React hook for building OpenAI Apps SDK widgets with MCP-use
+ * React hook for building MCP Apps and ChatGPT Apps SDK widgets
  *
- * Provides type-safe access to the window.openai API. Widget props come from
- * _meta["mcp-use/props"] (widget-only data), while toolInput contains the original tool arguments.
+ * Per SEP-1865, data flows through standard MCP channels:
+ * - `props`     → from `structuredContent` in the tool result (LLM does NOT see this)
+ * - `toolInput` → from tool call arguments (what the model sent)
+ * - `output`    → same as props (the structuredContent)
+ *
+ * The server decides what the LLM sees via `content` (text) and what the widget
+ * sees via `structuredContent` (props). This enables the use case where the tool
+ * body computes widget data that shouldn't pollute the model's context.
  *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
- *   const { props, toolInput, output, theme } = useWidget<
- *     { city: string; temperature: number },  // Props (widget-only)
- *     string,                                  // Output (model sees)
+ *   const { props, toolInput, theme } = useWidget<
+ *     { city: string; temperature: number },  // Props (from structuredContent)
+ *     { city: string; temperature: number },  // Output type
  *     {},                                      // Metadata
  *     {},                                      // State
- *     { city: string }                         // ToolInput (tool args)
+ *     { city: string }                         // ToolInput (tool call args)
  *   >();
  *
  *   return (
@@ -108,6 +114,10 @@ export function useWidget<
     unknown
   > | null>(null);
   const [mcpAppsToolOutput, setMcpAppsToolOutput] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [mcpAppsResponseMetadata, setMcpAppsResponseMetadata] = useState<Record<
     string,
     unknown
   > | null>(null);
@@ -184,12 +194,13 @@ export function useWidget<
         // Get initial state
         const toolInput = bridge.getToolInput();
         const toolOutput = bridge.getToolOutput();
+        const responseMeta = bridge.getToolResponseMetadata();
         const hostContext = bridge.getHostContext();
-
         const partialToolInput = bridge.getPartialToolInput();
 
         if (toolInput) setMcpAppsToolInput(toolInput);
         if (toolOutput) setMcpAppsToolOutput(toolOutput);
+        if (responseMeta) setMcpAppsResponseMetadata(responseMeta);
         if (partialToolInput) setMcpAppsPartialToolInput(partialToolInput);
         if (hostContext) setMcpAppsHostContext(hostContext);
       })
@@ -211,7 +222,7 @@ export function useWidget<
 
     const unsubToolResult = bridge.onToolResult((result) => {
       setMcpAppsToolOutput(result);
-      // Now that the tool is complete, clear the streaming partial
+      setMcpAppsResponseMetadata(bridge.getToolResponseMetadata());
       setMcpAppsPartialToolInput(null);
     });
 
@@ -295,27 +306,34 @@ export function useWidget<
     return urlParams.toolOutput as TOutput | null | undefined;
   }, [provider, openaiToolOutput, mcpAppsToolOutput, urlParams.toolOutput]);
 
-  // Extract widget props based on provider
+  // Props come from structuredContent in the tool result (per SEP-1865).
+  // The server puts widget rendering data in structuredContent, which the
+  // host sends to the widget via ui/notifications/tool-result. The LLM
+  // only sees `content` (text), not structuredContent.
   const widgetProps = useMemo(() => {
-    // Apps SDK: Props from toolResponseMetadata["mcp-use/props"]
-    if (
-      provider === "openai" &&
-      toolResponseMetadata &&
-      typeof toolResponseMetadata === "object"
-    ) {
-      const metaProps = (toolResponseMetadata as any)["mcp-use/props"];
-      if (metaProps) {
-        return metaProps as TProps;
-      }
+    // Apps SDK (ChatGPT): toolOutput IS structuredContent (set by window.openai.toolOutput)
+    if (provider === "openai" && openaiToolOutput) {
+      return openaiToolOutput as unknown as TProps;
     }
 
-    // MCP Apps: Props come from tool input (arguments)
-    if (provider === "mcp-apps" && mcpAppsToolInput) {
-      return mcpAppsToolInput as TProps;
+    // MCP Apps: mcpAppsToolOutput is already structuredContent (extracted by the bridge)
+    if (provider === "mcp-apps" && mcpAppsToolOutput) {
+      return mcpAppsToolOutput as TProps;
+    }
+
+    // URL params fallback (legacy mcp-ui)
+    if (provider === "mcp-ui" && urlParams.toolOutput) {
+      return urlParams.toolOutput as unknown as TProps;
     }
 
     return defaultProps || ({} as TProps);
-  }, [provider, toolResponseMetadata, mcpAppsToolInput, defaultProps]);
+  }, [
+    provider,
+    openaiToolOutput,
+    mcpAppsToolOutput,
+    urlParams.toolOutput,
+    defaultProps,
+  ]);
 
   // Theme, displayMode, and other host context from provider
   const theme = useMemo(() => {
@@ -500,12 +518,23 @@ export function useWidget<
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      // MCP Apps doesn't support widget state persistence
+      // MCP Apps: update local state + send ui/update-model-context to host
+      // so the model can reason about UI state on future turns (per SEP-1865)
       if (provider === "mcp-apps") {
         const currentState = localWidgetState;
         const newState =
           typeof state === "function" ? state(currentState) : state;
         setLocalWidgetState(newState);
+
+        const bridge = getMcpAppsBridge();
+        bridge
+          .updateModelContext({
+            structuredContent: newState as Record<string, unknown>,
+            content: [{ type: "text", text: JSON.stringify(newState) }],
+          })
+          .catch((err) => {
+            console.warn("[useWidget] Failed to update model context:", err);
+          });
         return;
       }
 
@@ -587,7 +616,9 @@ export function useWidget<
     props: widgetProps,
     toolInput: (toolInput || {}) as TToolInput,
     output: (toolOutput ?? null) as TOutput | null,
-    metadata: (toolResponseMetadata ?? null) as TMetadata | null,
+    metadata: (provider === "mcp-apps"
+      ? (mcpAppsResponseMetadata ?? null)
+      : (toolResponseMetadata ?? null)) as TMetadata | null,
     state: localWidgetState,
     setState,
 

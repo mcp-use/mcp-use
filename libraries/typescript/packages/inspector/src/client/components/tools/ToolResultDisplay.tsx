@@ -890,11 +890,10 @@ export function ToolResultDisplay({
                     );
                   }
 
-                  // Extract widget props from toolOutput._meta (same as OpenAI renderer)
-                  const metaSource = memoizedResult?._meta;
-                  const widgetProps = metaSource?.["mcp-use/props"] || null;
+                  // Widget props come from structuredContent (per SEP-1865)
+                  const widgetProps = memoizedResult?.structuredContent || null;
 
-                  // Merge widget props (from output) with custom props (from debug controls) and tool args
+                  // Merge widget props with custom props (from debug controls) and tool args
                   // Priority: activeProps > widgetProps > memoizedArgs
                   const finalToolInput = {
                     ...(memoizedArgs || {}),
@@ -931,6 +930,7 @@ export function ToolResultDisplay({
                         resourceUri={mcpAppsResourceUri}
                         readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
+                        customProps={activeProps || undefined}
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}

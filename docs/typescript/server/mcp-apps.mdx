@@ -1,10 +1,10 @@
 ---
 title: "MCP Apps - Standard Widget Protocol"
-description: "Build interactive widgets using the official MCP Apps protocol (SEP-1865) with cross-client compatibility"
+description: "Build interactive widgets using the official MCP Apps protocol with cross-client compatibility"
 icon: "blocks"
 ---
 
-MCP Apps is the **official standard** for interactive widgets in the Model Context Protocol ecosystem. Based on the [SEP-1865 specification](https://spec.modelcontextprotocol.io/specification/2025-11-21/extensions/apps/), MCP Apps provides a standardized way to create rich, interactive user interfaces that work across MCP-compatible clients.
+MCP Apps is the **official standard** for interactive widgets in the Model Context Protocol ecosystem. It provides a standardized way to create rich, interactive user interfaces that work across MCP-compatible clients.
 
 <Info>
   **mcp-use Advantage**: Write your widgets once using `type: "mcpApps"` and
@@ -32,7 +32,7 @@ MCP Apps is the **official standard** for interactive widgets in the Model Conte
 MCP Apps is the recommended widget protocol for MCP servers because it:
 
 - **MCP-native**: Built specifically for the Model Context Protocol ecosystem
-- **Open Standard**: Based on SEP-1865, ensuring long-term compatibility
+- **Open Standard**: Ensuring long-term compatibility across the MCP ecosystem
 - **Secure**: Double-iframe sandbox architecture with granular CSP control
 - **Feature-rich**: JSON-RPC 2.0 communication with full MCP integration
 - **Future-proof**: Supported by growing ecosystem of MCP clients
@@ -58,7 +58,7 @@ While both protocols enable interactive widgets, they have key differences:
 | ------------------- | -------------------------------------- | ------------------------------ |
 | **Protocol**        | JSON-RPC 2.0 over `postMessage`        | `window.openai` global API     |
 | **MIME Type**       | `text/html;profile=mcp-app`            | `text/html+skybridge`          |
-| **Specification**   | SEP-1865 (open standard)               | OpenAI proprietary             |
+| **Specification**   | MCP Apps (open standard)               | OpenAI proprietary             |
 | **Architecture**    | Double-iframe sandbox                  | Single iframe                  |
 | **CSP Format**      | camelCase (`connectDomains`)           | snake_case (`connect_domains`) |
 | **Client Support**  | MCP Apps clients (Claude, Goose, etc.) | ChatGPT                        |
@@ -112,9 +112,6 @@ server.uiResource({
     },
     prefersBorder: true,
 
-    // MCP Apps-specific metadata (optional)
-    autoResize: true,
-
     // ChatGPT-specific metadata (optional)
     widgetDescription: "Displays current weather conditions",
   },
@@ -135,8 +132,7 @@ This single configuration automatically generates metadata for **both protocols*
         connectDomains: ["https://api.weather.com"],
         resourceDomains: ["https://cdn.weather.com"]
       },
-      prefersBorder: true,
-      autoResize: true
+      prefersBorder: true
     }
   }
 }
@@ -159,9 +155,148 @@ This single configuration automatically generates metadata for **both protocols*
 }
 ```
 
+## Data Flow: What the LLM Sees vs What the Widget Sees
+
+Per the [MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps), a tool result has three fields with different visibility:
+
+| Field | LLM sees it? | Widget sees it? | Purpose |
+|---|---|---|---|
+| `content` | **Yes** | Yes | Text summary for the model's context |
+| `structuredContent` | **No** | Yes (as `props`) | Rendering data for the widget |
+| `_meta` | **No** | Yes (as `metadata`) | Protocol + custom metadata |
+
+This separation enables a powerful pattern: the **server computes data for the widget** (like search results, computed visualizations, etc.) without polluting the model's context window.
+
+### Server: Returning data
+
+```typescript
+server.tool({
+  name: "search-products",
+  schema: z.object({ query: z.string() }),
+  widget: { name: "product-search-result" },
+}, async ({ query }) => {
+  const results = await db.search(query);
+
+  return widget({
+    // Widget rendering data — LLM does NOT see this
+    props: { query, results },
+    // Text summary — LLM sees this
+    output: text(`Found ${results.length} products matching "${query}"`),
+  });
+});
+```
+
+### Widget: Reading data
+
+```tsx
+const { props, toolInput, isPending } = useWidget<ProductSearchProps>();
+
+// props     = structuredContent from tool result (computed by server)
+// toolInput = tool call arguments (what the model sent, e.g. { query: "mango" })
+```
+
+The `props` and `toolInput` are intentionally separate:
+- **`toolInput`** is what the model decided to pass (e.g. `{ query: "mango" }`)
+- **`props`** is what the server computed and returned (e.g. `{ query: "mango", results: [...16 items] }`)
+
+## Display Modes
+
+Widgets can request different display modes from the host:
+
+```tsx
+const { displayMode, requestDisplayMode } = useWidget();
+
+// Request fullscreen
+await requestDisplayMode("fullscreen");
+
+// Request picture-in-picture
+await requestDisplayMode("pip");
+
+// Return to inline
+await requestDisplayMode("inline");
+```
+
+The host may decline the request — always check `displayMode` for the actual state. Common pattern for a toolbar:
+
+```tsx
+const isFullscreen = displayMode === "fullscreen";
+const isPip = displayMode === "pip";
+
+return (
+  <div>
+    {!isFullscreen && !isPip && (
+      <>
+        <button onClick={() => requestDisplayMode("pip")}>PiP</button>
+        <button onClick={() => requestDisplayMode("fullscreen")}>Fullscreen</button>
+      </>
+    )}
+    {(isFullscreen || isPip) && (
+      <button onClick={() => requestDisplayMode("inline")}>Exit</button>
+    )}
+  </div>
+);
+```
+
+## Follow-Up Messages
+
+Widgets can send messages to the conversation on behalf of the user using `sendFollowUpMessage`. This triggers a new LLM turn:
+
+```tsx
+const { sendFollowUpMessage } = useWidget();
+
+<button onClick={() => sendFollowUpMessage("Tell me more about mangoes")}>
+  Ask the AI
+</button>
+```
+
+Per the MCP Apps specification, this maps to the `ui/message` JSON-RPC request. The host adds the message to the conversation and triggers the model to respond.
+
+## Host Context: Locale, Theme, and More
+
+`useWidget` exposes host context fields provided by the host:
+
+```tsx
+const { theme, locale, timeZone, safeArea, userAgent, maxHeight } = useWidget();
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `theme` | `"light" \| "dark"` | Current host theme |
+| `locale` | `string` | BCP 47 locale (e.g. `"en-US"`, `"fr-FR"`) |
+| `timeZone` | `string` | IANA timezone (e.g. `"America/New_York"`) |
+| `safeArea` | `{ insets: { top, right, bottom, left } }` | Safe area for notched devices |
+| `userAgent` | `{ device: { type }, capabilities: { hover, touch } }` | Device info |
+| `maxHeight` | `number` | Max available height in pixels |
+| `maxWidth` | `number \| undefined` | Max available width (MCP Apps only) |
+
+Use the Inspector's playground controls to test different locales, devices, and themes during development.
+
+## Response Metadata
+
+The tool result's `_meta` field is available as `metadata` in `useWidget`. Use the `metadata` option in the `widget()` helper to pass extra data that doesn't belong in `structuredContent`:
+
+```typescript
+// Server side
+return widget({
+  props: { items: filteredItems },
+  metadata: { totalCount: 1000, nextCursor: "abc123" },
+  output: text(`Showing ${filteredItems.length} of 1000 results`),
+});
+```
+
+```tsx
+// Widget side
+const { props, metadata } = useWidget();
+
+// props    = { items: [...] }           (from structuredContent)
+// metadata = { totalCount, nextCursor } (from _meta)
+```
+
+This works across both MCP Apps (`ui/notifications/tool-result` → `params._meta`) and ChatGPT (`window.openai.toolResponseMetadata`).
+
 ## Widget Code (Protocol-Agnostic)
 
-The beauty of mcp-use is that your widget code is **identical** regardless of which protocol is used:
+Your widget code is **identical** regardless of which protocol the host uses:
 
 ```tsx
 // resources/weather-display.tsx
@@ -243,6 +378,66 @@ const InteractiveWidget = () => {
 - ✅ **Cross-protocol**: Works identically in MCP Apps and ChatGPT
 
 See [useCallTool()](/typescript/server/widget-components/usecalltool) for complete documentation.
+
+## State Management
+
+State in an MCP Apps widget falls into three categories:
+
+| State type | Where it lives | Lifetime | Example |
+|---|---|---|---|
+| **Business data** | MCP server / backend | Long-lived | Tasks, search results, documents |
+| **UI state** | Widget instance | Per-widget | Selected row, expanded panel, filter |
+| **Cross-session** | Your backend | Across conversations | Saved preferences, workspace settings |
+
+### Business Data (Server-Owned)
+
+Business data is the source of truth. The widget receives it via `props` (from `structuredContent`) and can request updates by calling server tools:
+
+```tsx
+const { props } = useWidget<{ tasks: Task[] }>();
+const { callTool, data } = useCallTool("update-task");
+
+const handleToggle = (taskId: string) => {
+  callTool({ taskId, done: true });
+  // Server returns updated task list in structuredContent
+  // Widget re-renders with new props on next tool call
+};
+```
+
+### UI State (Widget-Owned)
+
+UI state describes **how** data is being viewed, not the data itself. Use `setState` from `useWidget`:
+
+```tsx
+type MyState = { favorites: string[] };
+
+const { props, state, setState } = useWidget<Props, Output, Meta, MyState>();
+
+const favorites = state?.favorites ?? [];
+
+const toggleFavorite = (id: string) => {
+  const current = state?.favorites ?? [];
+  const next = current.includes(id)
+    ? current.filter(f => f !== id)
+    : [...current, id];
+  setState({ favorites: next });
+};
+```
+
+**What happens under the hood:**
+
+- **ChatGPT**: Calls `window.openai.setWidgetState()` for host-managed persistence across message reloads.
+- **MCP Apps**: Updates local React state **and** sends `ui/update-model-context` to the host, so the model can reason about UI state on future turns.
+
+<Note>
+  `ui/update-model-context` is the MCP Apps equivalent of ChatGPT's
+  widget state persistence. Each call overwrites the previous context. The host
+  includes this data in the model's context on the next user message.
+</Note>
+
+### Cross-Session State (Backend-Owned)
+
+For state that must persist across conversations, store it on your backend. Use `callTool` from the widget to read/write preferences via your server's tools — don't rely on `localStorage`.
 
 ## MCP Apps Bridge API
 
@@ -485,14 +680,14 @@ Follow these steps to migrate:
 
 MCP Apps is designed for **interactive widgets**, while MCP UI is better for simpler, static content:
 
-| Feature              | MCP Apps                          | MCP UI                   |
-| -------------------- | --------------------------------- | ------------------------ |
-| **Use Case**         | Interactive widgets with state    | Static/simple content    |
-| **Interactivity**    | Full React components, tool calls | Limited (mostly display) |
-| **State Management** | Built-in state persistence        | No state                 |
-| **Tool Calls**       | ✅ Can call other MCP tools       | ❌ No tool access        |
-| **ChatGPT Support**  | ✅ Via dual-protocol              | ❌ Not supported         |
-| **Complexity**       | Higher (full React app)           | Lower (simple HTML)      |
+| Feature              | MCP Apps                                              | MCP UI                   |
+| -------------------- | ----------------------------------------------------- | ------------------------ |
+| **Use Case**         | Interactive widgets with state                        | Static/simple content    |
+| **Interactivity**    | Full React components, tool calls                     | Limited (mostly display) |
+| **State Management** | `setState` + `ui/update-model-context`                | No state                 |
+| **Tool Calls**       | ✅ Can call other MCP tools                           | ❌ No tool access        |
+| **ChatGPT Support**  | ✅ Via dual-protocol                                  | ❌ Not supported         |
+| **Complexity**       | Higher (full React app)                               | Lower (simple HTML)      |
 
 **When to use MCP Apps:**
 

@@ -198,35 +198,11 @@ function OpenAIComponentRendererBase({
           widgetCSP = resourceData.contents[0]._meta["openai/widgetCSP"];
         }
 
-        // For other metadata, prefer tool result's _meta as it may have tool-specific overrides
-        const metaSource =
-          currentToolResult?._meta || resourceData?.contents?.[0]?._meta;
-
-        // Extract widget props from _meta["mcp-use/props"]
-        const widgetProps = metaSource?.["mcp-use/props"] || null;
-
-        // Merge widget props with custom props (custom props take precedence)
-        const mergedProps = {
-          ...(widgetProps || {}),
+        // toolInput = original tool call arguments; custom props merged in
+        const finalToolInput = {
+          ...(currentToolArgs || {}),
           ...(currentCustomProps || {}),
         };
-        const finalWidgetProps =
-          Object.keys(mergedProps).length > 0 ? mergedProps : null;
-
-        // Debug logging
-        console.log("[OpenAIComponentRenderer] Widget data extraction:", {
-          hasMetaSource: !!metaSource,
-          hasMcpUseProps: !!metaSource?.["mcp-use/props"],
-          widgetProps,
-          customProps: currentCustomProps,
-          finalWidgetProps,
-          toolArgs: currentToolArgs,
-          structuredContent,
-          metaKeys: metaSource ? Object.keys(metaSource) : [],
-        });
-
-        // toolInput should be the original tool call arguments from toolArgs
-        const finalToolInput = currentToolArgs;
 
         // Update state with final values
         setWidgetToolInput(finalToolInput);
@@ -241,11 +217,9 @@ function OpenAIComponentRendererBase({
         };
         urlParams.set("mcpUseParams", JSON.stringify(params));
 
-        // Check for dev mode widget - check all _meta locations (toolResult, toolResult.contents, and resourceData.contents)
-        const metaForWidget =
-          currentToolResult?._meta ||
-          currentToolResult?.contents?.[0]?._meta ||
-          resourceData?.contents?.[0]?._meta;
+        // Check for dev mode widget from resource read metadata (mcp-use extension).
+        // This lives on the resource _meta, not on tool result _meta.
+        const metaForWidget = resourceData?.contents?.[0]?._meta;
 
         // Use dev mode if metadata says so
         const computedUseDevMode =
@@ -264,9 +238,7 @@ function OpenAIComponentRendererBase({
           uri: componentUrl,
           toolInput: finalToolInput, // Original tool call arguments
           toolOutput: structuredContent, // Tool output (structured data)
-          toolResponseMetadata: finalWidgetProps
-            ? { "mcp-use/props": finalWidgetProps }
-            : null, // Widget-specific props (merged with custom props)
+          toolResponseMetadata: null, // Protocol metadata only — props are in structuredContent
           resourceData, // Pass the fetched HTML
           toolId,
           widgetCSP, // Pass the CSP metadata

@@ -5,12 +5,16 @@ import { useCarouselAnimation } from "../hooks/useCarouselAnimation";
 
 interface CarouselProps {
   results: Array<{ fruit: string; color: string }>;
+  favorites?: string[];
   onSelectFruit: (fruit: string) => void;
+  onToggleFavorite?: (fruit: string) => void;
 }
 
 export const Carousel: React.FC<CarouselProps> = ({
   results,
+  favorites = [],
   onSelectFruit,
+  onToggleFavorite,
 }) => {
   const carouselContainerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -32,7 +36,11 @@ export const Carousel: React.FC<CarouselProps> = ({
                 key={`${fruit}-${index}`}
                 fruit={fruit}
                 color={item.color ?? "bg-default/10"}
+                isFavorite={favorites.includes(fruit)}
                 onClick={() => onSelectFruit(fruit)}
+                onToggleFavorite={
+                  onToggleFavorite ? () => onToggleFavorite(fruit) : undefined
+                }
               />
             );
           })}

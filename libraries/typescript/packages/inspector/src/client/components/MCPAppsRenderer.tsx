@@ -318,6 +318,30 @@ export function MCPAppsRenderer({
     // at the time of the fetch and don't warrant refetching the widget HTML.
   }, [serverId, resourceUri, toolCallId, toolName, cspMode]);
 
+  // Re-read prefersBorder from the server when the widget re-initializes
+  // (HMR support). When initCount > 1, it means the widget iframe reloaded
+  // (e.g. Vite HMR page reload) and the server may have updated metadata.
+  useEffect(() => {
+    if (initCount <= 1) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const resourceResult = await readResource(resourceUri);
+        if (cancelled) return;
+        const contentUiMeta = resourceResult?.contents?.[0]?._meta?.ui;
+        if (contentUiMeta && "prefersBorder" in contentUiMeta) {
+          setPrefersBorder(contentUiMeta.prefersBorder ?? true);
+        }
+      } catch {
+        // readResource may fail during reconnection; ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initCount, resourceUri, readResource]);
+
   // Initialize AppBridge when HTML is ready
   useEffect(() => {
     if (!widgetHtml || !sandboxRef.current) return;
@@ -434,14 +458,25 @@ export function MCPAppsRenderer({
 
     bridge.onupdatemodelcontext = async ({ content, structuredContent }) => {
       setWidgetModelContext(toolCallId, { content, structuredContent });
+      try {
+        localStorage.setItem(
+          `mcp-use:widget-state:${toolCallId}`,
+          JSON.stringify(structuredContent)
+        );
+      } catch (_) {
+        // localStorage may be unavailable (e.g., private browsing); ignore
+        void _;
+      }
       return {};
     };
 
     bridge.onloggingmessage = async ({ level, logger: _logger, data }) => {
       // Publish to console log bus (avoids postMessage issues with browser extensions)
+      // When data is an array it means the original console call had multiple args
+      // (bridge packs them as an array), so spread them rather than double-wrapping.
       consoleLogBus.publish({
         level: level as any,
-        args: [data],
+        args: Array.isArray(data) ? data : [data],
         timestamp: new Date().toISOString(),
         url: resourceUri,
       });
@@ -571,6 +606,18 @@ export function MCPAppsRenderer({
         return;
       }
 
+      // Detect widget re-initialization (e.g. after Vite HMR page reload).
+      // The AppBridge doesn't fire oninitialized for subsequent ui/initialize
+      // requests, so we detect it here and bump initCount to trigger re-sending
+      // of tool input/output to the new widget instance.
+      if (
+        event.data?.method === "ui/initialize" &&
+        event.data?.jsonrpc === "2.0" &&
+        event.data?.id != null
+      ) {
+        setInitCount((c) => c + 1);
+      }
+
       // Log received message
       rpcLogBus.publish({
         serverId: `widget-${toolCallId}`,
@@ -677,8 +724,11 @@ export function MCPAppsRenderer({
     const propsKey = JSON.stringify(mergedArgs);
 
     // Skip only if we've already sent this exact payload for this toolCallId
+    // Include initCount so a widget re-initialization (e.g. HMR page reload)
+    // always re-sends the tool input to the new widget instance.
+    const sentKey = `${toolCallId}:${initCount}`;
     if (
-      toolInputSentRef.current === toolCallId &&
+      toolInputSentRef.current === sentKey &&
       lastSentPropsRef.current === propsKey
     ) {
       return;
@@ -687,13 +737,13 @@ export function MCPAppsRenderer({
     if (partialToolInput) {
       const frame = requestAnimationFrame(() => {
         bridge.sendToolInput({ arguments: mergedArgs });
-        toolInputSentRef.current = toolCallId;
+        toolInputSentRef.current = sentKey;
         lastSentPropsRef.current = propsKey;
       });
       return () => cancelAnimationFrame(frame);
     } else {
       bridge.sendToolInput({ arguments: mergedArgs });
-      toolInputSentRef.current = toolCallId;
+      toolInputSentRef.current = sentKey;
       lastSentPropsRef.current = propsKey;
     }
   }, [initCount, toolInput, customProps, toolCallId, partialToolInput]);
@@ -706,10 +756,38 @@ export function MCPAppsRenderer({
 
     // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
-      bridge.sendToolResult(toolOutput as CallToolResult);
+      const result = toolOutput as CallToolResult;
+
+      // When customProps are set (from user presets), inject them as
+      // structuredContent so the widget receives them via useWidget().props.
+      // Without this, props only flow through sendToolInput (toolInput) while
+      // the widget reads props from the tool result's structuredContent.
+      if (customProps && Object.keys(customProps).length > 0) {
+        const parsed: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(customProps)) {
+          if (
+            typeof v === "string" &&
+            (v.trim().startsWith("[") || v.trim().startsWith("{"))
+          ) {
+            try {
+              parsed[k] = JSON.parse(v);
+            } catch {
+              parsed[k] = v;
+            }
+          } else {
+            parsed[k] = v;
+          }
+        }
+        bridge.sendToolResult({
+          ...result,
+          structuredContent: parsed,
+        } as CallToolResult);
+      } else {
+        bridge.sendToolResult(result);
+      }
     }
     // Note: When toolOutput is null, widget stays in pending state (isPending=true)
-  }, [initCount, toolOutput, toolCallId]);
+  }, [initCount, toolOutput, toolCallId, customProps]);
 
   // Send tool-cancelled notification when user cancels from the host UI
   useEffect(() => {

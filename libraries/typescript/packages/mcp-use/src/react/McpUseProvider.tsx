@@ -76,7 +76,7 @@ export function McpUseProvider({
   children,
   debugger: enableDebugger = false,
   viewControls = false,
-  autoSize = false,
+  autoSize = true,
 }: McpUseProviderProps) {
   const basename = getBasename();
   const [containerElement, setContainerElement] =

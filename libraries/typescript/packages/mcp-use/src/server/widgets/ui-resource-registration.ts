@@ -16,7 +16,6 @@ import type {
   ToolDefinition,
   UIResourceDefinition,
 } from "../types/index.js";
-import { AppsSdkAdapter, McpAppsAdapter } from "./adapters/index.js";
 import {
   applyDefaultProps,
   convertPropsToInputs,
@@ -187,18 +186,21 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   // Check if this widget was already registered (for HMR updates)
   const isUpdate = server.widgetDefinitions.has(enrichedDefinition.name);
 
-  // Store widget definition for use by tools with returnsWidget option
-  // Store both appsSdk and mcpApps widgets with type information for dual-protocol support
+  // Store minimal widget definition for use by tools with widget config.
+  // Only store what's needed to build protocol metadata at tool-call time:
+  // - widgetType: to decide mcpApps vs appsSdk code path
+  // - metadata: CSP/domain config needed by protocol adapters
+  // No mcp-use/* keys are stored — they don't belong on the wire.
   if (
-    (enrichedDefinition.type === "appsSdk" ||
-      enrichedDefinition.type === "mcpApps") &&
-    enrichedDefinition._meta
+    enrichedDefinition.type === "appsSdk" ||
+    enrichedDefinition.type === "mcpApps"
   ) {
-    // Store the entire enrichedDefinition for HMR metadata regeneration
     server.widgetDefinitions.set(enrichedDefinition.name, {
-      ...enrichedDefinition._meta,
-      "mcp-use/widgetType": enrichedDefinition.type,
-      "mcp-use/fullDefinition": enrichedDefinition, // Store full definition for HMR
+      widgetType: enrichedDefinition.type,
+      metadata:
+        enrichedDefinition.type === "mcpApps"
+          ? enrichedDefinition.metadata
+          : undefined,
     } as Record<string, unknown>);
 
     // Update any existing tools that reference this widget
@@ -274,20 +276,68 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     buildId: server.buildId,
   };
 
-  // Skip resource registration if this is an update (resources don't change, only metadata)
-  if (!isUpdate) {
-    // Per MCP Apps spec (SEP-1865): resource _meta.ui should contain CSP,
-    // prefersBorder, domain, permissions. Build it from the enriched definition.
-    const resourceUiMeta =
-      enrichedDefinition.type === "mcpApps"
-        ? buildResourceUiMeta(enrichedDefinition)
-        : undefined;
-    const resourceMeta = {
-      ...enrichedDefinition._meta,
-      ...(resourceUiMeta ? { ui: resourceUiMeta } : {}),
-    };
+  // Per MCP Apps spec (SEP-1865): resource _meta.ui should contain CSP,
+  // prefersBorder, domain, permissions. Build it from the enriched definition.
+  const resourceUiMeta =
+    enrichedDefinition.type === "mcpApps"
+      ? buildResourceUiMeta(enrichedDefinition)
+      : undefined;
+  const resourceMeta = {
+    ...enrichedDefinition._meta,
+    ...(resourceUiMeta ? { ui: resourceUiMeta } : {}),
+  };
 
-    // Register the resource
+  // Resolve the latest enriched definition dynamically.
+  // During HMR, widgetDefinitions is updated with the new definition but
+  // the original readCallback closure can't be replaced in the MCP SDK.
+  // By reading from widgetDefinitions at call time, the callback always
+  // uses the latest metadata (e.g. prefersBorder, CSP).
+  const getLatestDefinition = (): UIResourceDefinition => {
+    const stored = server.widgetDefinitions.get(enrichedDefinition.name);
+    const full = (stored as any)?.["mcp-use/fullDefinition"];
+    return (full as UIResourceDefinition) ?? enrichedDefinition;
+  };
+
+  const resourceReadCallback = async () => {
+    const latestDef = getLatestDefinition();
+    const params =
+      latestDef.type === "externalUrl"
+        ? applyDefaultProps(latestDef.props)
+        : {};
+
+    const uiResource = await createWidgetUIResource(
+      latestDef,
+      params,
+      serverConfig
+    );
+
+    uiResource.resource.uri = resourceUri;
+
+    return {
+      contents: [uiResource.resource],
+    };
+  };
+
+  const templateReadCallback = async (
+    uri: URL,
+    _params: Record<string, string>
+  ) => {
+    const latestDef = getLatestDefinition();
+    const uiResource = await createWidgetUIResource(
+      latestDef,
+      {},
+      serverConfig
+    );
+
+    uiResource.resource.uri = uri.toString();
+
+    return {
+      contents: [uiResource.resource],
+    };
+  };
+
+  if (!isUpdate) {
+    // Initial registration
     server.resource({
       name: enrichedDefinition.name,
       uri: resourceUri,
@@ -296,26 +346,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       mimeType,
       _meta: resourceMeta,
       annotations: enrichedDefinition.annotations,
-      readCallback: async () => {
-        // For externalUrl type, use default props. For others, use empty params
-        const params =
-          enrichedDefinition.type === "externalUrl"
-            ? applyDefaultProps(enrichedDefinition.props)
-            : {};
-
-        const uiResource = await createWidgetUIResource(
-          enrichedDefinition,
-          params,
-          serverConfig
-        );
-
-        // Ensure the resource content URI matches the registered URI (with build ID)
-        uiResource.resource.uri = resourceUri;
-
-        return {
-          contents: [uiResource.resource],
-        };
-      },
+      readCallback: resourceReadCallback,
     });
 
     // For Apps SDK and MCP Apps, also register a resource template to handle dynamic URIs with random IDs
@@ -339,22 +370,31 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         title: enrichedDefinition.title,
         description: enrichedDefinition.description,
         annotations: enrichedDefinition.annotations,
-        readCallback: async (uri: URL, params: Record<string, string>) => {
-          // Use empty params since structuredContent is passed separately
-          const uiResource = await createWidgetUIResource(
-            enrichedDefinition,
-            {},
-            serverConfig
-          );
-
-          // Ensure the resource content URI matches the template URI (with build ID)
-          uiResource.resource.uri = uri.toString();
-
-          return {
-            contents: [uiResource.resource],
-          };
-        },
+        readCallback: templateReadCallback,
       });
+    }
+  } else if (server.registrations) {
+    // HMR update: update existing resource handler and metadata so that
+    // resources/read returns fresh content (e.g. updated prefersBorder, CSP).
+    const resourceKey = `${enrichedDefinition.name}:${resourceUri}`;
+    const existingResource = server.registrations.resources?.get(resourceKey);
+    if (existingResource) {
+      existingResource.config = {
+        ...existingResource.config,
+        _meta: resourceMeta,
+      };
+      existingResource.handler = resourceReadCallback as any;
+    }
+
+    const resourceTemplateKey = `${enrichedDefinition.name}-dynamic`;
+    const existingTemplate =
+      server.registrations.resourceTemplates?.get(resourceTemplateKey);
+    if (existingTemplate) {
+      existingTemplate.config = {
+        ...existingTemplate.config,
+        _meta: resourceMeta,
+      };
+      existingTemplate.handler = templateReadCallback as any;
     }
   }
 
@@ -381,9 +421,9 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   // Note: Resources and resource templates are always registered regardless of exposeAsTool
   // because custom tools may reference them via the widget() helper
   if (exposeAsTool) {
-    // Build tool metadata using protocol adapters for dual-protocol support
-    const toolMetadata: Record<string, unknown> =
-      enrichedDefinition._meta || {};
+    // Build tool metadata using protocol adapters for dual-protocol support.
+    // Only include protocol-standard fields (ui.resourceUri, openai/*) — no mcp-use/* keys.
+    const toolMetadata: Record<string, unknown> = {};
 
     if (
       enrichedDefinition.type === "appsSdk" &&
@@ -494,12 +534,6 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
     // Tool callback function (used for both new registration and updates)
     const toolCallback = async (params: Record<string, unknown>) => {
-      // For HMR updates, read metadata from the tool registration config to get latest values
-      // This ensures we use updated metadata after HMR instead of the closed-over initial value
-      const currentToolMeta =
-        server.registrations?.tools?.get(enrichedDefinition.name)?.config
-          ?._meta || toolMetadata;
-
       // Create the UIResource with user-provided params
       const uiResource = await createWidgetUIResource(
         enrichedDefinition,
@@ -507,76 +541,15 @@ export function uiResourceRegistration<T extends UIResourceServer>(
         serverConfig
       );
 
-      // For Apps SDK, return _meta at top level with only text in content
-      if (enrichedDefinition.type === "appsSdk") {
-        // Generate a unique URI with random ID for each invocation
-        const randomId = Math.random().toString(36).substring(2, 15);
-        const uniqueUri = generateWidgetUri(
-          enrichedDefinition.name,
-          server.buildId,
-          ".html",
-          randomId
-        );
-
-        // Update toolMetadata with the unique URI and widget props
-        const uniqueToolMetadata = {
-          ...currentToolMeta,
-          "openai/outputTemplate": uniqueUri,
-          "mcp-use/props": params, // Pass params as widget props
-        };
-
-        // Generate tool output (what the model sees)
-        const toolOutputResult = enrichedDefinition.toolOutput
-          ? typeof enrichedDefinition.toolOutput === "function"
-            ? enrichedDefinition.toolOutput(params)
-            : enrichedDefinition.toolOutput
-          : generateToolOutput(enrichedDefinition, params, displayName);
-
-        // Ensure content exists (required by CallToolResult)
-        const content = toolOutputResult.content || [
-          { type: "text" as const, text: displayName },
-        ];
-
-        return {
-          _meta: uniqueToolMetadata,
-          content: content,
-          structuredContent: toolOutputResult.structuredContent,
-        };
-      }
-
-      // For MCP Apps, return dual-protocol response with _meta and resource
-      if (enrichedDefinition.type === "mcpApps") {
-        // Generate a unique URI with random ID for each invocation
-        const randomId = Math.random().toString(36).substring(2, 15);
-        const uniqueUri = generateWidgetUri(
-          enrichedDefinition.name,
-          server.buildId,
-          ".html",
-          randomId
-        );
-
-        // Build dual-protocol metadata using both adapters
-        const mcpAppsAdapter = new McpAppsAdapter();
-        const appsSdkAdapter = new AppsSdkAdapter();
-
-        const mcpAppsUniqueMeta = mcpAppsAdapter.buildToolMetadata(
-          enrichedDefinition,
-          uniqueUri
-        );
-        const appsSdkUniqueMeta = appsSdkAdapter.buildToolMetadata(
-          enrichedDefinition,
-          uniqueUri
-        );
-
-        // Per MCP Apps spec: tool _meta.ui only has resourceUri (+ visibility).
-        // CSP lives on the resource, not the tool call result.
-        const uniqueToolMetadata: Record<string, unknown> = {
-          ...currentToolMeta,
-          ...mcpAppsUniqueMeta,
-          ...appsSdkUniqueMeta,
-          "mcp-use/props": params, // Pass params as widget props
-        };
-
+      // For Apps SDK or MCP Apps, return clean tool result.
+      // Per OpenAI Apps SDK docs and SEP-1865: protocol fields (ui.resourceUri,
+      // openai/outputTemplate, openai/toolInvocation/*) belong on the tool
+      // DEFINITION (tools/list), not on every tool call result. The tool call
+      // result _meta is only for app-specific widget data.
+      if (
+        enrichedDefinition.type === "appsSdk" ||
+        enrichedDefinition.type === "mcpApps"
+      ) {
         // Generate tool output (what the model sees)
         const toolOutputResult = enrichedDefinition.toolOutput
           ? typeof enrichedDefinition.toolOutput === "function"
@@ -589,14 +562,18 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           { type: "text" as const, text: displayName },
         ];
 
-        return {
-          _meta: uniqueToolMetadata, // For ChatGPT compatibility
-          content: [
-            ...(Array.isArray(content) ? content : [content]),
-            uiResource, // For MCP Apps clients
-          ],
-          structuredContent: toolOutputResult?.structuredContent,
+        const result: Record<string, unknown> = {
+          content:
+            enrichedDefinition.type === "mcpApps"
+              ? [...(Array.isArray(content) ? content : [content]), uiResource]
+              : content,
         };
+
+        if (toolOutputResult?.structuredContent) {
+          result.structuredContent = toolOutputResult.structuredContent;
+        }
+
+        return result;
       }
 
       // For other types (legacy MCP-UI), return standard response

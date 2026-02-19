@@ -9,6 +9,11 @@ import type {
 } from "./types";
 import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
 
+interface WidgetModelContext {
+  content?: Array<{ type: string; text: string }>;
+  structuredContent?: Record<string, unknown>;
+}
+
 interface UseChatMessagesProps {
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
@@ -16,6 +21,8 @@ interface UseChatMessagesProps {
   isConnected: boolean;
   /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
+  /** Active widget model contexts to inject into the LLM conversation */
+  widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
 }
 
 export function useChatMessages({
@@ -24,6 +31,7 @@ export function useChatMessages({
   authConfig,
   isConnected,
   chatApiUrl,
+  widgetModelContexts,
 }: UseChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,7 +102,28 @@ export function useChatMessages({
           }
         }
 
-        // Call the streaming chat API endpoint
+        // Build widget state context messages (per SEP-1865 ui/update-model-context)
+        // These inform the LLM about current widget UI state so it can reason about what the user sees.
+        const widgetContextMessages: Array<{ role: string; content: string }> =
+          [];
+        if (widgetModelContexts && widgetModelContexts.size > 0) {
+          const parts: string[] = [];
+          for (const [, ctx] of widgetModelContexts) {
+            if (!ctx) continue;
+            if (ctx.content?.length) {
+              parts.push(ctx.content.map((c) => c.text).join("\n"));
+            } else if (ctx.structuredContent) {
+              parts.push(JSON.stringify(ctx.structuredContent));
+            }
+          }
+          if (parts.length > 0) {
+            widgetContextMessages.push({
+              role: "user",
+              content: `[Current Widget State]\n${parts.join("\n")}`,
+            });
+          }
+        }
+
         const response = await fetch(
           chatApiUrl ?? "/inspector/api/chat/stream",
           {
@@ -107,17 +136,20 @@ export function useChatMessages({
               mcpServerUrl,
               llmConfig,
               authConfig: authConfigWithTokens,
-              messages: [...messages, ...userMessages].map((m) => ({
-                role: m.role,
-                content:
-                  m.content ||
-                  (m.parts
-                    ?.filter((p) => p.type === "text")
-                    .map((p) => p.text)
-                    .join("") ??
-                    ""),
-                attachments: m.attachments,
-              })),
+              messages: [
+                ...[...messages, ...userMessages].map((m) => ({
+                  role: m.role,
+                  content:
+                    m.content ||
+                    (m.parts
+                      ?.filter((p) => p.type === "text")
+                      .map((p) => p.text)
+                      .join("") ??
+                      ""),
+                  attachments: m.attachments,
+                })),
+                ...widgetContextMessages,
+              ],
             }),
           }
         );

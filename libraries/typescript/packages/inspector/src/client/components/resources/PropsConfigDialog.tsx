@@ -63,47 +63,52 @@ export function PropsConfigDialog({
       if (shape && typeof shape === "object") {
         const properties: Record<string, any> = {};
         const required: string[] = [];
-        const zodTypeToJson = (typeName: string): string => {
-          if (typeName === "ZodNumber") return "number";
-          if (typeName === "ZodBoolean") return "boolean";
-          if (typeName === "ZodArray") return "array";
-          return "string";
+        const resolveType = (name: string): string => {
+          const map: Record<string, string> = {
+            ZodString: "string",
+            string: "string",
+            ZodNumber: "number",
+            number: "number",
+            ZodBoolean: "boolean",
+            boolean: "boolean",
+            ZodArray: "array",
+            array: "array",
+            ZodObject: "object",
+            object: "object",
+          };
+          return map[name] || "string";
         };
+        const getTypeName = (d: any): string => d?.typeName ?? d?.type ?? "";
         const parseProp = (p: any): { type: string; items?: any } => {
           const def = p?._def ?? p?.def ?? {};
           let inner = p;
-          let typeName = def.typeName ?? "";
-          // Unwrap Optional/Default to get inner type
+          let typeName = getTypeName(def);
           while (
             typeName === "ZodOptional" ||
             typeName === "ZodDefault" ||
             typeName === "ZodNullable"
           ) {
-            inner = def.innerType ?? def.type ?? inner;
+            inner = def.innerType ?? inner;
             const d = inner?._def ?? inner?.def ?? {};
-            typeName = d.typeName ?? "";
+            typeName = getTypeName(d);
           }
-          if (typeName === "ZodArray") {
-            const el = inner?._def?.type ?? inner?.def?.type;
+          const resolved = resolveType(typeName);
+          if (resolved === "array") {
+            const el =
+              inner?._def?.type ?? inner?.def?.element ?? inner?.element;
             if (el) {
               const elDef = el._def ?? el.def ?? {};
-              if (elDef.typeName === "ZodObject") {
+              if (resolveType(getTypeName(elDef)) === "object") {
                 const s = elDef.shape ?? el._def?.shape ?? el.def?.shape ?? {};
                 return {
                   type: "array",
                   items: {
                     type: "object",
                     properties: Object.fromEntries(
-                      Object.entries(s).map(([k, v]) => [
-                        k,
-                        {
-                          type: zodTypeToJson(
-                            (v as any)?._def?.typeName ??
-                              (v as any)?.def?.typeName ??
-                              "ZodString"
-                          ),
-                        },
-                      ])
+                      Object.entries(s).map(([k, v]) => {
+                        const vDef = (v as any)?._def ?? (v as any)?.def ?? {};
+                        return [k, { type: resolveType(getTypeName(vDef)) }];
+                      })
                     ),
                   },
                 };
@@ -111,16 +116,14 @@ export function PropsConfigDialog({
             }
             return { type: "array" };
           }
-          return { type: zodTypeToJson(typeName) || "string" };
+          return { type: resolved };
         };
         for (const [key, zodProp] of Object.entries(shape)) {
           const p = zodProp as any;
           const def = p?._def ?? p?.def ?? {};
-          const typeName = def.typeName ?? "";
+          const tn = getTypeName(def);
           const isOptional =
-            typeName === "ZodOptional" ||
-            typeName === "ZodDefault" ||
-            typeName === "ZodNullable";
+            tn === "ZodOptional" || tn === "ZodDefault" || tn === "ZodNullable";
           const parsed = parseProp(p);
           properties[key] = {
             type: parsed.type,
