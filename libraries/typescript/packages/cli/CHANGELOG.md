@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.14.0
+
+### Minor Changes
+
+- 7ebe19a: Add mcp-use skills add and mcp-use skills install commands to the cli to install AI agent skills (Cursor, Claude Code, Codex) from the mcp-use repository
+
+### Patch Changes
+
+- mcp-use@1.19.3
+- @mcp-use/inspector@0.21.1
+
 ## 2.14.0-canary.0
 
 ### Minor Changes

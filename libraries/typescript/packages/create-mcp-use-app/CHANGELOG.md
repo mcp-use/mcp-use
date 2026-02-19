@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.13.2
+
+### Patch Changes
+
+- 7ebe19a: Add missing @types/react and @types/react-dom to template devDependencies
+
 ## 0.13.2-canary.0
 
 ### Patch Changes
