@@ -37,6 +37,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private oauthProxyUrl?: string;
   private connectionUrl?: string; // MCP proxy URL that client connected to
   private originalFetch?: typeof fetch;
+  private _cachedTokenEndpoint: string | null = null;
+  private _refreshPromise: Promise<OAuthTokens | null> | null = null;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -395,8 +397,23 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     const data = localStorage.getItem(key);
     if (!data) return undefined;
     try {
-      // TODO: Add validation
-      return JSON.parse(data) as OAuthTokens;
+      const tokens = JSON.parse(data) as OAuthTokens;
+      if (tokens.access_token && tokens.refresh_token) {
+        try {
+          const payload = JSON.parse(atob(tokens.access_token.split(".")[1]));
+          if (payload.exp && Date.now() >= (payload.exp - 30) * 1000) {
+            console.log("[tokens] Access token expiring soon, refreshing...");
+            const refreshed = await this._dedupedRefresh(tokens);
+            if (refreshed) {
+              console.log("[tokens] Refreshed successfully");
+              return refreshed;
+            }
+          }
+        } catch {
+          // Can't decode JWT, return as-is
+        }
+      }
+      return tokens;
     } catch (e) {
       console.warn(`[${this.storageKeyPrefix}] Failed to parse tokens:`, e);
       localStorage.removeItem(key);
@@ -410,6 +427,87 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     // Clean up code verifier and last auth URL after successful token save
     localStorage.removeItem(this.getKey("code_verifier"));
     localStorage.removeItem(this.getKey("last_auth_url"));
+  }
+
+  private async _refresh(tokens: OAuthTokens): Promise<OAuthTokens | null> {
+    try {
+      if (!this._cachedTokenEndpoint) {
+        const res = await fetch(
+          `${this.serverUrl}/.well-known/oauth-protected-resource`
+        );
+        if (!res.ok) return null;
+        const meta = await res.json();
+        const authServer = meta.authorization_servers?.[0];
+        if (!authServer) return null;
+        const authRes = await fetch(
+          `${authServer}/.well-known/oauth-authorization-server`
+        );
+        if (!authRes.ok) return null;
+        this._cachedTokenEndpoint = (await authRes.json()).token_endpoint;
+      }
+      if (!this._cachedTokenEndpoint) return null;
+
+      const clientInfo = await this.clientInformation();
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: tokens.refresh_token!,
+      });
+      if (clientInfo?.client_id) body.set("client_id", clientInfo.client_id);
+
+      const resp = await fetch(this._cachedTokenEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body,
+      });
+      if (!resp.ok) return null;
+
+      const newTokens = await resp.json();
+      const merged = { refresh_token: tokens.refresh_token, ...newTokens };
+      await this.saveTokens(merged);
+      return merged;
+    } catch {
+      return null;
+    }
+  }
+
+  private async _dedupedRefresh(
+    tokens: OAuthTokens
+  ): Promise<OAuthTokens | null> {
+    if (this._refreshPromise) return this._refreshPromise;
+    this._refreshPromise = this._refresh(tokens);
+    try {
+      return await this._refreshPromise;
+    } finally {
+      this._refreshPromise = null;
+    }
+  }
+
+  async invalidateCredentials(
+    scope: "all" | "client" | "tokens" | "verifier"
+  ): Promise<void> {
+    switch (scope) {
+      case "all":
+        localStorage.removeItem(this.getKey("tokens"));
+        localStorage.removeItem(this.getKey("client_info"));
+        localStorage.removeItem(this.getKey("code_verifier"));
+        localStorage.removeItem(this.getKey("last_auth_url"));
+        break;
+      case "client":
+        localStorage.removeItem(this.getKey("client_info"));
+        break;
+      case "tokens":
+        localStorage.removeItem(this.getKey("tokens"));
+        break;
+      case "verifier":
+        localStorage.removeItem(this.getKey("code_verifier"));
+        break;
+      default:
+        // Ignore invalid scope
+        break;
+    }
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
