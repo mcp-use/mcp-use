@@ -181,10 +181,9 @@ export const SandboxedIframe = forwardRef<
   }, [handleMessage]);
 
   // Send HTML to proxy when ready
+  // CAUTION: Each run causes proxy to set inner.srcdoc = html, fully reloading the widget
   useEffect(() => {
     if (!proxyReady || !html || !outerRef.current?.contentWindow) return;
-
-    console.log("[SandboxedIframe] Sending HTML to sandbox proxy");
 
     // Send HTML via JSON-RPC notification per SEP-1865
     outerRef.current.contentWindow.postMessage(

@@ -23,6 +23,7 @@ import type {
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -69,10 +70,7 @@ interface MCPAppsRendererProps {
   cancelled?: boolean;
 }
 
-/**
- * MCPAppsRenderer Component
- */
-export function MCPAppsRenderer({
+function MCPAppsRendererBase({
   serverId,
   toolCallId,
   toolName,
@@ -114,6 +112,22 @@ export function MCPAppsRenderer({
   const hasLoadedOnceRef = useRef(false);
   const toolInputSentRef = useRef<string | null>(null);
   const lastSentPropsRef = useRef<string | null>(null);
+  const lastSentToolOutputKeyRef = useRef<string | null>(null);
+  const lastInitTimeRef = useRef(0);
+  const resendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  const toolInputRef = useRef(toolInput);
+  const toolOutputRef = useRef(toolOutput);
+  const customPropsRef = useRef(customProps);
+  const readResourceRef = useRef(readResource);
+  const serverRef = useRef(server);
+  const lastHostContextRef = useRef<string | null>(null);
+  toolInputRef.current = toolInput;
+  toolOutputRef.current = toolOutput;
+  customPropsRef.current = customProps;
+  readResourceRef.current = readResource;
+  serverRef.current = server;
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
   const [prefersBorder, setPrefersBorder] = useState<boolean>(true);
@@ -394,10 +408,48 @@ export function MCPAppsRenderer({
       { hostContext }
     );
 
-    // Register bridge handlers
+    // Register bridge handlers.
+    // Debounce: only accept the first init per bridge lifecycle; subsequent
+    // rapid re-inits (widget re-mounting after receiving data) are suppressed
+    // to prevent a feedback loop. A deferred resend ensures the latest widget
+    // instance still receives tool data after it settles.
     bridge.oninitialized = () => {
-      console.log("[MCPAppsRenderer] Widget initialized");
-      setInitCount((c) => c + 1);
+      const now = Date.now();
+      if (lastInitTimeRef.current > 0 && now - lastInitTimeRef.current < 2000) {
+        clearTimeout(resendTimerRef.current);
+        resendTimerRef.current = setTimeout(() => {
+          const cp = customPropsRef.current;
+          const parsed: Record<string, unknown> = {};
+          if (cp) {
+            for (const [k, v] of Object.entries(cp)) {
+              if (
+                typeof v === "string" &&
+                (v.trim().startsWith("[") || v.trim().startsWith("{"))
+              ) {
+                try {
+                  parsed[k] = JSON.parse(v);
+                } catch {
+                  parsed[k] = v;
+                }
+              } else {
+                parsed[k] = v;
+              }
+            }
+          }
+          const mergedArgs = { ...toolInputRef.current, ...parsed };
+          bridge.sendToolInput({ arguments: mergedArgs });
+          const output = toolOutputRef.current;
+          if (output) {
+            bridge.sendToolResult(output as CallToolResult);
+          }
+        }, 300);
+        return;
+      }
+      lastInitTimeRef.current = now;
+      setInitCount((c) => {
+        const next = c + 1;
+        return next;
+      });
     };
 
     bridge.onmessage = async ({ content }) => {
@@ -416,12 +468,13 @@ export function MCPAppsRenderer({
     };
 
     bridge.oncalltool = async ({ name, arguments: args }) => {
-      if (!server) {
+      const currentServer = serverRef.current;
+      if (!currentServer) {
         throw new Error("Server connection not available");
       }
 
       try {
-        const result = await server.callTool(name, args || {}, {
+        const result = await currentServer.callTool(name, args || {}, {
           timeout: MCP_APPS_CONFIG.TIMEOUTS.TOOL_CALL,
           resetTimeoutOnProgress: true,
         });
@@ -435,15 +488,16 @@ export function MCPAppsRenderer({
     };
 
     bridge.onreadresource = async ({ uri }) => {
-      const result = await readResource(uri);
+      const result = await readResourceRef.current(uri);
       return result.contents || [];
     };
 
     bridge.onlistresources = async () => {
-      if (!server) {
+      const currentServer = serverRef.current;
+      if (!currentServer) {
         throw new Error("Server connection not available");
       }
-      return { resources: server.resources };
+      return { resources: currentServer.resources };
     };
 
     bridge.onrequestdisplaymode = async ({ mode }) => {
@@ -606,17 +660,10 @@ export function MCPAppsRenderer({
         return;
       }
 
-      // Detect widget re-initialization (e.g. after Vite HMR page reload).
-      // The AppBridge doesn't fire oninitialized for subsequent ui/initialize
-      // requests, so we detect it here and bump initCount to trigger re-sending
-      // of tool input/output to the new widget instance.
-      if (
-        event.data?.method === "ui/initialize" &&
-        event.data?.jsonrpc === "2.0" &&
-        event.data?.id != null
-      ) {
-        setInitCount((c) => c + 1);
-      }
+      // Widget re-initialization detection (e.g. after Vite HMR page reload).
+      // bridge.oninitialized already handles initCount bumping for all
+      // ui/initialize messages (with debounce to prevent feedback loops).
+      // No initCount bump needed here.
 
       // Log received message
       rpcLogBus.publish({
@@ -635,6 +682,8 @@ export function MCPAppsRenderer({
     window.addEventListener("message", handleMessage);
 
     return () => {
+      lastInitTimeRef.current = 0;
+      clearTimeout(resendTimerRef.current);
       isActive = false;
       window.removeEventListener("message", handleMessage);
       if (bridge) {
@@ -658,29 +707,26 @@ export function MCPAppsRenderer({
         })();
       }
       bridgeRef.current = null;
+      lastHostContextRef.current = null;
       removeWidget(toolCallId);
     };
   }, [
     widgetHtml,
     sandboxRef,
-    // cspMode,
-    // widgetCsp,
-    // widgetPermissions,
-    // // hostContext removed - it's updated via separate useEffect calling setHostContext
     toolCallId,
-    server,
-    readResource,
-    // onSendFollowUp,
-    // displayMode,
-    // setWidgetModelContext,
-    // removeWidget,
+    // readResource, server: use refs to avoid bridge tear-down/recreate on parent re-renders
+    // (which would reset initCount and cause iframe/widget to re-init, appearing as "re-render")
   ]);
 
-  // Update host context when it changes
+  // Update host context when it changes (skip redundant notifications to avoid double render)
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || initCount === 0) return;
-    console.log("[MCPAppsRenderer] setHostContext called with:", hostContext);
+
+    const contextKey = JSON.stringify(hostContext);
+    if (lastHostContextRef.current === contextKey) return;
+    lastHostContextRef.current = contextKey;
+
     bridge.setHostContext(hostContext);
   }, [hostContext, initCount]);
 
@@ -756,6 +802,12 @@ export function MCPAppsRenderer({
 
     // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
+      // Skip if we already sent this exact payload (parent re-renders with new ref, same data)
+      const contentKey = JSON.stringify(
+        (toolOutput as any)?.structuredContent ?? toolOutput
+      );
+      if (lastSentToolOutputKeyRef.current === contentKey) return;
+      lastSentToolOutputKeyRef.current = contentKey;
       const result = toolOutput as CallToolResult;
 
       // When customProps are set (from user presets), inject them as
@@ -1019,3 +1071,37 @@ export function MCPAppsRenderer({
     </WidgetWrapper>
   );
 }
+
+function mcpAppsRendererAreEqual(
+  prev: MCPAppsRendererProps,
+  next: MCPAppsRendererProps
+): boolean {
+  const keys: (keyof MCPAppsRendererProps)[] = [
+    "serverId",
+    "toolCallId",
+    "toolName",
+    "resourceUri",
+    "displayMode",
+    "cancelled",
+    "noWrapper",
+  ];
+  for (const k of keys) {
+    if (prev[k] !== next[k]) return false;
+  }
+  if (prev.toolInput !== next.toolInput) return false;
+  if (prev.toolOutput !== next.toolOutput) return false;
+  if (prev.toolMetadata !== next.toolMetadata) return false;
+  if (prev.partialToolInput !== next.partialToolInput) return false;
+  if (prev.customProps !== next.customProps) return false;
+  if (prev.readResource !== next.readResource) return false;
+  if (prev.onSendFollowUp !== next.onSendFollowUp) return false;
+  if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
+  if (prev.className !== next.className) return false;
+  if (prev.serverBaseUrl !== next.serverBaseUrl) return false;
+  return true;
+}
+
+export const MCPAppsRenderer = memo(
+  MCPAppsRendererBase,
+  mcpAppsRendererAreEqual
+);

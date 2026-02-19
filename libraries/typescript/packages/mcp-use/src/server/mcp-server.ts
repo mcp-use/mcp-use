@@ -1908,6 +1908,39 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     }
 
+    // Patch tool _meta for tools with widget config that were registered
+    // before widget definitions were synced. During HMR, server.tool() runs
+    // on the new server where widgetDefinitions is empty, so it can only set
+    // Apps SDK metadata. Now that definitions are available, fill in MCP Apps
+    // metadata for mcpApps widgets. We use Object.assign to MUTATE the
+    // existing _meta object in place, because session-level _registeredTools
+    // entries share the same _meta reference (see createToolEntry).
+    for (const [, toolReg] of this.registrations.tools) {
+      const config = toolReg.config as any;
+      const widgetConfig = config?.widget;
+      const widgetName = widgetConfig?.name;
+      if (!widgetConfig || !widgetName || !config._meta) continue;
+      if (config._meta.ui?.resourceUri) continue;
+
+      const widgetDef = this.widgetDefinitions.get(widgetName);
+      const widgetType = widgetDef?.widgetType as string | undefined;
+      if (widgetType !== "mcpApps") continue;
+
+      const outputTemplate = config._meta["openai/outputTemplate"];
+      if (!outputTemplate) continue;
+
+      const adapterDef = {
+        type: "mcpApps" as const,
+        name: widgetName,
+        metadata: widgetDef?.metadata,
+      };
+      const dualMeta = buildDualProtocolMetadata(
+        adapterDef as any,
+        outputTemplate
+      );
+      Object.assign(config._meta, dualMeta);
+    }
+
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
@@ -2273,7 +2306,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         // Look up widget type to determine if dual-protocol metadata is needed
         const widgetDef = self.widgetDefinitions.get(widgetName);
         const widgetType = widgetDef?.widgetType as string | undefined;
-
         if (widgetType === "mcpApps") {
           const adapterDef = {
             type: "mcpApps" as const,

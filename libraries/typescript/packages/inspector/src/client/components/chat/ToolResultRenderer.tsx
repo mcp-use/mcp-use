@@ -158,11 +158,10 @@ export function ToolResultRenderer({
     return null;
   }, [hasAppsSdkComponent, parsedResult]);
 
-  // Extract widget props from structuredContent (per SEP-1865, widget data flows via tool-result)
-  const widgetProps = useMemo(() => {
-    const props = parsedResult?.structuredContent || null;
-    return props;
-  }, [parsedResult]);
+  // Memoize toolArgs and parsedResult to prevent unnecessary re-renders in child renderers
+  // (same pattern as ToolResultDisplay - stabilizes refs so effects don't re-run on parent re-renders)
+  const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
+  const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
 
   // Calculate resource URI outside of effect for stable dependency
   const resourceUri = useMemo(() => {
@@ -235,8 +234,8 @@ export function ToolResultRenderer({
             serverId={serverId}
             toolCallId={toolCallId}
             toolName={toolName}
-            toolInput={widgetProps || toolArgs}
-            toolOutput={parsedResult}
+            toolInput={memoizedToolArgs}
+            toolOutput={memoizedResult}
             toolMetadata={toolMeta}
             partialToolInput={partialToolArgs}
             resourceUri={resourceData.uri}
@@ -252,8 +251,8 @@ export function ToolResultRenderer({
           <OpenAIComponentRenderer
             componentUrl={resourceData.uri}
             toolName={toolName}
-            toolArgs={toolArgs}
-            toolResult={parsedResult}
+            toolArgs={memoizedToolArgs}
+            toolResult={memoizedResult}
             serverId={serverId}
             readResource={readResource}
             noWrapper={true}
@@ -274,8 +273,8 @@ export function ToolResultRenderer({
           serverId={serverId}
           toolCallId={toolCallId}
           toolName={toolName}
-          toolInput={widgetProps || toolArgs}
-          toolOutput={parsedResult}
+          toolInput={memoizedToolArgs}
+          toolOutput={memoizedResult}
           toolMetadata={toolMeta}
           partialToolInput={partialToolArgs}
           resourceUri={resourceData?.uri || resourceUri}
@@ -302,8 +301,8 @@ export function ToolResultRenderer({
       <OpenAIComponentRenderer
         componentUrl={resourceData?.uri || resourceUri}
         toolName={toolName}
-        toolArgs={toolArgs}
-        toolResult={parsedResult}
+        toolArgs={memoizedToolArgs}
+        toolResult={memoizedResult}
         serverId={serverId}
         readResource={readResource}
         noWrapper={true}

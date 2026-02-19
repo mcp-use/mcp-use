@@ -534,18 +534,12 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
     // Tool callback function (used for both new registration and updates)
     const toolCallback = async (params: Record<string, unknown>) => {
-      // Create the UIResource with user-provided params
-      const uiResource = await createWidgetUIResource(
-        enrichedDefinition,
-        params,
-        serverConfig
-      );
-
-      // For Apps SDK or MCP Apps, return clean tool result.
-      // Per OpenAI Apps SDK docs and SEP-1865: protocol fields (ui.resourceUri,
-      // openai/outputTemplate, openai/toolInvocation/*) belong on the tool
-      // DEFINITION (tools/list), not on every tool call result. The tool call
-      // result _meta is only for app-specific widget data.
+      // For Apps SDK or MCP Apps, return clean tool result per Apps SDK spec.
+      // Per OpenAI Apps SDK: tool results contain structuredContent, content
+      // (text items), and optional _meta. The widget HTML is NOT in the result;
+      // the host fetches it via resources/read using openai/outputTemplate from
+      // the tool definition.
+      // See: https://developers.openai.com/apps-sdk/build/mcp-server
       if (
         enrichedDefinition.type === "appsSdk" ||
         enrichedDefinition.type === "mcpApps"
@@ -557,26 +551,24 @@ export function uiResourceRegistration<T extends UIResourceServer>(
             : enrichedDefinition.toolOutput
           : generateToolOutput(enrichedDefinition, params, displayName);
 
-        // Ensure content exists (required by CallToolResult)
+        // Ensure content exists (required by CallToolResult) - text items only
         const content = toolOutputResult?.content || [
           { type: "text" as const, text: displayName },
         ];
+        const contentArray = Array.isArray(content) ? content : [content];
 
-        const result: Record<string, unknown> = {
-          content:
-            enrichedDefinition.type === "mcpApps"
-              ? [...(Array.isArray(content) ? content : [content]), uiResource]
-              : content,
+        return {
+          content: contentArray,
+          structuredContent: toolOutputResult?.structuredContent ?? params,
         };
-
-        if (toolOutputResult?.structuredContent) {
-          result.structuredContent = toolOutputResult.structuredContent;
-        }
-
-        return result;
       }
 
-      // For other types (legacy MCP-UI), return standard response
+      // For other types (legacy MCP-UI), return standard response with embedded resource
+      const uiResource = await createWidgetUIResource(
+        enrichedDefinition,
+        params,
+        serverConfig
+      );
       return {
         content: [
           {

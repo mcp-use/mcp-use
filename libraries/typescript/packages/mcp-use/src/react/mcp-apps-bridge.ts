@@ -87,6 +87,7 @@ interface ToolResultNotification {
  */
 class McpAppsBridge {
   private connected = false;
+  private connectPromise: Promise<void> | null = null;
   private requestId = 1;
   private pendingRequests = new Map<
     number | string,
@@ -438,7 +439,10 @@ class McpAppsBridge {
   }
 
   /**
-   * Initialize connection with MCP Apps host
+   * Initialize connection with MCP Apps host.
+   * Concurrent calls share the same in-flight connection attempt so that
+   * React StrictMode double-invocations and multiple useWidget() hooks
+   * only produce a single ui/initialize request.
    */
   async connect(): Promise<void> {
     if (this.connected) return;
@@ -449,6 +453,17 @@ class McpAppsBridge {
       return;
     }
 
+    if (!this.connectPromise) {
+      this.connectPromise = this.doConnect();
+      this.connectPromise.catch(() => {
+        this.connectPromise = null;
+      });
+    }
+
+    return this.connectPromise;
+  }
+
+  private async doConnect(): Promise<void> {
     console.log("[MCP Apps Bridge] Connecting to MCP Apps host...");
 
     try {
@@ -628,6 +643,7 @@ class McpAppsBridge {
     this.toolResultHandlers.clear();
     this.hostContextHandlers.clear();
     this.connected = false;
+    this.connectPromise = null;
   }
 }
 

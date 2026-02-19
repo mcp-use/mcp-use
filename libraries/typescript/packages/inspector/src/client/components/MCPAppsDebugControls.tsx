@@ -133,18 +133,20 @@ export function MCPAppsDebugControls({
     getDefaultSelectValue()
   );
 
-  // Update select value when active preset changes
+  // Update select value when active preset changes.
+  // In tool context, never auto-apply a localStorage preset on mount —
+  // the tool result's structuredContent is authoritative. The user can
+  // still manually pick a preset from the dropdown.
   useEffect(() => {
-    if (activePresetId) {
+    if (activePresetId && propsContext !== "tool") {
       setSelectValue(activePresetId);
     } else if (
       selectValue !== NO_PROPS_VALUE &&
       selectValue !== TOOL_PROPS_VALUE
     ) {
-      // If no active preset and not a special value, reset to default
       setSelectValue(getDefaultSelectValue());
     }
-  }, [activePresetId, selectValue, getDefaultSelectValue]);
+  }, [activePresetId, selectValue, getDefaultSelectValue, propsContext]);
 
   // Notify parent of props changes
   useEffect(() => {

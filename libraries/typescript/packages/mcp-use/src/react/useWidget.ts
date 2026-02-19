@@ -27,19 +27,28 @@ import type {
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
 
 /**
- * Hook to subscribe to a single value from window.openai globals
+ * Hook to subscribe to a single value from window.openai globals.
+ * Only triggers onChange when the value actually changes, to avoid redundant
+ * re-renders from duplicate events (e.g. theme sync that re-sends same toolOutput).
  */
 function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
   key: K
 ): OpenAiGlobals[K] | undefined {
   return useSyncExternalStore(
     (onChange) => {
+      // Initialize from current snapshot so redundant events with same values are ignored
+      let lastValue: unknown =
+        typeof window !== "undefined" && window.openai
+          ? (window.openai as OpenAiGlobals)[key]
+          : undefined;
       const handleSetGlobal = (event: any) => {
         const customEvent = event as SetGlobalsEvent;
         const value = customEvent.detail.globals[key];
         if (value === undefined) {
           return;
         }
+        if (value === lastValue) return;
+        lastValue = value;
         onChange();
       };
 
@@ -96,7 +105,9 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  * ### Key fields
  *
  * - `isPending` — `true` until the tool result arrives; `props` is `Partial<TProps>` while pending.
- * - `props` — `structuredContent` from the tool result (widget-only, hidden from model).
+ * - `props` — merged from toolInput (base) and structuredContent (overlay). When the widget is
+ *   exposed as a tool, props = toolInput during pending and structuredContent when done. When
+ *   the widget is returned by another tool, props = structuredContent (toolInput = parent's args).
  * - `toolInput` — the arguments the model passed to the tool.
  * - `partialToolInput` / `isStreaming` — real-time argument streaming (MCP Apps only).
  * - `theme`, `displayMode`, `locale`, `timeZone`, `safeArea`, `maxHeight` — host context.
@@ -339,29 +350,30 @@ export function useWidget<
     return urlParams.toolOutput as TOutput | null | undefined;
   }, [provider, openaiToolOutput, mcpAppsToolOutput, urlParams.toolOutput]);
 
-  // Props come from structuredContent in the tool result (per SEP-1865).
-  // The server puts widget rendering data in structuredContent, which the
-  // host sends to the widget via ui/notifications/tool-result. The LLM
-  // only sees `content` (text), not structuredContent.
+  // Props semantics:
+  // - Widget exposed as tool: props = toolInput (args to the tool); when result arrives, props = structuredContent (tool can echo/override).
+  // - Widget returned by another tool: props = structuredContent from that tool's result; toolInput = args to the parent tool.
+  // Merge: use toolInput as base, structuredContent overrides. This handles both cases: during pending we show toolInput; when done, structuredContent wins.
   const widgetProps = useMemo(() => {
-    // Apps SDK (ChatGPT): toolOutput IS structuredContent (set by window.openai.toolOutput)
+    const ti = (toolInput || {}) as Record<string, unknown>;
+    const base = (defaultProps || {}) as Record<string, unknown> as TProps;
+
+    // Extract structuredContent from provider-specific toolOutput
+    let structuredContent: Record<string, unknown> | undefined;
     if (provider === "openai" && openaiToolOutput) {
-      return openaiToolOutput as unknown as TProps;
+      structuredContent = openaiToolOutput as Record<string, unknown>;
+    } else if (provider === "mcp-apps" && mcpAppsToolOutput) {
+      structuredContent = mcpAppsToolOutput as Record<string, unknown>;
+    } else if (provider === "mcp-ui" && urlParams.toolOutput) {
+      structuredContent = urlParams.toolOutput as Record<string, unknown>;
     }
 
-    // MCP Apps: mcpAppsToolOutput is already structuredContent (extracted by the bridge)
-    if (provider === "mcp-apps" && mcpAppsToolOutput) {
-      return mcpAppsToolOutput as TProps;
-    }
-
-    // URL params fallback (legacy mcp-ui)
-    if (provider === "mcp-ui" && urlParams.toolOutput) {
-      return urlParams.toolOutput as unknown as TProps;
-    }
-
-    return defaultProps || ({} as TProps);
+    // Base: toolInput (for exposed-as-tool) or defaultProps; overlay: structuredContent
+    const merged = { ...base, ...ti, ...(structuredContent || {}) } as TProps;
+    return merged;
   }, [
     provider,
+    toolInput,
     openaiToolOutput,
     mcpAppsToolOutput,
     urlParams.toolOutput,
@@ -595,8 +607,10 @@ export function useWidget<
   // Determine if tool is still executing
   const isPending = useMemo(() => {
     if (provider === "openai") {
-      // When widget first loads before tool completes, toolResponseMetadata is null
-      return toolResponseMetadata === null;
+      // Tool is pending until the host delivers either toolOutput (structuredContent)
+      // or toolResponseMetadata (_meta). Checking both mirrors how MCP Apps works and
+      // avoids staying stuck when the server omits _meta from the tool result.
+      return openaiToolOutput === null && toolResponseMetadata === null;
     }
     if (provider === "mcp-apps") {
       // In MCP Apps, widget is pending until we receive tool-result notification
@@ -620,6 +634,7 @@ export function useWidget<
     return false;
   }, [
     provider,
+    openaiToolOutput,
     toolResponseMetadata,
     mcpAppsToolOutput,
     toolOutput,
