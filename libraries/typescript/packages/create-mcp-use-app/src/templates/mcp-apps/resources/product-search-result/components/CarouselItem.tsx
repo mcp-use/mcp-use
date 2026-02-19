@@ -4,12 +4,18 @@ import React from "react";
 export interface CarouselItemProps {
   fruit: string;
   color: string;
+  onClick: () => void;
 }
 
-export const CarouselItem: React.FC<CarouselItemProps> = ({ fruit, color }) => {
+export const CarouselItem: React.FC<CarouselItemProps> = ({
+  fruit,
+  color,
+  onClick,
+}) => {
   return (
     <div
-      className={`carousel-item size-52 rounded-xl border border-subtle ${color}`}
+      className={`carousel-item size-52 rounded-xl border border-subtle ${color} cursor-pointer`}
+      onClick={onClick}
     >
       <div className="carousel-item-bg">
         <Image src={"/fruits/" + fruit + ".png"} alt={fruit} />

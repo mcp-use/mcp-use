@@ -180,19 +180,20 @@ export const widgetMetadata: WidgetMetadata = {
   props: propSchema,
 };
 
-const WeatherDisplay: React.FC = () => {
-  const { props, isPending } = useWidget<z.infer<typeof propSchema>>();
+// city, temperature, conditions auto-injected from propSchema
+const WeatherDisplay = ({ city, temperature, conditions }) => {
+  const { isPending } = useWidget();
 
   if (isPending) {
-    return <div>Loading weather...</div>;
+    return <McpUseProvider autoSize><div>Loading weather...</div></McpUseProvider>;
   }
 
   return (
     <McpUseProvider autoSize>
       <div className="weather-card">
-        <h2>{props.city}</h2>
-        <div className="temperature">{props.temperature}°C</div>
-        <div className="conditions">{props.conditions}</div>
+        <h2>{city}</h2>
+        <div className="temperature">{temperature}°C</div>
+        <div className="conditions">{conditions}</div>
       </div>
     </McpUseProvider>
   );
@@ -216,23 +217,25 @@ Widgets can call MCP tools using the `useCallTool` hook for interactive function
 ```tsx
 import { useWidget, useCallTool } from "mcp-use/react";
 
-const InteractiveWidget = () => {
-  const { props, isPending: propsPending } = useWidget();
+// itemId auto-injected from widgetMetadata.props schema
+const InteractiveWidget = ({ itemId }) => {
+  const { isPending: widgetPending } = useWidget();
   const { callTool, data, isPending } = useCallTool("fetch-data");
 
-  if (propsPending) {
-    return <div>Loading...</div>;
+  if (widgetPending) {
+    return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
   }
 
   return (
-    <div>
-      <button onClick={() => callTool({ id: props.itemId })}>
-        {isPending ? "Loading..." : "Fetch Data"}
-      </button>
-      {data && (
-        <div>{JSON.stringify(data.structuredContent)}</div>
-      )}
-    </div>
+    <McpUseProvider autoSize>
+      <div>
+        <button onClick={() => callTool({ id: itemId })}>
+          {isPending ? "Loading..." : "Fetch Data"}
+        </button>
+        {data && (
+          <div>{JSON.stringify(data.structuredContent)}</div>
+        )}
+      </div>
   );
 };
 ```

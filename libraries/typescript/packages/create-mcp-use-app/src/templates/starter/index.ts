@@ -1,15 +1,54 @@
 import { MCPServer, object, text, completable } from "mcp-use/server";
 import { z } from "zod";
 
-// Create MCP server instance
+// ─────────────────────────────────────────────────────────────────────────────
+// ENVIRONMENT VARIABLES
+// Create a .env file in this directory and load it:
+//
+//   import { config } from "dotenv";
+//   config();
+//
+// Then access variables via process.env:
+//   const apiKey = process.env.MY_API_KEY;
+//
+// Common variables:
+//   PORT=3000
+//   MY_API_KEY=sk-...
+//   DATABASE_URL=postgresql://...
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OAUTH AUTHENTICATION (optional)
+// To protect your server with Auth0, add the oauth option to MCPServer:
+//
+//   import { oauthAuth0Provider } from "mcp-use/server";
+//
+//   const server = new MCPServer({
+//     name: "...",
+//     oauth: oauthAuth0Provider({
+//       domain: process.env.AUTH0_DOMAIN!,       // "your-tenant.auth0.com"
+//       audience: process.env.AUTH0_AUDIENCE!,   // "https://your-api.example.com"
+//     }),
+//   });
+//
+// Then access auth context in tools:
+//   server.tool({ name: "..." }, async (params, ctx) => {
+//     const userId = ctx.auth.userId;
+//     return text(`Hello, ${userId}`);
+//   });
+//
+// Other providers: oauthWorkOSProvider, oauthSupabaseProvider, oauthKeycloakProvider
+// Docs: https://mcp-use.com/docs/typescript/server/authentication
+// ─────────────────────────────────────────────────────────────────────────────
+
 const server = new MCPServer({
   name: "{{PROJECT_NAME}}",
-  title: "{{PROJECT_NAME}}", // display name
+  title: "{{PROJECT_NAME}}",
   version: "1.0.0",
-  description: "My first MCP server with all features",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
+  description: "MCP server with tools, resources, and prompts",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
   favicon: "favicon.ico",
-  websiteUrl: "https://mcp-use.com", // Can be customized later
+  websiteUrl: "https://mcp-use.com",
   icons: [
     {
       src: "icon.svg",
@@ -19,27 +58,10 @@ const server = new MCPServer({
   ],
 });
 
-/**
- * Define UI Widgets
- * All React components in the `resources/` folder
- * are automatically registered as MCP tools and resources.
- *
- * Just export widgetMetadata with description and Zod schema,
- * and mcp-use handles the rest!
- *
- * It will automatically add to your MCP server:
- * - server.tool('kanban-board')
- * - server.tool('display-weather')
- * - server.resource('ui://widget/kanban-board')
- * - server.resource('ui://widget/display-weather')
- *
- * Docs: https://mcp-use.com/docs/typescript/server/ui-widgets
- */
-
-/*
- * Define MCP tools
- * Docs: https://mcp-use.com/docs/typescript/server/tools
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL — actions the AI can call
+// Docs: https://mcp-use.com/docs/typescript/server/tools
+// ─────────────────────────────────────────────────────────────────────────────
 server.tool(
   {
     name: "fetch-weather",
@@ -53,10 +75,10 @@ server.tool(
   }
 );
 
-/*
- * Define MCP resources
- * Docs: https://mcp-use.com/docs/typescript/server/resources
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// RESOURCE — data the AI can read
+// Docs: https://mcp-use.com/docs/typescript/server/resources
+// ─────────────────────────────────────────────────────────────────────────────
 server.resource(
   {
     name: "config",
@@ -70,10 +92,10 @@ server.resource(
     })
 );
 
-/*
- * Define MCP prompts
- * Docs: https://mcp-use.com/docs/typescript/server/prompts
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// PROMPT — reusable message template
+// Docs: https://mcp-use.com/docs/typescript/server/prompts
+// ─────────────────────────────────────────────────────────────────────────────
 server.prompt(
   {
     name: "review-code",
@@ -97,6 +119,4 @@ server.prompt(
 );
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
-console.log(`Server running on port ${PORT}`);
-// Start the server
 server.listen(PORT);

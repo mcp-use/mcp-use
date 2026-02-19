@@ -37,11 +37,41 @@ export type InferZodInput<S> = S extends z.ZodTypeAny
   : Record<string, any>;
 
 export interface ServerConfig {
+  /**
+   * Unique identifier for the MCP server .
+   *
+   * @example "my-mcp-server"
+   * @example "product-search-api"
+   */
   name: string;
+  /**
+   * Semantic version of the server.
+   *
+   * @example "1.0.0"
+   */
   version: string;
+  /**
+   * Human-readable description of what the server does.
+   * Shown to clients during discovery.
+   *
+   * @example "MCP server for product search and recommendations"
+   */
   description?: string;
-  host?: string; // Hostname for widget URLs and server endpoints (defaults to 'localhost')
-  baseUrl?: string; // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
+  /**
+   * Hostname for widget URLs and server endpoints.
+   * Defaults to 'localhost' in development.
+   *
+   * @example "api.example.com"
+   */
+  host?: string;
+  /**
+   * Full base URL (overrides host:port for widget URLs).
+   * Use when deploying behind a reverse proxy or to a known public URL.
+   *
+   * @example "https://myserver.com"
+   * @example "https://api.example.com/mcp"
+   */
+  baseUrl?: string;
   /**
    * Custom CORS options for the server.
    *
@@ -346,11 +376,41 @@ export interface ServerConfig {
   }>;
 }
 
+/**
+ * Input parameter definition (legacy; prefer Zod schema with .describe()).
+ * Used by tools.inputs and prompts.args.
+ */
 export interface InputDefinition {
+  /**
+   * Parameter name (camelCase or kebab-case).
+   *
+   * @example "query"
+   * @example "maxResults"
+   */
   name: string;
+  /**
+   * Parameter type.
+   *
+   * @example "string"
+   * @example "number"
+   */
   type: "string" | "number" | "boolean" | "object" | "array";
+  /**
+   * Human-readable description; helps the model understand the parameter.
+   *
+   * @example "Search query to filter results"
+   */
   description?: string;
+  /**
+   * Whether the parameter is required (defaults to false).
+   */
   required?: boolean;
+  /**
+   * Default value when the parameter is omitted.
+   *
+   * @example 10
+   * @example "all"
+   */
   default?: unknown;
 }
 
@@ -358,10 +418,23 @@ export interface InputDefinition {
  * Annotations provide hints to clients about how to use or display resources
  */
 export interface ResourceAnnotations {
-  /** Intended audience(s) for this resource */
+  /**
+   * Intended audience(s) for this resource.
+   *
+   * @example ["user", "assistant"]
+   */
   audience?: ("user" | "assistant")[];
-  /** Priority from 0.0 (least important) to 1.0 (most important) */
+  /**
+   * Priority from 0.0 (least important) to 1.0 (most important).
+   * Clients may use this for ordering or filtering.
+   *
+   * @example 0.8
+   */
   priority?: number;
-  /** ISO 8601 formatted timestamp of last modification */
+  /**
+   * ISO 8601 formatted timestamp of last modification.
+   *
+   * @example "2025-01-15T10:30:00Z"
+   */
   lastModified?: string;
 }

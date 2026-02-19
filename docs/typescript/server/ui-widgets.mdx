@@ -130,14 +130,17 @@ export const widgetMetadata: WidgetMetadata = {
   props: propSchema,
 };
 
-const ProductSearchResult: React.FC = () => {
-  const { props } = useWidget<ProductSearchResultProps>();
+// props auto-injected from widgetMetadata.props schema
+const ProductSearchResult = ({ items }) => {
+  const { isPending } = useWidget();
+
+  if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
       <div>
         <Carousel />
-        <Accordion items={props.items} />
+        <Accordion items={items} />
       </div>
     </McpUseProvider>
   );
@@ -152,13 +155,15 @@ export default ProductSearchResult;
 Widgets render **before** the tool execution completes. On first render, `props` will be an empty object `{}` and `isPending` will be `true`. Always check `isPending` or use optional chaining when accessing props to avoid runtime errors.
 
 ```tsx
-const { props, isPending } = useWidget<MyProps>();
+// Props come in component signature, isPending from useWidget hook
+const MyWidget = ({ city, temperature }) => {
+  const { isPending } = useWidget();
 
-if (isPending) {
-  return <LoadingSpinner />;
-}
+  if (isPending) return <McpUseProvider autoSize><LoadingSpinner /></McpUseProvider>;
 
-// Now safe to access props.city, props.temperature, etc.
+  // Now safe to use props — city, temperature are defined
+  return <McpUseProvider autoSize><div>{city} - {temperature}°C</div></McpUseProvider>;
+};
 ```
 
 See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete details and patterns.
@@ -257,7 +262,7 @@ export const widgetMetadata: WidgetMetadata = {
 ```
 
 <Note>
-The `inputs` field expects a Zod schema that defines the shape of the parameters passed to your widget. This schema is used to generate the tool's input validation and to type-check the props in your widget component via `useWidget<T>()`.
+The `inputs` field expects a Zod schema that defines the shape of the parameters passed to your widget. This schema is used to generate the tool's input validation and to auto-type the props injected into your widget component.
 </Note>
 
 **Apps SDK Metadata Defaults:**
@@ -388,11 +393,7 @@ const imageUrl = window.__getFile?.("fruits/apple.png");
 
 ### Accessing Tool Input
 
-Widgets are called by the model in the same way as tools. The `useWidget` hook provides access to the tool input, typed based on widget metadata schmea you defined.
-
-```typescript
-const { props } = useWidget();
-```
+Widgets are called by the model in the same way as tools. Props from your `widgetMetadata.props` schema are automatically injected into your component signature — no hook needed for props access.
 
 **Example:**
 
@@ -404,9 +405,11 @@ export const widgetMetadata: WidgetMetadata = {
   }),
 };
 
-const ProductSearchResult: React.FC = () => {
-  const { props } = useWidget();
-  return <div>Query: {props.query}</div>;
+// query is auto-injected and auto-typed from the schema above
+const ProductSearchResult = ({ query }) => {
+  const { isPending } = useWidget();
+  if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
+  return <McpUseProvider autoSize><div>Query: {query}</div></McpUseProvider>;
 };
 ```
 
@@ -424,23 +427,27 @@ When the host supports it (MCP Apps, MCP Inspector), you can also show **streami
 **Pattern 1: Early return with loading state**
 
 ```tsx
-const MyWidget: React.FC = () => {
-  const { props, isPending } = useWidget<MyWidgetProps>();
+// city and temperature come from widgetMetadata.props schema
+const MyWidget = ({ city, temperature }) => {
+  const { isPending } = useWidget();
 
   if (isPending) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-      </div>
+      <McpUseProvider autoSize>
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+        </div>
+      </McpUseProvider>
     );
   }
 
-  // Safe to access props.city, props.temperature, etc.
   return (
-    <div>
-      <h1>{props.city}</h1>
-      <p>{props.temperature}°C</p>
-    </div>
+    <McpUseProvider autoSize>
+      <div>
+        <h1>{city}</h1>
+        <p>{temperature}°C</p>
+      </div>
+    </McpUseProvider>
   );
 };
 ```
@@ -448,35 +455,40 @@ const MyWidget: React.FC = () => {
 **Pattern 2: Conditional rendering**
 
 ```tsx
-const MyWidget: React.FC = () => {
-  const { props, isPending } = useWidget<MyWidgetProps>();
+const MyWidget = ({ city, temperature }) => {
+  const { isPending } = useWidget();
 
   return (
-    <div>
+    <McpUseProvider autoSize>
       {isPending ? (
         <LoadingSpinner />
       ) : (
         <div>
-          <h1>{props.city}</h1>
-          <p>{props.temperature}°C</p>
+          <h1>{city}</h1>
+          <p>{temperature}°C</p>
         </div>
       )}
-    </div>
+    </McpUseProvider>
   );
 };
 ```
 
-**Pattern 3: Using optional chaining** (when you want to show partial UI)
+**Pattern 3: Streaming preview** (live update as LLM generates args)
 
 ```tsx
-const MyWidget: React.FC = () => {
-  const { props } = useWidget<MyWidgetProps>();
+const MyWidget = ({ city, temperature }) => {
+  const { isPending, isStreaming, partialToolInput } = useWidget();
+
+  // Show partial input during streaming for live preview
+  const displayCity = isStreaming ? partialToolInput?.city ?? "..." : city;
 
   return (
-    <div>
-      <h1>{props.city ?? "Loading..."}</h1>
-      <p>{props.temperature ? `${props.temperature}°C` : "Loading..."}</p>
-    </div>
+    <McpUseProvider autoSize>
+      <div>
+        <h1>{displayCity}</h1>
+        {!isPending && <p>{temperature}°C</p>}
+      </div>
+    </McpUseProvider>
   );
 };
 ```
@@ -516,8 +528,8 @@ The `useCallTool` hook provides TanStack Query-like state management with full T
 ```tsx
 import { useWidget, useCallTool } from "mcp-use/react";
 
-const InteractiveWidget = () => {
-  const { props } = useWidget();
+// widgetProps (origin) come from widgetMetadata.props schema
+const InteractiveWidget = ({ origin }) => {
   const { callTool, data, isPending, isSuccess, isError, error } = 
     useCallTool("search-flights");
 

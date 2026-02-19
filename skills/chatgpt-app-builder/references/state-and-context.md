@@ -194,11 +194,12 @@ Todo list with persistent tasks, ephemeral viewing state, and LLM interaction:
 import { McpUseProvider, useWidget } from "mcp-use/react";
 import { useState } from "react";
 
-export default function TodoWidget() {
-  const { props, isPending, state, setState, sendFollowUpMessage } = useWidget();
+// tasks comes from widgetMetadata.props schema (initial data)
+const TodoWidget = ({ tasks: initialTasks }) => {
+  const { isPending, state, setState, sendFollowUpMessage } = useWidget();
 
   // PERSISTENT: Tasks survive widget close/reopen, LLM sees them
-  const tasks = state?.tasks || props.tasks || [];
+  const tasks = state?.tasks || initialTasks || [];
 
   // EPHEMERAL: Which task is being viewed (resets on reopen)
   const [viewing, setViewing] = useState<string | null>(null);

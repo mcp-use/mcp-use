@@ -16,6 +16,29 @@ The `useCallTool` hook provides a type-safe way to call MCP tools from within yo
 import { useCallTool } from "mcp-use/react";
 ```
 
+## Setup
+
+### TypeScript Configuration
+
+Ensure `.mcp-use/` is included in your `tsconfig.json`:
+
+```json
+{
+  "include": ["index.ts", "src/**/*", "resources/**/*", ".mcp-use/**/*"]
+}
+```
+
+<Note>
+All templates include this by default. For existing projects created before this was added, add `.mcp-use/**/*` to your include paths.
+</Note>
+
+### Automatic Type Generation
+
+Types are generated automatically:
+- **On install**: The `postinstall` script runs `mcp-use generate-types`
+- **During dev**: Types regenerate when tools change (HMR)
+- **Manual**: Run `mcp-use generate-types` anytime
+
 ## Basic Usage
 
 ```tsx
@@ -176,11 +199,11 @@ if (data) {
 }
 ```
 
-## Type Generation Integration
+## How Automatic Typing Works
 
-The hook automatically uses types from `.mcp-use/tool-registry.d.ts`:
+When you run `mcp-use dev` or `npm install`, types are automatically generated from your tool definitions:
 
-**Server tool definition:**
+**1. Define your tool with Zod schemas:**
 
 ```typescript
 // index.ts
@@ -191,22 +214,22 @@ server.tool({
     destination: z.string(),
     date: z.string().optional(),
   }),
-  execute: async ({ destination, date }) => {
-    // ... implementation
-    return object({
-      flights: array(object({
-        id: string(),
-        price: number(),
-      })),
-    });
-  }
+  outputSchema: z.object({
+    flights: z.array(z.object({
+      id: z.string(),
+      price: z.number(),
+    })),
+  }),
+}, async ({ destination, date }) => {
+  // ... implementation
+  return object({ flights: [...] });
 });
 ```
 
-**Generated types:**
+**2. Types generate automatically:**
 
 ```typescript
-// .mcp-use/tool-registry.d.ts (auto-generated)
+// .mcp-use/tool-registry.d.ts (auto-generated - don't edit!)
 declare module "mcp-use/react" {
   interface ToolRegistry {
     "search-flights": {
@@ -217,46 +240,23 @@ declare module "mcp-use/react" {
 }
 ```
 
-**Widget with full type safety:**
+**3. Use in widgets with full autocomplete:**
 
 ```tsx
 const { callTool, data } = useCallTool("search-flights");
-//                                      ^ Autocomplete for tool names
+//                                      ^ Autocomplete shows all tool names!
 
-// Autocomplete for input parameters
+// Input parameters are fully typed
 callTool({ destination: "NYC", date: "2024-12-01" });
+//         ^ Autocomplete for parameters
 
-// Strongly typed output
+// Output is strongly typed
 if (data) {
   data.structuredContent.flights.forEach(flight => {
-    //                   ^ Autocomplete for output structure
+    //                   ^ Full autocomplete for output structure
     console.log(flight.id, flight.price);
   });
 }
-```
-
-## Advanced: Manual Type Generation
-
-For scenarios without `mcp-use dev`, use `generateHelpers()`:
-
-```typescript
-import { generateHelpers } from "mcp-use/react";
-
-type MyToolMap = {
-  "search-flights": {
-    input: { destination: string; date?: string };
-    output: { flights: Array<{ id: string; price: number }> };
-  };
-  "book-flight": {
-    input: { flightId: string };
-    output: { confirmation: string };
-  };
-};
-
-const { useCallTool } = generateHelpers<MyToolMap>();
-
-// Now useCallTool is typed with your custom tool map
-const { callTool, data } = useCallTool("search-flights");
 ```
 
 ## Environment Support

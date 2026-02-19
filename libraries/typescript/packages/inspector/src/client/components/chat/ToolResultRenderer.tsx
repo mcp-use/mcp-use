@@ -22,6 +22,8 @@ interface ToolResultRendererProps {
   serverBaseUrl?: string;
   /** Partial/streaming tool arguments (forwarded to widget as partialToolInput) */
   partialToolArgs?: Record<string, unknown>;
+  /** Whether this tool execution was cancelled by the user */
+  cancelled?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ToolResultRenderer({
   onSendFollowUp,
   serverBaseUrl,
   partialToolArgs,
+  cancelled,
 }: ToolResultRendererProps) {
   const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
@@ -269,6 +272,7 @@ export function ToolResultRenderer({
         noWrapper={true}
         onSendFollowUp={onSendFollowUp}
         serverBaseUrl={serverBaseUrl}
+        cancelled={cancelled}
       />
     );
   }

@@ -86,38 +86,34 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false  // ← Critical: prevents duplicate tool registration
 };
 
-type Props = z.infer<typeof propsSchema>;
-
-export default function WeatherDisplay() {
-  const { props, isPending } = useWidget<Props>();
-
-  if (isPending) {
-    return (
-      <McpUseProvider autoSize>
-        <div>Loading weather...</div>
-      </McpUseProvider>
-    );
-  }
-
+const WeatherDisplay = ({ city, temp, conditions, icon }) => {
+  // Framework features via hook (opt-in)
+  const { isPending } = useWidget();
+  
+  if (isPending) return <McpUseProvider autoSize><div>Loading weather...</div></McpUseProvider>;
+  
   return (
     <McpUseProvider autoSize>
       <div style={{ padding: 20 }}>
-        <h2>{props.city}</h2>
-        <img src={props.icon} alt={props.conditions} width={64} />
-        <div style={{ fontSize: 48 }}>{props.temp}°C</div>
-        <p>{props.conditions}</p>
+        <h2>{city}</h2>
+        <img src={icon} alt={conditions} width={64} />
+        <div style={{ fontSize: 48 }}>{temp}°C</div>
+        <p>{conditions}</p>
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default WeatherDisplay;
 ```
 
-**Key requirements:**
+**Key points:**
 1. Export `widgetMetadata` with props schema
-2. Infer type from schema and pass to `useWidget<Props>()`
-3. Set `exposeAsTool: false` to avoid duplicate registration
-4. Wrap root in `<McpUseProvider autoSize>`
-5. **Always check `isPending` before accessing `props`**
+2. Component receives props automatically 
+3. Props are auto-typed from the Zod schema
+4. Use `useWidget()` hook only for framework features (isPending, callTool, theme, etc.)
+5. Set `exposeAsTool: false` to avoid duplicate registration
+6. Always wrap the root in `<McpUseProvider autoSize>` for auto-sizing and theme support
 
 ---
 
@@ -151,84 +147,105 @@ export const widgetMetadata: WidgetMetadata = {
 
 ## useWidget() Hook
 
-The `useWidget()` hook provides access to props and widget state:
+With the zero-config pattern, **props come directly into the component signature** — you don't need to destructure them from `useWidget()`. Use `useWidget()` only for framework features.
 
 ```typescript
-const {
-  props,        // Widget props from tool response
-  isPending,    // True while props are loading
-  setState,     // Update widget state
-  state,        // Current widget state
-  callTool      // Call MCP tools from widget
-} = useWidget();
-```
-
-### props
-Data passed from tool's `widget({ props })` response:
-
-```typescript
-const { props } = useWidget();
-
-// Access props after isPending check
-if (!isPending) {
-  console.log(props.city);      // "Tokyo"
-  console.log(props.temp);      // 28
-}
-```
-
-**Always check `isPending` before accessing `props`:**
-```typescript
-❌ const { props } = useWidget();
-   return <div>{props.city}</div>;  // Error! props undefined while loading
-
-✅ const { props, isPending } = useWidget();
-   if (isPending) return <div>Loading...</div>;
-   return <div>{props.city}</div>;  // Safe
+// Props are auto-injected into your component signature
+const MyWidget = ({ city, temp }) => {
+  // Use useWidget() for framework features only
+  const {
+    isPending,       // True while tool is executing
+    output,          // Tool's return value (what the model sees)
+    partialToolInput, // Streaming props during generation (live preview)
+    isStreaming,     // True while partialToolInput is being streamed
+    callTool,        // Call other MCP tools
+    setState,        // Update persistent widget state
+    state,           // Current widget state
+    theme,           // "light" | "dark"
+  } = useWidget();
+};
 ```
 
 ### isPending
-Boolean indicating if props are still loading.
 
-**CRITICAL:** Widgets render **before** the tool completes execution. On first render:
-- `isPending` is `true`
-- `props` is an empty object `{}`
-- Accessing `props` fields will cause errors
+**CRITICAL:** Widgets render **before** the tool completes execution. `isPending` tells you whether the tool is still running.
 
 **Widget Lifecycle:**
-1. Widget mounts immediately when tool is called → `isPending = true`, `props = {}`
-2. Tool executes and returns `widget({ props })`
-3. Widget re-renders → `isPending = false`, `props` contains data
+1. Widget mounts immediately when tool is called → `isPending = true`, props are `{}`
+2. (Optional) LLM streams tool arguments → `isStreaming = true`, `partialToolInput` updates
+3. Tool executes and returns → `isPending = false`, props contain final data
 
 ```typescript
-const { isPending } = useWidget();
+const Widget = ({ city, temp }) => {
+  const { isPending } = useWidget();
 
-if (isPending) {
+  if (isPending) {
+    return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
+  }
+
+  // Now safe to use props
   return (
     <McpUseProvider autoSize>
-      <div>Loading...</div>
+      <div>{city} — {temp}°C</div>
     </McpUseProvider>
   );
-}
-
-// Now safe to access props - guaranteed to have data
+};
 ```
 
-**Multiple patterns for handling isPending:**
+### output
+
+The structured data your server returned to the **model** (not the widget). This is the result of `return object({...})` in your tool handler — what appears in the chat.
+
+```typescript
+const Widget = ({ products }) => {
+  const { output } = useWidget<unknown, { count: number; category: string }>();
+
+  return (
+    <McpUseProvider autoSize>
+      <div>
+        {/* output is what was returned to the model */}
+        <p>Showing {output?.count} {output?.category} products</p>
+        <ul>{products.map(p => <li key={p.id}>{p.name}</li>)}</ul>
+      </div>
+    </McpUseProvider>
+  );
+};
+```
+
+### partialToolInput + isStreaming
+
+When the LLM streams its tool arguments (supported in MCP Apps hosts), you can show a live preview as the user types:
+
+```typescript
+const CodeWidget = ({ code, language }) => {
+  const { isPending, isStreaming, partialToolInput } = useWidget();
+
+  // Show partial content during streaming, then final props when complete
+  const displayCode = isStreaming && partialToolInput?.code != null
+    ? partialToolInput.code
+    : code ?? "";
+
+  return (
+    <McpUseProvider autoSize>
+      <pre data-language={language}>{displayCode || (isPending ? "Waiting..." : "")}</pre>
+    </McpUseProvider>
+  );
+};
+```
+
+**Handling isPending patterns:**
 
 ```typescript
 // ✅ Pattern 1: Early return (recommended)
 if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
-return <McpUseProvider autoSize><div>{props.data}</div></McpUseProvider>;
+return <McpUseProvider autoSize><div>{city}</div></McpUseProvider>;
 
 // ✅ Pattern 2: Conditional rendering
 return (
   <McpUseProvider autoSize>
-    {isPending ? <div>Loading...</div> : <div>{props.data}</div>}
+    {isPending ? <div>Loading...</div> : <div>{city}</div>}
   </McpUseProvider>
 );
-
-// ✅ Pattern 3: Optional chaining (when props might be undefined)
-return <McpUseProvider autoSize><div>{props?.data ?? "Loading..."}</div></McpUseProvider>;
 ```
 
 ---
@@ -238,10 +255,10 @@ return <McpUseProvider autoSize><div>{props?.data ?? "Loading..."}</div></McpUse
 **Required wrapper** for all widgets. Provides context and handles iframe sizing.
 
 ```typescript
-import { McpUseProvider } from "mcp-use/react";
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
-export default function MyWidget() {
-  const { props, isPending } = useWidget();
+const MyWidget = ({ city, temp }) => {
+  const { isPending } = useWidget();
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
@@ -250,11 +267,14 @@ export default function MyWidget() {
   return (
     <McpUseProvider autoSize>
       <div>
-        {/* Your widget content */}
+        {city} — {temp}°C
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default MyWidget;
+```
 ```
 
 **Props:**
@@ -269,6 +289,8 @@ export default function MyWidget() {
 
 ## Props Handling Patterns
 
+With zero-config prop injection, props come directly into your component signature — auto-typed from your `widgetMetadata.props` schema.
+
 ### Simple Props
 ```typescript
 export const widgetMetadata: WidgetMetadata = {
@@ -279,20 +301,23 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false
 };
 
-export default function SimpleWidget() {
-  const { props, isPending } = useWidget();
+// Props are auto-injected and auto-typed!
+const SimpleWidget = ({ message, count }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
       <div>
-        <p>{props.message}</p>
-        <p>Count: {props.count}</p>
+        <p>{message}</p>
+        <p>Count: {count}</p>
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default SimpleWidget;
 ```
 
 ### Array Props
@@ -307,21 +332,23 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false
 };
 
-export default function ListWidget() {
-  const { props, isPending } = useWidget();
+const ListWidget = ({ items }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
       <ul>
-        {props.items.map(item => (
+        {items.map(item => (
           <li key={item.id}>{item.name}</li>
         ))}
       </ul>
     </McpUseProvider>
   );
-}
+};
+
+export default ListWidget;
 ```
 
 ### Nested Props
@@ -339,12 +366,10 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false
 };
 
-export default function ProfileWidget() {
-  const { props, isPending } = useWidget();
+const ProfileWidget = ({ user }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
-
-  const { user } = props;
 
   return (
     <McpUseProvider autoSize>
@@ -355,7 +380,9 @@ export default function ProfileWidget() {
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default ProfileWidget;
 ```
 
 ### Optional Props
@@ -369,23 +396,26 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false
 };
 
-export default function FlexibleWidget() {
-  const { props, isPending } = useWidget();
+const FlexibleWidget = ({ title, subtitle, items }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
       <div>
-        <h1>{props.title}</h1>
-        {props.subtitle && <h2>{props.subtitle}</h2>}
+        <h1>{title}</h1>
+        {subtitle && <h2>{subtitle}</h2>}
         <ul>
-          {props.items.map((item, i) => <li key={i}>{item}</li>)}
+          {items.map((item, i) => <li key={i}>{item}</li>)}
         </ul>
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default FlexibleWidget;
+```
 ```
 
 ---
@@ -413,9 +443,9 @@ my-server/
 
 ## TypeScript Types
 
-For type safety, infer props type from schema:
+Props are **automatically typed** from your `widgetMetadata.props` Zod schema when using `mcp-use dev`. No manual type annotations needed!
 
-⚠️ **CRITICAL:** Always define your Zod schema in a separate constant before `widgetMetadata`. Never infer types from `widgetMetadata.props` - TypeScript will lose type information and the result will be `unknown`.
+⚠️ **CRITICAL:** Always define your Zod schema in a separate constant before `widgetMetadata`. Never infer types from `widgetMetadata.props` inline.
 
 ```typescript
 import { z } from "zod";
@@ -433,23 +463,27 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false
 };
 
-type Props = z.infer<typeof propsSchema>;
-
-export default function WeatherWidget() {
-  const { props, isPending } = useWidget<Props>();
+// Props auto-typed from schema — city is string, temp is number!
+const WeatherWidget = ({ city, temp, conditions }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
-  // Now props is fully typed!
   return (
     <McpUseProvider autoSize>
       <div>
-        <h2>{props.city}</h2>  {/* ✓ TypeScript knows this is string */}
-        <p>{props.temp}°C</p>   {/* ✓ TypeScript knows this is number */}
+        <h2>{city}</h2>         {/* ✓ TypeScript knows this is string */}
+        <p>{temp}°C</p>         {/* ✓ TypeScript knows this is number */}
+        <p>{conditions}</p>
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default WeatherWidget;
+```
+
+**How it works:** Running `mcp-use dev` generates `.mcp-use/<widget>/types.ts` from your schema automatically. TypeScript picks it up via your `tsconfig.json`'s `include` path.
 ```
 
 ---
@@ -458,54 +492,52 @@ export default function WeatherWidget() {
 
 ### ❌ Missing isPending Check
 ```typescript
-// ❌ Bad - props undefined during loading
-export default function BadWidget() {
-  const { props } = useWidget();
-
+// ❌ Bad - props undefined during loading (title will be undefined/error)
+const BadWidget = ({ title }) => {
   return (
     <McpUseProvider autoSize>
-      <div>{props.title}</div>  {/* Error! */}
+      <div>{title}</div>  {/* title is undefined while isPending! */}
     </McpUseProvider>
   );
-}
+};
 
 // ✅ Good
-export default function GoodWidget() {
-  const { props, isPending } = useWidget();
+const GoodWidget = ({ title }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
-      <div>{props.title}</div>
+      <div>{title}</div>
     </McpUseProvider>
   );
-}
+};
 ```
 
 ### ❌ Missing McpUseProvider
 ```typescript
-// ❌ Bad - Missing provider
-export default function BadWidget() {
-  const { props, isPending } = useWidget();
+// ❌ Bad - Missing provider (won't render correctly)
+const BadWidget = ({ title }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <div>Loading...</div>;
 
-  return <div>{props.title}</div>;  {/* Won't render correctly */}
-}
+  return <div>{title}</div>;
+};
 
 // ✅ Good
-export default function GoodWidget() {
-  const { props, isPending } = useWidget();
+const GoodWidget = ({ title }) => {
+  const { isPending } = useWidget();
 
   if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
-      <div>{props.title}</div>
+      <div>{title}</div>
     </McpUseProvider>
   );
-}
+};
 ```
 
 ### ❌ Missing exposeAsTool: false
@@ -525,52 +557,18 @@ export const widgetMetadata: WidgetMetadata = {
 };
 ```
 
-### ❌ Missing Type Parameter on useWidget
+### ❌ Inline Schema (Types Won't Infer)
 ```typescript
-// ❌ Bad - props is UnknownObject, no autocomplete or type safety
-const propsSchema = z.object({
-  title: z.string(),
-  count: z.number()
-});
-
-export default function BadWidget() {
-  const { props } = useWidget();  // props is UnknownObject
-  return <div>{props.title}</div>;  // No IDE support, runtime errors possible
-}
-
-// ✅ Good - props is fully typed with IDE support
-const propsSchema = z.object({
-  title: z.string(),
-  count: z.number()
-});
-
-type Props = z.infer<typeof propsSchema>;
-
-export default function GoodWidget() {
-  const { props } = useWidget<Props>();  // props is properly typed
-  return <div>{props.title}</div>;  // Full autocomplete and type checking
-}
-```
-
-### ❌ Inferring Type from widgetMetadata.props
-```typescript
-// ❌ Bad - Type inference fails, Props is unknown
+// ❌ Bad - Inline schema means TypeScript loses type information
 export const widgetMetadata: WidgetMetadata = {
   description: "...",
   props: z.object({
     title: z.string(),
     count: z.number()
-  })  // Inline schema definition
+  })  // Inline schema definition — title/count won't be typed in component
 };
 
-type Props = z.infer<typeof widgetMetadata.props>;  // Props is unknown!
-
-export default function BadWidget() {
-  const { props } = useWidget<Props>();
-  return <div>{props.title}</div>;  // No autocomplete, no type safety
-}
-
-// ✅ Good - Extract schema first for proper type inference
+// ✅ Good - Extract schema first so auto-injection is properly typed
 const propsSchema = z.object({
   title: z.string(),
   count: z.number()
@@ -581,12 +579,12 @@ export const widgetMetadata: WidgetMetadata = {
   props: propsSchema  // Reference the schema variable
 };
 
-type Props = z.infer<typeof propsSchema>;  // Props is properly typed!
-
-export default function GoodWidget() {
-  const { props } = useWidget<Props>();
-  return <div>{props.title}</div>;  // Full autocomplete and type checking
-}
+// Now title and count are fully typed in the component signature!
+const GoodWidget = ({ title, count }) => {
+  const { isPending } = useWidget();
+  if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
+  return <McpUseProvider autoSize><div>{title}: {count}</div></McpUseProvider>;
+};
 ```
 
 **Why this happens:** The `WidgetMetadata` type is generic, so TypeScript can't preserve the specific Zod schema type when defined inline. Always extract your schema to a separate constant before using it in `widgetMetadata`.

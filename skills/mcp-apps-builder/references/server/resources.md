@@ -59,7 +59,7 @@ Use a scheme-based format for organization:
 ```
 
 ### Name
-Machine-readable identifier (kebab-case):
+Machine-readable identifier :
 ```typescript
 ✅ "app_settings"
 ✅ "user_guide"

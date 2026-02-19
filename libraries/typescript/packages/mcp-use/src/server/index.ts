@@ -159,6 +159,12 @@ export { generateLandingPage } from "./landing.js";
 // Tool registry type generator (for CLI generate-types command)
 export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
 
+// Widget prop types generator (for CLI generate-types command)
+export { generateWidgetTypes } from "./utils/widget-types-generator.js";
+
+// Widget helper utilities
+export { slugifyWidgetName } from "./widgets/widget-helpers.js";
+
 export type {
   AppsSdkUIResource,
   DiscoverWidgetsOptions,

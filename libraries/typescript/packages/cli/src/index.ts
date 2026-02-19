@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
@@ -14,7 +15,6 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
-import { createSkillsCommand } from "./commands/skills.js";
 
 const program = new Command();
 
@@ -435,13 +435,19 @@ async function buildWidgets(
     // Create entry file
     const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
+import { useWidget } from 'mcp-use/react'
 import './styles.css'
-import Component from '${entryPath}'
+import UserComponent from '${entryPath}'
+
+function WidgetWrapper() {
+  const { props, ...widgetState } = useWidget()
+  return <UserComponent {...(props || {})} {...widgetState} />
+}
 
 const container = document.getElementById('widget-root')
-if (container && Component) {
+if (container) {
   const root = createRoot(container)
-  root.render(<Component />)
+  root.render(<WidgetWrapper />)
 }
 `;
 
@@ -1872,9 +1878,6 @@ program.addCommand(createClientCommand());
 // Deployments command
 program.addCommand(createDeploymentsCommand());
 
-// Skills command
-program.addCommand(createSkillsCommand());
-
 // Generate types command
 program
   .command("generate-types")
@@ -1882,13 +1885,13 @@ program
     "Generate TypeScript type definitions for tools (writes .mcp-use/tool-registry.d.ts)"
   )
   .option("-p, --path <path>", "Path to project directory", process.cwd())
-  .option("--server <file>", "Server entry file", "index.ts")
+  .option("--server <file>", "Server entry file (auto-detected if omitted)")
   .action(async (options) => {
     const projectPath = path.resolve(options.path);
-    const serverFile = path.join(projectPath, options.server);
 
-    try {
-      // Check if server file exists
+    let serverFile: string;
+    if (options.server) {
+      serverFile = path.join(projectPath, options.server);
       if (
         !(await access(serverFile)
           .then(() => true)
@@ -1897,7 +1900,21 @@ program
         console.error(chalk.red(`Server file not found: ${serverFile}`));
         process.exit(1);
       }
+    } else {
+      try {
+        const relative = await findServerFile(projectPath);
+        serverFile = path.join(projectPath, relative);
+      } catch {
+        console.error(
+          chalk.red(
+            "No server file found. Tried: index.ts, src/index.ts, server.ts, src/server.ts. Use --server to specify."
+          )
+        );
+        process.exit(1);
+      }
+    }
 
+    try {
       console.log(chalk.blue("Generating tool registry types..."));
 
       // Set HMR mode to prevent server from actually starting
@@ -1923,11 +1940,23 @@ program
       }
 
       // Generate types from registrations
-      // Dynamic import from the user's node_modules
-      const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
-      const { generateToolRegistryTypes } = await import(
-        path.join(mcpUsePath, "dist", "src", "server", "index.js")
-      ).then((mod) => mod);
+      // Resolve mcp-use from the user's project to handle monorepos, pnpm, etc.
+      const projectRequire = createRequire(
+        path.join(projectPath, "package.json")
+      );
+      let mcpUseServerPath = projectRequire.resolve("mcp-use/server");
+      // createRequire resolves to the CJS entry (.cjs); swap to ESM (.js)
+      // so dynamic import() gets proper named exports
+      if (mcpUseServerPath.endsWith(".cjs")) {
+        mcpUseServerPath = mcpUseServerPath.replace(/\.cjs$/, ".js");
+      }
+      const serverModule = await import(pathToFileURL(mcpUseServerPath).href);
+
+      const {
+        generateToolRegistryTypes,
+        generateWidgetTypes,
+        slugifyWidgetName,
+      } = serverModule;
 
       if (!generateToolRegistryTypes) {
         throw new Error(
@@ -1935,9 +1964,27 @@ program
         );
       }
 
+      // Generate tool registry types
       await generateToolRegistryTypes(server.registrations.tools, projectPath);
 
-      console.log(chalk.green("✓ Tool registry types generated successfully"));
+      // Generate widget prop types
+      if (
+        generateWidgetTypes &&
+        slugifyWidgetName &&
+        server.widgetDefinitions
+      ) {
+        for (const [widgetName, widgetDef] of server.widgetDefinitions) {
+          const slugified = slugifyWidgetName(widgetName);
+          await generateWidgetTypes(
+            widgetName,
+            slugified,
+            widgetDef as any,
+            projectPath
+          );
+        }
+      }
+
+      console.log(chalk.green("✓ Types generated successfully"));
       process.exit(0);
     } catch (error) {
       console.error(

@@ -136,9 +136,6 @@ importers:
       react-router-dom:
         specifier: ^7.12.0
         version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      tar:
-        specifier: ^7.4.3
-        version: 7.5.7
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -155,9 +152,6 @@ importers:
         specifier: 4.3.5
         version: 4.3.5
     devDependencies:
-      '@types/tar':
-        specifier: ^6.1.13
-        version: 6.1.13
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
@@ -247,12 +241,6 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.2.0
-      '@types/react':
-        specifier: ^19.2.7
-        version: 19.2.10
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.10)
       '@vitejs/plugin-react':
         specifier: ^5.1.2
         version: 5.1.3(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
@@ -308,12 +296,6 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.2.0
-      '@types/react':
-        specifier: ^19.2.7
-        version: 19.2.10
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.10)
       '@vitejs/plugin-react':
         specifier: ^5.1.2
         version: 5.1.3(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
@@ -369,12 +351,6 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.2.0
-      '@types/react':
-        specifier: ^19.2.7
-        version: 19.2.10
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.10)
       '@vitejs/plugin-react':
         specifier: ^5.1.2
         version: 5.1.3(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
@@ -507,6 +483,9 @@ importers:
       vite-express:
         specifier: ^0.22.0
         version: 0.22.1
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
     devDependencies:
       '@antfu/eslint-config':
         specifier: ^6.7.1
@@ -1101,6 +1080,61 @@ importers:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
+      vite:
+        specifier: ^7.3.0
+        version: 7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+
+  test_app:
+    dependencies:
+      '@openai/apps-sdk-ui':
+        specifier: ^0.2.1
+        version: 0.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(tailwindcss@4.1.18)
+      '@tanstack/react-query':
+        specifier: ^5.90.12
+        version: 5.90.20(react@19.2.4)
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.6
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/mcp-use
+      node-mocks-http:
+        specifier: ^1.17.2
+        version: 1.17.2(@types/express@5.0.6)(@types/node@25.2.0)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+      react-router:
+        specifier: ^7.12.0
+        version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tailwindcss:
+        specifier: ^4.1.18
+        version: 4.1.18
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.1.18
+        version: 4.1.18(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.2.0
+      '@vitejs/plugin-react':
+        specifier: ^5.1.2
+        version: 5.1.3(vite@7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vite:
         specifier: ^7.3.0
         version: 7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
@@ -6807,7 +6841,6 @@ packages:
   tar@7.5.7:
     resolution: {integrity: sha512-fov56fJiRuThVFXD6o6/Q354S7pnWMJIVlDBYijsTNx6jKSE4pvrDTs6lUnmGvNyfJwFQQwWy3owKz1ucIhveQ==}
     engines: {node: '>=18'}
-    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   term-size@2.2.1:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}

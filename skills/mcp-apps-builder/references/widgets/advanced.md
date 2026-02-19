@@ -54,9 +54,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-// Usage
-export default function SafeWidget() {
-  const { props, isPending } = useWidget();
+// Usage - props auto-injected from widgetMetadata.props schema
+const SafeWidget = ({ items, title }) => {
+  const { isPending } = useWidget();
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
@@ -65,11 +65,13 @@ export default function SafeWidget() {
   return (
     <McpUseProvider autoSize>
       <ErrorBoundary>
-        <WidgetContent props={props} />
+        <WidgetContent items={items} title={title} />
       </ErrorBoundary>
     </McpUseProvider>
   );
-}
+};
+
+export default SafeWidget;
 ```
 
 ---
@@ -82,15 +84,15 @@ Memoize expensive computations:
 import { useMemo } from "react";
 import { McpUseProvider, useWidget } from "mcp-use/react";
 
-export default function OptimizedWidget() {
-  const { props, isPending } = useWidget();
+// items prop auto-injected from widgetMetadata.props schema
+const OptimizedWidget = ({ items }) => {
+  const { isPending } = useWidget();
 
-  // Expensive computation - only runs when props.items changes
-  // Guard against isPending where props.items is undefined
+  // Expensive computation - only runs when items changes
   const sortedAndFiltered = useMemo(() => {
-    if (!props.items) return { items: [], total: 0, avgScore: 0 };
+    if (!items) return { items: [], total: 0, avgScore: 0 };
 
-    let result = props.items;
+    let result = items;
 
     // Filter
     result = result.filter(item => item.active);
@@ -106,7 +108,7 @@ export default function OptimizedWidget() {
         ? result.reduce((sum, item) => sum + item.score, 0) / result.length
         : 0
     };
-  }, [props.items]);
+  }, [items]);
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
@@ -124,7 +126,9 @@ export default function OptimizedWidget() {
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default OptimizedWidget;
 ```
 
 ---
@@ -137,8 +141,8 @@ Prevent unnecessary re-renders:
 import { useCallback, useState } from "react";
 import { McpUseProvider, useWidget } from "mcp-use/react";
 
-export default function CallbackWidget() {
-  const { props, isPending, callTool } = useWidget();
+const CallbackWidget = ({ items }) => {
+  const { isPending, callTool } = useWidget();
   const [loading, setLoading] = useState<Set<string>>(new Set());
 
   // Stable function reference
@@ -162,7 +166,7 @@ export default function CallbackWidget() {
   return (
     <McpUseProvider autoSize>
       <div>
-        {props.items.map(item => (
+        {items.map(item => (
           <ItemRow
             key={item.id}
             item={item}
@@ -173,7 +177,9 @@ export default function CallbackWidget() {
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default CallbackWidget;
 
 // Child component won't re-render unnecessarily
 const ItemRow = React.memo(({ item, onAction, loading }: any) => (

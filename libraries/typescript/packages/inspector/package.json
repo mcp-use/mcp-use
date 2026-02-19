@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "0.21.1-canary.0",
+  "version": "0.21.0",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -123,7 +123,8 @@
     "react-syntax-highlighter": "^16.1.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "vite-express": "^0.22.0"
+    "vite-express": "^0.22.0",
+    "zod": "4.3.5"
   },
   "publishConfig": {
     "access": "public"

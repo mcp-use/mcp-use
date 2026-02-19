@@ -23,26 +23,32 @@ import { useWidget } from "mcp-use/react";
 
 ## Basic Usage
 
+Starting from v1.19+, widgets automatically receive props without needing `useWidget` calls:
+
 ```tsx
-import { useWidget } from "mcp-use/react";
+// resources/weather-display.tsx
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
-interface MyWidgetProps {
-  city: string;
-  temperature: number;
-}
-
-const MyWidget: React.FC = () => {
-  // Works identically in both MCP Apps and ChatGPT
-  const { props, theme, callTool } = useWidget<MyWidgetProps>();
-
+// Props are auto-injected and auto-typed from widgetMetadata.props!
+const WeatherDisplay = ({ city, temperature }) => {
+  // Framework features via hook (opt-in)
+  const { isPending, theme } = useWidget();
+  
+  if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
+  
   return (
-    <div data-theme={theme}>
-      <h1>{props.city}</h1>
-      <p>{props.temperature}°C</p>
-    </div>
+    <McpUseProvider autoSize>
+      <div data-theme={theme}>
+        <h1>{city}</h1>
+        <p>{temperature}°C</p>
+      </div>
+    </McpUseProvider>
   );
 };
+
+export default WeatherDisplay;
 ```
+
 
 <Note>
 **Cross-Protocol Compatibility**: This exact code works without modifications in:
@@ -115,24 +121,14 @@ useWidget<
 ```tsx
 import { useWidget } from "mcp-use/react";
 
-interface ProductProps {
-  productId: string;
-  name: string;
-  price: number;
-}
-
-interface ProductOutput {
-  reviews: Array<{ rating: number; comment: string }>;
-}
-
 interface ProductState {
   favorites: string[];
 }
 
-const ProductWidget: React.FC = () => {
+// productId, name, price are auto-injected from widgetMetadata.props
+const ProductWidget = ({ productId, name, price }) => {
   const {
-    // Props and state
-    props,
+    // Tool output (what the model sees) and state
     output,
     state,
     setState,
@@ -151,27 +147,28 @@ const ProductWidget: React.FC = () => {
 
     // Availability
     isAvailable,
-  } = useWidget<ProductProps, ProductOutput, {}, ProductState>();
+  // Type params: skip TProps (props come via component signature), type output and state
+  } = useWidget<never, { reviews: Array<{ rating: number; comment: string }> }, {}, ProductState>();
 
   const handleAddToFavorites = async () => {
-    const newFavorites = [...(state?.favorites || []), props.productId];
+    const newFavorites = [...(state?.favorites || []), productId];
     await setState({ favorites: newFavorites });
   };
 
   const handleGetReviews = async () => {
-    const result = await callTool("get-product-reviews", {
-      productId: props.productId,
-    });
+    const result = await callTool("get-product-reviews", { productId });
     // Handle result
   };
 
   return (
-    <div data-theme={theme}>
-      <h1>{props.name}</h1>
-      <p>${props.price}</p>
-      <button onClick={handleAddToFavorites}>Add to Favorites</button>
-      <button onClick={handleGetReviews}>Get Reviews</button>
-    </div>
+    <McpUseProvider autoSize>
+      <div data-theme={theme}>
+        <h1>{name}</h1>
+        <p>${price}</p>
+        <button onClick={handleAddToFavorites}>Add to Favorites</button>
+        <button onClick={handleGetReviews}>Get Reviews</button>
+      </div>
+    </McpUseProvider>
   );
 };
 ```
@@ -193,41 +190,40 @@ Widgets render **before** the tool execution completes. This means:
 
 When the host supports **streaming tool arguments** (e.g. MCP Inspector, MCP Apps clients that send `tool-input-partial`), an optional phase occurs between (1) and (2): the widget receives partial tool input in real time via `partialToolInput` while `isStreaming` is `true`, then transitions to full `props` when the tool input is complete. See [Streaming tool arguments](#streaming-tool-arguments) below.
 
-**Example:**
+**Example (zero-config pattern — props in component signature):**
 
 ```tsx
-const MyWidget: React.FC = () => {
-  const { props, isPending } = useWidget<MyWidgetProps>();
+// city and temperature come directly from widgetMetadata.props schema
+const MyWidget = ({ city, temperature }) => {
+  const { isPending } = useWidget();
 
   if (isPending) {
-    return <LoadingSpinner />;
+    return <McpUseProvider autoSize><LoadingSpinner /></McpUseProvider>;
   }
 
-  // Safe to access props now
+  // Safe to use props now
   return (
-    <div>
-      {props.city} - {props.temperature}°C
-    </div>
+    <McpUseProvider autoSize>
+      <div>{city} - {temperature}°C</div>
+    </McpUseProvider>
   );
 };
 ```
 
-**Alternative: Using optional chaining**
+**Alternative: inline conditional**
 
 ```tsx
-const MyWidget: React.FC = () => {
-  const { props, isPending } = useWidget<MyWidgetProps>();
+const MyWidget = ({ city, temperature }) => {
+  const { isPending } = useWidget();
 
   return (
-    <div>
+    <McpUseProvider autoSize>
       {isPending ? (
         <LoadingSpinner />
       ) : (
-        <div>
-          {props.city} - {props.temperature}°C
-        </div>
+        <div>{city} - {temperature}°C</div>
       )}
-    </div>
+    </McpUseProvider>
   );
 };
 ```
@@ -245,23 +241,26 @@ This is only available when the host supports it; in ChatGPT Apps SDK or when us
 **Example: live preview while streaming**
 
 ```tsx
-const CodePreviewWidget: React.FC = () => {
-  const { props, isPending, isStreaming, partialToolInput } = useWidget<{ code: string; language: string }>();
+// code and language come from widgetMetadata.props schema
+const CodePreviewWidget = ({ code, language }) => {
+  const { isPending, isStreaming, partialToolInput } = useWidget();
 
   if (isPending && !partialToolInput) {
-    return <LoadingSpinner />;
+    return <McpUseProvider autoSize><LoadingSpinner /></McpUseProvider>;
   }
 
   // Show live preview during streaming, then final props when complete
   const displayCode = isStreaming && partialToolInput?.code != null
     ? partialToolInput.code
-    : props.code ?? "";
-  const displayLang = (isStreaming ? partialToolInput?.language : props.language) ?? "text";
+    : code ?? "";
+  const displayLang = (isStreaming ? partialToolInput?.language : language) ?? "text";
 
   return (
-    <pre data-language={displayLang}>
-      {displayCode || "Waiting for input..."}
-    </pre>
+    <McpUseProvider autoSize>
+      <pre data-language={displayLang}>
+        {displayCode || "Waiting for input..."}
+      </pre>
+    </McpUseProvider>
   );
 };
 ```
@@ -313,21 +312,26 @@ await setFavorites((prev) => [...prev, "newItem"]);
 
 ## Key Features
 
-### 1. Props Without Props
+### 1. Props via Component Signature
 
-Components don't accept props via React props. Instead, props come from the hook:
+Props are auto-injected into your component signature from the `widgetMetadata.props` schema:
 
 ```tsx
-// ❌ Don't do this
-const MyWidget: React.FC<MyProps> = ({ city, temperature }) => { ... }
+// ✅ New zero-config pattern — props auto-typed from schema
+const MyWidget = ({ city, temperature }) => {
+  const { isPending, callTool } = useWidget(); // Framework features only
+  // ...
+};
 
-// ✅ Do this
+// ✅ Backward compatible — also works
 const MyWidget: React.FC = () => {
-  const { props } = useWidget<MyProps>();
+  const { props, isPending } = useWidget<MyProps>();
   const { city, temperature } = props;
   // ...
-}
+};
 ```
+
+The first pattern is recommended: props come directly in the function signature, typed automatically by the dev server from your Zod schema.
 
 ### 2. Automatic Provider Detection
 

@@ -58,6 +58,15 @@ export function Layout({ children }: LayoutProps) {
         proxyConfig,
         transportType,
         preventAutoAuth: true,
+        clientOptions: {
+          capabilities: {
+            extensions: {
+              "io.modelcontextprotocol/ui": {
+                mimeTypes: ["text/html;profile=mcp-app"],
+              },
+            },
+          },
+        },
       });
     },
     [addServer]

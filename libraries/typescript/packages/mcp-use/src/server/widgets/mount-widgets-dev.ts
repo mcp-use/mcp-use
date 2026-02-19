@@ -247,13 +247,19 @@ export async function mountWidgetsDev(
 
     const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
+import { useWidget } from 'mcp-use/react'
 import './styles.css'
-import Component from '${widget.entry}'
+import UserComponent from '${widget.entry}'
+
+function WidgetWrapper() {
+  const { props, ...widgetState } = useWidget()
+  return <UserComponent {...(props || {})} {...widgetState} />
+}
 
 const container = document.getElementById('widget-root')
-if (container && Component) {
+if (container) {
   const root = createRoot(container)
-  root.render(<Component />)
+  root.render(<WidgetWrapper />)
   
   // Signal to parent that widget has mounted (after a brief delay for initial render)
   setTimeout(() => {
@@ -762,14 +768,29 @@ if (container && Component) {
               );
               console.log(`[WIDGETS] Reloaded metadata for ${widget.name}`);
 
-              // Regenerate tool registry types
-              import("../utils/tool-registry-generator.js")
-                .then(({ generateToolRegistryTypes }) =>
-                  generateToolRegistryTypes(server.registrations.tools)
-                )
-                .catch(() => {
-                  /* Ignore errors */
-                });
+              // Regenerate tool registry types and widget prop types
+              Promise.all([
+                import("../utils/tool-registry-generator.js").then(
+                  ({ generateToolRegistryTypes }) =>
+                    generateToolRegistryTypes(server.registrations.tools)
+                ),
+                import("../utils/widget-types-generator.js").then(
+                  async ({ generateWidgetTypes }) => {
+                    const { slugifyWidgetName } =
+                      await import("./widget-helpers.js");
+                    const mod = await server.ssrLoadModule(widget.entry);
+                    if (mod.widgetMetadata) {
+                      await generateWidgetTypes(
+                        widget.name,
+                        slugifyWidgetName(widget.name),
+                        mod.widgetMetadata
+                      );
+                    }
+                  }
+                ),
+              ]).catch(() => {
+                /* Ignore errors */
+              });
             } catch (error) {
               console.warn(
                 `[WIDGET] Failed to reload metadata for ${widget.name}:`,
@@ -807,14 +828,29 @@ if (container && Component) {
 
               console.log(`[WIDGETS] New widget added: ${widgetName}`);
 
-              // Regenerate tool registry types
-              import("../utils/tool-registry-generator.js")
-                .then(({ generateToolRegistryTypes }) =>
-                  generateToolRegistryTypes(server.registrations.tools)
-                )
-                .catch(() => {
-                  /* Ignore errors */
-                });
+              // Regenerate tool registry types and widget prop types
+              Promise.all([
+                import("../utils/tool-registry-generator.js").then(
+                  ({ generateToolRegistryTypes }) =>
+                    generateToolRegistryTypes(server.registrations.tools)
+                ),
+                import("../utils/widget-types-generator.js").then(
+                  async ({ generateWidgetTypes }) => {
+                    const { slugifyWidgetName } =
+                      await import("./widget-helpers.js");
+                    const mod = await server.ssrLoadModule(filePath);
+                    if (mod.widgetMetadata) {
+                      await generateWidgetTypes(
+                        widgetName,
+                        slugifyWidgetName(widgetName),
+                        mod.widgetMetadata
+                      );
+                    }
+                  }
+                ),
+              ]).catch(() => {
+                /* Ignore errors */
+              });
             } catch (error) {
               console.warn(
                 `[WIDGET] Failed to add new widget ${widgetName}:`,
@@ -848,14 +884,29 @@ if (container && Component) {
 
                 console.log(`[WIDGETS] New widget added: ${widgetName}`);
 
-                // Regenerate tool registry types
-                import("../utils/tool-registry-generator.js")
-                  .then(({ generateToolRegistryTypes }) =>
-                    generateToolRegistryTypes(server.registrations.tools)
-                  )
-                  .catch(() => {
-                    /* Ignore errors */
-                  });
+                // Regenerate tool registry types and widget prop types
+                Promise.all([
+                  import("../utils/tool-registry-generator.js").then(
+                    ({ generateToolRegistryTypes }) =>
+                      generateToolRegistryTypes(server.registrations.tools)
+                  ),
+                  import("../utils/widget-types-generator.js").then(
+                    async ({ generateWidgetTypes }) => {
+                      const { slugifyWidgetName } =
+                        await import("./widget-helpers.js");
+                      const mod = await server.ssrLoadModule(filePath);
+                      if (mod.widgetMetadata) {
+                        await generateWidgetTypes(
+                          widgetName,
+                          slugifyWidgetName(widgetName),
+                          mod.widgetMetadata
+                        );
+                      }
+                    }
+                  ),
+                ]).catch(() => {
+                  /* Ignore errors */
+                });
               } catch (error) {
                 console.warn(
                   `[WIDGET] Failed to add new widget ${widgetName}:`,

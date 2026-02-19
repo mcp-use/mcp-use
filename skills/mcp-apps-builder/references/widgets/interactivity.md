@@ -45,8 +45,8 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false
 };
 
-export default function TodoList() {
-  const { props, isPending, callTool } = useWidget();
+const TodoList = ({ todos }) => {
+  const { isPending, callTool } = useWidget();
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
@@ -59,7 +59,7 @@ export default function TodoList() {
   return (
     <McpUseProvider autoSize>
       <div>
-        {props.todos.map(todo => (
+        {todos.map(todo => (
           <div key={todo.id} style={{ display: "flex", gap: 8, padding: 8 }}>
             <input
               type="checkbox"
@@ -74,7 +74,9 @@ export default function TodoList() {
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default TodoList;
 ```
 
 **Corresponding tool:**
@@ -102,8 +104,8 @@ server.tool(
 ```tsx
 import { useState } from "react";
 
-export default function CreateItemWidget() {
-  const { props, isPending, callTool } = useWidget();
+const CreateItemWidget = ({ todos }) => {
+  const { isPending, callTool } = useWidget();
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -146,14 +148,16 @@ export default function CreateItemWidget() {
         </form>
 
         <div style={{ marginTop: 16 }}>
-          {props.todos.map(todo => (
+          {todos.map(todo => (
             <div key={todo.id}>{todo.title}</div>
           ))}
         </div>
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default CreateItemWidget;
 ```
 
 **Corresponding tool:**
@@ -189,10 +193,11 @@ const handleDelete = async (id: string) => {
   }
 };
 
+// In the component: const DeleteWidget = ({ todos }) => { ... }
 return (
   <McpUseProvider autoSize>
     <div>
-      {props.todos.map(todo => (
+      {todos.map(todo => (
         <div key={todo.id} style={{ display: "flex", justifyContent: "space-between", padding: 8 }}>
           <span>{todo.title}</span>
           <button onClick={() => handleDelete(todo.id)}>Delete</button>
@@ -218,16 +223,17 @@ interface Todo {
   completed: boolean;
 }
 
-export default function OptimisticWidget() {
-  const { props, isPending, callTool } = useWidget<{ todos: Todo[] }>();
+// todos prop is auto-injected from widgetMetadata.props schema
+const OptimisticWidget = ({ todos: initialTodos }: { todos: Todo[] }) => {
+  const { isPending, callTool } = useWidget();
   const [todos, setTodos] = useState<Todo[]>([]);
 
   // Sync todos from props once loaded
   useEffect(() => {
-    if (!isPending && props.todos) {
-      setTodos(props.todos);
+    if (!isPending && initialTodos) {
+      setTodos(initialTodos);
     }
-  }, [isPending, props.todos]);
+  }, [isPending, initialTodos]);
 
   const handleToggle = async (id: string) => {
     // Optimistic update
@@ -240,7 +246,7 @@ export default function OptimisticWidget() {
       await callTool("toggle-todo", { id });
     } catch (error) {
       // Revert on failure
-      setTodos(props.todos);
+      setTodos(initialTodos);
       alert("Failed to update todo");
     }
   };
@@ -265,7 +271,9 @@ export default function OptimisticWidget() {
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default OptimisticWidget;
 ```
 
 ---

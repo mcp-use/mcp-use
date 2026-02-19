@@ -168,6 +168,62 @@ mcp-use build -p ./my-server
 
 ---
 
+### `generate-types` - Type Generation
+
+Generate TypeScript type definitions for tools and widgets.
+
+```bash
+mcp-use generate-types [options]
+```
+
+**What happens during type generation:**
+
+1. Analyzes your server's tool and widget definitions
+2. Generates `.mcp-use/tool-registry.d.ts` with tool input/output types
+3. Generates `.mcp-use/<widget>/types.ts` for widget props (optional)
+4. Provides full TypeScript autocomplete in widgets
+
+**Options:**
+
+| Option              | Description       | Default           |
+| ------------------- | ----------------- | ----------------- |
+| `-p, --path <path>` | Project directory | Current directory |
+| `--server <file>`   | Server entry file | `index.ts`        |
+
+**Examples:**
+
+```bash
+# Generate types for current project
+mcp-use generate-types
+
+# Generate for a different project
+mcp-use generate-types --path ./my-server
+
+# Use different server file
+mcp-use generate-types --server src/server.ts
+```
+
+**When It Runs:**
+
+Types are generated automatically in most workflows:
+- **`postinstall` script**: Runs after `npm install` / `pnpm install`
+- **`mcp-use dev`**: Regenerates on file changes (HMR)
+- **Manual**: Run `mcp-use generate-types` to regenerate
+
+<Tip>
+**Setup**: Ensure `.mcp-use/` is included in your `tsconfig.json`:
+
+```json
+{
+  "include": ["index.ts", "src/**/*", "resources/**/*", ".mcp-use/**/*"]
+}
+```
+
+The mcp-apps template includes this by default.
+</Tip>
+
+---
+
 ### `start` - Production Server
 
 Start the production server from built files.
@@ -293,55 +349,6 @@ mcp-use logout
 ```
 
 Removes authentication credentials from `~/.mcp-use/config.json`.
-
----
-
-### Skills Commands
-
-#### `skills add` - Install AI Agent Skills
-
-```bash
-mcp-use skills add [options]
-```
-
-Downloads the latest mcp-use skills from [github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use) and installs them into all agent preset directories.
-
-**What happens:**
-
-1. Downloads the latest skills from GitHub
-2. Installs them into all agent preset directories:
-   - `.cursor/skills/` (Cursor)
-   - `.claude/skills/` (Claude Code)
-   - `.agent/skills/` (Codex)
-
-**Options:**
-
-| Option              | Description       | Default           |
-| ------------------- | ----------------- | ----------------- |
-| `-p, --path <path>` | Project directory | Current directory |
-
-**Examples:**
-
-```bash
-# Install skills in current project
-mcp-use skills add
-
-# Install skills in a specific project
-mcp-use skills add -p ./my-server
-```
-
-#### `skills install` - Alias for `skills add`
-
-```bash
-mcp-use skills install [options]
-```
-
-Identical to `skills add`. Use whichever you prefer.
-
-<Tip>
-  Skills are also installed automatically when creating a new project with
-  `create-mcp-use-app` (unless `--no-skills` is passed).
-</Tip>
 
 ---
 

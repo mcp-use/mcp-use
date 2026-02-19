@@ -55,6 +55,8 @@ interface MCPAppsDebugControlsProps {
   llmConfig?: LLMConfig | null;
   resource?: Resource | null;
   onPropsChange?: (props: Record<string, string> | null) => void;
+  /** When set, auto-opens the props popover with a hint listing these required prop names */
+  requiredProps?: string[];
   // Dual-protocol support
   protocol?: "apps-sdk" | "mcp-apps";
   onUpdateGlobals?: (updates: {
@@ -84,6 +86,7 @@ export function MCPAppsDebugControls({
   llmConfig,
   resource,
   onPropsChange,
+  requiredProps,
   protocol = "mcp-apps",
   onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
@@ -102,6 +105,15 @@ export function MCPAppsDebugControls({
     getActiveProps,
   } = useResourceProps(resourceUri);
   const [propsDialogOpen, setPropsDialogOpen] = useState(false);
+
+  // Controlled props popover — auto-opens when required props are missing
+  const hasRequiredProps = !!requiredProps?.length;
+  const missingProps = hasRequiredProps && !activePresetId;
+  const [propsPopoverOpen, setPropsPopoverOpen] = useState(() => missingProps);
+
+  useEffect(() => {
+    if (missingProps) setPropsPopoverOpen(true);
+  }, [missingProps]);
   const [editingPreset, setEditingPreset] = useState<PropPreset | null>(null);
   const [deviceDialogOpen, setDeviceDialogOpen] = useState(false);
   const [localeDialogOpen, setLocaleDialogOpen] = useState(false);
@@ -610,17 +622,23 @@ export function MCPAppsDebugControls({
       </Popover>
 
       {/* Props Selection */}
-      <Popover>
+      <Popover open={propsPopoverOpen} onOpenChange={setPropsPopoverOpen}>
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                className={`h-8 w-8 p-0 backdrop-blur-sm shadow-sm ${
+                  missingProps
+                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 animate-pulse"
+                    : "bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900"
+                }`}
                 data-testid="debugger-props-button"
               >
-                <Braces className="size-3.5" />
+                <Braces
+                  className={`size-3.5 ${missingProps ? "text-amber-500" : ""}`}
+                />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
@@ -637,6 +655,19 @@ export function MCPAppsDebugControls({
           className="w-64 p-2"
           data-testid="debugger-props-popover"
         >
+          {missingProps && (
+            <div className="mb-2 rounded-md border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-0.5">
+                Props required to render this widget:
+              </p>
+              <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                {requiredProps!.join(", ")}
+              </p>
+              <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">
+                Create a preset below to set them.
+              </p>
+            </div>
+          )}
           <div className="space-y-1">
             <Button
               variant={selectValue === NO_PROPS_VALUE ? "default" : "ghost"}

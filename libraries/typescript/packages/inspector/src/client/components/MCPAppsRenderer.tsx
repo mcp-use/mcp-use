@@ -65,6 +65,8 @@ interface MCPAppsRendererProps {
   customProps?: Record<string, string>;
   /** When provided, used directly instead of looking up via useMcpClient(). */
   serverBaseUrl?: string;
+  /** When true, sends ui/notifications/tool-cancelled to the widget. */
+  cancelled?: boolean;
 }
 
 /**
@@ -86,6 +88,8 @@ export function MCPAppsRenderer({
   onDisplayModeChange,
   noWrapper,
   customProps,
+  cancelled,
+  serverBaseUrl: serverBaseUrlProp,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -108,6 +112,8 @@ export function MCPAppsRenderer({
   const [isReady, setIsReady] = useState(false);
   const [showSpinner, setShowSpinner] = useState(true);
   const hasLoadedOnceRef = useRef(false);
+  const toolInputSentRef = useRef<string | null>(null);
+  const lastSentPropsRef = useRef<string | null>(null);
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
   const [prefersBorder, setPrefersBorder] = useState<boolean>(true);
@@ -162,14 +168,30 @@ export function MCPAppsRenderer({
         const resourceResult = await readResource(resourceUri);
         const resourceContent = resourceResult?.contents?.[0];
         const resourceMimeType = resourceContent?.mimeType;
-        const resourceMeta = resourceContent?._meta;
+        const contentMeta = resourceContent?._meta;
 
-        // Extract MCP Apps metadata from resource
-        const mcpAppsCsp = resourceMeta?.ui?.csp;
-        const mcpAppsPermissions = resourceMeta?.ui?.permissions;
+        // Per SEP-1865: _meta.ui may appear on both resources/list entries
+        // and resources/read content items, with content-item taking precedence.
+        const listingResource = server?.resources?.find(
+          (r) => r.uri === resourceUri
+        );
+        const listingUiMeta = (listingResource as any)?._meta?.ui;
+        const contentUiMeta = contentMeta?.ui;
+        const mergedUiMeta =
+          listingUiMeta || contentUiMeta
+            ? { ...listingUiMeta, ...contentUiMeta }
+            : undefined;
+        const resourceMeta = {
+          ...contentMeta,
+          ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
+        };
+
+        // Extract MCP Apps metadata from merged resource metadata
+        const mcpAppsCsp = mergedUiMeta?.csp;
+        const mcpAppsPermissions = mergedUiMeta?.permissions;
         // Check both MCP Apps and Apps SDK (ChatGPT) metadata paths
         const mcpAppsPrefersBorder =
-          resourceMeta?.ui?.prefersBorder ?? // MCP Apps protocol
+          mergedUiMeta?.prefersBorder ?? // MCP Apps protocol
           resourceMeta?.["openai/widgetPrefersBorder"] ?? // Apps SDK protocol
           true; // Default to true if not specified
 
@@ -184,13 +206,26 @@ export function MCPAppsRenderer({
         let devServerBaseUrl: string | undefined;
 
         if (computedUseDevMode && slugifiedName) {
-          // Extract server base URL from serverId (may include /mcp suffix)
-          const serverBaseUrl = serverId.replace(/\/mcp$/, "");
-          devServerBaseUrl = new URL(serverBaseUrl).origin;
-
-          // Normalize 0.0.0.0 to localhost for browser compatibility
-          devServerBaseUrl = devServerBaseUrl.replace("0.0.0.0", "localhost");
-          devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
+          // Prefer serverBaseUrl prop (e.g. from Mango sandbox); else derive from serverId only if it's a valid URL
+          let base: string | undefined;
+          if (typeof serverBaseUrlProp === "string" && serverBaseUrlProp) {
+            try {
+              base = new URL(serverBaseUrlProp).origin;
+            } catch {
+              base = undefined;
+            }
+          }
+          if (!base && /^https?:\/\//.test(serverId)) {
+            try {
+              base = new URL(serverId.replace(/\/mcp$/, "")).origin;
+            } catch {
+              base = undefined;
+            }
+          }
+          if (base) {
+            devServerBaseUrl = base.replace("0.0.0.0", "localhost");
+            devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
+          }
         }
 
         // Store widget data including dev URLs
@@ -556,8 +591,24 @@ export function MCPAppsRenderer({
       isActive = false;
       window.removeEventListener("message", handleMessage);
       if (bridge) {
-        bridge.teardownResource({}).catch(() => {});
-        bridge.close().catch(() => {});
+        const TEARDOWN_TIMEOUT = 2000;
+        (async () => {
+          try {
+            await Promise.race([
+              bridge.teardownResource({}),
+              new Promise((_, reject) =>
+                setTimeout(
+                  () => reject(new Error("teardown timeout")),
+                  TEARDOWN_TIMEOUT
+                )
+              ),
+            ]);
+          } catch {
+            // Timeout or error — proceed with close
+          } finally {
+            bridge.close().catch(() => {});
+          }
+        })();
       }
       bridgeRef.current = null;
       removeWidget(toolCallId);
@@ -595,31 +646,56 @@ export function MCPAppsRenderer({
     bridge.sendToolInputPartial({ arguments: partialToolInput });
   }, [initCount, partialToolInput]);
 
-  // Send tool input when ready
-  // Also resend when toolCallId changes (indicates re-execution)
-  // When partialToolInput is also available (streaming just finished), delay
-  // sending the complete input by one frame so the widget has time to process
-  // the partial first and show the streaming state
+  // Send tool input when ready. Re-send when toolCallId changes (re-execution)
+  // or when customProps changes (user selects/creates preset with different props).
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || initCount === 0) return;
 
-    // Merge customProps with toolInput
+    // Parse JSON strings in customProps so arrays/objects reach the widget as real values
+    const parsedCustomProps: Record<string, unknown> = {};
+    if (customProps) {
+      for (const [k, v] of Object.entries(customProps)) {
+        if (
+          typeof v === "string" &&
+          (v.trim().startsWith("[") || v.trim().startsWith("{"))
+        ) {
+          try {
+            parsedCustomProps[k] = JSON.parse(v);
+          } catch {
+            parsedCustomProps[k] = v;
+          }
+        } else {
+          parsedCustomProps[k] = v;
+        }
+      }
+    }
+
     const mergedArgs = {
       ...toolInput,
-      ...customProps,
+      ...parsedCustomProps,
     };
+    const propsKey = JSON.stringify(mergedArgs);
+
+    // Skip only if we've already sent this exact payload for this toolCallId
+    if (
+      toolInputSentRef.current === toolCallId &&
+      lastSentPropsRef.current === propsKey
+    ) {
+      return;
+    }
 
     if (partialToolInput) {
-      // Partials are also present - the partial effect (above) will fire first.
-      // Delay the complete input by one frame so the widget can render the
-      // streaming state before transitioning to the final state.
       const frame = requestAnimationFrame(() => {
         bridge.sendToolInput({ arguments: mergedArgs });
+        toolInputSentRef.current = toolCallId;
+        lastSentPropsRef.current = propsKey;
       });
       return () => cancelAnimationFrame(frame);
     } else {
       bridge.sendToolInput({ arguments: mergedArgs });
+      toolInputSentRef.current = toolCallId;
+      lastSentPropsRef.current = propsKey;
     }
   }, [initCount, toolInput, customProps, toolCallId, partialToolInput]);
 
@@ -635,6 +711,13 @@ export function MCPAppsRenderer({
     }
     // Note: When toolOutput is null, widget stays in pending state (isPending=true)
   }, [initCount, toolOutput, toolCallId]);
+
+  // Send tool-cancelled notification when user cancels from the host UI
+  useEffect(() => {
+    const bridge = bridgeRef.current;
+    if (!bridge || initCount === 0 || !cancelled) return;
+    bridge.sendToolCancelled({ reason: "Cancelled by user" });
+  }, [cancelled, initCount]);
 
   // Handle CSP violations
   const handleSandboxMessage = useCallback(

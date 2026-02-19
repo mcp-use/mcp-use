@@ -14,7 +14,7 @@ User prompt → LLM calls tool → Server handler runs → Returns widget() resp
 1. LLM calls the tool with user input
 2. Server handler fetches data, processes it
 3. Handler returns `widget({ props, output })`
-   - `props` → sent to widget UI via `useWidget().props` (LLM never sees this)
+   - `props` → auto-injected into the widget component's function signature (LLM never sees this)
    - `output` → response helper result the LLM reads for conversation
 
 ## Server Handler
@@ -64,7 +64,7 @@ server.tool(
 
 | Field | Type | Description |
 |---|---|---|
-| `props` | `Record<string, any>` | Data sent to widget via `useWidget().props`. Hidden from LLM. |
+| `props` | `Record<string, any>` | Data auto-injected into the widget component's props signature. Hidden from LLM. Access via `useWidget()` for backward compat. |
 | `output` | `CallToolResult` | Response helper (`text()`, `object()`, etc.) the LLM sees. |
 | `message` | `string` (optional) | Override text message for the LLM. |
 
@@ -100,8 +100,9 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false,  // Custom tool in index.ts handles registration
 };
 
-export default function RestaurantList() {
-  const { props, isPending, callTool } = useWidget();
+// cuisine, location, restaurants auto-injected from widgetMetadata.props
+const RestaurantList = ({ cuisine, location, restaurants }) => {
+  const { isPending, callTool } = useWidget();
 
   if (isPending) {
     return (
@@ -127,9 +128,9 @@ export default function RestaurantList() {
   return (
     <McpUseProvider autoSize>
       <div style={{ padding: 16 }}>
-        <h2>{props.cuisine} restaurants near {props.location}</h2>
+        <h2>{cuisine} restaurants near {location}</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {props.restaurants.map((r) => (
+          {restaurants.map((r) => (
             <div key={r.id} style={{
               padding: 12, borderRadius: 8, border: "1px solid #e5e7eb"
             }}>
@@ -144,7 +145,9 @@ export default function RestaurantList() {
       </div>
     </McpUseProvider>
   );
-}
+};
+
+export default RestaurantList;
 ```
 
 ## Required Widget Exports

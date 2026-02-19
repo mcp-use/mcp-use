@@ -155,6 +155,29 @@ export type UseMcpOptions = {
     features: string,
     window: globalThis.Window | null
   ) => void;
+  /**
+   * Additional client options passed to the underlying MCP SDK Client.
+   * Use this to advertise custom capabilities (e.g., MCP Apps extension).
+   *
+   * @example
+   * ```typescript
+   * useMcp({
+   *   url: '...',
+   *   clientOptions: {
+   *     capabilities: {
+   *       extensions: {
+   *         "io.modelcontextprotocol/ui": {
+   *           mimeTypes: ["text/html;profile=mcp-app"],
+   *         },
+   *       },
+   *     },
+   *   },
+   * })
+   * ```
+   */
+  clientOptions?: {
+    capabilities?: Record<string, unknown>;
+  };
   /** Connection timeout in milliseconds for establishing initial connection (default: 30000 / 30 seconds) */
   timeout?: number;
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */

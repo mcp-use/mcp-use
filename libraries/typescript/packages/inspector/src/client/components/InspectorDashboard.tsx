@@ -272,6 +272,15 @@ export function InspectorDashboard() {
       name: normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
+      clientOptions: {
+        capabilities: {
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: ["text/html;profile=mcp-app"],
+            },
+          },
+        },
+      },
       ...(proxyConfig
         ? {
             proxyConfig,
