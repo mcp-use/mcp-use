@@ -15,6 +15,7 @@ import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createSkillsCommand } from "./commands/skills.js";
+import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 
 const program = new Command();
 
@@ -1964,5 +1965,10 @@ program
       (globalThis as any).__mcpUseHmrMode = false;
     }
   });
+
+program.hook("preAction", async (_thisCommand, actionCommand) => {
+  const projectPath = actionCommand.opts().path as string | undefined;
+  await notifyIfUpdateAvailable(projectPath);
+});
 
 program.parse();

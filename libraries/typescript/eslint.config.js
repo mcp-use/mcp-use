@@ -7,6 +7,7 @@ import prettierConfig from "eslint-config-prettier";
 export default [
   {
     ignores: [
+      "**/.mcp-use/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/build/**",
