@@ -199,6 +199,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",
+    "node-mocks-http": "^1.17.2",
     "@mcp-ui/server": "^5.16.3",
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",

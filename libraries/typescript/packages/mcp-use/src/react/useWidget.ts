@@ -94,11 +94,11 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  * ```
  */
 export function useWidget<
-  TProps extends UnknownObject = UnknownObject,
-  TOutput extends UnknownObject = UnknownObject,
-  TMetadata extends UnknownObject = UnknownObject,
-  TState extends UnknownObject = UnknownObject,
-  TToolInput extends UnknownObject = UnknownObject,
+  TProps = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TState = UnknownObject,
+  TToolInput = UnknownObject,
 >(
   defaultProps?: TProps
 ): UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput> {
@@ -523,7 +523,9 @@ export function useWidget<
       if (provider === "mcp-apps") {
         const currentState = localWidgetState;
         const newState =
-          typeof state === "function" ? state(currentState) : state;
+          typeof state === "function"
+            ? (state as (prevState: TState | null) => TState)(currentState)
+            : state;
         setLocalWidgetState(newState);
 
         const bridge = getMcpAppsBridge();
@@ -547,7 +549,9 @@ export function useWidget<
       const currentState =
         widgetState !== undefined ? widgetState : localWidgetState;
       const newState =
-        typeof state === "function" ? state(currentState) : state;
+        typeof state === "function"
+          ? (state as (prevState: TState | null) => TState)(currentState)
+          : state;
 
       setLocalWidgetState(newState);
       return window.openai.setWidgetState(newState);
@@ -663,7 +667,7 @@ export function useWidget<
  * const props = useWidgetProps<{ city: string; temperature: number }>();
  * ```
  */
-export function useWidgetProps<TProps extends UnknownObject = UnknownObject>(
+export function useWidgetProps<TProps = UnknownObject>(
   defaultProps?: TProps
 ): Partial<TProps> {
   const { props } = useWidget<TProps>(defaultProps);
@@ -689,7 +693,7 @@ export function useWidgetTheme(): Theme {
  * const [favorites, setFavorites] = useWidgetState<string[]>([]);
  * ```
  */
-export function useWidgetState<TState extends UnknownObject>(
+export function useWidgetState<TState>(
   defaultState?: TState
 ): readonly [
   TState | null,

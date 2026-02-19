@@ -27,11 +27,11 @@ export interface WidgetMetadata {
    *
    * @example z.object({ city: z.string(), temperature: z.number() })
    */
-  props?: z.ZodObject<any> | InputDefinition[];
+  props?: z.ZodTypeAny | InputDefinition[];
   /** @deprecated Use `props` instead - Zod schema for widget input validation */
-  inputs?: z.ZodObject<any> | InputDefinition[];
+  inputs?: z.ZodTypeAny | InputDefinition[];
   /** @deprecated Use `props` instead - Alias for props to align with tool naming convention */
-  schema?: z.ZodObject<any> | InputDefinition[];
+  schema?: z.ZodTypeAny | InputDefinition[];
   /**
    * For auto-registered widgets: function or helper that generates the tool output (what the model sees).
    * If not provided, defaults to a summary message.

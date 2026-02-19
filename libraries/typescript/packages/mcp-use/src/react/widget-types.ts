@@ -147,10 +147,10 @@ declare global {
  * Shared fields for the useWidget hook result (everything except props and isPending)
  */
 interface UseWidgetResultBase<
-  TOutput extends UnknownObject = UnknownObject,
-  TMetadata extends UnknownObject = UnknownObject,
-  TState extends UnknownObject = UnknownObject,
-  TToolInput extends UnknownObject = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TState = UnknownObject,
+  TToolInput = UnknownObject,
 > {
   /** Original tool input arguments */
   toolInput: TToolInput;
@@ -221,11 +221,11 @@ interface UseWidgetResultBase<
  * ```
  */
 export type UseWidgetResult<
-  TProps extends UnknownObject = UnknownObject,
-  TOutput extends UnknownObject = UnknownObject,
-  TMetadata extends UnknownObject = UnknownObject,
-  TState extends UnknownObject = UnknownObject,
-  TToolInput extends UnknownObject = UnknownObject,
+  TProps = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TState = UnknownObject,
+  TToolInput = UnknownObject,
 > = UseWidgetResultBase<TOutput, TMetadata, TState, TToolInput> &
   (
     | {

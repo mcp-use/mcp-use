@@ -194,6 +194,7 @@ export const MessageList = memo(
                                     ? "call"
                                     : "result"
                             }
+                            partialArgs={part.toolInvocation.partialArgs}
                           />
                           {/* Render tool result / widget */}
                           {/* Render immediately for widget tools or streaming tools, even if result is null */}

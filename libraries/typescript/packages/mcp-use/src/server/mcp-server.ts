@@ -1163,7 +1163,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
-      let inputSchema: z.ZodObject<any> | Record<string, z.ZodSchema>;
+      let inputSchema: z.ZodTypeAny | Record<string, z.ZodSchema>;
       if (config.schema) {
         // Pass the Zod schema directly - it will be used for validation
         inputSchema = config.schema;

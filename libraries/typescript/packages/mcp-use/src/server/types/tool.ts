@@ -196,14 +196,14 @@ export interface ToolDefinition<
    *
    * @example z.object({ query: z.string().describe("Search term"), limit: z.number().optional().describe("Max results") })
    */
-  schema?: z.ZodObject<any>;
+  schema?: z.ZodTypeAny;
   /**
    * Zod schema for structured output. Enables type inference in useCallTool().
    * Types are generated to .mcp-use/tool-registry.d.ts when using mcp-use dev.
    *
    * @example z.object({ fruit: z.string(), color: z.string(), facts: z.array(z.string()) })
    */
-  outputSchema?: z.ZodObject<any>;
+  outputSchema?: z.ZodTypeAny;
   /**
    * Async callback function that executes the tool.
    * Receives tool parameters and an enhanced context with sampling, auth, and request info.

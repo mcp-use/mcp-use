@@ -652,6 +652,49 @@ function MyWidget() {
 }
 ```
 
+### Downloads & External Links
+
+Widgets run inside sandboxed iframes, which block two common patterns:
+
+- **`Blob` + `URL.createObjectURL()`** — object URLs cannot cross the iframe boundary
+- **`element.requestFullscreen()`** — the browser Fullscreen API is blocked in sandboxed iframes (use `requestDisplayMode("fullscreen")` instead)
+
+Use `openExternal` from `useWidget()` for all outbound navigation. For file downloads, serve the file from the MCP server and open the URL externally:
+
+<Warning>
+Never use `new Blob(...)` + `URL.createObjectURL()` or `window.open()` inside a widget. Both are blocked by the iframe sandbox.
+</Warning>
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+function DownloadButton({ svgData }: { svgData: string }) {
+  const { mcp_url, openExternal } = useWidget();
+
+  const handleDownload = async () => {
+    // POST the content to a server-side endpoint
+    const res = await fetch(`${mcp_url}/api/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: svgData, filename: "export.svg" }),
+    });
+    const { id } = await res.json();
+
+    // Open the resulting URL — host handles the actual download
+    openExternal(`${mcp_url}/api/download/${id}`);
+  };
+
+  return <button onClick={handleDownload}>Download SVG</button>;
+}
+```
+
+Your MCP server needs to expose matching endpoints:
+
+```typescript
+// POST /api/download — store content, return an ID
+// GET  /api/download/:id — serve with Content-Disposition: attachment
+```
+
 ## Custom Tools with Widgets
 
 You can create custom tools that return widgets instead of relying solely on automatic widget registration. This is useful when you need to:

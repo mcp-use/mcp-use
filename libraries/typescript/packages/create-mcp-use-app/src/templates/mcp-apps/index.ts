@@ -89,7 +89,9 @@ server.tool(
     }),
   },
   async ({ fruit }) => {
-    const found = fruits.find((f) => f.fruit === fruit);
+    const found = fruits.find(
+      (f) => f.fruit?.toLowerCase() === fruit?.toLowerCase()
+    );
     return object({
       fruit: found?.fruit ?? fruit,
       color: found?.color ?? "unknown",

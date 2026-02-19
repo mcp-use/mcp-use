@@ -54,6 +54,8 @@ const ProductSearchResult: React.FC = () => {
     FavoritesState
   >();
 
+  console.log("props", props);
+
   const {
     callTool: getFruitDetails,
     data: fruitDetails,

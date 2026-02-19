@@ -942,8 +942,15 @@ program
       }
 
       // Then run tsc (now schemas are available for import)
+      // Use the locally installed typescript binary directly rather than npx to
+      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package when
+      // typescript is not found in node_modules.
       console.log(chalk.gray("Building TypeScript..."));
-      await runCommand("npx", ["tsc"], projectPath);
+      await runCommand(
+        "node",
+        [path.join(projectPath, "node_modules", "typescript", "bin", "tsc")],
+        projectPath
+      ).promise;
       console.log(chalk.green("✓ TypeScript build complete!"));
 
       // Determine where the entry point was compiled to

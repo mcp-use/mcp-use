@@ -890,17 +890,6 @@ export function ToolResultDisplay({
                     );
                   }
 
-                  // Widget props come from structuredContent (per SEP-1865)
-                  const widgetProps = memoizedResult?.structuredContent || null;
-
-                  // Merge widget props with custom props (from debug controls) and tool args
-                  // Priority: activeProps > widgetProps > memoizedArgs
-                  const finalToolInput = {
-                    ...(memoizedArgs || {}),
-                    ...(widgetProps || {}),
-                    ...(activeProps || {}),
-                  };
-
                   return (
                     <div className="flex-1 relative">
                       {/* Floating controls in top-right */}
@@ -924,7 +913,7 @@ export function ToolResultDisplay({
                         serverId={serverId}
                         toolCallId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
-                        toolInput={finalToolInput}
+                        toolInput={memoizedArgs}
                         toolOutput={memoizedResult}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
