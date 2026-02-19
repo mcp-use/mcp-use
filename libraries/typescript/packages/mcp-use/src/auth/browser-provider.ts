@@ -1,10 +1,16 @@
 // browser-provider.ts
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import {
+  discoverOAuthProtectedResourceMetadata,
+  discoverAuthorizationServerMetadata,
+  refreshAuthorization,
+} from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { AuthorizationServerMetadata } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary
@@ -37,7 +43,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private oauthProxyUrl?: string;
   private connectionUrl?: string; // MCP proxy URL that client connected to
   private originalFetch?: typeof fetch;
-  private _cachedTokenEndpoint: string | null = null;
+  private _cachedAuthServerUrl: string | null = null;
+  private _cachedMetadata: AuthorizationServerMetadata | null = null;
   private _refreshPromise: Promise<OAuthTokens | null> | null = null;
   readonly onPopupWindow:
     | ((
@@ -431,43 +438,28 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
   private async _refresh(tokens: OAuthTokens): Promise<OAuthTokens | null> {
     try {
-      if (!this._cachedTokenEndpoint) {
-        const res = await fetch(
-          `${this.serverUrl}/.well-known/oauth-protected-resource`
-        );
-        if (!res.ok) return null;
-        const meta = await res.json();
-        const authServer = meta.authorization_servers?.[0];
-        if (!authServer) return null;
-        const authRes = await fetch(
-          `${authServer}/.well-known/oauth-authorization-server`
-        );
-        if (!authRes.ok) return null;
-        this._cachedTokenEndpoint = (await authRes.json()).token_endpoint;
+      if (!this._cachedAuthServerUrl || !this._cachedMetadata) {
+        const resourceMetadata =
+          await discoverOAuthProtectedResourceMetadata(this.serverUrl);
+        const authServerUrl = resourceMetadata.authorization_servers?.[0];
+        if (!authServerUrl) return null;
+        const metadata =
+          await discoverAuthorizationServerMetadata(authServerUrl);
+        if (!metadata) return null;
+        this._cachedAuthServerUrl = authServerUrl;
+        this._cachedMetadata = metadata as AuthorizationServerMetadata;
       }
-      if (!this._cachedTokenEndpoint) return null;
 
       const clientInfo = await this.clientInformation();
-      const body = new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: tokens.refresh_token!,
-      });
-      if (clientInfo?.client_id) body.set("client_id", clientInfo.client_id);
+      if (!clientInfo) return null;
 
-      const resp = await fetch(this._cachedTokenEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body,
+      const newTokens = await refreshAuthorization(this._cachedAuthServerUrl, {
+        metadata: this._cachedMetadata,
+        clientInformation: clientInfo,
+        refreshToken: tokens.refresh_token!,
       });
-      if (!resp.ok) return null;
-
-      const newTokens = await resp.json();
-      const merged = { refresh_token: tokens.refresh_token, ...newTokens };
-      await this.saveTokens(merged);
-      return merged;
+      await this.saveTokens(newTokens);
+      return newTokens;
     } catch {
       return null;
     }
