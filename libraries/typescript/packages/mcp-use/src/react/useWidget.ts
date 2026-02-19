@@ -61,27 +61,60 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
 }
 
 /**
- * React hook for building MCP Apps and ChatGPT Apps SDK widgets
+ * React hook for building MCP Apps and ChatGPT Apps SDK widgets.
  *
- * Per SEP-1865, data flows through standard MCP channels:
- * - `props`     → from `structuredContent` in the tool result (LLM does NOT see this)
- * - `toolInput` → from tool call arguments (what the model sent)
- * - `output`    → same as props (the structuredContent)
+ * Abstracts over three runtime providers, selected automatically:
  *
- * The server decides what the LLM sees via `content` (text) and what the widget
- * sees via `structuredContent` (props). This enables the use case where the tool
- * body computes widget data that shouldn't pollute the model's context.
+ * 1. **ChatGPT Apps SDK** (`window.openai`) — active when the widget is loaded
+ *    inside ChatGPT. Data arrives via `window.openai.toolInput`,
+ *    `window.openai.toolOutput`, etc. and through the `openai:set_globals`
+ *    custom event.
+ *
+ * 2. **MCP Apps bridge** (SEP-1865 `postMessage`) — active when the widget is
+ *    loaded in any SEP-1865-compliant host (e.g. Claude, Cursor) that is not
+ *    ChatGPT. The hook connects via `ui/initialize` and listens for
+ *    `ui/notifications/tool-input`, `ui/notifications/tool-input-partial`,
+ *    `ui/notifications/tool-result`, and `ui/notifications/host-context-changed`.
+ *
+ * 3. **URL params fallback** (`mcpUseParams`) — used during local development
+ *    (`mcp-use dev` inspector) where `toolInput` and `toolOutput` are injected
+ *    via the query string. No live streaming in this mode.
+ *
+ * ### Data flow (per SEP-1865)
+ *
+ * ```
+ * LLM calls tool → host sends tool-input → widget receives toolInput
+ *                → host executes tool  → host sends tool-result
+ *                                       → widget receives props (structuredContent)
+ * ```
+ *
+ * The server controls what the **LLM** sees (`content` text array) separately
+ * from what the **widget** sees (`structuredContent` / `props`). This lets the
+ * tool return rich structured data for rendering without polluting the model's
+ * context.
+ *
+ * ### Key fields
+ *
+ * - `isPending` — `true` until the tool result arrives; `props` is `Partial<TProps>` while pending.
+ * - `props` — `structuredContent` from the tool result (widget-only, hidden from model).
+ * - `toolInput` — the arguments the model passed to the tool.
+ * - `partialToolInput` / `isStreaming` — real-time argument streaming (MCP Apps only).
+ * - `theme`, `displayMode`, `locale`, `timeZone`, `safeArea`, `maxHeight` — host context.
+ * - `callTool`, `sendFollowUpMessage`, `openExternal`, `requestDisplayMode` — host actions.
+ * - `state` / `setState` — persisted state visible to the model on future turns.
  *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
- *   const { props, toolInput, theme } = useWidget<
+ *   const { props, isPending, toolInput, theme } = useWidget<
  *     { city: string; temperature: number },  // Props (from structuredContent)
+ *     {},                                      // State
  *     { city: string; temperature: number },  // Output type
  *     {},                                      // Metadata
- *     {},                                      // State
  *     { city: string }                         // ToolInput (tool call args)
  *   >();
+ *
+ *   if (isPending) return <p>Loading…</p>;
  *
  *   return (
  *     <div data-theme={theme}>
@@ -95,13 +128,13 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  */
 export function useWidget<
   TProps = UnknownObject,
+  TState = UnknownObject,
   TOutput = UnknownObject,
   TMetadata = UnknownObject,
-  TState = UnknownObject,
   TToolInput = UnknownObject,
 >(
   defaultProps?: TProps
-): UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput> {
+): UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput> {
   // Check if window.openai is available - use state to allow re-checking after async injection
   const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
     () => typeof window !== "undefined" && !!window.openai
@@ -657,7 +690,7 @@ export function useWidget<
     // Streaming
     partialToolInput,
     isStreaming,
-  } as UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput>;
+  } as UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>;
 }
 
 /**
@@ -699,12 +732,7 @@ export function useWidgetState<TState>(
   TState | null,
   (state: TState | ((prev: TState | null) => TState)) => Promise<void>,
 ] {
-  const { state, setState } = useWidget<
-    UnknownObject,
-    UnknownObject,
-    UnknownObject,
-    TState
-  >();
+  const { state, setState } = useWidget<UnknownObject, TState>();
 
   // Initialize with default if provided and state is null
   useEffect(() => {

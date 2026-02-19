@@ -47,12 +47,7 @@ const ProductSearchResult: React.FC = () => {
     locale,
     state,
     setState,
-  } = useWidget<
-    ProductSearchResultProps,
-    Record<string, unknown>,
-    Record<string, unknown>,
-    FavoritesState
-  >();
+  } = useWidget<ProductSearchResultProps, FavoritesState>();
 
   console.log("props", props);
 

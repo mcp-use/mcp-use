@@ -2,7 +2,6 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { Hono } from "hono";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutes } from "./shared-static.js";
-import { checkClientFiles, getClientDistPath } from "./file-utils.js";
 
 /**
  * Mount the MCP Inspector UI at a specified path on an Express or Hono app
@@ -31,19 +30,6 @@ export function mountInspector(
     sandboxOrigin?: string | null;
   }
 ): void {
-  // Find the built client files
-  const clientDistPath = getClientDistPath();
-
-  if (!checkClientFiles(clientDistPath)) {
-    console.warn(
-      `⚠️  MCP Inspector client files not found at ${clientDistPath}`
-    );
-    console.warn(
-      `   Run 'yarn build' in the inspector package to build the UI`
-    );
-  }
-
-  // Build runtime config to inject into the HTML
   const runtimeConfig = {
     devMode: config?.devMode,
     sandboxOrigin: config?.sandboxOrigin,
@@ -52,7 +38,7 @@ export function mountInspector(
   // If it's already a Hono app, register routes directly
   if (app instanceof Hono) {
     registerInspectorRoutes(app, config);
-    registerStaticRoutes(app, clientDistPath, runtimeConfig);
+    registerStaticRoutes(app, undefined, runtimeConfig);
     return;
   }
 
@@ -61,7 +47,7 @@ export function mountInspector(
 
   // Register routes on Hono app
   registerInspectorRoutes(honoApp, config);
-  registerStaticRoutes(honoApp, clientDistPath, runtimeConfig);
+  registerStaticRoutes(honoApp, undefined, runtimeConfig);
 
   // Convert all Hono routes to Express middleware
   app.use((req: Request, res: Response, next: NextFunction) => {

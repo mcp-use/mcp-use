@@ -1,11 +1,23 @@
 import type { Hono } from "hono";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import {
-  checkClientFiles,
-  getClientDistPath,
-  getContentType,
-} from "./file-utils.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Read version once at module load — dist/server/../../package.json resolves to
+// the inspector package root.
+const { version: INSPECTOR_VERSION } = JSON.parse(
+  readFileSync(join(__dirname, "../../package.json"), "utf-8")
+) as { version: string };
+
+// Allow overriding the CDN base for local development/testing:
+//   INSPECTOR_CDN_BASE=http://localhost:4000 node dist/server/server.js
+const CDN_BASE =
+  process.env.INSPECTOR_CDN_BASE ?? "https://inspector-cdn.mcp-use.com";
+const CDN_JS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.js`;
+const CDN_CSS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.css`;
 
 /**
  * Runtime configuration injected into the inspector HTML at serve time.
@@ -17,181 +29,135 @@ interface RuntimeConfig {
   sandboxOrigin?: string | null;
 }
 
-/**
- * Inject runtime configuration scripts into the inspector HTML.
- * These globals are read by client-side components like SandboxedIframe.tsx.
- */
-function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
-  if (!config) return html;
-
+function buildRuntimeScripts(config?: RuntimeConfig): string {
+  if (!config) return "";
   const scripts: string[] = [];
-
   if (config.devMode) {
     scripts.push(`<script>window.__MCP_DEV_MODE__ = true;</script>`);
   }
-
   if (config.sandboxOrigin) {
     scripts.push(
       `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
     );
   }
-
-  if (scripts.length === 0) return html;
-
-  // Inject before closing </head> tag
-  const injection = scripts.join("\n    ");
-  return html.replace("</head>", `    ${injection}\n  </head>`);
+  return scripts.join("\n    ");
 }
 
 /**
- * Register routes that serve the built inspector client, handle SPA entry routing, and provide a fallback when client files are missing.
+ * Generate the minimal HTML shell that loads the inspector from CDN.
  *
- * This registers asset serving under the inspector path, redirects the root path to `/inspector` while preserving query parameters, serves the SPA entry (`index.html`) for inspector routes, and installs a final catch-all that serves the SPA or a build-missing fallback page. If `clientDistPath` is not provided, the built client path is resolved automatically.
+ * The JS runs in the context of the serving origin so all /inspector/api/*
+ * calls remain same-origin regardless of where the CDN script is hosted.
+ */
+function generateShellHtml(config?: RuntimeConfig): string {
+  const runtimeScripts = buildRuntimeScripts(config);
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="${CDN_BASE}/favicon-black.svg"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="${CDN_BASE}/favicon-white.svg"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="${CDN_BASE}/favicon-black.svg"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="${CDN_CSS_URL}" />
+    <title>Inspector | mcp-use</title>
+    ${runtimeScripts}
+  </head>
+  <body>
+    <script>
+      if (typeof window !== "undefined" && typeof window.process === "undefined") {
+        window.process = {
+          env: {},
+          platform: "browser",
+          browser: true,
+          version: "v18.0.0",
+          versions: { node: "18.0.0" },
+          cwd: () => "/",
+          nextTick: (fn, ...args) => queueMicrotask(() => fn(...args)),
+        };
+      }
+    </script>
+    <div id="root"></div>
+    <script type="module" src="${CDN_JS_URL}"></script>
+  </body>
+</html>`;
+}
+
+/**
+ * Register routes that serve the inspector HTML shell and handle SPA routing.
  *
- * @param clientDistPath - Optional path to the built inspector client directory; when omitted, the implementation resolves the default distribution path
- * @param runtimeConfig - Optional runtime configuration to inject into the HTML
+ * The heavy client bundle is loaded from the CDN; no local static files are
+ * read or served. API routes are registered separately by registerInspectorRoutes
+ * and remain same-origin.
+ *
+ * The optional `clientDistPath` parameter is accepted for API compatibility but
+ * is no longer used.
  */
 export function registerStaticRoutes(
   app: Hono,
-  clientDistPath?: string,
+  _clientDistPath?: string,
   runtimeConfig?: RuntimeConfig
 ) {
-  const distPath = clientDistPath || getClientDistPath();
+  const serveShell = (c: any) => c.html(generateShellHtml(runtimeConfig));
 
-  if (!checkClientFiles(distPath)) {
-    console.warn(`⚠️  MCP Inspector client files not found at ${distPath}`);
-    console.warn(
-      `   Run 'yarn build' in the inspector package to build the UI`
-    );
-
-    // Fallback for when client is not built
-    app.get("*", (c) => {
-      return c.html(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>MCP Inspector</title>
-        </head>
-        <body>
-          <h1>MCP Inspector</h1>
-          <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-        </body>
-      </html>
-    `);
-    });
-    return;
-  }
-
-  // Serve static assets from /inspector/assets/* (matching Vite's base path)
-  app.get("/inspector/assets/*", (c) => {
-    const path = c.req.path.replace("/inspector/assets/", "assets/");
-    const fullPath = join(distPath, path);
-    if (existsSync(fullPath)) {
-      const content = readFileSync(fullPath);
-      // Set appropriate content type based on file extension
-      const contentType = getContentType(fullPath);
-      c.header("Content-Type", contentType);
-      return c.body(content);
-    }
-    return c.notFound();
-  });
-
-  // Redirect root path to /inspector (preserving query parameters)
+  // Redirect root to /inspector preserving query parameters
   app.get("/", (c) => {
     const url = new URL(c.req.url);
-    const queryString = url.search; // includes the '?' if there are params
-    return c.redirect(`/inspector${queryString}`);
+    return c.redirect(`/inspector${url.search}`);
   });
 
-  // Serve the main HTML file for /inspector and all other routes (SPA routing)
-  // Need to match both /inspector and /inspector/* for React Router to work
-  app.get("/inspector", (c) => {
-    const indexPath = join(distPath, "index.html");
-    if (existsSync(indexPath)) {
-      const content = injectRuntimeConfig(
-        readFileSync(indexPath, "utf-8"),
-        runtimeConfig
-      );
-      return c.html(content);
-    }
-    return c.html(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>MCP Inspector</title>
-        </head>
-        <body>
-          <h1>MCP Inspector</h1>
-          <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-        </body>
-      </html>
-    `);
-  });
+  // Serve the shell for /inspector and all sub-routes (React Router handles client-side routing)
+  app.get("/inspector", serveShell);
+  app.get("/inspector/*", serveShell);
+  // POST needed for OAuth flows
+  app.post("/inspector/*", serveShell);
 
-  // Catch-all for any /inspector/* routes (for React Router SPA routing)
-  // Handle both GET and POST since some OAuth flows use POST
-  const handleInspectorRoute = (c: any) => {
-    const indexPath = join(distPath, "index.html");
-    if (existsSync(indexPath)) {
-      const content = injectRuntimeConfig(
-        readFileSync(indexPath, "utf-8"),
-        runtimeConfig
-      );
-      return c.html(content);
-    }
-    return c.notFound();
-  };
-
-  app.get("/inspector/*", handleInspectorRoute);
-  app.post("/inspector/*", handleInspectorRoute);
-
-  // Final catch-all for root and other routes
-  app.get("*", (c) => {
-    const indexPath = join(distPath, "index.html");
-    if (existsSync(indexPath)) {
-      const content = injectRuntimeConfig(
-        readFileSync(indexPath, "utf-8"),
-        runtimeConfig
-      );
-      return c.html(content);
-    }
-    return c.html(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>MCP Inspector</title>
-        </head>
-        <body>
-          <h1>MCP Inspector</h1>
-          <p>Client files not found. Please run 'yarn build' to build the UI.</p>
-        </body>
-      </html>
-    `);
-  });
+  // Final catch-all
+  app.get("*", serveShell);
 }
 
 /**
- * Register static routes with development mode proxy support
+ * Register static routes with development mode proxy support.
+ *
+ * When VITE_DEV=true, proxies all non-API requests to the Vite dev server
+ * at localhost:3000 for HMR during inspector development. Otherwise falls
+ * back to the CDN-based shell via registerStaticRoutes.
  */
 export function registerStaticRoutesWithDevProxy(
   app: Hono,
-  clientDistPath?: string
+  _clientDistPath?: string
 ) {
-  const distPath = clientDistPath || getClientDistPath();
   const isDev =
     process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
   if (isDev) {
-    // Development mode: proxy client requests to Vite dev server
     console.warn(
       "🔧 Development mode: Proxying client requests to Vite dev server"
     );
 
-    // Proxy all non-API requests to Vite dev server
     app.get("*", async (c) => {
       const path = c.req.path;
 
-      // Skip API routes - both /api/ and /inspector/api/
       if (
         path.startsWith("/api/") ||
         path.startsWith("/inspector/api/") ||
@@ -201,17 +167,15 @@ export function registerStaticRoutesWithDevProxy(
       }
 
       try {
-        // Vite dev server should be running on port 3000
         const viteUrl = `http://localhost:3000${path}`;
         const response = await fetch(viteUrl, {
-          signal: AbortSignal.timeout(1000), // 1 second timeout
+          signal: AbortSignal.timeout(1000),
         });
 
         if (response.ok) {
           const content = await response.text();
           const contentType =
             response.headers.get("content-type") || "text/html";
-
           c.header("Content-Type", contentType);
           return c.html(content);
         }
@@ -219,23 +183,19 @@ export function registerStaticRoutesWithDevProxy(
         console.warn(`Failed to proxy to Vite dev server: ${error}`);
       }
 
-      // Fallback HTML if Vite dev server is not running
       return c.html(`
         <!DOCTYPE html>
         <html>
-          <head>
-            <title>MCP Inspector - Development</title>
-          </head>
+          <head><title>MCP Inspector - Development</title></head>
           <body>
             <h1>MCP Inspector - Development Mode</h1>
             <p>Vite dev server is not running. Please start it with:</p>
-            <pre>yarn dev:client</pre>
-            </body>
+            <pre>npm run dev:client</pre>
+          </body>
         </html>
       `);
     });
   } else {
-    // Production mode OR dev mode with built files: use standard static file serving
-    registerStaticRoutes(app, distPath);
+    registerStaticRoutes(app, _clientDistPath);
   }
 }

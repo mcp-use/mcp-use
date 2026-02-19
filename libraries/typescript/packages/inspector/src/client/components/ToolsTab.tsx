@@ -12,7 +12,7 @@ import {
   Telemetry,
 } from "@/client/telemetry";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import {
   useCallback,

@@ -945,10 +945,15 @@ program
       // Use the locally installed typescript binary directly rather than npx to
       // prevent npx from auto-installing the unrelated `tsc@2.0.4` package when
       // typescript is not found in node_modules.
+      // Raise the Node.js heap limit for tsc to avoid OOM on projects with
+      // heavy transitive types (React, Zod v4, etc.).
       console.log(chalk.gray("Building TypeScript..."));
       await runCommand(
         "node",
-        [path.join(projectPath, "node_modules", "typescript", "bin", "tsc")],
+        [
+          "--max-old-space-size=4096",
+          path.join(projectPath, "node_modules", "typescript", "bin", "tsc"),
+        ],
         projectPath
       ).promise;
       console.log(chalk.green("✓ TypeScript build complete!"));

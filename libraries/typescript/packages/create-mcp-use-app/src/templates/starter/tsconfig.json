@@ -6,19 +6,19 @@
     "moduleResolution": "bundler",
     "allowJs": true,
     "strict": true,
-    "declaration": true,
-    "declarationMap": true,
     "outDir": "./dist",
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/**/*"],
+  "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -76,8 +76,8 @@ export type TypedUseToolInfo<TMap extends ToolMap> = <
   TName extends keyof TMap & string,
 >() => UseWidgetResult<
   WidgetInputType<ToolInput<TMap, TName>>,
-  ToolOutput<TMap, TName>,
   UnknownObject,
+  ToolOutput<TMap, TName>,
   UnknownObject,
   WidgetInputType<ToolInput<TMap, TName>>
 >;
@@ -137,8 +137,8 @@ export function generateHelpers<TMap extends ToolMap>() {
     // Use type assertion since we know the mapping is correct
     return useWidget() as UseWidgetResult<
       WidgetInputType<ToolInput<TMap, TName>>,
-      ToolOutput<TMap, TName>,
       UnknownObject,
+      ToolOutput<TMap, TName>,
       UnknownObject,
       WidgetInputType<ToolInput<TMap, TName>>
     >;
