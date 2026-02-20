@@ -241,9 +241,38 @@ const program = new Command();
 
 // Render logo as ASCII art
 function renderLogo(): void {
-  console.log(chalk.cyan("▛▛▌▛▘▛▌▄▖▌▌▛▘█▌"));
-  console.log(chalk.cyan("▌▌▌▙▖▙▌  ▙▌▄▌▙▖"));
-  console.log(chalk.cyan("     ▌         "));
+  console.log(
+    chalk.white.bold(
+      " ███╗   ███╗   ██████╗  ██████╗         ██╗   ██╗  ███████╗  ███████╗"
+    )
+  );
+  console.log(
+    chalk.white.bold(
+      " ████╗ ████║  ██╔════╝  ██╔══██╗        ██║   ██║  ██╔════╝  ██╔════╝"
+    )
+  );
+  console.log(
+    chalk.white.bold(
+      " ██╔████╔██║  ██║       ██████╔╝  ━━━━  ██║   ██║  ███████╗  █████╗  "
+    )
+  );
+  console.log(
+    chalk.white.bold(
+      " ██║╚██╔╝██║  ██║       ██╔═══╝   ━━━━  ██║   ██║  ╚════██║  ██╔══╝  "
+    )
+  );
+  console.log(
+    chalk.white.bold(
+      " ██║ ╚═╝ ██║  ╚██████╗  ██║             ╚██████╔╝  ███████║  ███████╗"
+    )
+  );
+  console.log(
+    chalk.white.bold(
+      " ╚═╝     ╚═╝   ╚═════╝  ╚═╝              ╚═════╝   ╚══════╝  ╚══════╝"
+    )
+  );
+  console.log("");
+  console.log(chalk.gray.bold(" by Manufact"));
 }
 
 const packageJson = JSON.parse(
@@ -486,14 +515,12 @@ program
 
         let selectedTemplate = options.template;
 
+        console.log("");
+        renderLogo();
+        console.log("");
+
         // If no project name provided, prompt for it
         if (!projectName) {
-          console.log("");
-          renderLogo();
-          console.log("");
-          console.log(chalk.bold("Welcome to create-mcp-use-app!"));
-          console.log("");
-
           projectName = await promptForProjectName();
           console.log("");
         }
@@ -1376,43 +1403,6 @@ function TemplateSelector({
 
   return (
     <Box flexDirection="column">
-      <Box flexDirection="column" marginTop={1} marginBottom={1}>
-        <Text color="white" bold>
-          {
-            " ███╗   ███╗   ██████╗  ██████╗         ██╗   ██╗  ███████╗  ███████╗"
-          }
-        </Text>
-        <Text color="white" bold>
-          {
-            " ████╗ ████║  ██╔════╝  ██╔══██╗        ██║   ██║  ██╔════╝  ██╔════╝"
-          }
-        </Text>
-        <Text color="white" bold>
-          {
-            " ██╔████╔██║  ██║       ██████╔╝  ━━━━  ██║   ██║  ███████╗  █████╗  "
-          }
-        </Text>
-        <Text color="white" bold>
-          {
-            " ██║╚██╔╝██║  ██║       ██╔═══╝   ━━━━  ██║   ██║  ╚════██║  ██╔══╝  "
-          }
-        </Text>
-        <Text color="white" bold>
-          {
-            " ██║ ╚═╝ ██║  ╚██████╗  ██║             ╚██████╔╝  ███████║  ███████╗"
-          }
-        </Text>
-        <Text color="white" bold>
-          {
-            " ╚═╝     ╚═╝   ╚═════╝  ╚═╝              ╚═════╝   ╚══════╝  ╚══════╝"
-          }
-        </Text>
-      </Box>
-      <Box marginBottom={2}>
-        <Text color="white" bold>
-          {" by Manufact"}
-        </Text>
-      </Box>
       <Box marginBottom={1}>
         <Text bold>Select a template:</Text>
       </Box>
