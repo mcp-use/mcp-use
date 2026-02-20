@@ -99,7 +99,19 @@ function startLocalCdnServer(cdnDistDir) {
         /^\/inspector@.+?(\.(?:js|css))$/,
         "/inspector$1"
       );
-      const file = join(cdnDistDir, urlPath);
+      // Normalize path and ensure it stays within cdnDistDir to prevent traversal
+      if (urlPath.startsWith("/")) {
+        urlPath = urlPath.slice(1);
+      }
+      const file = resolve(cdnDistDir, urlPath);
+      const rootWithSep = cdnDistDir.endsWith("/") || cdnDistDir.endsWith("\\")
+        ? cdnDistDir
+        : cdnDistDir + (process.platform === "win32" ? "\\" : "/");
+      if (!file.startsWith(rootWithSep)) {
+        res.writeHead(404);
+        res.end(`Not found: ${urlPath}`);
+        return;
+      }
       try {
         const data = readFileSync(file);
         const ct = CONTENT_TYPES[extname(file)] ?? "application/octet-stream";
