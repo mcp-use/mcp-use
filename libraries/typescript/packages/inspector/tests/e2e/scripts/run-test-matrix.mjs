@@ -114,9 +114,10 @@ function startLocalCdnServer(cdnDistDir) {
         urlPath = urlPath.slice(1);
       }
       const file = resolve(cdnDistDir, urlPath);
-      const rootWithSep = cdnDistDir.endsWith("/") || cdnDistDir.endsWith("\\")
-        ? cdnDistDir
-        : cdnDistDir + (process.platform === "win32" ? "\\" : "/");
+      const rootWithSep =
+        cdnDistDir.endsWith("/") || cdnDistDir.endsWith("\\")
+          ? cdnDistDir
+          : cdnDistDir + (process.platform === "win32" ? "\\" : "/");
       if (!file.startsWith(rootWithSep)) {
         res.writeHead(404);
         res.end(`Not found: ${urlPath}`);
