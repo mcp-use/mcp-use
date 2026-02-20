@@ -26,7 +26,7 @@ export class WorkOSOAuthProvider implements OAuthProvider {
 
   constructor(config: WorkOSOAuthConfig) {
     this.config = config;
-    this.issuer = `https://${config.subdomain}.authkit.app`;
+    this.issuer = `https://${config.subdomain}`;
   }
 
   private getJWKS(): ReturnType<typeof createRemoteJWKSet> {
