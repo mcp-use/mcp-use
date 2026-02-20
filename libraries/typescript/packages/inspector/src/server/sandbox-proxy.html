@@ -177,6 +177,17 @@ document.addEventListener('securitypolicyviolation', function(e) {
       }
 
       /**
+       * Remove any existing CSP meta tags from HTML to prevent restrictive
+       * widget-embedded policies from overriding the injected permissive CSP.
+       */
+      function stripExistingCspMeta(html) {
+        return html.replace(
+          /<meta[^>]+http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>/gi,
+          ""
+        );
+      }
+
+      /**
        * Inject CSP meta tag and violation listener into HTML
        */
       function injectCSP(html, cspValue) {
@@ -241,7 +252,10 @@ document.addEventListener('securitypolicyviolation', function(e) {
 
             if (typeof html === "string") {
               if (permissive) {
-                // Permissive mode: inject maximally permissive CSP
+                // Permissive mode: strip any widget-embedded CSP meta tags first,
+                // then inject maximally permissive CSP so nothing is actually blocked.
+                // Without stripping, multiple CSP policies are intersected by the
+                // browser (most restrictive wins), which would defeat permissive mode.
                 const permissiveCsp = [
                   "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem: about:",
                   "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:",
@@ -255,7 +269,8 @@ document.addEventListener('securitypolicyviolation', function(e) {
                   "base-uri *",
                   "form-action *",
                 ].join("; ");
-                const processedHtml = injectCSP(html, permissiveCsp);
+                const strippedHtml = stripExistingCspMeta(html);
+                const processedHtml = injectCSP(strippedHtml, permissiveCsp);
                 inner.srcdoc = processedHtml;
               } else {
                 // Build CSP and inject into HTML (SEP-1865)
