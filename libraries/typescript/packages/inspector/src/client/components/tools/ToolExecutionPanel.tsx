@@ -29,6 +29,7 @@ import { ToolInputForm } from "./ToolInputForm";
 interface ToolExecutionPanelProps {
   selectedTool: Tool | null;
   toolArgs: Record<string, unknown>;
+  payloadToSend?: Record<string, unknown>;
   isExecuting: boolean;
   isConnected: boolean;
   onArgChange: (key: string, value: string) => void;
@@ -37,11 +38,19 @@ interface ToolExecutionPanelProps {
   onCancel?: () => void;
   onBulkPaste?: (pastedText: string, fieldKey: string) => Promise<boolean>;
   autoFilledFields?: Set<string>;
+  setFields?: Set<string>;
+  sendEmptyFields?: Set<string>;
+  onToggleEmpty?: (
+    key: string,
+    expectedType: "string" | "object" | "array",
+    pressed: boolean
+  ) => void;
 }
 
 export function ToolExecutionPanel({
   selectedTool,
   toolArgs,
+  payloadToSend,
   isExecuting,
   isConnected,
   onArgChange,
@@ -50,6 +59,9 @@ export function ToolExecutionPanel({
   onCancel,
   onBulkPaste,
   autoFilledFields,
+  setFields,
+  sendEmptyFields,
+  onToggleEmpty,
 }: ToolExecutionPanelProps) {
   const [showCancelButton, setShowCancelButton] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
@@ -80,10 +92,11 @@ export function ToolExecutionPanel({
     setTimeout(() => setCopiedMetadata(false), 2000);
   };
 
-  // Copy payload to clipboard
+  // Copy payload to clipboard (use payloadToSend when provided - reflects what will actually be sent)
   const copyPayloadToClipboard = () => {
     if (!selectedTool) return;
-    navigator.clipboard.writeText(JSON.stringify(toolArgs, null, 2));
+    const payload = payloadToSend ?? toolArgs;
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
     setCopiedPayload(true);
     setTimeout(() => setCopiedPayload(false), 2000);
   };
@@ -307,6 +320,9 @@ export function ToolExecutionPanel({
           onArgChange={onArgChange}
           onBulkPaste={onBulkPaste}
           autoFilledFields={autoFilledFields}
+          setFields={setFields}
+          sendEmptyFields={sendEmptyFields}
+          onToggleEmpty={onToggleEmpty}
         />
       </div>
 
