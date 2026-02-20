@@ -3,6 +3,8 @@ import { Textarea } from "@/client/components/ui/textarea";
 import { cn } from "@/client/lib/utils";
 import { Image as ImageIcon, Paperclip, X } from "lucide-react";
 import React, { useRef } from "react";
+import type { ToolInfo } from "./ToolSelector";
+import { ToolSelector } from "./ToolSelector";
 import type { MessageAttachment } from "./types";
 import { formatFileSize } from "./utils";
 
@@ -15,6 +17,9 @@ interface ChatInputProps {
   placeholder?: string;
   className?: string;
   showAttachButton?: boolean;
+  tools?: ToolInfo[];
+  disabledTools?: Set<string>;
+  onDisabledToolsChange?: (disabledTools: Set<string>) => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -32,6 +37,9 @@ export function ChatInput({
   placeholder = "Ask a question",
   className,
   showAttachButton = true,
+  tools,
+  disabledTools,
+  onDisabledToolsChange,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -120,9 +128,9 @@ export function ChatInput({
         aria-label="Upload images"
       />
 
-      {/* Attach button (positioned by parent) */}
-      {showAttachButton && (
-        <div className="absolute left-0 p-3 bottom-0">
+      {/* Bottom-left controls: attach + tool selector */}
+      <div className="absolute left-0 p-3 bottom-0 flex items-center gap-0.5">
+        {showAttachButton && (
           <Button
             variant="ghost"
             size="sm"
@@ -135,8 +143,19 @@ export function ChatInput({
           >
             <Paperclip className="h-4 w-4" />
           </Button>
-        </div>
-      )}
+        )}
+        {tools &&
+          tools.length > 0 &&
+          disabledTools &&
+          onDisabledToolsChange && (
+            <ToolSelector
+              tools={tools}
+              disabledTools={disabledTools}
+              onDisabledToolsChange={onDisabledToolsChange}
+              disabled={!isConnected || isLoading}
+            />
+          )}
+      </div>
     </div>
   );
 }

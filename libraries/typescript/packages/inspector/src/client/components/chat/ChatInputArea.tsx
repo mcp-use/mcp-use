@@ -7,6 +7,7 @@ import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
+import type { ToolInfo } from "./ToolSelector";
 import type { MessageAttachment } from "./types";
 
 interface ChatInputAreaProps {
@@ -20,6 +21,9 @@ interface ChatInputAreaProps {
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
   attachments: MessageAttachment[];
+  tools?: ToolInfo[];
+  disabledTools?: Set<string>;
+  onDisabledToolsChange?: (disabledTools: Set<string>) => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -47,6 +51,9 @@ export function ChatInputArea({
   selectedPrompt,
   promptResults,
   attachments,
+  tools,
+  disabledTools,
+  onDisabledToolsChange,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -107,6 +114,9 @@ export function ChatInputArea({
             "bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800",
             promptResults.length > 0 && "pt-16"
           )}
+          tools={tools}
+          disabledTools={disabledTools}
+          onDisabledToolsChange={onDisabledToolsChange}
           onInputChange={onInputChange}
           onKeyDown={onKeyDown}
           onKeyUp={onKeyUp}

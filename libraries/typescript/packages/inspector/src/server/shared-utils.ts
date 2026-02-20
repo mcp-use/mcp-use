@@ -184,8 +184,10 @@ export async function* handleChatRequestStream(requestBody: {
     client,
     maxSteps: 10,
     memoryEnabled: false, // Use externalHistory instead
+    exposeResourcesAsTools: false,
+    exposePromptsAsTools: false,
     systemPrompt:
-      "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
   });
 
   // Import LangChain message types for history conversion
@@ -446,8 +448,10 @@ export async function handleChatRequest(requestBody: {
     client,
     maxSteps: 10,
     memoryEnabled: false, // Use externalHistory instead
+    exposeResourcesAsTools: false,
+    exposePromptsAsTools: false,
     systemPrompt:
-      "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
   });
 
   // Import LangChain message types for history conversion

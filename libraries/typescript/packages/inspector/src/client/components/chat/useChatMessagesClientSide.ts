@@ -23,6 +23,7 @@ interface UseChatMessagesClientSideProps {
   isConnected: boolean;
   readResource?: (uri: string) => Promise<any>;
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
+  disabledTools?: Set<string>;
 }
 
 export function useChatMessagesClientSide({
@@ -31,6 +32,7 @@ export function useChatMessagesClientSide({
   isConnected,
   readResource,
   widgetModelContexts,
+  disabledTools,
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,6 +40,7 @@ export function useChatMessagesClientSide({
   const abortControllerRef = useRef<AbortController | null>(null);
   const agentRef = useRef<any>(null);
   const llmRef = useRef<any>(null);
+  const lastDisabledToolsRef = useRef<string>("");
 
   const sendMessage = useCallback(
     async (userInput: string, promptResults: PromptResult[]) => {
@@ -165,27 +168,32 @@ export function useChatMessagesClientSide({
           };
         }
 
-        // Create or reuse agent
-        if (
+        // Create or reuse agent — recreate when LLM or disabled tools change
+        const disallowedToolsArr = disabledTools
+          ? [...disabledTools].sort()
+          : [];
+        const disallowedToolsKey = disallowedToolsArr.join(",");
+        const needsNewAgent =
           !agentRef.current ||
-          agentRef.current.llm !== llmRef.current.instance
-        ) {
-          // Dynamic import from browser export to avoid bundling server-side code
+          agentRef.current.llm !== llmRef.current.instance ||
+          lastDisabledToolsRef.current !== disallowedToolsKey;
+
+        if (needsNewAgent) {
           const { MCPAgent } = await import("mcp-use/browser");
 
           agentRef.current = new MCPAgent({
             llm: llmRef.current.instance,
             client: (connection.client ?? undefined) as any,
-            memoryEnabled: false, // external history always used
+            memoryEnabled: false,
+            exposeResourcesAsTools: false,
+            exposePromptsAsTools: false,
+            disallowedTools:
+              disallowedToolsArr.length > 0 ? disallowedToolsArr : undefined,
             systemPrompt:
-              "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+              "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
           });
           await agentRef.current.initialize();
-        } else {
-          console.log(
-            "[useChatMessagesClientSide] Reusing existing agent. History length:",
-            agentRef.current.conversationHistory?.length
-          );
+          lastDisabledToolsRef.current = disallowedToolsKey;
         }
 
         // Build widget state context messages (per SEP-1865 ui/update-model-context)
@@ -721,7 +729,15 @@ export function useChatMessagesClientSide({
         abortControllerRef.current = null;
       }
     },
-    [connection, llmConfig, isConnected, messages, readResource, attachments]
+    [
+      connection,
+      llmConfig,
+      isConnected,
+      messages,
+      readResource,
+      attachments,
+      disabledTools,
+    ]
   );
 
   const clearMessages = useCallback(() => {

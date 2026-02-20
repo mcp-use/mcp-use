@@ -15,6 +15,7 @@ import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
+import type { ToolInfo } from "./ToolSelector";
 import type { LLMConfig, MessageAttachment } from "./types";
 
 interface ChatLandingFormProps {
@@ -30,6 +31,9 @@ interface ChatLandingFormProps {
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
   attachments: MessageAttachment[];
+  tools?: ToolInfo[];
+  disabledTools?: Set<string>;
+  onDisabledToolsChange?: (disabledTools: Set<string>) => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -63,6 +67,9 @@ export function ChatLandingForm({
   selectedPrompt,
   promptResults,
   attachments,
+  tools,
+  disabledTools,
+  onDisabledToolsChange,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -125,6 +132,9 @@ export function ChatLandingForm({
                   "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
                   promptResults.length > 0 && "pt-16"
                 )}
+                tools={tools}
+                disabledTools={disabledTools}
+                onDisabledToolsChange={onDisabledToolsChange}
                 onInputChange={onInputChange}
                 onKeyDown={onKeyDown}
                 onKeyUp={onKeyUp}

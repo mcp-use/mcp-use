@@ -52,6 +52,8 @@ interface CommonAgentOptions {
   disallowedTools?: string[];
   additionalTools?: StructuredToolInterface[];
   toolsUsedNames?: string[];
+  exposeResourcesAsTools?: boolean;
+  exposePromptsAsTools?: boolean;
   useServerManager?: boolean;
   verbose?: boolean;
   observe?: boolean;
