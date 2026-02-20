@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.0-canary.3
+
+### Patch Changes
+
+- 04cae62: Improve CLI prompts, install order, branding, and project structure output
+
 ## 0.14.0-canary.2
 
 ### Patch Changes
