@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.1-canary.0
+
+### Patch Changes
+
+- 4e0f531: Unify logo display across all CLI entry paths
+
 ## 0.14.0
 
 ### Minor Changes
