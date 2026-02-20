@@ -105,14 +105,14 @@ UI state (selections, filters) lives in the widget via `useState` or `setState`.
 ❌ `select-item` tool, `set-filter` tool
 ✅ Widget manages internally
 
-### 4. `exposeAsTool: false` for custom tools
-When defining a tool with `widget: { name }`, set this in the widget file to avoid duplicate registration:
+### 4. `exposeAsTool` defaults to `false`
+Widgets are not auto-registered as tools by default. When defining a custom tool with `widget: { name }`, omitting `exposeAsTool` (or leaving it `false`) is correct — the custom tool handles registration:
 
 ```typescript
 export const widgetMetadata: WidgetMetadata = {
   description: "...",
   props: z.object({...}),
-  exposeAsTool: false  // ← Prevents duplicate tool
+  // exposeAsTool defaults to false — correct for custom-tool pattern
 };
 ```
 

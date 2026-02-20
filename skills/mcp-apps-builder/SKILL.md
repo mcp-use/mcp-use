@@ -186,8 +186,8 @@ UI state lives in the widget, not in separate tools:
 - ❌ `select-item` tool, `set-filter` tool
 - ✅ Widget manages with `useState` or `setState`
 
-### 4. Use `exposeAsTool: false` for Custom Widget Tools
-Prevent duplicate tool registration:
+### 4. `exposeAsTool` Defaults to `false`
+Widgets are registered as resources only by default. Use a custom tool (recommended) or set `exposeAsTool: true` to expose a widget to the model:
 
 ```typescript
 // ✅ ALL 4 STEPS REQUIRED for proper type inference:

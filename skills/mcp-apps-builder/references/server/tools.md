@@ -242,7 +242,7 @@ server.tool(
 - Add `widget: { name }` to tool config
 - Return `widget({ props, output })` from handler
 - Create matching widget file: `resources/{name}.tsx`
-- Set `exposeAsTool: false` in widget metadata to avoid duplication
+- `exposeAsTool` defaults to `false` — omitting it is correct for this pattern
 
 See [../widgets/basics.md](../widgets/basics.md) for widget implementation.
 

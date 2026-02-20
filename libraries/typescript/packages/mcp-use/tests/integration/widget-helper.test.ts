@@ -36,7 +36,7 @@ describe("Widget Helper Integration Tests", () => {
       exposeAsTool: false,
     });
 
-    // Widget without exposeAsTool (should default to true)
+    // Widget without exposeAsTool (should default to false)
     server.uiResource({
       type: "appsSdk",
       name: "auto-widget",
@@ -185,15 +185,15 @@ describe("Widget Helper Integration Tests", () => {
       expect((result.content as any)[0]?.text).toContain("not found");
     });
 
-    it("should be callable as tool when exposeAsTool is undefined (default)", async () => {
-      // Call the auto-widget tool (should succeed)
+    it("should not be callable as tool when exposeAsTool is undefined (default is false)", async () => {
+      // Attempt to call the auto-widget tool (should return error — not auto-registered)
       const result = await client.callTool({
         name: "auto-widget",
         arguments: { message: "test" },
       });
 
-      expect(result).toBeDefined();
-      expect(result.content).toBeDefined();
+      expect(result.isError).toBe(true);
+      expect((result.content as any)[0]?.text).toContain("not found");
     });
 
     it("should be callable as tool when exposeAsTool is true", async () => {

@@ -273,11 +273,11 @@ export function MCPAppsDebugControls({
   const declaredCsp = widget?.declaredCsp;
   const effectivePolicy = widget?.effectivePolicy;
   const suggestedFix =
-    playground.cspMode === "widget-declared" && cspViolations.length > 0
+    cspViolations.length > 0
       ? computeSuggestedFix(cspViolations, declaredCsp)
       : null;
   const agentPrompt =
-    cspViolations.length > -1
+    cspViolations.length > 0
       ? buildAgentCspPrompt(
           declaredCsp,
           effectivePolicy,

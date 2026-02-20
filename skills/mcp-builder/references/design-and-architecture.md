@@ -74,16 +74,16 @@ Selections, filters, and UI state live in the widget -- not as separate tools.
 ❌ `select-recipe` tool, `set-filter` tool (these are widget state)
 ✅ Widget manages selections and filters internally via `useState` or `setState`
 
-### `exposeAsTool: false` pattern
+### `exposeAsTool` defaults to `false`
 
-When you create a custom tool with `widget: { name: "my-widget" }`, the widget file should set `exposeAsTool: false` to avoid creating a duplicate auto-registered tool:
+Widgets are not auto-registered as tools by default. When you create a custom tool with `widget: { name: "my-widget" }`, omitting `exposeAsTool` in the widget file is correct — the custom tool handles making the widget callable:
 
 ```typescript
 // resources/my-widget.tsx
 export const widgetMetadata: WidgetMetadata = {
   description: "...",
   props: z.object({ ... }),
-  exposeAsTool: false,  // Custom tool definition handles registration
+  // exposeAsTool defaults to false — custom tool definition handles registration
 };
 ```
 

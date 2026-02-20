@@ -255,9 +255,6 @@ export function useWidget<
     // Subscribe to updates
     const unsubToolInput = bridge.onToolInput((input) => {
       setMcpAppsToolInput(input);
-      // Don't clear partialToolInput here -- React batches both updates
-      // and isStreaming would never be true during a render. Instead,
-      // clear it when tool-result arrives (tool execution is complete).
     });
 
     const unsubToolInputPartial = bridge.onToolInputPartial((input) => {

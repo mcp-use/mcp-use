@@ -158,7 +158,7 @@ Every widget file MUST export:
 export const widgetMetadata: WidgetMetadata = {
   description: "What this widget shows",
   props: z.object({ /* ... */ }),
-  exposeAsTool: false,  // When using custom tool definition
+  // exposeAsTool defaults to false — custom tool in index.ts handles registration
 };
 
 export default function MyWidget() { /* ... */ }

@@ -1,4 +1,5 @@
 import { cn } from "@/client/lib/utils";
+import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +26,10 @@ interface OpenAIComponentRendererProps {
   /** When provided, used directly instead of looking up via useMcpClient().
    *  This avoids the dependency on McpClientProvider context. */
   serverBaseUrl?: string;
+  /** Status text shown while the tool is running (shimmer). Shown when toolResult is null. */
+  invoking?: string;
+  /** Status text shown after the tool completes (static muted). Shown when toolResult is present. */
+  invoked?: string;
   onUpdateGlobals?: (updates: {
     displayMode?: "inline" | "pip" | "fullscreen";
     theme?: "light" | "dark";
@@ -99,6 +104,8 @@ function OpenAIComponentRendererBase({
   showConsole = true,
   customProps,
   serverBaseUrl: serverBaseUrlProp,
+  invoking,
+  invoked,
   onUpdateGlobals,
 }: OpenAIComponentRendererProps) {
   const iframeRef = useRef<InstanceType<
@@ -1048,6 +1055,18 @@ function OpenAIComponentRendererBase({
 
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
+      {/* Status label above the widget — only in inline mode */}
+      {displayMode === "inline" && (invoking || invoked) && (
+        <div className="mb-1 px-1">
+          {invoking && !toolResult && (
+            <TextShimmer className="text-xs">{invoking}</TextShimmer>
+          )}
+          {invoked && toolResult && (
+            <span className="text-xs text-muted-foreground">{invoked}</span>
+          )}
+        </div>
+      )}
+
       {showSkeleton && (
         <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-0">
           <Spinner className="size-5" />
@@ -1172,6 +1191,8 @@ function openAIComponentRendererAreEqual(
       return false;
     }
   }
+  if (prev.invoking !== next.invoking) return false;
+  if (prev.invoked !== next.invoked) return false;
   return true;
 }
 

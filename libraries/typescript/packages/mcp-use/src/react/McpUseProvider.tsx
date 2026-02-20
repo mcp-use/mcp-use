@@ -10,20 +10,6 @@ import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { ThemeProvider } from "./ThemeProvider.js";
 import { WidgetControls } from "./WidgetControls.js";
 
-/**
- * Calculate basename for proper routing in both dev proxy and production
- */
-function getBasename(): string {
-  if (typeof window === "undefined") return "/";
-  const path = window.location.pathname;
-  // Check for inspector dev widget proxy pattern
-  const match = path.match(/^(\/inspector\/api\/dev-widget\/[^/]+)/);
-  if (match) {
-    return match[1];
-  }
-  return "/";
-}
-
 // Constants for height management
 const HEIGHT_DEBOUNCE_MS = 150; // Debounce duration to wait for animations to settle
 const MIN_HEIGHT_CHANGE_PX = 5; // Minimum height change to trigger notification
@@ -58,7 +44,6 @@ interface McpUseProviderProps {
  * Includes:
  * - StrictMode (always)
  * - ThemeProvider (always)
- * - BrowserRouter with automatic basename calculation (always)
  * - WidgetControls (if debugger={true} or viewControls is set)
  * - ErrorBoundary (always)
  * - Auto-sizing (if autoSize={true})
@@ -78,50 +63,11 @@ export function McpUseProvider({
   viewControls = false,
   autoSize = true,
 }: McpUseProviderProps) {
-  const basename = getBasename();
   const [containerElement, setContainerElement] =
     useState<HTMLDivElement | null>(null);
   const lastHeightRef = useRef<number>(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationInProgressRef = useRef<boolean>(false);
-
-  // State for dynamic router loading
-  const [BrowserRouter, setBrowserRouter] = useState<any>(null);
-  const [routerError, setRouterError] = useState<Error | null>(null);
-  const [isRouterLoading, setIsRouterLoading] = useState(true);
-
-  // Load react-router dynamically on mount
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      try {
-        const routerModule = await import("react-router");
-        if (mounted) {
-          setBrowserRouter(() => routerModule.BrowserRouter);
-          setIsRouterLoading(false);
-        }
-      } catch (error) {
-        if (mounted) {
-          setRouterError(
-            new Error(
-              "❌ react-router not installed!\n\n" +
-                "To use MCP widgets with McpUseProvider, you need to install:\n\n" +
-                "  npm install react-router\n" +
-                "  # or\n" +
-                "  pnpm add react-router\n\n" +
-                "This dependency is automatically included in projects created with 'create-mcp-use-app'."
-            )
-          );
-          setIsRouterLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   // Notify host about height changes (dual-protocol support)
   const notifyHeight = useCallback((height: number) => {
@@ -247,17 +193,6 @@ export function McpUseProvider({
     };
   }, [autoSize, containerElement, debouncedNotifyHeight]);
 
-  // Show minimal state while router is being loaded (usually very fast)
-  // Return null to avoid flash of "Loading..." text
-  if (isRouterLoading) {
-    return null;
-  }
-
-  // Throw error if router failed to load
-  if (routerError) {
-    throw routerError;
-  }
-
   // Build the component tree with conditional wrappers
   let content: React.ReactNode = children;
 
@@ -265,7 +200,6 @@ export function McpUseProvider({
   content = <ErrorBoundary>{content}</ErrorBoundary>;
 
   // WidgetControls wraps ErrorBoundary if debugger is enabled or viewControls is set
-  // It combines both debug and view control functionality with shared hover logic
   if (enableDebugger || viewControls) {
     content = (
       <WidgetControls debugger={enableDebugger} viewControls={viewControls}>
@@ -274,12 +208,7 @@ export function McpUseProvider({
     );
   }
 
-  // BrowserRouter wraps everything (should be loaded by now)
-  if (BrowserRouter) {
-    content = <BrowserRouter basename={basename}>{content}</BrowserRouter>;
-  }
-
-  // ThemeProvider wraps BrowserRouter
+  // ThemeProvider wraps WidgetControls
   content = <ThemeProvider>{content}</ThemeProvider>;
 
   // Wrap in container div for auto-sizing if enabled

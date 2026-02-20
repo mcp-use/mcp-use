@@ -238,13 +238,15 @@ export const widgetMetadata: WidgetMetadata = {
   // Required: Zod schema defining the widget's props shape
   props: z.ZodObject<...>,
 
-  // Optional: Control automatic tool registration (defaults to true)
+  // Optional: Control automatic tool registration (defaults to false)
   exposeAsTool?: boolean,
 
   // Recommended: Unified metadata (works with both MCP Apps and ChatGPT)
   metadata?: {
     csp?: { connectDomains?: string[], resourceDomains?: string[] },
     prefersBorder?: boolean,
+    invoking?: string,  // Status text while tool runs — auto-default: "Loading {name}..."
+    invoked?: string,   // Status text after tool completes — auto-default: "{name} ready"
   },
 
   // Alternative: Apps SDK metadata (ChatGPT-only, legacy format)
@@ -268,8 +270,10 @@ Widget templates automatically receive default Apps SDK metadata values:
 - `openai/widgetDomain`: Defaults to `"https://chatgpt.com"` (required for app submission)
 - `openai/widgetAccessible`: Allows component-initiated tool calls
 - `openai/widgetCSP`: [Content Security Policy](./content-security-policy) with default trusted domains
-- `openai/toolInvocation/invoking`: Loading state text (e.g., "Loading MyWidget...")
-- `openai/toolInvocation/invoked`: Ready state text (e.g., "MyWidget ready")
+- `openai/toolInvocation/invoking`: Loading state text — set via `metadata.invoking` (default: `"Loading MyWidget..."`)
+- `openai/toolInvocation/invoked`: Ready state text — set via `metadata.invoked` (default: `"MyWidget ready"`)
+
+These status texts are displayed as animated shimmer text (pending) and static text (complete) in the MCP Inspector. You can override them via `metadata.invoking`/`metadata.invoked` in your widget registration, or use `appsSdkMetadata` for raw key access:
 
 You can customize any of these in your widget's `appsSdkMetadata` export:
 
@@ -286,24 +290,40 @@ export const appsSdkMetadata = {
 
 **Widget Exposure Modes:**
 
-By default, widgets are automatically registered as both MCP tools and resources (`exposeAsTool: true`). You can control this behavior:
+<Warning>
+**Breaking change**: `exposeAsTool` now defaults to `false`. Widgets are registered as MCP resources only. To make a widget callable directly by a model, either set `exposeAsTool: true` in your widget metadata, or define a custom tool that returns the widget using the `widget()` helper (recommended).
+</Warning>
 
-- **Auto-registered (default)**: Widget is callable as a tool directly by the model
+By default, widgets are registered as MCP resources only — they are not auto-registered as tools. The recommended pattern is to expose widgets through a custom tool:
+
+- **Via custom tool (recommended)**: Define a tool that calls `widget()` in its handler. This gives you full control over tool naming, description, parameters, and business logic:
 
   ```typescript
+  // resources/weather-display/widget.tsx — no exposeAsTool needed
   export const widgetMetadata: WidgetMetadata = {
     description: "Display weather",
     props: propSchema,
-    // exposeAsTool: true (default, can be omitted)
   };
+
+  // index.ts — expose via a custom tool
+  server.tool({
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({ city: z.string() }),
+    widget: { name: "weather-display", invoking: "Fetching weather...", invoked: "Weather loaded" },
+  }, async ({ city }) => {
+    const data = await fetchWeather(city);
+    return widget({ props: data, output: text(`Weather in ${city}: ${data.temp}°C`) });
+  });
   ```
 
-- **Custom tool only**: Widget is only accessible through custom tools you define
+- **Auto-registered**: Widget is auto-registered as a tool using its metadata description and props schema as the tool's parameters. Simpler, but less control:
+
   ```typescript
   export const widgetMetadata: WidgetMetadata = {
     description: "Display weather",
     props: propSchema,
-    exposeAsTool: false, // Don't auto-register as tool
+    exposeAsTool: true, // Opt in to auto-registration
   };
   ```
 
@@ -762,14 +782,14 @@ server.tool(
   - `metadata` - Optional extra data in `_meta`. Widget reads via `useWidget().metadata`.
   - `message` - Optional text message override for `content`
 - **Widget must exist** - The widget name must match a `.tsx` file or folder in `resources/`
-- **Disable auto-registration** - Set `exposeAsTool: false` in the widget's metadata if you only want it accessible through custom tools:
+- **`exposeAsTool` defaults to `false`** - Widgets are resources by default. This is the expected setup when returning widgets from custom tools. To opt into auto-registration instead, set `exposeAsTool: true` in the widget metadata:
 
 ```tsx
 // resources/weather-display/widget.tsx
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather information",
   props: propSchema,
-  exposeAsTool: false, // Only accessible via custom tools
+  exposeAsTool: true, // Opt in to auto-register as a tool
 };
 ```
 

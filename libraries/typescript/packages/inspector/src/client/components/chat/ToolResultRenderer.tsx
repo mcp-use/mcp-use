@@ -224,11 +224,17 @@ export function ToolResultRenderer({
     }
   }, [extractedResource, resourceUri, activeProtocol, readResource]);
 
+  const invokingText = toolMeta?.["openai/toolInvocation/invoking"] as
+    | string
+    | undefined;
+  const invokedText = toolMeta?.["openai/toolInvocation/invoked"] as
+    | string
+    | undefined;
+
   // Render toggle when both protocols are supported
   if (supportsBothProtocols && resourceData && serverId && readResource) {
     return (
-      <div className="space-y-4 my-4">
-        {/* Render based on active protocol */}
+      <div className="my-4">
         {activeProtocol === "mcp-apps" && (
           <MCPAppsRenderer
             serverId={serverId}
@@ -237,6 +243,8 @@ export function ToolResultRenderer({
             toolInput={memoizedToolArgs}
             toolOutput={memoizedResult}
             toolMetadata={toolMeta}
+            invoking={invokingText}
+            invoked={invokedText}
             partialToolInput={partialToolArgs}
             resourceUri={resourceData.uri}
             readResource={readResource}
@@ -257,6 +265,8 @@ export function ToolResultRenderer({
             readResource={readResource}
             noWrapper={true}
             showConsole={false}
+            invoking={invokingText}
+            invoked={invokedText}
             serverBaseUrl={serverBaseUrl}
           />
         )}
@@ -276,6 +286,8 @@ export function ToolResultRenderer({
           toolInput={memoizedToolArgs}
           toolOutput={memoizedResult}
           toolMetadata={toolMeta}
+          invoking={invokingText}
+          invoked={invokedText}
           partialToolInput={partialToolArgs}
           resourceUri={resourceData?.uri || resourceUri}
           readResource={readResource}
@@ -308,6 +320,8 @@ export function ToolResultRenderer({
         noWrapper={true}
         className="my-4"
         showConsole={false}
+        invoking={invokingText}
+        invoked={invokedText}
         serverBaseUrl={serverBaseUrl}
       />
     );

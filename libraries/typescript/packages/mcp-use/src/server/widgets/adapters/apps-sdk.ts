@@ -52,6 +52,22 @@ export class AppsSdkAdapter extends BaseProtocolAdapter {
       }
     }
 
+    // Fall back to unified metadata.invoking/invoked if not already set via appsSdkMetadata
+    if ("metadata" in definition && definition.metadata) {
+      if (
+        definition.metadata.invoking !== undefined &&
+        !meta["openai/toolInvocation/invoking"]
+      ) {
+        meta["openai/toolInvocation/invoking"] = definition.metadata.invoking;
+      }
+      if (
+        definition.metadata.invoked !== undefined &&
+        !meta["openai/toolInvocation/invoked"]
+      ) {
+        meta["openai/toolInvocation/invoked"] = definition.metadata.invoked;
+      }
+    }
+
     return meta;
   }
 

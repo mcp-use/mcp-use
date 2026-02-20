@@ -117,5 +117,17 @@ export interface WidgetMetadata {
     widgetDescription?: string;
     /** Enable automatic size change notifications (MCP Apps only, ignored by ChatGPT) */
     autoResize?: boolean;
+    /**
+     * Status text shown while the tool is running.
+     * Maps to `openai/toolInvocation/invoking` in tool metadata.
+     * Auto-default: `"Loading {name}..."`
+     */
+    invoking?: string;
+    /**
+     * Status text shown after the tool completes.
+     * Maps to `openai/toolInvocation/invoked` in tool metadata.
+     * Auto-default: `"{name} ready"`
+     */
+    invoked?: string;
   };
 }
