@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.21.2-canary.0
+
+### Patch Changes
+
+- fbf1308: Fix OAuth auth flow: add proactive token refresh, remove static auth header override, always proxy WorkOS requests, and ensure OAuth fetch interceptor is installed on autoConnect
+  - mcp-use@1.19.4-canary.0
+
 ## 0.21.1
 
 ### Patch Changes
