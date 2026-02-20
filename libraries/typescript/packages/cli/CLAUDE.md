@@ -66,7 +66,7 @@ npx tsx /path/to/cli/src/index.ts dev
 - Reads/saves tunnel subdomain to `dist/mcp-use.json` for persistence
 
 **`deploy` command (`src/commands/deploy.ts`):**
-- Deploys to mcp-use cloud via GitHub integration
+- Deploys to Manufact cloud via GitHub integration
 - Pre-flight checks for GitHub App access to repository
 - Supports project linking (`.mcp-use/project.json`) for redeployments
 - Handles environment variables via `--env` or `--env-file`

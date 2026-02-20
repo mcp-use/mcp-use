@@ -122,7 +122,7 @@ mcp-use start [options]
 Deploy your MCP server to production via [manufact.com](https://manufact.com):
 
 ```bash
-# Login to mcp-use cloud
+# Login to Manufact cloud
 mcp-use login
 
 # Check authentication status
@@ -371,7 +371,7 @@ MCP_URL=https://myserver.com mcp-use build
 
 #### Deployment & Cloud
 
-For deploying to mcp-use cloud, see the environment variables in this section for detailed configuration:
+For deploying to Manufact cloud, see the environment variables in this section for detailed configuration:
 
 ```bash
 # Frontend URL (where /auth/cli page is)

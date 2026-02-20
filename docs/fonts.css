@@ -22,3 +22,8 @@
 body {
   font-family: 'inter-variable', sans-serif;
 }
+
+#sidebar-content ul li a img {
+  background: none !important;
+}
+

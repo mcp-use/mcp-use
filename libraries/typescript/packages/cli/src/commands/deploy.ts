@@ -777,7 +777,7 @@ async function promptGitHubInstallation(
 }
 
 /**
- * Deploy command - deploys MCP server to mcp-use cloud
+ * Deploy command - deploys MCP server to Manufact cloud
  */
 export async function deployCommand(options: DeployOptions): Promise<void> {
   try {

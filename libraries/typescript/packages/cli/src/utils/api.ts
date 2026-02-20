@@ -138,7 +138,7 @@ export interface GitHubReposResponse {
 }
 
 /**
- * API client for mcp-use cloud
+ * API client for Manufact cloud
  */
 export class McpUseAPI {
   private baseUrl: string;
