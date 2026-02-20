@@ -266,10 +266,12 @@ export async function navigateToResourcesAndSelectWeather(
     .click();
   await expect(page.getByRole("heading", { name: "Resources" })).toBeVisible();
   await page.getByTestId("resource-item-weather-display").click();
-  // Wait for widget iframe to appear
-  await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
-    timeout: 5000,
-  });
+  // Widget requires props - wait for props wall text (iframe only appears after props are set)
+  await expect(
+    page.getByText(
+      "This widget requires props, set or generate them in the props debugger"
+    )
+  ).toBeVisible({ timeout: 5000 });
 }
 
 /**
