@@ -408,11 +408,18 @@ function OpenAIComponentRendererBase({
           }
 
           if (iframeWindow.openai) {
-            // Skip redundant dispatch: if only theme/displayMode and already match, no need to notify
-            const onlyCosmetic =
-              merged.toolOutput === undefined &&
-              merged.toolResponseMetadata === undefined;
-            if (onlyCosmetic) {
+            // Skip redundant dispatch only when updates are exclusively theme/displayMode
+            // and those already match. Must NOT skip when locale, userAgent, safeArea,
+            // maxHeight, or toolOutput need to be applied (debug toggles, etc.).
+            const hasHostContextUpdates =
+              merged.locale !== undefined ||
+              merged.safeArea !== undefined ||
+              merged.userAgent !== undefined ||
+              merged.maxHeight !== undefined ||
+              merged.toolOutput !== undefined ||
+              merged.toolResponseMetadata !== undefined;
+
+            if (!hasHostContextUpdates) {
               const themeMatch =
                 merged.theme === undefined ||
                 iframeWindow.openai.theme === merged.theme;

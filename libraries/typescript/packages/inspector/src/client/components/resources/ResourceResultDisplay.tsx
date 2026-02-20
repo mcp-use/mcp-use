@@ -365,7 +365,10 @@ export function ResourceResultDisplay({
             if (previewMode) {
               // MCP Apps mode
               return (
-                <div className="flex-1 h-full relative">
+                <div
+                  className="flex-1 h-full relative"
+                  data-testid="resource-widget-preview"
+                >
                   {/* Floating controls in top-right */}
                   <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
                     <MCPAppsDebugControls
