@@ -13,6 +13,21 @@ import type {
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { BrowserMCPClient } from "../client/browser.js";
 
+
+/**
+ * Configuration for SDK-level reconnection behavior on streamable HTTP transports.
+ */
+export type ReconnectionOptions = {
+  /** Maximum delay between reconnection attempts in ms (default: 30000) */
+  maxReconnectionDelay?: number;
+  /** Initial delay before first reconnection attempt in ms (default: 1000) */
+  initialReconnectionDelay?: number;
+  /** Multiplier applied to delay after each failed attempt (default: 1.5) */
+  reconnectionDelayGrowFactor?: number;
+  /** Maximum number of reconnection retries (default: 2) */
+  maxRetries?: number;
+};
+
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
   url?: string;
@@ -111,6 +126,12 @@ export type UseMcpOptions = {
   autoRetry?: boolean | number;
   /** Auto reconnect if an established connection is lost, with delay in ms (default: 3000) */
   autoReconnect?: boolean | number;
+  /** Health check polling interval in ms when autoReconnect is enabled (default: 10000) */
+  healthCheckInterval?: number;
+  /** Time in ms without a successful health check before triggering reconnect (default: 30000) */
+  healthCheckTimeout?: number;
+  /** SDK-level reconnection options for streamable HTTP transport */
+  reconnectionOptions?: ReconnectionOptions;
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
   /**

@@ -93,6 +93,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     logLevel: logLevelOption,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
+    healthCheckInterval,
+    healthCheckTimeout,
+    reconnectionOptions,
     transportType = "auto",
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
@@ -626,6 +629,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           clientInfo: mergedClientInfo,
           // Pass custom fetch if provided (e.g., OAuth retry fetch for scope-step-up)
           ...(customFetch && { fetch: customFetch }),
+          // Pass user-configurable reconnection options for streamable HTTP transport
+          ...(reconnectionOptions && { reconnectionOptions }),
         };
 
         // Add gateway URL if using proxy
@@ -790,6 +795,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             addLog,
             connect,
             defaultReconnectDelay: DEFAULT_RECONNECT_DELAY,
+            healthCheckIntervalMs: healthCheckInterval,
+            healthCheckTimeoutMs: healthCheckTimeout,
           });
 
           // Store cleanup function for later
