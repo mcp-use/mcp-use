@@ -180,7 +180,7 @@ function MCPAppsRendererBase({
   serverRef.current = server;
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
-  const [prefersBorder, setPrefersBorder] = useState<boolean>(true);
+  const [prefersBorder, setPrefersBorder] = useState<boolean>(false);
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<DisplayMode>("inline");
 
@@ -286,7 +286,7 @@ function MCPAppsRendererBase({
         }
         const mcpAppsPermissions = mergedUiMeta?.permissions;
         // MCP Apps only: prefersBorder is in resource _meta.ui per spec
-        const mcpAppsPrefersBorder = mergedUiMeta?.prefersBorder ?? true;
+        const mcpAppsPrefersBorder = mergedUiMeta?.prefersBorder ?? false;
 
         // Store widget data
         const storeResponse = await fetch(
@@ -431,7 +431,7 @@ function MCPAppsRendererBase({
         if (cancelled) return;
         const contentUiMeta = resourceResult?.contents?.[0]?._meta?.ui;
         if (contentUiMeta && "prefersBorder" in contentUiMeta) {
-          setPrefersBorder(contentUiMeta.prefersBorder ?? true);
+          setPrefersBorder(contentUiMeta.prefersBorder ?? false);
         }
       } catch {
         // readResource may fail during reconnection; ignore
@@ -1132,7 +1132,8 @@ function MCPAppsRendererBase({
         <div
           className={cn(
             "flex-1 w-full h-full flex justify-center items-center relative",
-            isFullscreen && "pt-14"
+            isFullscreen && "pt-14",
+            !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
           )}
         >
           {showSpinner && (

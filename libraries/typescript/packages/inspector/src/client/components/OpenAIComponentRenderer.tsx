@@ -1055,18 +1055,6 @@ function OpenAIComponentRendererBase({
 
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
-      {/* Status label above the widget — only in inline mode */}
-      {displayMode === "inline" && (invoking || invoked) && (
-        <div className="mb-1 px-1">
-          {invoking && !toolResult && (
-            <TextShimmer className="text-xs">{invoking}</TextShimmer>
-          )}
-          {invoked && toolResult && (
-            <span className="text-xs text-muted-foreground">{invoked}</span>
-          )}
-        </div>
-      )}
-
       {showSkeleton && (
         <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-0">
           <Spinner className="size-5" />
@@ -1078,7 +1066,6 @@ function OpenAIComponentRendererBase({
         displayMode !== "fullscreen" &&
         displayMode !== "pip" && (
           <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
-            {/* Use advanced debug controls for Apps SDK (same as MCP Apps) */}
             <MCPAppsDebugControls
               displayMode={displayMode}
               onDisplayModeChange={handleDisplayModeChange}
@@ -1143,27 +1130,43 @@ function OpenAIComponentRendererBase({
           className={cn(
             "flex-1 w-full flex justify-center items-center relative z-10",
             displayMode === "fullscreen" && "pt-14",
-            centerVertically && "items-center"
+            centerVertically && "items-center",
+            displayMode === "inline" && (invoking || invoked) && "pt-8"
           )}
         >
-          <iframe
-            ref={iframeRef}
-            src={widgetUrl}
-            className={cn(
-              displayMode === "inline" && " w-full max-w-[768px]",
-              displayMode === "fullscreen" && "w-full h-full rounded-none",
-              displayMode === "pip" && "w-full h-full rounded-lg"
+          <div className="relative w-full max-w-[768px]">
+            {/* Status label above the widget — only in inline mode, matching MCPAppsRenderer */}
+            {displayMode === "inline" && (invoking || invoked) && (
+              <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
+                {invoking && !toolResult && (
+                  <TextShimmer className="text-xs">{invoking}</TextShimmer>
+                )}
+                {invoked && toolResult && (
+                  <span className="text-xs text-muted-foreground">
+                    {invoked}
+                  </span>
+                )}
+              </div>
             )}
-            style={{
-              height:
-                displayMode === "fullscreen" || displayMode === "pip"
-                  ? "100%"
-                  : `${iframeHeight}px`,
-            }}
-            sandbox={IFRAME_SANDBOX_PERMISSIONS}
-            title={`OpenAI Component: ${toolName}`}
-            allow="web-share"
-          />
+            <iframe
+              ref={iframeRef}
+              src={widgetUrl}
+              className={cn(
+                displayMode === "inline" && "w-full",
+                displayMode === "fullscreen" && "w-full h-full rounded-none",
+                displayMode === "pip" && "w-full h-full rounded-lg"
+              )}
+              style={{
+                height:
+                  displayMode === "fullscreen" || displayMode === "pip"
+                    ? "100%"
+                    : `${iframeHeight}px`,
+              }}
+              sandbox={IFRAME_SANDBOX_PERMISSIONS}
+              title={`OpenAI Component: ${toolName}`}
+              allow="web-share"
+            />
+          </div>
         </div>
       </div>
     </Wrapper>
