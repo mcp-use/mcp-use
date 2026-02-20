@@ -110,7 +110,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "framer-motion": "^12.27.1",
-    "hono": "^4.11.4",
+    "hono": "^4.11.10",
     "langchain": "^1.2.10",
     "lucide-react": "^0.562.0",
     "markdown-to-jsx": "^9.5.7",
