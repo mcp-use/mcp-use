@@ -321,9 +321,6 @@ class McpAppsBridge {
         const params = notification.params as unknown as ToolInputNotification;
         console.log("[MCP Apps Bridge] Tool input received:", params.arguments);
         this.toolInput = params.arguments;
-        // Don't clear partialToolInput here — React batches state updates from
-        // both tool-input-partial and tool-input handlers, so isStreaming would
-        // never be true during a render. Let tool-result clear it instead.
         this.toolInputHandlers.forEach((handler) => handler(params.arguments));
         break;
       }

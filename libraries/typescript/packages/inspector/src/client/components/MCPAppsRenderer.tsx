@@ -86,6 +86,7 @@ function buildCSPString(csp: WidgetDeclaredCsp): string {
 }
 import { Spinner } from "./ui/spinner";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
+import { TextShimmer } from "./ui/text-shimmer.js";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
 
@@ -96,6 +97,8 @@ interface MCPAppsRendererProps {
   toolInput?: Record<string, unknown>;
   toolOutput?: unknown;
   toolMetadata?: Record<string, unknown>;
+  invoking?: string;
+  invoked?: string;
   /** Partial/streaming tool arguments (forwarded to widget via sendToolInputPartial) */
   partialToolInput?: Record<string, unknown>;
   resourceUri: string;
@@ -121,6 +124,8 @@ function MCPAppsRendererBase({
   toolInput,
   toolOutput,
   toolMetadata,
+  invoking,
+  invoked,
   partialToolInput,
   resourceUri,
   readResource,
@@ -1135,26 +1140,46 @@ function MCPAppsRendererBase({
               <Spinner className="size-5" />
             </div>
           )}
-          <SandboxedIframe
-            ref={sandboxRef}
-            html={widgetHtml}
-            sandbox={IFRAME_SANDBOX_PERMISSIONS}
-            csp={widgetCsp}
-            permissions={widgetPermissions}
-            permissive={cspMode === "permissive"}
-            onLoad={() => setIsReady(true)}
-            onMessage={handleSandboxMessage}
-            title={`MCP App: ${toolName}`}
-            className={cn(
-              displayMode === "inline" && "w-full",
-              displayMode === "fullscreen" && "w-full h-full rounded-none",
-              displayMode === "pip" && "w-full h-full",
-              displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
-              "overflow-hidden relative z-20",
-              prefersBorder && "border border-zinc-200 dark:border-zinc-700"
-            )}
-            style={iframeStyle}
-          />
+          <div
+            className="relative w-full"
+            style={{ maxWidth: iframeStyle.maxWidth }}
+          >
+            <div className="absolute -top-8 left-2 z-10 h-full">
+              {/* Status label above the widget — only in inline mode */}
+              {!isPip && !isFullscreen && (invoking || invoked) && (
+                <div className="whitespace-nowrap">
+                  {invoking && !toolOutput && (
+                    <TextShimmer className="text-xs ">{invoking}</TextShimmer>
+                  )}
+                  {invoked && !!toolOutput && (
+                    <span className="text-xs text-muted-foreground">
+                      {invoked}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <SandboxedIframe
+              ref={sandboxRef}
+              html={widgetHtml}
+              sandbox={IFRAME_SANDBOX_PERMISSIONS}
+              csp={widgetCsp}
+              permissions={widgetPermissions}
+              permissive={cspMode === "permissive"}
+              onLoad={() => setIsReady(true)}
+              onMessage={handleSandboxMessage}
+              title={`MCP App: ${toolName}`}
+              className={cn(
+                displayMode === "inline" && "w-full",
+                displayMode === "fullscreen" && "w-full h-full rounded-none",
+                displayMode === "pip" && "w-full h-full",
+                displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
+                "overflow-hidden relative z-20",
+                prefersBorder && "border border-zinc-200 dark:border-zinc-700"
+              )}
+              style={iframeStyle}
+            />{" "}
+          </div>
         </div>
       </div>
     </WidgetWrapper>
@@ -1188,6 +1213,8 @@ function mcpAppsRendererAreEqual(
   if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
   if (prev.className !== next.className) return false;
   if (prev.serverBaseUrl !== next.serverBaseUrl) return false;
+  if (prev.invoking !== next.invoking) return false;
+  if (prev.invoked !== next.invoked) return false;
   return true;
 }
 

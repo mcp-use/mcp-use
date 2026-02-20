@@ -415,13 +415,14 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     }
   }
 
-  // Check if tool should be registered (defaults to true for backward compatibility)
+  // Check if tool should be registered (defaults to false — use exposeAsTool: true to opt in,
+  // or define a custom tool that calls widget() in its handler).
   // Check direct property first (from programmatic API), then fall back to _meta (from file-based widgets)
   const widgetMetadata = enrichedDefinition._meta?.["mcp-use/widget"] as
     | { exposeAsTool?: boolean }
     | undefined;
   const exposeAsTool =
-    enrichedDefinition.exposeAsTool ?? widgetMetadata?.exposeAsTool ?? true;
+    enrichedDefinition.exposeAsTool ?? widgetMetadata?.exposeAsTool ?? false;
 
   // FIX: Propagate newly registered resources to existing sessions independently of tool registration
   // Previously, resource propagation was only done inside addWidgetTool (which requires exposeAsTool=true).

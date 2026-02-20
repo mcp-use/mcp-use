@@ -6,7 +6,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
-import { Check, Copy, History, Maximize, Minimize, Zap } from "lucide-react";
+import {
+  Check,
+  Copy,
+  History,
+  Maximize,
+  Minimize,
+  Play,
+  Zap,
+} from "lucide-react";
 import React, {
   useCallback,
   useEffect,
@@ -559,6 +567,15 @@ export function ToolResultDisplay({
   );
   const hasMcpUIResources = mcpUIResources.length > 0;
 
+  const activeUri = useMemo(
+    () =>
+      appsSdkUri ||
+      mcpAppsResourceUri ||
+      mcpUIResources[0]?.resource?.uri ||
+      null,
+    [appsSdkUri, mcpAppsResourceUri, mcpUIResources]
+  );
+
   // Check if result has content or structuredContent (for formatted/raw toggle)
   const hasContentOrStructured = useMemo(
     () =>
@@ -661,7 +678,7 @@ export function ToolResultDisplay({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
+    <div className="relative flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
       <div className="flex-1 overflow-y-auto h-full">
         <div className="space-y-0 flex flex-col flex-1 h-full">
           <div
@@ -690,19 +707,6 @@ export function ToolResultDisplay({
               hasMcpAppsResource ||
               hasMcpUIResources) && (
               <div className="flex items-center gap-4 sm:ml-4">
-                {/* Show URI if available */}
-                {(appsSdkUri ||
-                  mcpAppsResourceUri ||
-                  mcpUIResources[0]?.resource?.uri) && (
-                  <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
-                    URI:{" "}
-                    {appsSdkUri ||
-                      mcpAppsResourceUri ||
-                      mcpUIResources[0]?.resource?.uri ||
-                      "No URI"}
-                  </span>
-                )}
-
                 {/* Dynamic view mode buttons */}
                 <div className="flex items-center gap-2">
                   {availableViews.map((view, index) => (
@@ -754,6 +758,18 @@ export function ToolResultDisplay({
             )}
 
             <div className="ml-auto flex items-center gap-1">
+              {isMaximized && onRerunTool && (
+                <Button
+                  data-testid="tool-result-rerun"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRerunTool}
+                  title="Re-run with same arguments"
+                >
+                  <Play className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-1">Re-run</span>
+                </Button>
+              )}
               {(hasMcpAppsResource ||
                 hasAppsSdkResource ||
                 hasMcpUIResources) &&
@@ -837,7 +853,7 @@ export function ToolResultDisplay({
             }
 
             // Render based on selected view mode
-            return (() => {
+            const widgetContent = (() => {
               // Show loading state while view mode is initializing
               if (!viewMode) {
                 return (
@@ -896,6 +912,16 @@ export function ToolResultDisplay({
                         serverId={serverId}
                         readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
+                        invoking={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoking"
+                          ] as string
+                        }
+                        invoked={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoked"
+                          ] as string
+                        }
                       />
                     </div>
                   );
@@ -936,6 +962,16 @@ export function ToolResultDisplay({
                       <MCPAppsRenderer
                         key={`mcp-apps-${result.timestamp}`}
                         serverId={serverId}
+                        invoking={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoking"
+                          ] as string
+                        }
+                        invoked={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoked"
+                          ] as string
+                        }
                         toolCallId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
                         toolInput={memoizedArgs}
@@ -1064,9 +1100,22 @@ export function ToolResultDisplay({
                   return null;
               }
             })();
+
+            return widgetContent;
           })()}
         </div>
       </div>
+
+      {activeUri &&
+        (viewMode === "chatgpt-app" ||
+          viewMode === "mcp-apps" ||
+          viewMode === "mcp-ui") && (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">
+              {activeUri}
+            </span>
+          </div>
+        )}
     </div>
   );
 }

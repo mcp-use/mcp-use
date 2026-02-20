@@ -691,7 +691,7 @@ if (container && Component) {
               props: schemaField,
               html: html,
               dev: true,
-              exposeAsTool: metadata.exposeAsTool ?? true,
+              exposeAsTool: metadata.exposeAsTool ?? false,
             },
             ui: {},
             // mcp-use private extension: props schema for inspector PropsConfigDialog.
@@ -1006,13 +1006,14 @@ export default PostHog;
     },
   };
 
-  // Suppress spurious full-page reloads from Vite HMR on initial widget load.
   // Suppress all full-page reloads for widgets. The widgetHmrPlugin makes
   // widget files self-accepting (import.meta.hot.accept()), so React Fast
   // Refresh handles component updates at the module level. Full-page reloads
-  // are never needed because the HTML template is static. Without this,
-  // server-side HMR sync (SSR metadata extraction) triggers module graph
-  // invalidations that send spurious full-reload messages to the browser.
+  // must be suppressed because widgets run inside iframes that receive host
+  // context (window.openai props) via postMessage — a reload would wipe that
+  // state. Dep re-optimization reloads are also suppressed; instead we rely
+  // on optimizeDeps.include + resolve.dedupe to pre-bundle all React deps
+  // in a single pass, preventing duplicate React instances.
   const suppressFullReloadPlugin = {
     name: "suppress-widget-full-reload",
     configureServer(srv: any) {
@@ -1055,6 +1056,7 @@ export default PostHog;
     "react/jsx-dev-runtime",
     "react-dom",
     "react-dom/client",
+    "mcp-use/react",
   ];
 
   const hmrPort = await findAvailablePort(DEFAULT_HMR_PORT);
@@ -1073,6 +1075,7 @@ export default PostHog;
       react(),
     ],
     resolve: {
+      dedupe: ["react", "react-dom"],
       alias: {
         "@": pathHelpers.join(getCwd(), resourcesDir),
       },

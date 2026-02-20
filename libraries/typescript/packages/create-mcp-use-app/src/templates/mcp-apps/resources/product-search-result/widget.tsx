@@ -28,6 +28,8 @@ export const widgetMetadata: WidgetMetadata = {
   exposeAsTool: false,
   metadata: {
     prefersBorder: false,
+    invoking: "Loading product search results...",
+    invoked: "Product search results loaded",
     csp: {
       // Widget-specific
       resourceDomains: ["https://cdn.openai.com"],

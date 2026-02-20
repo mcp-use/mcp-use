@@ -273,11 +273,11 @@ export function MCPAppsDebugControls({
   const declaredCsp = widget?.declaredCsp;
   const effectivePolicy = widget?.effectivePolicy;
   const suggestedFix =
-    playground.cspMode === "widget-declared" && cspViolations.length > 0
+    cspViolations.length > 0
       ? computeSuggestedFix(cspViolations, declaredCsp)
       : null;
   const agentPrompt =
-    cspViolations.length > -1
+    cspViolations.length > 0
       ? buildAgentCspPrompt(
           declaredCsp,
           effectivePolicy,
@@ -637,7 +637,13 @@ export function MCPAppsDebugControls({
                   <ShieldCheck className="size-3.5" />
                 )}
                 {cspViolations.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white leading-none">
+                  <span
+                    className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold text-white leading-none ${
+                      playground.cspMode === "permissive"
+                        ? "bg-yellow-500"
+                        : "bg-red-500"
+                    }`}
+                  >
                     {cspViolations.length > 99 ? "99+" : cspViolations.length}
                   </span>
                 )}
@@ -647,7 +653,8 @@ export function MCPAppsDebugControls({
           <TooltipContent>
             CSP:{" "}
             {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
-            {cspViolations.length > 0 && ` · ${cspViolations.length} blocked`}
+            {cspViolations.length > 0 &&
+              ` · ${cspViolations.length} ${playground.cspMode === "permissive" ? "would be blocked" : "blocked"}`}
           </TooltipContent>
         </Tooltip>
         <DialogContent
@@ -857,9 +864,18 @@ export function MCPAppsDebugControls({
           {cspViolations.length > 0 && (
             <div className="mt-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
-                  {cspViolations.length} blocked request
-                  {cspViolations.length !== 1 ? "s" : ""}
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wide ${
+                    playground.cspMode === "permissive"
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {cspViolations.length}{" "}
+                  {playground.cspMode === "permissive"
+                    ? "would-be-blocked"
+                    : "blocked"}{" "}
+                  request{cspViolations.length !== 1 ? "s" : ""}
                 </span>
                 <button
                   className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 underline"

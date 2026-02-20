@@ -112,6 +112,10 @@ server.uiResource({
     },
     prefersBorder: true,
 
+    // Invocation status text — shown in inspector and ChatGPT while tool runs / after completion
+    invoking: "Fetching weather...",   // auto-default: "Loading weather-display..."
+    invoked: "Weather loaded",         // auto-default: "weather-display ready"
+
     // ChatGPT-specific metadata (optional)
     widgetDescription: "Displays current weather conditions",
   },
@@ -623,11 +627,13 @@ Complete mapping from Apps SDK to MCP Apps metadata:
 | `redirect_domains`             | `redirectDomains`     | Array of redirect domains (ChatGPT-specific)            |
 | `script_directives`            | `scriptDirectives`    | Array of script CSP directives                          |
 | `style_directives`             | `styleDirectives`     | Array of style CSP directives                           |
-| `"openai/widgetPrefersBorder"` | `prefersBorder`       | Boolean                                                 |
-| `"openai/widgetDomain"`        | `domain`              | String (custom domain)                                  |
-| `"openai/widgetDescription"`   | `widgetDescription`   | String (widget description)                             |
-| `"openai/widgetAccessible"`    | `widgetAccessible`    | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
-| `"openai/locale"`              | `locale`              | String (ChatGPT-specific, can stay in appsSdkMetadata)  |
+| `"openai/widgetPrefersBorder"`         | `prefersBorder`       | Boolean                                                 |
+| `"openai/widgetDomain"`                | `domain`              | String (custom domain)                                  |
+| `"openai/widgetDescription"`           | `widgetDescription`   | String (widget description)                             |
+| `"openai/widgetAccessible"`            | `widgetAccessible`    | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
+| `"openai/locale"`                      | `locale`              | String (ChatGPT-specific, can stay in appsSdkMetadata)  |
+| `"openai/toolInvocation/invoking"`     | `invoking`            | String — status text while tool runs (auto-defaulted)   |
+| `"openai/toolInvocation/invoked"`      | `invoked`             | String — status text after tool completes (auto-defaulted) |
 
 See [Content Security Policy](./content-security-policy) for full CSP configuration and field details.
 

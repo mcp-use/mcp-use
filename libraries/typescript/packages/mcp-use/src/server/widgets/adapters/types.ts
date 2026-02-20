@@ -158,6 +158,24 @@ export interface UnifiedWidgetMetadata {
   autoResize?: boolean;
 
   /**
+   * Status text shown while the tool is running.
+   * Automatically maps to `openai/toolInvocation/invoking` in tool metadata.
+   * Defaults to `"Loading {name}..."` if not set.
+   *
+   * @example "Fetching weather data..."
+   */
+  invoking?: string;
+
+  /**
+   * Status text shown after the tool completes.
+   * Automatically maps to `openai/toolInvocation/invoked` in tool metadata.
+   * Defaults to `"{name} ready"` if not set.
+   *
+   * @example "Weather data loaded"
+   */
+  invoked?: string;
+
+  /**
    * Allow arbitrary additional properties for future spec evolution
    */
   [key: string]: any;

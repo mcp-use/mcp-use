@@ -5,6 +5,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import { Command } from "cmdk";
 import {
+  BrushCleaning,
   ExternalLink,
   FileText,
   History,
@@ -306,6 +307,35 @@ export function CommandPalette({
       category: "Community",
       action: () => window.open("https://discord.gg/XkNkSkMz3V", "_blank"),
     },
+    {
+      id: "clear-localstorage",
+      name: "Clear localStorage & Reload",
+      description:
+        "Having trouble connecting? Clear stored auth data and refresh",
+      type: "global",
+      category: "Troubleshooting",
+      action: () => {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            (key.startsWith("mcp:auth") || key.startsWith("mcp-inspector"))
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key));
+        toast.success(
+          `Cleared ${keysToRemove.length} localStorage item(s). Refreshing page...`,
+          { duration: 2000 }
+        );
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+        onOpenChange(false);
+      },
+    },
   ];
 
   // Create server selection items
@@ -547,6 +577,13 @@ export function CommandPalette({
           return (
             <div className="bg-purple-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
               <DiscordIcon className="h-4 w-4 text-purple-500" />
+            </div>
+          );
+        }
+        if (category === "Troubleshooting") {
+          return (
+            <div className="bg-yellow-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+              <BrushCleaning className="h-4 w-4 text-yellow-500" />
             </div>
           );
         }

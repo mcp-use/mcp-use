@@ -115,7 +115,7 @@ export default function WeatherDisplay() {
 **Key requirements:**
 1. Export `widgetMetadata` with props schema
 2. Infer type from schema and pass to `useWidget<Props>()`
-3. Set `exposeAsTool: false` to avoid duplicate registration
+3. `exposeAsTool` defaults to `false` — correct when pairing with a custom tool
 4. Wrap root in `<McpUseProvider autoSize>`
 5. **Always check `isPending` before accessing `props`**
 
@@ -138,14 +138,30 @@ export const widgetMetadata: WidgetMetadata = {
       value: z.number()
     }))
   }),
-  exposeAsTool: false  // Always false for custom widgets
+  exposeAsTool: false  // Default; omit or set explicitly when pairing with a custom tool
 };
 ```
 
 **Fields:**
 - `description` - What the widget displays/does
 - `props` - Zod schema defining expected props shape
-- `exposeAsTool` - Set to `false` for widgets paired with custom tools
+- `exposeAsTool` - Set to `true` to auto-register as a tool (default: `false`)
+- `metadata.invoking` - Status text shown in inspector while tool runs (auto-default: `"Loading {name}..."`)
+- `metadata.invoked` - Status text shown in inspector after tool completes (auto-default: `"{name} ready"`)
+
+```typescript
+export const widgetMetadata: WidgetMetadata = {
+  description: "Display weather information for a city",
+  props: propsSchema,
+  metadata: {
+    invoking: "Fetching weather...", // Shimmer text while tool runs
+    invoked: "Weather loaded",       // Static text when complete
+    csp: { connectDomains: ["https://api.weather.com"] },
+  },
+};
+```
+
+These status texts appear as animated shimmer text (pending) and static text (complete) in the MCP Inspector and ChatGPT. The values also flow to `openai/toolInvocation/invoking`/`invoked` in tool metadata automatically.
 
 ---
 
@@ -508,20 +524,20 @@ export default function GoodWidget() {
 }
 ```
 
-### ❌ Missing exposeAsTool: false
+### `exposeAsTool` — default is `false`
 ```typescript
-// ❌ Bad - Creates duplicate tool
+// ✅ Default — widget is a resource only, exposed via a custom tool
 export const widgetMetadata: WidgetMetadata = {
   description: "...",
   props: z.object({ ... })
-  // Missing exposeAsTool: false
+  // exposeAsTool defaults to false
 };
 
-// ✅ Good
+// ✅ Explicit opt-in to auto-registration
 export const widgetMetadata: WidgetMetadata = {
   description: "...",
   props: z.object({ ... }),
-  exposeAsTool: false  // Prevents duplicate
+  exposeAsTool: true  // Auto-registers widget as a tool
 };
 ```
 

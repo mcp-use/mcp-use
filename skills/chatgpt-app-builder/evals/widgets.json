@@ -13,7 +13,7 @@
   },
   {
     "query": "I'm getting duplicate tool registration for my widget",
-    "expected_behavior": "Widget has exposeAsTool: true (default) AND custom tool with widget: { name }. Fix: set exposeAsTool: false on widgetMetadata."
+    "expected_behavior": "Widget has exposeAsTool: true AND custom tool with widget: { name }. Fix: remove exposeAsTool: true from widgetMetadata (default is false) since the custom tool handles registration."
   },
   {
     "query": "Show me how to build a product search widget with filter bar and product cards",

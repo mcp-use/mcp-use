@@ -425,9 +425,9 @@ export function createWidgetRegistration(
   const description =
     (metadata.description as string | undefined) || `Widget: ${widgetName}`;
   const title = (metadata.title as string | undefined) || widgetName;
-  // Extract exposeAsTool flag (defaults to true if not specified)
+  // Extract exposeAsTool flag (defaults to false — use exposeAsTool: true to opt in)
   const exposeAsTool =
-    metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : true;
+    metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : false;
 
   // Auto-detect widget type based on metadata presence:
   // - Default → mcpApps (dual-protocol for both ChatGPT and MCP Apps clients)
@@ -531,6 +531,8 @@ export function createWidgetRegistration(
       type: "mcpApps" as const,
       metadata: {
         description,
+        invoking: `Loading ${widgetName}...`,
+        invoked: `${widgetName} ready`,
         ...((metadata.metadata as Record<string, unknown> | undefined) || {}),
       },
       // Include appsSdkMetadata if provided for advanced ChatGPT features
