@@ -33,7 +33,7 @@ server.listen();
 With a `.env` file:
 
 ```bash
-MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-subdomain
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app
 ```
 
 That's it. JWT verification, OAuth discovery, and token proxying are handled automatically.
@@ -44,7 +44,7 @@ That's it. JWT verification, OAuth discovery, and token proxying are handled aut
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` | Yes | Your AuthKit subdomain (e.g., `my-company`) |
+| `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` | Yes | Your full AuthKit domain (e.g., `my-company.authkit.app`) |
 | `MCP_USE_OAUTH_WORKOS_CLIENT_ID` | No | Pre-registered OAuth client ID. Omit for DCR mode |
 | `MCP_USE_OAUTH_WORKOS_API_KEY` | No | WorkOS API key for making WorkOS API calls |
 
@@ -52,7 +52,7 @@ That's it. JWT verification, OAuth discovery, and token proxying are handled aut
 
 WorkOS Dashboard → **Domains** tab → **AuthKit Domain**
 
-The subdomain is the part before `.authkit.app`. For example, if your AuthKit domain is `my-company.authkit.app`, the subdomain is `my-company`.
+Use the **full AuthKit domain** including `.authkit.app`. For example, if your AuthKit domain is `my-company.authkit.app`, set the value to `my-company.authkit.app` (not just `my-company`).
 
 ---
 
@@ -68,7 +68,7 @@ Explicit config (overrides env vars):
 
 ```typescript
 oauth: oauthWorkOSProvider({
-  subdomain: "my-company",
+  subdomain: "my-company.authkit.app",
   clientId: "client_01KB5DRXBDDY1VGCBKY108SKJW",  // optional
   apiKey: "sk_test_...",                             // optional
   verifyJwt: false,                                  // development only
@@ -77,7 +77,7 @@ oauth: oauthWorkOSProvider({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `subdomain` | `string` | env var | AuthKit subdomain |
+| `subdomain` | `string` | env var | Full AuthKit domain (e.g., `my-company.authkit.app`) |
 | `clientId` | `string?` | env var | Pre-registered client ID. Omit for DCR |
 | `apiKey` | `string?` | env var | WorkOS API key |
 | `verifyJwt` | `boolean?` | `true` | Set `false` to skip JWT verification (development only) |
@@ -180,8 +180,8 @@ server.tool(
 ## Example `.env`
 
 ```bash
-# Required: AuthKit subdomain (WorkOS Dashboard → Domains → AuthKit Domain)
-MCP_USE_OAUTH_WORKOS_SUBDOMAIN=my-company
+# Required: Full AuthKit domain (WorkOS Dashboard → Domains → AuthKit Domain)
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=my-company.authkit.app
 
 # Optional: Pre-registered OAuth client ID (omit for DCR mode)
 # MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_01KB5DRXBDDY1VGCBKY108SKJW

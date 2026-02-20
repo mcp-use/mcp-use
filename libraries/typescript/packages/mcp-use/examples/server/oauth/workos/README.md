@@ -87,7 +87,7 @@ Create a `.env` file with these variables:
 
 ```bash
 # Your AuthKit subdomain - REQUIRED
-MCP_USE_OAUTH_WORKOS_SUBDOMAIN=imaginative-palm-54-staging
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=imaginative-palm-54-staging.authkit.app
 
 # Your pre-registered OAuth client ID - REQUIRED for this mode
 MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_01KB5DRXBDDY1VGCBKY108SKJW
@@ -297,7 +297,7 @@ CMD ["npm", "start"]
 ```bash
 WORKOS_CLIENT_ID=client_...
 WORKOS_API_KEY=sk_live_...  # Use production key
-WORKOS_SUBDOMAIN=your-production-subdomain
+WORKOS_SUBDOMAIN=your-company.authkit.app
 NODE_ENV=production
 ```
 
@@ -357,7 +357,7 @@ NODE_ENV=production
 
 **Solutions**:
 
-- Verify your `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` environment variable is correct (just the subdomain, not the full URL)
+- Verify your `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` environment variable is the full AuthKit domain (e.g., `my-company.authkit.app`, not just `my-company`)
 - Check that your `WORKOS_API_KEY` is valid and not expired
 - Ensure the token is being sent in the `Authorization: Bearer <token>` header
 
