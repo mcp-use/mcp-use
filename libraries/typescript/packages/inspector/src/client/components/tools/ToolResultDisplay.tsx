@@ -65,6 +65,18 @@ interface ToolResultDisplayProps {
   isMaximized?: boolean;
 }
 
+// Isolated component so 1s interval doesn't re-render parent (and thus widget iframe)
+function RelativeTimeDisplay({ timestamp }: { timestamp: number }) {
+  const [label, setLabel] = useState(() => getRelativeTime(timestamp));
+  useEffect(() => {
+    const update = () => setLabel(getRelativeTime(timestamp));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [timestamp]);
+  return <span>{label}</span>;
+}
+
 // Helper function to format relative time
 function getRelativeTime(timestamp: number): string {
   const now = Date.now();
@@ -360,7 +372,6 @@ export function ToolResultDisplay({
   isMaximized = false,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [relativeTime, setRelativeTime] = useState<string>("");
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
   const [viewMode, setViewMode] = useState<ViewMode | null>(null); // Let effect initialize
   const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
@@ -410,19 +421,6 @@ export function ToolResultDisplay({
     hasSeenComponentViewRef.current = false;
     setViewMode(null);
   }, [currentResult?.toolName]);
-
-  // Update relative time every second
-  useEffect(() => {
-    const updateTime = () => {
-      if (result) {
-        setRelativeTime(getRelativeTime(result.timestamp));
-      }
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, [result]);
 
   // Memoize result.args and result.result to prevent unnecessary re-renders
   // in OpenAIComponentRenderer when only relativeTime changes
@@ -758,7 +756,7 @@ export function ToolResultDisplay({
                     <SelectValue>
                       <div className="flex items-center gap-1">
                         <History className="h-3 w-3" />
-                        <span>{relativeTime}</span>
+                        <RelativeTimeDisplay timestamp={result.timestamp} />
                       </div>
                     </SelectValue>
                   </SelectTrigger>
@@ -890,18 +888,6 @@ export function ToolResultDisplay({
                     );
                   }
 
-                  // Extract widget props from toolOutput._meta (same as OpenAI renderer)
-                  const metaSource = memoizedResult?._meta;
-                  const widgetProps = metaSource?.["mcp-use/props"] || null;
-
-                  // Merge widget props (from output) with custom props (from debug controls) and tool args
-                  // Priority: activeProps > widgetProps > memoizedArgs
-                  const finalToolInput = {
-                    ...(memoizedArgs || {}),
-                    ...(widgetProps || {}),
-                    ...(activeProps || {}),
-                  };
-
                   return (
                     <div className="flex-1 relative">
                       {/* Floating controls in top-right */}
@@ -925,12 +911,13 @@ export function ToolResultDisplay({
                         serverId={serverId}
                         toolCallId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
-                        toolInput={finalToolInput}
+                        toolInput={memoizedArgs}
                         toolOutput={memoizedResult}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
                         readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
+                        customProps={activeProps || undefined}
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}

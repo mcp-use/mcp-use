@@ -23,6 +23,7 @@ import { useResourceProps, type PropPreset } from "../hooks/useResourceProps";
 import type { LLMConfig } from "./chat/types";
 import { IframeConsole } from "./IframeConsole";
 import { PropsConfigDialog } from "./resources/PropsConfigDialog";
+import { JSONDisplay } from "./shared/JSONDisplay";
 import { SafeAreaInsetsEditor } from "./ui-playground/shared/SafeAreaInsetsEditor";
 import { Button } from "./ui/button";
 import {
@@ -55,6 +56,8 @@ interface MCPAppsDebugControlsProps {
   llmConfig?: LLMConfig | null;
   resource?: Resource | null;
   onPropsChange?: (props: Record<string, string> | null) => void;
+  /** When set, auto-opens the props popover with a hint listing these required prop names */
+  requiredProps?: string[];
   // Dual-protocol support
   protocol?: "apps-sdk" | "mcp-apps";
   onUpdateGlobals?: (updates: {
@@ -84,6 +87,7 @@ export function MCPAppsDebugControls({
   llmConfig,
   resource,
   onPropsChange,
+  requiredProps,
   protocol = "mcp-apps",
   onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
@@ -102,6 +106,15 @@ export function MCPAppsDebugControls({
     getActiveProps,
   } = useResourceProps(resourceUri);
   const [propsDialogOpen, setPropsDialogOpen] = useState(false);
+
+  // Controlled props popover — auto-opens when required props are missing
+  const hasRequiredProps = !!requiredProps?.length;
+  const missingProps = hasRequiredProps && !activePresetId;
+  const [propsPopoverOpen, setPropsPopoverOpen] = useState(() => missingProps);
+
+  useEffect(() => {
+    if (missingProps) setPropsPopoverOpen(true);
+  }, [missingProps]);
   const [editingPreset, setEditingPreset] = useState<PropPreset | null>(null);
   const [deviceDialogOpen, setDeviceDialogOpen] = useState(false);
   const [localeDialogOpen, setLocaleDialogOpen] = useState(false);
@@ -120,32 +133,30 @@ export function MCPAppsDebugControls({
     getDefaultSelectValue()
   );
 
-  // Update select value when active preset changes
+  // Update select value when active preset changes.
+  // In tool context, never auto-apply a localStorage preset on mount —
+  // the tool result's structuredContent is authoritative. The user can
+  // still manually pick a preset from the dropdown.
   useEffect(() => {
-    if (activePresetId) {
+    if (activePresetId && propsContext !== "tool") {
       setSelectValue(activePresetId);
     } else if (
       selectValue !== NO_PROPS_VALUE &&
       selectValue !== TOOL_PROPS_VALUE
     ) {
-      // If no active preset and not a special value, reset to default
       setSelectValue(getDefaultSelectValue());
     }
-  }, [activePresetId, selectValue, getDefaultSelectValue]);
+  }, [activePresetId, selectValue, getDefaultSelectValue, propsContext]);
 
   // Notify parent of props changes
   useEffect(() => {
     if (!onPropsChange) return;
 
-    if (selectValue === NO_PROPS_VALUE) {
+    if (selectValue === NO_PROPS_VALUE || selectValue === TOOL_PROPS_VALUE) {
+      // Both "None" and "Tool Props" mean no custom override — use natural tool result flow.
+      // Per SEP-1865, widget props come from structuredContent in the tool result, not from
+      // tool call arguments; overriding with args would erase the real structured data.
       onPropsChange(null);
-    } else if (selectValue === TOOL_PROPS_VALUE && toolInput) {
-      // Convert toolInput to string props
-      const stringProps: Record<string, string> = {};
-      Object.entries(toolInput).forEach(([key, value]) => {
-        stringProps[key] = String(value);
-      });
-      onPropsChange(stringProps);
     } else if (activePresetId) {
       const props = getActiveProps();
       onPropsChange(props);
@@ -609,103 +620,144 @@ export function MCPAppsDebugControls({
         </PopoverContent>
       </Popover>
 
-      {/* Props Selection */}
-      <Popover>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
+      {/* Props Button — JSON viewer in tool context, preset picker in resource context */}
+      {propsContext === "tool" ? (
+        <Dialog>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                  data-testid="debugger-props-button"
+                >
+                  <Braces className="size-3.5" />
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent>View Tool Props</TooltipContent>
+          </Tooltip>
+          <DialogContent
+            className="sm:max-w-[600px]"
+            data-testid="debugger-props-dialog"
+          >
+            <DialogHeader>
+              <DialogTitle>Tool Props</DialogTitle>
+            </DialogHeader>
+            <div className="overflow-auto max-h-[60vh] rounded-md bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-3">
+              <JSONDisplay data={toolInput ?? {}} filename="tool-props.json" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        <Popover open={propsPopoverOpen} onOpenChange={setPropsPopoverOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={`h-8 w-8 p-0 backdrop-blur-sm shadow-sm ${
+                    missingProps
+                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 animate-pulse"
+                      : "bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900"
+                  }`}
+                  data-testid="debugger-props-button"
+                >
+                  <Braces
+                    className={`size-3.5 ${missingProps ? "text-amber-500" : ""}`}
+                  />
+                </Button>
+              </PopoverTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+              Props:{" "}
+              {selectValue === NO_PROPS_VALUE
+                ? "No Props"
+                : selectValue === TOOL_PROPS_VALUE
+                  ? "Tool Props"
+                  : presets.find((p) => p.id === selectValue)?.name || "Custom"}
+            </TooltipContent>
+          </Tooltip>
+          <PopoverContent
+            className="w-64 p-2"
+            data-testid="debugger-props-popover"
+          >
+            {missingProps && (
+              <div className="mb-2 rounded-md border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-0.5">
+                  Props required to render this widget:
+                </p>
+                <p className="text-xs font-mono text-amber-600 dark:text-amber-400">
+                  {requiredProps!.join(", ")}
+                </p>
+                <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">
+                  Create a preset below to set them.
+                </p>
+              </div>
+            )}
+            <div className="space-y-1">
               <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                data-testid="debugger-props-button"
-              >
-                <Braces className="size-3.5" />
-              </Button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            Props:{" "}
-            {selectValue === NO_PROPS_VALUE
-              ? "No Props"
-              : selectValue === TOOL_PROPS_VALUE
-                ? "Tool Props"
-                : presets.find((p) => p.id === selectValue)?.name || "Custom"}
-          </TooltipContent>
-        </Tooltip>
-        <PopoverContent
-          className="w-64 p-2"
-          data-testid="debugger-props-popover"
-        >
-          <div className="space-y-1">
-            <Button
-              variant={selectValue === NO_PROPS_VALUE ? "default" : "ghost"}
-              size="sm"
-              className="w-full justify-start"
-              onClick={() => handleValueChange(NO_PROPS_VALUE)}
-              data-testid="debugger-props-no-props"
-            >
-              No Props
-            </Button>
-
-            {propsContext === "tool" && toolInput && (
-              <Button
-                variant={selectValue === TOOL_PROPS_VALUE ? "default" : "ghost"}
+                variant={selectValue === NO_PROPS_VALUE ? "secondary" : "ghost"}
                 size="sm"
                 className="w-full justify-start"
-                onClick={() => handleValueChange(TOOL_PROPS_VALUE)}
-                data-testid="debugger-props-tool-props"
+                onClick={() => handleValueChange(NO_PROPS_VALUE)}
+                data-testid="debugger-props-no-props"
               >
-                Props from Tool
+                No Props
               </Button>
-            )}
 
-            {presets.map((preset) => (
-              <div key={preset.id} className="relative group flex items-center">
-                <Button
-                  variant={selectValue === preset.id ? "default" : "ghost"}
-                  size="sm"
-                  className="w-full justify-start pr-14"
-                  onClick={() => handleValueChange(preset.id)}
-                  data-testid={`debugger-props-preset-${preset.id}`}
+              {presets.map((preset) => (
+                <div
+                  key={preset.id}
+                  className="relative group flex items-center"
                 >
-                  {preset.name}
-                </Button>
-                <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
-                    variant="ghost"
+                    variant={selectValue === preset.id ? "secondary" : "ghost"}
                     size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={(e) => handleEditPreset(preset, e)}
-                    data-testid={`debugger-props-edit-${preset.id}`}
+                    className="w-full justify-start pr-14"
+                    onClick={() => handleValueChange(preset.id)}
+                    data-testid={`debugger-props-preset-${preset.id}`}
                   >
-                    <Settings className="h-3 w-3" />
+                    {preset.name}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0"
-                    onClick={(e) => handleDeletePreset(preset.id, e)}
-                    data-testid={`debugger-props-delete-${preset.id}`}
-                  >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
+                  <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => handleEditPreset(preset, e)}
+                      data-testid={`debugger-props-edit-${preset.id}`}
+                    >
+                      <Settings className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => handleDeletePreset(preset.id, e)}
+                      data-testid={`debugger-props-delete-${preset.id}`}
+                    >
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-primary"
-              onClick={() => handleValueChange(CREATE_PRESET_VALUE)}
-              data-testid="debugger-props-create-preset"
-            >
-              + Create Preset...
-            </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-primary"
+                onClick={() => handleValueChange(CREATE_PRESET_VALUE)}
+                data-testid="debugger-props-create-preset"
+              >
+                + Create Preset...
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+      )}
 
       {/* Console - uses IframeConsole drawer like Apps SDK */}
       <IframeConsole iframeId={toolCallId} enabled={true} />

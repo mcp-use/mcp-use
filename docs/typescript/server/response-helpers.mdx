@@ -422,7 +422,15 @@ server.tool({
 
 ### widget()
 
-Creates a response that returns runtime data for an OpenAI Apps SDK widget. Used in conjunction with the `widget` config on your tool definition.
+Creates a response for a tool that returns a widget. Used in conjunction with the `widget` config on your tool definition.
+
+Per the [MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps), the tool result has three fields with different visibility:
+
+| Field | LLM sees it? | Widget sees it? | Populated by |
+|---|---|---|---|
+| `content` | **Yes** | Yes | `output` or `message` |
+| `structuredContent` | **No** | Yes (as `props`) | `props` |
+| `_meta` | **No** | Yes (as `metadata`) | `metadata` |
 
 <Note>
   The `widget()` helper only handles **runtime data**. Widget configuration
@@ -438,47 +446,54 @@ server.tool(
   {
     name: "show-weather",
     schema: z.object({ city: z.string() }),
-    // Widget configuration goes here (registration-time)
     widget: {
-      name: "weather-display", // Must match widget in resources/
+      name: "weather-display",
       invoking: "Fetching weather data...",
       invoked: "Weather data loaded",
-      widgetAccessible: true,
-      resultCanProduceWidget: true,
     },
   },
   async ({ city }) => {
     const weatherData = await fetchWeather(city);
 
-    // widget() helper returns runtime data only
     return widget({
       props: {
         city,
         temperature: weatherData.temp,
         conditions: weatherData.conditions,
-        humidity: weatherData.humidity,
       },
       output: text(
         `Weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`
       ),
-      message: `Showing weather for ${city}`,
     });
   }
 );
 ```
 
+With extra metadata for the widget:
+
+```typescript
+return widget({
+  props: { items: filteredItems },
+  metadata: { totalCount: 1000, nextCursor: "abc123" },
+  output: text(`Showing ${filteredItems.length} of 1000 results`),
+});
+```
+
 **Parameters:**
 
-- `props` - Widget-only data passed to `useWidget().props` in your widget component (hidden from the model)
-- `output` - Optional response helper (text(), object(), etc.) that defines what the model sees
-- `message` - Optional text message override (used if no output provided)
+| Parameter | Type | Description |
+|---|---|---|
+| `props` | `Record<string, any>` | Widget rendering data. Sent as `structuredContent` (LLM does **not** see). Widget reads via `useWidget().props`. |
+| `output` | `CallToolResult` | Response helper (text(), object(), etc.) defining what the LLM sees in `content`. |
+| `metadata` | `Record<string, unknown>` | Extra data for the widget in `_meta`. Widget reads via `useWidget().metadata`. |
+| `message` | `string` | Optional text override for `content` (used instead of `output`). |
 
-**Returns**: `CallToolResult` with widget props in `_meta["mcp-use/props"]` and tool output in `content`
+**Returns**: `CallToolResult` with `structuredContent` (props), `content` (LLM text), and `_meta` (metadata)
 
 <Tip>
   The widget name must match a `.tsx` file or folder in your `resources/`
-  directory. The widget will receive the `props` data via the `useWidget()`
-  hook, while the model sees the `output` or `message` in the conversation.
+  directory. The widget receives `props` via `useWidget().props` and `metadata`
+  via `useWidget().metadata`, while the model only sees the `output` text.
 </Tip>
 
 ## Using Response Helpers in Prompts and Resources

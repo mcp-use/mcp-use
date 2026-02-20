@@ -6,17 +6,36 @@ import type { z } from "zod";
 import type { CSPConfig } from "../widgets/adapters/types.js";
 
 export interface WidgetMetadata {
+  /**
+   * Human-readable title for the widget.
+   *
+   * @example "Weather Display"
+   * @example "Product Search Results"
+   */
   title?: string;
+  /**
+   * Description of what the widget displays.
+   * Used by auto-registered tool descriptions and shown to the model.
+   *
+   * @example "Display fruit search results"
+   * @example "Display weather information for a city"
+   */
   description?: string;
-  /** Zod schema for widget props validation (preferred) or InputDefinition array */
-  props?: z.ZodObject<any> | InputDefinition[];
+  /**
+   * Zod schema for widget props validation (preferred) or InputDefinition array.
+   * Props are auto-typed into the component signature.
+   *
+   * @example z.object({ city: z.string(), temperature: z.number() })
+   */
+  props?: z.ZodTypeAny | InputDefinition[];
   /** @deprecated Use `props` instead - Zod schema for widget input validation */
-  inputs?: z.ZodObject<any> | InputDefinition[];
+  inputs?: z.ZodTypeAny | InputDefinition[];
   /** @deprecated Use `props` instead - Alias for props to align with tool naming convention */
-  schema?: z.ZodObject<any> | InputDefinition[];
+  schema?: z.ZodTypeAny | InputDefinition[];
   /**
    * For auto-registered widgets: function or helper that generates the tool output (what the model sees).
    * If not provided, defaults to a summary message.
+   *
    * @example
    * ```typescript
    * // As a function
@@ -37,10 +56,14 @@ export interface WidgetMetadata {
         | import("../utils/response-helpers.js").TypedCallToolResult<any>)
     | CallToolResult
     | import("../utils/response-helpers.js").TypedCallToolResult<any>;
-  /** Control automatic tool registration (defaults to true) */
+  /**
+   * Whether to auto-register this widget as an MCP tool (defaults to true).
+   * Set to false when the widget is paired with a custom server.tool().
+   */
   exposeAsTool?: boolean;
   /** Annotations for both resource and tool - supports both ResourceAnnotations and ToolAnnotations */
   annotations?: ResourceAnnotations & Partial<ToolAnnotations>;
+  /** Optional metadata for the widget */
   _meta?: Record<string, unknown>;
 
   /**

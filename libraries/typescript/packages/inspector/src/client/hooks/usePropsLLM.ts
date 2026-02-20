@@ -17,6 +17,34 @@ export interface GeneratedProp {
   value: string;
 }
 
+/** Extract the outermost JSON object from LLM response (handles markdown code blocks and nested JSON). */
+function extractOutermostJsonObject(
+  text: string
+): Record<string, unknown> | null {
+  let raw = text.trim();
+  const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    raw = codeBlockMatch[1].trim();
+  }
+  const start = raw.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  for (let i = start; i < raw.length; i++) {
+    if (raw[i] === "{") depth++;
+    else if (raw[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(raw.slice(start, i + 1)) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export function usePropsLLM({ llmConfig }: UsePropsLLMProps) {
   const llmRef = useRef<{
     instance: any;
@@ -47,11 +75,22 @@ export function usePropsLLM({ llmConfig }: UsePropsLLMProps) {
         const propDescriptions = propNames
           .map((key) => {
             const prop = propsSchema.properties[key];
-            return `  - ${key} (${prop.type || "string"})${prop.description ? `: ${prop.description}` : ""}`;
+            const base = `  - ${key} (${prop.type || "string"})`;
+            const desc = prop.description ? `: ${prop.description}` : "";
+            let itemsHint = "";
+            if (
+              prop.type === "array" &&
+              prop.items?.type === "object" &&
+              prop.items?.properties
+            ) {
+              const itemKeys = Object.keys(prop.items.properties).join(", ");
+              itemsHint = ` — array of objects with keys: {${itemKeys}}`;
+            }
+            return `${base}${itemsHint}${desc}`;
           })
           .join("\n");
 
-        const systemPrompt = `You are helping a developer configure props for a UI widget. The widget has a defined schema with specific props. Generate appropriate values for ONLY the props listed in the schema. Return ONLY a JSON object with these exact keys.`;
+        const systemPrompt = `You are helping a developer configure props for a UI widget. The widget has a defined schema with specific props. Generate appropriate values for ONLY the props listed in the schema. Return ONLY a JSON object with these exact keys. For array props, each item must match the specified structure.`;
 
         const userPrompt = `Widget: ${resource.name || resource.uri}
 Description: ${resourceDescription}
@@ -60,7 +99,7 @@ Props Schema:
 ${propDescriptions}
 
 Generate appropriate default/example values for these props. Return ONLY a JSON object with the exact prop names as keys.
-Example: {"query": "example search term"}`;
+Example: {"query": "example search term", "results": [{"fruit": "Apple", "color": "red"}]}`;
 
         const { SystemMessage, HumanMessage } =
           await import("@langchain/core/messages");
@@ -113,14 +152,18 @@ Example: {"query": "example search term"}`;
         const response = await llmRef.current.instance.invoke(messages);
         const responseText = response.content || response.text || "";
 
-        // Parse JSON response
-        const jsonMatch = responseText.match(/\{[^{}]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return Object.entries(parsed).map(([key, value]) => ({
-            key,
-            value: String(value),
-          }));
+        const parsed = extractOutermostJsonObject(responseText);
+        if (parsed) {
+          const entries: GeneratedProp[] = Object.entries(parsed).map(
+            ([key, value]) => ({
+              key,
+              value:
+                typeof value === "object" && value !== null
+                  ? JSON.stringify(value)
+                  : String(value),
+            })
+          );
+          return entries;
         }
 
         throw new Error("Could not parse props from LLM response");
@@ -210,15 +253,16 @@ Based on this information, suggest 3-5 common customizable properties like theme
 
       // Parse the response to extract key-value pairs
       try {
-        // Try to extract JSON from the response
-        const jsonMatch = responseText.match(/\{[^{}]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          // Convert to GeneratedProp array
-          return Object.entries(parsed).map(([key, value]) => ({
+        const parsed = extractOutermostJsonObject(responseText);
+        if (parsed) {
+          const entries = Object.entries(parsed).map(([key, value]) => ({
             key,
-            value: String(value),
+            value:
+              typeof value === "object" && value !== null
+                ? JSON.stringify(value)
+                : String(value),
           }));
+          return entries;
         }
 
         // Fallback: try to parse lines like "key: value" or "key = value"

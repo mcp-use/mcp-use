@@ -47,99 +47,115 @@ export function PropsConfigDialog({
 }: PropsConfigDialogProps) {
   // Detect props schema from resource metadata
   const propsSchema = useMemo(() => {
-    console.log("[PropsConfigDialog] Schema detection:", {
-      resourceAnnotations,
-      resource,
-      resourceUri: resource.uri,
-      resourceName: resource.name,
-      hasResourceAnnotations: !!resourceAnnotations,
-      resourceAnnotationsKeys: resourceAnnotations
-        ? Object.keys(resourceAnnotations)
-        : [],
-      hasResourceDotAnnotations: !!resource.annotations,
-      resourceDotAnnotationsKeys: resource.annotations
-        ? Object.keys(resource.annotations)
-        : [],
-    });
-
     // Check for mcp-use widget props in _meta["mcp-use/widget"].props
     const mcpUseWidget = resourceAnnotations?.["mcp-use/widget"] as any;
     if (mcpUseWidget?.props) {
-      console.log("[PropsConfigDialog] Found Zod schema in mcp-use/widget", {
-        props: mcpUseWidget.props,
-      });
+      const props = mcpUseWidget.props;
 
-      // Convert Zod schema format to JSON Schema-like format
-      // Zod format: { def: { type: "object", shape: { propName: { def: {...}, type: "string" } } } }
-      if (
-        mcpUseWidget.props.def?.type === "object" &&
-        mcpUseWidget.props.def.shape
-      ) {
-        const shape = mcpUseWidget.props.def.shape;
-        const properties: Record<string, any> = {};
-        const required: string[] = [];
-
-        for (const [key, zodProp] of Object.entries(shape)) {
-          const prop = zodProp as any;
-          // Extract type from Zod definition
-          const propType = prop.type || prop.def?.type || "string";
-
-          properties[key] = {
-            type: propType,
-            description: prop.description || prop.def?.description,
-          };
-
-          // Check if required (Zod marks optional with _def.typeName === "ZodOptional")
-          if (prop.def && !prop.def.typeName?.includes("Optional")) {
-            required.push(key);
-          }
-        }
-
-        return {
-          type: "object",
-          properties,
-          required: required.length > 0 ? required : undefined,
-        };
+      // Already JSON Schema format (e.g. from built manifest)
+      if (props.type === "object" && props.properties) {
+        return props;
       }
 
-      // Check if it's already in JSON Schema format (not Zod)
-      if (
-        mcpUseWidget.props.type === "object" &&
-        mcpUseWidget.props.properties
-      ) {
-        console.log("[PropsConfigDialog] Found JSON Schema in mcp-use/widget", {
-          props: mcpUseWidget.props,
-        });
-        // It's already JSON Schema, return as-is
-        return mcpUseWidget.props;
+      // Zod schema (def/shape structure) — props arrive JSON-serialized from MCP,
+      // so we get plain objects not live Zod instances. Parse the structure directly.
+      const shape = props?.def?.shape ?? props?._def?.shape;
+      if (shape && typeof shape === "object") {
+        const properties: Record<string, any> = {};
+        const required: string[] = [];
+        const resolveType = (name: string): string => {
+          const map: Record<string, string> = {
+            ZodString: "string",
+            string: "string",
+            ZodNumber: "number",
+            number: "number",
+            ZodBoolean: "boolean",
+            boolean: "boolean",
+            ZodArray: "array",
+            array: "array",
+            ZodObject: "object",
+            object: "object",
+          };
+          return map[name] || "string";
+        };
+        const getTypeName = (d: any): string => d?.typeName ?? d?.type ?? "";
+        const parseProp = (p: any): { type: string; items?: any } => {
+          const def = p?._def ?? p?.def ?? {};
+          let inner = p;
+          let typeName = getTypeName(def);
+          while (
+            typeName === "ZodOptional" ||
+            typeName === "ZodDefault" ||
+            typeName === "ZodNullable"
+          ) {
+            inner = def.innerType ?? inner;
+            const d = inner?._def ?? inner?.def ?? {};
+            typeName = getTypeName(d);
+          }
+          const resolved = resolveType(typeName);
+          if (resolved === "array") {
+            const el =
+              inner?._def?.type ?? inner?.def?.element ?? inner?.element;
+            if (el) {
+              const elDef = el._def ?? el.def ?? {};
+              if (resolveType(getTypeName(elDef)) === "object") {
+                const s = elDef.shape ?? el._def?.shape ?? el.def?.shape ?? {};
+                return {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: Object.fromEntries(
+                      Object.entries(s).map(([k, v]) => {
+                        const vDef = (v as any)?._def ?? (v as any)?.def ?? {};
+                        return [k, { type: resolveType(getTypeName(vDef)) }];
+                      })
+                    ),
+                  },
+                };
+              }
+            }
+            return { type: "array" };
+          }
+          return { type: resolved };
+        };
+        for (const [key, zodProp] of Object.entries(shape)) {
+          const p = zodProp as any;
+          const def = p?._def ?? p?.def ?? {};
+          const tn = getTypeName(def);
+          const isOptional =
+            tn === "ZodOptional" || tn === "ZodDefault" || tn === "ZodNullable";
+          const parsed = parseProp(p);
+          properties[key] = {
+            type: parsed.type,
+            ...(parsed.items && { items: parsed.items }),
+            description: p?.description ?? def.description,
+          };
+          if (!isOptional) required.push(key);
+        }
+        if (Object.keys(properties).length > 0) {
+          return {
+            type: "object",
+            properties,
+            required: required.length > 0 ? required : undefined,
+          };
+        }
       }
     }
 
     // Check standard JSON Schema locations
     const annotations = resourceAnnotations as Record<string, any>;
     if (annotations?.["mcp-use/propsSchema"]) {
-      console.log("[PropsConfigDialog] Found schema in resourceAnnotations");
       return annotations["mcp-use/propsSchema"] as any;
     }
     const resourceAnnots = resource.annotations as Record<string, any>;
     if (resourceAnnots?.["mcp-use/propsSchema"]) {
-      console.log("[PropsConfigDialog] Found schema in resource.annotations");
       return resourceAnnots["mcp-use/propsSchema"] as any;
     }
 
-    console.log("[PropsConfigDialog] No schema found, using generic mode");
     return null;
   }, [resourceAnnotations, resource.annotations, resource.uri, resource.name]);
 
   const hasSchema = !!propsSchema;
-
-  console.log("[PropsConfigDialog] Render mode:", {
-    hasSchema,
-    propsSchema: propsSchema ? Object.keys(propsSchema) : null,
-    propsSchemaProperties: propsSchema?.properties
-      ? Object.keys(propsSchema.properties)
-      : null,
-  });
 
   const [presetName, setPresetName] = useState("");
   // For schema mode: track values by field name

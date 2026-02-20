@@ -13,6 +13,7 @@ import { MessageList } from "./chat/MessageList";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
+import { useWidgetDebug } from "../context/WidgetDebugContext";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -111,12 +112,17 @@ export function ChatTab({
   const llmConfig = managedLlmConfig ?? localLlmConfig;
   const isManaged = !!managedLlmConfig;
 
+  const { getAllModelContexts } = useWidgetDebug();
+
+  const widgetModelContexts = getAllModelContexts();
+
   // Use client-side or server-side chat implementation
   const chatHookParams = {
     connection,
     llmConfig,
     isConnected,
     readResource,
+    widgetModelContexts,
   };
 
   const serverSideChat = useChatMessages({
@@ -125,6 +131,7 @@ export function ChatTab({
     authConfig: userAuthConfig,
     isConnected,
     chatApiUrl,
+    widgetModelContexts,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 

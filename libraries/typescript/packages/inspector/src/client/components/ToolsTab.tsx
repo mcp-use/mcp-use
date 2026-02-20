@@ -12,7 +12,7 @@ import {
   Telemetry,
 } from "@/client/telemetry";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import {
   useCallback,
@@ -649,9 +649,16 @@ export function ToolsTab({
       const widgetResourceUri = mcpAppsResourceUri || openaiOutputTemplate;
 
       // Pre-fetch widget resource if this is a widget tool (Issue #930 fix)
+      // Batch into single setResults to avoid double render during pending state
       let preFetchedResource: any = null;
       if (widgetResourceUri && typeof widgetResourceUri === "string") {
-        // Create result entry with loading state BEFORE executing tool
+        try {
+          preFetchedResource = await readResource(widgetResourceUri);
+        } catch {
+          // Continue with tool execution even if resource fetch fails
+        }
+
+        // Single state update with pending entry (avoids extra re-render from pre-fetch update)
         const pendingResultEntry: ToolResult = {
           toolName: selectedTool.name,
           args: parsedArgs,
@@ -661,40 +668,12 @@ export function ToolsTab({
           toolMeta,
           appsSdkResource: {
             uri: widgetResourceUri,
-            resourceData: null,
-            isLoading: true,
+            resourceData: preFetchedResource,
+            isLoading: false,
           },
         };
 
-        // For widget components, replace results instead of appending
         setResults([pendingResultEntry]);
-
-        // Pre-fetch the resource BEFORE executing the tool
-        try {
-          preFetchedResource = await readResource(widgetResourceUri);
-
-          // Update result entry with fetched resource (but no tool result yet)
-          setResults((prev) =>
-            prev.map((r, idx) =>
-              idx === 0
-                ? {
-                    ...r,
-                    appsSdkResource: {
-                      uri: widgetResourceUri,
-                      resourceData: preFetchedResource,
-                      isLoading: false,
-                    },
-                  }
-                : r
-            )
-          );
-
-          // Small delay to ensure widget iframe loads and shows pending state
-          // before we update it with the result (prevents race condition for fast tools)
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        } catch (error) {
-          // Continue with tool execution even if resource fetch fails
-        }
       }
 
       // Use a 10 minute timeout for tool calls, as tools may trigger sampling/elicitation

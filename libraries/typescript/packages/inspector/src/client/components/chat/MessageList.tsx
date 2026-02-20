@@ -54,9 +54,14 @@ export const MessageList = memo(
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Helper function to get tool metadata by name
+    // Helper function to get tool metadata by name.
+    // Normalizes hyphens/underscores because the Anthropic API converts
+    // hyphenated tool names to underscores in tool_use responses while
+    // MCP servers register tools with the original (often hyphenated) names.
     const getToolMeta = (toolName: string): Record<string, any> | undefined => {
-      const tool = tools?.find((t) => t.name === toolName);
+      const normalize = (n: string) => n.replace(/-/g, "_");
+      const key = normalize(toolName);
+      const tool = tools?.find((t) => normalize(t.name) === key);
       return tool?._meta;
     };
 
@@ -189,6 +194,7 @@ export const MessageList = memo(
                                     ? "call"
                                     : "result"
                             }
+                            partialArgs={part.toolInvocation.partialArgs}
                           />
                           {/* Render tool result / widget */}
                           {/* Render immediately for widget tools or streaming tools, even if result is null */}
@@ -207,6 +213,11 @@ export const MessageList = memo(
                               )}
                               onSendFollowUp={sendMessage}
                               partialToolArgs={part.toolInvocation.partialArgs}
+                              cancelled={
+                                part.toolInvocation.state === "error" &&
+                                part.toolInvocation.result ===
+                                  "Cancelled by user"
+                              }
                             />
                           )}
                         </div>

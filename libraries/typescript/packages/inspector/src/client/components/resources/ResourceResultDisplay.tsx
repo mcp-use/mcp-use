@@ -14,7 +14,7 @@ import {
   Maximize,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { detectWidgetProtocol } from "../../utils/widget-detection";
 import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
@@ -164,6 +164,24 @@ export function ResourceResultDisplay({
     ...result?.resourceAnnotations,
     ...contentMetadata,
   };
+
+  // Detect required props from the widget schema so we can warn before rendering
+  const requiredProps = useMemo(() => {
+    const widget = (combinedAnnotations as any)?.["mcp-use/widget"];
+    if (!widget?.props) return [];
+    // Zod format: { def: { type: "object", shape: { propName: { def: { type: "..." } } } } }
+    const shape = widget.props.def?.shape;
+    if (shape) {
+      return Object.entries(shape)
+        .filter(([, v]: any) => {
+          const t = v?.def?.type ?? v?.type;
+          return t !== "optional" && t !== "default";
+        })
+        .map(([k]) => k);
+    }
+    // JSON Schema format
+    return (widget.props.required as string[]) ?? [];
+  }, [combinedAnnotations]);
 
   // Detect widget protocol (Priority: MCP Apps → Apps SDK → MCP-UI)
   const widgetProtocol = detectWidgetProtocol(
@@ -347,7 +365,10 @@ export function ResourceResultDisplay({
             if (previewMode) {
               // MCP Apps mode
               return (
-                <div className="flex-1 h-full relative">
+                <div
+                  className="flex-1 h-full relative"
+                  data-testid="resource-widget-preview"
+                >
                   {/* Floating controls in top-right */}
                   <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
                     <MCPAppsDebugControls
@@ -360,6 +381,11 @@ export function ResourceResultDisplay({
                       llmConfig={llmConfig || null}
                       resource={selectedResource || null}
                       onPropsChange={setActiveProps}
+                      requiredProps={
+                        requiredProps.length > 0 && !activeProps
+                          ? requiredProps
+                          : undefined
+                      }
                     />
                   </div>
 
@@ -402,7 +428,7 @@ export function ResourceResultDisplay({
             if (previewMode) {
               // OpenAI Apps SDK Component mode
               return (
-                <div className="flex-1 h-full">
+                <div className="flex-1 h-full relative">
                   <OpenAIComponentRenderer
                     componentUrl={openaiOutputTemplate}
                     toolName={result.uri}

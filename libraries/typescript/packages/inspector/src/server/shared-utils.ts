@@ -1022,27 +1022,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           enumerable: true
         });
 
-        setTimeout(() => {
-          try {
-            const globalsEvent = new CustomEvent('openai:set_globals', {
-              detail: {
-                globals: {
-                  toolInput: openaiAPI.toolInput,
-                  toolOutput: openaiAPI.toolOutput,
-                  toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
-                  widgetState: openaiAPI.widgetState,
-                  displayMode: openaiAPI.displayMode,
-                  maxHeight: openaiAPI.maxHeight,
-                  theme: openaiAPI.theme,
-                  locale: openaiAPI.locale,
-                  safeArea: openaiAPI.safeArea,
-                  userAgent: openaiAPI.userAgent
-                }
-              }
-            });
-            window.dispatchEvent(globalsEvent);
-          } catch (err) {}
-        }, 0);
+        // Do not fire openai:set_globals here — window.openai is already set synchronously.
+        // useSyncExternalStore reads it on first render. Firing the event would cause a
+        // redundant second render (double flash at pending/final state).
 
         // Listen for widget state requests from inspector
         window.addEventListener('message', (event) => {

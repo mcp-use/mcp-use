@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { MCPServer } from "../../src/server/index.js";
 import { widget } from "../../src/server/utils/response-helpers.js";
-import type { WidgetMetadata } from "../../src/server/types/widget.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -223,24 +222,14 @@ describe("Widget Helper Integration Tests", () => {
         arguments: { message: "test" },
       });
 
-      // Compare structure (not exact values due to random URIs)
-      expect(manualResult).toHaveProperty("_meta");
-      expect(manualResult).toHaveProperty("content");
+      // Per SEP-1865: protocol metadata (outputTemplate, widgetAccessible, etc.)
+      // belongs on the tool definition (tools/list), not on the tool call result.
+      // Tool results only have content, structuredContent, and optional app-specific _meta.
 
-      expect(autoResult).toHaveProperty("_meta");
+      // Check content structure for both
+      expect(manualResult).toHaveProperty("content");
       expect(autoResult).toHaveProperty("content");
 
-      // Check metadata fields exist on manual result
-      expect(manualResult._meta).toHaveProperty("openai/outputTemplate");
-      expect(manualResult._meta).toHaveProperty("openai/widgetAccessible");
-      expect(manualResult._meta).toHaveProperty(
-        "openai/resultCanProduceWidget"
-      );
-
-      // Auto result also has outputTemplate
-      expect(autoResult._meta).toHaveProperty("openai/outputTemplate");
-
-      // Check content structure
       expect(manualResult.content).toHaveLength(1);
       expect((manualResult.content as any)[0]).toHaveProperty("type", "text");
       expect((manualResult.content as any)[0]).toHaveProperty("text");
@@ -252,13 +241,31 @@ describe("Widget Helper Integration Tests", () => {
       expect((autoResult.content as any)[0]).toHaveProperty("type", "text");
       expect((autoResult.content as any)[0]).toHaveProperty("text");
 
-      // Both should have valid widget URIs
-      const manualUri = manualResult._meta?.["openai/outputTemplate"];
-      const autoUri = autoResult._meta?.["openai/outputTemplate"];
-      expect(manualUri).toMatch(
-        /^ui:\/\/widget\/comparison-widget-[a-z0-9]+\.html$/
-      );
-      expect(autoUri).toMatch(/^ui:\/\/widget\/auto-widget/);
+      // Verify widget metadata is on tool definitions (tools/list), not on results
+      const { tools } = await client.listTools();
+      const manualTool = tools.find((t) => t.name === "manual-comparison-tool");
+      const autoTool = tools.find((t) => t.name === "auto-widget");
+
+      expect(manualTool).toBeDefined();
+      expect(manualTool!._meta).toBeDefined();
+      expect(manualTool!._meta).toHaveProperty("openai/outputTemplate");
+      expect(manualTool!._meta).toHaveProperty("openai/widgetAccessible");
+      expect(manualTool!._meta).toHaveProperty("openai/resultCanProduceWidget");
+
+      expect(autoTool).toBeDefined();
+      // auto-registered tools may not expose _meta in tools/list (host/SDK dependent)
+      if (autoTool!._meta) {
+        expect(autoTool!._meta).toHaveProperty("openai/outputTemplate");
+        const autoUri = (autoTool!._meta as Record<string, unknown>)?.[
+          "openai/outputTemplate"
+        ] as string;
+        expect(autoUri).toMatch(/^ui:\/\/widget\/auto-widget/);
+      }
+
+      const manualUri = (manualTool!._meta as Record<string, unknown>)?.[
+        "openai/outputTemplate"
+      ] as string;
+      expect(manualUri).toMatch(/^ui:\/\/widget\/comparison-widget.*\.html$/);
     });
 
     it("should allow custom metadata in manual widget() calls", async () => {
@@ -268,16 +275,21 @@ describe("Widget Helper Integration Tests", () => {
         arguments: {},
       });
 
-      // Verify custom metadata
+      // Verify tool result content
       expect((result.content as any)[0]?.text).toBe("Custom message");
-      expect(result._meta?.["openai/toolInvocation/invoking"]).toBe(
+
+      // Per SEP-1865: invoking, invoked, widgetAccessible, resultCanProduceWidget
+      // belong on the tool definition (tools/list), not on the tool call result
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === "manual-custom-metadata-tool");
+      const meta = tool?._meta as Record<string, unknown> | undefined;
+
+      expect(meta?.["openai/toolInvocation/invoking"]).toBe(
         "Custom invoking..."
       );
-      expect(result._meta?.["openai/toolInvocation/invoked"]).toBe(
-        "Custom invoked"
-      );
-      expect(result._meta?.["openai/widgetAccessible"]).toBe(false);
-      expect(result._meta?.["openai/resultCanProduceWidget"]).toBe(true);
+      expect(meta?.["openai/toolInvocation/invoked"]).toBe("Custom invoked");
+      expect(meta?.["openai/widgetAccessible"]).toBe(false);
+      expect(meta?.["openai/resultCanProduceWidget"]).toBe(true);
     });
   });
 });

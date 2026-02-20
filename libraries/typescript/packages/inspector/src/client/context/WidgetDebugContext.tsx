@@ -79,6 +79,7 @@ interface WidgetDebugContextType extends WidgetDebugState {
   setWidgetState: (widgetId: string, state: any) => void;
   updatePlaygroundSettings: (settings: Partial<PlaygroundSettings>) => void;
   clearAllWidgets: () => void;
+  getAllModelContexts: () => Map<string, WidgetInfo["modelContext"]>;
 }
 
 const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
@@ -238,6 +239,16 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const getAllModelContexts = useCallback(() => {
+    const contexts = new Map<string, WidgetInfo["modelContext"]>();
+    for (const [id, widget] of state.widgets) {
+      if (widget.modelContext) {
+        contexts.set(id, widget.modelContext);
+      }
+    }
+    return contexts;
+  }, [state.widgets]);
+
   // Memoize context value to prevent unnecessary re-renders of consumers
   const value = useMemo<WidgetDebugContextType>(
     () => ({
@@ -252,6 +263,7 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       setWidgetState,
       updatePlaygroundSettings,
       clearAllWidgets,
+      getAllModelContexts,
     }),
     [
       state,
@@ -265,6 +277,7 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       setWidgetState,
       updatePlaygroundSettings,
       clearAllWidgets,
+      getAllModelContexts,
     ]
   );
 

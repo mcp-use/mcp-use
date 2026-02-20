@@ -23,6 +23,7 @@ import type {
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -65,12 +66,11 @@ interface MCPAppsRendererProps {
   customProps?: Record<string, string>;
   /** When provided, used directly instead of looking up via useMcpClient(). */
   serverBaseUrl?: string;
+  /** When true, sends ui/notifications/tool-cancelled to the widget. */
+  cancelled?: boolean;
 }
 
-/**
- * MCPAppsRenderer Component
- */
-export function MCPAppsRenderer({
+function MCPAppsRendererBase({
   serverId,
   toolCallId,
   toolName,
@@ -86,6 +86,8 @@ export function MCPAppsRenderer({
   onDisplayModeChange,
   noWrapper,
   customProps,
+  cancelled,
+  serverBaseUrl: serverBaseUrlProp,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -108,6 +110,24 @@ export function MCPAppsRenderer({
   const [isReady, setIsReady] = useState(false);
   const [showSpinner, setShowSpinner] = useState(true);
   const hasLoadedOnceRef = useRef(false);
+  const toolInputSentRef = useRef<string | null>(null);
+  const lastSentPropsRef = useRef<string | null>(null);
+  const lastSentToolOutputKeyRef = useRef<string | null>(null);
+  const lastInitTimeRef = useRef(0);
+  const resendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  const toolInputRef = useRef(toolInput);
+  const toolOutputRef = useRef(toolOutput);
+  const customPropsRef = useRef(customProps);
+  const readResourceRef = useRef(readResource);
+  const serverRef = useRef(server);
+  const lastHostContextRef = useRef<string | null>(null);
+  toolInputRef.current = toolInput;
+  toolOutputRef.current = toolOutput;
+  customPropsRef.current = customProps;
+  readResourceRef.current = readResource;
+  serverRef.current = server;
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
   const [prefersBorder, setPrefersBorder] = useState<boolean>(true);
@@ -162,14 +182,30 @@ export function MCPAppsRenderer({
         const resourceResult = await readResource(resourceUri);
         const resourceContent = resourceResult?.contents?.[0];
         const resourceMimeType = resourceContent?.mimeType;
-        const resourceMeta = resourceContent?._meta;
+        const contentMeta = resourceContent?._meta;
 
-        // Extract MCP Apps metadata from resource
-        const mcpAppsCsp = resourceMeta?.ui?.csp;
-        const mcpAppsPermissions = resourceMeta?.ui?.permissions;
+        // Per SEP-1865: _meta.ui may appear on both resources/list entries
+        // and resources/read content items, with content-item taking precedence.
+        const listingResource = server?.resources?.find(
+          (r) => r.uri === resourceUri
+        );
+        const listingUiMeta = (listingResource as any)?._meta?.ui;
+        const contentUiMeta = contentMeta?.ui;
+        const mergedUiMeta =
+          listingUiMeta || contentUiMeta
+            ? { ...listingUiMeta, ...contentUiMeta }
+            : undefined;
+        const resourceMeta = {
+          ...contentMeta,
+          ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
+        };
+
+        // Extract MCP Apps metadata from merged resource metadata
+        const mcpAppsCsp = mergedUiMeta?.csp;
+        const mcpAppsPermissions = mergedUiMeta?.permissions;
         // Check both MCP Apps and Apps SDK (ChatGPT) metadata paths
         const mcpAppsPrefersBorder =
-          resourceMeta?.ui?.prefersBorder ?? // MCP Apps protocol
+          mergedUiMeta?.prefersBorder ?? // MCP Apps protocol
           resourceMeta?.["openai/widgetPrefersBorder"] ?? // Apps SDK protocol
           true; // Default to true if not specified
 
@@ -184,13 +220,26 @@ export function MCPAppsRenderer({
         let devServerBaseUrl: string | undefined;
 
         if (computedUseDevMode && slugifiedName) {
-          // Extract server base URL from serverId (may include /mcp suffix)
-          const serverBaseUrl = serverId.replace(/\/mcp$/, "");
-          devServerBaseUrl = new URL(serverBaseUrl).origin;
-
-          // Normalize 0.0.0.0 to localhost for browser compatibility
-          devServerBaseUrl = devServerBaseUrl.replace("0.0.0.0", "localhost");
-          devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
+          // Prefer serverBaseUrl prop (e.g. from Mango sandbox); else derive from serverId only if it's a valid URL
+          let base: string | undefined;
+          if (typeof serverBaseUrlProp === "string" && serverBaseUrlProp) {
+            try {
+              base = new URL(serverBaseUrlProp).origin;
+            } catch {
+              base = undefined;
+            }
+          }
+          if (!base && /^https?:\/\//.test(serverId)) {
+            try {
+              base = new URL(serverId.replace(/\/mcp$/, "")).origin;
+            } catch {
+              base = undefined;
+            }
+          }
+          if (base) {
+            devServerBaseUrl = base.replace("0.0.0.0", "localhost");
+            devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
+          }
         }
 
         // Store widget data including dev URLs
@@ -283,6 +332,30 @@ export function MCPAppsRenderer({
     // at the time of the fetch and don't warrant refetching the widget HTML.
   }, [serverId, resourceUri, toolCallId, toolName, cspMode]);
 
+  // Re-read prefersBorder from the server when the widget re-initializes
+  // (HMR support). When initCount > 1, it means the widget iframe reloaded
+  // (e.g. Vite HMR page reload) and the server may have updated metadata.
+  useEffect(() => {
+    if (initCount <= 1) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const resourceResult = await readResource(resourceUri);
+        if (cancelled) return;
+        const contentUiMeta = resourceResult?.contents?.[0]?._meta?.ui;
+        if (contentUiMeta && "prefersBorder" in contentUiMeta) {
+          setPrefersBorder(contentUiMeta.prefersBorder ?? true);
+        }
+      } catch {
+        // readResource may fail during reconnection; ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initCount, resourceUri, readResource]);
+
   // Initialize AppBridge when HTML is ready
   useEffect(() => {
     if (!widgetHtml || !sandboxRef.current) return;
@@ -335,10 +408,48 @@ export function MCPAppsRenderer({
       { hostContext }
     );
 
-    // Register bridge handlers
+    // Register bridge handlers.
+    // Debounce: only accept the first init per bridge lifecycle; subsequent
+    // rapid re-inits (widget re-mounting after receiving data) are suppressed
+    // to prevent a feedback loop. A deferred resend ensures the latest widget
+    // instance still receives tool data after it settles.
     bridge.oninitialized = () => {
-      console.log("[MCPAppsRenderer] Widget initialized");
-      setInitCount((c) => c + 1);
+      const now = Date.now();
+      if (lastInitTimeRef.current > 0 && now - lastInitTimeRef.current < 2000) {
+        clearTimeout(resendTimerRef.current);
+        resendTimerRef.current = setTimeout(() => {
+          const cp = customPropsRef.current;
+          const parsed: Record<string, unknown> = {};
+          if (cp) {
+            for (const [k, v] of Object.entries(cp)) {
+              if (
+                typeof v === "string" &&
+                (v.trim().startsWith("[") || v.trim().startsWith("{"))
+              ) {
+                try {
+                  parsed[k] = JSON.parse(v);
+                } catch {
+                  parsed[k] = v;
+                }
+              } else {
+                parsed[k] = v;
+              }
+            }
+          }
+          const mergedArgs = { ...toolInputRef.current, ...parsed };
+          bridge.sendToolInput({ arguments: mergedArgs });
+          const output = toolOutputRef.current;
+          if (output) {
+            bridge.sendToolResult(output as CallToolResult);
+          }
+        }, 300);
+        return;
+      }
+      lastInitTimeRef.current = now;
+      setInitCount((c) => {
+        const next = c + 1;
+        return next;
+      });
     };
 
     bridge.onmessage = async ({ content }) => {
@@ -357,12 +468,13 @@ export function MCPAppsRenderer({
     };
 
     bridge.oncalltool = async ({ name, arguments: args }) => {
-      if (!server) {
+      const currentServer = serverRef.current;
+      if (!currentServer) {
         throw new Error("Server connection not available");
       }
 
       try {
-        const result = await server.callTool(name, args || {}, {
+        const result = await currentServer.callTool(name, args || {}, {
           timeout: MCP_APPS_CONFIG.TIMEOUTS.TOOL_CALL,
           resetTimeoutOnProgress: true,
         });
@@ -376,15 +488,16 @@ export function MCPAppsRenderer({
     };
 
     bridge.onreadresource = async ({ uri }) => {
-      const result = await readResource(uri);
+      const result = await readResourceRef.current(uri);
       return result.contents || [];
     };
 
     bridge.onlistresources = async () => {
-      if (!server) {
+      const currentServer = serverRef.current;
+      if (!currentServer) {
         throw new Error("Server connection not available");
       }
-      return { resources: server.resources };
+      return { resources: currentServer.resources };
     };
 
     bridge.onrequestdisplaymode = async ({ mode }) => {
@@ -399,14 +512,25 @@ export function MCPAppsRenderer({
 
     bridge.onupdatemodelcontext = async ({ content, structuredContent }) => {
       setWidgetModelContext(toolCallId, { content, structuredContent });
+      try {
+        localStorage.setItem(
+          `mcp-use:widget-state:${toolCallId}`,
+          JSON.stringify(structuredContent)
+        );
+      } catch (_) {
+        // localStorage may be unavailable (e.g., private browsing); ignore
+        void _;
+      }
       return {};
     };
 
     bridge.onloggingmessage = async ({ level, logger: _logger, data }) => {
       // Publish to console log bus (avoids postMessage issues with browser extensions)
+      // When data is an array it means the original console call had multiple args
+      // (bridge packs them as an array), so spread them rather than double-wrapping.
       consoleLogBus.publish({
         level: level as any,
-        args: [data],
+        args: Array.isArray(data) ? data : [data],
         timestamp: new Date().toISOString(),
         url: resourceUri,
       });
@@ -536,6 +660,11 @@ export function MCPAppsRenderer({
         return;
       }
 
+      // Widget re-initialization detection (e.g. after Vite HMR page reload).
+      // bridge.oninitialized already handles initCount bumping for all
+      // ui/initialize messages (with debounce to prevent feedback loops).
+      // No initCount bump needed here.
+
       // Log received message
       rpcLogBus.publish({
         serverId: `widget-${toolCallId}`,
@@ -553,36 +682,51 @@ export function MCPAppsRenderer({
     window.addEventListener("message", handleMessage);
 
     return () => {
+      lastInitTimeRef.current = 0;
+      clearTimeout(resendTimerRef.current);
       isActive = false;
       window.removeEventListener("message", handleMessage);
       if (bridge) {
-        bridge.teardownResource({}).catch(() => {});
-        bridge.close().catch(() => {});
+        const TEARDOWN_TIMEOUT = 2000;
+        (async () => {
+          try {
+            await Promise.race([
+              bridge.teardownResource({}),
+              new Promise((_, reject) =>
+                setTimeout(
+                  () => reject(new Error("teardown timeout")),
+                  TEARDOWN_TIMEOUT
+                )
+              ),
+            ]);
+          } catch {
+            // Timeout or error — proceed with close
+          } finally {
+            bridge.close().catch(() => {});
+          }
+        })();
       }
       bridgeRef.current = null;
+      lastHostContextRef.current = null;
       removeWidget(toolCallId);
     };
   }, [
     widgetHtml,
     sandboxRef,
-    // cspMode,
-    // widgetCsp,
-    // widgetPermissions,
-    // // hostContext removed - it's updated via separate useEffect calling setHostContext
     toolCallId,
-    server,
-    readResource,
-    // onSendFollowUp,
-    // displayMode,
-    // setWidgetModelContext,
-    // removeWidget,
+    // readResource, server: use refs to avoid bridge tear-down/recreate on parent re-renders
+    // (which would reset initCount and cause iframe/widget to re-init, appearing as "re-render")
   ]);
 
-  // Update host context when it changes
+  // Update host context when it changes (skip redundant notifications to avoid double render)
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || initCount === 0) return;
-    console.log("[MCPAppsRenderer] setHostContext called with:", hostContext);
+
+    const contextKey = JSON.stringify(hostContext);
+    if (lastHostContextRef.current === contextKey) return;
+    lastHostContextRef.current = contextKey;
+
     bridge.setHostContext(hostContext);
   }, [hostContext, initCount]);
 
@@ -595,31 +739,58 @@ export function MCPAppsRenderer({
     bridge.sendToolInputPartial({ arguments: partialToolInput });
   }, [initCount, partialToolInput]);
 
-  // Send tool input when ready
-  // Also resend when toolCallId changes (indicates re-execution)
-  // When partialToolInput is also available (streaming just finished), delay
-  // sending the complete input by one frame so the widget has time to process
-  // the partial first and show the streaming state
+  // Send tool input when ready. Re-send when toolCallId changes (re-execution)
+  // or when customProps changes (user selects/creates preset with different props).
   useEffect(() => {
     const bridge = bridgeRef.current;
     if (!bridge || initCount === 0) return;
 
-    // Merge customProps with toolInput
+    // Parse JSON strings in customProps so arrays/objects reach the widget as real values
+    const parsedCustomProps: Record<string, unknown> = {};
+    if (customProps) {
+      for (const [k, v] of Object.entries(customProps)) {
+        if (
+          typeof v === "string" &&
+          (v.trim().startsWith("[") || v.trim().startsWith("{"))
+        ) {
+          try {
+            parsedCustomProps[k] = JSON.parse(v);
+          } catch {
+            parsedCustomProps[k] = v;
+          }
+        } else {
+          parsedCustomProps[k] = v;
+        }
+      }
+    }
     const mergedArgs = {
       ...toolInput,
-      ...customProps,
+      ...parsedCustomProps,
     };
+    const propsKey = JSON.stringify(mergedArgs);
+
+    // Skip only if we've already sent this exact payload for this toolCallId
+    // Include initCount so a widget re-initialization (e.g. HMR page reload)
+    // always re-sends the tool input to the new widget instance.
+    const sentKey = `${toolCallId}:${initCount}`;
+    if (
+      toolInputSentRef.current === sentKey &&
+      lastSentPropsRef.current === propsKey
+    ) {
+      return;
+    }
 
     if (partialToolInput) {
-      // Partials are also present - the partial effect (above) will fire first.
-      // Delay the complete input by one frame so the widget can render the
-      // streaming state before transitioning to the final state.
       const frame = requestAnimationFrame(() => {
         bridge.sendToolInput({ arguments: mergedArgs });
+        toolInputSentRef.current = sentKey;
+        lastSentPropsRef.current = propsKey;
       });
       return () => cancelAnimationFrame(frame);
     } else {
       bridge.sendToolInput({ arguments: mergedArgs });
+      toolInputSentRef.current = sentKey;
+      lastSentPropsRef.current = propsKey;
     }
   }, [initCount, toolInput, customProps, toolCallId, partialToolInput]);
 
@@ -631,10 +802,51 @@ export function MCPAppsRenderer({
 
     // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
-      bridge.sendToolResult(toolOutput as CallToolResult);
+      // Skip if we already sent this exact payload (parent re-renders with new ref, same data)
+      const contentKey = JSON.stringify(
+        (toolOutput as any)?.structuredContent ?? toolOutput
+      );
+      if (lastSentToolOutputKeyRef.current === contentKey) return;
+      lastSentToolOutputKeyRef.current = contentKey;
+      const result = toolOutput as CallToolResult;
+
+      // When customProps are set (from user presets), inject them as
+      // structuredContent so the widget receives them via useWidget().props.
+      // Without this, props only flow through sendToolInput (toolInput) while
+      // the widget reads props from the tool result's structuredContent.
+      if (customProps && Object.keys(customProps).length > 0) {
+        const parsed: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(customProps)) {
+          if (
+            typeof v === "string" &&
+            (v.trim().startsWith("[") || v.trim().startsWith("{"))
+          ) {
+            try {
+              parsed[k] = JSON.parse(v);
+            } catch {
+              parsed[k] = v;
+            }
+          } else {
+            parsed[k] = v;
+          }
+        }
+        bridge.sendToolResult({
+          ...result,
+          structuredContent: parsed,
+        } as CallToolResult);
+      } else {
+        bridge.sendToolResult(result);
+      }
     }
     // Note: When toolOutput is null, widget stays in pending state (isPending=true)
-  }, [initCount, toolOutput, toolCallId]);
+  }, [initCount, toolOutput, toolCallId, customProps]);
+
+  // Send tool-cancelled notification when user cancels from the host UI
+  useEffect(() => {
+    const bridge = bridgeRef.current;
+    if (!bridge || initCount === 0 || !cancelled) return;
+    bridge.sendToolCancelled({ reason: "Cancelled by user" });
+  }, [cancelled, initCount]);
 
   // Handle CSP violations
   const handleSandboxMessage = useCallback(
@@ -859,3 +1071,37 @@ export function MCPAppsRenderer({
     </WidgetWrapper>
   );
 }
+
+function mcpAppsRendererAreEqual(
+  prev: MCPAppsRendererProps,
+  next: MCPAppsRendererProps
+): boolean {
+  const keys: (keyof MCPAppsRendererProps)[] = [
+    "serverId",
+    "toolCallId",
+    "toolName",
+    "resourceUri",
+    "displayMode",
+    "cancelled",
+    "noWrapper",
+  ];
+  for (const k of keys) {
+    if (prev[k] !== next[k]) return false;
+  }
+  if (prev.toolInput !== next.toolInput) return false;
+  if (prev.toolOutput !== next.toolOutput) return false;
+  if (prev.toolMetadata !== next.toolMetadata) return false;
+  if (prev.partialToolInput !== next.partialToolInput) return false;
+  if (prev.customProps !== next.customProps) return false;
+  if (prev.readResource !== next.readResource) return false;
+  if (prev.onSendFollowUp !== next.onSendFollowUp) return false;
+  if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
+  if (prev.className !== next.className) return false;
+  if (prev.serverBaseUrl !== next.serverBaseUrl) return false;
+  return true;
+}
+
+export const MCPAppsRenderer = memo(
+  MCPAppsRendererBase,
+  mcpAppsRendererAreEqual
+);

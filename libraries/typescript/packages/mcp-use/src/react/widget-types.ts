@@ -147,62 +147,289 @@ declare global {
  * Shared fields for the useWidget hook result (everything except props and isPending)
  */
 interface UseWidgetResultBase<
-  TOutput extends UnknownObject = UnknownObject,
-  TMetadata extends UnknownObject = UnknownObject,
-  TState extends UnknownObject = UnknownObject,
-  TToolInput extends UnknownObject = UnknownObject,
+  TState = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TToolInput = UnknownObject,
 > {
-  /** Original tool input arguments */
+  /**
+   * The arguments the model passed when calling the tool.
+   *
+   * Delivered via `ui/notifications/tool-input` (SEP-1865) once after the
+   * `ui/initialize` handshake completes, or via `window.openai.toolInput` in
+   * the ChatGPT Apps SDK. This reflects exactly what the LLM decided to send —
+   * useful for displaying a "requested" summary alongside the rendered result.
+   */
   toolInput: TToolInput;
-  /** Tool output from the last execution */
+
+  /**
+   * The `structuredContent` field from the tool result.
+   *
+   * This is widget-only data: the LLM only sees the plain-text `content` array
+   * from the tool response, not `structuredContent`. Use `output` (i.e. `props`)
+   * to pass rich, structured data to the widget without polluting the model context.
+   *
+   * Delivered via `ui/notifications/tool-result` (SEP-1865) /
+   * `window.openai.toolOutput` (Apps SDK). `null` while the tool is still
+   * executing (`isPending === true`).
+   */
   output: TOutput | null;
-  /** Response metadata from the tool */
+
+  /**
+   * The `_meta` object from the tool result.
+   *
+   * Intended for auxiliary information such as timestamps, cache headers, or
+   * API version identifiers. Not included in the model's context window.
+   * `null` while the tool is still executing.
+   */
   metadata: TMetadata | null;
-  /** Persisted widget state */
+
+  /**
+   * Persisted widget state that the model can read on future turns.
+   *
+   * On MCP Apps, calling `setState` sends a `ui/update-model-context` request
+   * (SEP-1865) so the updated state is available to the LLM in the next
+   * conversation turn. On ChatGPT, it calls `window.openai.setWidgetState`.
+   * Use this to keep the model informed about user interactions (selected items,
+   * filters, current view, etc.) without requiring an explicit tool call.
+   */
   state: TState | null;
-  /** Update widget state (persisted and shown to model) */
+
+  /**
+   * Update the persisted widget state.
+   *
+   * Accepts either a new state value or a functional updater `(prev) => next`.
+   * On MCP Apps, sends `ui/update-model-context` (SEP-1865) with the new state
+   * so the LLM can reason about it on future turns. On ChatGPT Apps SDK, calls
+   * `window.openai.setWidgetState`. Multiple rapid updates before the next user
+   * message are deduplicated by the host — only the last value is sent to the
+   * model.
+   */
   setState: (
     state: TState | ((prevState: TState | null) => TState)
   ) => Promise<void>;
 
   // Layout and theme
-  /** Current theme (light/dark) */
+
+  /**
+   * The host's current color-scheme preference.
+   *
+   * `"light"` or `"dark"`. Changes are notified via
+   * `ui/notifications/host-context-changed` (SEP-1865) / `openai:set_globals`
+   * (Apps SDK). Use the standardized `--color-*` CSS variables provided by the
+   * host for automatic theming, or branch on this value to apply your own
+   * styles.
+   *
+   * @example
+   * ```tsx
+   * const { theme } = useWidget();
+   * return <div data-theme={theme}>…</div>;
+   * ```
+   */
   theme: Theme;
-  /** Current display mode */
+
+  /**
+   * The current rendering context of the widget.
+   *
+   * - `"inline"` — default; widget is embedded in the host's content flow.
+   * - `"fullscreen"` — widget occupies the full screen or window.
+   * - `"pip"` — floating picture-in-picture overlay. On mobile, PiP requests
+   *   are coerced to `"fullscreen"` by the host.
+   *
+   * Changes when the host responds to a `requestDisplayMode` call or when the
+   * host initiates a layout change. Updated via
+   * `ui/notifications/host-context-changed` (SEP-1865) / `openai:set_globals`
+   * (Apps SDK).
+   *
+   * @see requestDisplayMode
+   */
   displayMode: DisplayMode;
-  /** Safe area insets for layout */
+
+  /**
+   * Host-provided safe area inset boundaries in pixels.
+   *
+   * Insets describe the space consumed by OS chrome (notch, home indicator,
+   * rounded corners, system bars) on all four sides. Apply these as padding or
+   * margin so interactive elements are not hidden behind the OS chrome.
+   * From `HostContext.safeAreaInsets` per SEP-1865.
+   *
+   * @example
+   * ```tsx
+   * const { safeArea } = useWidget();
+   * const style = { paddingBottom: safeArea.insets.bottom };
+   * ```
+   */
   safeArea: SafeArea;
-  /** Maximum height available */
+
+  /**
+   * Maximum height the widget container can grow to, in pixels.
+   *
+   * When provided, the container is in *flexible* mode: the widget controls its
+   * own height up to this ceiling. When omitted (undefined in raw host context),
+   * height is unbounded. From `HostContext.containerDimensions.maxHeight`
+   * (SEP-1865) / `window.openai.maxHeight` (Apps SDK).
+   *
+   * Use this to cap scrollable lists or lazy-rendered content so the widget
+   * doesn't overflow the host's layout.
+   */
   maxHeight: number;
-  /** Maximum width available (MCP Apps only) */
+
+  /**
+   * Maximum width the widget container can grow to, in pixels.
+   *
+   * Behaves the same as `maxHeight` but for the horizontal axis. Only provided
+   * by MCP Apps hosts (SEP-1865 `HostContext.containerDimensions.maxWidth`);
+   * the ChatGPT Apps SDK does not expose a max-width constraint.
+   * `undefined` when unbounded or unavailable.
+   */
   maxWidth?: number;
-  /** User agent information */
+
+  /**
+   * Device type and input-capability flags reported by the host.
+   *
+   * Use `userAgent.device.type` (`"mobile"`, `"tablet"`, `"desktop"`) to adapt
+   * layout density, and `userAgent.capabilities.hover` / `.touch` to decide
+   * whether to show hover-only UI elements or touch-friendly hit targets.
+   * From `HostContext.platform` and `HostContext.deviceCapabilities` (SEP-1865)
+   * / `window.openai.userAgent` (Apps SDK).
+   */
   userAgent: UserAgent;
-  /** Current locale */
+
+  /**
+   * The user's language and region preference as a BCP 47 tag (e.g. `"en-US"`,
+   * `"es-ES"`, `"ja-JP"`).
+   *
+   * Use this to initialize `Intl` formatters, load the correct translation
+   * bundle, or set the `lang` attribute on the root element. From
+   * `HostContext.locale` (SEP-1865) / `window.openai.locale` (Apps SDK).
+   */
   locale: string;
-  /** Current timezone (IANA timezone identifier) */
+
+  /**
+   * The user's timezone as an IANA identifier (e.g. `"America/New_York"`,
+   * `"Europe/Paris"`).
+   *
+   * Pass to `Intl.DateTimeFormat` when displaying local times. On ChatGPT the
+   * Apps SDK does not expose a timezone, so this falls back to the browser's
+   * own `Intl.DateTimeFormat().resolvedOptions().timeZone`. From
+   * `HostContext.timeZone` (SEP-1865).
+   */
   timeZone: string;
-  /** MCP server base URL for making API requests */
+
+  /**
+   * Base URL of the MCP server running inside the sandbox.
+   *
+   * Derived from `window.__mcpPublicUrl`. Use this to make direct HTTP requests
+   * to your server (e.g. for REST endpoints or asset URLs) without going through
+   * the host's `tools/call` proxy.
+   */
   mcp_url: string;
 
   // Actions
-  /** Call a tool on the MCP server */
+
+  /**
+   * Call any tool registered on the MCP server.
+   *
+   * Sends a `tools/call` JSON-RPC request via the host. Works for both
+   * model-visible tools and app-only tools (`visibility: ["app"]` per SEP-1865)
+   * — the latter are hidden from the LLM but callable by the widget. Returns a
+   * normalized `CallToolResponse` with `content`, `structuredContent`, `result`
+   * (joined text convenience field), and optional `_meta`.
+   *
+   * @example
+   * ```tsx
+   * const { callTool } = useWidget();
+   * const res = await callTool("refresh_data", { id: 42 });
+   * console.log(res.structuredContent);
+   * ```
+   */
   callTool: (
     name: string,
     args: Record<string, unknown>
   ) => Promise<CallToolResponse>;
-  /** Send a follow-up message to the conversation */
+
+  /**
+   * Add a user-role message to the conversation and trigger a new model turn.
+   *
+   * On MCP Apps, sends a `ui/message` request (SEP-1865) with
+   * `role: "user"`. On ChatGPT Apps SDK, calls
+   * `window.openai.sendFollowUpMessage`. The host may request user consent
+   * before adding the message.
+   *
+   * Use this to let the widget drive the conversation — for example, when the
+   * user selects an item and you want the model to generate a contextual
+   * response.
+   */
   sendFollowUpMessage: (prompt: string) => Promise<void>;
-  /** Open an external URL */
+
+  /**
+   * Ask the host to open a URL in the user's default browser or a new tab.
+   *
+   * On MCP Apps, sends a `ui/open-link` request (SEP-1865). On ChatGPT Apps
+   * SDK, calls `window.openai.openExternal`. The host may deny the request
+   * (e.g. policy violation or invalid URL) — errors are logged but not thrown.
+   */
   openExternal: (href: string) => void;
-  /** Request a different display mode */
+
+  /**
+   * Request the host to change the widget's display mode.
+   *
+   * Sends `ui/request-display-mode` (SEP-1865) /
+   * `window.openai.requestDisplayMode` (Apps SDK). The host returns the
+   * *actual* granted mode, which may differ from the requested one — always
+   * check the response `mode` field. PiP (`"pip"`) is coerced to
+   * `"fullscreen"` on mobile by the ChatGPT host.
+   *
+   * @example
+   * ```tsx
+   * const { requestDisplayMode } = useWidget();
+   * const { mode } = await requestDisplayMode("fullscreen");
+   * // mode may be "fullscreen" or the previous mode if rejected
+   * ```
+   */
   requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>;
 
-  /** Whether the widget API is available */
+  /**
+   * Whether the widget runtime is connected and ready.
+   *
+   * `true` when either `window.openai` (ChatGPT Apps SDK) or the MCP Apps
+   * `postMessage` bridge (SEP-1865) has successfully initialized. `false` while
+   * still connecting, or when the widget is rendered outside a supported host
+   * (e.g. during local development via URL params).
+   */
   isAvailable: boolean;
-  /** Partial/streaming tool arguments, updated in real-time as the LLM generates them. Null when not streaming. */
+
+  /**
+   * Partial tool arguments streamed in real-time while the LLM is still
+   * generating them.
+   *
+   * Delivered via `ui/notifications/tool-input-partial` (SEP-1865). The object
+   * is a best-effort parse of the incomplete JSON output: unclosed
+   * brackets/braces are automatically closed, so the shape is valid JSON but
+   * fields may be missing, incomplete strings, or change in subsequent updates.
+   * `null` when the LLM has finished generating arguments or when the host does
+   * not support partial streaming.
+   *
+   * Only available on MCP Apps hosts; always `null` on ChatGPT Apps SDK and URL
+   * params fallback.
+   *
+   * @see isStreaming
+   */
   partialToolInput: Partial<TToolInput> | null;
-  /** Whether tool arguments are currently being streamed (partial input received but complete input not yet available) */
+
+  /**
+   * Whether the LLM is currently streaming tool arguments.
+   *
+   * `true` while `partialToolInput` is non-null and the complete `toolInput`
+   * has not yet arrived. Useful for rendering a skeleton or progress indicator
+   * before all arguments are known.
+   *
+   * Becomes `false` once `ui/notifications/tool-input` (the complete arguments)
+   * is received. Only `true` on MCP Apps hosts that send
+   * `ui/notifications/tool-input-partial`; always `false` on ChatGPT Apps SDK.
+   *
+   * @see partialToolInput
+   */
   isStreaming: boolean;
 }
 
@@ -221,23 +448,49 @@ interface UseWidgetResultBase<
  * ```
  */
 export type UseWidgetResult<
-  TProps extends UnknownObject = UnknownObject,
-  TOutput extends UnknownObject = UnknownObject,
-  TMetadata extends UnknownObject = UnknownObject,
-  TState extends UnknownObject = UnknownObject,
-  TToolInput extends UnknownObject = UnknownObject,
-> = UseWidgetResultBase<TOutput, TMetadata, TState, TToolInput> &
+  TProps = UnknownObject,
+  TState = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TToolInput = UnknownObject,
+> = UseWidgetResultBase<TState, TOutput, TMetadata, TToolInput> &
   (
     | {
-        /** Whether the tool is currently executing (props may be incomplete) */
+        /**
+         * `true` while the tool is still executing.
+         *
+         * On MCP Apps, becomes `false` once `ui/notifications/tool-result` is
+         * received (SEP-1865). On ChatGPT Apps SDK, becomes `false` once
+         * `toolResponseMetadata` is non-null. While `true`, `props` is typed as
+         * `Partial<TProps>` — guard on this value before accessing required fields.
+         */
         isPending: true;
-        /** Widget props — partial while the tool is still executing */
+        /**
+         * Widget props — partial while the tool is still executing.
+         *
+         * Populated from `structuredContent` in the tool result (delivered via
+         * `ui/notifications/tool-result` / `window.openai.toolOutput`). Fields
+         * may be `undefined` until the tool completes. Guard on `isPending` to
+         * narrow the type to the full `TProps` shape.
+         */
         props: Partial<TProps>;
       }
     | {
-        /** Whether the tool is currently executing (props are fully populated) */
+        /**
+         * `false` once the tool result has been received and props are fully
+         * populated.
+         *
+         * After this point, `props` is guaranteed to be `TProps` (not partial),
+         * so field access is safe without optional chaining.
+         */
         isPending: false;
-        /** Widget props from _meta["mcp-use/props"] (widget-only data, hidden from model) */
+        /**
+         * Fully populated widget props from `structuredContent` in the tool result.
+         *
+         * Widget-only data: the LLM only sees the plain-text `content` array and
+         * never `structuredContent`. All required fields of `TProps` are present
+         * when `isPending` is `false`.
+         */
         props: TProps;
       }
   );
