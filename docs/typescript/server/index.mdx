@@ -7,14 +7,14 @@ icon: "list-start"
 # MCP Server
 
 **mcp-use** has a complete MCP server framework implementation for TypeScript. 
-It improves the official Model Context Protocol SDK with support for Edge Runtime, ChatGPT Apps SDK and MCP-UI. In addition, it supports all official MCP features and achieves a conformance score of 100/100 based on the official MCP Conformance Tests.
+It improves the official Model Context Protocol SDK with many developer friendly features. In addition, it supports all official MCP features and achieves a conformance score of 100% based on the official MCP Conformance Tests.
 
 ## Key Features
 
 - **Full MCP compatibility**: MCP servers built with mcp-use are 100% compatible with the MCP specs.
-- **Apps SDK & MCP-UI support**: UI widgets are compatible with Apps SDK for ChatGPT and MCP-UI resources. [UI Widgets](/typescript/server/ui-widgets).
+- **MCP Apps support**: UI widgets are compatible with MCP Apps for all compatible clients (ChatGPT, Claude, etc.). [UI Widgets](/typescript/server/ui-widgets).
 - **Edge runtime support**: Built-in Edge runtime support
-- **Built-in Inspector**: An handy MCP inspector is launched for you to test you MCP server.
+- **Built-in Inspector**: An handy MCP inspector is launched for you to test you MCP server. See [MCP Inspector](/inspector) for more details.
 - **Hot Module Reloading**: Add, remove, or update tools, prompts, and resources without restarting the server or dropping connections.
 - **One command to get started**: Use `npx create-mcp-use-app` command to scaffold a complete MCP server.
 
@@ -24,35 +24,11 @@ It improves the official Model Context Protocol SDK with support for Edge Runtim
 
 The easiest way to get started is to use the `create-mcp-use-app` command, which scaffolds a complete MCP server project with all necessary configuration:
 
-<CodeGroup>
-```bash npm
+```bash
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
 npm run dev
 ```
-
-```bash pnpm
-pnpm create mcp-use-app my-mcp-server
-cd my-mcp-server
-pnpm dev
-```
-
-```bash yarn
-yarn create mcp-use-app my-mcp-server
-cd my-mcp-server
-yarn dev
-```
-</CodeGroup>
-
-This command will create a new MCP server with:
-- A complete TypeScript MCP server project structure.
-- Example MCP Tools and Resources to get you started.
-- Example UI Widgets React components in `resources/` folder exposed as tools and resources in Apps SDK for ChatGPT and MCP-UI format.
-- Pre-configured server metadata (title, icons, websiteUrl) with your project name and mcp-use branding.
-- Pre-configured build tools and dev server.
-- MCP Inspector to test your server.
-- Optionally install all dependencies
-- Optionally install skills for agent support
 
 ### Project Structure
 
@@ -60,12 +36,17 @@ After creation, your project will have this structure:
 
 ```
 my-mcp-server/
-├── resources/
-│   └── component.tsx  # React widgets for Apps SDK and MCP-UI
-├── public/            # Static assets (icons, favicon, etc.)
-│   ├── icon.svg       # Server icon (mcp-use branding by default)
-│   └── favicon.ico    # Browser favicon
-├── index.ts           # MCP server entry point with serverInfo configured
+├── resources/                    # React widgets for Apps SDK and MCP-UI
+│   ├── product-search-result/   # Example widget (folder name = widget name)
+│   │   ├── widget.tsx            # Main widget component
+│   │   ├── types.ts              # Props and types
+│   │   ├── components/           # Optional subcomponents
+│   │   └── hooks/                # Optional hooks
+│   └── styles.css               # Shared styles
+├── public/                       # Static assets (icons, favicon, etc.)
+│   ├── icon.svg                  # Server icon (mcp-use branding by default)
+│   └── favicon.ico               # Browser favicon
+├── index.ts                      # MCP server entry point
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -75,26 +56,12 @@ my-mcp-server/
 
 Commands:
 
-<CodeGroup>
-```bash yarn
-yarn dev   # start the development server
-yarn build # build the server
-yarn start # start the production server
-yarn deploy # deploy the server to mcp-use cloud
-```
-```bash npm
+```bash
 npm run dev   # start the development server
 npm run build # build the server
 npm run start # start the production server
-npm run deploy # deploy the server to mcp-use cloud
+npm run deploy # deploy the server to Manufact Cloud
 ```
-```bash pnpm
-pnpm dev   # start the development server
-pnpm build # build the server
-pnpm start # start the production server
-pnpm deploy # deploy the server to mcp-use cloud
-```
-</CodeGroup>
 
 When you run your MCP server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
@@ -107,9 +74,6 @@ The development server supports Hot Module Reloading for tools, prompts, and res
 ```bash
 # HMR is enabled by default
 npm run dev
-
-# Disable HMR if needed (uses tsx watch instead)
-npx mcp-use dev --no-hmr
 ```
 
 **What HMR does:**
@@ -122,7 +86,7 @@ This means you can keep the Inspector open, modify your server code, and see you
 
 ### Deploy Your MCP Server
 You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.
-Or you can deploy it on [mcp-use Cloud](https://mcp-use.com).
+Or you can deploy it on [Manufact Cloud](https://manufact.com).
 For detailed instructions, see the [Deploy Your Server](/typescript/server/deployment/mcp-use) guide.
 
 
@@ -140,66 +104,11 @@ For detailed instructions, see the [Deploy Your Server](/typescript/server/deplo
 
 If you prefer to set up manually or add mcp-use to an existing project, install the package via npm:
 
-<CodeGroup>
-```bash npm
+
+```bash
 npm install mcp-use
 ```
-```bash pnpm
-pnpm add mcp-use
-```
-```bash yarn
-yarn add mcp-use
-```
-</CodeGroup>
 
-
-## Example server file
-
-The easiest way to start is with `create-mcp-use-app`, which provides a working example. After running the scaffold command above, your server is ready to go!
-
-For manual setup, here's a minimal example:
-
-```typescript
-import { MCPServer, text, object } from 'mcp-use/server'
-import { z } from 'zod'
-
-// Create server instance
-const server = new MCPServer({
-  name: 'my-mcp-server',
-  version: '1.0.0',
-  description: 'My first MCP server',
-})
-
-// Define a simple tool
-server.tool({
-  name: 'greet',
-  description: 'Greet someone by name',
-  schema: z.object({
-    name: z.string().describe('The name of the person to greet'),
-  })
-}, async ({ name }) => 
-    text(`Hello, ${name}! Welcome to MCP.`)
-)
-
-// Define a resource
-server.resource({
-  name: 'config',
-  uri: 'config://settings',
-  description: 'Server configuration',
-}, async () => 
-    object({
-      theme: 'dark',
-      language: 'en'
-    })
-)
-
-// Start the server
-await server.listen(3000)
-```
-
-When you run this server, it will be available at:
-- **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
-- **Inspector UI**: `http://localhost:3000/inspector` - Development and testing interface
 
 ## Architecture Overview
 
@@ -227,8 +136,8 @@ Reusable, parameterized templates for AI model interactions. Prompts standardize
 
 **Learn more**: [Prompts Guide →](/typescript/server/prompts)
 
-### **UI Widgets**
-Rich, interactive React components that render in chat clients. Widgets are automatically registered from your `resources/` folder and work with both ChatGPT Apps SDK and MCP-UI.
+### **UI Widgets (MCP Apps)**
+Rich, interactive React components that render in chat clients. Widgets are automatically registered from your `resources/` folder and work with all compatible clients (ChatGPT, Claude, etc.).
 
 <img src="./images/apps-sdk-widget.png" alt="Apps SDK UI Widget Example" style={{maxWidth: '600px', borderRadius: '8px', margin: '1rem 0', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} />
 
@@ -299,7 +208,7 @@ class McpServer {
     Configure your server for production deployment
   </Card>
   <Card title="Deploy to Production" icon="rocket" href="/typescript/server/deployment/mcp-use">
-    Deploy your server to mcp-use Cloud with one command
+    Deploy your server to Manufact Cloud with one command
   </Card>
 </CardGroup>
 

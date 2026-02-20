@@ -559,12 +559,11 @@
                   },
                   "typescript/server/response-helpers",
                   {
-                    "group": "UI Widgets",
+                    "group": "MCP Apps",
                     "icon": "app-window-mac",
-                    "tag": "Cross-Compatible",
                     "pages": [
                       "typescript/server/mcp-apps",
-                      "typescript/server/ui-widgets",
+                      "typescript/server/content-security-policy",
                       "typescript/server/widget-components/usewidget",
                       "typescript/server/widget-components/usecalltool",
                       "typescript/server/widget-components/mcpuseprovider",
@@ -572,7 +571,14 @@
                       "typescript/server/widget-components/errorboundary",
                       "typescript/server/widget-components/image",
                       "typescript/server/widget-components/themeprovider",
-                      "typescript/server/mcp-ui-resources"
+                      {
+                        "group": "Deprecated",
+                        "icon": "archive",
+                        "pages": [
+                          "typescript/server/ui-widgets",
+                          "typescript/server/mcp-ui-resources"
+                        ]
+                      }
                     ]
                   },
                   {
@@ -606,11 +612,8 @@
                         "group": "OAuth Providers",
                         "icon": "plug",
                         "pages": [
-                          "typescript/server/authentication/providers/auth0",
                           "typescript/server/authentication/providers/workos",
-                          "typescript/server/authentication/providers/supabase",
-                          "typescript/server/authentication/providers/keycloak",
-                          "typescript/server/authentication/providers/custom"
+                          "typescript/server/authentication/providers/supabase"
                         ]
                       }
                     ]

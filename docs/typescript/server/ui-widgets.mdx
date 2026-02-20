@@ -222,7 +222,7 @@ For the simplified `metadata` format with camelCase, use `type: "mcpApps"` inste
 
 </Warning>
 
-See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation and migration guide.
+See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation and [Content Security Policy](./content-security-policy) for CSP configuration.
 
 ## Widget Metadata
 
@@ -267,7 +267,7 @@ Widget templates automatically receive default Apps SDK metadata values:
 - `openai/widgetDescription`: Generated from your widget's description
 - `openai/widgetDomain`: Defaults to `"https://chatgpt.com"` (required for app submission)
 - `openai/widgetAccessible`: Allows component-initiated tool calls
-- `openai/widgetCSP`: Content Security Policy with default trusted domains
+- `openai/widgetCSP`: [Content Security Policy](./content-security-policy) with default trusted domains
 - `openai/toolInvocation/invoking`: Loading state text (e.g., "Loading MyWidget...")
 - `openai/toolInvocation/invoked`: Ready state text (e.g., "MyWidget ready")
 
@@ -307,7 +307,7 @@ By default, widgets are automatically registered as both MCP tools and resources
   };
   ```
 
-**Note**: Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used.
+**Note**: Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used. See [Content Security Policy](./content-security-policy) for full CSP documentation.
 
 ## Components & Hooks
 
@@ -812,12 +812,12 @@ CSP_URLS=https://myserver.com,...other domains
 
 - `MCP_URL`: Base URL for widget assets and public files. Used by Vite's `base` option during build. Also used by the server to configure CSP.
 - `MCP_SERVER_URL`: (Optional) MCP server URL for API calls. When set, URLs are injected at build time for static deployments where widgets are served from storage rather than the MCP server.
-- `CSP_URLS`: (Optional) Additional domains to whitelist in widget Content Security Policy. Supports comma-separated list. For Supabase, use the base project URL without path (e.g., `https://nnpumlykjksvxivhywwo.supabase.co`). Required for static deployments where widget assets are served from different domains.
+- `CSP_URLS`: (Optional) Additional domains to whitelist in widget Content Security Policy. Supports comma-separated list. For Supabase, use the base project URL without path (e.g., `https://nnpumlykjksvxivhywwo.supabase.co`). Required for static deployments where widget assets are served from different domains. See [Content Security Policy](./content-security-policy) for full CSP documentation.
 
 <Note>
 **Static Deployments**: Set `MCP_URL` (for assets), `MCP_SERVER_URL` (for API calls), and `CSP_URLS` (for CSP whitelisting) when deploying to platforms like Supabase where widgets are served from static storage.
 
-**Alternative CSP Configuration**: Instead of using the global `CSP_URLS` environment variable, you can configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` (see [Apps SDK Metadata](#apps-sdk-metadata) section above).
+**Alternative CSP Configuration**: Instead of using the global `CSP_URLS` environment variable, you can configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` (see [Apps SDK Metadata](#apps-sdk-metadata) or [Content Security Policy](./content-security-policy)).
 
 </Note>
 
@@ -857,6 +857,7 @@ You need to enable the Developer Mode in ChatGPT to test widgets.
 ## Next Steps
 
 - [MCP Apps](/typescript/server/mcp-apps) - Use the standard MCP protocol with dual-protocol support
+- [Content Security Policy](./content-security-policy) - CSP configuration for widgets
 - [Creating MCP Apps Server](./creating-mcp-apps-server) - Complete server setup guide
 - [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test widgets with the Inspector
 - [Widget Components](/typescript/server/widget-components/usewidget) - React components and hooks

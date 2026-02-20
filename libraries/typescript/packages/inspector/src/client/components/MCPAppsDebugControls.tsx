@@ -1,7 +1,10 @@
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import {
   Braces,
+  ChevronDown,
+  ChevronRight,
   Clock,
+  Copy,
   Maximize2,
   Monitor,
   MousePointer2,
@@ -18,7 +21,11 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { LOCALE_OPTIONS, TIMEZONE_OPTIONS } from "../constants/debug-options";
-import { useWidgetDebug } from "../context/WidgetDebugContext";
+import {
+  useWidgetDebug,
+  type CspViolation,
+  type WidgetDeclaredCsp,
+} from "../context/WidgetDebugContext";
 import { useResourceProps, type PropPreset } from "../hooks/useResourceProps";
 import type { LLMConfig } from "./chat/types";
 import { IframeConsole } from "./IframeConsole";
@@ -76,6 +83,174 @@ const NO_PROPS_VALUE = "__no_props__";
 const TOOL_PROPS_VALUE = "__tool_props__";
 const CREATE_PRESET_VALUE = "__create_preset__";
 
+/**
+ * Compute suggested CSP domains to add from blocked violations.
+ * Merges with current declared CSP and dedupes.
+ */
+function computeSuggestedFix(
+  violations: CspViolation[],
+  currentDeclared?: WidgetDeclaredCsp
+): {
+  connectDomains: string[];
+  resourceDomains: string[];
+  frameDomains?: string[];
+} {
+  const connectSet = new Set(currentDeclared?.connectDomains ?? []);
+  const resourceSet = new Set(currentDeclared?.resourceDomains ?? []);
+  const frameSet = new Set(currentDeclared?.frameDomains ?? []);
+
+  const RESOURCE_DIRECTIVES = new Set([
+    "script-src",
+    "style-src",
+    "img-src",
+    "font-src",
+    "media-src",
+  ]);
+  const CONNECT_DIRECTIVE = "connect-src";
+  const FRAME_DIRECTIVE = "frame-src";
+
+  for (const v of violations) {
+    const uri = (v.blockedUri || "").trim();
+    if (
+      !uri ||
+      uri === "(inline)" ||
+      uri.startsWith("blob:") ||
+      uri.startsWith("data:")
+    ) {
+      continue;
+    }
+    let origin: string | null = null;
+    try {
+      const url = new URL(uri);
+      origin = url.origin;
+    } catch {
+      continue;
+    }
+    if (!origin) continue;
+
+    const dir = (v.effectiveDirective || v.directive || "").toLowerCase();
+
+    if (dir === CONNECT_DIRECTIVE) {
+      connectSet.add(origin);
+      if (origin.startsWith("http://")) {
+        connectSet.add(origin.replace("http://", "ws://"));
+      } else if (origin.startsWith("https://")) {
+        connectSet.add(origin.replace("https://", "wss://"));
+      }
+    } else if (RESOURCE_DIRECTIVES.has(dir)) {
+      resourceSet.add(origin);
+    } else if (dir === FRAME_DIRECTIVE) {
+      frameSet.add(origin);
+    }
+  }
+
+  const result: {
+    connectDomains: string[];
+    resourceDomains: string[];
+    frameDomains?: string[];
+  } = {
+    connectDomains: Array.from(connectSet).sort(),
+    resourceDomains: Array.from(resourceSet).sort(),
+  };
+  if (frameSet.size > 0) {
+    result.frameDomains = Array.from(frameSet).sort();
+  }
+  return result;
+}
+
+const MCP_APPS_CSP_SPEC_URL =
+  "https://raw.githubusercontent.com/modelcontextprotocol/ext-apps/bcfffb6585ea4fb1e3a9da39fb8911b83399fa71/specification/2026-01-26/apps.mdx";
+const MCP_USE_CSP_DOCS_URL = "https://mcp-use.com/docs/typescript/server/csp";
+
+/**
+ * Build an agent prompt to fix CSP violations.
+ * Includes context, current CSP, violations, and suggested fix for an agent to apply.
+ * Only call when violations.length > 0.
+ */
+function buildAgentCspPrompt(
+  declaredCsp: WidgetDeclaredCsp | undefined,
+  effectivePolicy: string | undefined,
+  violations: CspViolation[],
+  suggestedFix: {
+    connectDomains: string[];
+    resourceDomains: string[];
+    frameDomains?: string[];
+  } | null
+): string {
+  const lines: string[] = [
+    "Fix the Content Security Policy (CSP) for this MCP Apps widget. The widget has CSP violations that block network requests and resources.",
+    "",
+    "**References:**",
+    `- MCP Apps CSP spec: ${MCP_APPS_CSP_SPEC_URL}`,
+    `- mcp-use CSP docs: ${MCP_USE_CSP_DOCS_URL}`,
+    "",
+  ];
+
+  lines.push("**Current declared CSP:**");
+  if (declaredCsp) {
+    lines.push(
+      `connectDomains: ${JSON.stringify(declaredCsp.connectDomains ?? [])}`
+    );
+    lines.push(
+      `resourceDomains: ${JSON.stringify(declaredCsp.resourceDomains ?? [])}`
+    );
+    lines.push(
+      `frameDomains: ${JSON.stringify(declaredCsp.frameDomains ?? [])}`
+    );
+    lines.push(
+      `baseUriDomains: ${JSON.stringify(declaredCsp.baseUriDomains ?? [])}`
+    );
+  } else {
+    lines.push("No CSP declared.");
+  }
+  lines.push("");
+
+  if (effectivePolicy) {
+    lines.push("**Effective policy (originalPolicy):**");
+    lines.push("```");
+    lines.push(effectivePolicy);
+    lines.push("```");
+    lines.push("");
+  }
+
+  if (violations.length > 0) {
+    lines.push(`**Blocked requests (${violations.length}):**`);
+    for (const v of violations) {
+      const dir = v.effectiveDirective || v.directive;
+      const uri = v.blockedUri || "(inline)";
+      lines.push(`- ${dir}: ${uri}`);
+    }
+    lines.push("");
+  }
+
+  if (suggestedFix) {
+    lines.push("**Apply this CSP config to fix the violations:**");
+    lines.push(
+      'Add these domains to the widget\'s CSP metadata (appsSdkMetadata["openai/widgetCSP"] or resource _meta.ui.csp). Use camelCase for MCP Apps (connectDomains, resourceDomains) or snake_case for OpenAI format (connect_domains, resource_domains).'
+    );
+    lines.push("");
+    lines.push("```json");
+    lines.push(
+      JSON.stringify(
+        {
+          connectDomains: suggestedFix.connectDomains,
+          resourceDomains: suggestedFix.resourceDomains,
+          ...(suggestedFix.frameDomains?.length
+            ? { frameDomains: suggestedFix.frameDomains }
+            : {}),
+        },
+        null,
+        2
+      )
+    );
+    lines.push("```");
+  } else {
+    lines.push("No blocked requests - no fix needed.");
+  }
+
+  return lines.join("\n");
+}
+
 export function MCPAppsDebugControls({
   displayMode,
   onDisplayModeChange,
@@ -93,7 +268,23 @@ export function MCPAppsDebugControls({
 }: MCPAppsDebugControlsProps) {
   const { playground, updatePlaygroundSettings, widgets, clearCspViolations } =
     useWidgetDebug();
-  const cspViolations = widgets.get(toolCallId)?.cspViolations ?? [];
+  const widget = widgets.get(toolCallId);
+  const cspViolations = widget?.cspViolations ?? [];
+  const declaredCsp = widget?.declaredCsp;
+  const effectivePolicy = widget?.effectivePolicy;
+  const suggestedFix =
+    playground.cspMode === "widget-declared" && cspViolations.length > 0
+      ? computeSuggestedFix(cspViolations, declaredCsp)
+      : null;
+  const agentPrompt =
+    cspViolations.length > -1
+      ? buildAgentCspPrompt(
+          declaredCsp,
+          effectivePolicy,
+          cspViolations,
+          suggestedFix
+        )
+      : "";
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
   const isAppsSdk = protocol === "apps-sdk";
@@ -122,6 +313,9 @@ export function MCPAppsDebugControls({
   const [localeDialogOpen, setLocaleDialogOpen] = useState(false);
   const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
   const [cspDialogOpen, setCspDialogOpen] = useState(false);
+  const [cspDeclaredExpanded, setCspDeclaredExpanded] = useState(true);
+  const [cspPolicyExpanded, setCspPolicyExpanded] = useState(true);
+  const [cspSuggestedExpanded, setCspSuggestedExpanded] = useState(true);
 
   // Determine default select value based on context
   const getDefaultSelectValue = useCallback(() => {
@@ -457,7 +651,7 @@ export function MCPAppsDebugControls({
           </TooltipContent>
         </Tooltip>
         <DialogContent
-          className="sm:max-w-[420px]"
+          className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto"
           data-testid="debugger-csp-dialog"
         >
           <DialogHeader>
@@ -497,6 +691,167 @@ export function MCPAppsDebugControls({
               </div>
             </Button>
           </div>
+
+          {/* Current declared CSP */}
+          <div className="mt-3 border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
+              onClick={() => setCspDeclaredExpanded((v) => !v)}
+            >
+              {cspDeclaredExpanded ? (
+                <ChevronDown className="size-3.5 shrink-0" />
+              ) : (
+                <ChevronRight className="size-3.5 shrink-0" />
+              )}
+              Current declared CSP
+            </button>
+            {cspDeclaredExpanded && (
+              <div className="px-3 pb-3 pt-0 space-y-1.5 text-xs">
+                {declaredCsp ? (
+                  <>
+                    <div>
+                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                        connectDomains:
+                      </span>{" "}
+                      {declaredCsp.connectDomains?.length
+                        ? JSON.stringify(declaredCsp.connectDomains)
+                        : "Not declared"}
+                    </div>
+                    <div>
+                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                        resourceDomains:
+                      </span>{" "}
+                      {declaredCsp.resourceDomains?.length
+                        ? JSON.stringify(declaredCsp.resourceDomains)
+                        : "Not declared"}
+                    </div>
+                    <div>
+                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                        frameDomains:
+                      </span>{" "}
+                      {declaredCsp.frameDomains?.length
+                        ? JSON.stringify(declaredCsp.frameDomains)
+                        : "Not declared"}
+                    </div>
+                    <div>
+                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                        baseUriDomains:
+                      </span>{" "}
+                      {declaredCsp.baseUriDomains?.length
+                        ? JSON.stringify(declaredCsp.baseUriDomains)
+                        : "Not declared"}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    {playground.cspMode === "permissive"
+                      ? "Widget-declared (would apply in Widget-Declared mode)"
+                      : "No CSP declared"}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Policy string (originalPolicy / effectivePolicy) */}
+          <div className="mt-3 border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors">
+              <button
+                type="button"
+                className="flex-1 flex items-center gap-2 text-left text-sm font-medium min-w-0"
+                onClick={() => setCspPolicyExpanded((v) => !v)}
+              >
+                {cspPolicyExpanded ? (
+                  <ChevronDown className="size-3.5 shrink-0" />
+                ) : (
+                  <ChevronRight className="size-3.5 shrink-0" />
+                )}
+                originalPolicy
+              </button>
+              {effectivePolicy && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(effectivePolicy);
+                        toast.success("Policy copied to clipboard");
+                      }}
+                      aria-label="Copy policy"
+                    >
+                      <Copy className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy policy</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            {cspPolicyExpanded && (
+              <div className="px-3 pb-3 pt-0">
+                {effectivePolicy ? (
+                  <pre className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all bg-zinc-50 dark:bg-zinc-900 p-2 rounded border border-zinc-100 dark:border-zinc-800">
+                    {effectivePolicy}
+                  </pre>
+                ) : (
+                  <span className="text-zinc-500 dark:text-zinc-400 text-xs">
+                    No policy data yet (load widget in Widget-Declared mode)
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Prompt for Agents - only when there are blocked requests */}
+          {cspViolations.length > -1 && (
+            <div className="mt-3 border border-amber-200 dark:border-amber-800 rounded-md overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
+                <button
+                  type="button"
+                  className="flex-1 flex items-center gap-2 text-left text-sm font-medium min-w-0 text-amber-800 dark:text-amber-200"
+                  onClick={() => setCspSuggestedExpanded((v) => !v)}
+                >
+                  {cspSuggestedExpanded ? (
+                    <ChevronDown className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  ) : (
+                    <ChevronRight className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  )}
+                  Prompt for Agents
+                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-200/50 dark:hover:bg-amber-800/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(agentPrompt);
+                        toast.success("Prompt copied to clipboard");
+                      }}
+                      aria-label="Copy prompt for agents"
+                    >
+                      <Copy className="size-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy prompt for agents</TooltipContent>
+                </Tooltip>
+              </div>
+              {cspSuggestedExpanded && (
+                <div className="px-3 pb-3 pt-0">
+                  <pre
+                    className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-900 p-2 rounded border border-zinc-100 dark:border-zinc-800 overflow-x-auto max-h-48 overflow-y-auto"
+                    data-testid="debugger-csp-prompt-for-agents"
+                  >
+                    {agentPrompt}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* CSP Violations panel */}
           {cspViolations.length > 0 && (
