@@ -29,12 +29,11 @@ export const widgetMetadata: WidgetMetadata = {
   metadata: {
     prefersBorder: false,
     csp: {
-      connectDomains: [],
-      resourceDomains: [],
+      // Widget-specific
+      resourceDomains: ["https://cdn.openai.com"],
     },
   },
 };
-
 type FavoritesState = { favorites: string[] };
 
 const ProductSearchResult: React.FC = () => {
@@ -48,8 +47,6 @@ const ProductSearchResult: React.FC = () => {
     state,
     setState,
   } = useWidget<ProductSearchResultProps, FavoritesState>();
-
-  console.log("props", props);
 
   const {
     callTool: getFruitDetails,
@@ -120,7 +117,7 @@ const ProductSearchResult: React.FC = () => {
                 size="lg"
                 uniform
                 variant="ghost"
-                className="text-danger"
+                className="text-danger/80"
               >
                 <HeartFilled />
                 {favorites.length}
@@ -240,7 +237,7 @@ const ProductSearchResult: React.FC = () => {
                         }
                         className={
                           favorites.includes(selectedFruit.fruit)
-                            ? "text-danger"
+                            ? "text-danger/80"
                             : "text-secondary"
                         }
                       >

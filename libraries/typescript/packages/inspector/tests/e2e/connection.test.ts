@@ -290,9 +290,11 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("tool-execution-execute-button").click();
 
-    await expect(page.getByText("Text Content (JSON)")).toBeVisible({
+    await expect(page.getByText("Text Content")).toBeVisible({
       timeout: 10000,
     });
+    await expect(page.getByTestId("tool-result-format-toggle-0")).toBeVisible();
+    await page.getByTestId("tool-result-format-toggle-0").click();
     const resultsContent = page.getByTestId("tool-execution-results-content");
     await expect(
       resultsContent.getByText('"flagType": "boolean"')

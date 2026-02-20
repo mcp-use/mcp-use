@@ -63,6 +63,7 @@ interface ToolResultDisplayProps {
   onFullscreen: (index: number) => void;
   onMaximize?: () => void;
   isMaximized?: boolean;
+  onRerunTool?: () => void;
 }
 
 // Isolated component so 1s interval doesn't re-render parent (and thus widget iframe)
@@ -130,6 +131,22 @@ function isValidJSON(str: string): boolean {
 
 // Component to render formatted content
 function FormattedContentDisplay({ content }: { content: any[] }) {
+  const [formattedIndices, setFormattedIndices] = useState<Set<number>>(
+    new Set()
+  );
+
+  const toggleFormat = useCallback((idx: number) => {
+    setFormattedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  }, []);
+
   if (!Array.isArray(content) || content.length === 0) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">No content</div>
@@ -142,36 +159,45 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
         // Handle text content
         if (item.type === "text") {
           const text = item.text || "";
+          const isFormatted = formattedIndices.has(idx);
+          const canFormat = isValidJSON(text);
+          const parsed = canFormat
+            ? (() => {
+                try {
+                  return JSON.parse(text);
+                } catch {
+                  return null;
+                }
+              })()
+            : null;
 
-          // Check if it's stringified JSON
-          if (isValidJSON(text)) {
-            try {
-              const parsed = JSON.parse(text);
-              return (
-                <div key={idx} className="space-y-2">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                    Text Content (JSON)
-                  </div>
-                  <JSONDisplay data={parsed} filename={`content-${idx}.json`} />
-                </div>
-              );
-            } catch {
-              // Fall through to plain text
-            }
-          }
-
-          // Plain text
           return (
             <div key={idx} className="space-y-2">
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Text Content
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Text Content{isFormatted ? " (formatted)" : ""}
+                </div>
+                {canFormat && (
+                  <button
+                    type="button"
+                    onClick={() => toggleFormat(idx)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    data-testid={`tool-result-format-toggle-${idx}`}
+                  >
+                    {isFormatted ? "Show as text" : "Try to format"}
+                  </button>
+                )}
               </div>
-              <div
-                className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-sm whitespace-pre-wrap break-words"
-                data-testid="tool-execution-results-text-content"
-              >
-                {text}
-              </div>
+              {isFormatted && parsed !== null ? (
+                <JSONDisplay data={parsed} filename={`content-${idx}.json`} />
+              ) : (
+                <div
+                  className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-sm whitespace-pre-wrap break-words"
+                  data-testid="tool-execution-results-text-content"
+                >
+                  {text}
+                </div>
+              )}
             </div>
           );
         }
@@ -370,6 +396,7 @@ export function ToolResultDisplay({
   onCopy,
   onMaximize,
   isMaximized = false,
+  onRerunTool,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
@@ -921,6 +948,7 @@ export function ToolResultDisplay({
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}
+                        onRerun={onRerunTool}
                       />
                     </div>
                   );

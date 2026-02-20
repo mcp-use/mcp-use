@@ -586,9 +586,10 @@ class McpAppsBridge {
    * Send a message to the conversation
    */
   async sendMessage(content: { type: string; text: string }): Promise<void> {
+    const contentArray = Array.isArray(content) ? content : [content];
     await this.sendRequest("ui/message", {
       role: "user",
-      content,
+      content: contentArray,
     });
   }
 

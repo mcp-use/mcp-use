@@ -45,12 +45,13 @@ export function PropsConfigDialog({
   llmConfig,
   editingPreset,
 }: PropsConfigDialogProps) {
-  // Detect props schema from resource metadata
+  // Detect props schema from resource metadata.
+  // mcp-use servers publish the widget props schema under the private extension key
+  // "mcp-use/propsSchema" in the resource listing _meta (not inside _meta.ui, which is
+  // spec-only). The schema is either a serialized Zod structure or plain JSON Schema.
   const propsSchema = useMemo(() => {
-    // Check for mcp-use widget props in _meta["mcp-use/widget"].props
-    const mcpUseWidget = resourceAnnotations?.["mcp-use/widget"] as any;
-    if (mcpUseWidget?.props) {
-      const props = mcpUseWidget.props;
+    const parsePropsSchema = (props: any): any => {
+      if (!props) return null;
 
       // Already JSON Schema format (e.g. from built manifest)
       if (props.type === "object" && props.properties) {
@@ -140,16 +141,18 @@ export function PropsConfigDialog({
           };
         }
       }
-    }
+      return null;
+    };
 
-    // Check standard JSON Schema locations
+    // Primary: mcp-use/propsSchema in merged annotations (resource._meta from listing)
     const annotations = resourceAnnotations as Record<string, any>;
     if (annotations?.["mcp-use/propsSchema"]) {
-      return annotations["mcp-use/propsSchema"] as any;
+      return parsePropsSchema(annotations["mcp-use/propsSchema"]);
     }
+    // Fallback: resource.annotations (older path)
     const resourceAnnots = resource.annotations as Record<string, any>;
     if (resourceAnnots?.["mcp-use/propsSchema"]) {
-      return resourceAnnots["mcp-use/propsSchema"] as any;
+      return parsePropsSchema(resourceAnnots["mcp-use/propsSchema"]);
     }
 
     return null;

@@ -144,11 +144,12 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
   }) => {
     await page.getByTestId("resource-item-weather-display").click();
 
-    // Resource result shows either Apps SDK or MCP Apps widget (priority order)
-    const widgetIframe = page.locator('iframe[title*="weather-display"]');
-    await expect(widgetIframe).toBeVisible({ timeout: 15000 });
-    const frame = page.frameLocator('iframe[title*="weather-display"]').first();
-    await expect(frame.locator("body")).toBeVisible({ timeout: 3000 });
+    // Widget requires props - check props wall text is visible
+    await expect(
+      page.getByText(
+        "This widget requires props, set or generate them in the props debugger"
+      )
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("weather-display resource - should switch between preview and JSON view", async ({
@@ -156,9 +157,12 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
   }) => {
     await page.getByTestId("resource-item-weather-display").click();
 
-    await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
-      timeout: 10000,
-    });
+    // Widget requires props - check props wall text is visible in preview
+    await expect(
+      page.getByText(
+        "This widget requires props, set or generate them in the props debugger"
+      )
+    ).toBeVisible({ timeout: 10000 });
 
     await page.getByRole("button", { name: "JSON" }).click();
     await expect(page.getByTestId("resource-result-json")).toBeVisible({
@@ -168,9 +172,12 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
     await expect(resultContent).toContainText('"uri"');
 
     await page.getByRole("button", { name: /Component|Preview/ }).click();
-    await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
-      timeout: 10000,
-    });
+    // Back to preview - props wall is shown again
+    await expect(
+      page.getByText(
+        "This widget requires props, set or generate them in the props debugger"
+      )
+    ).toBeVisible({ timeout: 10000 });
   });
 });
 

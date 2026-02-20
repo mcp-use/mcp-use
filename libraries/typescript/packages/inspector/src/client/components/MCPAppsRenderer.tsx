@@ -68,6 +68,8 @@ interface MCPAppsRendererProps {
   serverBaseUrl?: string;
   /** When true, sends ui/notifications/tool-cancelled to the widget. */
   cancelled?: boolean;
+  /** Called when the CSP mode changes after the widget is already loaded, requesting the tool to be re-executed. */
+  onRerun?: () => void;
 }
 
 function MCPAppsRendererBase({
@@ -87,7 +89,7 @@ function MCPAppsRendererBase({
   noWrapper,
   customProps,
   cancelled,
-  serverBaseUrl: serverBaseUrlProp,
+  onRerun,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -136,6 +138,19 @@ function MCPAppsRendererBase({
 
   // Use controlled displayMode if provided, otherwise use internal state
   const displayMode = displayModeProp ?? internalDisplayMode;
+
+  // Keep a ref so the onsizechange closure (captured at bridge creation) always
+  // reads the current displayMode without needing to recreate the bridge.
+  const displayModeRef = useRef(displayMode);
+  displayModeRef.current = displayMode;
+
+  // Track the last height requested by the widget in inline mode.
+  // This persists across fullscreen/PiP transitions so the iframe is
+  // restored to the correct height when returning to inline (rather than
+  // always snapping back to DEFAULT_HEIGHT).
+  const [inlineHeight, setInlineHeight] = useState<number>(
+    MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT
+  );
 
   // Use useRef instead of useState to avoid state updates during ref callback
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -195,54 +210,37 @@ function MCPAppsRendererBase({
           listingUiMeta || contentUiMeta
             ? { ...listingUiMeta, ...contentUiMeta }
             : undefined;
-        const resourceMeta = {
-          ...contentMeta,
-          ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
-        };
+        // const resourceMeta = {
+        //   ...contentMeta,
+        //   ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
+        // };
 
-        // Extract MCP Apps metadata from merged resource metadata
-        const mcpAppsCsp = mergedUiMeta?.csp;
-        const mcpAppsPermissions = mergedUiMeta?.permissions;
-        // Check both MCP Apps and Apps SDK (ChatGPT) metadata paths
-        const mcpAppsPrefersBorder =
-          mergedUiMeta?.prefersBorder ?? // MCP Apps protocol
-          resourceMeta?.["openai/widgetPrefersBorder"] ?? // Apps SDK protocol
-          true; // Default to true if not specified
-
-        // Detect dev mode from widget metadata (same logic as Apps SDK)
-        const widgetMeta = resourceMeta?.["mcp-use/widget"];
-        const computedUseDevMode = widgetMeta?.html && widgetMeta?.dev;
-        const widgetName = widgetMeta?.name;
-        const slugifiedName = widgetMeta?.slugifiedName || widgetName;
-
-        // Calculate dev widget URL if in dev mode
-        let devWidgetUrl: string | undefined;
-        let devServerBaseUrl: string | undefined;
-
-        if (computedUseDevMode && slugifiedName) {
-          // Prefer serverBaseUrl prop (e.g. from Mango sandbox); else derive from serverId only if it's a valid URL
-          let base: string | undefined;
-          if (typeof serverBaseUrlProp === "string" && serverBaseUrlProp) {
-            try {
-              base = new URL(serverBaseUrlProp).origin;
-            } catch {
-              base = undefined;
-            }
-          }
-          if (!base && /^https?:\/\//.test(serverId)) {
-            try {
-              base = new URL(serverId.replace(/\/mcp$/, "")).origin;
-            } catch {
-              base = undefined;
-            }
-          }
-          if (base) {
-            devServerBaseUrl = base.replace("0.0.0.0", "localhost");
-            devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
-          }
+        // MCP Apps: Use ui.csp from resource per SEP-1865. Fallback to openai/widgetCSP
+        // from tool metadata (transformed to camelCase) when resource lacks it.
+        let mcpAppsCsp = mergedUiMeta?.csp;
+        if (!mcpAppsCsp && (toolMetadata as any)?.["openai/widgetCSP"]) {
+          const wcsp = (toolMetadata as any)["openai/widgetCSP"] as Record<
+            string,
+            unknown
+          >;
+          const fallback: Record<string, unknown> = {};
+          if (Array.isArray(wcsp.connect_domains))
+            fallback.connectDomains = wcsp.connect_domains;
+          if (Array.isArray(wcsp.resource_domains))
+            fallback.resourceDomains = wcsp.resource_domains;
+          if (Array.isArray(wcsp.frame_domains))
+            fallback.frameDomains = wcsp.frame_domains;
+          if (Array.isArray(wcsp.base_uri_domains))
+            fallback.baseUriDomains = wcsp.base_uri_domains;
+          if (Array.isArray(wcsp.script_directives))
+            fallback.scriptDirectives = wcsp.script_directives;
+          if (Object.keys(fallback).length > 0) mcpAppsCsp = fallback as any;
         }
+        const mcpAppsPermissions = mergedUiMeta?.permissions;
+        // MCP Apps only: prefersBorder is in resource _meta.ui per spec
+        const mcpAppsPrefersBorder = mergedUiMeta?.prefersBorder ?? true;
 
-        // Store widget data including dev URLs
+        // Store widget data
         const storeResponse = await fetch(
           MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_STORE,
           {
@@ -250,7 +248,7 @@ function MCPAppsRendererBase({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               serverId,
-              uri: resourceUri, // Backend expects 'uri' not 'resourceUri'
+              uri: resourceUri,
               toolInput,
               toolOutput,
               toolId: toolCallId,
@@ -262,8 +260,6 @@ function MCPAppsRendererBase({
               mimeType: resourceMimeType,
               mcpAppsCsp,
               mcpAppsPermissions,
-              devWidgetUrl, // Store dev URL for HMR
-              devServerBaseUrl, // Store dev base URL
             }),
           }
         );
@@ -274,12 +270,9 @@ function MCPAppsRendererBase({
           );
         }
 
-        // Use dev endpoint in dev mode for live HMR, otherwise use cached content
-        const contentEndpoint = computedUseDevMode
-          ? MCP_APPS_CONFIG.API_ENDPOINTS.DEV_WIDGET_CONTENT(toolCallId)
-          : MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_CONTENT(toolCallId);
-
         // Fetch widget content with CSP metadata
+        const contentEndpoint =
+          MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_CONTENT(toolCallId);
         const contentResponse = await fetch(
           `${contentEndpoint}?csp_mode=${cspMode}`
         );
@@ -292,8 +285,9 @@ function MCPAppsRendererBase({
           );
         }
 
+        const contentJson = await contentResponse.json();
         const { html, csp, permissions, mimeTypeWarning, mimeTypeValid } =
-          await contentResponse.json();
+          contentJson;
 
         if (!mimeTypeValid) {
           setLoadError(
@@ -330,7 +324,19 @@ function MCPAppsRendererBase({
     // hostContext, addWidget, toolInput, toolOutput, resolvedTheme are intentionally
     // excluded to prevent infinite re-render loops — they are captured by closure
     // at the time of the fetch and don't warrant refetching the widget HTML.
-  }, [serverId, resourceUri, toolCallId, toolName, cspMode]);
+    // cspMode is intentionally excluded — changes are handled by the effect below.
+  }, [serverId, resourceUri, toolCallId, toolName]);
+
+  // When CSP mode changes after the widget has already loaded, request a
+  // full tool re-execution so the fresh result is rendered with the new CSP.
+  const prevCspModeRef = useRef(cspMode);
+  useEffect(() => {
+    if (prevCspModeRef.current === cspMode) return;
+    prevCspModeRef.current = cspMode;
+    if (hasLoadedOnceRef.current && onRerun) {
+      onRerun();
+    }
+  }, [cspMode, onRerun]);
 
   // Re-read prefersBorder from the server when the widget re-initializes
   // (HMR support). When initCount > 1, it means the widget iframe reloaded
@@ -566,7 +572,9 @@ function MCPAppsRendererBase({
     };
 
     bridge.onsizechange = ({ width, height }) => {
-      if (displayMode !== "inline") return;
+      // Use ref so this closure always reads the current displayMode even
+      // though it was captured when the bridge was first created.
+      if (displayModeRef.current !== "inline") return;
       const iframeEl = iframe;
       if (!iframeEl || (height === undefined && width === undefined)) return;
 
@@ -598,6 +606,10 @@ function MCPAppsRendererBase({
       if (adjustedHeight !== undefined) {
         from.height = `${iframeEl.offsetHeight}px`;
         iframeEl.style.height = to.height = `${adjustedHeight}px`;
+        // Persist in state so React uses this height when returning to inline
+        // mode (avoids snapping back to DEFAULT_HEIGHT and missing a resize
+        // event when the PiP container happens to be the same pixel height).
+        setInlineHeight(adjustedHeight);
       }
 
       iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
@@ -802,10 +814,13 @@ function MCPAppsRendererBase({
 
     // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
-      // Skip if we already sent this exact payload (parent re-renders with new ref, same data)
-      const contentKey = JSON.stringify(
-        (toolOutput as any)?.structuredContent ?? toolOutput
-      );
+      // Skip if we already sent this exact payload (parent re-renders with new ref, same data).
+      // Include customProps in the key so a preset change always triggers a re-send with the
+      // new structuredContent, even when toolOutput itself hasn't changed.
+      const contentKey = JSON.stringify({
+        content: (toolOutput as any)?.structuredContent ?? toolOutput,
+        customProps: customProps ?? null,
+      });
       if (lastSentToolOutputKeyRef.current === contentKey) return;
       lastSentToolOutputKeyRef.current = contentKey;
       const result = toolOutput as CallToolResult;
@@ -991,10 +1006,7 @@ function MCPAppsRendererBase({
   })();
 
   const iframeStyle: CSSProperties = {
-    height:
-      isFullscreen || isPip
-        ? "100%"
-        : `${MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT}px`,
+    height: isFullscreen || isPip ? "100%" : `${inlineHeight}px`,
     width: "100%",
     maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
     transition:
@@ -1095,6 +1107,7 @@ function mcpAppsRendererAreEqual(
   if (prev.customProps !== next.customProps) return false;
   if (prev.readResource !== next.readResource) return false;
   if (prev.onSendFollowUp !== next.onSendFollowUp) return false;
+  if (prev.onRerun !== next.onRerun) return false;
   if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
   if (prev.className !== next.className) return false;
   if (prev.serverBaseUrl !== next.serverBaseUrl) return false;

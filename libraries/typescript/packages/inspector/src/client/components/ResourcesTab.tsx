@@ -183,7 +183,10 @@ export function ResourcesTab({
             uri: resource.uri,
             result,
             timestamp,
-            resourceAnnotations: resource.annotations as Record<string, any>,
+            resourceAnnotations: {
+              ...(resource.annotations as Record<string, any>),
+              ...(((resource as any)._meta as Record<string, any>) || {}),
+            },
           });
         } catch (error) {
           // Track failed resource read
@@ -209,7 +212,10 @@ export function ResourcesTab({
             },
             error: error instanceof Error ? error.message : "Unknown error",
             timestamp,
-            resourceAnnotations: resource.annotations as Record<string, any>,
+            resourceAnnotations: {
+              ...(resource.annotations as Record<string, any>),
+              ...(((resource as any)._meta as Record<string, any>) || {}),
+            },
           });
         } finally {
           setIsLoading(false);

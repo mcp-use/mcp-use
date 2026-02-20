@@ -103,6 +103,10 @@ export function ToolsTab({
     useState<SavedRequest | null>(null);
   const { selectedToolName, setSelectedToolName } = useInspector();
   const [toolArgs, setToolArgs] = useState<Record<string, unknown>>({});
+  const [setFields, setSetFields] = useState<Set<string>>(new Set());
+  const [sendEmptyFields, setSendEmptyFields] = useState<Set<string>>(
+    new Set()
+  );
   const [results, setResults] = useState<ToolResult[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [copiedResult, setCopiedResult] = useState<number | null>(null);
@@ -250,31 +254,21 @@ export function ToolsTab({
 
   const handleToolSelect = useCallback((tool: Tool) => {
     setSelectedTool(tool);
-    // Initialize args with default values based on tool input schema
+    // Only initialize fields that have schema defaults; others start unset (not sent)
     const initialArgs: Record<string, unknown> = {};
-    const rootSchema = (tool.inputSchema || {}) as Record<string, unknown>;
+    const initialSetFields = new Set<string>();
     if (tool.inputSchema?.properties) {
       Object.entries(tool.inputSchema.properties).forEach(([key, prop]) => {
-        const typedProp = prop as any;
-        const effectiveType = getToolPropertyType(prop, rootSchema);
+        const typedProp = prop as { default?: unknown };
         if (typedProp.default !== undefined) {
           initialArgs[key] = typedProp.default;
-        } else if (effectiveType === "string") {
-          initialArgs[key] = "";
-        } else if (effectiveType === "number" || effectiveType === "integer") {
-          initialArgs[key] = 0;
-        } else if (effectiveType === "boolean") {
-          initialArgs[key] = false;
-        } else if (effectiveType === "array") {
-          // Initialize as empty JSON string to preserve formatting
-          initialArgs[key] = "[]";
-        } else if (effectiveType === "object") {
-          // Initialize as empty JSON string to preserve formatting
-          initialArgs[key] = "{}";
+          initialSetFields.add(key);
         }
       });
     }
     setToolArgs(initialArgs);
+    setSetFields(initialSetFields);
+    setSendEmptyFields(new Set());
   }, []);
 
   const loadSavedRequest = useCallback(
@@ -283,6 +277,8 @@ export function ToolsTab({
       if (tool) {
         setSelectedTool(tool);
         setToolArgs(request.args);
+        setSetFields(new Set(Object.keys(request.args)));
+        setSendEmptyFields(new Set());
         setSelectedSavedRequest(request);
       }
     },
@@ -449,38 +445,84 @@ export function ToolsTab({
 
   const handleArgChange = useCallback(
     (key: string, value: string) => {
-      setToolArgs((prev) => {
-        const newArgs = { ...prev };
-        const rootSchema = (selectedTool?.inputSchema || {}) as Record<
-          string,
-          unknown
-        >;
+      const rootSchema = (selectedTool?.inputSchema || {}) as Record<
+        string,
+        unknown
+      >;
+      const prop = selectedTool?.inputSchema?.properties?.[key];
+      const expectedType = prop
+        ? getToolPropertyType(prop, rootSchema)
+        : "string";
 
-        if (selectedTool?.inputSchema?.properties?.[key]) {
-          const prop = selectedTool.inputSchema.properties[key];
-          const expectedType = getToolPropertyType(prop, rootSchema);
+      let processedValue: unknown;
+      if (expectedType === "object" || expectedType === "array") {
+        processedValue = value;
+      } else if (expectedType === "string") {
+        processedValue = value;
+      } else {
+        processedValue = coerceTextInputValueByType(value, expectedType);
+      }
 
-          // Keep object/array types as strings to preserve formatting and cursor position
-          if (expectedType === "object" || expectedType === "array") {
-            newArgs[key] = value;
-          } else if (expectedType === "string") {
-            newArgs[key] = value;
-          } else {
-            newArgs[key] = coerceTextInputValueByType(value, expectedType);
-          }
+      setToolArgs((prev) => ({ ...prev, [key]: processedValue }));
+
+      // Treat as empty: blank input. "{}" and "[]" are explicit values, not empty.
+      const trimmed = String(value).trim();
+      const isEmpty = trimmed === "";
+
+      setSetFields((prev) => {
+        const next = new Set(prev);
+        if (isEmpty) {
+          next.delete(key);
         } else {
-          // If no schema info, keep as string to be safe
-          newArgs[key] = value;
+          next.add(key);
         }
+        return next;
+      });
 
-        return newArgs;
+      // Clear "send empty" intent when user edits the field
+      setSendEmptyFields((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
       });
     },
     [selectedTool]
   );
 
+  const handleToggleEmpty = useCallback(
+    (
+      key: string,
+      expectedType: "string" | "object" | "array",
+      pressed: boolean
+    ) => {
+      if (pressed) {
+        const emptyValue =
+          expectedType === "array"
+            ? "[]"
+            : expectedType === "object"
+              ? "{}"
+              : "";
+        setToolArgs((prev) => ({ ...prev, [key]: emptyValue }));
+        setSetFields((prev) => new Set(prev).add(key));
+        setSendEmptyFields((prev) => new Set(prev).add(key));
+      } else {
+        setSendEmptyFields((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+        setSetFields((prev) => {
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+    },
+    []
+  );
+
   const handleBulkPaste = useCallback(
-    async (pastedText: string, fieldKey: string): Promise<boolean> => {
+    async (pastedText: string, _fieldKey: string): Promise<boolean> => {
       if (!selectedTool) return false;
 
       // Try to parse as object
@@ -613,6 +655,30 @@ export function ToolsTab({
     });
   }, [autoFillDialog]);
 
+  // Payload that will actually be sent (for copy, display)
+  const payloadToSend = useMemo(() => {
+    if (!selectedTool?.inputSchema?.properties) return {};
+    const rootSchema = (selectedTool.inputSchema || {}) as Record<
+      string,
+      unknown
+    >;
+    const result: Record<string, unknown> = {};
+    for (const key of setFields) {
+      const prop = selectedTool.inputSchema.properties[key];
+      if (!prop) continue;
+      const expectedType = getToolPropertyType(prop, rootSchema);
+      const rawValue = sendEmptyFields.has(key)
+        ? expectedType === "array"
+          ? "[]"
+          : expectedType === "object"
+            ? "{}"
+            : ""
+        : toolArgs[key];
+      result[key] = coerceExecutionArgByType(rawValue, expectedType);
+    }
+    return result;
+  }, [selectedTool, toolArgs, setFields, sendEmptyFields]);
+
   const executeTool = useCallback(async () => {
     if (!selectedTool || isExecuting) return;
 
@@ -623,21 +689,7 @@ export function ToolsTab({
     const startTime = Date.now();
 
     try {
-      // Parse values by resolved schema type before execution
-      const parsedArgs = { ...toolArgs };
-      const rootSchema = (selectedTool.inputSchema || {}) as Record<
-        string,
-        unknown
-      >;
-      if (selectedTool.inputSchema?.properties) {
-        Object.entries(selectedTool.inputSchema.properties).forEach(
-          ([key, prop]) => {
-            const expectedType = getToolPropertyType(prop, rootSchema);
-            const value = parsedArgs[key];
-            parsedArgs[key] = coerceExecutionArgByType(value, expectedType);
-          }
-        );
-      }
+      const parsedArgs = payloadToSend;
 
       // Extract tool metadata BEFORE executing to detect widget tools
       const toolMeta =
@@ -837,7 +889,15 @@ export function ToolsTab({
     } finally {
       setIsExecuting(false);
     }
-  }, [selectedTool, toolArgs, isExecuting, callTool, readResource, serverId]);
+  }, [
+    selectedTool,
+    payloadToSend,
+    toolArgs,
+    isExecuting,
+    callTool,
+    readResource,
+    serverId,
+  ]);
 
   const handleCopyResult = useCallback(async (index: number, text: string) => {
     try {
@@ -902,7 +962,7 @@ export function ToolsTab({
         requestName.trim() ||
         `${selectedTool.name} - ${new Date().toLocaleString()}`,
       toolName: selectedTool.name,
-      args: toolArgs,
+      args: payloadToSend,
       savedAt: Date.now(),
       serverId: (selectedTool as any)._serverId,
       serverName: (selectedTool as any)._serverName,
@@ -928,7 +988,7 @@ export function ToolsTab({
   }, [
     selectedTool,
     requestName,
-    toolArgs,
+    payloadToSend,
     savedRequests,
     saveSavedRequests,
     serverId,
@@ -1065,6 +1125,7 @@ export function ToolsTab({
                 <ToolExecutionPanel
                   selectedTool={selectedTool}
                   toolArgs={toolArgs}
+                  payloadToSend={payloadToSend}
                   isExecuting={isExecuting}
                   isConnected={isConnected}
                   onArgChange={handleArgChange}
@@ -1072,6 +1133,9 @@ export function ToolsTab({
                   onSave={openSaveDialog}
                   onBulkPaste={handleBulkPaste}
                   autoFilledFields={autoFilledFields}
+                  setFields={setFields}
+                  sendEmptyFields={sendEmptyFields}
+                  onToggleEmpty={handleToggleEmpty}
                 />
               </motion.div>
             )}
@@ -1093,6 +1157,7 @@ export function ToolsTab({
                   onCopy={handleCopyResult}
                   onDelete={handleDeleteResult}
                   onFullscreen={handleFullscreen}
+                  onRerunTool={executeTool}
                 />
               </motion.div>
             )}
@@ -1245,6 +1310,7 @@ export function ToolsTab({
             <ToolExecutionPanel
               selectedTool={selectedTool}
               toolArgs={toolArgs}
+              payloadToSend={payloadToSend}
               isExecuting={isExecuting}
               isConnected={isConnected}
               onArgChange={handleArgChange}
@@ -1257,6 +1323,9 @@ export function ToolsTab({
               }}
               onBulkPaste={handleBulkPaste}
               autoFilledFields={autoFilledFields}
+              setFields={setFields}
+              sendEmptyFields={sendEmptyFields}
+              onToggleEmpty={handleToggleEmpty}
             />
           </ResizablePanel>
 
@@ -1274,6 +1343,7 @@ export function ToolsTab({
                 onFullscreen={handleFullscreen}
                 onMaximize={handleMaximize}
                 isMaximized={isMaximized}
+                onRerunTool={executeTool}
               />
             </div>
           </ResizablePanel>

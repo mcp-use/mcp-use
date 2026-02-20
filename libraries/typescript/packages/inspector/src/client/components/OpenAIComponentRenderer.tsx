@@ -144,7 +144,7 @@ function OpenAIComponentRendererBase({
   const server = servers.find((connection) => connection.id === serverId);
   const serverBaseUrl = serverBaseUrlProp ?? server?.url;
   const { resolvedTheme } = useTheme();
-  const { playground } = useWidgetDebug();
+  const { playground, addWidget, addCspViolation } = useWidgetDebug();
 
   // Refs to hold latest values without triggering effect re-runs
   // This prevents infinite loops caused by object/function reference changes
@@ -173,7 +173,6 @@ function OpenAIComponentRendererBase({
       // Access latest values from refs to avoid stale closures
       const currentToolResult = toolResultRef.current;
       const currentReadResource = readResourceRef.current;
-      const currentServerBaseUrl = serverBaseUrlRef.current;
       const currentResolvedTheme = resolvedThemeRef.current;
       // Capture playground from closure at effect run time
       const currentPlayground = playground;
@@ -218,32 +217,17 @@ function OpenAIComponentRendererBase({
           ...(latestCustomProps || {}),
         };
 
-        // Check for dev mode widget from resource read metadata (mcp-use extension).
-        // This lives on the resource _meta, not on tool result _meta.
-        const metaForWidget = resourceData?.contents?.[0]?._meta;
-
-        // Use dev mode if metadata says so
-        const computedUseDevMode =
-          metaForWidget?.["mcp-use/widget"]?.html &&
-          metaForWidget?.["mcp-use/widget"]?.dev;
-
-        const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
-        // Get slugified name for URL routing (falls back to original name if not provided)
-        const slugifiedName =
-          metaForWidget?.["mcp-use/widget"]?.slugifiedName || widgetName;
-
-        // Prepare widget data with optional dev URLs
+        // Prepare widget data for storage
         const widgetDataToStore: any = {
           serverId,
           uri: componentUrl,
-          toolInput: finalToolInput, // Original tool call arguments
-          toolOutput: structuredContent, // Tool output (structured data)
-          toolResponseMetadata: null, // Protocol metadata only — props are in structuredContent
-          resourceData, // Pass the fetched HTML
+          toolInput: finalToolInput,
+          toolOutput: structuredContent,
+          toolResponseMetadata: null,
+          resourceData,
           toolId,
-          widgetCSP, // Pass the CSP metadata
-          theme: currentResolvedTheme, // Pass the current theme to prevent flash
-          // Include current playground settings for window.openai initialization
+          widgetCSP,
+          theme: currentResolvedTheme,
           playground: {
             locale: currentPlayground.locale,
             deviceType: currentPlayground.deviceType,
@@ -251,14 +235,6 @@ function OpenAIComponentRendererBase({
             safeAreaInsets: currentPlayground.safeAreaInsets,
           },
         };
-
-        if (computedUseDevMode && slugifiedName && currentServerBaseUrl) {
-          const devServerBaseUrl = new URL(currentServerBaseUrl).origin;
-          // Use slugified name for URL routing
-          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
-          widgetDataToStore.devWidgetUrl = devWidgetUrl;
-          widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
-        }
 
         // Inspector API routes (/inspector/api/*) are always served by the same
         // origin that hosts the inspector UI.  Use relative URLs so fetch targets
@@ -303,19 +279,15 @@ function OpenAIComponentRendererBase({
         // setState across await boundaries.
         setWidgetToolInput(finalToolInput);
         setWidgetToolOutput(structuredContent);
-        setUseDevMode(computedUseDevMode || false);
+        setUseDevMode(false);
         // Only set widget URL on first run; subsequent runs (e.g. toolResult arrives) just update
         // the store so that iframe fetch gets latest data. Changing URL would reload the iframe.
         if (!hasSetWidgetUrlRef.current) {
           hasSetWidgetUrlRef.current = true;
-          if (computedUseDevMode && widgetName && currentServerBaseUrl) {
-            // Use proxy URL for dev widgets (same-origin, supports HMR)
-            const proxyUrl = `${inspectorApiBase}/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
-            setWidgetUrl(proxyUrl);
-          } else {
-            const prodUrl = `${inspectorApiBase}/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
-            setWidgetUrl(prodUrl);
-          }
+          const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
+          setWidgetUrl(widgetUrl);
+          // Register widget in debug context so CSP violations can be stored
+          addWidget(toolId, { toolName, protocol: "chatgpt-app" });
         }
         setIsSameOrigin(computedIsSameOrigin);
       } catch (error) {
@@ -633,6 +605,18 @@ function OpenAIComponentRendererBase({
       }
 
       switch (event.data.type) {
+        case "openai:csp-violation":
+          addCspViolation(toolId, {
+            directive: event.data.directive,
+            effectiveDirective: event.data.effectiveDirective,
+            blockedUri: event.data.blockedUri,
+            sourceFile: event.data.sourceFile,
+            lineNumber: event.data.lineNumber,
+            columnNumber: event.data.columnNumber,
+            timestamp: event.data.timestamp || Date.now(),
+          });
+          break;
+
         case "openai:setWidgetState":
           try {
             // Widget state is already handled by the server-injected script

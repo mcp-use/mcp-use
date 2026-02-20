@@ -282,9 +282,26 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     enrichedDefinition.type === "mcpApps"
       ? buildResourceUiMeta(enrichedDefinition)
       : undefined;
+
+  // The listing-level _meta is separate from the content _meta returned by resources/read.
+  // Internal "mcp-use/widget" bookkeeping is excluded entirely.
+  // "mcp-use/propsSchema" is a mcp-use private extension forwarded as-is: the inspector
+  // reads it from resource._meta to power PropsConfigDialog. Other hosts ignore unknown
+  // _meta keys, so this stays out of the spec's _meta.ui namespace.
+  const defMeta = enrichedDefinition._meta as
+    | Record<string, unknown>
+    | undefined;
+  const defMetaPublic = defMeta
+    ? Object.fromEntries(
+        Object.entries(defMeta).filter(
+          ([k]) => k !== "mcp-use/widget" && k !== "ui"
+        )
+      )
+    : {};
+  const listingUi = resourceUiMeta || {};
   const resourceMeta = {
-    ...enrichedDefinition._meta,
-    ...(resourceUiMeta ? { ui: resourceUiMeta } : {}),
+    ...defMetaPublic,
+    ...(Object.keys(listingUi).length > 0 ? { ui: listingUi } : {}),
   };
 
   // Resolve the latest enriched definition dynamically.
