@@ -167,10 +167,11 @@ export function ResourceResultDisplay({
 
   // Detect required props from the widget schema so we can warn before rendering
   const requiredProps = useMemo(() => {
-    const widget = (combinedAnnotations as any)?.["mcp-use/widget"];
-    if (!widget?.props) return [];
+    const uiMeta = (combinedAnnotations as any)?.ui;
+    if (!uiMeta?.props) return [];
+    const props = uiMeta.props;
     // Zod format: { def: { type: "object", shape: { propName: { def: { type: "..." } } } } }
-    const shape = widget.props.def?.shape;
+    const shape = props.def?.shape;
     if (shape) {
       return Object.entries(shape)
         .filter(([, v]: any) => {
@@ -180,7 +181,7 @@ export function ResourceResultDisplay({
         .map(([k]) => k);
     }
     // JSON Schema format
-    return (widget.props.required as string[]) ?? [];
+    return (props.required as string[]) ?? [];
   }, [combinedAnnotations]);
 
   // Detect widget protocol (Priority: MCP Apps → Apps SDK → MCP-UI)

@@ -469,12 +469,9 @@ export function InspectorDashboard() {
 
   const handleReconnect = (connection: any) => {
     console.log("[InspectorDashboard] Reconnecting server:", connection.id);
-    if (connection.retry) {
+    if (connection.state === "failed" && connection.retry) {
       connection.retry();
     } else {
-      console.warn(
-        "[InspectorDashboard] No retry method available, using connectServer fallback"
-      );
       connectServer(connection.id);
     }
   };

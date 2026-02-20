@@ -1729,6 +1729,8 @@ program
       if (mcpUrl) {
         env.MCP_URL = mcpUrl;
         console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
+      } else if (!env.MCP_URL) {
+        env.MCP_URL = `http://localhost:${port}`;
       }
 
       const serverProc = spawn("node", [serverFile], {

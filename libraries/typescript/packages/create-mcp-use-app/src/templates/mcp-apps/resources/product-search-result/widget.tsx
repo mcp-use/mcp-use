@@ -120,7 +120,7 @@ const ProductSearchResult: React.FC = () => {
                 size="lg"
                 uniform
                 variant="ghost"
-                className="text-danger"
+                className="text-danger/80"
               >
                 <HeartFilled />
                 {favorites.length}
@@ -240,7 +240,7 @@ const ProductSearchResult: React.FC = () => {
                         }
                         className={
                           favorites.includes(selectedFruit.fruit)
-                            ? "text-danger"
+                            ? "text-danger/80"
                             : "text-secondary"
                         }
                       >

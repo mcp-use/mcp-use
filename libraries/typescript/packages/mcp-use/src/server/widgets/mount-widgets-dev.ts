@@ -682,6 +682,9 @@ if (container && Component) {
               dev: true,
               exposeAsTool: metadata.exposeAsTool ?? true,
             },
+            ui: {
+              ...(schemaField ? { props: schemaField } : {}),
+            },
             ...dualProtocolMeta,
           };
 
@@ -943,6 +946,104 @@ export default PostHog;
     },
   };
 
+  // Strip `widgetMetadata` export from browser builds so React Fast Refresh
+  // works. Widget files export both a React component (default) and
+  // `widgetMetadata` (named). The React plugin can't hot-update files with
+  // non-component exports and falls back to full-reload. By removing the
+  // export for the browser, Fast Refresh sees only the component and can
+  // do proper HMR. The SSR build keeps the export for metadata extraction.
+  // Make widget files compatible with React Fast Refresh by stripping the
+  // `widgetMetadata` named export for browser builds. SSR keeps it for
+  // metadata extraction. Also injects `import.meta.hot.accept()` as a
+  // safety net so even unusual export patterns never cascade to full-reload.
+  const widgetHmrPlugin = {
+    name: "widget-hmr-compat",
+    enforce: "pre" as const,
+    transform(code: string, id: string, options?: { ssr?: boolean }) {
+      if (options?.ssr) return null;
+      const cleanId = id.replace(/[?#].*$/, "");
+      if (!cleanId.endsWith(".tsx") && !cleanId.endsWith(".ts")) return null;
+      if (!code.includes("widgetMetadata")) return null;
+
+      let result = code;
+      // Strip all forms of widgetMetadata export
+      result = result.replace(
+        /export\s+(const|let|var)\s+widgetMetadata\b/g,
+        "const _widgetMetadata"
+      );
+      result = result.replace(
+        /export\s*\{[^}]*\bwidgetMetadata\b[^}]*\}/g,
+        (match) => {
+          // Remove widgetMetadata from export list, keep others
+          const cleaned = match
+            .replace(/\bwidgetMetadata\b\s*(as\s+\w+)?\s*,?\s*/g, "")
+            .replace(/,\s*\}/, " }")
+            .replace(/\{\s*\}/, "{ /* stripped */ }");
+          return cleaned.includes("{ /* stripped */ }") ? "" : cleaned;
+        }
+      );
+
+      // Safety net: ensure the module self-accepts HMR even if we missed
+      // an export pattern, preventing cascade to full-reload
+      if (!result.includes("import.meta.hot")) {
+        result += "\nif (import.meta.hot) { import.meta.hot.accept(); }\n";
+      }
+
+      return result;
+    },
+  };
+
+  // Suppress spurious full-page reloads from Vite HMR on initial widget load.
+  // Suppress all full-page reloads for widgets. The widgetHmrPlugin makes
+  // widget files self-accepting (import.meta.hot.accept()), so React Fast
+  // Refresh handles component updates at the module level. Full-page reloads
+  // are never needed because the HTML template is static. Without this,
+  // server-side HMR sync (SSR metadata extraction) triggers module graph
+  // invalidations that send spurious full-reload messages to the browser.
+  const suppressFullReloadPlugin = {
+    name: "suppress-widget-full-reload",
+    configureServer(srv: any) {
+      const channels: any[] = [];
+      if (srv.ws) channels.push(srv.ws);
+      if (srv.hot) channels.push(srv.hot);
+      if (srv.environments?.client?.hot)
+        channels.push(srv.environments.client.hot);
+
+      for (const channel of channels) {
+        if (!channel?.send) continue;
+        const origSend = channel.send.bind(channel);
+        channel.send = (...args: any[]) => {
+          const msg = args[0];
+          if (
+            (msg && typeof msg === "object" && msg.type === "full-reload") ||
+            (typeof msg === "string" && msg.includes('"type":"full-reload"'))
+          ) {
+            return;
+          }
+          return origSend(...args);
+        };
+      }
+    },
+    handleHotUpdate({ file }: { file: string }) {
+      if (file.endsWith(".html")) return [];
+      return undefined;
+    },
+  };
+
+  // Build the optimizeDeps config. We point `entries` directly at widget
+  // source files so esbuild scans their imports and pre-bundles ALL deps
+  // at startup. The temp entry files use absolute import paths that esbuild
+  // can't follow, so we scan widget sources instead. We also include the
+  // core deps from the generated entry template (react, react-dom/client).
+  const widgetSourceEntries = widgets.map((w) => w.entry);
+  const coreDeps = [
+    "react",
+    "react/jsx-runtime",
+    "react/jsx-dev-runtime",
+    "react-dom",
+    "react-dom/client",
+  ];
+
   const hmrPort = await findAvailablePort(DEFAULT_HMR_PORT);
 
   const viteServer = await createServer({
@@ -952,6 +1053,8 @@ export default PostHog;
       zodJitlessPlugin,
       nodeStubsPlugin,
       ssrCssPlugin,
+      widgetHmrPlugin,
+      suppressFullReloadPlugin,
       watchResourcesPlugin,
       tailwindcss(),
       react(),
@@ -1012,8 +1115,12 @@ export default PostHog;
     // Explicitly tell Vite to watch files outside root
     // This is needed because widget entry files import from resources directory
     optimizeDeps: {
+      // Scan widget source files at startup so all deps are pre-bundled
+      // before any browser connects. Avoids mid-session "optimized
+      // dependencies changed" reloads that create duplicate React instances.
+      entries: widgetSourceEntries,
+      include: coreDeps,
       // Exclude Node.js-only packages from browser bundling
-      // posthog-node is for server-side telemetry and doesn't work in browser
       exclude: ["posthog-node"],
     },
     ssr: {
@@ -1157,13 +1264,12 @@ export default PostHog;
     return c.text(message, 404);
   });
 
-  widgets.forEach((widget) => {
-    // Use slugified name for URL display
+  for (const widget of widgets) {
     const slugifiedName = slugifyWidgetName(widget.name);
     console.log(
       `[WIDGET] ${widget.name} mounted at ${baseRoute}/${slugifiedName}`
     );
-  });
+  }
 
   // register a tool and resource for each widget
   for (const widget of widgets) {

@@ -700,16 +700,12 @@ export function generateWidgetContainerHtml(
       <script>
         (async function() {
           try {
-            // Change URL to "/" BEFORE loading widget (for React Router)
-            //history.replaceState(null, '', '/');
-
             // Fetch the actual widget HTML using toolId
             const response = await fetch('${basePath}/api/resources/widget-content/${toolId}');
             const html = await response.text();
 
             // Replace entire document with widget HTML using proper method
             document.open();
-            // Write the HTML content - the browser will parse it properly
             document.write(html);
             document.close();
           } catch (error) {
@@ -738,7 +734,6 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     toolResponseMetadata,
     resourceData,
     toolId,
-    devServerBaseUrl,
     theme,
     playground,
   } = widgetData;
@@ -830,20 +825,12 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
       (function() {
         'use strict';
 
-        // Change URL to "/" for React Router compatibility
-        // Skip if running in Inspector dev-widget proxy to prevent redirecting iframe to Inspector home
-        if (window.location.pathname !== '/' && !window.location.pathname.includes('/dev-widget/')) {
+        // Change URL to "/" for React Router compatibility.
+        // Skip when loaded inside the inspector (widget-content endpoint)
+        // to prevent Vite HMR reloads from navigating to "/" (inspector SPA).
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/inspector/')) {
           history.replaceState(null, '', '/');
         }
-
-        // Inject MCP widget utilities for Image component and file access
-        // __mcpServerUrl provides the server origin for widgets to use in API calls
-        // (e.g., fetch(window.__mcpServerUrl + '/api/fruits') instead of hardcoding localhost)
-        window.__mcpServerUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}"` : '""'};
-        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
-        window.__getFile = function(filename) {
-          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
-        };
 
         function emitWidgetRuntimeError(payload) {
           var args = [{

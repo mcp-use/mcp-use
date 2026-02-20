@@ -34,7 +34,7 @@ export const CarouselItem: React.FC<CarouselItemProps> = ({
             e.stopPropagation();
             onToggleFavorite();
           }}
-          className={`absolute top-2 right-2 z-10 ${isFavorite ? "text-danger" : "text-secondary"}`}
+          className={`absolute top-2 right-2 z-10 ${isFavorite ? "text-danger/80" : "text-secondary"}`}
         >
           {isFavorite ? <HeartFilled /> : <HeartXs />}
         </Button>

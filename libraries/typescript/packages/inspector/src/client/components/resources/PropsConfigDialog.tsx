@@ -47,10 +47,10 @@ export function PropsConfigDialog({
 }: PropsConfigDialogProps) {
   // Detect props schema from resource metadata
   const propsSchema = useMemo(() => {
-    // Check for mcp-use widget props in _meta["mcp-use/widget"].props
-    const mcpUseWidget = resourceAnnotations?.["mcp-use/widget"] as any;
-    if (mcpUseWidget?.props) {
-      const props = mcpUseWidget.props;
+    // Check for widget props in _meta.ui.props (standard metadata path)
+    const uiMeta = resourceAnnotations?.ui as any;
+    if (uiMeta?.props) {
+      const props = uiMeta.props;
 
       // Already JSON Schema format (e.g. from built manifest)
       if (props.type === "object" && props.properties) {

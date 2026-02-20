@@ -451,7 +451,7 @@ export function createWidgetRegistration(
     _meta: {
       "mcp-use/widget": {
         name: widgetName,
-        slugifiedName: slugifiedName, // URL-safe slug for dev routing
+        slugifiedName: slugifiedName,
         title: title,
         description: description,
         type: widgetType,
@@ -459,6 +459,9 @@ export function createWidgetRegistration(
         html: html,
         dev: isDev,
         exposeAsTool: exposeAsTool,
+      },
+      ui: {
+        ...(props && Object.keys(props).length > 0 ? { props } : {}),
       },
       ...(metadata._meta || {}),
     },
@@ -567,12 +570,27 @@ export async function createWidgetUIResource(
     urlConfig
   );
 
-  // Merge definition._meta into the resource's _meta
-  // This includes mcp-use/widget metadata alongside appsSdkMetadata
+  // Merge definition._meta into the resource's _meta.
+  // Deep-merge _meta.ui so we preserve SEP-1865 fields (prefersBorder, csp) from
+  // createMcpAppsResource while adding definition._meta.ui (e.g. props).
   if (definition._meta && Object.keys(definition._meta).length > 0) {
+    const resourceMeta = uiResource.resource._meta ?? {};
+    const defMeta = definition._meta as {
+      ui?: Record<string, unknown>;
+      [k: string]: unknown;
+    };
+    const { ui: defUi, ...defMetaRest } = defMeta;
+    const mergedUi =
+      resourceMeta.ui || defUi
+        ? {
+            ...((resourceMeta.ui as Record<string, unknown>) || {}),
+            ...(defUi || {}),
+          }
+        : undefined;
     uiResource.resource._meta = {
-      ...uiResource.resource._meta,
-      ...definition._meta,
+      ...resourceMeta,
+      ...defMetaRest,
+      ...(mergedUi !== undefined ? { ui: mergedUi } : {}),
     };
   }
 

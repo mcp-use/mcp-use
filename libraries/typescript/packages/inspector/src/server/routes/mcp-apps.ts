@@ -10,27 +10,6 @@ import { getWidgetData, storeWidgetData } from "../shared-utils.js";
 
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
-// Helper to fetch with retry for cold-start Vite dev server
-async function fetchWithRetry(
-  url: string,
-  maxRetries = 3,
-  delay = 1000
-): Promise<Response> {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) return response;
-      if (i < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    } catch (error) {
-      if (i === maxRetries - 1) throw error;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error(`Failed to fetch after ${maxRetries} retries`);
-}
-
 // Sandbox proxy HTML (inlined to avoid file path issues at runtime)
 const SANDBOX_PROXY_HTML = `<!doctype html>
 <html>
@@ -362,27 +341,13 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
-      // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
-      let processedHtml = htmlContent;
-      if (widgetData.devServerBaseUrl) {
-        const injectionScript = `<script>window.__mcpPublicUrl = "${widgetData.devServerBaseUrl}/mcp-use/public";</script>`;
-
-        // Inject after <head> tag if present
-        if (processedHtml.includes("<head>")) {
-          processedHtml = processedHtml.replace(
-            /<head>/i,
-            `<head>\n    ${injectionScript}`
-          );
-        } else {
-          // Fallback: inject at the beginning
-          processedHtml = injectionScript + processedHtml;
-        }
-      }
-
-      // Return JSON with HTML and metadata for CSP enforcement
+      // Return JSON with HTML and metadata for CSP enforcement.
+      // The HTML is served as-is -- the MCP server is responsible for
+      // producing fully-resolved HTML with absolute asset URLs and any
+      // runtime globals the widget framework needs.
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
-        html: processedHtml,
+        html: htmlContent,
         csp: isPermissive ? undefined : mcpAppsCsp,
         permissions: mcpAppsPermissions,
         permissive: isPermissive,
@@ -393,74 +358,6 @@ export function registerMcpAppsRoutes(app: Hono) {
       });
     } catch (error) {
       console.error("[MCP Apps] Error fetching widget content:", error);
-      return c.json(
-        { error: error instanceof Error ? error.message : "Unknown error" },
-        500
-      );
-    }
-  });
-
-  // Dev widget content endpoint - fetches live HTML from Vite dev server
-  app.get("/inspector/api/mcp-apps/dev-widget-content/:toolId", async (c) => {
-    try {
-      const toolId = c.req.param("toolId");
-      const cspModeParam = c.req.query("csp_mode") as
-        | "permissive"
-        | "widget-declared"
-        | undefined;
-
-      const widgetData = getWidgetData(toolId);
-
-      if (!widgetData?.devWidgetUrl || !widgetData?.devServerBaseUrl) {
-        return c.json({ error: "Dev widget data not found or expired" }, 404);
-      }
-
-      console.log(
-        `[MCP Apps] Fetching live HTML from Vite dev server: ${widgetData.devWidgetUrl}`
-      );
-
-      // Fetch HTML from Vite dev server with retry logic for cold starts
-      const response = await fetchWithRetry(widgetData.devWidgetUrl);
-      if (!response.ok) {
-        return c.json(
-          { error: `Failed to fetch from dev server (${response.status})` },
-          response.status as 400 | 404 | 500
-        );
-      }
-
-      const htmlContent = await response.text();
-
-      // Determine CSP mode
-      const cspMode = cspModeParam || "permissive";
-      const isPermissive = cspMode === "permissive";
-
-      // Inject window.__mcpPublicUrl for mcp_url support (needed for useWidget hook)
-      let processedHtml = htmlContent;
-      if (widgetData.devServerBaseUrl) {
-        const injectionScript = `<script>window.__mcpPublicUrl = "${widgetData.devServerBaseUrl}/mcp-use/public";</script>`;
-
-        // Inject after <head> tag if present
-        if (processedHtml.includes("<head>")) {
-          processedHtml = processedHtml.replace(
-            /<head>/i,
-            `<head>\n    ${injectionScript}`
-          );
-        } else {
-          // Fallback: inject at the beginning
-          processedHtml = injectionScript + processedHtml;
-        }
-      }
-
-      // Return JSON with fresh HTML from Vite
-      c.header("Cache-Control", "no-cache, no-store, must-revalidate");
-      return c.json({
-        html: processedHtml,
-        csp: isPermissive ? undefined : widgetData.mcpAppsCsp,
-        permissions: widgetData.mcpAppsPermissions,
-        mimeTypeValid: true, // Dev mode widgets always valid
-      });
-    } catch (error) {
-      console.error("[MCP Apps] Error fetching dev widget:", error);
       return c.json(
         { error: error instanceof Error ? error.message : "Unknown error" },
         500
@@ -482,10 +379,6 @@ export function registerMcpAppsRoutes(app: Hono) {
           "http://127.0.0.1:*",
           "https://localhost:*",
           "https://127.0.0.1:*",
-          "https://*.mcp-use.com",
-          "https://*.manufact.com",
-          "https://manufact.com",
-          "http://*.mcp-use.com",
           additionalFrameAncestors,
         ]
           .filter(Boolean)
