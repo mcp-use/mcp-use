@@ -645,24 +645,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           serverConfig.headers = allHeaders;
         }
 
-        // Add OAuth token if available
-        if (authProviderRef.current) {
-          const tokens = await authProviderRef.current.tokens?.();
-          if (!isMountedRef.current) {
-            addLog(
-              "debug",
-              "Connection aborted after token fetch - component unmounted"
-            );
-            return "failed";
-          }
-          if (tokens?.access_token) {
-            serverConfig.headers = {
-              ...serverConfig.headers,
-              Authorization: `Bearer ${tokens.access_token}`,
-            };
-          }
-        }
-
         // Client should be initialized by the parent connect() function
         // If it's not AND component is still mounted, this is a programming error
         if (!clientRef.current) {
