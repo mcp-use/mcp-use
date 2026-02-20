@@ -15,6 +15,7 @@ import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createSkillsCommand } from "./commands/skills.js";
+import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 
 const program = new Command();
 
@@ -942,8 +943,20 @@ program
       }
 
       // Then run tsc (now schemas are available for import)
+      // Use the locally installed typescript binary directly rather than npx to
+      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package when
+      // typescript is not found in node_modules.
+      // Raise the Node.js heap limit for tsc to avoid OOM on projects with
+      // heavy transitive types (React, Zod v4, etc.).
       console.log(chalk.gray("Building TypeScript..."));
-      await runCommand("npx", ["tsc"], projectPath);
+      await runCommand(
+        "node",
+        [
+          "--max-old-space-size=4096",
+          path.join(projectPath, "node_modules", "typescript", "bin", "tsc"),
+        ],
+        projectPath
+      ).promise;
       console.log(chalk.green("✓ TypeScript build complete!"));
 
       // Determine where the entry point was compiled to
@@ -1716,6 +1729,8 @@ program
       if (mcpUrl) {
         env.MCP_URL = mcpUrl;
         console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
+      } else if (!env.MCP_URL) {
+        env.MCP_URL = `http://localhost:${port}`;
       }
 
       const serverProc = spawn("node", [serverFile], {
@@ -1952,5 +1967,10 @@ program
       (globalThis as any).__mcpUseHmrMode = false;
     }
   });
+
+program.hook("preAction", async (_thisCommand, actionCommand) => {
+  const projectPath = actionCommand.opts().path as string | undefined;
+  await notifyIfUpdateAvailable(projectPath);
+});
 
 program.parse();

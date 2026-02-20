@@ -128,16 +128,21 @@ export async function createRemoteDomResource(
   script: string,
   framework: "react" | "webcomponents" = "react",
   encoding: UIEncoding = "text",
-  adapters?: AdaptersConfig,
-  metadata?: AppsSdkMetadata
+  _adapters?: AdaptersConfig,
+  _metadata?: AppsSdkMetadata
 ): Promise<UIResourceContent> {
-  return await createUIResource({
-    uri: uri as `ui://${string}`,
-    content: { type: "remoteDom", script, framework },
-    encoding,
-    adapters: adapters,
-    metadata: metadata,
-  });
+  // remoteDom was removed from createUIResource in @mcp-ui/server v6.
+  // The MIME type is still rendered by @mcp-ui/client, so construct manually.
+  const resource: Record<string, unknown> = {
+    uri,
+    mimeType: `application/vnd.mcp-ui.remote-dom+${framework}`,
+  };
+  if (encoding === "blob") {
+    resource.blob = Buffer.from(script).toString("base64");
+  } else {
+    resource.text = script;
+  }
+  return { type: "resource", resource } as UIResourceContent;
 }
 
 /**

@@ -36,7 +36,7 @@ mcp-use for TypeScript provides the complete MCP stack:
 - **🤖 MCP Agent** - Build AI agents that can use tools and reason across multiple steps
 - **🔌 MCP Client** - Connect directly to MCP servers for programmatic tool access
 - **🛠️ MCP Server Framework** - Create your own MCP servers with tools, resources, and prompts
-- **🎨 MCP-UI Resources** - Build ChatGPT-style apps with interactive React widgets
+- **🎨 MCP Apps** - Build interactive widgets that work across Claude, ChatGPT, and other MCP clients
 - **🔍 MCP Inspector** - Web-based debugger for testing and monitoring
 
 ---
@@ -78,16 +78,16 @@ Your MCP server is now running at `http://localhost:3000` with the inspector aut
 
 ---
 
-## 🎨 Build ChatGPT-Style Apps with MCP-UI Resources
+## 🎨 MCP Apps
 
-One of the most powerful features of mcp-use is the ability to build **interactive UI widgets** that work alongside your MCP tools. Create ChatGPT-like experiences with custom React components that can call MCP tools and display rich, interactive content.
+MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients — write once, run everywhere.
 
-### Why MCP-UI Resources?
+### Why MCP Apps?
 
 - **🖥️ Interactive Interfaces** - Build rich UIs like dashboards, kanban boards, forms, and visualizations
 - **🔗 Tool Integration** - UI widgets can directly call MCP tools using the `useMcp()` hook
 - **📦 Self-Contained** - Widgets are bundled and served automatically by your MCP server
-- **🎯 Framework Agnostic** - Compatible with any MCP client (Claude Desktop, custom apps, etc.)
+- **🎯 Framework Agnostic** - Compatible with any MCP client (Claude Desktop, ChatGPT, custom apps, etc.)
 - **⚡ Hot Reload** - Development workflow with instant updates
 
 ### Quick Example
@@ -129,7 +129,7 @@ server.uiResource({
 
 **Learn More:**
 
-- [MCP-UI Resources Guide](#mcp-ui-resources) (detailed section below)
+- [MCP Apps Guide](#mcp-apps) (detailed section below)
 - [Create mcp-use App](./packages/create-mcp-use-app/README.md) - Scaffolding with UI examples
 - [AI SDK Integration](#-ai-sdk-integration) - Build with Vercel AI SDK
 
@@ -550,7 +550,7 @@ npm run start
 
 - **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
 - **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
-- **Documentation**: [Full docs](https://github.com/mcp-use/mcp-use)
+- **Documentation**: [Full docs](https://mcp-use.com/docs)
 
 ---
 

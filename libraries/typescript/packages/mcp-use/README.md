@@ -551,9 +551,9 @@ server.listen(3000);
 | **♻️ Hot Reload**          | Development mode with automatic reloading                        |
 | **📊 Observability**       | Built-in logging and monitoring capabilities                     |
 
-### MCP-UI Resources
+### MCP Apps
 
-mcp-use provides a unified `uiResource()` method for registering interactive UI widgets that are compatible with MCP-UI clients. This automatically creates both a tool (for dynamic parameters) and a resource (for static access).
+mcp-use provides a unified `uiResource()` method for registering interactive UI widgets that work across Claude, ChatGPT, and other MCP clients. This automatically creates both a tool (for dynamic parameters) and a resource (for static access).
 
 #### Quick Start
 

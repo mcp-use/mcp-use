@@ -12,11 +12,17 @@ import { fileToAttachment, isValidTotalSize } from "./utils";
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
 
+interface WidgetModelContext {
+  content?: Array<{ type: string; text: string }>;
+  structuredContent?: Record<string, unknown>;
+}
+
 interface UseChatMessagesClientSideProps {
   connection: MCPConnection;
   llmConfig: LLMConfig | null;
   isConnected: boolean;
   readResource?: (uri: string) => Promise<any>;
+  widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
 }
 
 export function useChatMessagesClientSide({
@@ -24,6 +30,7 @@ export function useChatMessagesClientSide({
   llmConfig,
   isConnected,
   readResource,
+  widgetModelContexts,
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -181,12 +188,35 @@ export function useChatMessagesClientSide({
           );
         }
 
+        // Build widget state context messages (per SEP-1865 ui/update-model-context)
+        const widgetContextMessages: Message[] = [];
+        if (widgetModelContexts && widgetModelContexts.size > 0) {
+          const parts: string[] = [];
+          for (const [, ctx] of widgetModelContexts) {
+            if (!ctx) continue;
+            if (ctx.content?.length) {
+              parts.push(ctx.content.map((c) => c.text).join("\n"));
+            } else if (ctx.structuredContent) {
+              parts.push(JSON.stringify(ctx.structuredContent));
+            }
+          }
+          if (parts.length > 0) {
+            widgetContextMessages.push({
+              id: `widget-context-${Date.now()}`,
+              role: "user",
+              content: `[Current Widget State]\n${parts.join("\n")}`,
+              timestamp: Date.now(),
+            });
+          }
+        }
+
         // Stream events from agent
         // Don't include the new userMessage here - streamEvents() appends it internally
         // as new HumanMessage(query), so including it would cause duplication
         const externalHistory = convertMessagesToLangChain([
           ...messages,
           ...promptResultsMessages,
+          ...widgetContextMessages,
         ]);
 
         for await (const event of agentRef.current.streamEvents(

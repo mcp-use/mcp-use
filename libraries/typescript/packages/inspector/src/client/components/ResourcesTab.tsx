@@ -7,7 +7,7 @@ import {
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import {
   useCallback,
@@ -183,7 +183,10 @@ export function ResourcesTab({
             uri: resource.uri,
             result,
             timestamp,
-            resourceAnnotations: resource.annotations as Record<string, any>,
+            resourceAnnotations: {
+              ...(resource.annotations as Record<string, any>),
+              ...(((resource as any)._meta as Record<string, any>) || {}),
+            },
           });
         } catch (error) {
           // Track failed resource read
@@ -209,7 +212,10 @@ export function ResourcesTab({
             },
             error: error instanceof Error ? error.message : "Unknown error",
             timestamp,
-            resourceAnnotations: resource.annotations as Record<string, any>,
+            resourceAnnotations: {
+              ...(resource.annotations as Record<string, any>),
+              ...(((resource as any)._meta as Record<string, any>) || {}),
+            },
           });
         } finally {
           setIsLoading(false);

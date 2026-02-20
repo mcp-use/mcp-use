@@ -87,40 +87,7 @@ export async function adaptConnectMiddleware(
   connectMiddleware: any,
   middlewarePath: string
 ): Promise<MiddlewareHandler> {
-  // Dynamically import required modules (optional dependencies)
-  // Use createRequire to resolve from user's project directory
-  let createRequest: any;
-  let createResponse: any;
-
-  try {
-    // Use createRequire to resolve modules from the user's project directory
-    const { createRequire } = await import("node:module");
-    const { pathToFileURL } = await import("node:url");
-
-    // Create a require function that resolves from the user's project directory
-    const userProjectRequire = createRequire(
-      pathToFileURL(
-        // Use process.cwd() since this is a runtime utility that should work from user's project
-        process.cwd() + "/package.json"
-      ).href
-    );
-
-    // Resolve the actual module path from the user's project
-    const httpMocksPath = userProjectRequire.resolve("node-mocks-http");
-
-    const httpMocks = await import(httpMocksPath);
-    createRequest = httpMocks.createRequest;
-    createResponse = httpMocks.createResponse;
-  } catch (error) {
-    throw new Error(
-      "❌ Widget middleware dependencies not installed!\n\n" +
-        "To use Connect middleware adapters with MCP widgets, you need to install:\n\n" +
-        "  npm install node-mocks-http\n" +
-        "  # or\n" +
-        "  pnpm add node-mocks-http\n\n" +
-        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
-    );
-  }
+  const { createRequest, createResponse } = await import("node-mocks-http");
 
   // Normalize middleware path: remove trailing * and /
   let normalizedPath = middlewarePath;
@@ -154,7 +121,8 @@ export async function adaptConnectMiddleware(
 
     // Transform Hono request to IncomingMessage-like object
     const mockRequest = createRequest({
-      method: request.method.toUpperCase(),
+      method:
+        request.method.toUpperCase() as import("node-mocks-http").RequestMethod,
       url: middlewarePathname + parsedURL.search,
       headers:
         request.headers && typeof request.headers.entries === "function"
@@ -172,7 +140,7 @@ export async function adaptConnectMiddleware(
     const res = await new Promise<Response | undefined>((resolve) => {
       const originalEnd = mockResponse.end.bind(mockResponse);
 
-      mockResponse.end = (...args: Parameters<typeof originalEnd>) => {
+      (mockResponse as any).end = (...args: Parameters<typeof originalEnd>) => {
         const result = originalEnd(...args);
 
         if (!responseResolved && mockResponse.writableEnded) {
@@ -239,7 +207,7 @@ export async function adaptConnectMiddleware(
 
           if (noBodyStatuses.includes(statusCode)) {
             // For no-body status codes, return a response without body
-            resolve(c.newResponse(null, statusCode));
+            resolve(c.newResponse(null, statusCode as any));
           } else if (responseBody) {
             resolve(c.body(responseBody));
           } else {

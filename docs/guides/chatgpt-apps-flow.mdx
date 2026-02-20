@@ -59,19 +59,13 @@ When building widgets with the official SDK, you need to:
 ```mermaid
 flowchart LR
     Developer[Developer] --> Setup[Manual Setup]
-    Setup --> Structure[Create server/ & web/]
+    Setup --> Structure["Create server/ & web/"]
     Structure --> Config[Configure Build Tools]
     Config --> Hooks[Implement Custom Hooks]
     Hooks --> Bundle[Manual Bundling]
     Bundle --> CSP[Configure CSP]
     CSP --> Deploy[Deploy]
     Deploy --> ChatGPT[ChatGPT]
-
-    style Setup fill:#ff6b6b
-    style Config fill:#ff6b6b
-    style Hooks fill:#ff6b6b
-    style Bundle fill:#ff6b6b
-    style CSP fill:#ff6b6b
 ```
 
 ### Code Example: Official SDK Setup
@@ -272,10 +266,6 @@ flowchart LR
     Auto --> Bundle[Auto-Bundle]
     Bundle --> Deploy[Deploy]
     Deploy --> ChatGPT[ChatGPT]
-
-    style Create fill:#51cf66
-    style Auto fill:#51cf66
-    style Bundle fill:#51cf66
 ```
 
 ### Code Example: mcp-use Setup

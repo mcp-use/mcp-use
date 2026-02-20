@@ -266,10 +266,12 @@ export async function navigateToResourcesAndSelectWeather(
     .click();
   await expect(page.getByRole("heading", { name: "Resources" })).toBeVisible();
   await page.getByTestId("resource-item-weather-display").click();
-  // Wait for widget iframe to appear
-  await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
-    timeout: 5000,
-  });
+  // Widget requires props - wait for props wall text (iframe only appears after props are set)
+  await expect(
+    page.getByText(
+      "This widget requires props, set or generate them in the props debugger"
+    )
+  ).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -285,13 +287,24 @@ export function getWeatherResourceFrame(page: Page): FrameLocator {
 
 /**
  * Open props configuration dialog via the debugger controls.
+ * When used in Resources tab (after navigateToResourcesAndSelectWeather), scopes to
+ * the resource widget preview to avoid clicking a props button from the Tools tab.
  */
 export async function openPropsDialog(page: Page): Promise<void> {
-  // Click props button to open popover
-  await page.getByTestId("debugger-props-button").click();
+  // Scope to resource widget preview when present (Resources tab) to avoid
+  // clicking the wrong props button (Tools tab can have its own debug controls).
+  const resourcePreview = page.getByTestId("resource-widget-preview");
+  const propsButton =
+    (await resourcePreview.count()) > 0
+      ? resourcePreview.getByTestId("debugger-props-button")
+      : page.getByTestId("debugger-props-button");
+
+  await propsButton.click();
   await expect(page.getByTestId("debugger-props-popover")).toBeVisible();
-  // Click "Create Preset"
-  await page.getByTestId("debugger-props-create-preset").click();
+  // Wait for Create Preset button to be stable (avoids "element was detached" race)
+  const createPreset = page.getByTestId("debugger-props-create-preset");
+  await expect(createPreset).toBeVisible();
+  await createPreset.click();
   // Verify dialog opens
   await expect(page.getByTestId("props-config-dialog")).toBeVisible();
 }

@@ -43,11 +43,8 @@ export function buildDualProtocolMetadata(
   const appsSdkResourceMeta =
     adapters.appsSdk.buildResourceMetadata(definition);
 
-  // Per MCP Apps spec (SEP-1865): tool _meta.ui should only contain
-  // resourceUri and visibility. CSP, prefersBorder, domain, and description
-  // belong on the resource _meta.ui (in resources/list and resources/read),
-  // NOT on the tool definition. So we don't merge mcpAppsResourceMeta here.
-
+  // Per SEP-1865: CSP belongs on the resource _meta.ui, not on the tool.
+  // Tool _meta.ui only has resourceUri and visibility.
   return {
     ...existingMetadata,
     ...mcpAppsToolMeta, // ui: { resourceUri }, "ui/resourceUri"
@@ -57,10 +54,37 @@ export function buildDualProtocolMetadata(
 }
 
 /**
+ * Transform snake_case CSP (openai/widgetCSP format) to camelCase (ui.csp format).
+ * Ensures resource _meta.ui.csp matches tool _meta["openai/widgetCSP"] for dual-protocol.
+ */
+function snakeCaseCspToCamelCase(
+  wcsp: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  if (!wcsp || typeof wcsp !== "object") return undefined;
+  const result: Record<string, unknown> = {};
+  if (Array.isArray(wcsp.connect_domains))
+    result.connectDomains = wcsp.connect_domains;
+  if (Array.isArray(wcsp.resource_domains))
+    result.resourceDomains = wcsp.resource_domains;
+  if (Array.isArray(wcsp.frame_domains))
+    result.frameDomains = wcsp.frame_domains;
+  if (Array.isArray(wcsp.base_uri_domains))
+    result.baseUriDomains = wcsp.base_uri_domains;
+  if (Array.isArray(wcsp.script_directives))
+    result.scriptDirectives = wcsp.script_directives;
+  if (Array.isArray(wcsp.style_directives))
+    result.styleDirectives = wcsp.style_directives;
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/**
  * Build MCP Apps resource metadata with CSP, prefersBorder, domain etc.
  *
  * Per MCP Apps spec (SEP-1865), these fields belong on the resource _meta.ui,
  * not on the tool definition.
+ *
+ * For dual-protocol (mcpApps), ui.csp is derived from the same source as
+ * openai/widgetCSP so both tool and resource have identical CSP.
  *
  * @param definition - UI resource definition
  * @returns Resource metadata with _meta.ui containing CSP etc.
@@ -71,9 +95,23 @@ export function buildResourceUiMeta(
   const adapters = createProtocolAdapters();
   const mcpAppsResourceMeta =
     adapters.mcpApps.buildResourceMetadata(definition);
-  return (
-    (mcpAppsResourceMeta._meta?.ui as Record<string, unknown>) || undefined
-  );
+  let uiMeta =
+    (mcpAppsResourceMeta._meta?.ui as Record<string, unknown>) || undefined;
+
+  // Dual-protocol: derive ui.csp from openai/widgetCSP so both are in sync
+  if (definition.type === "mcpApps") {
+    const appsSdkResourceMeta =
+      adapters.appsSdk.buildResourceMetadata(definition);
+    const openaiWidgetCSP = (
+      appsSdkResourceMeta._meta as Record<string, unknown>
+    )?.["openai/widgetCSP"] as Record<string, unknown> | undefined;
+    const csp = snakeCaseCspToCamelCase(openaiWidgetCSP);
+    if (csp) {
+      uiMeta = { ...(uiMeta || {}), csp };
+    }
+  }
+
+  return uiMeta && Object.keys(uiMeta).length > 0 ? uiMeta : undefined;
 }
 
 /**

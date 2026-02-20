@@ -580,16 +580,46 @@ export function binary(base64Data: string, mimeType: string): CallToolResult {
 }
 
 /**
- * Configuration for widget response utility (runtime data only)
+ * Configuration for widget response utility (runtime data only).
+ * Pass to widget() from a tool handler that has widget config at registration.
+ *
+ * Per SEP-1865, widget data flows through standard MCP channels:
+ * - Tool arguments are sent to the widget via `ui/notifications/tool-input`
+ * - Tool result (content + structuredContent) is sent via `ui/notifications/tool-result`
+ * There is no custom `mcp-use/props` sideband; props go into structuredContent.
  */
 export interface WidgetResponseConfig {
-  /** Widget-only data passed to useWidget().props (hidden from model) */
+  /**
+   * Widget-only data sent as structuredContent in the tool result.
+   * The widget receives this via `ui/notifications/tool-result`.
+   * Per spec, structuredContent is "not added to model context".
+   *
+   * @example { temperature: 22, conditions: "Sunny", city: "Paris" }
+   * @example { query: "mango", results: [{ fruit: "mango", color: "#FBF1E1" }] }
+   */
   props?: Record<string, any>;
   /** @deprecated Use `props` instead - Legacy alias for props */
   data?: Record<string, any>;
-  /** Response helper result that the model sees (text(), json(), etc.) */
+  /**
+   * Response helper result (text(), object(), etc.) that the model sees.
+   * Summarizes the tool result for the conversation.
+   *
+   * @example text(`Weather in Paris: 22°C, Sunny`)
+   * @example object({ count: 16, query: "mango" })
+   */
   output?: CallToolResult | TypedCallToolResult<any>;
-  /** Optional override for the text message */
+  /**
+   * Extra metadata sent in the tool result's `_meta`.
+   * The widget receives this via `useWidget().metadata`.
+   * Not added to model context. Use for pagination cursors, timestamps, etc.
+   *
+   * @example { totalCount: 1000, nextCursor: "abc123" }
+   */
+  metadata?: Record<string, unknown>;
+  /**
+   * Optional override for the text message in content.
+   * Used when you want to show different text than output provides.
+   */
   message?: string;
 }
 
@@ -624,34 +654,26 @@ export interface WidgetResponseConfig {
  * ```
  */
 export function widget(config: WidgetResponseConfig): CallToolResult {
-  // Support both 'data' (legacy) and 'props' (new API)
   const props = config.props || config.data || {};
-  const { output, message } = config;
+  const { output, message, metadata } = config;
 
-  // Build the final content array
   const finalContent = message
     ? [{ type: "text" as const, text: message }]
     : Array.isArray(output?.content) && output.content.length > 0
       ? output.content
       : [{ type: "text" as const, text: "" }];
 
-  // Build metadata, always creating _meta
-  const meta: Record<string, unknown> = {
-    ...(output?._meta || {}),
-    "mcp-use/props": props,
-  };
-
-  // Build result
   const result: CallToolResult = {
     content: finalContent,
-    _meta: meta,
   };
 
-  // Include structuredContent from output if present, otherwise use props/data
+  if (metadata && Object.keys(metadata).length > 0) {
+    result._meta = metadata;
+  }
+
   if (output?.structuredContent) {
     result.structuredContent = output.structuredContent;
   } else if (Object.keys(props).length > 0) {
-    // If no output provided, use props/data as structuredContent
     result.structuredContent = props;
   }
 

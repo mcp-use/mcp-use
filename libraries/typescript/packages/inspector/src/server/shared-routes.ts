@@ -13,9 +13,6 @@ import {
 } from "./shared-utils.js";
 import { formatErrorResponse } from "./utils.js";
 
-// WebSocket proxy for Vite HMR - note: requires WebSocket library
-// For now, this is a placeholder that will be implemented when WebSocket support is added
-
 /**
  * Get frame-ancestors policy from environment variable
  * Format: Space-separated list of origins or '*'
@@ -31,140 +28,6 @@ function getFrameAncestorsFromEnv(): string | undefined {
 
   // For origin list, keep as-is (CSP expects space-separated)
   return trimmed;
-}
-
-/**
- * Convert a URL to use localhost for server-side fetches.
- *
- * When the Inspector runs behind a reverse proxy (e.g., E2B sandbox), the
- * devServerBaseUrl/devWidgetUrl from the client contains the external proxy URL
- * (e.g., https://3000-xxx.e2b.app/...). Server-side fetches to this external URL
- * may go through the proxy's catch-all route which returns the Inspector SPA HTML
- * instead of the Vite-served widget content.
- *
- * Since the server-side handler runs on the SAME machine as the dev server,
- * we convert external URLs to http://localhost:{PORT} to fetch directly from
- * the Vite middleware.
- *
- * @param externalUrl - The URL that may be an external proxy URL
- * @param requestUrl - The current request URL (used to derive the local port)
- * @returns The URL rewritten to use localhost, or the original URL if already local
- */
-function toLocalhostUrl(externalUrl: string, requestUrl: string): string {
-  try {
-    const url = new URL(externalUrl);
-    // Already localhost - no rewrite needed
-    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      return externalUrl;
-    }
-
-    // Derive the local port from the request URL (the server's own port)
-    // or from the external URL's hostname pattern (e.g., "3000-xxx.e2b.app" -> port 3000)
-    let localPort = "3000";
-    try {
-      const reqUrl = new URL(requestUrl);
-      if (reqUrl.hostname === "localhost" || reqUrl.hostname === "127.0.0.1") {
-        localPort = reqUrl.port || "3000";
-      }
-    } catch {
-      // Ignore parse errors
-    }
-
-    // Try to extract port from E2B-style hostname: "3000-xxx.e2b.app" -> "3000"
-    const portMatch = url.hostname.match(/^(\d+)-/);
-    if (portMatch) {
-      localPort = portMatch[1];
-    }
-
-    return `http://localhost:${localPort}${url.pathname}${url.search}`;
-  } catch {
-    return externalUrl;
-  }
-}
-
-/**
- * Fetch with retry logic and exponential backoff for handling cold starts
- *
- * Retries fetch requests that fail due to connection timeouts or refused connections,
- * which commonly occur when the Vite dev server is still initializing.
- *
- * @param url - The URL to fetch
- * @param options - Fetch options
- * @param maxRetries - Maximum number of retry attempts (default: 3)
- * @param initialDelay - Initial delay in milliseconds before first retry (default: 500ms)
- * @returns The successful response
- * @throws The final error if all retries fail
- */
-async function fetchWithRetry(
-  url: string,
-  options?: RequestInit,
-  maxRetries = 3,
-  initialDelay = 500,
-  perRequestTimeoutMs = 8_000
-): Promise<Response> {
-  let lastError: Error | unknown;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      // Each attempt gets a per-request timeout so we fail fast and retry
-      // rather than hanging until the gateway (e.g. E2B reverse proxy) kills us with 504
-      const response = await fetch(url, {
-        ...options,
-        signal: AbortSignal.timeout(perRequestTimeoutMs),
-      });
-
-      // If successful, return immediately
-      if (response.ok || response.status < 500) {
-        return response;
-      }
-
-      // For 5xx errors, treat as retriable
-      lastError = new Error(
-        `Server error: ${response.status} ${response.statusText}`
-      );
-    } catch (error) {
-      lastError = error;
-
-      // Check if this is a retriable error (connection timeout, refused, or aborted)
-      const isRetriable =
-        error instanceof Error &&
-        (error.message.includes("ETIMEDOUT") ||
-          error.message.includes("ECONNREFUSED") ||
-          error.message.includes("fetch failed") ||
-          error.message.includes("Failed to fetch") ||
-          error.name === "TimeoutError" ||
-          error.name === "AbortError");
-
-      // If not retriable or this was the last attempt, throw immediately
-      if (!isRetriable || attempt === maxRetries) {
-        throw error;
-      }
-
-      // Calculate delay with exponential backoff
-      const delay = initialDelay * Math.pow(2, attempt);
-
-      // Log retry attempt
-      console.log(
-        `[Dev Widget Proxy] Dev server not ready, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
-      );
-
-      // Wait before retrying
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      continue;
-    }
-
-    // For 5xx errors, retry with backoff
-    if (attempt < maxRetries) {
-      const delay = initialDelay * Math.pow(2, attempt);
-      console.log(
-        `[Dev Widget Proxy] Server error, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  // All retries exhausted
-  throw lastError;
 }
 
 /**
@@ -308,10 +171,22 @@ export function registerInspectorRoutes(
         return c.html(`<html><body>Error: ${result.error}</body></html>`, 404);
       }
 
-      // Set security headers with widget-specific CSP
+      // Derive the MCP server origin from serverId so widget resources
+      // (scripts, images, styles) hosted on the MCP server are allowed by CSP.
+      let serverOrigin: string | undefined;
+      if (widgetData.serverId && /^https?:\/\//.test(widgetData.serverId)) {
+        try {
+          serverOrigin = new URL(
+            widgetData.serverId.replace(/\/mcp$/, "")
+          ).origin.replace("0.0.0.0", "localhost");
+        } catch {
+          /* ignore invalid URLs */
+        }
+      }
+
       const headers = getWidgetSecurityHeaders(
         widgetData.widgetCSP,
-        undefined, // No dev server for production widgets
+        serverOrigin,
         getFrameAncestorsFromEnv()
       );
       Object.entries(headers).forEach(([key, value]) => {
@@ -326,259 +201,6 @@ export function registerInspectorRoutes(
       const errorStack = error instanceof Error ? error.stack : "";
       console.error("[Widget Content] Stack:", errorStack);
       return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
-    }
-  });
-
-  // Dev widget HTML proxy - fetches from dev server and injects OpenAI wrapper
-  app.get("/inspector/api/dev-widget/:toolId", async (c) => {
-    try {
-      const toolId = c.req.param("toolId");
-      const widgetData = getWidgetData(toolId);
-
-      if (!widgetData?.devWidgetUrl || !widgetData?.devServerBaseUrl) {
-        return c.html(
-          "<html><body>Error: Dev widget data not found or expired</body></html>",
-          404
-        );
-      }
-
-      // When running behind a reverse proxy (e.g., E2B sandbox), devWidgetUrl may be
-      // an external URL (https://3000-xxx.e2b.app/...) that the proxy resolves back
-      // to the Inspector SPA instead of the Vite-served widget. Convert to localhost
-      // since the server-side fetch runs on the same machine as the dev server.
-      const localDevWidgetUrl = toLocalhostUrl(
-        widgetData.devWidgetUrl,
-        c.req.url
-      );
-
-      const debugWidget =
-        process.env.DEBUG != null &&
-        process.env.DEBUG !== "" &&
-        process.env.DEBUG !== "0" &&
-        process.env.DEBUG.toLowerCase() !== "false";
-
-      // Fetch HTML from dev server with retry logic for cold starts
-      if (debugWidget) {
-        console.log(
-          `[Dev Widget Proxy] Fetching from: ${localDevWidgetUrl} (original: ${widgetData.devWidgetUrl})`
-        );
-      }
-      const response = await fetchWithRetry(localDevWidgetUrl);
-      if (!response.ok) {
-        const status = response.status as 400 | 404 | 500 | 502 | 503;
-        return c.html(
-          `<html><body>Error: Failed to fetch widget from dev server (${response.status})</body></html>`,
-          status
-        );
-      }
-
-      let html = await response.text();
-
-      // Create a modified widgetData with the fetched HTML as resourceData
-      // IMPORTANT: Preserve devServerBaseUrl for window.__mcpPublicUrl injection
-      const modifiedWidgetData = {
-        ...widgetData,
-        resourceData: {
-          contents: [{ text: html }],
-        },
-        devServerBaseUrl: widgetData.devServerBaseUrl,
-      };
-
-      // Inject OpenAI wrapper using existing logic
-      const result = generateWidgetContentHtml(modifiedWidgetData);
-
-      if (result.error) {
-        return c.html(`<html><body>Error: ${result.error}</body></html>`, 500);
-      }
-
-      // Use the HTML with injected wrapper for path rewriting
-      html = result.html;
-
-      // Rewrite asset paths to go through proxy
-      // Extract widget name from devWidgetUrl if available
-      const widgetNameMatch = widgetData.devWidgetUrl?.match(
-        /\/mcp-use\/widgets\/([^/?]+)/
-      );
-      const widgetName = widgetNameMatch ? widgetNameMatch[1] : "widget";
-
-      // Rewrite absolute URLs to use direct server paths (not proxy paths).
-      // The Vite middleware at /mcp-use/widgets/* handles requests directly,
-      // which works through reverse proxies when allowedHosts is enabled.
-      // This is more reliable than the asset proxy approach.
-
-      // 1) Strip devServerBaseUrl prefix from absolute URLs
-      const escapedBaseUrl = widgetData.devServerBaseUrl.replace(
-        /[.*+?^${}()|[\]\\]/g,
-        "\\$&"
-      );
-      html = html.replace(
-        new RegExp(
-          `(src|href)="(${escapedBaseUrl})(/mcp-use/widgets/[^"]+)"`,
-          "g"
-        ),
-        (_match, attr, _origin, path) => {
-          return `${attr}="${path}"`;
-        }
-      );
-
-      // 2) Strip localhost URLs → bare paths (works through reverse proxy)
-      html = html.replace(
-        /((?:src|href)\s*=\s*|from\s+)(['"])(https?:\/\/(?:localhost|0\.0\.0\.0|127\.0\.0\.1):\d+)(\/mcp-use\/widgets\/[^'"]+)(['"])/g,
-        (_match, attr, q1, _origin, path, q2) => {
-          return `${attr}${q1}${path}${q2}`;
-        }
-      );
-
-      // Handle Vite's relative asset imports
-      html = html.replace(/(src|href)="\.\/([^"]+)"/g, (match, attr, path) => {
-        if (
-          path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i)
-        ) {
-          return `${attr}="/mcp-use/widgets/${widgetName}/${path}"`;
-        }
-        return match;
-      });
-
-      // Inject base tag and Vite HMR WebSocket configuration
-      if (widgetData.devServerBaseUrl) {
-        const devServerUrl = new URL(widgetData.devServerBaseUrl);
-        const wsProtocol = devServerUrl.protocol === "https:" ? "wss" : "ws";
-        const wsHost = devServerUrl.host;
-        const directWsUrl = `${wsProtocol}://${wsHost}/mcp-use/widgets/`;
-
-        // Base tag uses the direct Vite middleware path (works through reverse proxy)
-        const baseTag = `<base href="/mcp-use/widgets/${widgetName}/">`;
-
-        // Inject CSP violation listener to warn about non-whitelisted resources
-        const cspWarningScript = `
-    <script>
-      // Listen for CSP violations (from Report-Only policy)
-      document.addEventListener('securitypolicyviolation', (e) => {
-        // Only warn about report-only violations (not enforced ones)
-        if (e.disposition === 'report') {
-          console.warn(
-            '%c⚠️ CSP Warning: Resource would be blocked in production',
-            'color: orange; font-weight: bold',
-            '\\n  Blocked URL:', e.blockedURI,
-            '\\n  Directive:', e.violatedDirective,
-            '\\n  Policy:', e.originalPolicy,
-            '\\n\\nℹ️ To fix: Add this domain to your widget\\'s CSP configuration in appsSdkMetadata[\\'openai/widgetCSP\\']'
-          );
-        }
-      });
-    </script>`;
-
-        // Inject configuration script before Vite client loads
-        // This tells Vite where to connect for HMR
-        const viteConfigScript = `
-    <script>
-      // Configure Vite HMR to connect directly to dev server
-      window.__vite_ws_url__ = "${directWsUrl}";
-    </script>`;
-
-        // Insert base tag immediately after <head> (before any scripts)
-        html = html.replace(/<head>/i, `<head>\n    ${baseTag}`);
-
-        // Insert CSP warning and config scripts before the first script tag
-        html = html.replace(
-          /<script/,
-          cspWarningScript + viteConfigScript + "\n    <script"
-        );
-      }
-
-      // Set security headers
-      const headers = getWidgetSecurityHeaders(
-        widgetData.widgetCSP,
-        widgetData.devServerBaseUrl,
-        getFrameAncestorsFromEnv()
-      );
-      Object.entries(headers).forEach(([key, value]) => {
-        c.header(key, value);
-      });
-
-      if (debugWidget) {
-        const scriptUrls = [
-          ...html.matchAll(/src\s*=\s*["']([^"']+)["']/g),
-        ].map((m) => m[1]);
-        console.log(`[Dev Widget Proxy] Final HTML script URLs:`, scriptUrls);
-      }
-
-      return c.html(html);
-    } catch (error) {
-      console.error("[Dev Widget Proxy] Error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
-    }
-  });
-
-  // Dev widget asset proxy - forwards asset requests to dev server
-  app.get("/inspector/api/dev-widget/:toolId/assets/*", async (c) => {
-    try {
-      const toolId = c.req.param("toolId");
-      // Use the full URL (not just path) to preserve query parameters.
-      // Vite uses query params like ?html-proxy&index=0.js to serve
-      // extracted inline scripts from HTML files. Without the query string,
-      // Vite returns the raw HTML instead of the compiled JS module.
-      const reqUrl = new URL(c.req.url);
-      const assetPath =
-        reqUrl.pathname.replace(
-          `/inspector/api/dev-widget/${toolId}/assets`,
-          ""
-        ) + reqUrl.search;
-      const widgetData = getWidgetData(toolId);
-
-      if (!widgetData?.devServerBaseUrl) {
-        return c.notFound();
-      }
-
-      // Construct full URL to dev server asset
-      // Use localhost for server-side fetch (same fix as dev-widget handler above)
-      const localBaseUrl = toLocalhostUrl(
-        widgetData.devServerBaseUrl,
-        c.req.url
-      );
-      const devAssetUrl = `${localBaseUrl}${assetPath}`;
-
-      console.log(`[Dev Widget Asset Proxy] ${assetPath} → ${devAssetUrl}`);
-
-      // Forward request to dev server
-      const response = await fetch(devAssetUrl, {
-        headers: {
-          Accept: c.req.header("Accept") || "*/*",
-        },
-      });
-
-      if (!response.ok) {
-        console.warn(
-          `[Dev Widget Asset Proxy] ${devAssetUrl} → ${response.status}`
-        );
-        return c.notFound();
-      }
-
-      // Forward response with appropriate headers
-      const contentType =
-        response.headers.get("Content-Type") || "application/octet-stream";
-      console.log(
-        `[Dev Widget Asset Proxy] ${assetPath} → ${response.status} ${contentType}`
-      );
-      const headers: Record<string, string> = {
-        "Content-Type": contentType,
-      };
-
-      // Forward cache headers if present
-      const cacheControl = response.headers.get("Cache-Control");
-      if (cacheControl) {
-        headers["Cache-Control"] = cacheControl;
-      }
-
-      return new Response(response.body, {
-        status: response.status,
-        headers,
-      });
-    } catch (error) {
-      console.error("[Dev Widget Asset Proxy] Error:", error);
-      return c.notFound();
     }
   });
 

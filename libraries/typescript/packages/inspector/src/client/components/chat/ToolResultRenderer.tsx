@@ -10,6 +10,23 @@ import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
 import { MCPUIResource } from "./MCPUIResource";
 
+function ModelContextBadge({ widgetId }: { widgetId: string }) {
+  const { getWidget } = useWidgetDebug();
+  const widget = getWidget(widgetId);
+  const ctx = widget?.modelContext;
+  if (!ctx?.content?.length && !ctx?.structuredContent) return null;
+  const preview =
+    ctx.content?.map((c: any) => c.text).join(" ") ??
+    JSON.stringify(ctx.structuredContent).slice(0, 80);
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/30 border border-border/40 rounded-md mt-1">
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+      <span className="font-medium">State synced to model</span>
+      <span className="truncate opacity-60 max-w-[300px]">{preview}</span>
+    </div>
+  );
+}
+
 interface ToolResultRendererProps {
   toolName: string;
   toolArgs: Record<string, unknown>;
@@ -22,6 +39,8 @@ interface ToolResultRendererProps {
   serverBaseUrl?: string;
   /** Partial/streaming tool arguments (forwarded to widget as partialToolInput) */
   partialToolArgs?: Record<string, unknown>;
+  /** Whether this tool execution was cancelled by the user */
+  cancelled?: boolean;
 }
 
 /**
@@ -37,6 +56,7 @@ export function ToolResultRenderer({
   onSendFollowUp,
   serverBaseUrl,
   partialToolArgs,
+  cancelled,
 }: ToolResultRendererProps) {
   const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
@@ -138,18 +158,10 @@ export function ToolResultRenderer({
     return null;
   }, [hasAppsSdkComponent, parsedResult]);
 
-  // Extract widget props from result metadata (similar to OpenAIComponentRenderer)
-  // Widget props come from the tool result's _meta, not from the original tool arguments
-  const widgetProps = useMemo(() => {
-    const props = parsedResult?._meta?.["mcp-use/props"] || null;
-    console.log("[ToolResultRenderer] Widget props extraction:", {
-      hasMetaProps: !!props,
-      widgetProps: props,
-      toolArgs,
-      willUse: props || toolArgs,
-    });
-    return props;
-  }, [parsedResult, toolArgs]);
+  // Memoize toolArgs and parsedResult to prevent unnecessary re-renders in child renderers
+  // (same pattern as ToolResultDisplay - stabilizes refs so effects don't re-run on parent re-renders)
+  const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
+  const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
 
   // Calculate resource URI outside of effect for stable dependency
   const resourceUri = useMemo(() => {
@@ -222,8 +234,8 @@ export function ToolResultRenderer({
             serverId={serverId}
             toolCallId={toolCallId}
             toolName={toolName}
-            toolInput={widgetProps || toolArgs}
-            toolOutput={parsedResult}
+            toolInput={memoizedToolArgs}
+            toolOutput={memoizedResult}
             toolMetadata={toolMeta}
             partialToolInput={partialToolArgs}
             resourceUri={resourceData.uri}
@@ -231,6 +243,7 @@ export function ToolResultRenderer({
             noWrapper={true}
             onSendFollowUp={onSendFollowUp}
             serverBaseUrl={serverBaseUrl}
+            cancelled={cancelled}
           />
         )}
 
@@ -238,8 +251,8 @@ export function ToolResultRenderer({
           <OpenAIComponentRenderer
             componentUrl={resourceData.uri}
             toolName={toolName}
-            toolArgs={toolArgs}
-            toolResult={parsedResult}
+            toolArgs={memoizedToolArgs}
+            toolResult={memoizedResult}
             serverId={serverId}
             readResource={readResource}
             noWrapper={true}
@@ -255,21 +268,24 @@ export function ToolResultRenderer({
   // Render immediately if we have resourceUri from metadata, even if resourceData is still loading
   if (isMcpAppsTool && resourceUri && serverId && readResource) {
     return (
-      <MCPAppsRenderer
-        serverId={serverId}
-        toolCallId={toolCallId}
-        toolName={toolName}
-        toolInput={widgetProps || toolArgs}
-        toolOutput={parsedResult}
-        toolMetadata={toolMeta}
-        partialToolInput={partialToolArgs}
-        resourceUri={resourceData?.uri || resourceUri}
-        readResource={readResource}
-        className="my-4"
-        noWrapper={true}
-        onSendFollowUp={onSendFollowUp}
-        serverBaseUrl={serverBaseUrl}
-      />
+      <>
+        <MCPAppsRenderer
+          serverId={serverId}
+          toolCallId={toolCallId}
+          toolName={toolName}
+          toolInput={memoizedToolArgs}
+          toolOutput={memoizedResult}
+          toolMetadata={toolMeta}
+          partialToolInput={partialToolArgs}
+          resourceUri={resourceData?.uri || resourceUri}
+          readResource={readResource}
+          className="my-4"
+          noWrapper={true}
+          onSendFollowUp={onSendFollowUp}
+          serverBaseUrl={serverBaseUrl}
+        />
+        <ModelContextBadge widgetId={toolCallId} />
+      </>
     );
   }
 
@@ -285,8 +301,8 @@ export function ToolResultRenderer({
       <OpenAIComponentRenderer
         componentUrl={resourceData?.uri || resourceUri}
         toolName={toolName}
-        toolArgs={toolArgs}
-        toolResult={parsedResult}
+        toolArgs={memoizedToolArgs}
+        toolResult={memoizedResult}
         serverId={serverId}
         readResource={readResource}
         noWrapper={true}

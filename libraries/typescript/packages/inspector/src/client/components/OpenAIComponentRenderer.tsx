@@ -126,12 +126,16 @@ function OpenAIComponentRendererBase({
   const [_widgetToolOutput, setWidgetToolOutput] = useState<any>(null);
   const pendingGlobalUpdatesRef = useRef<IframeGlobalUpdates | null>(null);
   const flushGlobalsRafRef = useRef<number | null>(null);
+  const batchedGlobalsRef = useRef<IframeGlobalUpdates | null>(null);
+  const batchScheduledRef = useRef<boolean>(false);
+  const lastSentToolOutputKeyRef = useRef<string | null>(null);
 
   // Generate unique tool ID
   const toolIdRef = useRef(
     `tool-${Date.now()}-${Math.random().toString(36).substring(7)}`
   );
   const toolId = toolIdRef.current;
+  const hasSetWidgetUrlRef = useRef(false);
 
   // Always call useMcpClient() to satisfy React's hooks-rules-of-order.
   // Prefer the explicit serverBaseUrl prop when provided (e.g. when embedded
@@ -140,7 +144,7 @@ function OpenAIComponentRendererBase({
   const server = servers.find((connection) => connection.id === serverId);
   const serverBaseUrl = serverBaseUrlProp ?? server?.url;
   const { resolvedTheme } = useTheme();
-  const { playground } = useWidgetDebug();
+  const { playground, addWidget, addCspViolation } = useWidgetDebug();
 
   // Refs to hold latest values without triggering effect re-runs
   // This prevents infinite loops caused by object/function reference changes
@@ -163,14 +167,13 @@ function OpenAIComponentRendererBase({
 
   // Store widget data and set up iframe URL
   useEffect(() => {
+    let cancelled = false;
+
     const storeAndSetUrl = async () => {
       // Access latest values from refs to avoid stale closures
-      const currentToolArgs = toolArgsRef.current;
       const currentToolResult = toolResultRef.current;
       const currentReadResource = readResourceRef.current;
-      const currentServerBaseUrl = serverBaseUrlRef.current;
       const currentResolvedTheme = resolvedThemeRef.current;
-      const currentCustomProps = customPropsRef.current;
       // Capture playground from closure at effect run time
       const currentPlayground = playground;
 
@@ -183,11 +186,17 @@ function OpenAIComponentRendererBase({
       );
 
       try {
-        // Extract structured content from tool result (the actual tool parameters)
-        const structuredContent = currentToolResult?.structuredContent || null;
+        // Extract structured content from tool result (the actual tool parameters).
+        // Default to {} (not null) so window.openai.toolOutput is non-null in the
+        // iframe HTML — this prevents useWidget isPending from staying true when the
+        // tool result arrives after the iframe loads.
+        const structuredContent = currentToolResult
+          ? (currentToolResult.structuredContent ?? {})
+          : null;
 
         // Fetch the HTML resource client-side (where the connection exists)
         const resourceData = await currentReadResource(componentUrl);
+        if (cancelled) return;
 
         // Extract CSP metadata - check tool result first, then resource (where appsSdkMetadata lives)
         // The CSP is typically in the resource's _meta (set via appsSdkMetadata), not the tool result's _meta
@@ -198,80 +207,27 @@ function OpenAIComponentRendererBase({
           widgetCSP = resourceData.contents[0]._meta["openai/widgetCSP"];
         }
 
-        // For other metadata, prefer tool result's _meta as it may have tool-specific overrides
-        const metaSource =
-          currentToolResult?._meta || resourceData?.contents?.[0]?._meta;
-
-        // Extract widget props from _meta["mcp-use/props"]
-        const widgetProps = metaSource?.["mcp-use/props"] || null;
-
-        // Merge widget props with custom props (custom props take precedence)
-        const mergedProps = {
-          ...(widgetProps || {}),
-          ...(currentCustomProps || {}),
+        // Re-read refs right before building finalToolInput so we use the latest
+        // values (avoids race where toolArgs was empty at effect start but
+        // populated by the time we reach here, e.g. when toolResult arrives).
+        const latestToolArgs = toolArgsRef.current;
+        const latestCustomProps = customPropsRef.current;
+        const finalToolInput = {
+          ...(latestToolArgs || {}),
+          ...(latestCustomProps || {}),
         };
-        const finalWidgetProps =
-          Object.keys(mergedProps).length > 0 ? mergedProps : null;
 
-        // Debug logging
-        console.log("[OpenAIComponentRenderer] Widget data extraction:", {
-          hasMetaSource: !!metaSource,
-          hasMcpUseProps: !!metaSource?.["mcp-use/props"],
-          widgetProps,
-          customProps: currentCustomProps,
-          finalWidgetProps,
-          toolArgs: currentToolArgs,
-          structuredContent,
-          metaKeys: metaSource ? Object.keys(metaSource) : [],
-        });
-
-        // toolInput should be the original tool call arguments from toolArgs
-        const finalToolInput = currentToolArgs;
-
-        // Update state with final values
-        setWidgetToolInput(finalToolInput);
-        setWidgetToolOutput(structuredContent);
-
-        // pass props as url params (toolInput, toolOutput)
-        const urlParams = new URLSearchParams();
-        const params = {
-          toolInput: finalToolInput,
-          toolOutput: structuredContent,
-          toolId,
-        };
-        urlParams.set("mcpUseParams", JSON.stringify(params));
-
-        // Check for dev mode widget - check all _meta locations (toolResult, toolResult.contents, and resourceData.contents)
-        const metaForWidget =
-          currentToolResult?._meta ||
-          currentToolResult?.contents?.[0]?._meta ||
-          resourceData?.contents?.[0]?._meta;
-
-        // Use dev mode if metadata says so
-        const computedUseDevMode =
-          metaForWidget?.["mcp-use/widget"]?.html &&
-          metaForWidget?.["mcp-use/widget"]?.dev;
-        setUseDevMode(computedUseDevMode || false);
-
-        const widgetName = metaForWidget?.["mcp-use/widget"]?.name;
-        // Get slugified name for URL routing (falls back to original name if not provided)
-        const slugifiedName =
-          metaForWidget?.["mcp-use/widget"]?.slugifiedName || widgetName;
-
-        // Prepare widget data with optional dev URLs
+        // Prepare widget data for storage
         const widgetDataToStore: any = {
           serverId,
           uri: componentUrl,
-          toolInput: finalToolInput, // Original tool call arguments
-          toolOutput: structuredContent, // Tool output (structured data)
-          toolResponseMetadata: finalWidgetProps
-            ? { "mcp-use/props": finalWidgetProps }
-            : null, // Widget-specific props (merged with custom props)
-          resourceData, // Pass the fetched HTML
+          toolInput: finalToolInput,
+          toolOutput: structuredContent,
+          toolResponseMetadata: null,
+          resourceData,
           toolId,
-          widgetCSP, // Pass the CSP metadata
-          theme: currentResolvedTheme, // Pass the current theme to prevent flash
-          // Include current playground settings for window.openai initialization
+          widgetCSP,
+          theme: currentResolvedTheme,
           playground: {
             locale: currentPlayground.locale,
             deviceType: currentPlayground.deviceType,
@@ -279,14 +235,6 @@ function OpenAIComponentRendererBase({
             safeAreaInsets: currentPlayground.safeAreaInsets,
           },
         };
-
-        if (computedUseDevMode && slugifiedName && currentServerBaseUrl) {
-          const devServerBaseUrl = new URL(currentServerBaseUrl).origin;
-          // Use slugified name for URL routing
-          const devWidgetUrl = `${devServerBaseUrl}/mcp-use/widgets/${slugifiedName}`;
-          widgetDataToStore.devWidgetUrl = devWidgetUrl;
-          widgetDataToStore.devServerBaseUrl = devServerBaseUrl;
-        }
 
         // Inspector API routes (/inspector/api/*) are always served by the same
         // origin that hosts the inspector UI.  Use relative URLs so fetch targets
@@ -316,6 +264,8 @@ function OpenAIComponentRendererBase({
           );
         }
 
+        if (cancelled) return;
+
         // Determine if the widget iframe will be same-origin with the inspector page.
         // When inspectorApiBase matches window.location.origin (e.g. both http://localhost:3000),
         // the iframe is same-origin and we can access its DOM for console interception & debug controls.
@@ -324,19 +274,24 @@ function OpenAIComponentRendererBase({
             inspectorApiBase === window.location.origin
           : true;
 
-        if (computedUseDevMode && widgetName && currentServerBaseUrl) {
-          // Use proxy URL for dev widgets (same-origin, supports HMR)
-          // Add timestamp to force iframe reload when widget data changes (e.g., props)
-          const proxyUrl = `${inspectorApiBase}/inspector/api/dev-widget/${toolId}?t=${Date.now()}`;
-          setWidgetUrl(proxyUrl);
-          setIsSameOrigin(computedIsSameOrigin);
-        } else {
-          // Add timestamp to force iframe reload when widget data changes (e.g., props)
-          const prodUrl = `${inspectorApiBase}/inspector/api/resources/widget/${toolId}?t=${Date.now()}`;
-          setWidgetUrl(prodUrl);
-          setIsSameOrigin(computedIsSameOrigin);
+        // Batch all state updates in one synchronous block so React 18 batches a single re-render.
+        // Avoids double application from StrictMode (cancelled guard above) and multiple
+        // setState across await boundaries.
+        setWidgetToolInput(finalToolInput);
+        setWidgetToolOutput(structuredContent);
+        setUseDevMode(false);
+        // Only set widget URL on first run; subsequent runs (e.g. toolResult arrives) just update
+        // the store so that iframe fetch gets latest data. Changing URL would reload the iframe.
+        if (!hasSetWidgetUrlRef.current) {
+          hasSetWidgetUrlRef.current = true;
+          const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
+          setWidgetUrl(widgetUrl);
+          // Register widget in debug context so CSP violations can be stored
+          addWidget(toolId, { toolName, protocol: "chatgpt-app" });
         }
+        setIsSameOrigin(computedIsSameOrigin);
       } catch (error) {
+        if (cancelled) return;
         console.error("Error storing widget data:", error);
         setError(
           error instanceof Error ? error.message : "Failed to prepare widget"
@@ -345,148 +300,156 @@ function OpenAIComponentRendererBase({
     };
 
     storeAndSetUrl();
+    return () => {
+      cancelled = true;
+    };
   }, [
     componentUrl,
     serverId,
     toolId,
     customProps,
     // Re-run when toolArgs materially change (e.g., from empty to populated when streaming).
-    // Serialized to avoid re-runs from object reference changes.
     JSON.stringify(toolArgs),
-    // Note: toolResult._meta is intentionally excluded - it's updated dynamically
-    // via updateIframeGlobals() (see effect at line ~504) without reloading the widget.
-    // Note: readResource, serverBaseUrl, playground are intentionally excluded.
-    // resolvedTheme and playground are captured at mount time for initialization,
-    // then updated dynamically via updateIframeGlobals() without reloading the widget.
+    // Re-run when toolResult arrives so store has latest data before iframe fetches.
+    // For fast tools, result may arrive before iframe loads — storing early avoids race.
+    // toolResult._meta is updated via updateIframeGlobals() without re-storing.
+    toolResult,
   ]);
 
-  // Helper to update window.openai globals inside iframe
+  // Helper to update window.openai globals inside iframe.
+  // Batches multiple synchronous calls (e.g. tool result + theme effects) into
+  // one apply + one event dispatch to avoid double renders.
   const updateIframeGlobals = useCallback(
     (updates: IframeGlobalUpdates) => {
-      const scheduleFlushWhenOpenAiAvailable = () => {
-        if (flushGlobalsRafRef.current !== null) {
-          return;
-        }
-        let attempts = 0;
-        const tryFlush = () => {
-          const iframeWindow = iframeRef.current?.contentWindow;
-          const pending = pendingGlobalUpdatesRef.current;
-          if (!iframeWindow || !pending) {
-            flushGlobalsRafRef.current = null;
-            return;
-          }
-          if (iframeWindow.openai) {
-            pendingGlobalUpdatesRef.current = null;
-            flushGlobalsRafRef.current = null;
-            updateIframeGlobals(pending);
-            return;
-          }
-          attempts += 1;
-          if (attempts >= 60) {
-            flushGlobalsRafRef.current = null;
-            return;
-          }
-          flushGlobalsRafRef.current = window.requestAnimationFrame(tryFlush);
-        };
-        flushGlobalsRafRef.current = window.requestAnimationFrame(tryFlush);
+      batchedGlobalsRef.current = {
+        ...(batchedGlobalsRef.current || {}),
+        ...updates,
       };
 
-      if (iframeRef.current?.contentWindow) {
-        try {
-          const iframeWindow = iframeRef.current.contentWindow;
-          const iframeDocument = iframeRef.current.contentDocument;
+      if (!iframeRef.current?.contentWindow) {
+        if (onUpdateGlobals) onUpdateGlobals(updates);
+        return;
+      }
 
-          // Set color-scheme on iframe document for light-dark() CSS function
-          // OpenAI Apps SDK UI uses [data-theme] attribute to set color-scheme via CSS
-          // This is required for design tokens to work correctly
-          if (updates.theme !== undefined && iframeDocument) {
+      if (batchScheduledRef.current) return;
+      batchScheduledRef.current = true;
+
+      queueMicrotask(() => {
+        batchScheduledRef.current = false;
+        const merged = batchedGlobalsRef.current;
+        batchedGlobalsRef.current = null;
+        if (!merged) return;
+
+        const scheduleFlushWhenOpenAiAvailable = () => {
+          if (flushGlobalsRafRef.current !== null) return;
+          let attempts = 0;
+          const tryFlush = () => {
+            const iframeWindow = iframeRef.current?.contentWindow;
+            const pending = pendingGlobalUpdatesRef.current;
+            if (!iframeWindow || !pending) {
+              flushGlobalsRafRef.current = null;
+              return;
+            }
+            if (iframeWindow.openai) {
+              pendingGlobalUpdatesRef.current = null;
+              flushGlobalsRafRef.current = null;
+              updateIframeGlobals(pending);
+              return;
+            }
+            attempts += 1;
+            if (attempts >= 60) {
+              flushGlobalsRafRef.current = null;
+              return;
+            }
+            flushGlobalsRafRef.current = window.requestAnimationFrame(tryFlush);
+          };
+          flushGlobalsRafRef.current = window.requestAnimationFrame(tryFlush);
+        };
+
+        try {
+          const iframeWindow = iframeRef.current?.contentWindow;
+          const iframeDocument = iframeRef.current?.contentDocument;
+          if (!iframeWindow) return;
+
+          if (merged.theme !== undefined && iframeDocument) {
             const htmlElement = iframeDocument.documentElement;
-            // Set data-theme attribute (used by OpenAI Apps SDK UI CSS)
-            htmlElement.setAttribute("data-theme", updates.theme);
-            // Also set inline style as fallback
-            htmlElement.style.colorScheme = updates.theme;
-            // Add theme as a class for Tailwind dark mode (class-based strategy)
+            htmlElement.setAttribute("data-theme", merged.theme);
+            htmlElement.style.colorScheme = merged.theme;
             htmlElement.classList.remove("light", "dark");
-            htmlElement.classList.add(updates.theme);
+            htmlElement.classList.add(merged.theme);
           }
 
           if (iframeWindow.openai) {
-            // Update all provided properties
-            if (updates.displayMode !== undefined) {
-              iframeWindow.openai.displayMode = updates.displayMode;
-            }
-            if (updates.theme !== undefined) {
-              iframeWindow.openai.theme = updates.theme;
-            }
-            if (updates.maxHeight !== undefined) {
-              iframeWindow.openai.maxHeight = updates.maxHeight;
-            }
-            if (updates.locale !== undefined) {
-              iframeWindow.openai.locale = updates.locale;
-            }
-            if (updates.safeArea !== undefined) {
-              iframeWindow.openai.safeArea = updates.safeArea;
-            }
-            if (updates.userAgent !== undefined) {
-              iframeWindow.openai.userAgent = updates.userAgent;
-            }
-            // Update toolOutput and metadata (for Issue #930 fix)
-            if (updates.toolOutput !== undefined) {
-              iframeWindow.openai.toolOutput = updates.toolOutput;
-            }
-            if (updates.toolResponseMetadata !== undefined) {
-              iframeWindow.openai.toolResponseMetadata =
-                updates.toolResponseMetadata;
-            }
+            // Skip redundant dispatch only when updates are exclusively theme/displayMode
+            // and those already match. Must NOT skip when locale, userAgent, safeArea,
+            // maxHeight, or toolOutput need to be applied (debug toggles, etc.).
+            const hasHostContextUpdates =
+              merged.locale !== undefined ||
+              merged.safeArea !== undefined ||
+              merged.userAgent !== undefined ||
+              merged.maxHeight !== undefined ||
+              merged.toolOutput !== undefined ||
+              merged.toolResponseMetadata !== undefined;
 
-            // Dispatch the set_globals event to notify React components
+            if (!hasHostContextUpdates) {
+              const themeMatch =
+                merged.theme === undefined ||
+                iframeWindow.openai.theme === merged.theme;
+              const displayModeMatch =
+                merged.displayMode === undefined ||
+                iframeWindow.openai.displayMode === merged.displayMode;
+              if (themeMatch && displayModeMatch) return;
+            }
+            if (merged.displayMode !== undefined)
+              iframeWindow.openai.displayMode = merged.displayMode;
+            if (merged.theme !== undefined)
+              iframeWindow.openai.theme = merged.theme;
+            if (merged.maxHeight !== undefined)
+              iframeWindow.openai.maxHeight = merged.maxHeight;
+            if (merged.locale !== undefined)
+              iframeWindow.openai.locale = merged.locale;
+            if (merged.safeArea !== undefined)
+              iframeWindow.openai.safeArea = merged.safeArea;
+            if (merged.userAgent !== undefined)
+              iframeWindow.openai.userAgent = merged.userAgent;
+            if (merged.toolOutput !== undefined)
+              iframeWindow.openai.toolOutput = merged.toolOutput;
+            if (merged.toolResponseMetadata !== undefined)
+              iframeWindow.openai.toolResponseMetadata =
+                merged.toolResponseMetadata;
+
             try {
-              // Use global CustomEvent constructor
-              const globalsEvent = new (iframeWindow as any).CustomEvent(
+              const ev = new (iframeWindow as any).CustomEvent(
                 "openai:set_globals",
-                {
-                  detail: {
-                    globals: {
-                      ...iframeWindow.openai,
-                    },
-                  },
-                }
+                { detail: { globals: { ...iframeWindow.openai } } }
               );
-              iframeWindow.dispatchEvent(globalsEvent);
-            } catch (eventError) {
-              // If CustomEvent fails, use postMessage fallback
+              iframeWindow.dispatchEvent(ev);
+            } catch {
               iframeWindow.postMessage(
-                {
-                  type: "openai:globalsChanged",
-                  updates,
-                },
+                { type: "openai:globalsChanged", updates: merged },
                 "*"
               );
             }
           } else {
-            // Queue updates until OpenAI globals are available inside the iframe.
             pendingGlobalUpdatesRef.current = {
               ...(pendingGlobalUpdatesRef.current || {}),
-              ...updates,
+              ...merged,
             };
             scheduleFlushWhenOpenAiAvailable();
           }
-        } catch (e) {
-          // Cross-origin or other error, use postMessage instead
-          iframeRef.current.contentWindow.postMessage(
-            {
-              type: "openai:globalsChanged",
-              updates,
-            },
-            "*"
-          );
-        }
-      }
 
-      // Notify parent component of globals updates
-      if (onUpdateGlobals) {
-        onUpdateGlobals(updates);
-      }
+          if (onUpdateGlobals) onUpdateGlobals(merged);
+        } catch {
+          const cw = iframeRef.current?.contentWindow;
+          if (cw) {
+            cw.postMessage(
+              { type: "openai:globalsChanged", updates: merged },
+              "*"
+            );
+          }
+          if (onUpdateGlobals) onUpdateGlobals(merged);
+        }
+      });
     },
     [onUpdateGlobals]
   );
@@ -505,16 +468,17 @@ function OpenAIComponentRendererBase({
   useEffect(() => {
     if (!toolResult || !isReady || !iframeRef.current?.contentWindow) return;
 
-    // Extract the data we need to send to the widget
     const structuredContent = toolResult?.structuredContent || toolResult;
     const metadata = toolResult?._meta || null;
+    const contentKey = JSON.stringify(structuredContent);
 
-    // Update iframe globals (wait for next frame to ensure window.openai is ready)
-    requestAnimationFrame(() => {
-      updateIframeGlobals({
-        toolOutput: structuredContent,
-        toolResponseMetadata: metadata,
-      });
+    // Skip if we already sent this exact toolOutput (parent may re-render with new ref, same data)
+    if (lastSentToolOutputKeyRef.current === contentKey) return;
+    lastSentToolOutputKeyRef.current = contentKey;
+
+    updateIframeGlobals({
+      toolOutput: structuredContent,
+      toolResponseMetadata: metadata,
     });
   }, [toolResult, isReady, updateIframeGlobals]);
 
@@ -641,6 +605,18 @@ function OpenAIComponentRendererBase({
       }
 
       switch (event.data.type) {
+        case "openai:csp-violation":
+          addCspViolation(toolId, {
+            directive: event.data.directive,
+            effectiveDirective: event.data.effectiveDirective,
+            blockedUri: event.data.blockedUri,
+            sourceFile: event.data.sourceFile,
+            lineNumber: event.data.lineNumber,
+            columnNumber: event.data.columnNumber,
+            timestamp: event.data.timestamp || Date.now(),
+          });
+          break;
+
         case "openai:setWidgetState":
           try {
             // Widget state is already handled by the server-injected script
@@ -883,10 +859,13 @@ function OpenAIComponentRendererBase({
 
     // Handle the race where the iframe finishes loading before listeners are attached.
     // In that case, "load" won't fire again and the widget can stay pending forever.
+    // Guard: only treat as loaded if the document has actual content (scripts).
+    // A stale about:blank or empty document should not trigger handleLoad.
     if (
       iframe &&
       (iframe.contentDocument?.readyState === "complete" ||
-        iframe.contentDocument?.readyState === "interactive")
+        iframe.contentDocument?.readyState === "interactive") &&
+      (iframe.contentDocument?.querySelectorAll("script").length ?? 0) > 0
     ) {
       handleLoad();
     }
@@ -934,22 +913,16 @@ function OpenAIComponentRendererBase({
     updateIframeGlobals({ theme: resolvedTheme });
   }, [resolvedTheme, isReady, isSameOrigin, updateIframeGlobals]);
 
-  // Hide skeleton after iframe loads + brief delay for widget to render
+  // Hide skeleton once the iframe has loaded real content.
+  // The readyState guard in the load handler already ensures we only set
+  // isReady when the iframe has actual scripts (not a stale blank document),
+  // so no additional delay is needed.
   useEffect(() => {
     if (!isReady || !showSkeleton) {
       return;
     }
-
-    // Give the widget 300ms to render after iframe loads
-    // This handles cold Vite starts without requiring widget code changes
-    const timer = setTimeout(() => {
-      setShowSkeleton(false);
-      hasLoadedOnceRef.current = true;
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-    };
+    setShowSkeleton(false);
+    hasLoadedOnceRef.current = true;
   }, [isReady, showSkeleton]);
 
   // Dynamically resize iframe height to its content, capped at 100vh
@@ -1178,5 +1151,32 @@ function OpenAIComponentRendererBase({
   );
 }
 
+// Custom comparison to diagnose re-renders: log when props differ
+function openAIComponentRendererAreEqual(
+  prev: OpenAIComponentRendererProps,
+  next: OpenAIComponentRendererProps
+) {
+  const keys = [
+    "componentUrl",
+    "toolName",
+    "serverId",
+    "toolArgs",
+    "toolResult",
+    "readResource",
+    "className",
+  ] as const;
+  for (const k of keys) {
+    const p = prev[k as keyof OpenAIComponentRendererProps];
+    const n = next[k as keyof OpenAIComponentRendererProps];
+    if (p !== n) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Memoize the component to prevent unnecessary re-renders when props haven't changed
-export const OpenAIComponentRenderer = memo(OpenAIComponentRendererBase);
+export const OpenAIComponentRenderer = memo(
+  OpenAIComponentRendererBase,
+  openAIComponentRendererAreEqual
+);

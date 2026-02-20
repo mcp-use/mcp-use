@@ -43,12 +43,13 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
 
     await page.getByTestId("tool-execution-execute-button").click();
 
-    // Tab 1: Component (Apps SDK) - verify pending state first
-    await expect(page.getByTestId("tool-result-view-chatgpt-app")).toBeVisible({
+    // Tab 1: MCP Apps (default active tab after execution)
+    await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
       timeout: 10000,
     });
-    await page.getByTestId("tool-result-view-chatgpt-app").click();
 
+    // Tab 2: Apps SDK - click to verify pending state while tool executes (10s delay)
+    await page.getByTestId("tool-result-view-chatgpt-app").click();
     const appsSdkFrame = page.frameLocator(
       'iframe[title^="OpenAI Component: get-weather-delayed"]'
     );
@@ -63,8 +64,7 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
     await expect(appsSdkFrame.getByText("Partly Cloudy")).toBeVisible();
     await expect(appsSdkFrame.getByText(/22/)).toBeVisible();
 
-    // Tab 2: Component (MCP Apps) - double iframe (outer proxy, inner guest)
-    await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible();
+    // Back to Tab 1: MCP Apps - double iframe (outer proxy, inner guest)
     await page.getByTestId("tool-result-view-mcp-apps").click();
     const mcpAppsOuter = page.frameLocator(
       'iframe[title^="MCP App: get-weather-delayed"]'
@@ -144,11 +144,12 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
   }) => {
     await page.getByTestId("resource-item-weather-display").click();
 
-    // Resource result shows either Apps SDK or MCP Apps widget (priority order)
-    const widgetIframe = page.locator('iframe[title*="weather-display"]');
-    await expect(widgetIframe).toBeVisible({ timeout: 5000 });
-    const frame = page.frameLocator('iframe[title*="weather-display"]').first();
-    await expect(frame.locator("body")).toBeVisible({ timeout: 3000 });
+    // Widget requires props - check props wall text is visible
+    await expect(
+      page.getByText(
+        "This widget requires props, set or generate them in the props debugger"
+      )
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test("weather-display resource - should switch between preview and JSON view", async ({
@@ -156,21 +157,27 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
   }) => {
     await page.getByTestId("resource-item-weather-display").click();
 
-    await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
-      timeout: 5000,
-    });
+    // Widget requires props - check props wall text is visible in preview
+    await expect(
+      page.getByText(
+        "This widget requires props, set or generate them in the props debugger"
+      )
+    ).toBeVisible({ timeout: 10000 });
 
     await page.getByRole("button", { name: "JSON" }).click();
     await expect(page.getByTestId("resource-result-json")).toBeVisible({
-      timeout: 3000,
+      timeout: 10000,
     });
     const resultContent = page.getByTestId("resource-result-json");
     await expect(resultContent).toContainText('"uri"');
 
     await page.getByRole("button", { name: /Component|Preview/ }).click();
-    await expect(page.locator('iframe[title*="weather-display"]')).toBeVisible({
-      timeout: 3000,
-    });
+    // Back to preview - props wall is shown again
+    await expect(
+      page.getByText(
+        "This widget requires props, set or generate them in the props debugger"
+      )
+    ).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -289,7 +296,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     );
     const widgetFrame = outerFrame.frameLocator("iframe");
     const spinner = widgetFrame.locator('[class*="animate-spin"]').first();
-    await expect(spinner).toBeVisible({ timeout: 3000 });
+    await expect(spinner).toBeVisible({ timeout: 20000 });
 
     await expect(spinner).not.toBeVisible({ timeout: 10000 });
     await expect(widgetFrame.getByText(/london/i)).toBeVisible({

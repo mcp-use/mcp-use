@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "2.14.0-canary.0",
+  "version": "2.15.0-canary.3",
   "description": "The mcp-use CLI is a tool for building and deploying MCP servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -48,25 +48,25 @@
   },
   "dependencies": {
     "@mcp-use/inspector": "workspace:*",
-    "@tailwindcss/vite": "^4.1.18",
-    "@vitejs/plugin-react": "^5.1.2",
+    "@tailwindcss/vite": "^4.2.0",
+    "@vitejs/plugin-react": "^5.1.4",
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
     "commander": "^14.0.2",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "esbuild": "0.27.1",
-    "globby": "^16.1.0",
+    "globby": "^16.1.1",
     "mcp-use": "workspace:*",
     "open": "^11.0.0",
+    "tar": "^7.5.9",
     "tsx": "^4.21.0",
     "vite": "^7.3.1",
     "vite-plugin-singlefile": "^2.0.3",
-    "tar": "^7.4.3",
     "ws": "^8.19.0",
-    "zod": "^4.2.0"
+    "zod": "4.3.5"
   },
   "devDependencies": {
-    "@types/tar": "^6.1.13",
+    "@types/tar": "^7.0.87",
     "@types/ws": "^8.18.1",
     "vitest": "^4.0.17"
   },

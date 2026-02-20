@@ -18,6 +18,7 @@ interface ToolCallDisplayProps {
   args: Record<string, unknown>;
   result?: any;
   state?: "call" | "result" | "error";
+  partialArgs?: Record<string, unknown>;
 }
 
 export function ToolCallDisplay({
@@ -25,8 +26,10 @@ export function ToolCallDisplay({
   args,
   result,
   state = "result",
+  partialArgs,
 }: ToolCallDisplayProps) {
   const [_copied, setCopied] = useState(false);
+  const displayArgs = state === "call" && partialArgs ? partialArgs : args;
 
   const getStatusIcon = () => {
     switch (state) {
@@ -91,9 +94,9 @@ export function ToolCallDisplay({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">
                 {toolName}(
-                {Object.keys(args).length > 0 ? (
+                {Object.keys(displayArgs).length > 0 ? (
                   <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
-                    {Object.keys(args).length} args
+                    {Object.keys(displayArgs).length} args
                   </span>
                 ) : (
                   ""
@@ -126,8 +129,14 @@ export function ToolCallDisplay({
             <Wrench className="h-5 w-5" />
             Tool Call Details
           </SheetTitle>
-          <SheetDescription>
-            {toolName} -{state}
+          <SheetDescription className="flex items-center gap-2">
+            {toolName} — {state}
+            {state === "call" && (
+              <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                streaming…
+              </span>
+            )}
           </SheetDescription>
         </SheetHeader>
 
@@ -137,12 +146,12 @@ export function ToolCallDisplay({
             <h3 className="text-sm font-medium mb-2">Arguments</h3>
             <div className="relative" data-testid="chat-tool-drawer-args">
               <pre className="text-xs bg-muted/50 rounded-lg p-3 overflow-x-auto border font-mono leading-relaxed max-h-48 whitespace-pre-wrap break-words">
-                {formatContent(args)}
+                {formatContent(displayArgs)}
               </pre>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => copyToClipboard(formatContent(args))}
+                onClick={() => copyToClipboard(formatContent(displayArgs))}
                 className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
                 title="Copy arguments"
               >

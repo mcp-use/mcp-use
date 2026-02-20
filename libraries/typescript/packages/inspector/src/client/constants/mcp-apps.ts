@@ -8,8 +8,6 @@ export const MCP_APPS_CONFIG = {
    */
   API_ENDPOINTS: {
     WIDGET_STORE: "/inspector/api/mcp-apps/widget/store",
-    DEV_WIDGET_CONTENT: (toolCallId: string) =>
-      `/inspector/api/mcp-apps/dev-widget-content/${toolCallId}`,
     WIDGET_CONTENT: (toolCallId: string) =>
       `/inspector/api/mcp-apps/widget-content/${toolCallId}`,
   },

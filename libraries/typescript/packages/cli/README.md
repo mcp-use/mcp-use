@@ -119,7 +119,7 @@ mcp-use start [options]
 
 ### Cloud Deployment
 
-Deploy your MCP server to mcp-use cloud:
+Deploy your MCP server to production via [manufact.com](https://manufact.com):
 
 ```bash
 # Login to mcp-use cloud

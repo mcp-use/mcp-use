@@ -14,7 +14,7 @@ import {
   Maximize,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { detectWidgetProtocol } from "../../utils/widget-detection";
 import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
@@ -94,9 +94,18 @@ export function ResourceResultDisplay({
   selectedResource,
   llmConfig,
 }: ResourceResultDisplayProps) {
+  // Stable empty object — avoids breaking MCPAppsRenderer memo on every re-render
+  const emptyToolInput = useMemo(() => ({}), []);
   const [activeProps, setActiveProps] = useState<Record<string, string> | null>(
     null
   );
+
+  // Stable callback — must not change reference on re-renders, otherwise
+  // MCPAppsDebugControls' useEffect (which has onPropsChange in its deps) would
+  // re-fire and create an infinite loop.
+  const handlePropsChange = useCallback((p: Record<string, string> | null) => {
+    setActiveProps(p);
+  }, []);
   const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
@@ -165,6 +174,25 @@ export function ResourceResultDisplay({
     ...contentMetadata,
   };
 
+  // Detect required props from the widget schema so we can warn before rendering.
+  // Reads from "mcp-use/propsSchema" (mcp-use private extension in resource listing _meta).
+  const requiredProps = useMemo(() => {
+    const props = (combinedAnnotations as any)?.["mcp-use/propsSchema"];
+    if (!props) return [];
+    // Zod format: { def: { type: "object", shape: { propName: { def: { type: "..." } } } } }
+    const shape = props.def?.shape;
+    if (shape) {
+      return Object.entries(shape)
+        .filter(([, v]: any) => {
+          const t = v?.def?.type ?? v?.type;
+          return t !== "optional" && t !== "default";
+        })
+        .map(([k]) => k);
+    }
+    // JSON Schema format
+    return (props.required as string[]) ?? [];
+  }, [combinedAnnotations]);
+
   // Detect widget protocol (Priority: MCP Apps → Apps SDK → MCP-UI)
   const widgetProtocol = detectWidgetProtocol(
     combinedAnnotations,
@@ -189,6 +217,8 @@ export function ResourceResultDisplay({
 
   const hasMcpAppsResource =
     (widgetProtocol === "mcp-apps" || isMcpAppResource) && !!mcpAppsResourceUri;
+
+  const needsProps = requiredProps.length > 0 && !activeProps;
 
   if (isLoading) {
     return (
@@ -347,7 +377,10 @@ export function ResourceResultDisplay({
             if (previewMode) {
               // MCP Apps mode
               return (
-                <div className="flex-1 h-full relative">
+                <div
+                  className="flex-1 h-full relative"
+                  data-testid="resource-widget-preview"
+                >
                   {/* Floating controls in top-right */}
                   <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
                     <MCPAppsDebugControls
@@ -359,24 +392,38 @@ export function ResourceResultDisplay({
                       resourceAnnotations={combinedAnnotations}
                       llmConfig={llmConfig || null}
                       resource={selectedResource || null}
-                      onPropsChange={setActiveProps}
+                      onPropsChange={handlePropsChange}
+                      requiredProps={
+                        requiredProps.length > 0 && !activeProps
+                          ? requiredProps
+                          : undefined
+                      }
                     />
                   </div>
 
-                  <MCPAppsRenderer
-                    serverId={serverId}
-                    toolCallId={`resource-${result.timestamp}`}
-                    toolName={result.uri}
-                    toolInput={{}}
-                    toolOutput={result.result}
-                    toolMetadata={combinedAnnotations}
-                    resourceUri={mcpAppsResourceUri}
-                    readResource={readResource}
-                    className="w-full h-full relative flex p-4"
-                    customProps={activeProps || undefined}
-                    displayMode={mcpAppsDisplayMode}
-                    onDisplayModeChange={setMcpAppsDisplayMode}
-                  />
+                  {needsProps ? (
+                    <div className="flex items-center justify-center w-full h-full min-h-[200px] rounded-xl border-2 border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800/50 m-4">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center px-6">
+                        This widget requires props, set or generate them in the
+                        props debugger
+                      </p>
+                    </div>
+                  ) : (
+                    <MCPAppsRenderer
+                      serverId={serverId}
+                      toolCallId={`resource-${result.timestamp}`}
+                      toolName={result.uri}
+                      toolInput={emptyToolInput}
+                      toolOutput={result.result}
+                      toolMetadata={combinedAnnotations}
+                      resourceUri={mcpAppsResourceUri}
+                      readResource={readResource}
+                      className="w-full h-full relative flex p-4"
+                      customProps={activeProps || undefined}
+                      displayMode={mcpAppsDisplayMode}
+                      onDisplayModeChange={setMcpAppsDisplayMode}
+                    />
+                  )}
                 </div>
               );
             } else {
@@ -402,17 +449,26 @@ export function ResourceResultDisplay({
             if (previewMode) {
               // OpenAI Apps SDK Component mode
               return (
-                <div className="flex-1 h-full">
-                  <OpenAIComponentRenderer
-                    componentUrl={openaiOutputTemplate}
-                    toolName={result.uri}
-                    toolArgs={{}}
-                    toolResult={result.result}
-                    serverId={serverId}
-                    readResource={readResource}
-                    className="w-full h-full relative flex p-4"
-                    customProps={activeProps || undefined}
-                  />
+                <div className="flex-1 h-full relative">
+                  {needsProps ? (
+                    <div className="flex items-center justify-center w-full h-full min-h-[200px] rounded-xl border-2 border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800/50 m-4">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center px-6">
+                        This widget requires props, set or generate them in the
+                        props debugger
+                      </p>
+                    </div>
+                  ) : (
+                    <OpenAIComponentRenderer
+                      componentUrl={openaiOutputTemplate}
+                      toolName={result.uri}
+                      toolArgs={{}}
+                      toolResult={result.result}
+                      serverId={serverId}
+                      readResource={readResource}
+                      className="w-full h-full relative flex p-4"
+                      customProps={activeProps || undefined}
+                    />
+                  )}
                 </div>
               );
             } else {

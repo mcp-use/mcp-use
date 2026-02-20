@@ -103,6 +103,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
     fetch: customFetch,
+    clientOptions,
     onNotification,
     onSampling: onSamplingOption,
     samplingCallback: samplingCallbackOption,
@@ -628,6 +629,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           clientInfo: mergedClientInfo,
           // Pass custom fetch if provided (e.g., OAuth retry fetch for scope-step-up)
           ...(customFetch && { fetch: customFetch }),
+          // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
+          ...(clientOptions && { clientOptions }),
         };
 
         // Add gateway URL if using proxy
@@ -642,24 +645,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Add custom headers if provided (includes proxy headers)
         if (allHeaders && Object.keys(allHeaders).length > 0) {
           serverConfig.headers = allHeaders;
-        }
-
-        // Add OAuth token if available
-        if (authProviderRef.current) {
-          const tokens = await authProviderRef.current.tokens?.();
-          if (!isMountedRef.current) {
-            addLog(
-              "debug",
-              "Connection aborted after token fetch - component unmounted"
-            );
-            return "failed";
-          }
-          if (tokens?.access_token) {
-            serverConfig.headers = {
-              ...serverConfig.headers,
-              Authorization: `Bearer ${tokens.access_token}`,
-            };
-          }
         }
 
         // Client should be initialized by the parent connect() function

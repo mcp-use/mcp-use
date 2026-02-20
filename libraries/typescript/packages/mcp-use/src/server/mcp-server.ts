@@ -29,7 +29,6 @@ import {
   createParamsSchema,
   toolRegistration,
 } from "./tools/index.js";
-import { AppsSdkAdapter, McpAppsAdapter } from "./widgets/adapters/index.js";
 import {
   mountWidgets,
   setupFaviconRoute,
@@ -1164,7 +1163,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
-      let inputSchema: z.ZodObject<any> | Record<string, z.ZodSchema>;
+      let inputSchema: z.ZodTypeAny | Record<string, z.ZodSchema>;
       if (config.schema) {
         // Pass the Zod schema directly - it will be used for validation
         inputSchema = config.schema;
@@ -1225,7 +1224,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Widget tools are managed by the Vite file watcher, not by index.ts.
       shouldRemove: (_key, reg) => {
         const meta = (reg.config as any)?._meta;
-        return !meta?.["mcp-use/widget"];
+        const hasWidgetConfig = !!(reg.config as any)?.widget;
+        const hasUiResourceUri = !!(meta?.ui as any)?.resourceUri;
+        return !hasWidgetConfig && !hasUiResourceUri;
       },
       sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
         sessionId,
@@ -1907,6 +1908,39 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     }
 
+    // Patch tool _meta for tools with widget config that were registered
+    // before widget definitions were synced. During HMR, server.tool() runs
+    // on the new server where widgetDefinitions is empty, so it can only set
+    // Apps SDK metadata. Now that definitions are available, fill in MCP Apps
+    // metadata for mcpApps widgets. We use Object.assign to MUTATE the
+    // existing _meta object in place, because session-level _registeredTools
+    // entries share the same _meta reference (see createToolEntry).
+    for (const [, toolReg] of this.registrations.tools) {
+      const config = toolReg.config as any;
+      const widgetConfig = config?.widget;
+      const widgetName = widgetConfig?.name;
+      if (!widgetConfig || !widgetName || !config._meta) continue;
+      if (config._meta.ui?.resourceUri) continue;
+
+      const widgetDef = this.widgetDefinitions.get(widgetName);
+      const widgetType = widgetDef?.widgetType as string | undefined;
+      if (widgetType !== "mcpApps") continue;
+
+      const outputTemplate = config._meta["openai/outputTemplate"];
+      if (!outputTemplate) continue;
+
+      const adapterDef = {
+        type: "mcpApps" as const,
+        name: widgetName,
+        metadata: widgetDef?.metadata,
+      };
+      const dualMeta = buildDualProtocolMetadata(
+        adapterDef as any,
+        outputTemplate
+      );
+      Object.assign(config._meta, dualMeta);
+    }
+
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
@@ -2271,23 +2305,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
         // Look up widget type to determine if dual-protocol metadata is needed
         const widgetDef = self.widgetDefinitions.get(widgetName);
-        const widgetType = widgetDef?.["mcp-use/widgetType"] as
-          | string
-          | undefined;
-
+        const widgetType = widgetDef?.widgetType as string | undefined;
         if (widgetType === "mcpApps") {
-          // Create a definition for the dual-protocol metadata builder
           const adapterDef = {
             type: "mcpApps" as const,
             name: widgetName,
-            _meta: widgetDef,
-            metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
+            metadata: widgetDef?.metadata,
           };
 
-          // Build dual-protocol tool metadata using the shared helper.
-          // Per MCP Apps spec (SEP-1865): tool _meta.ui only has resourceUri.
-          // CSP belongs on the resource, not the tool. Apps SDK fields (openai/*)
-          // DO go on the tool for ChatGPT compatibility.
+          // Build dual-protocol tool metadata. Per SEP-1865: tool _meta.ui
+          // only has resourceUri. CSP belongs on the resource, not the tool.
           const dualMeta = buildDualProtocolMetadata(
             adapterDef as any,
             outputTemplate,
@@ -2305,7 +2332,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               widgetConfig.resultCanProduceWidget ?? true,
           };
         } else {
-          // Legacy Apps SDK only metadata
           toolDefinition._meta = {
             ...toolDefinition._meta,
             "openai/outputTemplate": outputTemplate,
@@ -2328,95 +2354,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         actualCallback = (async (params: any, ctx: any) => {
           const result = await originalCallback(params, ctx);
 
-          // Look up the widget definition and inject its metadata into the response
-          // Use self (the running server) because widgetDefinitions are synced TO the running server during HMR
-          const widgetDef = self.widgetDefinitions.get(widgetName);
-          const widgetType = widgetDef?.["mcp-use/widgetType"] as
-            | string
-            | undefined;
-
+          // Per OpenAI Apps SDK docs and SEP-1865: protocol fields belong on the
+          // tool DEFINITION (tools/list), not on every tool call result.
+          // The tool call result _meta is only for app-specific widget data.
+          // We only fill in an empty text placeholder if needed.
           if (result && typeof result === "object") {
-            // Generate unique URI for this invocation
-            const randomId = Math.random().toString(36).substring(2, 15);
-            const buildIdPart = self.buildId ? `-${self.buildId}` : "";
-            const uniqueUri = `ui://widget/${widgetName}${buildIdPart}-${randomId}.html`;
-
-            // Build response metadata based on widget type
-            let responseMeta: Record<string, unknown>;
-
-            if (widgetType === "mcpApps") {
-              // Generate dual-protocol metadata for mcpApps widgets
-              const mcpAppsAdapter = new McpAppsAdapter();
-              const appsSdkAdapter = new AppsSdkAdapter();
-
-              // Create a definition for adapter calls with metadata field
-              const adapterDef = {
-                type: "mcpApps" as const,
-                name: widgetName,
-                _meta: widgetDef,
-                metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
-              };
-
-              // Build both tool and resource metadata
-              const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
-                adapterDef as any,
-                uniqueUri
-              );
-              const mcpAppsResourceMeta = mcpAppsAdapter.buildResourceMetadata(
-                adapterDef as any
-              );
-              const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
-                adapterDef as any,
-                uniqueUri
-              );
-              const appsSdkResourceMeta = appsSdkAdapter.buildResourceMetadata(
-                adapterDef as any
-              );
-
-              // Deep merge the ui metadata
-              const mergedUiMeta = {
-                ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
-                ...(mcpAppsResourceMeta._meta?.ui || {}),
-              };
-
-              responseMeta = {
-                ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
-                ...mcpAppsToolMeta,
-                ...appsSdkToolMeta,
-                ...(appsSdkResourceMeta._meta || {}),
-                ui: mergedUiMeta,
-                "openai/toolInvocation/invoking":
-                  widgetConfig.invoking ?? `Loading ${widgetName}...`,
-                "openai/toolInvocation/invoked":
-                  widgetConfig.invoked ?? `${widgetName} ready`,
-                "openai/widgetAccessible":
-                  widgetConfig.widgetAccessible ?? true,
-                "openai/resultCanProduceWidget":
-                  widgetConfig.resultCanProduceWidget ?? true,
-              };
-            } else {
-              // Legacy Apps SDK only metadata
-              responseMeta = {
-                ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
-                "openai/outputTemplate": uniqueUri,
-                "openai/toolInvocation/invoking":
-                  widgetConfig.invoking ?? `Loading ${widgetName}...`,
-                "openai/toolInvocation/invoked":
-                  widgetConfig.invoked ?? `${widgetName} ready`,
-                "openai/widgetAccessible":
-                  widgetConfig.widgetAccessible ?? true,
-                "openai/resultCanProduceWidget":
-                  widgetConfig.resultCanProduceWidget ?? true,
-              };
-            }
-
-            // Set _meta on the result, merging with any existing _meta (e.g., from widget() helper)
-            (result as any)._meta = {
-              ...(result._meta || {}),
-              ...responseMeta,
-            };
-
-            // Update message if empty
             if (
               (result as any).content?.[0]?.type === "text" &&
               !(result as any).content[0].text
@@ -3098,7 +3040,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link ToolCallback} for callback signature
    */
   public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
-    toolDefinition: T,
+    toolDefinition: T & ToolDefinition<any, any, HasOAuth>,
     callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
   ) => this;
 
@@ -3285,7 +3227,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       | PromptDefinition<any, HasOAuth>
       | import("./types/index.js").PromptDefinitionWithoutCallback,
   >(
-    promptDefinition: T,
+    promptDefinition: T &
+      (
+        | PromptDefinition<any, HasOAuth>
+        | import("./types/index.js").PromptDefinitionWithoutCallback
+      ),
     callback?: PromptCallback<InferPromptInput<T>, HasOAuth>
   ) => this;
 

@@ -87,6 +87,7 @@ interface ToolResultNotification {
  */
 class McpAppsBridge {
   private connected = false;
+  private connectPromise: Promise<void> | null = null;
   private requestId = 1;
   private pendingRequests = new Map<
     number | string,
@@ -98,6 +99,7 @@ class McpAppsBridge {
   private toolInput: Record<string, unknown> | null = null;
   private partialToolInput: Record<string, unknown> | null = null;
   private toolOutput: Record<string, unknown> | null = null;
+  private toolResponseMetadata: Record<string, unknown> | null = null;
   private hostContext: HostContext | null = null;
   private initialized = false;
 
@@ -340,12 +342,11 @@ class McpAppsBridge {
       }
       case "ui/notifications/tool-result": {
         const params = notification.params as ToolResultNotification;
-        // Prefer structuredContent, fall back to parsing text content
         const output =
           params.structuredContent || this.parseTextContent(params);
-        console.log("[MCP Apps Bridge] Tool result received:", output);
+        const meta = (params._meta as Record<string, unknown>) || null;
         this.toolOutput = output;
-        // Clear streaming partial now that tool execution is complete
+        this.toolResponseMetadata = meta;
         this.partialToolInput = null;
         this.toolResultHandlers.forEach((handler) => handler(output));
         break;
@@ -438,7 +439,10 @@ class McpAppsBridge {
   }
 
   /**
-   * Initialize connection with MCP Apps host
+   * Initialize connection with MCP Apps host.
+   * Concurrent calls share the same in-flight connection attempt so that
+   * React StrictMode double-invocations and multiple useWidget() hooks
+   * only produce a single ui/initialize request.
    */
   async connect(): Promise<void> {
     if (this.connected) return;
@@ -449,6 +453,17 @@ class McpAppsBridge {
       return;
     }
 
+    if (!this.connectPromise) {
+      this.connectPromise = this.doConnect();
+      this.connectPromise.catch(() => {
+        this.connectPromise = null;
+      });
+    }
+
+    return this.connectPromise;
+  }
+
+  private async doConnect(): Promise<void> {
     console.log("[MCP Apps Bridge] Connecting to MCP Apps host...");
 
     try {
@@ -503,10 +518,17 @@ class McpAppsBridge {
   }
 
   /**
-   * Get current tool output
+   * Get current tool output (structuredContent from tool result)
    */
   getToolOutput(): Record<string, unknown> | null {
     return this.toolOutput;
+  }
+
+  /**
+   * Get tool response metadata (_meta from tool result)
+   */
+  getToolResponseMetadata(): Record<string, unknown> | null {
+    return this.toolResponseMetadata;
   }
 
   /**
@@ -564,9 +586,10 @@ class McpAppsBridge {
    * Send a message to the conversation
    */
   async sendMessage(content: { type: string; text: string }): Promise<void> {
+    const contentArray = Array.isArray(content) ? content : [content];
     await this.sendRequest("ui/message", {
       role: "user",
-      content,
+      content: contentArray,
     });
   }
 
@@ -583,6 +606,18 @@ class McpAppsBridge {
   async requestDisplayMode(mode: DisplayMode): Promise<{ mode: DisplayMode }> {
     const result = await this.sendRequest("ui/request-display-mode", { mode });
     return result as { mode: DisplayMode };
+  }
+
+  /**
+   * Update the host's model context (SEP-1865 ui/update-model-context).
+   * The host will include this data in the model's context on future turns.
+   * Each call overwrites the previous context.
+   */
+  async updateModelContext(params: {
+    content?: Array<{ type: string; text: string }>;
+    structuredContent?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.sendRequest("ui/update-model-context", params);
   }
 
   /**
@@ -609,6 +644,7 @@ class McpAppsBridge {
     this.toolResultHandlers.clear();
     this.hostContextHandlers.clear();
     this.connected = false;
+    this.connectPromise = null;
   }
 }
 

@@ -272,6 +272,15 @@ export function InspectorDashboard() {
       name: normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
+      clientOptions: {
+        capabilities: {
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: ["text/html;profile=mcp-app"],
+            },
+          },
+        },
+      },
       ...(proxyConfig
         ? {
             proxyConfig,
@@ -460,12 +469,9 @@ export function InspectorDashboard() {
 
   const handleReconnect = (connection: any) => {
     console.log("[InspectorDashboard] Reconnecting server:", connection.id);
-    if (connection.retry) {
+    if (connection.state === "failed" && connection.retry) {
       connection.retry();
     } else {
-      console.warn(
-        "[InspectorDashboard] No retry method available, using connectServer fallback"
-      );
       connectServer(connection.id);
     }
   };
@@ -762,7 +768,8 @@ export function InspectorDashboard() {
                         </TooltipContent>
                       </Tooltip>
                       {(connection.state === "ready" ||
-                        connection.state === "failed") && (
+                        connection.state === "failed" ||
+                        connection.state === "discovering") && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -783,7 +790,9 @@ export function InspectorDashboard() {
                             <p>
                               {connection.state === "failed"
                                 ? "Retry connection"
-                                : "Resync connection"}
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -832,7 +841,8 @@ export function InspectorDashboard() {
                             Edit connection settings
                           </DropdownMenuItem>
                           {(connection.state === "ready" ||
-                            connection.state === "failed") && (
+                            connection.state === "failed" ||
+                            connection.state === "discovering") && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -842,7 +852,9 @@ export function InspectorDashboard() {
                               <RotateCcw className="h-4 w-4 mr-2" />
                               {connection.state === "failed"
                                 ? "Retry connection"
-                                : "Resync connection"}
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
