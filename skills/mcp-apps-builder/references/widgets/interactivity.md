@@ -1,36 +1,51 @@
 # Widget Interactivity
 
-Widgets can call MCP tools using the `callTool()` function from `useWidget()`. This enables buttons, forms, and actions within widgets.
+Widgets call MCP tools using the `useCallTool()` hook from `mcp-use/react`. This enables buttons, forms, and actions within widgets with built-in state management.
 
-**Use callTool() for:** Creating items, updating data, triggering actions, submitting forms
+**Use useCallTool() for:** Creating items, updating data, triggering actions, submitting forms
 
 ---
 
-## callTool() Basics
+## useCallTool() Basics
 
-The `callTool()` function from `useWidget()` calls any MCP tool from your server:
+`useCallTool()` provides a TanStack Query-like state machine for calling MCP tools:
 
 ```tsx
-const { callTool } = useWidget();
+import { useCallTool } from "mcp-use/react";
 
-// Call a tool
-await callTool("tool-name", { param: "value" });
+const { callTool, callToolAsync, isPending, isSuccess, isError, data, error } =
+  useCallTool("tool-name");
+
+// Fire-and-forget with optional callbacks
+callTool({ param: "value" }, {
+  onSuccess: (result) => console.log(result.structuredContent),
+  onError: (err) => console.error(err),
+  onSettled: () => hideSpinner(),
+});
+
+// Or async/await
+const result = await callToolAsync({ param: "value" });
 ```
 
-**Signature:**
-```typescript
-callTool(
-  toolName: string,
-  params: Record<string, any>
-): Promise<ToolResponse>
-```
+**State flags:**
+
+| Property | Description |
+|---|---|
+| `isPending` | Tool is executing |
+| `isSuccess` | Succeeded — `data` is available |
+| `isError` | Failed — `error` is available |
+| `isIdle` | No call made yet |
+| `callTool` | Fire-and-forget; optional `onSuccess`/`onError`/`onSettled` callbacks |
+| `callToolAsync` | Returns `Promise<CallToolResult>` |
+
+**Type inference:** When using `mcp-use dev`, types for tool names, inputs, and outputs are auto-generated to `.mcp-use/tool-registry.d.ts`. The hook is fully typed with autocomplete.
 
 ---
 
 ## Simple Button Action
 
 ```tsx
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
 
 export const widgetMetadata: WidgetMetadata = {
@@ -46,15 +61,12 @@ export const widgetMetadata: WidgetMetadata = {
 };
 
 export default function TodoList() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending: isLoading } = useWidget();
+  const { callTool, isPending } = useCallTool("toggle-todo");
 
-  if (isPending) {
+  if (isLoading) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
   }
-
-  const handleToggle = async (id: string, completed: boolean) => {
-    await callTool("toggle-todo", { id, completed: !completed });
-  };
 
   return (
     <McpUseProvider autoSize>
@@ -64,7 +76,8 @@ export default function TodoList() {
             <input
               type="checkbox"
               checked={todo.completed}
-              onChange={() => handleToggle(todo.id, todo.completed)}
+              onChange={() => callTool({ id: todo.id, completed: !todo.completed })}
+              disabled={isPending}
             />
             <span style={{ textDecoration: todo.completed ? "line-through" : "none" }}>
               {todo.title}
@@ -99,33 +112,29 @@ server.tool(
 
 ## Form Submission
 
+`isPending` from `useCallTool` replaces manual `submitting` state:
+
 ```tsx
 import { useState } from "react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 export default function CreateItemWidget() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending: isLoading } = useWidget();
+  const { callTool, isPending } = useCallTool("create-todo");
   const [title, setTitle] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
-  if (isPending) {
+  if (isLoading) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!title.trim()) return;
 
-    setSubmitting(true);
-    try {
-      await callTool("create-todo", { title });
-      setTitle("");  // Clear form on success
-    } catch (error) {
-      console.error("Failed to create todo:", error);
-      alert("Failed to create todo");
-    } finally {
-      setSubmitting(false);
-    }
+    callTool({ title }, {
+      onSuccess: () => setTitle(""),
+      onError: () => alert("Failed to create todo"),
+    });
   };
 
   return (
@@ -137,11 +146,11 @@ export default function CreateItemWidget() {
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="New todo..."
-            disabled={submitting}
+            disabled={isPending}
             style={{ padding: 8, width: 300, marginRight: 8 }}
           />
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Creating..." : "Add Todo"}
+          <button type="submit" disabled={isPending}>
+            {isPending ? "Creating..." : "Add Todo"}
           </button>
         </form>
 
@@ -177,16 +186,14 @@ server.tool(
 ## Delete Action
 
 ```tsx
-const handleDelete = async (id: string) => {
-  if (!confirm("Are you sure you want to delete this item?")) {
-    return;
-  }
+const { callTool: deleteTodo, isPending: isDeleting } = useCallTool("delete-todo");
 
-  try {
-    await callTool("delete-todo", { id });
-  } catch (error) {
-    alert("Failed to delete item");
-  }
+const handleDelete = (id: string) => {
+  if (!confirm("Are you sure you want to delete this item?")) return;
+
+  deleteTodo({ id }, {
+    onError: () => alert("Failed to delete item"),
+  });
 };
 
 return (
@@ -195,7 +202,7 @@ return (
       {props.todos.map(todo => (
         <div key={todo.id} style={{ display: "flex", justifyContent: "space-between", padding: 8 }}>
           <span>{todo.title}</span>
-          <button onClick={() => handleDelete(todo.id)}>Delete</button>
+          <button onClick={() => handleDelete(todo.id)} disabled={isDeleting}>Delete</button>
         </div>
       ))}
     </div>
@@ -211,6 +218,7 @@ Update UI immediately, then call tool:
 
 ```tsx
 import { useState, useEffect } from "react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 interface Todo {
   id: string;
@@ -219,15 +227,15 @@ interface Todo {
 }
 
 export default function OptimisticWidget() {
-  const { props, isPending, callTool } = useWidget<{ todos: Todo[] }>();
+  const { props, isPending: isLoading } = useWidget<{ todos: Todo[] }>();
+  const { callToolAsync } = useCallTool("toggle-todo");
   const [todos, setTodos] = useState<Todo[]>([]);
 
-  // Sync todos from props once loaded
   useEffect(() => {
-    if (!isPending && props.todos) {
+    if (!isLoading && props.todos) {
       setTodos(props.todos);
     }
-  }, [isPending, props.todos]);
+  }, [isLoading, props.todos]);
 
   const handleToggle = async (id: string) => {
     // Optimistic update
@@ -236,16 +244,15 @@ export default function OptimisticWidget() {
     ));
 
     try {
-      // Call tool in background
-      await callTool("toggle-todo", { id });
-    } catch (error) {
+      await callToolAsync({ id });
+    } catch {
       // Revert on failure
       setTodos(props.todos);
       alert("Failed to update todo");
     }
   };
 
-  if (isPending) {
+  if (isLoading) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
   }
 
@@ -272,16 +279,13 @@ export default function OptimisticWidget() {
 
 ## Action Buttons
 
-Multiple actions per item:
+Multiple actions per item — declare a hook for each tool:
 
 ```tsx
-const handleAction = async (action: string, id: string) => {
-  try {
-    await callTool(action, { id });
-  } catch (error) {
-    alert(`Failed to ${action}`);
-  }
-};
+const { callTool: editItem } = useCallTool("edit-item");
+const { callTool: duplicateItem } = useCallTool("duplicate-item");
+const { callTool: archiveItem } = useCallTool("archive-item");
+const { callTool: deleteItem } = useCallTool("delete-item");
 
 return (
   <McpUseProvider autoSize>
@@ -292,19 +296,10 @@ return (
           <p>{item.description}</p>
 
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => handleAction("edit-item", item.id)}>
-              Edit
-            </button>
-            <button onClick={() => handleAction("duplicate-item", item.id)}>
-              Duplicate
-            </button>
-            <button onClick={() => handleAction("archive-item", item.id)}>
-              Archive
-            </button>
-            <button
-              onClick={() => handleAction("delete-item", item.id)}
-              style={{ color: "red" }}
-            >
+            <button onClick={() => editItem({ id: item.id })}>Edit</button>
+            <button onClick={() => duplicateItem({ id: item.id })}>Duplicate</button>
+            <button onClick={() => archiveItem({ id: item.id })}>Archive</button>
+            <button onClick={() => deleteItem({ id: item.id })} style={{ color: "red" }}>
               Delete
             </button>
           </div>
@@ -321,9 +316,11 @@ return (
 
 ```tsx
 import { useState } from "react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 export default function EditableList() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending: isLoading } = useWidget();
+  const { callToolAsync, isPending: isSaving } = useCallTool("update-item");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
@@ -334,9 +331,9 @@ export default function EditableList() {
 
   const saveEdit = async (id: string) => {
     try {
-      await callTool("update-item", { id, title: editValue });
+      await callToolAsync({ id, title: editValue });
       setEditingId(null);
-    } catch (error) {
+    } catch {
       alert("Failed to save");
     }
   };
@@ -346,7 +343,7 @@ export default function EditableList() {
     setEditValue("");
   };
 
-  if (isPending) {
+  if (isLoading) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
   }
 
@@ -363,7 +360,7 @@ export default function EditableList() {
                   onChange={e => setEditValue(e.target.value)}
                   autoFocus
                 />
-                <button onClick={() => saveEdit(item.id)}>Save</button>
+                <button onClick={() => saveEdit(item.id)} disabled={isSaving}>Save</button>
                 <button onClick={cancelEdit}>Cancel</button>
               </>
             ) : (
@@ -388,11 +385,15 @@ Select multiple items and act on them:
 
 ```tsx
 import { useState } from "react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 export default function BatchActions() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending: isLoading } = useWidget();
+  const { callTool: archiveItems, isPending: isArchiving } = useCallTool("archive-items");
+  const { callTool: deleteItems, isPending: isDeleting } = useCallTool("delete-items");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [processing, setProcessing] = useState(false);
+
+  const processing = isArchiving || isDeleting;
 
   const toggleSelection = (id: string) => {
     const newSelection = new Set(selectedIds);
@@ -404,51 +405,39 @@ export default function BatchActions() {
     setSelectedIds(newSelection);
   };
 
-  const handleBatchAction = async (action: string) => {
-    if (selectedIds.size === 0) return;
-
-    setProcessing(true);
-    try {
-      await callTool(action, {
-        ids: Array.from(selectedIds)
-      });
-      setSelectedIds(new Set());  // Clear selection
-    } catch (error) {
-      alert(`Failed to ${action}`);
-    } finally {
-      setProcessing(false);
-    }
+  const handleBatchArchive = () => {
+    archiveItems({ ids: Array.from(selectedIds) }, {
+      onSuccess: () => setSelectedIds(new Set()),
+      onError: () => alert("Failed to archive items"),
+    });
   };
 
-  if (isPending) {
+  const handleBatchDelete = () => {
+    deleteItems({ ids: Array.from(selectedIds) }, {
+      onSuccess: () => setSelectedIds(new Set()),
+      onError: () => alert("Failed to delete items"),
+    });
+  };
+
+  if (isLoading) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
   }
 
   return (
     <McpUseProvider autoSize>
       <div>
-        {/* Batch action buttons */}
         {selectedIds.size > 0 && (
           <div style={{ padding: 12, backgroundColor: "#f5f5f5", marginBottom: 16 }}>
             <span>{selectedIds.size} selected</span>
-            <button
-              onClick={() => handleBatchAction("archive-items")}
-              disabled={processing}
-              style={{ marginLeft: 8 }}
-            >
+            <button onClick={handleBatchArchive} disabled={processing} style={{ marginLeft: 8 }}>
               Archive
             </button>
-            <button
-              onClick={() => handleBatchAction("delete-items")}
-              disabled={processing}
-              style={{ marginLeft: 8 }}
-            >
+            <button onClick={handleBatchDelete} disabled={processing} style={{ marginLeft: 8 }}>
               Delete
             </button>
           </div>
         )}
 
-        {/* Item list */}
         {props.items.map(item => (
           <div key={item.id} style={{ padding: 8, display: "flex", gap: 8 }}>
             <input
@@ -485,32 +474,21 @@ server.tool(
 
 ## Handling Tool Errors
 
+Use `isError` and `error` from the hook instead of manual error state:
+
 ```tsx
-import { useState } from "react";
-
-const [error, setError] = useState<string | null>(null);
-
-const handleAction = async (toolName: string, params: any) => {
-  setError(null);  // Clear previous error
-
-  try {
-    await callTool(toolName, params);
-  } catch (err) {
-    // Display error to user
-    setError(err instanceof Error ? err.message : "Action failed");
-  }
-};
+const { callTool, isError, error, isPending } = useCallTool("some-tool");
 
 return (
   <McpUseProvider autoSize>
     <div>
-      {error && (
+      {isError && (
         <div style={{ padding: 12, backgroundColor: "#ffebee", color: "#c62828", marginBottom: 16 }}>
-          {error}
+          {error instanceof Error ? error.message : "Action failed"}
         </div>
       )}
 
-      <button onClick={() => handleAction("some-tool", { ... })}>
+      <button onClick={() => callTool({ /* params */ })} disabled={isPending}>
         Perform Action
       </button>
     </div>
@@ -520,18 +498,19 @@ return (
 
 ---
 
-## Loading States
+## Per-Item Loading States
 
-Show loading indicator during tool call:
+For per-item loading when sharing one hook instance, track the active ID separately:
 
 ```tsx
+const { callToolAsync } = useCallTool("process-item");
 const [loadingId, setLoadingId] = useState<string | null>(null);
 
 const handleAction = async (id: string) => {
   setLoadingId(id);
   try {
-    await callTool("process-item", { id });
-  } catch (error) {
+    await callToolAsync({ id });
+  } catch {
     alert("Failed");
   } finally {
     setLoadingId(null);
@@ -562,24 +541,24 @@ return (
 ## Confirmation Dialogs
 
 ```tsx
-const handleDelete = async (id: string, title: string) => {
-  const confirmed = confirm(`Are you sure you want to delete "${title}"?`);
+const { callTool: deleteItem } = useCallTool("delete-item");
 
-  if (!confirmed) return;
+const handleDelete = (id: string, title: string) => {
+  if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
 
-  try {
-    await callTool("delete-item", { id });
-  } catch (error) {
-    alert("Failed to delete");
-  }
+  deleteItem({ id }, {
+    onError: () => alert("Failed to delete"),
+  });
 };
 ```
 
-Or with custom dialog:
+Or with a custom dialog:
 
 ```tsx
 import { useState } from "react";
+import { useCallTool } from "mcp-use/react";
 
+const { callToolAsync } = useCallTool("delete-item");
 const [confirmDialog, setConfirmDialog] = useState<{ id: string; title: string } | null>(null);
 
 const handleDeleteClick = (id: string, title: string) => {
@@ -590,9 +569,9 @@ const handleConfirmDelete = async () => {
   if (!confirmDialog) return;
 
   try {
-    await callTool("delete-item", { id: confirmDialog.id });
+    await callToolAsync({ id: confirmDialog.id });
     setConfirmDialog(null);
-  } catch (error) {
+  } catch {
     alert("Failed to delete");
   }
 };
@@ -600,28 +579,18 @@ const handleConfirmDelete = async () => {
 return (
   <McpUseProvider autoSize>
     <div>
-      {/* Items */}
       {props.items.map(item => (
         <div key={item.id}>
           <span>{item.title}</span>
-          <button onClick={() => handleDeleteClick(item.id, item.title)}>
-            Delete
-          </button>
+          <button onClick={() => handleDeleteClick(item.id, item.title)}>Delete</button>
         </div>
       ))}
 
-      {/* Confirmation dialog */}
       {confirmDialog && (
         <div style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.5)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.5)", display: "flex",
+          alignItems: "center", justifyContent: "center"
         }}>
           <div style={{ backgroundColor: "white", padding: 24, borderRadius: 8 }}>
             <h3>Confirm Delete</h3>
@@ -642,59 +611,57 @@ return (
 
 ```tsx
 import { useState } from "react";
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
+
+const propsSchema = z.object({
+  todos: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    completed: z.boolean()
+  }))
+});
+
+type Props = z.infer<typeof propsSchema>;
 
 export const widgetMetadata: WidgetMetadata = {
   description: "Interactive todo list",
-  props: z.object({
-    todos: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      completed: z.boolean()
-    }))
-  }),
+  props: propsSchema,
   exposeAsTool: false
 };
 
 export default function InteractiveTodoList() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending: isLoading } = useWidget<Props>();
+  const { callTool: createTodo, isPending: isCreating } = useCallTool("create-todo");
+  const { callTool: toggleTodo } = useCallTool("toggle-todo");
+  const { callTool: deleteTodo } = useCallTool("delete-todo");
   const [newTodo, setNewTodo] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  if (isPending) {
+  if (isLoading) {
     return <McpUseProvider autoSize><div>Loading todos...</div></McpUseProvider>;
   }
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
 
-    setSubmitting(true);
-    try {
-      await callTool("create-todo", { title: newTodo });
-      setNewTodo("");
-    } catch (error) {
-      alert("Failed to create todo");
-    } finally {
-      setSubmitting(false);
-    }
+    createTodo({ title: newTodo }, {
+      onSuccess: () => setNewTodo(""),
+      onError: () => alert("Failed to create todo"),
+    });
   };
 
-  const handleToggle = async (id: string, completed: boolean) => {
-    await callTool("toggle-todo", { id, completed: !completed });
+  const handleToggle = (id: string, completed: boolean) => {
+    toggleTodo({ id, completed: !completed });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     setDeletingId(id);
-    try {
-      await callTool("delete-todo", { id });
-    } catch (error) {
-      alert("Failed to delete");
-    } finally {
-      setDeletingId(null);
-    }
+    deleteTodo({ id }, {
+      onError: () => alert("Failed to delete"),
+      onSettled: () => setDeletingId(null),
+    });
   };
 
   return (
@@ -702,32 +669,27 @@ export default function InteractiveTodoList() {
       <div style={{ padding: 20 }}>
         <h2>Todos ({props.todos.length})</h2>
 
-        {/* Create form */}
         <form onSubmit={handleCreate} style={{ marginBottom: 16 }}>
           <input
             type="text"
             value={newTodo}
             onChange={e => setNewTodo(e.target.value)}
             placeholder="New todo..."
-            disabled={submitting}
+            disabled={isCreating}
             style={{ padding: 8, width: 300, marginRight: 8 }}
           />
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Adding..." : "Add"}
+          <button type="submit" disabled={isCreating}>
+            {isCreating ? "Adding..." : "Add"}
           </button>
         </form>
 
-        {/* Todo list */}
         <div>
           {props.todos.map(todo => (
             <div
               key={todo.id}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: 8,
-                borderBottom: "1px solid #eee"
+                display: "flex", alignItems: "center", gap: 8,
+                padding: 8, borderBottom: "1px solid #eee"
               }}
             >
               <input
@@ -766,12 +728,13 @@ export default function InteractiveTodoList() {
 
 ## Best Practices
 
-1. **Always handle errors** - Wrap callTool in try/catch
-2. **Show loading states** - Disable buttons, show spinners
-3. **Provide feedback** - Success messages, error alerts
-4. **Optimistic updates** - Update UI before server response for snappy UX
-5. **Confirm destructive actions** - Use confirm() for deletes
-6. **Clear forms on success** - Reset input after successful submission
+1. **Use `useCallTool` for built-in state management** - No need for manual `isPending`/`error` state
+2. **Declare hooks at the top level** - One hook per tool name; React rules apply
+3. **Use `callTool` for fire-and-forget** - Handle success/error via callbacks
+4. **Use `callToolAsync` for sequential operations** - When you need to await results or chain calls
+5. **Use `isError`/`error` from the hook** - Instead of manual error state for single-tool widgets
+6. **Optimistic updates** - Update local state before the call, revert on error
+7. **Confirm destructive actions** - Use confirm() for deletes
 
 ---
 

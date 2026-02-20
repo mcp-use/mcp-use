@@ -101,7 +101,7 @@ Load these before diving into tools/resources/widgets sections.
 
 - **[interactivity.md](references/widgets/interactivity.md)**
   - When: Adding buttons, forms, or calling tools from within widgets
-  - Covers: `callTool()`, form handling, action buttons, optimistic updates
+  - Covers: `useCallTool()`, form handling, action buttons, optimistic updates
 
 - **[ui-guidelines.md](references/widgets/ui-guidelines.md)**
   - When: Styling widgets to support themes, responsive layouts, or accessibility
