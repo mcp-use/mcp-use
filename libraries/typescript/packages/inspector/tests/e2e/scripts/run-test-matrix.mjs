@@ -54,6 +54,16 @@ const conformanceServerDir = resolve(
 const childProcesses = [];
 let cdnServer = null;
 
+// Simple HTML escape to safely include user input in responses
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Cleanup handler
 function cleanup() {
   console.log("\n🧹 Cleaning up processes...");
@@ -122,7 +132,7 @@ function startLocalCdnServer(cdnDistDir) {
         res.end(data);
       } catch {
         res.writeHead(404);
-        res.end(`Not found: ${urlPath}`);
+        res.end(`Not found: ${escapeHtml(urlPath)}`);
       }
     });
 
