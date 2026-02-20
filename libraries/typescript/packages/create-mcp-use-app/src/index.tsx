@@ -606,12 +606,28 @@ program
           }
         }
 
-        // Ask to install dependencies if not explicitly set
+        // Ask to install skills if not explicitly set
         console.log("");
-        const shouldInstall =
-          options.install !== undefined
-            ? options.install
-            : await promptForInstall();
+        const shouldInstallSkills =
+          options.skills !== undefined
+            ? options.skills
+            : await promptForSkillsPresets();
+        let skillsInstalled = false;
+        if (shouldInstallSkills) {
+          console.log("");
+          console.log(chalk.cyan("📚 Installing skills..."));
+          try {
+            await addSkillsToProject(projectPath);
+            skillsInstalled = true;
+            console.log(chalk.green("✅ Skills installed successfully!"));
+          } catch (err) {
+            console.log(
+              chalk.yellow(
+                "⚠️  Skills install failed. Run `npx skills add mcp-use/mcp-use` manually in root directory."
+              )
+            );
+          }
+        }
 
         // Determine which package manager to use
         let usedPackageManager = "npm";
@@ -629,146 +645,61 @@ program
           if (detected) {
             usedPackageManager = detected;
           } else {
-            // No flag and couldn't detect, try in order: yarn → npm → pnpm
-            const defaultOrder = ["yarn", "npm", "pnpm"];
+            // No flag and couldn't detect, try in order: npm → pnpm → yarn
+            const defaultOrder = ["npm", "pnpm", "yarn"];
             // We'll determine the working one during installation
             usedPackageManager = defaultOrder[0];
           }
         }
 
+        // Ask to install dependencies if not explicitly set
+        console.log("");
+        const shouldInstall =
+          options.install !== undefined
+            ? options.install
+            : await promptForInstall(usedPackageManager);
+
         // Install dependencies if requested or chosen via prompt
         if (shouldInstall) {
-          // Always show a message before installing
           console.log("");
           console.log(chalk.cyan("📦 Installing dependencies..."));
           console.log("");
 
-          // Yarn and npm show their own progress, so we don't need a spinner for them
-          const showSpinner =
-            usedPackageManager !== "yarn" && usedPackageManager !== "npm";
-          const spinner = showSpinner
-            ? ora("Installing packages...").start()
-            : null;
+          const isKnownManager =
+            options.yarn ||
+            options.npm ||
+            options.pnpm ||
+            detectPackageManager();
+          const managersToTry = isKnownManager
+            ? [usedPackageManager]
+            : ["npm", "pnpm", "yarn"];
 
-          try {
-            if (
-              options.yarn ||
-              options.npm ||
-              options.pnpm ||
-              detectPackageManager()
-            ) {
-              // Use the specific package manager with optimized flags
-              await runPackageManager(
-                usedPackageManager,
-                getInstallArgs(usedPackageManager),
-                projectPath
+          let installed = false;
+          for (const pm of managersToTry) {
+            const spinner = ora(`Installing packages with ${pm}... `).start();
+            try {
+              await runPackageManager(pm, getInstallArgs(pm), projectPath);
+              usedPackageManager = pm;
+              spinner.succeed(`Packages installed successfully with ${pm}`);
+              installed = true;
+              break;
+            } catch {
+              const remaining = managersToTry.slice(
+                managersToTry.indexOf(pm) + 1
               );
-              if (spinner) {
-                spinner.succeed(
-                  `Packages installed successfully with ${usedPackageManager}`
+              if (remaining.length > 0) {
+                spinner.warn(
+                  `${pm} not available, trying ${remaining[0]}...`
                 );
               } else {
-                console.log("");
-                console.log(
-                  chalk.green("✅ Dependencies installed successfully!")
-                );
-                console.log("");
-              }
-            } else {
-              // Try in order: yarn → npm → pnpm
-              if (spinner)
-                spinner.text = "Installing packages (trying yarn)...";
-              try {
-                await runPackageManager(
-                  "yarn",
-                  getInstallArgs("yarn"),
-                  projectPath
-                );
-                usedPackageManager = "yarn";
-                if (spinner) {
-                  spinner.succeed("Packages installed successfully with yarn");
-                } else {
-                  console.log("");
-                  console.log(
-                    chalk.green(
-                      "✅ Dependencies installed successfully with yarn!"
-                    )
-                  );
-                  console.log("");
-                }
-              } catch {
-                if (spinner) spinner.text = "yarn not found, trying npm...";
-                try {
-                  await runPackageManager(
-                    "npm",
-                    getInstallArgs("npm"),
-                    projectPath
-                  );
-                  usedPackageManager = "npm";
-                  if (spinner) {
-                    spinner.succeed("Packages installed successfully with npm");
-                  } else {
-                    console.log("");
-                    console.log(
-                      chalk.green(
-                        "✅ Dependencies installed successfully with npm!"
-                      )
-                    );
-                    console.log("");
-                  }
-                } catch {
-                  if (spinner) spinner.text = "npm not found, trying pnpm...";
-                  await runPackageManager(
-                    "pnpm",
-                    getInstallArgs("pnpm"),
-                    projectPath
-                  );
-                  usedPackageManager = "pnpm";
-                  if (spinner) {
-                    spinner.succeed(
-                      "Packages installed successfully with pnpm"
-                    );
-                  } else {
-                    console.log("");
-                    console.log(
-                      chalk.green(
-                        "✅ Dependencies installed successfully with pnpm!"
-                      )
-                    );
-                    console.log("");
-                  }
-                }
+                spinner.fail("Package installation failed");
               }
             }
-          } catch (error) {
-            if (spinner) {
-              spinner.fail("Package installation failed");
-            } else {
-              console.log("❌ Package installation failed");
-            }
+          }
+
+          if (!installed) {
             console.log(
               '⚠️  Please run "npm install", "yarn install", or "pnpm install" manually'
-            );
-          }
-        }
-
-        // Ask to install skills if not explicitly set
-        console.log("");
-        const shouldInstallSkills =
-          options.skills !== undefined
-            ? options.skills
-            : await promptForSkillsPresets();
-        if (shouldInstallSkills) {
-          console.log("");
-          console.log(chalk.cyan("📚 Installing skills..."));
-          try {
-            await addSkillsToProject(projectPath);
-            console.log(chalk.green("✅ Skills installed successfully!"));
-          } catch (err) {
-            console.log(
-              chalk.yellow(
-                "⚠️  Skills install failed. Run `npx skills add mcp-use/mcp-use` manually in root directory."
-              )
             );
           }
         }
@@ -784,31 +715,46 @@ program
           );
         } else if (options.canary) {
           console.log(
-            chalk.blue("🚀 Canary mode: Using canary versions of packages")
+            chalk.cyan("🚀 Canary mode: Using canary versions of packages")
           );
         }
         console.log("");
         console.log(chalk.bold("📁 Project structure:"));
         console.log(`   ${sanitizedProjectName}/`);
-        if (validatedTemplate === "mcp-apps") {
+        if (skillsInstalled) {
+          console.log("   ├── .agent/skills/");
+          console.log("   ├── .claude/skills/");
+          console.log("   ├── .cursor/skills/");
+        }
+        if (validatedTemplate === "blank") {
+          console.log("   ├── public/");
+          console.log("   ├── index.ts (server entry point)");
+          console.log("   ├── package.json");
+          console.log("   ├── tsconfig.json");
+          console.log("   └── README.md");
+        } else if (validatedTemplate === "mcp-apps") {
+          console.log("   ├── public/");
+          console.log("   ├── resources/");
+          console.log("   │   └── product-search-result/");
+          console.log("   │       └── widget.tsx");
+          console.log("   ├── index.ts (server entry point)");
+          console.log("   ├── package.json");
+          console.log("   ├── tsconfig.json");
+          console.log("   └── README.md");
+        } else if (validatedTemplate === "starter") {
+          console.log("   ├── public/");
           console.log("   ├── resources/");
           console.log("   │   └── display-weather.tsx");
+          console.log("   ├── index.ts (server entry point)");
+          console.log("   ├── package.json");
+          console.log("   ├── tsconfig.json");
+          console.log("   └── README.md");
+        } else {
+          console.log("   ├── index.ts (server entry point)");
+          console.log("   ├── package.json");
+          console.log("   ├── tsconfig.json");
+          console.log("   └── README.md");
         }
-        if (validatedTemplate === "mcp-ui") {
-          console.log("   ├── resources/");
-          console.log("   │   └── kanban-board.tsx");
-        }
-        if (validatedTemplate === "starter") {
-          console.log("   ├── resources/");
-          console.log("   │   └── kanban-board.tsx (MCP-UI example)");
-          console.log(
-            "   │   └── display-weather.tsx (OpenAI Apps SDK example)"
-          );
-        }
-        console.log("   ├── index.ts (server entry point)");
-        console.log("   ├── package.json");
-        console.log("   ├── tsconfig.json");
-        console.log("   └── README.md");
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
         console.log(chalk.cyan(`   cd ${sanitizedProjectName}`));
@@ -839,11 +785,11 @@ program
           );
           console.log("");
         }
-        console.log(chalk.blue("📚 Learn more: https://mcp-use.com/docs"));
+        console.log(chalk.cyan("📚 Learn more: https://manufact.com/docs"));
         console.log(chalk.gray("💬 For feedback and bug reporting visit:"));
         console.log(
           chalk.gray(
-            "   https://github.com/mcp-use/mcp-use or https://mcp-use.com"
+            "   https://github.com/mcp-use/mcp-use or https://manufact.com"
           )
         );
       } catch (error) {
@@ -1224,7 +1170,7 @@ function updateIndexTs(projectPath: string, projectName: string) {
 }
 
 // Ink component for install dependencies prompt (Y/n)
-function InstallPrompt({ onSubmit }: { onSubmit: (install: boolean) => void }) {
+function InstallPrompt({ packageManager, onSubmit }: { packageManager: string; onSubmit: (install: boolean) => void }) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (val: string) => {
@@ -1239,7 +1185,7 @@ function InstallPrompt({ onSubmit }: { onSubmit: (install: boolean) => void }) {
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>Install dependencies now? (Y/n)</Text>
+        <Text bold>Install dependencies with {packageManager}? (Y/n)</Text>
       </Box>
       <Box>
         <Text color="cyan">❯ </Text>
@@ -1249,10 +1195,11 @@ function InstallPrompt({ onSubmit }: { onSubmit: (install: boolean) => void }) {
   );
 }
 
-async function promptForInstall(): Promise<boolean> {
+async function promptForInstall(packageManager: string): Promise<boolean> {
   return new Promise((resolve) => {
     const { unmount } = render(
       <InstallPrompt
+        packageManager={packageManager}
         onSubmit={(install) => {
           unmount();
           resolve(install);
@@ -1282,7 +1229,7 @@ function SkillsPresetPrompt({
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>Install skills (Recommended)? (Y/n)</Text>
+        <Text bold>Install AI coding skills for Cursor, Claude Code, and Codex? (Recommended) (Y/n)</Text>
       </Box>
       <Box>
         <Text color="cyan">❯ </Text>
@@ -1422,6 +1369,17 @@ function TemplateSelector({
 
   return (
     <Box flexDirection="column">
+      <Box flexDirection="column" marginTop={1} marginBottom={1}>
+        <Text color="white" bold>{" ███╗   ███╗   ██████╗  ██████╗         ██╗   ██╗  ███████╗  ███████╗"}</Text>
+        <Text color="white" bold>{" ████╗ ████║  ██╔════╝  ██╔══██╗        ██║   ██║  ██╔════╝  ██╔════╝"}</Text>
+        <Text color="white" bold>{" ██╔████╔██║  ██║       ██████╔╝  ━━━━  ██║   ██║  ███████╗  █████╗  "}</Text>
+        <Text color="white" bold>{" ██║╚██╔╝██║  ██║       ██╔═══╝   ━━━━  ██║   ██║  ╚════██║  ██╔══╝  "}</Text>
+        <Text color="white" bold>{" ██║ ╚═╝ ██║  ╚██████╗  ██║             ╚██████╔╝  ███████║  ███████╗"}</Text>
+        <Text color="white" bold>{" ╚═╝     ╚═╝   ╚═════╝  ╚═╝              ╚═════╝   ╚══════╝  ╚══════╝"}</Text>
+      </Box>
+      <Box marginBottom={2}>
+        <Text color="white" bold>{" by Manufact"}</Text>
+      </Box>
       <Box marginBottom={1}>
         <Text bold>Select a template:</Text>
       </Box>
@@ -1429,6 +1387,12 @@ function TemplateSelector({
         items={items}
         initialIndex={initialIndex}
         onSelect={(item) => onSelect(item.value)}
+        indicatorComponent={({ isSelected }) => (
+          <Text color="cyan">{isSelected ? "❯ " : "  "}</Text>
+        )}
+        itemComponent={({ isSelected, label }) => (
+          <Text color={isSelected ? "cyan" : undefined}>{label}</Text>
+        )}
       />
     </Box>
   );
