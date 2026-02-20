@@ -688,9 +688,7 @@ program
                 managersToTry.indexOf(pm) + 1
               );
               if (remaining.length > 0) {
-                spinner.warn(
-                  `${pm} not available, trying ${remaining[0]}...`
-                );
+                spinner.warn(`${pm} not available, trying ${remaining[0]}...`);
               } else {
                 spinner.fail("Package installation failed");
               }
@@ -1170,7 +1168,13 @@ function updateIndexTs(projectPath: string, projectName: string) {
 }
 
 // Ink component for install dependencies prompt (Y/n)
-function InstallPrompt({ packageManager, onSubmit }: { packageManager: string; onSubmit: (install: boolean) => void }) {
+function InstallPrompt({
+  packageManager,
+  onSubmit,
+}: {
+  packageManager: string;
+  onSubmit: (install: boolean) => void;
+}) {
   const [value, setValue] = useState("");
 
   const handleSubmit = (val: string) => {
@@ -1229,7 +1233,10 @@ function SkillsPresetPrompt({
   return (
     <Box flexDirection="column">
       <Box marginBottom={1}>
-        <Text bold>Install AI coding skills for Cursor, Claude Code, and Codex? (Recommended) (Y/n)</Text>
+        <Text bold>
+          Install AI coding skills for Cursor, Claude Code, and Codex?
+          (Recommended) (Y/n)
+        </Text>
       </Box>
       <Box>
         <Text color="cyan">❯ </Text>
@@ -1370,15 +1377,41 @@ function TemplateSelector({
   return (
     <Box flexDirection="column">
       <Box flexDirection="column" marginTop={1} marginBottom={1}>
-        <Text color="white" bold>{" ███╗   ███╗   ██████╗  ██████╗         ██╗   ██╗  ███████╗  ███████╗"}</Text>
-        <Text color="white" bold>{" ████╗ ████║  ██╔════╝  ██╔══██╗        ██║   ██║  ██╔════╝  ██╔════╝"}</Text>
-        <Text color="white" bold>{" ██╔████╔██║  ██║       ██████╔╝  ━━━━  ██║   ██║  ███████╗  █████╗  "}</Text>
-        <Text color="white" bold>{" ██║╚██╔╝██║  ██║       ██╔═══╝   ━━━━  ██║   ██║  ╚════██║  ██╔══╝  "}</Text>
-        <Text color="white" bold>{" ██║ ╚═╝ ██║  ╚██████╗  ██║             ╚██████╔╝  ███████║  ███████╗"}</Text>
-        <Text color="white" bold>{" ╚═╝     ╚═╝   ╚═════╝  ╚═╝              ╚═════╝   ╚══════╝  ╚══════╝"}</Text>
+        <Text color="white" bold>
+          {
+            " ███╗   ███╗   ██████╗  ██████╗         ██╗   ██╗  ███████╗  ███████╗"
+          }
+        </Text>
+        <Text color="white" bold>
+          {
+            " ████╗ ████║  ██╔════╝  ██╔══██╗        ██║   ██║  ██╔════╝  ██╔════╝"
+          }
+        </Text>
+        <Text color="white" bold>
+          {
+            " ██╔████╔██║  ██║       ██████╔╝  ━━━━  ██║   ██║  ███████╗  █████╗  "
+          }
+        </Text>
+        <Text color="white" bold>
+          {
+            " ██║╚██╔╝██║  ██║       ██╔═══╝   ━━━━  ██║   ██║  ╚════██║  ██╔══╝  "
+          }
+        </Text>
+        <Text color="white" bold>
+          {
+            " ██║ ╚═╝ ██║  ╚██████╗  ██║             ╚██████╔╝  ███████║  ███████╗"
+          }
+        </Text>
+        <Text color="white" bold>
+          {
+            " ╚═╝     ╚═╝   ╚═════╝  ╚═╝              ╚═════╝   ╚══════╝  ╚══════╝"
+          }
+        </Text>
       </Box>
       <Box marginBottom={2}>
-        <Text color="white" bold>{" by Manufact"}</Text>
+        <Text color="white" bold>
+          {" by Manufact"}
+        </Text>
       </Box>
       <Box marginBottom={1}>
         <Text bold>Select a template:</Text>
