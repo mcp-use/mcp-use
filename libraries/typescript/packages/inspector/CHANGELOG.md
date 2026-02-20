@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.22.0-canary.4
+
+### Patch Changes
+
+- 76f10ec: Fix(docs): updated docs to remove outdated information
+- Updated dependencies [76f10ec]
+  - mcp-use@1.20.0-canary.4
+
 ## 0.22.0-canary.3
 
 ### Minor Changes

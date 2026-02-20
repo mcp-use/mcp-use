@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.0-canary.2
+
+### Patch Changes
+
+- 76f10ec: Fix(docs): updated docs to remove outdated information
+
 ## 0.14.0-canary.1
 
 ### Minor Changes
