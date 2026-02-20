@@ -490,7 +490,7 @@ export function useAutoConnect({
       return;
     }
 
-    // Handle failed connection - show error and navigate home
+    // Handle failed connection - show error but keep the tile visible in failed state
     // Note: useMcp's autoProxyFallback will have already tried proxy fallback internally
     if (connection?.state === "failed") {
       console.warn("[useAutoConnect] Connection failed after all retries");
@@ -500,16 +500,13 @@ export function useAutoConnect({
       );
 
       // Defer state updates to avoid updating during render
+      // Do NOT remove the connection or navigate away - leave the tile in failed state
       queueMicrotask(() => {
-        removeConnection(connection.id);
         setIsAutoConnecting(false);
         setAutoConnectConfig(null);
-
-        // Navigate to home page after connection failure
-        navigate("/");
       });
     }
-  }, [connections, autoConnectConfig, removeConnection, navigate]);
+  }, [connections, autoConnectConfig, navigate]);
 
   // Clear loading state for connections that complete without retry
   useEffect(() => {

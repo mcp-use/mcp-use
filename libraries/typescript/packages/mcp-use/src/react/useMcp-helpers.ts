@@ -101,6 +101,7 @@ export function startConnectionHealthMonitoring(params: {
   gatewayUrl?: string;
   url?: string;
   allHeaders?: Record<string, string>;
+  getAuthHeaders?: () => Promise<Record<string, string>>;
   isMountedRef: { current: boolean };
   stateRef: { current: string };
   autoReconnectRef: { current: boolean | number };
@@ -131,9 +132,12 @@ export function startConnectionHealthMonitoring(params: {
         return;
       }
 
+      const authHeaders = params.getAuthHeaders
+        ? await params.getAuthHeaders()
+        : {};
       const response = await fetch(healthCheckUrl, {
         method: "HEAD",
-        headers: params.allHeaders,
+        headers: { ...params.allHeaders, ...authHeaders },
         signal: AbortSignal.timeout(5000),
       });
 

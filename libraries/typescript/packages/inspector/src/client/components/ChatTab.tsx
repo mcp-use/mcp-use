@@ -1,6 +1,12 @@
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
@@ -10,6 +16,7 @@ import { ChatLandingForm } from "./chat/ChatLandingForm";
 import { ConfigurationDialog } from "./chat/ConfigurationDialog";
 import { ConfigureEmptyState } from "./chat/ConfigureEmptyState";
 import { MessageList } from "./chat/MessageList";
+import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
@@ -88,9 +95,19 @@ export function ChatTab({
   const [quickQuestions, setQuickQuestions] =
     useState<string[]>(chatQuickQuestions);
   const [followups, setFollowups] = useState<string[]>(chatFollowups);
+  const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
+
+  const toolInfos: ToolInfo[] = useMemo(
+    () =>
+      (connection.tools ?? []).map((t) => ({
+        name: t.name,
+        description: t.description,
+      })),
+    [connection.tools]
+  );
 
   // Use custom hooks for configuration, chat messages and mcp prompts handling
   const {
@@ -123,6 +140,7 @@ export function ChatTab({
     isConnected,
     readResource,
     widgetModelContexts,
+    disabledTools,
   };
 
   const serverSideChat = useChatMessages({
@@ -564,6 +582,9 @@ export function ChatTab({
           selectedPrompt={selectedPrompt}
           promptResults={results}
           attachments={attachments}
+          tools={toolInfos}
+          disabledTools={disabledTools}
+          onDisabledToolsChange={setDisabledTools}
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
@@ -643,6 +664,9 @@ export function ChatTab({
           promptResults={results}
           selectedPrompt={selectedPrompt}
           attachments={attachments}
+          tools={toolInfos}
+          disabledTools={disabledTools}
+          onDisabledToolsChange={setDisabledTools}
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
