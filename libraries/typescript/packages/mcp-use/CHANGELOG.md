@@ -1,5 +1,22 @@
 # mcp-use
 
+## 1.20.2
+
+### Patch Changes
+
+- 455c18f: feat(mcp-use): enhance health monitoring with dynamic authentication headers
+  - Added `getAuthHeaders` parameter to `startConnectionHealthMonitoring` for customizable authentication headers during health checks.
+  - Implemented logic to fetch and include authorization headers in the health check request, improving security and flexibility.
+  - Updated `useMcp` to provide a default implementation for `getAuthHeaders`, ensuring seamless integration with authentication providers.
+  - Modified middleware to allow HEAD requests without authentication, facilitating health checks and keep-alive functionality.
+
+- 455c18f: Add `exposeResourcesAsTools` and `exposePromptsAsTools` options to `MCPAgentOptions` (both default to `true` for backward compatibility). The inspector chat tab now sets both to `false`, so the agent only exposes actual MCP tools to the LLM rather than fabricating tool wrappers for resources and prompts.
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+  - @mcp-use/inspector@0.22.2
+  - @mcp-use/cli@2.15.2
+
 ## 1.20.2-canary.0
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.15.2
+
+### Patch Changes
+
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+  - mcp-use@1.20.2
+  - @mcp-use/inspector@0.22.2
+
 ## 2.15.2-canary.0
 
 ### Patch Changes
