@@ -768,7 +768,8 @@ export function InspectorDashboard() {
                         </TooltipContent>
                       </Tooltip>
                       {(connection.state === "ready" ||
-                        connection.state === "failed") && (
+                        connection.state === "failed" ||
+                        connection.state === "discovering") && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -789,7 +790,9 @@ export function InspectorDashboard() {
                             <p>
                               {connection.state === "failed"
                                 ? "Retry connection"
-                                : "Resync connection"}
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -838,7 +841,8 @@ export function InspectorDashboard() {
                             Edit connection settings
                           </DropdownMenuItem>
                           {(connection.state === "ready" ||
-                            connection.state === "failed") && (
+                            connection.state === "failed" ||
+                            connection.state === "discovering") && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -848,7 +852,9 @@ export function InspectorDashboard() {
                               <RotateCcw className="h-4 w-4 mr-2" />
                               {connection.state === "failed"
                                 ? "Retry connection"
-                                : "Resync connection"}
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem

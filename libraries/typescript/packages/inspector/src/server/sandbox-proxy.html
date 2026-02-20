@@ -110,6 +110,11 @@
         const baseUriDomains = (csp.baseUriDomains || [])
           .map(sanitizeDomain)
           .filter(Boolean);
+        const scriptDirectives = (csp.scriptDirectives || []).filter(
+          function (d) {
+            return typeof d === "string" && d.length > 0;
+          }
+        );
 
         // connect-src: Only allow declared domains, or 'none' if empty
         const connectSrc =
@@ -129,9 +134,13 @@
         const baseUri =
           baseUriDomains.length > 0 ? baseUriDomains.join(" ") : "'none'";
 
+        const scriptSrcParts = ["'unsafe-inline'", resourceSrc];
+        if (scriptDirectives.length > 0)
+          scriptSrcParts.push(scriptDirectives.join(" "));
+
         return [
           "default-src 'none'",
-          "script-src 'unsafe-inline' " + resourceSrc,
+          "script-src " + scriptSrcParts.join(" "),
           "style-src 'unsafe-inline' " + resourceSrc,
           "img-src " + resourceSrc,
           "font-src " + resourceSrc,

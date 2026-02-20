@@ -91,7 +91,9 @@ export function MCPAppsDebugControls({
   protocol = "mcp-apps",
   onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
-  const { playground, updatePlaygroundSettings } = useWidgetDebug();
+  const { playground, updatePlaygroundSettings, widgets, clearCspViolations } =
+    useWidgetDebug();
+  const cspViolations = widgets.get(toolCallId)?.cspViolations ?? [];
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
   const isAppsSdk = protocol === "apps-sdk";
@@ -424,79 +426,114 @@ export function MCPAppsDebugControls({
         </Dialog>
       )}
 
-      {/* CSP Mode - only for MCP Apps (rendering concern, not widget API) */}
-      {!isAppsSdk && (
-        <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button
-                  data-testid="debugger-csp-button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+      {/* CSP Mode — shown for both MCP Apps and Apps SDK */}
+      <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button
+                data-testid="debugger-csp-button"
+                variant="outline"
+                size="sm"
+                className="relative h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              >
+                {playground.cspMode === "permissive" ? (
+                  <ShieldOff className="size-3.5" />
+                ) : (
+                  <ShieldCheck className="size-3.5" />
+                )}
+                {cspViolations.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white leading-none">
+                    {cspViolations.length > 99 ? "99+" : cspViolations.length}
+                  </span>
+                )}
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            CSP:{" "}
+            {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
+            {cspViolations.length > 0 && ` · ${cspViolations.length} blocked`}
+          </TooltipContent>
+        </Tooltip>
+        <DialogContent
+          className="sm:max-w-[420px]"
+          data-testid="debugger-csp-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>CSP Mode</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Button
+              data-testid="debugger-csp-option-permissive"
+              variant={
+                playground.cspMode === "permissive" ? "default" : "outline"
+              }
+              className="w-full justify-start"
+              onClick={() => {
+                updatePlaygroundSettings({ cspMode: "permissive" });
+                setCspDialogOpen(false);
+              }}
+            >
+              <ShieldOff className="size-4 mr-2" />
+              <div className="flex flex-col items-start">
+                <span>Permissive</span>
+              </div>
+            </Button>
+            <Button
+              data-testid="debugger-csp-option-widget-declared"
+              variant={
+                playground.cspMode === "widget-declared" ? "default" : "outline"
+              }
+              className="w-full justify-start"
+              onClick={() => {
+                updatePlaygroundSettings({ cspMode: "widget-declared" });
+                setCspDialogOpen(false);
+              }}
+            >
+              <ShieldCheck className="size-4 mr-2" />
+              <div className="flex flex-col items-start">
+                <span>Widget-Declared</span>
+              </div>
+            </Button>
+          </div>
+
+          {/* CSP Violations panel */}
+          {cspViolations.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide">
+                  {cspViolations.length} blocked request
+                  {cspViolations.length !== 1 ? "s" : ""}
+                </span>
+                <button
+                  className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 underline"
+                  onClick={() => clearCspViolations(toolCallId)}
                 >
-                  {playground.cspMode === "permissive" ? (
-                    <ShieldOff className="size-3.5" />
-                  ) : (
-                    <ShieldCheck className="size-3.5" />
-                  )}
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent>
-              CSP:{" "}
-              {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
-            </TooltipContent>
-          </Tooltip>
-          <DialogContent
-            className="sm:max-w-[300px]"
-            data-testid="debugger-csp-dialog"
-          >
-            <DialogHeader>
-              <DialogTitle>CSP Mode</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Button
-                data-testid="debugger-csp-option-permissive"
-                variant={
-                  playground.cspMode === "permissive" ? "default" : "outline"
-                }
-                className="w-full justify-start"
-                onClick={() => {
-                  updatePlaygroundSettings({ cspMode: "permissive" });
-                  setCspDialogOpen(false);
-                }}
-              >
-                <ShieldOff className="size-4 mr-2" />
-                <div className="flex flex-col items-start">
-                  <span>Permissive</span>
-                  <span className="text-xs opacity-70">Development</span>
-                </div>
-              </Button>
-              <Button
-                data-testid="debugger-csp-option-widget-declared"
-                variant={
-                  playground.cspMode === "widget-declared"
-                    ? "default"
-                    : "outline"
-                }
-                className="w-full justify-start"
-                onClick={() => {
-                  updatePlaygroundSettings({ cspMode: "widget-declared" });
-                  setCspDialogOpen(false);
-                }}
-              >
-                <ShieldCheck className="size-4 mr-2" />
-                <div className="flex flex-col items-start">
-                  <span>Widget-Declared</span>
-                  <span className="text-xs opacity-70">Production</span>
-                </div>
-              </Button>
+                  Clear
+                </button>
+              </div>
+              <div className="max-h-56 overflow-y-auto space-y-1 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-2">
+                {cspViolations.map((v, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-0.5 py-1 border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="shrink-0 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-mono font-semibold text-red-700 dark:text-red-300">
+                        {v.effectiveDirective || v.directive}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 break-all leading-snug">
+                      {v.blockedUri || "(inline)"}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Capabilities - Touch */}
       <Tooltip>

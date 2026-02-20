@@ -144,7 +144,7 @@ function OpenAIComponentRendererBase({
   const server = servers.find((connection) => connection.id === serverId);
   const serverBaseUrl = serverBaseUrlProp ?? server?.url;
   const { resolvedTheme } = useTheme();
-  const { playground } = useWidgetDebug();
+  const { playground, addWidget, addCspViolation } = useWidgetDebug();
 
   // Refs to hold latest values without triggering effect re-runs
   // This prevents infinite loops caused by object/function reference changes
@@ -286,6 +286,8 @@ function OpenAIComponentRendererBase({
           hasSetWidgetUrlRef.current = true;
           const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
           setWidgetUrl(widgetUrl);
+          // Register widget in debug context so CSP violations can be stored
+          addWidget(toolId, { toolName, protocol: "chatgpt-app" });
         }
         setIsSameOrigin(computedIsSameOrigin);
       } catch (error) {
@@ -603,6 +605,18 @@ function OpenAIComponentRendererBase({
       }
 
       switch (event.data.type) {
+        case "openai:csp-violation":
+          addCspViolation(toolId, {
+            directive: event.data.directive,
+            effectiveDirective: event.data.effectiveDirective,
+            blockedUri: event.data.blockedUri,
+            sourceFile: event.data.sourceFile,
+            lineNumber: event.data.lineNumber,
+            columnNumber: event.data.columnNumber,
+            timestamp: event.data.timestamp || Date.now(),
+          });
+          break;
+
         case "openai:setWidgetState":
           try {
             // Widget state is already handled by the server-injected script

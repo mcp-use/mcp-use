@@ -460,9 +460,12 @@ export function createWidgetRegistration(
         dev: isDev,
         exposeAsTool: exposeAsTool,
       },
-      ui: {
-        ...(props && Object.keys(props).length > 0 ? { props } : {}),
-      },
+      ui: {},
+      // mcp-use private extension: props schema for inspector PropsConfigDialog.
+      // Not part of SEP-1865; other hosts will ignore this key.
+      ...(props && Object.keys(props).length > 0
+        ? { "mcp-use/propsSchema": props }
+        : {}),
       ...(metadata._meta || {}),
     },
     htmlTemplate: html,
@@ -570,26 +573,47 @@ export async function createWidgetUIResource(
     urlConfig
   );
 
-  // Merge definition._meta into the resource's _meta.
-  // Deep-merge _meta.ui so we preserve SEP-1865 fields (prefersBorder, csp) from
-  // createMcpAppsResource while adding definition._meta.ui (e.g. props).
+  // Merge fields from definition._meta into the resource content _meta.
+  // Per SEP-1865, content item _meta.ui must only contain: csp, prefersBorder, domain, permissions.
+  // "mcp-use/widget" (internal bookkeeping with html, dev flag, etc.) is always stripped.
+  // "mcp-use/propsSchema" is kept as a top-level _meta extension so the inspector can
+  // render the props config dialog from the resources/read content response.
   if (definition._meta && Object.keys(definition._meta).length > 0) {
     const resourceMeta = uiResource.resource._meta ?? {};
     const defMeta = definition._meta as {
       ui?: Record<string, unknown>;
       [k: string]: unknown;
     };
-    const { ui: defUi, ...defMetaRest } = defMeta;
+    // Only include spec-compliant ui fields in content _meta.
+    // scriptDirectives is kept as a practical extension used by the sandbox proxy.
+    const specUiKeys = new Set([
+      "csp",
+      "prefersBorder",
+      "domain",
+      "permissions",
+    ]);
+    const defUiFiltered = defMeta.ui
+      ? Object.fromEntries(
+          Object.entries(defMeta.ui).filter(([k]) => specUiKeys.has(k))
+        )
+      : undefined;
     const mergedUi =
-      resourceMeta.ui || defUi
+      resourceMeta.ui || defUiFiltered
         ? {
             ...((resourceMeta.ui as Record<string, unknown>) || {}),
-            ...(defUi || {}),
+            ...(defUiFiltered || {}),
           }
         : undefined;
+    // Strip only "mcp-use/widget" (internal bookkeeping with html, slugifiedName, etc.).
+    // Other mcp-use/* keys like "mcp-use/propsSchema" pass through as top-level _meta extensions.
+    const defMetaPublic = Object.fromEntries(
+      Object.entries(defMeta).filter(
+        ([k]) => k !== "ui" && k !== "mcp-use/widget"
+      )
+    );
     uiResource.resource._meta = {
       ...resourceMeta,
-      ...defMetaRest,
+      ...defMetaPublic,
       ...(mergedUi !== undefined ? { ui: mergedUi } : {}),
     };
   }

@@ -63,15 +63,18 @@ const SANDBOX_PROXY_HTML = `<!doctype html>
         const resourceDomains = (csp.resourceDomains || []).map(sanitizeDomain).filter(Boolean);
         const frameDomains = (csp.frameDomains || []).map(sanitizeDomain).filter(Boolean);
         const baseUriDomains = (csp.baseUriDomains || []).map(sanitizeDomain).filter(Boolean);
+        const scriptDirectives = (csp.scriptDirectives || []).filter(function(d) { return typeof d === "string" && d.length > 0; });
 
         const connectSrc = connectDomains.length > 0 ? connectDomains.join(" ") : "'none'";
         const resourceSrc = resourceDomains.length > 0 ? ["data:", "blob:", ...resourceDomains].join(" ") : "data: blob:";
         const frameSrc = frameDomains.length > 0 ? frameDomains.join(" ") : "'none'";
         const baseUri = baseUriDomains.length > 0 ? baseUriDomains.join(" ") : "'none'";
+        const scriptSrcParts = ["'unsafe-inline'", resourceSrc];
+        if (scriptDirectives.length > 0) scriptSrcParts.push(scriptDirectives.join(" "));
 
         return [
           "default-src 'none'",
-          "script-src 'unsafe-inline' " + resourceSrc,
+          "script-src " + scriptSrcParts.join(" "),
           "style-src 'unsafe-inline' " + resourceSrc,
           "img-src " + resourceSrc,
           "font-src " + resourceSrc,

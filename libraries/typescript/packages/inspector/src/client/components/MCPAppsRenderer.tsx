@@ -68,6 +68,8 @@ interface MCPAppsRendererProps {
   serverBaseUrl?: string;
   /** When true, sends ui/notifications/tool-cancelled to the widget. */
   cancelled?: boolean;
+  /** Called when the CSP mode changes after the widget is already loaded, requesting the tool to be re-executed. */
+  onRerun?: () => void;
 }
 
 function MCPAppsRendererBase({
@@ -87,6 +89,7 @@ function MCPAppsRendererBase({
   noWrapper,
   customProps,
   cancelled,
+  onRerun,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -212,8 +215,27 @@ function MCPAppsRendererBase({
         //   ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
         // };
 
-        // Extract MCP Apps metadata from merged resource metadata (SEP-1865)
-        const mcpAppsCsp = mergedUiMeta?.csp;
+        // MCP Apps: Use ui.csp from resource per SEP-1865. Fallback to openai/widgetCSP
+        // from tool metadata (transformed to camelCase) when resource lacks it.
+        let mcpAppsCsp = mergedUiMeta?.csp;
+        if (!mcpAppsCsp && (toolMetadata as any)?.["openai/widgetCSP"]) {
+          const wcsp = (toolMetadata as any)["openai/widgetCSP"] as Record<
+            string,
+            unknown
+          >;
+          const fallback: Record<string, unknown> = {};
+          if (Array.isArray(wcsp.connect_domains))
+            fallback.connectDomains = wcsp.connect_domains;
+          if (Array.isArray(wcsp.resource_domains))
+            fallback.resourceDomains = wcsp.resource_domains;
+          if (Array.isArray(wcsp.frame_domains))
+            fallback.frameDomains = wcsp.frame_domains;
+          if (Array.isArray(wcsp.base_uri_domains))
+            fallback.baseUriDomains = wcsp.base_uri_domains;
+          if (Array.isArray(wcsp.script_directives))
+            fallback.scriptDirectives = wcsp.script_directives;
+          if (Object.keys(fallback).length > 0) mcpAppsCsp = fallback as any;
+        }
         const mcpAppsPermissions = mergedUiMeta?.permissions;
         // MCP Apps only: prefersBorder is in resource _meta.ui per spec
         const mcpAppsPrefersBorder = mergedUiMeta?.prefersBorder ?? true;
@@ -263,8 +285,9 @@ function MCPAppsRendererBase({
           );
         }
 
+        const contentJson = await contentResponse.json();
         const { html, csp, permissions, mimeTypeWarning, mimeTypeValid } =
-          await contentResponse.json();
+          contentJson;
 
         if (!mimeTypeValid) {
           setLoadError(
@@ -301,7 +324,19 @@ function MCPAppsRendererBase({
     // hostContext, addWidget, toolInput, toolOutput, resolvedTheme are intentionally
     // excluded to prevent infinite re-render loops — they are captured by closure
     // at the time of the fetch and don't warrant refetching the widget HTML.
-  }, [serverId, resourceUri, toolCallId, toolName, cspMode]);
+    // cspMode is intentionally excluded — changes are handled by the effect below.
+  }, [serverId, resourceUri, toolCallId, toolName]);
+
+  // When CSP mode changes after the widget has already loaded, request a
+  // full tool re-execution so the fresh result is rendered with the new CSP.
+  const prevCspModeRef = useRef(cspMode);
+  useEffect(() => {
+    if (prevCspModeRef.current === cspMode) return;
+    prevCspModeRef.current = cspMode;
+    if (hasLoadedOnceRef.current && onRerun) {
+      onRerun();
+    }
+  }, [cspMode, onRerun]);
 
   // Re-read prefersBorder from the server when the widget re-initializes
   // (HMR support). When initCount > 1, it means the widget iframe reloaded
@@ -779,10 +814,13 @@ function MCPAppsRendererBase({
 
     // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
-      // Skip if we already sent this exact payload (parent re-renders with new ref, same data)
-      const contentKey = JSON.stringify(
-        (toolOutput as any)?.structuredContent ?? toolOutput
-      );
+      // Skip if we already sent this exact payload (parent re-renders with new ref, same data).
+      // Include customProps in the key so a preset change always triggers a re-send with the
+      // new structuredContent, even when toolOutput itself hasn't changed.
+      const contentKey = JSON.stringify({
+        content: (toolOutput as any)?.structuredContent ?? toolOutput,
+        customProps: customProps ?? null,
+      });
       if (lastSentToolOutputKeyRef.current === contentKey) return;
       lastSentToolOutputKeyRef.current = contentKey;
       const result = toolOutput as CallToolResult;
@@ -1069,6 +1107,7 @@ function mcpAppsRendererAreEqual(
   if (prev.customProps !== next.customProps) return false;
   if (prev.readResource !== next.readResource) return false;
   if (prev.onSendFollowUp !== next.onSendFollowUp) return false;
+  if (prev.onRerun !== next.onRerun) return false;
   if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
   if (prev.className !== next.className) return false;
   if (prev.serverBaseUrl !== next.serverBaseUrl) return false;

@@ -613,6 +613,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     widgetCSP,
+    mcpAppsCsp,
+    mcpAppsPermissions,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
@@ -664,6 +666,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolId,
     timestamp: Date.now(),
     widgetCSP,
+    mcpAppsCsp,
+    mcpAppsPermissions,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
@@ -994,6 +998,23 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             }
           }
         };
+
+        // Report CSP violations to the inspector host
+        document.addEventListener('securitypolicyviolation', function(e) {
+          window.parent.postMessage({
+            type: 'openai:csp-violation',
+            toolId: ${safeToolId},
+            directive: e.violatedDirective,
+            effectiveDirective: e.effectiveDirective,
+            blockedUri: e.blockedURI,
+            sourceFile: e.sourceFile || null,
+            lineNumber: e.lineNumber,
+            columnNumber: e.columnNumber,
+            originalPolicy: e.originalPolicy,
+            disposition: e.disposition,
+            timestamp: Date.now(),
+          }, '*');
+        });
 
         Object.defineProperty(window, 'openai', {
           value: openaiAPI,

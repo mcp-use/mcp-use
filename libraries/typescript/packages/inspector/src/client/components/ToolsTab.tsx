@@ -1157,6 +1157,7 @@ export function ToolsTab({
                   onCopy={handleCopyResult}
                   onDelete={handleDeleteResult}
                   onFullscreen={handleFullscreen}
+                  onRerunTool={executeTool}
                 />
               </motion.div>
             )}
@@ -1342,6 +1343,7 @@ export function ToolsTab({
                 onFullscreen={handleFullscreen}
                 onMaximize={handleMaximize}
                 isMaximized={isMaximized}
+                onRerunTool={executeTool}
               />
             </div>
           </ResizablePanel>

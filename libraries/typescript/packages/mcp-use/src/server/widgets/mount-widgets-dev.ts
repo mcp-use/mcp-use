@@ -275,7 +275,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -508,7 +508,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -586,6 +586,42 @@ if (container && Component) {
           }
         }
 
+        // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for all widget registrations.
+        const serverOrigin = serverConfig.serverBaseUrl
+          ? new URL(serverConfig.serverBaseUrl).origin
+          : null;
+        let enrichedCspMetadata = metadata.metadata as
+          | Record<string, any>
+          | undefined;
+        if (serverOrigin) {
+          const csp = enrichedCspMetadata?.csp
+            ? { ...enrichedCspMetadata.csp }
+            : {};
+          for (const field of [
+            "connectDomains",
+            "resourceDomains",
+            "baseUriDomains",
+          ] as const) {
+            if (csp[field] && !csp[field].includes(serverOrigin)) {
+              csp[field] = [...csp[field], serverOrigin];
+            } else if (!csp[field]) {
+              csp[field] = [serverOrigin];
+            }
+          }
+          const wsOrigin = serverOrigin.replace(/^http/, "ws");
+          if (!csp.connectDomains?.includes(wsOrigin)) {
+            csp.connectDomains = [...(csp.connectDomains || []), wsOrigin];
+          }
+          const unsafeEval = "'unsafe-eval'";
+          if (!csp.scriptDirectives?.includes(unsafeEval)) {
+            csp.scriptDirectives = [
+              ...(csp.scriptDirectives || []),
+              unsafeEval,
+            ];
+          }
+          enrichedCspMetadata = { ...enrichedCspMetadata, csp };
+        }
+
         // For HMR updates, use the direct update path to avoid re-registration issues
         if (isHmrUpdate) {
           const schemaField = metadata.props || metadata.inputs;
@@ -629,31 +665,6 @@ if (container && Component) {
           const buildIdPart = getBuildIdPart(undefined); // dev mode has no buildId
           const resourceUri = `ui://widget/${widgetName}${buildIdPart}.html`;
 
-          // Enrich CSP with server origin for the Apps SDK openai/widgetCSP field.
-          // Per MCP Apps spec: CSP doesn't go on tool _meta.ui (that's resource-only),
-          // but the Apps SDK protocol (openai/widgetCSP) DOES put CSP on the tool.
-          const serverOrigin = serverConfig.serverBaseUrl
-            ? new URL(serverConfig.serverBaseUrl).origin
-            : null;
-          let enrichedCspMetadata = metadata.metadata as
-            | Record<string, any>
-            | undefined;
-          if (serverOrigin && enrichedCspMetadata?.csp) {
-            const csp = { ...enrichedCspMetadata.csp };
-            for (const field of [
-              "connectDomains",
-              "resourceDomains",
-              "baseUriDomains",
-            ] as const) {
-              if (csp[field] && !csp[field].includes(serverOrigin)) {
-                csp[field] = [...csp[field], serverOrigin];
-              } else if (!csp[field]) {
-                csp[field] = [serverOrigin];
-              }
-            }
-            enrichedCspMetadata = { ...enrichedCspMetadata, csp };
-          }
-
           const hmrDefinition = {
             name: widgetName,
             type: widgetType,
@@ -682,9 +693,10 @@ if (container && Component) {
               dev: true,
               exposeAsTool: metadata.exposeAsTool ?? true,
             },
-            ui: {
-              ...(schemaField ? { props: schemaField } : {}),
-            },
+            ui: {},
+            // mcp-use private extension: props schema for inspector PropsConfigDialog.
+            // Not part of SEP-1865; other hosts will ignore this key.
+            ...(schemaField ? { "mcp-use/propsSchema": schemaField } : {}),
             ...dualProtocolMeta,
           };
 
@@ -705,19 +717,20 @@ if (container && Component) {
           );
         }
 
-        // Full registration for new widgets
-        // Use slugified name for temp directory path
+        // Full registration for new widgets (use enriched CSP with ws, unsafe-eval for dev)
         const { slugifyWidgetName } = await import("./widget-helpers.js");
         const slugifiedName = slugifyWidgetName(widgetName);
+        const metadataToRegister = {
+          ...metadata,
+          metadata: enrichedCspMetadata ?? metadata.metadata,
+          ...(metadata.description
+            ? {}
+            : { description: `Widget: ${widgetName}` }),
+        } as Record<string, unknown>;
         await registerWidgetFromTemplate(
           widgetName,
           pathHelpers.join(tempDir, slugifiedName, "index.html"),
-          (metadata.description
-            ? metadata
-            : { ...metadata, description: `Widget: ${widgetName}` }) as Record<
-            string,
-            unknown
-          >,
+          metadataToRegister,
           serverConfig,
           registerWidget,
           true // isDev
@@ -1308,16 +1321,52 @@ export default PostHog;
       );
     }
 
+    // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for initial registration.
+    // Same logic as extractAndRegisterWidget - the initial loop bypassed this before.
+    let enrichedCspMetadata = metadata.metadata as
+      | Record<string, any>
+      | undefined;
+    const serverOrigin = serverConfig.serverBaseUrl
+      ? new URL(serverConfig.serverBaseUrl).origin
+      : null;
+    if (serverOrigin) {
+      const csp = enrichedCspMetadata?.csp
+        ? { ...enrichedCspMetadata.csp }
+        : {};
+      for (const field of [
+        "connectDomains",
+        "resourceDomains",
+        "baseUriDomains",
+      ] as const) {
+        if (csp[field] && !csp[field].includes(serverOrigin)) {
+          csp[field] = [...csp[field], serverOrigin];
+        } else if (!csp[field]) {
+          csp[field] = [serverOrigin];
+        }
+      }
+      const wsOrigin = serverOrigin.replace(/^http/, "ws");
+      if (!csp.connectDomains?.includes(wsOrigin)) {
+        csp.connectDomains = [...(csp.connectDomains || []), wsOrigin];
+      }
+      const unsafeEval = "'unsafe-eval'";
+      if (!csp.scriptDirectives?.includes(unsafeEval)) {
+        csp.scriptDirectives = [...(csp.scriptDirectives || []), unsafeEval];
+      }
+      enrichedCspMetadata = { ...enrichedCspMetadata, csp };
+    }
+
+    const metadataToRegister = {
+      ...metadata,
+      metadata: enrichedCspMetadata ?? metadata.metadata,
+      ...(metadata.description ? {} : { description: widget.description }),
+    } as Record<string, unknown>;
+
     // Use the extracted helper to register the widget
+    const slugifiedName = slugifyWidgetName(widget.name);
     await registerWidgetFromTemplate(
       widget.name,
-      pathHelpers.join(tempDir, widget.name, "index.html"),
-      (metadata.description
-        ? metadata
-        : { ...metadata, description: widget.description }) as Record<
-        string,
-        unknown
-      >,
+      pathHelpers.join(tempDir, slugifiedName, "index.html"),
+      metadataToRegister,
       serverConfig,
       registerWidget,
       true // isDev

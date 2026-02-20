@@ -63,6 +63,7 @@ interface ToolResultDisplayProps {
   onFullscreen: (index: number) => void;
   onMaximize?: () => void;
   isMaximized?: boolean;
+  onRerunTool?: () => void;
 }
 
 // Isolated component so 1s interval doesn't re-render parent (and thus widget iframe)
@@ -395,6 +396,7 @@ export function ToolResultDisplay({
   onCopy,
   onMaximize,
   isMaximized = false,
+  onRerunTool,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
@@ -946,6 +948,7 @@ export function ToolResultDisplay({
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}
+                        onRerun={onRerunTool}
                       />
                     </div>
                   );
