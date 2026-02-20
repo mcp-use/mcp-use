@@ -6,6 +6,43 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.20.1" description="February 2026">
+  ## Widget Status Texts & CSP Handling
+  Patch release with widget metadata enhancements and CSP improvements.
+
+- **New**: `invoking` and `invoked` properties in widget metadata for customizable status messages during tool execution
+- **Breaking**: McpUseProvider no longer includes BrowserRouter; add it explicitly if your widget uses react-router
+- **Enhancement**: MCPAppsDebugControls CSP mode violation indicators; sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Fix** (create-mcp-use-app): Unify logo display across all CLI entry paths
+- **Update**: Updated @mcp-use/inspector to v0.22.1
+- **Update**: Updated @mcp-use/cli to v2.15.1
+</Update>
+
+<Update label="v1.20.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.20.0&title=Widget%20Debug%20%26%20CSP%20Improvements&date=2026-02&lang=typescript" alt="Release 1.20.0" />
+  </Frame>
+  ## Widget Debug & CSP Improvements
+  Minor release with Iframe Console enhancements, MCP Apps debug controls, and CSP handling.
+
+- **New**: CLI update check notifies when a newer mcp-use release is available
+- **Fix**: CLI TSC build uses node with increased heap; avoid npx installing wrong package
+- **Fix**: CLI fallback MCP_URL when tunnel is unavailable
+- **New** (create-mcp-use-app): @types/react and @types/react-dom in template devDependencies
+- **Enhancement**: Slim down generated READMEs; improve mcp-apps template (Carousel, product-search-result widget); include .mcp-use in tsconfig; fix postinstall script
+- **Fix**: create-mcp-use-app product-search-result template styling and CSP metadata
+- **Enhancement**: Iframe Console with expandable logs, level filter, search, resizable height
+- **New**: Widget debug context for chat; MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics)
+- **New**: CDN build for inspector; CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+- **Fix**: useSyncExternalStore first-render handling; reconnect logic; Tools tab only sends explicitly set fields; resource annotations include `_meta`
+- **Fix**: mcp-use widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+- **Enhancement**: useWidget merges props from toolInput and structuredContent per SEP-1865
+- **New**: updateModelContext and useMcp clientOptions
+- **Fix**: WorkOS subdomain config to accept full AuthKit domain (e.g., `name.authkit.app`)
+- **Update**: Updated @mcp-use/inspector to v0.22.0
+- **Update**: Updated @mcp-use/cli to v2.15.0
+</Update>
+
 <Update label="v1.19.2" description="February 2026">
   ## Tool Schema & Type Testing Improvements
   Patch release with nested input schema fixes and compile-time type regression testing.

@@ -6,6 +6,32 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.22.1" description="February 2026">
+  ## Widget Status Texts & CSP Fixes
+  Patch release with invoking/invoked status display and CSP handling improvements.
+
+- **New**: Display of `invoking` and `invoked` status texts in MCPAppsRenderer, OpenAIComponentRenderer, ToolResultDisplay, ToolResultRenderer
+- **Enhancement**: MCPAppsDebugControls adjusts violation indicators based on CSP mode
+- **Fix**: sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Update**: Updated mcp-use to v1.20.1
+</Update>
+
+<Update label="v0.22.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.22.0&title=Iframe%20Console%20%26%20CSP%20Panel&date=2026-02&lang=inspector" alt="Release 0.22.0" />
+  </Frame>
+  ## Iframe Console & CSP Panel
+  Minor release with Iframe Console enhancements and CSP violation handling.
+
+- **New**: Iframe Console with expandable logs, level filter, search, resizable height
+- **New**: Widget debug context for chat
+- **Enhancement**: MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics)
+- **New**: CDN build
+- **Fix**: useSyncExternalStore first-render handling; reconnect logic; Tools tab sends only explicitly set fields; resource annotations include `_meta`
+- **New**: CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+- **Update**: Updated mcp-use to v1.20.0
+</Update>
+
 <Update label="v0.21.0" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=0.21.0&title=Bulk%20Paste%20%26%20Tool%20Definition%20Enhancements&date=2026-02&lang=inspector" alt="Release 0.21.0" />
