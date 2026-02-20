@@ -768,6 +768,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             gatewayUrl,
             url,
             allHeaders,
+            getAuthHeaders: async (): Promise<Record<string, string>> => {
+              try {
+                const tokens = await authProviderRef.current?.tokens?.();
+                if (tokens?.access_token) {
+                  const tokenType = tokens.token_type || "bearer";
+                  return {
+                    Authorization: `${tokenType.charAt(0).toUpperCase() + tokenType.slice(1)} ${tokens.access_token}`,
+                  };
+                }
+              } catch {
+                // Intentionally empty - fall through to return {}
+              }
+              return {};
+            },
             isMountedRef,
             stateRef,
             autoReconnectRef,

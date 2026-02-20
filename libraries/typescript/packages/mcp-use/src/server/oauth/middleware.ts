@@ -20,6 +20,11 @@ export function createBearerAuthMiddleware(
   baseUrl?: string
 ) {
   return async (c: Context, next: Next) => {
+    // Allow HEAD requests through without auth - used for health checks/keep-alive
+    if (c.req.method === "HEAD") {
+      return next();
+    }
+
     const authHeader = c.req.header("Authorization");
 
     // Build WWW-Authenticate header for 401 responses
