@@ -287,22 +287,18 @@ export function useAutoConnect({
 
       console.log("[useAutoConnect] Final custom headers:", finalCustomHeaders);
 
-      // Prepare proxy configuration
-      // Note: Use "headers" instead of deprecated "customHeaders"
-      // Always provide proxyAddress when we have headers so autoProxyFallback can use them
-      const proxyConfig =
-        connectionType === "Via Proxy"
-          ? {
-              proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-              headers: finalCustomHeaders,
-            }
-          : Object.keys(finalCustomHeaders).length > 0
-            ? {
-                // Provide proxyAddress for autoProxyFallback to use with headers
-                proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-                headers: finalCustomHeaders,
-              }
-            : undefined;
+      // Always provide proxyAddress so the OAuth fetch interceptor gets installed.
+      // Without it, OAuth metadata/registration requests go directly to the
+      // external provider and get CORS-blocked in the browser.
+      const proxyConfig: {
+        proxyAddress: string;
+        headers?: Record<string, string>;
+      } = {
+        proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+        ...(Object.keys(finalCustomHeaders).length > 0 && {
+          headers: finalCustomHeaders,
+        }),
+      };
 
       console.warn(
         `[useAutoConnect] Attempting connection (${connectionType}):`,
