@@ -344,7 +344,21 @@ export function useWidget<
   }, [provider, openaiToolInput, mcpAppsToolInput, urlParams.toolInput]);
 
   const toolOutput = useMemo(() => {
-    if (provider === "openai") return openaiToolOutput;
+    if (provider === "openai") {
+      // Unwrap CallToolResult envelope if the host passed the full tool-result params
+      const raw = openaiToolOutput as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (
+        raw &&
+        raw.structuredContent &&
+        typeof raw.structuredContent === "object"
+      ) {
+        return raw.structuredContent as TOutput | null | undefined;
+      }
+      return openaiToolOutput;
+    }
     if (provider === "mcp-apps")
       return mcpAppsToolOutput as TOutput | null | undefined;
     return urlParams.toolOutput as TOutput | null | undefined;
@@ -358,10 +372,18 @@ export function useWidget<
     const ti = (toolInput || {}) as Record<string, unknown>;
     const base = (defaultProps || {}) as Record<string, unknown> as TProps;
 
-    // Extract structuredContent from provider-specific toolOutput
+    // Extract structuredContent from provider-specific toolOutput.
+    // Some hosts (e.g. compat runtimes bridging MCP Apps → window.openai) pass the
+    // full CallToolResult envelope { content, structuredContent, _meta } as toolOutput
+    // instead of pre-extracting structuredContent. Detect and unwrap when needed.
     let structuredContent: Record<string, unknown> | undefined;
     if (provider === "openai" && openaiToolOutput) {
-      structuredContent = openaiToolOutput as Record<string, unknown>;
+      const raw = openaiToolOutput as Record<string, unknown>;
+      if (raw.structuredContent && typeof raw.structuredContent === "object") {
+        structuredContent = raw.structuredContent as Record<string, unknown>;
+      } else {
+        structuredContent = raw;
+      }
     } else if (provider === "mcp-apps" && mcpAppsToolOutput) {
       structuredContent = mcpAppsToolOutput as Record<string, unknown>;
     } else if (provider === "mcp-ui" && urlParams.toolOutput) {
