@@ -7,5 +7,10 @@
     "@mcp-use/inspector": "0.22.1",
     "mcp-use": "1.20.1"
   },
-  "changesets": []
+  "changesets": [
+    "beige-clouds-write",
+    "fiery-oranges-give",
+    "lucky-beds-show",
+    "remove-resource-prompt-tool-conversion"
+  ]
 }

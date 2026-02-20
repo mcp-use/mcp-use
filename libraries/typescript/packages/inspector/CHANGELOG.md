@@ -1,5 +1,21 @@
 # @mcp-use/inspector
 
+## 0.22.2-canary.0
+
+### Patch Changes
+
+- 89cdd0b: fix(inspector): update useAutoConnect to retain tile visibility on connection failure
+- 89cdd0b: fix(inspector): update MCPAppsRenderer and OpenAIComponentRenderer for improved border handling and status display
+  - Changed default state for `prefersBorder` in MCPAppsRenderer to false, aligning with updated UI specifications.
+  - Updated OpenAIComponentRenderer to conditionally display status labels above the widget in inline mode, enhancing user feedback.
+  - Adjusted CSS classes for better layout management based on display modes, improving overall user experience.
+  - Increased z-index for sticky elements in ToolResultDisplay to ensure proper layering in the UI.
+
+- 89cdd0b: Add `exposeResourcesAsTools` and `exposePromptsAsTools` options to `MCPAgentOptions` (both default to `true` for backward compatibility). The inspector chat tab now sets both to `false`, so the agent only exposes actual MCP tools to the LLM rather than fabricating tool wrappers for resources and prompts.
+- Updated dependencies [89cdd0b]
+- Updated dependencies [89cdd0b]
+  - mcp-use@1.20.2-canary.0
+
 ## 0.22.1
 
 ### Patch Changes
