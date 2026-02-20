@@ -39,9 +39,51 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
 import { cn } from "../lib/utils";
+import type { WidgetDeclaredCsp } from "../context/WidgetDebugContext";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
 import { SandboxedIframe } from "./ui/SandboxedIframe";
+
+/**
+ * Build CSP policy string from declared domains (matches sandbox-proxy buildCSP).
+ * Used for CSP dialog display when no violations have occurred yet.
+ */
+function buildCSPString(csp: WidgetDeclaredCsp): string {
+  const sanitize = (d: string) => d.replace(/['"<>;]/g, "").trim();
+  const connectDomains = (csp.connectDomains || [])
+    .map(sanitize)
+    .filter(Boolean);
+  const resourceDomains = (csp.resourceDomains || [])
+    .map(sanitize)
+    .filter(Boolean);
+  const frameDomains = (csp.frameDomains || []).map(sanitize).filter(Boolean);
+  const baseUriDomains = (csp.baseUriDomains || [])
+    .map(sanitize)
+    .filter(Boolean);
+
+  const connectSrc =
+    connectDomains.length > 0 ? connectDomains.join(" ") : "'none'";
+  const resourceSrc =
+    resourceDomains.length > 0
+      ? ["data:", "blob:", ...resourceDomains].join(" ")
+      : "data: blob:";
+  const frameSrc = frameDomains.length > 0 ? frameDomains.join(" ") : "'none'";
+  const baseUri =
+    baseUriDomains.length > 0 ? baseUriDomains.join(" ") : "'none'";
+
+  return [
+    "default-src 'none'",
+    `script-src 'unsafe-inline' ${resourceSrc}`,
+    `style-src 'unsafe-inline' ${resourceSrc}`,
+    `img-src ${resourceSrc}`,
+    `font-src ${resourceSrc}`,
+    `media-src ${resourceSrc}`,
+    `connect-src ${connectSrc}`,
+    `frame-src ${frameSrc}`,
+    "object-src 'none'",
+    `base-uri ${baseUri}`,
+  ].join("; ");
+}
 import { Spinner } from "./ui/spinner";
 import { WidgetWrapper } from "./ui/WidgetWrapper";
 
@@ -104,6 +146,7 @@ function MCPAppsRendererBase({
     removeWidget,
     addCspViolation,
     setWidgetModelContext,
+    setWidgetDeclaredCsp,
   } = useWidgetDebug();
 
   const [initCount, setInitCount] = useState(0);
@@ -312,6 +355,38 @@ function MCPAppsRendererBase({
           protocol: "mcp-apps",
           hostContext,
         });
+
+        // Populate CSP dialog data: declared CSP and effective policy.
+        // Use mcpAppsCsp when csp is undefined (permissive mode) so dialog shows widget-declared domains.
+        const cspForDeclared = csp ?? mcpAppsCsp;
+        const declaredCsp =
+          cspForDeclared && typeof cspForDeclared === "object"
+            ? {
+                connectDomains: cspForDeclared.connectDomains,
+                resourceDomains: cspForDeclared.resourceDomains,
+                frameDomains: cspForDeclared.frameDomains,
+                baseUriDomains: cspForDeclared.baseUriDomains,
+              }
+            : undefined;
+        let effectivePolicy: string | undefined;
+        if (cspMode === "permissive") {
+          effectivePolicy = [
+            "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: filesystem: about:",
+            "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:",
+            "style-src * 'unsafe-inline' data: blob:",
+            "img-src * data: blob: https: http:",
+            "media-src * data: blob: https: http:",
+            "font-src * data: blob: https: http:",
+            "connect-src * data: blob: https: http: ws: wss: about:",
+            "frame-src * data: blob: https: http: about:",
+            "object-src * data: blob:",
+            "base-uri *",
+            "form-action *",
+          ].join("; ");
+        } else if (declaredCsp) {
+          effectivePolicy = buildCSPString(declaredCsp);
+        }
+        setWidgetDeclaredCsp(toolCallId, declaredCsp, effectivePolicy);
       } catch (err) {
         setLoadError(
           err instanceof Error ? err.message : "Failed to prepare widget"
@@ -875,6 +950,7 @@ function MCPAppsRendererBase({
         lineNumber,
         columnNumber,
         effectiveDirective,
+        originalPolicy,
         timestamp,
       } = event.data;
 
@@ -885,6 +961,7 @@ function MCPAppsRendererBase({
         sourceFile,
         lineNumber,
         columnNumber,
+        originalPolicy,
         timestamp: timestamp || Date.now(),
       });
 

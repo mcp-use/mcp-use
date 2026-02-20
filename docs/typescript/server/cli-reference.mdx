@@ -8,49 +8,23 @@ The `@mcp-use/cli` is a build and development tool for creating MCP servers with
 
 ## Installation
 
-<CodeGroup>
-```bash npm
-# Install globally
-npm install -g @mcp-use/cli
-
-# Or use with npx (no installation needed)
-
-npx @mcp-use/cli dev
-
-# Install as project dependency
-
-npm install --save-dev @mcp-use/cli
-
-````
-
-```bash yarn
-# Install globally
-yarn global add @mcp-use/cli
-
-# Or use with yarn
-yarn @mcp-use/cli dev
-
-# Install as project dependency
-yarn add --dev @mcp-use/cli
-````
-
-```bash pnpm
-# Install globally
-pnpm add -g @mcp-use/cli
-
-# Or use with pnpm
-pnpm @mcp-use/cli dev
-
-# Install as project dependency
-pnpm add -D @mcp-use/cli
-```
-
-</CodeGroup>
-
 <Tip>
   When using `create-mcp-use-app`, the CLI is automatically installed as a
   project dependency.
 </Tip>
+
+```bash 
+# Install globally
+npm install -g @mcp-use/cli
+
+# Or use with npx (no installation needed)
+npx @mcp-use/cli dev
+
+# Install as project dependency
+npm install --save-dev @mcp-use/cli
+
+````
+
 
 ---
 
@@ -117,11 +91,6 @@ HMR is enabled by default in development mode. It allows you to modify tools, pr
 - Changes to OAuth configuration
 
 Connected clients automatically receive `list_changed` notifications and refresh their cached lists.
-
-<Note>
-  If you encounter issues with HMR, disable it with `--no-hmr` to fall back to
-  full server restarts on changes.
-</Note>
 
 ---
 
@@ -210,7 +179,7 @@ mcp-use start -p ./my-server
 
 ### `deploy` - Cloud Deployment
 
-Deploy your MCP server to mcp-use cloud.
+Deploy your MCP server to Manufact Cloud.
 
 ```bash
 mcp-use deploy [options]
@@ -264,13 +233,13 @@ mcp-use deploy --runtime python
 
 ### Authentication Commands
 
-#### `login` - Authenticate with mcp-use Cloud
+#### `login` - Authenticate with Manufact Cloud
 
 ```bash
 mcp-use login
 ```
 
-Starts an OAuth-style device code flow to authenticate with [Manufact cloud](https://manufact.com). Opens a browser window to complete authentication.
+Starts an OAuth-style device code flow to authenticate with [Manufact Cloud](https://manufact.com). Opens a browser window to complete authentication.
 
 **What happens:**
 
@@ -498,7 +467,7 @@ The CLI automatically adds `.mcp-use/` to your `.gitignore` as this file contain
 
 **Contents:**
 
-- `apiKey` - Authentication token for mcp-use cloud
+- `apiKey` - Authentication token for Manufact Cloud
 - `apiUrl` - Backend API URL (can be customized for local development)
 
 **Usage:**
@@ -554,196 +523,6 @@ mcp-use deploy
 
 ---
 
-## Project Structure
-
-The CLI expects the following project structure:
-
-```
-my-mcp-server/
-├── package.json
-├── tsconfig.json
-├── src/
-│   └── index.ts              # MCP server entry point
-├── resources/                # UI widgets (React components)
-│   ├── weather.tsx           # Widget file
-│   └── dashboard/            # Widget directory
-│       └── widget.tsx        # Widget in subdirectory
-├── public/                   # Static assets (optional)
-│   └── favicon.ico
-├── dist/                     # Build output (generated)
-│   ├── index.js              # Compiled server
-│   ├── mcp-use.json          # Build manifest
-│   ├── public/               # Copied static assets
-│   └── resources/            # Built widgets
-│       └── mcp-use/
-│           └── widgets/
-│               ├── weather/
-│               │   ├── index.html
-│               │   └── assets/
-│               │       └── index-[hash].js
-│               └── dashboard/
-│                   ├── index.html
-│                   └── assets/
-│                       └── index-[hash].js
-└── .mcp-use/                 # CLI metadata (auto-generated)
-    ├── project.json          # Deployment link
-    └── sessions.json         # Dev sessions
-```
-
----
-
-## Common Workflows
-
-### Development Workflow
-
-```bash
-# Start development
-mcp-use dev
-
-# Make changes to src/index.ts or resources/*.tsx
-# Server hot-reloads automatically
-# Inspector shows changes immediately
-```
-
-### Build and Deploy Workflow
-
-```bash
-# Build for production
-mcp-use build
-
-# Test locally
-mcp-use start
-
-# Deploy to cloud
-mcp-use login
-mcp-use deploy
-```
-
-### CI/CD Pipeline
-
-```bash
-# In your CI/CD pipeline
-npm install
-npm run build       # Uses mcp-use build
-npm run start       # Uses mcp-use start
-
-# Or with PM2 for production
-npm run build
-pm2 start "mcp-use start" --name my-mcp-server
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-
-# Install dependencies
-COPY package*.json ./
-RUN npm ci --production
-
-# Copy source and build
-COPY . .
-RUN npm run build
-
-# Expose port
-EXPOSE 3000
-
-# Start server
-CMD ["npm", "start"]
-```
-
----
-
-## Package.json Scripts
-
-Add these convenience scripts to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "dev": "mcp-use dev",
-    "build": "mcp-use build",
-    "start": "mcp-use start",
-    "deploy": "mcp-use deploy",
-    "tunnel": "mcp-use start --tunnel"
-  }
-}
-```
-
----
-
-## Troubleshooting
-
-### Port Already in Use
-
-```bash
-# Use a different port
-mcp-use dev --port 3001
-```
-
-### TypeScript Compilation Errors
-
-```bash
-# Check tsconfig.json
-# Ensure all dependencies are installed
-npm install
-
-# Check TypeScript version
-npx tsc --version
-```
-
-### Widgets Not Loading
-
-**Symptoms:** Widgets don't appear or show 404 errors
-
-**Solutions:**
-
-- Ensure `.tsx` files are in the `resources/` directory
-- Check React dependencies are installed (`react`, `react-dom`)
-- Verify build output in `dist/resources/mcp-use/widgets/`
-- Check widget metadata in `dist/mcp-use.json`
-
-### Inspector Not Opening
-
-```bash
-# Manually open http://localhost:3000/inspector
-# Or disable auto-open
-mcp-use dev --no-open
-```
-
-### Build Fails with "Entry Point Not Found"
-
-**Cause:** The build can't locate your server entry point
-
-**Solutions:**
-
-- Ensure you have `src/index.ts` or `src/server.ts`
-- Check `tsconfig.json` has correct `outDir` setting
-- Verify no TypeScript compilation errors
-
-### Deploy Fails with GitHub Permissions
-
-**Cause:** mcp-use GitHub App doesn't have access to your repository
-
-**Solutions:**
-
-1. Visit the GitHub App installation page (CLI provides link)
-2. Grant access to your repository
-3. Retry `mcp-use deploy`
-
-### HMR Not Working
-
-**Symptoms:** Changes don't reflect without manual restart
-
-**Solutions:**
-
-- Check file watcher isn't hitting system limits (especially in Docker)
-- Try disabling and re-enabling: `mcp-use dev --no-hmr` then restart normally
-- Ensure changes are in watched directories (`src/`, `resources/`)
-- Check console for HMR error messages
-
----
 
 ### `generate-types` - Type Generation
 
@@ -780,25 +559,6 @@ mcp-use generate-types -p ./my-server
 mcp-use generate-types --server src/server.ts
 ```
 
-**Generated output:**
-
-Creates `.mcp-use/tool-registry.d.ts` that augments the `ToolRegistry` interface:
-
-```typescript
-// .mcp-use/tool-registry.d.ts (auto-generated - DO NOT EDIT)
-declare module "mcp-use/react" {
-  interface ToolRegistry {
-    "search-flights": {
-      input: { destination: string; date?: string };
-      output: { flights: Array<{ id: string; price: number }> };
-    };
-    "book-flight": {
-      input: { flightId: string };
-      output: { confirmation: string };
-    };
-  }
-}
-```
 
 **When to use:**
 
@@ -831,6 +591,6 @@ The CLI introspects your server's tool registrations and converts Zod schemas to
 ## Next Steps
 
 - [Server Configuration](/typescript/server/configuration) - Advanced server configuration
-- [Deployment Guide](/typescript/server/deployment/mcp-use) - Deploy to mcp-use cloud
+- [Deployment Guide](/typescript/server/deployment/mcp-use) - Deploy to Manufact Cloud
 - [UI Widgets](/typescript/server/ui-widgets) - Build interactive widgets
 - [Session Management](/typescript/server/session-management) - Configure session storage

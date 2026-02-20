@@ -1,5 +1,5 @@
 ---
-title: "MCP Apps - Standard Widget Protocol"
+title: "Overview"
 description: "Build interactive widgets using the official MCP Apps protocol with cross-client compatibility"
 icon: "blocks"
 ---
@@ -629,6 +629,8 @@ Complete mapping from Apps SDK to MCP Apps metadata:
 | `"openai/widgetAccessible"`    | `widgetAccessible`    | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
 | `"openai/locale"`              | `locale`              | String (ChatGPT-specific, can stay in appsSdkMetadata)  |
 
+See [Content Security Policy](./content-security-policy) for full CSP configuration and field details.
+
 ### Migration Checklist
 
 Follow these steps to migrate:
@@ -674,7 +676,7 @@ Follow these steps to migrate:
    - Props received correctly
    - Theme syncing works
    - Tool calls function properly
-   - CSP allows required resources
+   - CSP allows required resources (see [Content Security Policy](./content-security-policy))
 
 ## Comparison with MCP UI
 

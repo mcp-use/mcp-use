@@ -4,134 +4,254 @@ description: "Advanced configuration and deployment options"
 icon: "cog"
 ---
 
-# Configuration
-
-This guide covers advanced configuration options, deployment strategies, and best practices for production MCP servers.
+This guide covers the full `MCPServer` configuration API, session and transport options, and deployment strategies.
 
 ## Server Configuration
 
 ### Basic Configuration
 
-The server accepts configuration during initialization:
+`MCPServer` accepts a `ServerConfig` object at construction time:
 
 ```typescript
 import { MCPServer } from 'mcp-use/server'
 
 const server = new MCPServer({
+  // ── Required ──────────────────────────────────────────────
   name: 'my-server',
-  title: 'My Server', // display name - shown in Inspector and MCP clients
-  version: '1.0.0',              // Semantic version
-  description: 'Server purpose',  // Human-readable description
-  host: 'localhost',             // Hostname (defaults to 'localhost')
-  baseUrl: process.env.MCP_URL || "http://localhost:3000", // MCP Server production URL (needed for UI Widgets to work correctly)
-  websiteUrl: 'https://mcp-use.com', // Website URL (can be customized)
-  favicon: 'favicon.ico',        // Favicon relative to public/ folder
-  icons: [                       // Server icons for branding
+  version: '1.0.0',
+
+  // ── Identity (shown in Inspector / MCP clients) ───────────
+  title: 'My Server',                   // Display name (defaults to name)
+  description: 'What this server does', // Shown during discovery
+  websiteUrl: 'https://myserver.com',
+  favicon: 'favicon.ico',               // Relative to public/ dir
+  icons: [
     {
-      src: 'icon.svg',           // Relative paths converted to absolute URLs
+      src: 'icon.svg',
       mimeType: 'image/svg+xml',
       sizes: ['512x512']
     }
   ],
-  allowedOrigins: process.env.NODE_ENV === 'production' 
-    ? ['https://myapp.com']      // Production: explicit origins
-    : undefined,                 // Development: allows all origins
+
+  // ── Network ────────────────────────────────────────────────
+  host: 'localhost',                    // Bind hostname (default: 'localhost')
+  baseUrl: 'https://mcp.example.com',   // Public URL for widget/asset URLs
+                                        // Overrides host:port; also read from MCP_URL env var
+
+  // ── CORS ───────────────────────────────────────────────────
   cors: {
     origin: ['https://myapp.com'],
-    credentials: true
-  },                             // Optional CORS override
-  sessionIdleTimeoutMs: 86400000,  // Session idle timeout (default: 1 day)
-  autoCreateSessionOnInvalidId: true  // Auto-create session on invalid ID (default: true, compatible with ChatGPT)
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+  },
+
+  // ── DNS Rebinding Protection ───────────────────────────────
+  allowedOrigins: ['https://myapp.com'],  // Enables Host header validation
+
+  // ── Transport ─────────────────────────────────────────────
+  stateless: false,                     // See "Stateless Mode" below
+
+  // ── Sessions ──────────────────────────────────────────────
+  sessionIdleTimeoutMs: 3600000,        // 1 hour (default: 86400000 = 1 day)
+  sessionStore: new InMemorySessionStore(),   // See "Session Storage" below
+  streamManager: new InMemoryStreamManager(), // See "Stream Manager" below
+
+  // ── Auth ─────────────────────────────────────────────────
+  oauth: oauthAuth0Provider({ ... }),   // See OAuth docs
 })
+
+await server.listen(3000)
 ```
 
-**Note:** When using `create-mcp-use-app`, these metadata fields (title, websiteUrl, favicon, icons) are automatically configured with your project name and mcp-use branding.
+**Port resolution order:** `listen(port)` argument → `--port` CLI flag → `PORT` env var → `3000`
+
+**Base URL resolution order:** `baseUrl` config → `MCP_URL` env var → `http://{host}:{port}`
 
 ### Environment Variables
 
-Use environment variables for configuration:
+The server reads the following environment variables at runtime:
+
+| Variable | Effect | Default |
+|---|---|---|
+| `PORT` | HTTP server port | `3000` |
+| `HOST` | Bind hostname | `localhost` |
+| `MCP_URL` | Full public base URL (for widget/asset URLs) | `http://{HOST}:{PORT}` |
+| `NODE_ENV` | `production` disables dev features (inspector, type generation) | — |
+| `DEBUG` | Enables verbose debug logging | — |
+| `CSP_URLS` | Comma-separated extra URLs added to widget CSP `resource_domains` | — |
+
+**OAuth providers** also read zero-config env vars — see the OAuth docs for the full list.
+
+## Transport & Sessions
+
+### Stateless Mode
+
+The server supports two transport modes:
+
+| Mode | Sessions | SSE | Best for |
+|---|---|---|---|
+| **Stateful** | Yes | Yes | Long-lived clients, notifications, sampling |
+| **Stateless** | No | No | Edge functions, serverless, simple request/response |
+
+**Auto-detection (default):**
+
+- **Deno / edge runtimes** → always stateless
+- **Node.js** → detected per-request from the `Accept` header:
+  - `Accept: application/json, text/event-stream` → stateful (SSE)
+  - `Accept: application/json` only → stateless
 
 ```typescript
-// .env file
-PORT=3000
-NODE_ENV=production
-LOG_LEVEL=info
-DATABASE_URL=postgresql://user:pass@localhost:5432/db
-API_KEY=your-secret-api-key
-MCP_URL=https://api.example.com
-
-// In your server
-import dotenv from 'dotenv'
-dotenv.config()
-
-const config = {
-  port: parseInt(process.env.PORT || '3000'),
-  environment: process.env.NODE_ENV || 'development',
-  logLevel: process.env.LOG_LEVEL || 'info',
-  database: process.env.DATABASE_URL,
-  apiKey: process.env.API_KEY,
-  baseUrl: process.env.MCP_URL
-}
-
+// Force stateless mode (ignores Accept header)
 const server = new MCPServer({
-  name: 'configured-server',
+  name: 'my-server',
   version: '1.0.0',
-  description: `Server running in ${config.environment} mode`
+  stateless: true,
 })
 
-// Use config throughout your server
-server.listen(config.port)
+// Force stateful mode
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  stateless: false,
+})
 ```
 
-### Configuration File
+<Tip>
+Leave `stateless` unset in most cases. Auto-detection lets the same server handle both SSE-capable and HTTP-only clients transparently.
+</Tip>
 
-Load configuration from JSON or YAML:
+### Session Storage
+
+Session metadata (client capabilities, log level, etc.) is stored in a pluggable `SessionStore`. Three backends are available:
+
+**In-memory (default)**
 
 ```typescript
-// config.json
-{
-  "server": {
-    "name": "my-mcp-server",
-    "version": "1.0.0",
-    "port": 3000
-  },
-  "features": {
-    "enableInspector": true,
-    "enableMetrics": true,
-    "enableCaching": true
-  },
-  "security": {
-    "corsOrigins": ["http://localhost:3000"],
-    "rateLimit": {
-      "windowMs": 900000,
-      "max": 100
-    }
-  }
-}
-
-// Load in server
-import config from './config.json'
+import { MCPServer, InMemorySessionStore } from 'mcp-use/server'
 
 const server = new MCPServer({
-  name: config.server.name,
-  version: config.server.version
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new InMemorySessionStore(), // default — no config needed
 })
-
-// Apply configuration
-if (config.features.enableInspector) {
-  // Inspector will auto-mount if available
-}
-
-server.listen(config.server.port)
 ```
+
+Sessions are lost on server restart. Suitable for single-instance production servers.
+
+**Filesystem (development)**
+
+```typescript
+import { MCPServer, FileSystemSessionStore } from 'mcp-use/server'
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new FileSystemSessionStore({
+    path: '.mcp-use/sessions.json', // default
+    debounceMs: 100,                // write debounce (default: 100ms)
+    maxAgeMs: 86400000,             // session TTL (default: 24h)
+  }),
+})
+```
+
+Sessions survive HMR reloads, so clients don't need to re-initialize when you save a file during development.
+
+<Warning>
+`FileSystemSessionStore` is not designed for production or distributed deployments. Use Redis for those scenarios.
+</Warning>
+
+**Redis (production)**
+
+```bash
+npm install redis
+```
+
+```typescript
+import { MCPServer, RedisSessionStore } from 'mcp-use/server'
+import { createClient } from 'redis'
+
+const redis = createClient({ url: process.env.REDIS_URL })
+await redis.connect()
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new RedisSessionStore({
+    client: redis,
+    prefix: 'mcp:session:',   // default
+    defaultTTL: 3600,         // seconds (default: 3600 = 1 hour)
+  }),
+})
+```
+
+Sessions persist across server restarts and are shared across all instances, enabling horizontal scaling.
+
+### Distributed Stream Management
+
+The `streamManager` controls active SSE connections and is responsible for routing server-to-client push notifications. By default, SSE streams are in-memory, meaning notifications only reach clients connected to the same server instance.
+
+For distributed deployments with multiple server instances behind a load balancer, use `RedisStreamManager` to fan-out notifications via Redis Pub/Sub:
+
+```bash
+npm install redis
+```
+
+```typescript
+import { MCPServer, RedisSessionStore, RedisStreamManager } from 'mcp-use/server'
+import { createClient } from 'redis'
+
+// Redis Pub/Sub requires a dedicated client — it cannot be shared
+const redis = createClient({ url: process.env.REDIS_URL })
+const pubSubRedis = redis.duplicate()
+
+await redis.connect()
+await pubSubRedis.connect()
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  sessionStore: new RedisSessionStore({ client: redis }),
+  streamManager: new RedisStreamManager({
+    client: redis,           // for session availability checks
+    pubSubClient: pubSubRedis, // dedicated Pub/Sub client (required)
+    prefix: 'mcp:stream:',  // default
+    heartbeatInterval: 10,  // seconds (default: 10)
+  }),
+})
+```
+
+**How it works:**
+1. Client connects to Server A → SSE stream created, Server A subscribes to `mcp:stream:{sessionId}` in Redis
+2. Client's next request hits Server B (load balancer)
+3. Server B sends a notification → publishes to Redis channel
+4. Server A receives the Redis message → pushes to the SSE stream → client gets the notification
 
 ## Middleware Configuration
 
-`MCPServer` is Hono-based and supports `server.use(...)` for adding middleware to custom routes.
+`MCPServer` exposes a `server.app` Hono instance for adding custom routes and middleware.
 
 ### CORS Customization
 
-By default, CORS is permissive (`origin: "*"`) for developer ergonomics. Override with `server` config when needed.
+By default, CORS is permissive (`origin: "*"`) for developer ergonomics. Set `cors` in the server config to restrict it.
+
+<Warning>
+The `cors` config option **replaces** the default CORS configuration entirely — there is no merge. If you override `cors`, include all headers your clients need (e.g. `mcp-session-id` in `exposeHeaders`).
+</Warning>
+
+Default CORS configuration:
+```typescript
+{
+  origin: '*',
+  allowMethods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: [
+    'Content-Type', 'Accept', 'Authorization',
+    'mcp-protocol-version', 'mcp-session-id',
+    'X-Proxy-Token', 'X-Target-URL',
+  ],
+  exposeHeaders: ['mcp-session-id'],
+}
+```
+
+Custom CORS example:
 
 ```typescript
 const server = new MCPServer({
@@ -141,12 +261,14 @@ const server = new MCPServer({
     origin: ['https://app.example.com'],
     allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'mcp-protocol-version'],
-    exposeHeaders: ['mcp-session-id']
-  }
+    exposeHeaders: ['mcp-session-id'],
+  },
 })
 ```
 
 ### Route-Scoped Middleware
+
+Add middleware or custom routes to `server.app`:
 
 ```typescript
 import { MCPServer } from 'mcp-use/server'
@@ -156,668 +278,100 @@ const server = new MCPServer({
   version: '1.0.0',
 })
 
-server.use('/api/admin/*', async (c, next) => {
+// Auth middleware for custom routes
+server.app.use('/api/admin/*', async (c, next) => {
   const apiKey = c.req.header('x-api-key')
   if (!apiKey || apiKey !== process.env.API_KEY) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   await next()
 })
+
+// Custom HTTP endpoint
+server.app.get('/health', (c) => c.json({ status: 'ok' }))
 ```
 
-### DNS Rebinding Configuration
-
-Use the `allowedOrigins` server config property as the single way to enable DNS rebinding protection.
-
-### Logging Configuration
-
-mcp-use provides a built-in logging system that works in both Node.js and browser environments. The server uses environment variables for log level control.
-
-```typescript
-import { Logger } from 'mcp-use/server'
-
-// Configure logging programmatically
-Logger.configure({
-  level: 'debug',              // Log level: error, warn, info, http, verbose, debug, silly
-  format: 'detailed'           // Format: minimal, detailed, or emoji
-})
-
-// Or use environment-based configuration
-// DEBUG=0 - Production mode (info level)
-// DEBUG=1 - Debug mode (info level with more details)
-// DEBUG=2 - Verbose mode (debug level with full details)
-
-// Set debug level programmatically
-Logger.setDebug(2)  // Enable verbose logging
-
-// Change log format
-Logger.setFormat('emoji')  // Use emoji-based format for better visibility
-```
-
-**Environment Variable Usage:**
-
-```bash
-# Production logging (default)
-node server.js
-
-# Debug mode
-DEBUG=1 node server.js
-
-# Verbose debug with full details
-DEBUG=2 node server.js
-```
-
-For comprehensive logging configuration and log level details, see the [Server Logging](./logging) documentation.
+<Note>
+MCP protocol routes (`/mcp`, `/mcp-use/widgets/*`, `/inspector`) are registered by the server internally. Add your custom routes before calling `listen()` or `getHandler()`.
+</Note>
 
 ## Security Configuration
 
 ### DNS Rebinding Protection
 
-The server supports DNS rebinding protection via host-header validation. This applies globally across server routes when enabled.
+Use `allowedOrigins` to enable Host header validation and protect against DNS rebinding attacks.
 
-**Development vs Production Behavior:**
-
-- **Default behavior** (`allowedOrigins` not set):
-  - DNS rebinding host validation is disabled (same behavior as before)
-  - All `Host` values are accepted
-
-- **Custom `allowedOrigins` set**:
-  - Values are normalized to hostnames and used as the allow list for `Host` validation
-  - Protection applies to all routes, including inspector and static assets
-  - Use this for explicit production allow lists
-
-- **Empty list** (`allowedOrigins: []`):
-  - DNS rebinding host validation remains disabled
-
-**Example Configuration:**
+**Behavior:**
+- `allowedOrigins` not set (default) → no host validation, all `Host` values accepted
+- `allowedOrigins: []` → no host validation (same as not set)
+- `allowedOrigins: ['https://myapp.com']` → Host header must match one of the configured hostnames; applies globally to all routes
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
-
-// Default behavior: no host validation
+// Default: no host validation (development)
 const devServer = new MCPServer({
   name: 'dev-server',
-  version: '1.0.0'
+  version: '1.0.0',
 })
 
-// Production: explicit allow list
+// Production: restrict to known hostnames
 const prodServer = new MCPServer({
   name: 'prod-server',
   version: '1.0.0',
   allowedOrigins: [
     'https://myapp.com',
     'https://app.myapp.com',
-    'https://admin.myapp.com'
-  ]
+  ],
 })
-// Host header must match one of the configured hostnames
 
-// Environment-based configuration
+// Load from environment
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  allowedOrigins: process.env.NODE_ENV === 'production'
-    ? process.env.ALLOWED_ORIGINS?.split(',') || []
-    : undefined
+  allowedOrigins: process.env.ALLOWED_ORIGINS?.split(','),
 })
 ```
 
-**Security Best Practices:**
+<Tip>
+`allowedOrigins` accepts full URLs (e.g. `"https://myapp.com"`) and normalizes them to hostnames for validation.
+</Tip>
 
-1. **Set `allowedOrigins` in production** - Do not rely on the default permissive behavior for public deployments
-2. **Use environment variables** - Store allowed origins in environment variables, not in code
-3. **Be specific** - Only include hosts that actually need access
-4. **Include protocol in config values** - `allowedOrigins` accepts full origin values and normalizes them to hostnames
-5. **Test with spoofed Host headers** - Verify invalid hosts are rejected before deployment
+### Session Timeout
 
-**Note:** If `allowedOrigins` is configured, host validation applies to the entire server.
-
-### Session Management
-
-The server manages client sessions to maintain state across multiple requests. Sessions are stored in memory and can be configured with idle timeouts and reconnection behavior.
-
-**Session Configuration Options:**
-
-- **`sessionIdleTimeoutMs`**: Controls how long a session remains active when idle (default: 1 day)
-- **`autoCreateSessionOnInvalidId`**: Controls behavior when a client sends a request with an invalid or expired session ID
-
-**Session Reconnection Behavior:**
-
-By default, the server automatically creates a new session when it receives a request with an invalid or expired session ID. This enables seamless reconnection after server restarts and provides compatibility with clients that don't properly handle session expiration.
-
-According to the [MCP protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management), clients **MUST** start a new session by sending a new `InitializeRequest` when they receive HTTP 404 in response to a request containing an `MCP-Session-Id`. However, some clients (like ChatGPT) don't properly implement this behavior and fail to reconnect.
+Control how long idle sessions are kept in memory:
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
-
-// Default behavior (compatible with ChatGPT and other non-compliant clients)
-// Automatically creates new session when invalid session ID is detected
-const compatibleServer = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  autoCreateSessionOnInvalidId: true  // Default: true
-})
-
-// Use strict MCP spec behavior (requires compliant clients)
-// Returns 404 for invalid session IDs, requires explicit initialize
-const specCompliantServer = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  autoCreateSessionOnInvalidId: false  // Strict MCP spec compliance
-})
-```
-
-**When to Use Each Option:**
-
-- **`autoCreateSessionOnInvalidId: true`** (default):
-  - Enables seamless reconnection after server restarts
-  - Compatible with non-compliant clients like ChatGPT
-  - Clients can continue using old session IDs (server auto-creates new session)
-  - Recommended for most use cases, especially when using ChatGPT or other OpenAI clients
-
-- **`autoCreateSessionOnInvalidId: false`**:
-  - Follows MCP protocol specification strictly
-  - Clients must explicitly send `initialize` request after server restart
-  - More predictable behavior for protocol-compliant clients
-  - Use only if you're certain all clients properly handle 404 errors by reinitializing
-
-**Example: Handling Server Restarts**
-
-```typescript
-// Server with auto-reconnection enabled
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  sessionIdleTimeoutMs: 3600000,  // 1 hour (default is 1 day)
-  autoCreateSessionOnInvalidId: true  // Auto-create on invalid session
+  sessionIdleTimeoutMs: 3600000, // 1 hour (default: 86400000 = 1 day)
 })
-
-// When server restarts:
-// 1. Client sends request with old session ID
-// 2. Server detects invalid session ID
-// 3. Server automatically creates new session
-// 4. Request proceeds normally
-// 5. Client receives new session ID in response headers
 ```
-
-**Best Practices:**
-
-1. **Use default behavior (true) in most cases** - Provides compatibility with ChatGPT and other common clients
-2. **Set to false only for compliant clients** - Only disable if you're certain all clients properly reinitialize on 404
-3. **Monitor session creation** - Log warnings when auto-creating sessions to detect connection issues
-4. **Set appropriate timeouts** - Configure `sessionIdleTimeoutMs` based on your application's needs
-5. **Reference the MCP spec** - Understand that clients should reinitialize on 404 per the [MCP protocol specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management)
 
 ### Input Validation
 
-Validate and sanitize all inputs:
+Always validate tool inputs using Zod schemas. The schema is enforced automatically before your handler runs:
 
 ```typescript
 import { error, text } from 'mcp-use/server'
-import validator from 'validator'
 import { z } from 'zod'
-import DOMPurify from 'isomorphic-dompurify'
 
 server.tool({
   name: 'process_input',
   schema: z.object({
-    email: z.string().describe('The email address to validate'),
-    url: z.string().describe('The URL to validate'),
-    html: z.string().describe('The HTML to sanitize').optional()
+    email: z.string().email().describe('Email address'),
+    url: z.string().url().describe('URL to process'),
   }),
-}, async ({ email, url, html }) => {
-    // Validate email
-    if (!validator.isEmail(email)) {
-      return error('Invalid email address');
-    }
-
-    // Validate URL
-    if (!validator.isURL(url, { require_protocol: true })) {
-      return error('Invalid URL');
-    }
-
-    // Sanitize HTML if provided
-    const cleanHtml = html ? DOMPurify.sanitize(html) : ''
-
-    // Process validated inputs
-    return text('Inputs validated and processed');
-  });
-```
-
-### Secure Headers
-
-Add security headers:
-
-```typescript
-import helmet from 'helmet'
-
-// Basic security headers
-server.use(helmet())
-
-// Custom CSP for widgets
-server.use(helmet.contentSecurityPolicy({
-  directives: {
-    defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
-    styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    imgSrc: ["'self'", 'data:', 'https:'],
-    connectSrc: ["'self'"],
-    fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-    frameSrc: ["'self'"],
-    frameAncestors: ["'none'"]
-  }
-}))
-```
-
-## Performance Configuration
-
-### Caching
-
-Implement caching for expensive operations:
-
-```typescript
-import NodeCache from 'node-cache'
-
-const cache = new NodeCache({
-  stdTTL: 600,      // 10 minutes default TTL
-  checkperiod: 120, // Check for expired keys every 2 minutes
-  useClones: false  // Don't clone objects (better performance)
-})
-
-// Cache middleware
-function cacheMiddleware(key: string, ttl?: number) {
-  return async (c, next) => {
-    const url = new URL(c.req.url)
-    const cacheKey = `${key}:${url.pathname}:${url.search}`
-    const cached = cache.get(cacheKey)
-
-    if (cached) {
-      return c.json(cached)
-    }
-
-    await next()
-
-    // Cache the response body
-    const body = await c.res.clone().json()
-    cache.set(cacheKey, body, ttl)
-  }
-}
-
-// Use cache middleware
-server.use('/api/expensive', cacheMiddleware('expensive-operation', 300))
-server.get('/api/expensive', async (c) => {
-  const result = await performExpensiveOperation()
-  return c.json(result)
+}, async ({ email, url }) => {
+  // Inputs are already validated by Zod at this point
+  return text(`Processing ${email} and ${url}`)
 })
 ```
 
-### Database Connection Pooling
-
-Configure database connections efficiently:
-
-```typescript
-import { Pool } from 'pg'
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 20,                    // Maximum pool size
-  idleTimeoutMillis: 30000,   // Close idle clients after 30s
-  connectionTimeoutMillis: 2000, // Timeout after 2s
-})
-
-// Monitor pool health
-pool.on('error', (err, client) => {
-  console.error('Unexpected error on idle client', err)
-})
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  await pool.end()
-  process.exit(0)
-})
-```
-
-## Deployment Configuration
-
-### Docker Configuration
-
-Create a Dockerfile for containerization:
-
-```dockerfile
-# Dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-COPY tsconfig.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy source code
-COPY src ./src
-COPY dist ./dist
-
-# Build TypeScript
-RUN npm run build
-
-# Expose port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
-
-# Run server
-CMD ["node", "dist/index.js"]
-```
-
-Docker Compose configuration:
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  mcp-server:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://user:pass@db:5432/mydb
-    depends_on:
-      - db
-    restart: unless-stopped
-
-  db:
-    image: postgres:15
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: mydb
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
-```
-
-### PM2 Configuration
-
-Use PM2 for process management:
-
-```javascript
-// ecosystem.config.js
-module.exports = {
-  apps: [{
-    name: 'mcp-server',
-    script: './dist/index.js',
-    instances: 'max',  // Use all CPU cores
-    exec_mode: 'cluster',
-    watch: false,
-    max_memory_restart: '1G',
-    env: {
-      NODE_ENV: 'production',
-      PORT: 3000
-    },
-    error_file: './logs/err.log',
-    out_file: './logs/out.log',
-    log_file: './logs/combined.log',
-    time: true
-  }]
-}
-```
-
-Start with PM2:
-
-```bash
-pm2 start ecosystem.config.js
-pm2 save
-pm2 startup
-```
-
-### Kubernetes Configuration
-
-Deploy to Kubernetes:
-
-```yaml
-# deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mcp-server
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: mcp-server
-  template:
-    metadata:
-      labels:
-        app: mcp-server
-    spec:
-      containers:
-      - name: mcp-server
-        image: your-registry/mcp-server:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: NODE_ENV
-          value: "production"
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: mcp-secrets
-              key: database-url
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp-server
-spec:
-  selector:
-    app: mcp-server
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 3000
-  type: LoadBalancer
-```
-
-## Monitoring and Metrics
-
-### Health Check Endpoint
-
-Implement comprehensive health checks:
-
-```typescript
-server.get('/health', async (c) => {
-  const health = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    service: 'mcp-server',
-    version: '1.0.0',
-    checks: {}
-  }
-
-  // Check database connection
-  try {
-    await pool.query('SELECT 1')
-    health.checks.database = 'healthy'
-  } catch (error) {
-    health.checks.database = 'unhealthy'
-    health.status = 'degraded'
-  }
-
-  // Check external API
-  try {
-    const response = await fetch('https://api.example.com/health')
-    health.checks.externalApi = response.ok ? 'healthy' : 'unhealthy'
-  } catch (error) {
-    health.checks.externalApi = 'unhealthy'
-    health.status = 'degraded'
-  }
-
-  // Return appropriate status code
-  const statusCode = health.status === 'healthy' ? 200 : 503
-  return c.json(health, statusCode)
-})
-```
-
-### Metrics Collection
-
-Collect and expose metrics:
-
-```typescript
-import promClient from 'prom-client'
-
-// Create a Registry
-const register = new promClient.Registry()
-
-// Add default metrics
-promClient.collectDefaultMetrics({ register })
-
-// Custom metrics
-const httpRequestDuration = new promClient.Histogram({
-  name: 'http_request_duration_seconds',
-  help: 'Duration of HTTP requests in seconds',
-  labelNames: ['method', 'route', 'status'],
-  buckets: [0.1, 0.5, 1, 2, 5]
-})
-register.registerMetric(httpRequestDuration)
-
-// Middleware to track metrics
-server.use(async (c, next) => {
-  const start = Date.now()
-  await next()
-  const duration = (Date.now() - start) / 1000
-  httpRequestDuration
-    .labels(c.req.method, c.req.path, c.res.status.toString())
-    .observe(duration)
-})
-
-// Metrics endpoint
-server.get('/metrics', async (c) => {
-  const metrics = await register.metrics()
-  return c.text(metrics, 200, { 'Content-Type': register.contentType })
-})
-```
-
-## Client Configuration
-
-### MCP Client Setup
-
-Configure MCP clients to connect to your server:
-
-```json
-{
-  "mcpServers": {
-    "my-server": {
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "Authorization": "Bearer your-token",
-        "X-API-Key": "your-api-key"
-      },
-      "timeout": 30000,
-      "retryAttempts": 3
-    }
-  }
-}
-```
-
-## Development Configuration
-
-### CLI Options
-
-The `mcp-use` CLI provides several options for development:
-
-```bash
-# Start development server (HMR enabled by default)
-mcp-use dev
-
-# Specify port
-mcp-use dev --port 3001
-
-# Disable Hot Module Reloading (uses tsx watch instead)
-mcp-use dev --no-hmr
-
-# Don't auto-open inspector in browser
-mcp-use dev --no-open
-
-# Specify project path
-mcp-use dev --path ./my-server
-```
-
-### Hot Module Reloading (HMR)
-
-HMR is enabled by default during development. It allows you to modify tools, prompts, and resources without restarting the server or dropping client connections.
-
-**How it works:**
-1. The CLI watches your `src/` directory for `.ts` and `.tsx` changes
-2. When a file changes, it re-imports your server module
-3. Changes are diffed and applied to the running server
-4. Connected clients receive `list_changed` notifications
-
-**What can be hot-reloaded:**
-- Adding new tools, prompts, resources, or resource templates
-- Updating existing registrations (descriptions, schemas, handlers)
-- Removing registrations
-
-**What requires a restart:**
-- Server configuration changes (name, version, port)
-- Adding new middleware
-- Changes to OAuth configuration
-
-**Disabling HMR:**
-
-If you encounter issues with HMR, you can disable it:
-
-```bash
-mcp-use dev --no-hmr
-```
-
-This falls back to `tsx watch`, which restarts the entire server on changes.
-
-## Best Practices
-
-1. **Use Environment Variables**: Never hardcode secrets
-2. **Implement Health Checks**: Monitor service health
-3. **Add Logging**: Log all important operations
-4. **Rate Limiting**: Protect against abuse
-5. **Input Validation**: Always validate user input
-6. **Error Handling**: Graceful error recovery
-7. **Caching**: Cache expensive operations
-8. **Security Headers**: Use Helmet.js
-9. **Process Management**: Use PM2 or similar
-10. **Monitoring**: Implement metrics and alerts
 
 ## Next Steps
 
-- [Getting Started](/typescript/getting-started/quickstart) - Initial setup
-- [API Reference](./api-reference) - Complete API docs
-- [Examples](./examples) - Real-world implementations
-- [UI Widgets](./ui-widgets) - Widget configuration
+- [Creating an MCP Server](./creating-mcp-apps-server) - Getting started
+- [OAuth / Authentication](./oauth) - Securing your server
+- [UI Widgets](./ui-widgets) - Interactive widget components
+- [Content Security Policy](./content-security-policy) - Per-widget CSP configuration
+- [Deployment: Supabase](./deployment/supabase) - Full Supabase Edge Functions guide
