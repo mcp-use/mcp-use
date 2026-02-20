@@ -192,6 +192,28 @@ MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
 
 ---
 
+## Troubleshooting
+
+### Redirect URI Mismatch
+
+If you get a redirect URI error during the OAuth flow, add your client's callback URL to WorkOS:
+
+1. Go to WorkOS Dashboard → **Developer** → **Redirects** tab
+2. Click **Edit redirect URIs**
+3. Add the redirect URI your MCP client expects
+
+For example, if testing locally with the MCP Inspector on port 3000:
+
+```
+http://localhost:3000/oauth/callback
+```
+
+The exact URI depends on your client and port — check the error message for the expected value.
+
+> **Note:** Changes to redirect URIs in WorkOS may take a few minutes to take effect.
+
+---
+
 ## Next Steps
 
 - **Auth overview** → [overview.md](overview.md)
