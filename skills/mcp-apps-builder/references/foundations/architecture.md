@@ -156,16 +156,20 @@ Understanding the flow of a request:
    ↓
 2. Hono middleware chain (server.app.use)
    ↓
-3. MCP protocol routing
+3. OAuth bearer auth (if `oauth` is configured — verifies JWT, populates ctx.auth)
    ↓
-4. Tool/Resource/Prompt handler
+4. MCP protocol routing
    ↓
-5. Response helpers (text, object, etc.)
+5. Tool/Resource/Prompt handler
    ↓
-6. MCP protocol response
+6. Response helpers (text, object, etc.)
    ↓
-7. HTTP Response
+7. MCP protocol response
+   ↓
+8. HTTP Response
 ```
+
+> When `oauth` is configured, unauthenticated requests to `/mcp/*` receive a `401` with a `WWW-Authenticate` header that tells MCP clients where to start the OAuth flow. See [../authentication/overview.md](../authentication/overview.md) for setup.
 
 ### Example Flow
 
@@ -224,20 +228,6 @@ server.use(async (c, next) => {
   await next();
   const duration = Date.now() - start;
   console.log(`${c.req.method} ${c.req.path} - ${duration}ms`);
-});
-```
-
-### Authentication Middleware
-
-```typescript
-server.use(async (c, next) => {
-  const apiKey = c.req.header('x-api-key');
-
-  if (!apiKey || apiKey !== process.env.API_KEY) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  await next();
 });
 ```
 

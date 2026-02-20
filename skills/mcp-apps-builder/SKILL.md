@@ -46,6 +46,27 @@ Load these before diving into tools/resources/widgets sections.
 
 ---
 
+### 🔐 Adding Authentication?
+**When:** Protecting your server with OAuth (WorkOS, Supabase, or custom)
+
+- **[overview.md](references/authentication/overview.md)**
+  - When: First time adding auth, understanding `ctx.auth`, or choosing a provider
+  - Covers: `oauth` config, user context shape, provider comparison, common mistakes
+
+- **[workos.md](references/authentication/workos.md)**
+  - When: Using WorkOS AuthKit for authentication
+  - Covers: Setup, env vars, DCR vs pre-registered, roles/permissions, WorkOS API calls
+
+- **[supabase.md](references/authentication/supabase.md)**
+  - When: Using Supabase for authentication
+  - Covers: Setup, env vars, HS256 vs ES256, RLS-aware API calls
+
+- **[custom.md](references/authentication/custom.md)**
+  - When: Using any other identity provider (GitHub, Okta, Azure AD, Google, etc.)
+  - Covers: Custom verification, user info extraction, provider examples
+
+---
+
 ### 🔧 Building Server Backend (No UI)?
 **When:** Implementing MCP features (actions, data, templates). Read the specific file for the primitive you're building.
 
@@ -106,6 +127,9 @@ Load these before diving into tools/resources/widgets sections.
 ```
 What do you need to build?
 
+├─ OAuth / user authentication
+│  └─> authentication/overview.md → provider-specific guide
+│
 ├─ Simple backend action (no UI)
 │  └─> Use Tool: server/tools.md
 │
