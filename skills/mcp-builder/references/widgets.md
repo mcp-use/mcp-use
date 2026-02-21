@@ -200,7 +200,7 @@ const {
 
   // Actions
   callTool,           // Call another MCP tool: callTool("tool-name", { args })
-  sendFollowUpMessage,// Trigger LLM response: sendFollowUpMessage("analyze this")
+  sendFollowUpMessage,// Trigger LLM response: sendFollowUpMessage("analyze this") or sendFollowUpMessage([{ type: "text", text: "..." }])
   openExternal,       // Open external URL: openExternal("https://example.com")
   requestDisplayMode, // Request mode change: requestDisplayMode("fullscreen")
   mcp_url,            // MCP server base URL for custom API requests
@@ -239,10 +239,20 @@ const handleRefresh = async () => {
 
 ### Triggering LLM Response
 
+Accepts a plain string shorthand or a full content block array per the SEP-1865 `ui/message` spec:
+
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
+// String shorthand (most common)
 <button onClick={() => sendFollowUpMessage("Compare the weather in these cities")}>
+  Ask AI to Compare
+</button>
+
+// Full content array (MCP Apps — supports text, image, resource blocks)
+<button onClick={() => sendFollowUpMessage([
+  { type: "text", text: "Compare the weather in these cities" },
+])}>
   Ask AI to Compare
 </button>
 ```

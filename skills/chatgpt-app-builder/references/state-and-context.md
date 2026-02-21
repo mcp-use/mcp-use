@@ -145,7 +145,7 @@ function SearchWidget() {
 
 ## Triggering LLM Response: `sendFollowUpMessage`
 
-Trigger the LLM to respond from a widget interaction:
+Trigger the LLM to respond from a widget interaction. Accepts a plain string shorthand or a full content block array per the SEP-1865 `ui/message` spec:
 
 ```tsx
 import { useWidget } from "mcp-use/react";
@@ -154,11 +154,21 @@ function AnalyzeButton() {
   const { sendFollowUpMessage } = useWidget();
 
   return (
-    <button onClick={() => sendFollowUpMessage(
-      "Compare the top 3 results and recommend the best one based on price and reviews."
-    )}>
-      Ask AI to Analyze
-    </button>
+    <>
+      {/* String shorthand (most common) */}
+      <button onClick={() => sendFollowUpMessage(
+        "Compare the top 3 results and recommend the best one based on price and reviews."
+      )}>
+        Ask AI to Analyze
+      </button>
+
+      {/* Full content array — MCP Apps hosts support text, image, and resource blocks */}
+      <button onClick={() => sendFollowUpMessage([
+        { type: "text", text: "Compare the top 3 results and recommend the best one based on price and reviews." },
+      ])}>
+        Ask AI to Analyze (content array)
+      </button>
+    </>
   );
 }
 ```
@@ -167,6 +177,8 @@ Use this when:
 - User clicks "Find best option" and the LLM should reason about the data
 - User completes a selection and the LLM should provide recommendations
 - Widget needs the LLM to take action based on current state
+
+> **Note**: When running inside ChatGPT (Apps SDK), only text blocks are extracted and joined as a plain string prompt. Non-text blocks are ignored on that path.
 
 ## Opening External URLs: `openExternal`
 

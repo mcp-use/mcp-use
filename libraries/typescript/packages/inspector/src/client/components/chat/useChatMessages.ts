@@ -39,10 +39,17 @@ export function useChatMessages({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string, promptResults: PromptResult[]) => {
+    async (
+      userInput: string,
+      promptResults: PromptResult[],
+      extraAttachments?: MessageAttachment[]
+    ) => {
+      const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       // Can send if there's text, prompt results, or attachments
       const hasContent =
-        userInput.trim() || promptResults.length > 0 || attachments.length > 0;
+        userInput.trim() ||
+        promptResults.length > 0 ||
+        allAttachments.length > 0;
       if (!hasContent || !llmConfig || !isConnected) {
         return;
       }
@@ -54,13 +61,13 @@ export function useChatMessages({
       // Don't create one when only using prompt results (they create their own messages)
       const userMessages: Message[] = [...promptResultsMessages];
 
-      if (userInput.trim() || attachments.length > 0) {
+      if (userInput.trim() || allAttachments.length > 0) {
         const userMessage: Message = {
           id: `user-${Date.now()}`,
           role: "user",
           content: userInput.trim(),
           timestamp: Date.now(),
-          attachments: attachments.length > 0 ? [...attachments] : undefined,
+          attachments: allAttachments.length > 0 ? allAttachments : undefined,
         };
         userMessages.push(userMessage);
       }

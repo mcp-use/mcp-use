@@ -1,5 +1,6 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
-import { memo, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef } from "react";
+import type { MessageContentBlock } from "mcp-use/react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
@@ -37,7 +38,10 @@ interface MessageListProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   tools?: any[];
-  sendMessage?: (message: string) => Promise<void>;
+  sendMessage?: (
+    message: string,
+    attachments?: MessageAttachment[]
+  ) => Promise<void>;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
 }
@@ -72,6 +76,32 @@ export const MessageList = memo(
       // mcp-ui requires result to detect, so don't pre-render for those
       return protocol !== null && protocol !== "mcp-ui";
     };
+
+    // Convert a ui/message content array to a text string + image attachments,
+    // then forward to sendMessage so the full message reaches the LLM.
+    const handleFollowUp = useCallback(
+      (content: MessageContentBlock[]) => {
+        const text = content
+          .filter(
+            (c): c is { type: "text"; text: string } =>
+              c.type === "text" && "text" in c
+          )
+          .map((c) => c.text)
+          .join("\n");
+        const images: MessageAttachment[] = content
+          .filter(
+            (c): c is { type: "image"; data: string; mimeType: string } =>
+              c.type === "image" && "data" in c && "mimeType" in c
+          )
+          .map((c) => ({
+            type: "image" as const,
+            data: c.data,
+            mimeType: c.mimeType,
+          }));
+        sendMessage?.(text, images.length > 0 ? images : undefined);
+      },
+      [sendMessage]
+    );
 
     // Scroll to bottom when messages change or streaming status changes
     useEffect(() => {
@@ -211,7 +241,7 @@ export const MessageList = memo(
                               toolMeta={getToolMeta(
                                 part.toolInvocation.toolName
                               )}
-                              onSendFollowUp={sendMessage}
+                              onSendFollowUp={handleFollowUp}
                               partialToolArgs={part.toolInvocation.partialArgs}
                               cancelled={
                                 part.toolInvocation.state === "error" &&
@@ -259,7 +289,7 @@ export const MessageList = memo(
                                   readResource={readResource}
                                   serverBaseUrl={serverBaseUrl}
                                   toolMeta={getToolMeta(toolCall.toolName)}
-                                  onSendFollowUp={sendMessage}
+                                  onSendFollowUp={handleFollowUp}
                                 />
                               )}
                             </div>

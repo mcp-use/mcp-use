@@ -23,6 +23,7 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import type { MessageContentBlock } from "mcp-use/react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
@@ -479,12 +480,31 @@ export function ToolResultDisplay({
 
   // Memoize onSendFollowUp to prevent infinite re-render loop
   // This callback is used in MCPAppsRenderer's effect dependency array
-  const memoizedOnSendFollowUp = useCallback((text: string) => {
-    toast.info("Message received", {
-      description: text,
-      duration: 5000,
-    });
-  }, []);
+  const memoizedOnSendFollowUp = useCallback(
+    (content: MessageContentBlock[]) => {
+      const text = content
+        .filter(
+          (c): c is { type: "text"; text: string } =>
+            c.type === "text" && "text" in c
+        )
+        .map((c) => c.text)
+        .join("\n");
+      const imageCount = content.filter((c) => c.type === "image").length;
+      const resourceCount = content.filter((c) => c.type === "resource").length;
+      const extras = [
+        imageCount > 0 && `${imageCount} image${imageCount > 1 ? "s" : ""}`,
+        resourceCount > 0 &&
+          `${resourceCount} resource${resourceCount > 1 ? "s" : ""}`,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      toast.info("Widget follow-up", {
+        description: [text, extras].filter(Boolean).join(" — "),
+        duration: 5000,
+      });
+    },
+    []
+  );
 
   // Get widget debug context for protocol selection
   const { playground } = useWidgetDebug();

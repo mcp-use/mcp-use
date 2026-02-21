@@ -16,6 +16,7 @@ import { normalizeCallToolResponse } from "./widget-utils.js";
 import type {
   CallToolResponse,
   DisplayMode,
+  MessageContentBlock,
   OpenAiGlobals,
   SafeArea,
   SetGlobalsEvent,
@@ -530,16 +531,32 @@ export function useWidget<
   );
 
   const sendFollowUpMessage = useCallback(
-    async (prompt: string): Promise<void> => {
+    async (content: string | MessageContentBlock[]): Promise<void> => {
+      const contentArray: MessageContentBlock[] =
+        typeof content === "string"
+          ? [{ type: "text", text: content }]
+          : content;
+
       if (provider === "mcp-apps") {
         const bridge = getMcpAppsBridge();
-        await bridge.sendMessage({ type: "text", text: prompt });
+        await bridge.sendMessage(contentArray);
         return;
       }
 
       if (!window.openai?.sendFollowUpMessage) {
         throw new Error("window.openai.sendFollowUpMessage is not available");
       }
+      // window.openai only supports plain text; extract and join text blocks
+      const prompt =
+        typeof content === "string"
+          ? content
+          : contentArray
+              .filter(
+                (c): c is { type: "text"; text: string } =>
+                  c.type === "text" && "text" in c
+              )
+              .map((c) => c.text)
+              .join("\n");
       return window.openai.sendFollowUpMessage({ prompt });
     },
     [provider]

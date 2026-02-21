@@ -41,6 +41,7 @@ export {
 export type {
   API,
   CallToolResponse,
+  MessageContentBlock,
   DeviceType,
   DisplayMode,
   OpenAiGlobals,
