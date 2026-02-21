@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.22.3-canary.0
+
+### Patch Changes
+
+- 0b9818c: fix(inspector): standalone deployment was importing the version from the wrong path
+  - mcp-use@1.20.3-canary.0
+
 ## 0.22.2
 
 ### Patch Changes

@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.22.2",
     "mcp-use": "1.20.2"
   },
-  "changesets": []
+  "changesets": [
+    "new-onions-mix"
+  ]
 }
