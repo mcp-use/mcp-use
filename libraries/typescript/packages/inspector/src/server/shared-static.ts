@@ -1,12 +1,12 @@
 import type { Hono } from "hono";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import {
   checkClientFiles,
   getClientDistPath,
   getContentType,
 } from "./file-utils.js";
+import { getInspectorVersion } from "./version.js";
 
 // ---------------------------------------------------------------------------
 // CDN mode (opt-in)
@@ -16,13 +16,9 @@ import {
 // ---------------------------------------------------------------------------
 const USE_CDN = process.env.INSPECTOR_USE_CDN === "true";
 
-// Read version once at module load — dist/server/../../package.json resolves
-// to the inspector package root.
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const { version: INSPECTOR_VERSION } = JSON.parse(
-  readFileSync(join(__dirname, "../../package.json"), "utf-8")
-) as { version: string };
+// Version is embedded at build time — works regardless of where cli.js is
+// located in the installed package (avoids path-traversal bugs when bundled).
+const INSPECTOR_VERSION = getInspectorVersion();
 
 // Allow overriding the CDN base for local testing:
 //   INSPECTOR_CDN_BASE=http://localhost:4000 INSPECTOR_USE_CDN=true node dist/server/server.js
