@@ -127,16 +127,21 @@ export function registerPrompt(
       undefined
     );
 
-    // Create enhanced context with client capability checker
-    const enhancedContext = Object.assign(
-      requestContext ? Object.create(requestContext) : {},
-      {
-        client: createClientCapabilityChecker(
-          session?.clientCapabilities,
-          session?.clientInfo
-        ),
-      }
-    );
+    // Create enhanced context with client capability checker.
+    // Use Object.defineProperty to ensure the own property is created even
+    // when the Hono Context prototype has a non-writable or accessor property.
+    const enhancedContext: any = requestContext
+      ? Object.create(requestContext)
+      : {};
+    Object.defineProperty(enhancedContext, "client", {
+      value: createClientCapabilityChecker(
+        session?.clientCapabilities,
+        session?.clientInfo
+      ),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
 
     // Execute callback with context
     const executeCallback = async () => {

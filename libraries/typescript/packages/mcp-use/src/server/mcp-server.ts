@@ -72,6 +72,7 @@ import { setupOAuthForServer } from "./oauth/setup.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
 import {
+  createClientCapabilityChecker,
   createEnhancedContext,
   findSessionContext,
   isValidLogLevel,
@@ -2691,7 +2692,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let errorType: string | null = null;
 
         try {
-          const result = await (handler as any)(params, extra);
+          // Build enhanced context so ctx.client is available in prompt callbacks
+          const session = sessionId ? this.sessions.get(sessionId) : undefined;
+          const requestContext = getRequestContext() || session?.context;
+          const enhancedCtx: any = requestContext
+            ? Object.create(requestContext)
+            : {};
+          Object.defineProperty(enhancedCtx, "client", {
+            value: createClientCapabilityChecker(
+              session?.clientCapabilities,
+              session?.clientInfo
+            ),
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+
+          const result = await (handler as any)(
+            params,
+            (handler as any).length >= 2 ? enhancedCtx : undefined
+          );
 
           // If it's already a GetPromptResult, return as-is
           if ("messages" in result && Array.isArray(result.messages)) {
@@ -2742,7 +2762,25 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let contents: any[] = [];
 
         try {
-          const result = await (handler as any)(extra);
+          // Build enhanced context so ctx.client is available in resource callbacks
+          const session = sessionId ? this.sessions.get(sessionId) : undefined;
+          const requestContext = getRequestContext() || session?.context;
+          const enhancedCtx: any = requestContext
+            ? Object.create(requestContext)
+            : {};
+          Object.defineProperty(enhancedCtx, "client", {
+            value: createClientCapabilityChecker(
+              session?.clientCapabilities,
+              session?.clientInfo
+            ),
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+
+          const result = await (handler as any)(
+            (handler as any).length >= 1 ? enhancedCtx : undefined
+          );
           // If it's already a ReadResourceResult, return as-is
           if ("contents" in result && Array.isArray(result.contents)) {
             contents = result.contents;
