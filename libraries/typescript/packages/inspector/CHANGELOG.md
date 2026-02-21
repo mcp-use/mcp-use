@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.23.0-canary.0
+
+### Minor Changes
+
+- 452d274: feat(inspector): improve emebedded chat
+
+### Patch Changes
+
+- mcp-use@1.20.4-canary.0
+
 ## 0.22.3
 
 ### Patch Changes
