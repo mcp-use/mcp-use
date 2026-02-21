@@ -135,25 +135,22 @@ Prevent unnecessary re-renders:
 
 ```tsx
 import { useCallback, useState } from "react";
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 export default function CallbackWidget() {
-  const { props, isPending, callTool } = useWidget();
-  const [loading, setLoading] = useState<Set<string>>(new Set());
+  const { props, isPending } = useWidget();
+  const { callToolAsync } = useCallTool("process-item");
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   // Stable function reference
-  const handleAction = useCallback(async (id: string, action: string) => {
-    setLoading(prev => new Set(prev).add(id));
+  const handleAction = useCallback(async (id: string) => {
+    setLoadingId(id);
     try {
-      await callTool(action, { id });
+      await callToolAsync({ id });
     } finally {
-      setLoading(prev => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setLoadingId(null);
     }
-  }, [callTool]);
+  }, [callToolAsync]);
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
@@ -167,7 +164,7 @@ export default function CallbackWidget() {
             key={item.id}
             item={item}
             onAction={handleAction}
-            loading={loading.has(item.id)}
+            loading={loadingId === item.id}
           />
         ))}
       </div>
@@ -179,7 +176,7 @@ export default function CallbackWidget() {
 const ItemRow = React.memo(({ item, onAction, loading }: any) => (
   <div>
     <span>{item.name}</span>
-    <button onClick={() => onAction(item.id, "process")} disabled={loading}>
+    <button onClick={() => onAction(item.id)} disabled={loading}>
       {loading ? "Processing..." : "Process"}
     </button>
   </div>
@@ -237,15 +234,17 @@ export default function AsyncWidget() {
 
 **Prefer tool calls over direct API calls:**
 ```tsx
-// ✅ Better - Use callTool
+// ✅ Better - Use useCallTool
+const { callToolAsync } = useCallTool("get-item-details");
+
 useEffect(() => {
   if (!isPending && props.itemId) {
     setLoading(true);
-    callTool("get-item-details", { id: props.itemId })
+    callToolAsync({ id: props.itemId })
       .then(result => setDetails(result))
       .finally(() => setLoading(false));
   }
-}, [isPending, props.itemId, callTool]);
+}, [isPending, props.itemId, callToolAsync]);
 ```
 
 ---
@@ -420,7 +419,7 @@ Delay search to avoid excessive calls:
 
 ```tsx
 import { useState, useEffect } from "react";
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -439,7 +438,8 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function DebouncedSearchWidget() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending } = useWidget();
+  const { callToolAsync } = useCallTool("search");
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<{ id: string; name: string }[]>([]);
   const [searching, setSearching] = useState(false);
@@ -453,11 +453,11 @@ export default function DebouncedSearchWidget() {
     }
 
     setSearching(true);
-    callTool("search", { query: debouncedSearch })
-      .then(result => setResults(result.items || []))
+    callToolAsync({ query: debouncedSearch })
+      .then(result => setResults(result.structuredContent?.items || []))
       .catch(err => console.error("Search failed:", err))
       .finally(() => setSearching(false));
-  }, [debouncedSearch, callTool]);
+  }, [debouncedSearch, callToolAsync]);
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
@@ -495,7 +495,7 @@ Load more items as user scrolls:
 
 ```tsx
 import { useState, useRef, useEffect } from "react";
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 interface Item {
   id: string;
@@ -503,7 +503,8 @@ interface Item {
 }
 
 export default function InfiniteScrollWidget() {
-  const { props, isPending, callTool } = useWidget<{ items: Item[] }>();
+  const { props, isPending } = useWidget<{ items: Item[] }>();
+  const { callToolAsync } = useCallTool("load-more");
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -536,15 +537,16 @@ export default function InfiniteScrollWidget() {
   const loadMore = async () => {
     setLoading(true);
     try {
-      const result = await callTool("load-more", {
+      const result = await callToolAsync({
         offset: items.length,
         limit: 20
       });
 
-      if (result.items.length === 0) {
+      const newItems = result.structuredContent?.items || [];
+      if (newItems.length === 0) {
         setHasMore(false);
       } else {
-        setItems(prev => [...prev, ...result.items]);
+        setItems(prev => [...prev, ...newItems]);
       }
     } catch (error) {
       console.error("Failed to load more:", error);
@@ -688,7 +690,7 @@ export default function DraggableList() {
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
-    // Optionally save new order with callTool
+    // Optionally save new order with useCallTool
   };
 
   if (isPending) {
@@ -728,17 +730,18 @@ export default function DraggableList() {
 
 ```tsx
 import { useEffect } from "react";
-import { McpUseProvider, useWidget } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
 export default function KeyboardWidget() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending } = useWidget();
+  const { callTool: save } = useCallTool("save");
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+S to save
       if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
-        callTool("save", {});
+        save({});
       }
 
       // Escape to cancel
@@ -754,7 +757,7 @@ export default function KeyboardWidget() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [callTool]);
+  }, [save]);
 
   if (isPending) {
     return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;

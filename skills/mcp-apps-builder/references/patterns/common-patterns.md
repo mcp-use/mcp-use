@@ -267,7 +267,7 @@ server.listen();
 
 ```tsx
 import { useState } from "react";
-import { McpUseProvider, useWidget, useWidgetTheme, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useWidget, useWidgetTheme, useCallTool, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
 
 export const widgetMetadata: WidgetMetadata = {
@@ -285,10 +285,12 @@ export const widgetMetadata: WidgetMetadata = {
 };
 
 export default function TodoList() {
-  const { props, isPending, callTool } = useWidget();
+  const { props, isPending } = useWidget();
   const theme = useWidgetTheme();
+  const { callTool: createTodo, isPending: isCreating } = useCallTool("create-todo");
+  const { callTool: toggleTodo } = useCallTool("toggle-todo");
+  const { callTool: deleteTodo } = useCallTool("delete-todo");
   const [newTodo, setNewTodo] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   if (isPending) {
@@ -307,34 +309,26 @@ export default function TodoList() {
     hover: theme === "dark" ? "#2a2a2a" : "#f5f5f5"
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
 
-    setSubmitting(true);
-    try {
-      await callTool("create-todo", { title: newTodo });
-      setNewTodo("");
-    } catch (error) {
-      alert("Failed to create todo");
-    } finally {
-      setSubmitting(false);
-    }
+    createTodo({ title: newTodo }, {
+      onSuccess: () => setNewTodo(""),
+      onError: () => alert("Failed to create todo"),
+    });
   };
 
-  const handleToggle = async (id: string, completed: boolean) => {
-    await callTool("toggle-todo", { id, completed: !completed });
+  const handleToggle = (id: string, completed: boolean) => {
+    toggleTodo({ id, completed: !completed });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     setDeletingId(id);
-    try {
-      await callTool("delete-todo", { id });
-    } catch (error) {
-      alert("Failed to delete");
-    } finally {
-      setDeletingId(null);
-    }
+    deleteTodo({ id }, {
+      onError: () => alert("Failed to delete"),
+      onSettled: () => setDeletingId(null),
+    });
   };
 
   return (
@@ -351,7 +345,7 @@ export default function TodoList() {
             value={newTodo}
             onChange={e => setNewTodo(e.target.value)}
             placeholder="New todo..."
-            disabled={submitting}
+            disabled={isCreating}
             style={{
               flex: 1,
               padding: 8,
@@ -363,17 +357,17 @@ export default function TodoList() {
           />
           <button
             type="submit"
-            disabled={submitting}
+            disabled={isCreating}
             style={{
               padding: "8px 16px",
               border: "none",
               borderRadius: 4,
               backgroundColor: "#0066cc",
               color: "white",
-              cursor: submitting ? "not-allowed" : "pointer"
+              cursor: isCreating ? "not-allowed" : "pointer"
             }}
           >
-            {submitting ? "Adding..." : "Add"}
+            {isCreating ? "Adding..." : "Add"}
           </button>
         </form>
 
@@ -672,7 +666,7 @@ All examples use mock data, making it easy to prototype and test before connecti
 Each example shows how to pair a tool with a widget for visual output.
 
 ### 3. **Interactive Actions**
-Todo list shows create/update/delete operations from within widgets using `callTool()`.
+Todo list shows create/update/delete operations from within widgets using `useCallTool()`.
 
 ### 4. **Theme Support**
 All widgets use `useWidgetTheme()` to adapt to light/dark mode.

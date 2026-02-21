@@ -1,8 +1,9 @@
 # Widget Interactivity
 
-Widgets call MCP tools using the `useCallTool()` hook from `mcp-use/react`. This enables buttons, forms, and actions within widgets with built-in state management.
+Widgets interact with the outside world using hooks from `mcp-use/react`. `useCallTool()` provides tool calling with built-in state management. `sendFollowUpMessage` from `useWidget()` triggers LLM conversation turns.
 
-**Use useCallTool() for:** Creating items, updating data, triggering actions, submitting forms
+**Use `useCallTool()` for:** Creating items, updating data, triggering actions, submitting forms
+**Use `sendFollowUpMessage` for:** Asking the AI to analyze, compare, summarize, or respond based on widget context
 
 ---
 
@@ -607,6 +608,93 @@ return (
 
 ---
 
+## Triggering LLM Responses: `sendFollowUpMessage`
+
+`sendFollowUpMessage` from `useWidget()` sends a message to the conversation and triggers a new LLM turn — as if the user typed it. Use this to let widget interactions drive the conversation.
+
+```tsx
+import { McpUseProvider, useWidget } from "mcp-use/react";
+
+export default function AnalysisWidget() {
+  const { props, isPending, sendFollowUpMessage } = useWidget();
+
+  if (isPending) {
+    return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
+  }
+
+  return (
+    <McpUseProvider autoSize>
+      <div style={{ padding: 20 }}>
+        <h2>Results for "{props.query}"</h2>
+        {props.items.map(item => (
+          <div key={item.id} style={{ padding: 8, borderBottom: "1px solid #ddd" }}>
+            <strong>{item.name}</strong> — ${item.price}
+          </div>
+        ))}
+
+        <button
+          onClick={() => sendFollowUpMessage(
+            `Compare the top 3 results for "${props.query}" and recommend the best one.`
+          )}
+          style={{ marginTop: 16, padding: "8px 16px" }}
+        >
+          Ask AI to Compare
+        </button>
+      </div>
+    </McpUseProvider>
+  );
+}
+```
+
+### Combining with `useCallTool`
+
+A widget can use both — `useCallTool` for data mutations and `sendFollowUpMessage` for triggering LLM reasoning:
+
+```tsx
+import { useState } from "react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
+
+export default function TodoWidget() {
+  const { props, isPending, state, setState, sendFollowUpMessage } = useWidget();
+  const { callTool: toggleTodo } = useCallTool("toggle-todo");
+
+  if (isPending) {
+    return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
+  }
+
+  const tasks = state?.tasks || props.tasks || [];
+  const remaining = tasks.filter(t => !t.completed).length;
+
+  return (
+    <McpUseProvider autoSize>
+      <div style={{ padding: 20 }}>
+        {tasks.map(t => (
+          <div key={t.id} style={{ display: "flex", gap: 8, padding: 8 }}>
+            <input
+              type="checkbox"
+              checked={t.completed}
+              onChange={() => toggleTodo({ id: t.id, completed: !t.completed })}
+            />
+            {t.title}
+          </div>
+        ))}
+
+        <button
+          onClick={() => sendFollowUpMessage(
+            `I have ${remaining} tasks left. Help me prioritize them.`
+          )}
+          style={{ marginTop: 16, padding: "8px 16px" }}
+        >
+          Ask AI to Prioritize
+        </button>
+      </div>
+    </McpUseProvider>
+  );
+}
+```
+
+---
+
 ## Complete Example
 
 ```tsx
@@ -735,6 +823,7 @@ export default function InteractiveTodoList() {
 5. **Use `isError`/`error` from the hook** - Instead of manual error state for single-tool widgets
 6. **Optimistic updates** - Update local state before the call, revert on error
 7. **Confirm destructive actions** - Use confirm() for deletes
+8. **Use `sendFollowUpMessage` for LLM reasoning** - When you want the AI to analyze, compare, or respond based on widget context rather than mutating data
 
 ---
 

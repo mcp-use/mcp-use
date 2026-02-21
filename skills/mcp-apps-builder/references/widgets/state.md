@@ -600,8 +600,9 @@ const [filter, setFilter] = useState("all");
 
 ### ❌ Don't Call Tools for Filtering/Sorting
 ```typescript
-// ❌ Bad - Calling tool to filter
-<button onClick={() => callTool("filter-items", { category: "electronics" })}>
+// ❌ Bad - Using a tool call for client-side filtering
+const { callTool: filterItems } = useCallTool("filter-items");
+<button onClick={() => filterItems({ category: "electronics" })}>
   Filter
 </button>
 
