@@ -45,6 +45,16 @@ export interface EmbeddedConfig {
   chatQuickQuestions?: string[];
   /** Initial followup suggestions shown above input in chat mode. */
   chatFollowups?: string[];
+  /** When true, hides the "New Chat" / clear button in the chat header. */
+  chatHideClearButton?: boolean;
+  /** When true, hides the tool selector (wrench icon) in the chat input. */
+  chatHideToolSelector?: boolean;
+  /**
+   * When true, treat the chat as already connected even when no MCP server is
+   * selected. Use this together with `chatApiUrl` when the backend manages the
+   * MCP connections and no client-side server URL is required.
+   */
+  forceConnected?: boolean;
 }
 
 interface InspectorState {

@@ -37,6 +37,8 @@ interface ChatHeaderProps {
   clearButtonHideShortcut?: boolean;
   /** Button variant for the clear/new-chat button. Default: "default". */
   clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
+  /** When true, hides the "New Chat" / clear button entirely. */
+  hideClearButton?: boolean;
 }
 
 export function ChatHeader({
@@ -59,6 +61,7 @@ export function ChatHeader({
   clearButtonHideIcon,
   clearButtonHideShortcut,
   clearButtonVariant,
+  hideClearButton,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
@@ -113,7 +116,7 @@ export function ChatHeader({
           </Tooltip>
         )}
         {/* New Chat / Clear button */}
-        {hasMessages && (
+        {!hideClearButton && hasMessages && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

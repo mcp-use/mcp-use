@@ -467,6 +467,7 @@ export function useChatMessages({
     attachments,
     sendMessage,
     clearMessages,
+    setMessages,
     stop,
     addAttachment,
     removeAttachment,
