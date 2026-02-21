@@ -8,6 +8,7 @@
     "mcp-use": "1.20.3"
   },
   "changesets": [
-    "moody-laws-melt"
+    "moody-laws-melt",
+    "thirty-kiwis-cough"
   ]
 }

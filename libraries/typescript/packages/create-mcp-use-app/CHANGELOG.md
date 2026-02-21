@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.2-canary.0
+
+### Patch Changes
+
+- 608a95f: fix(templates): update gitignore
+
 ## 0.14.1
 
 ### Patch Changes
