@@ -1,5 +1,12 @@
 # create-mcp-use-app
 
+## 0.14.2
+
+### Patch Changes
+
+- 9d8a73f: fix(templates): remove unused dependencies
+- 9d8a73f: fix(templates): update gitignore
+
 ## 0.14.2-canary.1
 
 ### Patch Changes
