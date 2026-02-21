@@ -5,7 +5,7 @@ import type {
 import type { InputDefinition, OptionalizeUndefinedFields } from "./common.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
-import type { McpContext } from "./context.js";
+import type { ClientCapabilityChecker, McpContext } from "./context.js";
 
 // Re-export MCP SDK types for convenience
 export type { GetPromptResult };
@@ -13,17 +13,19 @@ export type { GetPromptResult };
 export type { GetPromptResult as PromptResult };
 
 /**
- * Enhanced Prompt Context that provides access to request context.
+ * Enhanced Prompt Context that provides access to request context and
+ * client capability information.
  *
  * This unified context provides:
  * - `auth` - Authentication info (when OAuth is configured)
  * - `req` - Hono request object
+ * - `client` - Client capability checker (name, capabilities, MCP Apps support)
  * - All other Hono Context properties and methods
  *
  * @template HasOAuth - Whether OAuth is configured (affects auth availability)
  */
 export type EnhancedPromptContext<HasOAuth extends boolean = false> =
-  McpContext<HasOAuth>;
+  McpContext<HasOAuth> & { client: ClientCapabilityChecker };
 
 /**
  * Extract input type from a prompt definition's schema

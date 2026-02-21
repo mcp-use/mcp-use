@@ -431,6 +431,41 @@ interface UseWidgetResultBase<
    * @see partialToolInput
    */
   isStreaming: boolean;
+
+  /**
+   * Name and version of the MCP Apps host as reported during the
+   * `ui/initialize` handshake (SEP-1865).
+   *
+   * `undefined` when running inside ChatGPT (Apps SDK path) or outside a
+   * supported MCP Apps host. Use this to conditionally tailor the UI for
+   * specific host environments.
+   *
+   * @example
+   * ```tsx
+   * const { hostInfo } = useWidget();
+   * console.log(hostInfo?.name); // "claude-desktop"
+   * ```
+   */
+  hostInfo?: { name: string; version: string };
+
+  /**
+   * Host capabilities advertised during the `ui/initialize` handshake
+   * (SEP-1865 `HostCapabilities` object).
+   *
+   * `undefined` when running inside ChatGPT (Apps SDK path), outside a
+   * supported MCP Apps host, or when the host did not include capabilities.
+   * Use this to check for optional host features such as `openLinks`,
+   * `serverTools`, or `serverResources`.
+   *
+   * @example
+   * ```tsx
+   * const { hostCapabilities } = useWidget();
+   * if (hostCapabilities?.openLinks) {
+   *   // Host can open external links
+   * }
+   * ```
+   */
+  hostCapabilities?: Record<string, unknown>;
 }
 
 /**

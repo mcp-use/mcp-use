@@ -1136,7 +1136,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           progressToken,
           sendNotification,
           foundSession?.logLevel,
-          foundSession?.clientCapabilities
+          foundSession?.clientCapabilities,
+          undefined,
+          undefined,
+          foundSession?.clientInfo
         );
 
         const executeCallback = async () => {
@@ -2610,7 +2613,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           session?.logLevel,
           session?.clientCapabilities,
           sessionId,
-          this.sessions
+          this.sessions,
+          session?.clientInfo
         );
 
         const executeCallback = async () => {

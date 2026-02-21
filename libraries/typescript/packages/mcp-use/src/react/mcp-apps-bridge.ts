@@ -101,6 +101,8 @@ class McpAppsBridge {
   private toolOutput: Record<string, unknown> | null = null;
   private toolResponseMetadata: Record<string, unknown> | null = null;
   private hostContext: HostContext | null = null;
+  private hostInfo: { name: string; version: string } | null = null;
+  private hostCapabilities: Record<string, unknown> | null = null;
   private initialized = false;
 
   // Event handlers
@@ -482,6 +484,17 @@ class McpAppsBridge {
         console.log("[MCP Apps Bridge] Host context:", this.hostContext);
       }
 
+      // Store host info and capabilities
+      if (result.hostInfo) {
+        this.hostInfo = result.hostInfo;
+      }
+      if (result.hostCapabilities) {
+        this.hostCapabilities = result.hostCapabilities as Record<
+          string,
+          unknown
+        >;
+      }
+
       // Send initialized notification
       this.sendNotification("ui/notifications/initialized", {});
 
@@ -533,6 +546,20 @@ class McpAppsBridge {
    */
   getHostContext(): HostContext | null {
     return this.hostContext;
+  }
+
+  /**
+   * Get host info (name and version of the MCP Apps host)
+   */
+  getHostInfo(): { name: string; version: string } | null {
+    return this.hostInfo;
+  }
+
+  /**
+   * Get host capabilities advertised during the ui/initialize handshake
+   */
+  getHostCapabilities(): Record<string, unknown> | null {
+    return this.hostCapabilities;
   }
 
   /**

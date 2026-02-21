@@ -27,6 +27,8 @@ export {
   createElicitMethod,
   createReportProgressMethod,
   createEnhancedContext,
+  createClientCapabilityChecker,
+  supportsApps,
 } from "./tool-execution-helpers.js";
 
 // Re-export types from the types module for backward compatibility

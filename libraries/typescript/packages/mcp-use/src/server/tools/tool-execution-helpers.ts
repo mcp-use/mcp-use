@@ -540,11 +540,41 @@ function createLogMethod(
   };
 }
 
+const MCP_UI_EXTENSION_ID = "io.modelcontextprotocol/ui";
+const MCP_UI_MIME_TYPE = "text/html;profile=mcp-app";
+
+/**
+ * Checks whether a raw client capabilities object advertises support for
+ * MCP Apps (SEP-1865 / `io.modelcontextprotocol/ui` extension).
+ *
+ * Useful at server setup time when you want to conditionally register
+ * widget-enabled tool variants before any callback is invoked.
+ *
+ * @example
+ * ```typescript
+ * server.onClientConnected((caps) => {
+ *   if (supportsApps(caps)) {
+ *     // register widget tools
+ *   }
+ * });
+ * ```
+ */
+export function supportsApps(
+  clientCapabilities: Record<string, any> | undefined
+): boolean {
+  return (
+    (clientCapabilities as any)?.extensions?.[
+      MCP_UI_EXTENSION_ID
+    ]?.mimeTypes?.includes(MCP_UI_MIME_TYPE) ?? false
+  );
+}
+
 /**
  * Create client capability checker object
  */
-function createClientCapabilityChecker(
-  clientCapabilities: Record<string, any> | undefined
+export function createClientCapabilityChecker(
+  clientCapabilities: Record<string, any> | undefined,
+  clientInfo?: Record<string, any>
 ) {
   const caps = clientCapabilities || {};
 
@@ -555,6 +585,51 @@ function createClientCapabilityChecker(
 
     capabilities(): Record<string, any> {
       return { ...caps }; // Return a copy to prevent mutation
+    },
+
+    /**
+     * Returns the name and version of the connecting client as advertised
+     * in the MCP initialize handshake.
+     */
+    info(): { name?: string; version?: string } {
+      return { ...(clientInfo as { name?: string; version?: string }) };
+    },
+
+    /**
+     * Returns the settings object for a specific extension (SEP-1724).
+     * Returns `undefined` if the client did not advertise that extension.
+     *
+     * @example
+     * ```typescript
+     * // Check for MCP Apps support (SEP-1865)
+     * const uiExt = ctx.client.extension("io.modelcontextprotocol/ui");
+     * if (uiExt?.mimeTypes?.includes("text/html;profile=mcp-app")) { ... }
+     *
+     * // Or use the convenience method:
+     * if (ctx.client.supportsApps()) { ... }
+     * ```
+     */
+    extension(id: string): Record<string, any> | undefined {
+      return (caps as any)?.extensions?.[id];
+    },
+
+    /**
+     * Returns `true` if the client advertises support for MCP Apps
+     * (SEP-1865, extension identifier `io.modelcontextprotocol/ui`).
+     *
+     * Use this to conditionally register widget-enabled tool variants
+     * or return widget-aware responses.
+     *
+     * @example
+     * ```typescript
+     * if (ctx.client.supportsApps()) {
+     *   return widget({ uri: "ui://my-widget", props: result });
+     * }
+     * return text(result.summary);
+     * ```
+     */
+    supportsApps(): boolean {
+      return supportsApps(caps);
     },
   };
 }
@@ -660,7 +735,8 @@ export function createEnhancedContext(
   minLogLevel?: string,
   clientCapabilities?: Record<string, unknown>,
   sessionId?: string,
-  sessions?: Map<string, SessionData>
+  sessions?: Map<string, SessionData>,
+  clientInfo?: Record<string, unknown>
 ): Context & {
   sample: ReturnType<typeof createSampleMethod>;
   elicit: ReturnType<typeof createElicitMethod>;
@@ -669,7 +745,7 @@ export function createEnhancedContext(
     total?: number;
   }) => Promise<void>;
   log: (level: string, data: unknown, logger?: string) => Promise<void>;
-  client: { capabilities?: Record<string, unknown> };
+  client: ReturnType<typeof createClientCapabilityChecker>;
   session: { id?: string };
   sendNotification: typeof sendNotification;
 } {
@@ -690,7 +766,10 @@ export function createEnhancedContext(
 
   enhancedContext.log = createLogMethod(sendNotification, minLogLevel);
 
-  enhancedContext.client = createClientCapabilityChecker(clientCapabilities);
+  enhancedContext.client = createClientCapabilityChecker(
+    clientCapabilities,
+    clientInfo
+  );
 
   // Add session information
   if (sessionId) {

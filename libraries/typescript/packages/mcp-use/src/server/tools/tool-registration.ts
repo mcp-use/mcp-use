@@ -211,7 +211,8 @@ export function toolRegistration<
         session?.logLevel,
         session?.clientCapabilities,
         sessionId,
-        this.sessions
+        this.sessions,
+        session?.clientInfo
       );
 
       // Execute callback

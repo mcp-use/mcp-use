@@ -306,11 +306,11 @@ export interface ToolContext {
 
   /**
    * Client capability interface
-   * Provides access to client capabilities advertised during initialization
+   * Provides access to client capabilities and info advertised during initialization
    */
   client: {
     /**
-     * Check if client supports a specific capability
+     * Check if client supports a specific top-level capability
      * @param capability - Capability name (e.g., "sampling", "elicitation", "roots")
      * @returns true if client advertised this capability, false otherwise
      *
@@ -337,6 +337,52 @@ export interface ToolContext {
      * ```
      */
     capabilities(): Record<string, any>;
+
+    /**
+     * Get the connecting client's name and version from the MCP initialize handshake.
+     *
+     * @example
+     * ```typescript
+     * const { name, version } = ctx.client.info();
+     * console.log(`Connected client: ${name} ${version}`);
+     * // "claude-desktop 1.2.0"
+     * ```
+     */
+    info(): { name?: string; version?: string };
+
+    /**
+     * Get the settings object for a specific MCP extension (SEP-1724).
+     * Returns `undefined` if the client did not advertise that extension.
+     *
+     * @param id - Extension identifier (e.g., "io.modelcontextprotocol/ui")
+     * @returns The extension settings object, or `undefined` if not supported
+     *
+     * @example
+     * ```typescript
+     * const uiExt = ctx.client.extension("io.modelcontextprotocol/ui");
+     * if (uiExt?.mimeTypes?.includes("text/html;profile=mcp-app")) {
+     *   // register widget-enabled tool
+     * }
+     * ```
+     */
+    extension(id: string): Record<string, any> | undefined;
+
+    /**
+     * Returns `true` if the client advertises MCP Apps support
+     * (SEP-1865, extension `io.modelcontextprotocol/ui` with MIME type
+     * `text/html;profile=mcp-app`).
+     *
+     * Use this to conditionally return widget-aware responses.
+     *
+     * @example
+     * ```typescript
+     * if (ctx.client.supportsApps()) {
+     *   return widget({ uri: "ui://my-widget", props: result });
+     * }
+     * return text(result.summary);
+     * ```
+     */
+    supportsApps(): boolean;
   };
 
   /**

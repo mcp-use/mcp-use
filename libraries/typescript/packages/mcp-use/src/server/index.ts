@@ -25,6 +25,9 @@ export {
   runWithContext,
 } from "./context-storage.js";
 
+// Client capability utilities
+export { supportsApps } from "./tools/tool-execution-helpers.js";
+
 // Response helper utilities for tools and resources
 export {
   array,
@@ -161,6 +164,7 @@ export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
 
 export type {
   AppsSdkUIResource,
+  ClientCapabilityChecker,
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
   GetPromptResult,

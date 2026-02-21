@@ -417,6 +417,7 @@ export async function mountMcp(
             const sessionData = sessions.get(sid);
             if (sessionData) {
               sessionData.clientCapabilities = clientCapabilities;
+              sessionData.clientInfo = clientInfo;
             }
 
             // Track server initialize event
