@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.16.0
+
+### Minor Changes
+
+- ee3c3c5: feat(cli): added support for --tunnel flag with full chatgpt hmr
+
+### Patch Changes
+
+- mcp-use@1.20.5
+- @mcp-use/inspector@0.23.1
+
 ## 2.16.0-canary.0
 
 ### Minor Changes
