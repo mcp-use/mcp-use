@@ -31,6 +31,53 @@ This file provides a NAVIGATION GUIDE ONLY. Before implementing any MCP server f
 
 Comprehensive guide for building production-ready MCP servers with tools, resources, prompts, and widgets using mcp-use.
 
+## ⚠️ FIRST: New Project or Existing Project?
+
+**Before doing anything else, determine whether you are inside an existing mcp-use project.**
+
+**Detection:** Check the workspace for a `package.json` that lists `"mcp-use"` as a dependency, OR any `.ts` file that imports from `"mcp-use/server"`.
+
+```
+├─ mcp-use project FOUND → Do NOT scaffold. You are already in a project.
+│  └─ Skip to "Quick Navigation" below to add features.
+│
+├─ NO mcp-use project (empty dir, unrelated project, or greenfield)
+│  └─ Scaffold first with npx create-mcp-use-app, then add features.
+│     See "Scaffolding a New Project" below.
+│
+└─ Inside an UNRELATED project (e.g. Next.js app) and user wants an MCP server
+   └─ Ask the user where to create it, then scaffold in that directory.
+      Do NOT scaffold inside an existing unrelated project root.
+```
+
+**NEVER manually create `MCPServer` boilerplate, `package.json`, or project structure by hand.** The CLI sets up TypeScript config, dev scripts, inspector integration, hot reload, and widget compilation that are difficult to replicate manually.
+
+---
+
+### Scaffolding a New Project
+
+```bash
+npx create-mcp-use-app my-server
+cd my-server
+npm run dev
+```
+
+**Pick the right template based on what the user needs:**
+
+| Template | Command | Best For |
+|----------|---------|----------|
+| **starter** (default) | `npx create-mcp-use-app my-server` | Full-featured: tools + resources + prompts + widgets |
+| **mcp-apps** | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT/Claude/OpenAI Apps SDK |
+| **blank** | `npx create-mcp-use-app my-server --template blank` | Clean slate with commented-out examples |
+| **GitHub repo** | `npx create-mcp-use-app my-server --template owner/repo` | Custom or community template |
+
+**Useful flags:**
+- `--npm` / `--yarn` / `--pnpm` — choose package manager
+
+For full scaffolding details, see **[quickstart.md](references/foundations/quickstart.md)**.
+
+---
+
 ## Quick Navigation
 
 **Choose your path based on what you're building:**
@@ -40,7 +87,8 @@ Comprehensive guide for building production-ready MCP servers with tools, resour
 
 1. **[concepts.md](references/foundations/concepts.md)** - MCP primitives (Tool, Resource, Prompt, Widget) and when to use each
 2. **[architecture.md](references/foundations/architecture.md)** - Server structure (Hono-based), middleware system, server.use() vs server.app
-3. **[quickstart.md](references/foundations/quickstart.md)** - Basic server setup patterns and first tool example
+3. **[quickstart.md](references/foundations/quickstart.md)** - Scaffolding, setup, and first tool example
+4. **[deployment.md](references/foundations/deployment.md)** - Deploying to Manufact Cloud, self-hosting, Docker, managing deployments
 
 Load these before diving into tools/resources/widgets sections.
 
@@ -125,8 +173,11 @@ Load these before diving into tools/resources/widgets sections.
 ## Decision Tree
 
 ```
-What do you need to build?
+What do you need?
 
+├─ New project from scratch
+│  └─> quickstart.md (scaffolding + setup)
+│
 ├─ OAuth / user authentication
 │  └─> authentication/overview.md → provider-specific guide
 │
@@ -139,8 +190,11 @@ What do you need to build?
 ├─ Reusable prompt template
 │  └─> Use Prompt: server/prompts.md
 │
-└─ Visual/interactive UI
-   └─> Use Widget: widgets/basics.md
+├─ Visual/interactive UI
+│  └─> Use Widget: widgets/basics.md
+│
+└─ Deploy to production
+   └─> deployment.md (cloud deploy, self-hosting, Docker)
 ```
 
 ---
