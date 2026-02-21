@@ -57,6 +57,10 @@ export interface ChatTabProps {
   clearButtonHideShortcut?: boolean;
   /** Button variant for the clear/new-chat button. Default: "default". */
   clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
+  /** When true, hides the "New Chat" / clear button entirely. */
+  hideClearButton?: boolean;
+  /** When true, hides the tool selector (wrench icon) in the chat input. */
+  hideToolSelector?: boolean;
   /** Initial quick questions shown below the landing input. */
   chatQuickQuestions?: string[];
   /** Initial followups shown above input in active chat mode. */
@@ -86,6 +90,8 @@ export function ChatTab({
   clearButtonHideIcon,
   clearButtonHideShortcut,
   clearButtonVariant,
+  hideClearButton,
+  hideToolSelector,
   chatQuickQuestions = [],
   chatFollowups = [],
 }: ChatTabProps) {
@@ -159,6 +165,7 @@ export function ChatTab({
     attachments,
     sendMessage,
     clearMessages,
+    setMessages,
     stop,
     addAttachment,
     removeAttachment,
@@ -230,6 +237,7 @@ export function ChatTab({
         getState: true,
         setQuickQuestions: true,
         setFollowups: true,
+        loadMessages: true,
       },
     });
   }, [postBridgeEvent]);
@@ -335,6 +343,19 @@ export function ChatTab({
         const values = sanitizeStringList(data.followups);
         setFollowups(values);
         postResult(true, { followups: values });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:load_messages") {
+        const rawMessages = (data as unknown as { messages?: unknown })
+          .messages;
+        if (!Array.isArray(rawMessages)) {
+          postResult(false, { error: "messages must be an array" });
+          return;
+        }
+        setMessages(rawMessages as ChatMessage[]);
+        postResult(true, { count: rawMessages.length });
+        return;
       }
     };
 
@@ -342,6 +363,7 @@ export function ChatTab({
     return () => window.removeEventListener("message", handleMessage);
   }, [
     clearMessages,
+    setMessages,
     followups,
     getSerializedMessages,
     isLoading,
@@ -582,9 +604,11 @@ export function ChatTab({
           selectedPrompt={selectedPrompt}
           promptResults={results}
           attachments={attachments}
-          tools={toolInfos}
-          disabledTools={disabledTools}
-          onDisabledToolsChange={setDisabledTools}
+          tools={hideToolSelector ? undefined : toolInfos}
+          disabledTools={hideToolSelector ? undefined : disabledTools}
+          onDisabledToolsChange={
+            hideToolSelector ? undefined : setDisabledTools
+          }
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
@@ -630,6 +654,7 @@ export function ChatTab({
         clearButtonHideIcon={clearButtonHideIcon}
         clearButtonHideShortcut={clearButtonHideShortcut}
         clearButtonVariant={clearButtonVariant}
+        hideClearButton={hideClearButton}
       />
 
       {/* Messages Area */}
@@ -664,9 +689,11 @@ export function ChatTab({
           promptResults={results}
           selectedPrompt={selectedPrompt}
           attachments={attachments}
-          tools={toolInfos}
-          disabledTools={disabledTools}
-          onDisabledToolsChange={setDisabledTools}
+          tools={hideToolSelector ? undefined : toolInfos}
+          disabledTools={hideToolSelector ? undefined : disabledTools}
+          onDisabledToolsChange={
+            hideToolSelector ? undefined : setDisabledTools
+          }
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}

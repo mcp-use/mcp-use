@@ -1,14 +1,32 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { cn } from "@/client/lib/utils";
+
+// Simple hash function to convert a string to a number
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
+
+// Seeded random number generator (simple LCG)
+function seededRandom(seed: number, index: number = 0): number {
+  const x = Math.sin(seed + index) * 10000;
+  return x - Math.floor(x);
+}
 
 export interface RandomGradientBackgroundProps {
   className?: string;
   children?: ReactNode;
   grayscaled?: boolean;
   color?: string | null; // oklch(hue lightness saturation)
+  seed?: string; // Optional seed for deterministic gradient
 }
 
 export function RandomGradientBackground({
@@ -16,7 +34,13 @@ export function RandomGradientBackground({
   color,
   children,
   grayscaled = false,
+  seed,
 }: RandomGradientBackgroundProps) {
+  const fallbackSeed = useId();
+  const seedHash = useMemo(() => {
+    return seed ? hashString(seed) : hashString(fallbackSeed);
+  }, [seed, fallbackSeed]);
+
   const saturation = useMemo(() => {
     if (color) {
       const values = color.split("(")[1].split(")")[0].trim().split(/\s+/);
@@ -38,8 +62,8 @@ export function RandomGradientBackground({
       const values = color.split("(")[1].split(")")[0].trim().split(/\s+/);
       return Number.parseFloat(values[2] || "0");
     }
-    return Math.floor(Math.random() * 360);
-  }, [color]);
+    return Math.floor(seededRandom(seedHash, 0) * 360);
+  }, [color, seedHash]);
 
   const randomColor = useMemo(() => {
     if (color) {
@@ -53,8 +77,8 @@ export function RandomGradientBackground({
   }, [randomHue, saturation, lightness, color]);
 
   const direction = useMemo(() => {
-    return Math.floor(Math.random() * 360);
-  }, [randomHue]);
+    return Math.floor(seededRandom(seedHash, 1) * 360);
+  }, [seedHash]);
 
   const brightnessFilter = useMemo(() => {
     return "1000%";
