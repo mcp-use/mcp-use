@@ -62,19 +62,7 @@ cd my-server
 npm run dev
 ```
 
-**Pick the right template based on what the user needs:**
-
-| Template | Command | Best For |
-|----------|---------|----------|
-| **starter** (default) | `npx create-mcp-use-app my-server` | Full-featured: tools + resources + prompts + widgets |
-| **mcp-apps** | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT/Claude/OpenAI Apps SDK |
-| **blank** | `npx create-mcp-use-app my-server --template blank` | Clean slate with commented-out examples |
-| **GitHub repo** | `npx create-mcp-use-app my-server --template owner/repo` | Custom or community template |
-
-**Useful flags:**
-- `--npm` / `--yarn` / `--pnpm` — choose package manager
-
-For full scaffolding details, see **[quickstart.md](references/foundations/quickstart.md)**.
+For full scaffolding details and CLI flags, see **[quickstart.md](references/foundations/quickstart.md)**.
 
 ---
 

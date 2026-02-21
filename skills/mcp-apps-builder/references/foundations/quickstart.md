@@ -6,8 +6,6 @@ Build your first MCP server tool in 5 minutes.
 
 ### Scaffolding a New Project
 
-**NEVER manually create project files.** Always use the CLI — it sets up TypeScript config, dev scripts, inspector, hot reload, and widget compilation.
-
 ```bash
 npx create-mcp-use-app my-server
 cd my-server
@@ -27,7 +25,7 @@ Pick the template that matches what the user is building:
 | **blank** | `npx create-mcp-use-app my-server --template blank` | Clean slate — bare server with commented-out examples |
 | **GitHub repo** | `npx create-mcp-use-app my-server --template owner/repo` | Custom or community templates from any GitHub repository |
 
-**When unsure, use `starter`.** It includes everything and the user can delete what they don't need.
+**When unsure, use `mcp-apps`.** It's the recommended default with widget support for ChatGPT, Claude, and other MCP Apps-compatible clients.
 
 ### Common Flags
 
