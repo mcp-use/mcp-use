@@ -29,8 +29,6 @@
   },
   "dependencies": {
     "@openai/apps-sdk-ui": "^0.2.1",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
     "mcp-use": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

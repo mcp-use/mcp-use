@@ -29,8 +29,6 @@
   "dependencies": {
     "@openai/apps-sdk-ui": "^0.2.1",
     "@tanstack/react-query": "^5.90.12",
-    "cors": "^2.8.5",
-    "express": "^5.2.1",
     "mcp-use": "workspace:*",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
