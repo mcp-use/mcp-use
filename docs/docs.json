@@ -415,6 +415,7 @@
                   "python/api-reference/mcp_use_server_router",
                   "python/api-reference/mcp_use_server_runner",
                   "python/api-reference/mcp_use_server_server",
+                  "python/api-reference/mcp_use_server_templates_cli",
                   "python/api-reference/mcp_use_server_types",
                   {
                     "group": "Utils",
