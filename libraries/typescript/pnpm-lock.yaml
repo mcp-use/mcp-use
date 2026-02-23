@@ -875,6 +875,22 @@ importers:
         specifier: ^7.3.0
         version: 7.3.1(@types/node@25.2.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/mcp-use/examples/server/features/express-middleware:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/mcp-use/examples/server/features/notifications:
     dependencies:
       mcp-use:
