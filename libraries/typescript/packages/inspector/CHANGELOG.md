@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.23.2-canary.0
+
+### Patch Changes
+
+- 85f4bff: Fix --no-open flag being ignored in inspector standalone dev mode
+  - mcp-use@1.20.6-canary.0
+
 ## 0.23.1
 
 ### Patch Changes
