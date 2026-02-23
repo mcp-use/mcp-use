@@ -12,17 +12,24 @@ This example demonstrates using both Express and Hono middlewares with mcp-use s
 
 ## Middleware Types
 
-### Express Middleware
-```typescript
-const expressLogger = (req: any, res: any, next: () => void) => {
-  console.log(`[Express Middleware] ${req.method} ${req.url}`);
-  next();
-};
+### Express Middleware from npm
+```javascript
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+
+const morganLogger = morgan("combined");
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+server.use(morganLogger);
+server.use("/api", apiLimiter);
 ```
 
 ### Hono Middleware
-```typescript
-const honoLogger = async (c: any, next: any) => {
+```javascript
+const honoLogger = async (c, next) => {
   const start = Date.now();
   await next();
   const duration = Date.now() - start;
@@ -32,9 +39,9 @@ const honoLogger = async (c: any, next: any) => {
 
 ## Routes
 
-- `GET /public/info` - Public endpoint (no auth required)
-- `GET /api/health` - Protected endpoint (requires Authorization header)
-- `POST /api/data` - Protected endpoint (requires Authorization header)
+- `GET /public/info` - Public endpoint (no rate limiting)
+- `GET /api/health` - Rate limited endpoint (100 requests per 15 minutes)
+- `POST /api/data` - Rate limited endpoint (100 requests per 15 minutes)
 
 ## Running
 
@@ -52,20 +59,17 @@ The server will start on `http://localhost:3000`
 curl http://localhost:3000/public/info
 ```
 
-### Test Protected Routes (will fail without auth)
+### Test Protected Routes (rate limited)
 ```bash
 curl http://localhost:3000/api/health
-# Returns: {"error":"Unauthorized"}
-
-curl -H "Authorization: Bearer token" http://localhost:3000/api/health
 # Returns: {"status":"ok","timestamp":"...","duration":0}
+# Note: After 100 requests in 15 minutes, you'll get rate limit error
 ```
 
 ### Test POST Route
 ```bash
 curl -X POST http://localhost:3000/api/data \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer token" \
   -d '{"test":"data"}'
 ```
 
@@ -74,5 +78,7 @@ curl -X POST http://localhost:3000/api/data \
 This example demonstrates that TypeScript correctly accepts both Express and Hono middleware types without type errors. The `server.use()` method is properly typed to accept:
 
 - `MiddlewareHandler` (Hono middleware)
-- `ExpressMiddleware` (Express middleware)
+- `ExpressMiddleware` (Express middleware from npm packages)
 - `ExpressErrorMiddleware` (Express error middleware)
+
+The example uses real npm packages (`morgan` and `express-rate-limit`) to demonstrate that actual Express middleware works seamlessly with the Hono server.

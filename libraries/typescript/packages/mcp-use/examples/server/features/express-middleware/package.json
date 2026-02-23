@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "mcp-use": "workspace:*",
-    "zod": "4.3.5"
+    "zod": "4.3.5",
+    "morgan": "^1.10.1",
+    "express-rate-limit": "^7.4.1"
   },
   "devDependencies": {
     "@types/node": "^25.0.2",
