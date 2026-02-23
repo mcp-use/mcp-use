@@ -387,7 +387,7 @@ server.use(rateLimiter({
 
 > Adjust the key generator depending on your hosting environment.
 
-**Note:** mcp-use is built on Hono. Use Hono-compatible middleware — Express middleware (e.g., `express-rate-limit`) is **not** compatible. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
+**Note:** mcp-use is built on Hono and supports both Hono-compatible middleware and Express middleware. Express middleware (e.g., `express-rate-limit`, `morgan`) is automatically detected and adapted. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
 
 ---
 
