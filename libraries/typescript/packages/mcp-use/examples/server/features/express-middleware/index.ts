@@ -1,6 +1,6 @@
 /**
  * Express Middleware Example
- * 
+ *
  * Demonstrates using both Express and Hono middlewares with mcp-use server.
  * This example shows:
  * - Express middleware from npm packages (morgan, express-rate-limit)
@@ -48,7 +48,9 @@ const honoLogger = async (c, next) => {
   const start = Date.now();
   await next();
   const duration = Date.now() - start;
-  console.log(`[Hono Middleware] ${c.req.method} ${c.req.path} - ${duration}ms`);
+  console.log(
+    `[Hono Middleware] ${c.req.method} ${c.req.path} - ${duration}ms`
+  );
 };
 
 const honoTimer = async (c, next) => {
@@ -81,7 +83,11 @@ server.tool(
     name: "get-server-info",
     description: "Get server information including middleware count",
     schema: z.object({
-      includeStats: z.boolean().optional().default(false).describe("Include statistics"),
+      includeStats: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Include statistics"),
     }),
   },
   async ({ includeStats }) => {
@@ -122,7 +128,7 @@ server.post("/api/data", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const startTime = c.get("startTime");
   const duration = startTime ? Date.now() - startTime : 0;
-  
+
   return c.json({
     received: body,
     processed: true,
@@ -145,7 +151,9 @@ server.get("/public/info", (c) => {
 
 console.log("Starting Express Middleware Example Server...");
 console.log("This server demonstrates:");
-console.log("  - Express middleware from npm: morgan (logger), express-rate-limit");
+console.log(
+  "  - Express middleware from npm: morgan (logger), express-rate-limit"
+);
 console.log("  - Hono middleware: honoLogger, honoTimer");
 console.log("  - MCP tool: get-server-info");
 console.log("  - GET route: /api/health (rate limited), /public/info (public)");

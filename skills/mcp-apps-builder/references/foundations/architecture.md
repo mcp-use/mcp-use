@@ -143,7 +143,7 @@ server.use("/api", rateLimit({
 }));
 ```
 
-**Note:** Express middleware is detected by function signature (3-4 parameters for Express vs 2 for Hono). Both types can be mixed in the same application.
+**Note:** Express middleware is detected by function signature (3-4 parameters) and pattern matching for Express-specific code patterns (e.g., `res.send`, `req.body`). Hono middleware uses 2 parameters and Hono-specific patterns (e.g., `c.req`, `c.json`). Both types can be mixed in the same application.
 
 ---
 

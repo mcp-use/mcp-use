@@ -1,6 +1,6 @@
 /**
  * Test file for Express middleware compatibility
- * 
+ *
  * Verifies that Express middleware from npm packages can be used with server.use()
  */
 

@@ -35,7 +35,10 @@ type ExpressErrorMiddleware = (
 /**
  * Union type for all acceptable middleware types
  */
-type AcceptableMiddleware = MiddlewareHandler | ExpressMiddleware | ExpressErrorMiddleware;
+type AcceptableMiddleware =
+  | MiddlewareHandler
+  | ExpressMiddleware
+  | ExpressErrorMiddleware;
 
 /**
  * Create a proxy that allows direct access to Hono methods
@@ -111,12 +114,14 @@ export function createHonoProxy<T extends object>(
     get(target, prop) {
       // Special handling for 'use' method to auto-detect and adapt Express middleware
       if (prop === "use") {
-        return async (...args: AcceptableMiddleware[] | [string, ...AcceptableMiddleware[]]) => {
+        return async (
+          ...args: AcceptableMiddleware[] | [string, ...AcceptableMiddleware[]]
+        ) => {
           // Hono's use signature: use(path?, ...handlers)
           // Check if the first arg is a path (string) or a handler (function)
           const hasPath = typeof args[0] === "string";
           const path: string = hasPath ? (args[0] as string) : "*";
-          const handlers: AcceptableMiddleware[] = hasPath 
+          const handlers: AcceptableMiddleware[] = hasPath
             ? (args.slice(1) as AcceptableMiddleware[])
             : (args as AcceptableMiddleware[]);
 
