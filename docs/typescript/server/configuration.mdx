@@ -227,7 +227,44 @@ const server = new MCPServer({
 
 ## Middleware Configuration
 
-`MCPServer` exposes a `server.app` Hono instance for adding custom routes and middleware.
+`MCPServer` supports both **Hono middleware** and **Express middleware**. Express middleware is automatically detected and adapted to work with Hono.
+
+### Using Middleware
+
+You can add middleware using `server.use()` or `server.app.use()`:
+
+```typescript
+import { MCPServer } from 'mcp-use/server'
+import morgan from 'morgan'
+import rateLimit from 'express-rate-limit'
+
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+})
+
+// Hono middleware
+server.use(async (c, next) => {
+  console.log(`${c.req.method} ${c.req.path}`)
+  await next()
+})
+
+// Express middleware (automatically adapted)
+server.use(morgan('combined'))
+server.use('/api', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+}))
+
+// Mix both types
+server.use(morgan('dev'), async (c, next) => {
+  await next()
+})
+```
+
+<Tip>
+Express middleware is detected by function signature (3-4 parameters) and pattern matching for Express-specific code patterns (e.g., `res.send`, `req.body`). Hono middleware uses 2 parameters and Hono-specific patterns (e.g., `c.req`, `c.json`). Both types can be mixed in the same application.
+</Tip>
 
 ### CORS Customization
 
@@ -268,18 +305,19 @@ const server = new MCPServer({
 
 ### Route-Scoped Middleware
 
-Add middleware or custom routes to `server.app`:
+Add middleware or custom routes using `server.use()` or `server.app.use()`:
 
 ```typescript
 import { MCPServer } from 'mcp-use/server'
+import rateLimit from 'express-rate-limit'
 
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
 })
 
-// Auth middleware for custom routes
-server.app.use('/api/admin/*', async (c, next) => {
+// Hono middleware for specific routes
+server.use('/api/admin/*', async (c, next) => {
   const apiKey = c.req.header('x-api-key')
   if (!apiKey || apiKey !== process.env.API_KEY) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -287,8 +325,14 @@ server.app.use('/api/admin/*', async (c, next) => {
   await next()
 })
 
+// Express middleware for specific routes (automatically adapted)
+server.use('/api', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+}))
+
 // Custom HTTP endpoint
-server.app.get('/health', (c) => c.json({ status: 'ok' }))
+server.get('/health', (c) => c.json({ status: 'ok' }))
 ```
 
 <Note>
