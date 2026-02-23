@@ -41,6 +41,56 @@ export function LayoutContent({
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
 
+  // When forceConnected is enabled, render the chat tab directly without a
+  // real server connection. The backend (chatApiUrl) manages everything.
+  if (!selectedServer && embeddedConfig.forceConnected) {
+    if (!embeddedConfig.chatApiUrl) {
+      return <>{children}</>;
+    }
+    const stubConnection = {
+      id: "force-connected",
+      url: "",
+      name: "",
+      state: "ready" as const,
+      tools: [],
+      prompts: [],
+      resources: [],
+    } as unknown as MCPConnection;
+
+    return (
+      <ChatTab
+        key="chat-force-connected"
+        connection={stubConnection}
+        isConnected={true}
+        prompts={[]}
+        serverId="force-connected"
+        callPrompt={async () => ({ messages: [] })}
+        readResource={async () => ({ contents: [] })}
+        useClientSide={false}
+        chatApiUrl={embeddedConfig.chatApiUrl}
+        managedLlmConfig={
+          embeddedConfig.managedLlmConfig ?? {
+            provider: "anthropic",
+            model: "server-managed",
+            apiKey: "server-managed",
+          }
+        }
+        hideTitle={embeddedConfig.chatHideTitle}
+        hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
+        hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
+        clearButtonLabel={embeddedConfig.chatClearButtonLabel}
+        clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
+        clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
+        clearButtonVariant={embeddedConfig.chatClearButtonVariant}
+        chatQuickQuestions={embeddedConfig.chatQuickQuestions}
+        chatFollowups={embeddedConfig.chatFollowups}
+        hideClearButton={embeddedConfig.chatHideClearButton}
+        hideToolSelector={embeddedConfig.chatHideToolSelector}
+        enableKeyboardShortcuts={false}
+      />
+    );
+  }
+
   if (!selectedServer) {
     return <>{children}</>;
   }
@@ -134,7 +184,9 @@ export function LayoutContent({
           <ChatTab
             key={`chat-${selectedServer.id}-${selectedServer.state}`}
             connection={selectedServer}
-            isConnected={selectedServer.state === "ready"}
+            isConnected={
+              embeddedConfig.forceConnected || selectedServer.state === "ready"
+            }
             prompts={selectedServer.prompts}
             serverId={selectedServer.id}
             callPrompt={selectedServer.getPrompt}
@@ -164,6 +216,8 @@ export function LayoutContent({
             clearButtonVariant={embeddedConfig.chatClearButtonVariant}
             chatQuickQuestions={embeddedConfig.chatQuickQuestions}
             chatFollowups={embeddedConfig.chatFollowups}
+            hideClearButton={embeddedConfig.chatHideClearButton}
+            hideToolSelector={embeddedConfig.chatHideToolSelector}
           />
         </div>
       )}

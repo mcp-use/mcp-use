@@ -4,16 +4,87 @@ Build your first MCP server tool in 5 minutes.
 
 ## Setup
 
-```bash
-# Create new project
-npx create-mcp-use-app my-server
+### Scaffolding a New Project
 
-# Start development server
+```bash
+npx create-mcp-use-app my-server
 cd my-server
 npm run dev
 ```
 
-This opens the inspector at `http://localhost:3000/inspector` where you can test your server.
+This installs dependencies, starts the server on port 3000, and opens the inspector at `http://localhost:3000/inspector`.
+
+### Choosing a Template
+
+Pick the template that matches what the user is building:
+
+| Template | Command | Use When |
+|----------|---------|----------|
+| **starter** (default) | `npx create-mcp-use-app my-server` | Full-featured server with tools, resources, prompts, and widget examples |
+| **mcp-apps** | `npx create-mcp-use-app my-server --template mcp-apps` | Widget-focused for ChatGPT, Claude, and other MCP Apps-compatible clients |
+| **blank** | `npx create-mcp-use-app my-server --template blank` | Clean slate — bare server with commented-out examples |
+| **GitHub repo** | `npx create-mcp-use-app my-server --template owner/repo` | Custom or community templates from any GitHub repository |
+
+**When unsure, use `mcp-apps`.** It's the recommended default with widget support for ChatGPT, Claude, and other MCP Apps-compatible clients.
+
+### Common Flags
+
+```bash
+# Choose package manager
+npx create-mcp-use-app my-server --npm
+npx create-mcp-use-app my-server --pnpm
+
+# Skip interactive prompts
+npx create-mcp-use-app my-server --install --skills
+
+# List all available templates
+npx create-mcp-use-app --list-templates
+```
+
+### What Each Template Produces
+
+**starter:**
+```
+my-server/
+├── index.ts              # Server with example tool, resource, and prompt
+├── resources/            # Widget directory (display-weather.tsx example)
+├── public/               # Static assets (favicon, icon)
+├── package.json          # Pre-configured scripts: dev, build, start, deploy
+└── tsconfig.json
+```
+
+**mcp-apps:**
+```
+my-server/
+├── index.ts              # Server with widget-returning tools
+├── resources/            # Widget directory (product-search-result/ example)
+│   └── product-search-result/
+│       ├── widget.tsx    # React widget with carousel UI
+│       └── components/   # Reusable widget components
+├── public/
+├── package.json
+└── tsconfig.json
+```
+
+**blank:**
+```
+my-server/
+├── index.ts              # Bare MCPServer with commented-out examples
+├── public/
+├── package.json
+└── tsconfig.json
+```
+
+### Development Workflow
+
+After scaffolding:
+
+1. `npm run dev` — starts server with hot reload + inspector
+2. Edit `index.ts` to add tools, resources, prompts
+3. Add widgets as `.tsx` files in `resources/`
+4. Test everything at `http://localhost:3000/inspector`
+5. `npm run build` — production build
+6. `npm run deploy` — deploy to production
 
 ---
 

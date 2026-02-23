@@ -175,9 +175,10 @@ const {
   isPending,    // True while props are loading
   setState,     // Update widget state
   state,        // Current widget state
-  callTool      // Call MCP tools from widget
 } = useWidget();
 ```
+
+**To call tools from a widget**, use the dedicated `useCallTool()` hook — see [interactivity.md](interactivity.md).
 
 ### props
 Data passed from tool's `widget({ props })` response:

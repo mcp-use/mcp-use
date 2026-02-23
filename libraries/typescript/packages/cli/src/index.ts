@@ -1067,7 +1067,7 @@ program
   )
   .option("--no-open", "Do not auto-open inspector")
   .option("--no-hmr", "Disable hot module reloading (use tsx watch instead)")
-  // .option('--tunnel', 'Expose server through a tunnel')
+  .option("--tunnel", "Expose server through a tunnel")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -1088,15 +1088,77 @@ program
       // Find the main source file
       const serverFile = await findServerFile(projectPath);
 
+      // Start tunnel if requested
+      let tunnelProcess: any = undefined;
+      let tunnelSubdomain: string | undefined = undefined;
+      let tunnelUrl: string | undefined = undefined;
+
+      if (options.tunnel) {
+        try {
+          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          let existingSubdomain: string | undefined;
+
+          try {
+            const manifestContent = await readFile(manifestPath, "utf-8");
+            const manifest = JSON.parse(manifestContent);
+            existingSubdomain = manifest.tunnel?.subdomain;
+            if (existingSubdomain) {
+              console.log(
+                chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
+              );
+            }
+          } catch {
+            // Manifest doesn't exist or is invalid, that's okay
+          }
+
+          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          tunnelUrl = tunnelInfo.url;
+          tunnelProcess = tunnelInfo.process;
+          tunnelSubdomain = tunnelInfo.subdomain;
+
+          // Persist subdomain for reuse across restarts
+          try {
+            let manifest: any = {};
+            try {
+              const manifestContent = await readFile(manifestPath, "utf-8");
+              manifest = JSON.parse(manifestContent);
+            } catch {
+              // File doesn't exist, create new manifest
+            }
+
+            if (!manifest.tunnel) {
+              manifest.tunnel = {};
+            }
+            manifest.tunnel.subdomain = tunnelSubdomain;
+
+            await mkdir(path.dirname(manifestPath), { recursive: true });
+            await writeFile(
+              manifestPath,
+              JSON.stringify(manifest, null, 2),
+              "utf-8"
+            );
+          } catch (error) {
+            console.warn(
+              chalk.yellow(
+                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+              )
+            );
+          }
+        } catch (error) {
+          console.error(chalk.red("Failed to start tunnel:"), error);
+          process.exit(1);
+        }
+      }
+
       // Set environment variables for the server
       const mcpUrl = `http://${host}:${port}`;
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
-      // Only set MCP_URL if not already provided by the user.
-      // Users may set MCP_URL to an external proxy URL (ngrok, E2B, etc.)
-      // for correct widget URLs and HMR WebSocket connections through proxies.
-      if (!process.env.MCP_URL) {
+      // Tunnel URL takes priority; otherwise preserve user-provided MCP_URL (e.g., for reverse proxy setups)
+      if (tunnelUrl) {
+        process.env.MCP_URL = tunnelUrl;
+      } else if (!process.env.MCP_URL) {
         process.env.MCP_URL = mcpUrl;
       }
 
@@ -1167,20 +1229,52 @@ program
             );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+            if (tunnelUrl) {
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+            }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
           }
         }
 
         // Handle cleanup
-        const cleanup = () => {
+        let noHmrCleanupInProgress = false;
+        const cleanup = async () => {
+          if (noHmrCleanupInProgress) return;
+          noHmrCleanupInProgress = true;
+
           console.log(chalk.gray("\n\nShutting down..."));
+
+          if (
+            tunnelProcess &&
+            typeof (tunnelProcess as any).markShutdown === "function"
+          ) {
+            (tunnelProcess as any).markShutdown();
+          }
+
+          if (tunnelSubdomain) {
+            try {
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+                method: "DELETE",
+              });
+            } catch {
+              // Ignore cleanup errors
+            }
+          }
+
           processes.forEach((proc) => {
             if (proc && typeof proc.kill === "function") {
               proc.kill("SIGINT");
             }
           });
-          setTimeout(() => process.exit(0), 1000);
+
+          if (tunnelProcess && typeof tunnelProcess.kill === "function") {
+            tunnelProcess.kill("SIGINT");
+          }
+
+          setTimeout(() => process.exit(0), 2000);
         };
 
         process.on("SIGINT", cleanup);
@@ -1353,6 +1447,9 @@ program
             );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+            if (tunnelUrl) {
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+            }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
             console.log(chalk.gray(`Watching for changes...\n`));
             await open(inspectorUrl);
@@ -1375,6 +1472,9 @@ program
         console.log(chalk.green.bold(`✓ Server ready`));
         console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+        if (tunnelUrl) {
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+        }
         console.log(chalk.gray(`Watching for changes...\n`));
       }
 
@@ -1558,10 +1658,39 @@ program
       });
 
       // Handle cleanup
-      const cleanup = () => {
+      let hmrCleanupInProgress = false;
+      const cleanup = async () => {
+        if (hmrCleanupInProgress) return;
+        hmrCleanupInProgress = true;
+
         console.log(chalk.gray("\n\nShutting down..."));
         watcher.close();
-        process.exit(0);
+
+        if (
+          tunnelProcess &&
+          typeof (tunnelProcess as any).markShutdown === "function"
+        ) {
+          (tunnelProcess as any).markShutdown();
+        }
+
+        if (tunnelSubdomain) {
+          try {
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+
+        if (tunnelProcess && typeof tunnelProcess.kill === "function") {
+          tunnelProcess.kill("SIGINT");
+          setTimeout(() => process.exit(0), 2000);
+        } else {
+          process.exit(0);
+        }
       };
 
       process.on("SIGINT", cleanup);

@@ -791,6 +791,7 @@ export function useChatMessagesClientSide({
     attachments,
     sendMessage,
     clearMessages,
+    setMessages,
     stop,
     addAttachment,
     removeAttachment,

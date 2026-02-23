@@ -26,10 +26,6 @@
         <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
         <img src="https://static.pepy.tech/badge/mcp-use" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Client Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-client-conformance.json" /></a>
     <br/>
     <a href="https://mcp-use.com/docs/typescript" alt="Typescript Documentation">
         <img src="https://img.shields.io/badge/typescript-docs-blue?labelColor=white&logo=typescript" alt="Badge"></a>
@@ -37,10 +33,6 @@
         <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
     <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
         <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Conformance">
-        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" /></a>
-    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Client Conformance">
-      <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-node-client-conformance.json" /></a>
     <br/>
 </p>
 </div>
@@ -62,7 +54,7 @@ Visit our [docs](https://mcp-use.com/docs) or jump to a quickstart ([TypeScript]
 
 > **Using Claude Code, Codex, Cursor or other AI coding agents?**
 >
-> **[Install mcp-use skill](https://skills.sh/mcp-use/skills/chatgpt-app-builder)**
+> **[Install mcp-use skill for MCP Apps](https://skills.sh/mcp-use/mcp-use/mcp-apps-builder)**
 
 ## Quickstart: MCP Servers and MCP Apps
 
@@ -71,7 +63,7 @@ Visit our [docs](https://mcp-use.com/docs) or jump to a quickstart ([TypeScript]
 Build your first MCP Server or MPC App:
 
 ```bash
-npx create-mcp-use-app my-server
+npx create-mcp-use-app@latest
 ```
 
 Or create a server manually:
@@ -407,13 +399,28 @@ main();
 
 ---
 
+## Conformance to Model Context Protocol
+
+<div align="center">
+    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Conformance">
+        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-conformance.json" /></a>
+    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="Python MCP Client Conformance">
+        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/python-client-conformance.json" /></a>
+    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Conformance">
+        <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-conformance.json" /></a>
+    <a href="https://github.com/mcp-use/mcp-use/actions/workflows/conformance.yml" alt="TypeScript MCP Client Conformance">
+      <img src="https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/tonxxd/6edf670f0446dc9f7a1f32d6bfda2b70/raw/typescript-node-client-conformance.json" /></a>
+</div>
+
+---
+
 ## Community & Support
 
 - **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
 - **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
 - **Documentation**: [mcp-use.com/docs](https://mcp-use.com/docs)
 - **Website**: [manufact.com](https://manufact.com)
-- **Twitter**: Follow [@pietrozullo](https://x.com/pietrozullo) and [@pederzh](https://x.com/pederzh)
+- **X.com**: Follow [Manufact](https://x.com/manufact)
 - **Contributing**: See [CONTRIBUTING.md](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md)
 - **License**: MIT © [MCP-Use Contributors](https://github.com/mcp-use/mcp-use/graphs/contributors)
 
