@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.20.6-canary.1
+
+### Patch Changes
+
+- 1c8d340: Fix TypeScript type errors when passing Express middleware to server.use(). Added proper type definitions to accept both Hono and Express middleware, with Express middleware automatically detected and adapted at runtime.
+  - @mcp-use/cli@2.16.1-canary.1
+  - @mcp-use/inspector@0.23.2-canary.1
+
 ## 1.20.6-canary.0
 
 ### Patch Changes
