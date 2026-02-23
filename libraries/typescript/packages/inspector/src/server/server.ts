@@ -5,7 +5,7 @@ import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
-import { isPortAvailable, parsePortFromArgs } from "./utils.js";
+import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
 
 const app = new Hono();
 
@@ -99,8 +99,8 @@ async function startServer() {
       console.warn(`🚀 MCP Inspector running on http://localhost:${port}`);
     }
 
-    // Auto-open browser in development
-    if (process.env.NODE_ENV !== "production") {
+    // Auto-open browser in development (unless --no-open flag is present)
+    if (process.env.NODE_ENV !== "production" && !hasNoOpenFlag()) {
       try {
         const url = isDev
           ? "http://localhost:3000"
