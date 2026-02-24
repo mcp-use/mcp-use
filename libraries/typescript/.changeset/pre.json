@@ -9,8 +9,10 @@
   },
   "changesets": [
     "client-completion-support",
+    "client-user-context-mcp-apps",
     "express-middleware-types",
     "fix-inspector-no-open",
-    "hip-ducks-wish"
+    "hip-ducks-wish",
+    "sharp-foxes-lick"
   ]
 }
