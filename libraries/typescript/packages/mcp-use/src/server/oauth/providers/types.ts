@@ -151,6 +151,12 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
 }
 
+export interface ClerkOAuthConfig extends BaseOAuthConfig {
+  provider: "clerk";
+  domain: string;        // e.g. "my-app.clerk.accounts.dev" or custom domain
+  verifyJwt?: boolean;   // defaults to true, disabled only for local dev
+}
+
 /**
  * Union type of all OAuth provider configurations
  */
@@ -159,4 +165,5 @@ export type OAuthConfig =
   | Auth0OAuthConfig
   | KeycloakOAuthConfig
   | WorkOSOAuthConfig
-  | CustomOAuthConfig;
+  | CustomOAuthConfig
+  | ClerkOAuthConfig;
