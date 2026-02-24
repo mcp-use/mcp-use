@@ -97,6 +97,16 @@ export interface ConnectorInitOptions {
    * When provided, registered as initial notification handler.
    */
   onNotification?: NotificationHandler;
+  /**
+   * Reconnection options for streamable HTTP transport.
+   * Controls retry behavior of the underlying `StreamableHTTPClientTransport`.
+   */
+  reconnectionOptions?: {
+    maxReconnectionDelay?: number;
+    initialReconnectionDelay?: number;
+    reconnectionDelayGrowFactor?: number;
+    maxRetries?: number;
+  };
 }
 
 /**

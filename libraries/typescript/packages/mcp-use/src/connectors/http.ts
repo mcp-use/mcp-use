@@ -295,12 +295,12 @@ export class HttpConnector extends BaseConnector {
           requestInit: {
             headers: this.headers,
           },
-          // Pass through reconnection options
           reconnectionOptions: {
             maxReconnectionDelay: 30000,
             initialReconnectionDelay: 1000,
             reconnectionDelayGrowFactor: 1.5,
-            maxRetries: 2, // Disable automatic reconnection - let higher-level logic handle it
+            maxRetries: 2,
+            ...this.opts.reconnectionOptions,
           },
           // Don't pass sessionId - let the SDK generate it automatically during connect()
         }

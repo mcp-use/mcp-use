@@ -15,6 +15,21 @@ import type {
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { BrowserMCPClient } from "../client/browser.js";
 
+/**
+ * SDK-level reconnection options for streamable HTTP transports.
+ * Controls the retry behavior of the underlying `StreamableHTTPClientTransport`.
+ */
+export type ReconnectionOptions = {
+  /** Maximum delay between reconnection attempts in ms (default: 30000) */
+  maxReconnectionDelay?: number;
+  /** Initial delay before first reconnection attempt in ms (default: 1000) */
+  initialReconnectionDelay?: number;
+  /** Multiplier applied to delay after each failed attempt (default: 1.5) */
+  reconnectionDelayGrowFactor?: number;
+  /** Maximum number of reconnection retries (default: 2) */
+  maxRetries?: number;
+};
+
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
   url?: string;
@@ -111,8 +126,38 @@ export type UseMcpOptions = {
     | "silly";
   /** Auto retry connection if initial connection fails, with delay in ms (default: false) */
   autoRetry?: boolean | number;
-  /** Auto reconnect if an established connection is lost, with delay in ms (default: 3000) */
-  autoReconnect?: boolean | number;
+  /**
+   * Auto reconnect if an established connection is lost.
+   *
+   * Can be:
+   * - `boolean`: Enable/disable with default 3000ms delay and 10s health check
+   * - `number`: Reconnect delay in ms (enables health checks with defaults)
+   * - `object`: Full configuration for reconnection and health checks
+   *
+   * @default 3000
+   */
+  autoReconnect?:
+    | boolean
+    | number
+    | {
+        /** Whether to enable automatic reconnection (default: true) */
+        enabled?: boolean;
+        /** Delay in ms before reconnection attempt (default: 3000) */
+        initialDelay?: number;
+        /**
+         * Interval in ms for health check polling via HEAD requests.
+         * Set to `false` to disable health checks entirely.
+         * @default 10000
+         */
+        healthCheckInterval?: number | false;
+        /**
+         * Time in ms without a successful health check before triggering reconnect.
+         * @default 30000
+         */
+        healthCheckTimeout?: number;
+      };
+  /** SDK-level reconnection options for the streamable HTTP transport */
+  reconnectionOptions?: ReconnectionOptions;
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
   /**
