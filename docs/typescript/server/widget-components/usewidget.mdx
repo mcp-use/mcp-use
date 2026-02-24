@@ -110,6 +110,30 @@ useWidget<
 | `partialToolInput`  | `Partial<TProps> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
 | `isStreaming`       | `boolean`            | Whether tool arguments are currently being streamed (partial input received but complete input not yet available). `false` in ChatGPT Apps SDK or when the host does not stream. |
 
+### Host Identity (MCP Apps only)
+
+| Property           | Type                                          | Description                                                                                                     |
+| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `hostInfo`         | `{ name: string; version: string } \| undefined` | Name and version of the MCP Apps host, from the `ui/initialize` handshake. `undefined` in ChatGPT Apps SDK.  |
+| `hostCapabilities` | `Record<string, unknown> \| undefined`        | Capabilities advertised by the MCP Apps host (SEP-1865 `HostCapabilities`). `undefined` in ChatGPT Apps SDK.   |
+
+These fields are only populated when the widget is running inside an MCP Apps host (Claude, Goose, or any client implementing SEP-1865). They are `undefined` in the ChatGPT Apps SDK environment.
+
+```tsx
+const { hostInfo, hostCapabilities } = useWidget();
+
+// Identify the host
+if (hostInfo) {
+  console.log(`Running inside ${hostInfo.name} ${hostInfo.version}`);
+  // e.g. "claude-desktop 1.2.0"
+}
+
+// Check for optional host features
+if (hostCapabilities?.openLinks) {
+  // Host supports opening external URLs via ui/open-link
+}
+```
+
 ## Complete Example
 
 ```tsx

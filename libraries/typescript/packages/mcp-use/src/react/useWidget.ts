@@ -170,6 +170,14 @@ export function useWidget<
     unknown
   > | null>(null);
   const [mcpAppsHostContext, setMcpAppsHostContext] = useState<any>(null);
+  const [mcpAppsHostInfo, setMcpAppsHostInfo] = useState<{
+    name: string;
+    version: string;
+  } | null>(null);
+  const [mcpAppsHostCapabilities, setMcpAppsHostCapabilities] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   // Re-check for window.openai availability after mount (in case it's injected asynchronously)
   useEffect(() => {
@@ -247,6 +255,11 @@ export function useWidget<
         if (responseMeta) setMcpAppsResponseMetadata(responseMeta);
         if (partialToolInput) setMcpAppsPartialToolInput(partialToolInput);
         if (hostContext) setMcpAppsHostContext(hostContext);
+
+        const hostInfo = bridge.getHostInfo();
+        const hostCapabilities = bridge.getHostCapabilities();
+        if (hostInfo) setMcpAppsHostInfo(hostInfo);
+        if (hostCapabilities) setMcpAppsHostCapabilities(hostCapabilities);
       })
       .catch((error) => {
         console.warn("[useWidget] Failed to connect to MCP Apps host:", error);
@@ -724,6 +737,10 @@ export function useWidget<
     // Streaming
     partialToolInput,
     isStreaming,
+
+    // Host identity (MCP Apps only)
+    hostInfo: mcpAppsHostInfo ?? undefined,
+    hostCapabilities: mcpAppsHostCapabilities ?? undefined,
   } as UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>;
 }
 

@@ -32,7 +32,7 @@ overrides:
 
 patchedDependencies:
   '@modelcontextprotocol/sdk':
-    hash: bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78
+    hash: c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e
     path: patches/@modelcontextprotocol__sdk.patch
 
 importers:
@@ -386,10 +386,10 @@ importers:
         version: 6.1.0(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.0.1
-        version: 1.0.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
+        version: 1.0.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
       '@modelcontextprotocol/sdk':
         specifier: ^1.26.0
-        version: 1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+        version: 1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -567,10 +567,10 @@ importers:
         version: link:../inspector
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.0.1
-        version: 1.0.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
+        version: 1.0.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
       '@modelcontextprotocol/sdk':
         specifier: ^1.26.0
-        version: 1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+        version: 1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       express:
         specifier: ^5.2.1
         version: 5.2.1
@@ -747,6 +747,22 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.2.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/mcp-use/examples/server/features/client-info:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.3.0
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -1136,6 +1152,61 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.3.0
+      '@vitejs/plugin-react':
+        specifier: ^5.1.4
+        version: 5.1.4(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^7.3.0
+        version: 7.3.1(@types/node@25.3.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  test_app:
+    dependencies:
+      '@openai/apps-sdk-ui':
+        specifier: ^0.2.1
+        version: 0.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(tailwindcss@4.2.0)
+      cors:
+        specifier: ^2.8.6
+        version: 2.8.6
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/mcp-use
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+      react-router:
+        specifier: ^7.12.0
+        version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tailwindcss:
+        specifier: ^4.2.0
+        version: 4.2.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.2.0
+        version: 4.2.0(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.3.0
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.10
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.10)
       '@vitejs/plugin-react':
         specifier: ^5.1.4
         version: 5.1.4(vite@7.3.1(@types/node@25.3.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
@@ -8342,8 +8413,8 @@ snapshots:
 
   '@mcp-ui/client@6.1.0(@cfworker/json-schema@4.1.1)(@preact/signals-core@1.12.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@modelcontextprotocol/ext-apps': 0.3.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
-      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/ext-apps': 0.3.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
+      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       '@quilted/threads': 3.3.1(@preact/signals-core@1.12.2)
       '@r2wc/react-to-web-component': 2.1.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@remote-dom/core': 1.10.1(@preact/signals-core@1.12.2)
@@ -8359,8 +8430,8 @@ snapshots:
 
   '@mcp-ui/server@6.1.0(@cfworker/json-schema@4.1.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
     dependencies:
-      '@modelcontextprotocol/ext-apps': 0.3.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
-      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/ext-apps': 0.3.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
+      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - react
@@ -8368,9 +8439,9 @@ snapshots:
       - supports-color
       - zod
 
-  '@modelcontextprotocol/ext-apps@0.3.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
+  '@modelcontextprotocol/ext-apps@0.3.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       zod: 4.3.5
     optionalDependencies:
       '@oven/bun-darwin-aarch64': 1.3.8
@@ -8393,9 +8464,9 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@modelcontextprotocol/ext-apps@1.0.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
+  '@modelcontextprotocol/ext-apps@1.0.1(@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/sdk': 1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       zod: 4.3.5
     optionalDependencies:
       '@oven/bun-darwin-aarch64': 1.3.8
@@ -8418,7 +8489,7 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@modelcontextprotocol/sdk@1.26.0(patch_hash=bd735eaf047347a90d606ef58733ee8345f7b9e7f9c43c8050d1d732c17bdf78)(@cfworker/json-schema@4.1.1)(zod@4.3.5)':
+  '@modelcontextprotocol/sdk@1.26.0(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)':
     dependencies:
       '@hono/node-server': 1.19.9(hono@4.12.0)
       ajv: 8.17.1

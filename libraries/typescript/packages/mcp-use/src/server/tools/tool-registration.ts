@@ -201,6 +201,15 @@ export function toolRegistration<
         }
       }
 
+      // Build request-level user meta from extra._meta (strip SDK-internal progressToken).
+      const requestMeta =
+        extra?._meta &&
+        Object.keys(extra._meta).some((k) => k !== "progressToken")
+          ? (Object.fromEntries(
+              Object.entries(extra._meta).filter(([k]) => k !== "progressToken")
+            ) as Record<string, unknown>)
+          : undefined;
+
       // Create enhanced context with sample, elicit, and reportProgress methods
       const enhancedContext = createEnhancedContext(
         requestContext,
@@ -211,7 +220,9 @@ export function toolRegistration<
         session?.logLevel,
         session?.clientCapabilities,
         sessionId,
-        this.sessions
+        this.sessions,
+        session?.clientInfo,
+        requestMeta
       );
 
       // Execute callback

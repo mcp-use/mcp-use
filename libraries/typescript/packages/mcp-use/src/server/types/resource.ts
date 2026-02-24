@@ -7,7 +7,7 @@ import type { ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
-import type { McpContext } from "./context.js";
+import type { ClientCapabilityChecker, McpContext } from "./context.js";
 import type { UnifiedWidgetMetadata } from "../widgets/adapters/types.js";
 
 // UIResourceContent type from MCP-UI
@@ -91,17 +91,19 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
 }
 
 /**
- * Enhanced Resource Context that provides access to request context.
+ * Enhanced Resource Context that provides access to request context and
+ * client capability information.
  *
  * This unified context provides:
  * - `auth` - Authentication info (when OAuth is configured)
  * - `req` - Hono request object
+ * - `client` - Client capability checker (name, capabilities, MCP Apps support)
  * - All other Hono Context properties and methods
  *
  * @template HasOAuth - Whether OAuth is configured (affects auth availability)
  */
 export type EnhancedResourceContext<HasOAuth extends boolean = false> =
-  McpContext<HasOAuth>;
+  McpContext<HasOAuth> & { client: ClientCapabilityChecker };
 
 /**
  * Helper interface for bivariant parameter checking on resource callbacks.

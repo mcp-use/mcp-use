@@ -239,7 +239,10 @@ export async function mountMcp(
             // Re-register oninitialized handler
             server.server.oninitialized = async () => {
               const clientCapabilities = server.server.getClientCapabilities();
-              const clientInfo = (server.server as any).getClientInfo?.() || {};
+              const clientInfo =
+                server.server.getClientVersion?.() ||
+                (server.server as any).getClientInfo?.() ||
+                {};
               const protocolVersion =
                 (server.server as any).getProtocolVersion?.() || "unknown";
 
@@ -254,6 +257,7 @@ export async function mountMcp(
               const sessionData = sessions.get(sid);
               if (sessionData) {
                 sessionData.clientCapabilities = clientCapabilities;
+                sessionData.clientInfo = clientInfo;
               }
 
               Telemetry.getInstance()
@@ -387,7 +391,10 @@ export async function mountMcp(
           // The server.oninitialized callback fires after the client sends the initialized notification
           server.server.oninitialized = async () => {
             const clientCapabilities = server.server.getClientCapabilities();
-            const clientInfo = (server.server as any).getClientInfo?.() || {};
+            const clientInfo =
+              server.server.getClientVersion?.() ||
+              (server.server as any).getClientInfo?.() ||
+              {};
             const protocolVersion =
               (server.server as any).getProtocolVersion?.() || "unknown";
 
@@ -417,6 +424,7 @@ export async function mountMcp(
             const sessionData = sessions.get(sid);
             if (sessionData) {
               sessionData.clientCapabilities = clientCapabilities;
+              sessionData.clientInfo = clientInfo;
             }
 
             // Track server initialize event
