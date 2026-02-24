@@ -66,7 +66,6 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
-    "@types/tar": "^7.0.87",
     "@types/ws": "^8.18.1",
     "vitest": "^4.0.17"
   },
