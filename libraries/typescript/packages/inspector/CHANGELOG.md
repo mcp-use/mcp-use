@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.0-canary.5
+
+### Patch Changes
+
+- 2a8a9d1: feat(inspector): enhance logger middleware to filter noisy API endpoints
+  - mcp-use@1.21.0-canary.5
+
 ## 0.24.0-canary.4
 
 ### Minor Changes
