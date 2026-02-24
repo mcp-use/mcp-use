@@ -747,6 +747,40 @@ const result = await server.callTool(
 
 Same API as standalone `useMcp`, but accessed per-server.
 
+#### `complete(params)`
+
+Request autocomplete suggestions for prompt arguments or resource template URIs:
+
+```typescript
+// Complete a prompt argument
+const result = await server.complete({
+  ref: { type: 'ref/prompt', name: 'code-review' },
+  argument: { name: 'language', value: 'py' }
+});
+
+console.log('Suggestions:', result.completion.values);
+// Output: ['python', 'pytorch', ...]
+
+// Complete a resource template URI variable
+const result = await server.complete({
+  ref: { type: 'ref/resource', uri: 'file:///{path}' },
+  argument: { name: 'path', value: '/home' }
+});
+```
+
+See [Completions](/typescript/client/completion) for detailed usage and examples.
+
+#### `refreshResourceTemplates()`
+
+Manually refresh the resource templates list from the server:
+
+```typescript
+await server.refreshResourceTemplates();
+console.log('Updated templates:', server.resourceTemplates);
+```
+
+The `resourceTemplates` state is automatically populated on connection and updated when notifications are received. Use this method to force a refresh when needed.
+
 ## Standalone useMcp Hook
 
 For simple single-server applications, you can use `useMcp` directly without the provider:
