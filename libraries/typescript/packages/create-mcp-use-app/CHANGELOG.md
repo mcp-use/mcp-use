@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.3-canary.0
+
+### Patch Changes
+
+- 869eafa: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+
 ## 0.14.2
 
 ### Patch Changes

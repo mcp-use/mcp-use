@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.16.1-canary.2
+
+### Patch Changes
+
+- 869eafa: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+  - mcp-use@1.20.6-canary.2
+  - @mcp-use/inspector@0.23.2-canary.2
+
 ## 2.16.1-canary.1
 
 ### Patch Changes

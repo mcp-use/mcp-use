@@ -9,6 +9,7 @@
   },
   "changesets": [
     "express-middleware-types",
-    "fix-inspector-no-open"
+    "fix-inspector-no-open",
+    "hip-ducks-wish"
   ]
 }
