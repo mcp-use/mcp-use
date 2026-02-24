@@ -18,8 +18,20 @@ app.use(
   })
 );
 
-// Apply logger middleware to API routes for request/response logging
-app.use("/inspector/api/*", logger());
+// Apply logger middleware to API routes for request/response logging.
+// Filter out noisy endpoints (telemetry, RPC stream/log) to reduce log spam.
+const noisyPaths = [
+  "/inspector/api/tel/",
+  "/inspector/api/rpc/stream",
+  "/inspector/api/rpc/log",
+];
+app.use(
+  "/inspector/api/*",
+  logger((message, ...rest) => {
+    if (noisyPaths.some((p) => message.includes(p))) return;
+    console.log(message, ...rest);
+  })
+);
 
 // Register all API routes
 registerInspectorRoutes(app);
