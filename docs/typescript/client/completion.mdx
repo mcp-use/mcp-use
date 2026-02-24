@@ -381,6 +381,17 @@ Common errors and how to handle them:
 | `Invalid argument` | Argument not defined in schema | Verify argument name matches server schema |
 | `Not completable` | Argument doesn't have `completable()` | Only request completions for completable arguments |
 
+## Run the Example
+
+A full Node.js example is available in the mcp-use repository:
+
+```bash
+# From packages/mcp-use:
+pnpm run example:completion
+```
+
+This starts the completion server and runs the client, demonstrating prompt and resource template completions. See `examples/server/features/completion/` and `examples/client/node/communication/completion-client.ts`.
+
 ## Related
 
 - [Prompts](/typescript/client/prompts) - Learn about prompt templates
