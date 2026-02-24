@@ -323,6 +323,30 @@ const client = new MCPClient(
 );
 ```
 
+### Per-server callback overrides
+
+Each server entry in `mcpServers` can define its own `onSampling`, `onElicitation`, and `onNotification` callbacks. These override the root-level defaults for that server only.
+
+```typescript
+const client = new MCPClient(
+  {
+    mcpServers: {
+      codeServer: {
+        url: "https://code.example.com/mcp",
+        onSampling: claudeSampling,
+      },
+      utilityServer: {
+        url: "https://util.example.com/mcp",
+        // no callbacks -> uses root-level defaults
+      },
+    },
+  },
+  { onSampling: fallbackSampling }
+);
+```
+
+For full details and examples, see the [Sampling](/typescript/client/sampling#per-server-sampling-callbacks) and [Elicitation](/typescript/client/elicitation#per-server-elicitation-callbacks) guides.
+
 ### Example Configuration
 
 Here's a basic example of how to configure an MCP server:
