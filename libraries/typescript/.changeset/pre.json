@@ -8,6 +8,7 @@
     "mcp-use": "1.20.5"
   },
   "changesets": [
+    "client-completion-support",
     "express-middleware-types",
     "fix-inspector-no-open",
     "hip-ducks-wish"
