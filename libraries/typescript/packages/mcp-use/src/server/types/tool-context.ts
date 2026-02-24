@@ -11,6 +11,7 @@ import type {
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
+import type { UserContext } from "../tools/tool-execution-helpers.js";
 
 /**
  * Options for the sample() function in tool context.
@@ -383,6 +384,73 @@ export interface ToolContext {
      * ```
      */
     supportsApps(): boolean;
+
+    /**
+     * Returns normalized end-user context from `params._meta` sent by the
+     * client on this specific tool invocation.
+     *
+     * **Scope:** Per-invocation. Unlike the other `ctx.client` methods, which
+     * reflect the session-level initialize handshake, `user()` can return a
+     * different value on every tool call because the client includes fresh
+     * metadata with each request.
+     *
+     * **Returns `undefined`** when the client does not include user metadata
+     * (e.g. Inspector, Claude Desktop, CLI, most non-ChatGPT clients).
+     *
+     * **Advisory only:** This data is self-reported by the client and
+     * **unverified**. Do not use it for access control. For verified identity
+     * use `ctx.auth` (requires OAuth to be configured on the server).
+     *
+     * **ChatGPT multi-tenant model:**
+     * ChatGPT establishes a single MCP session for all users of a deployed app.
+     * `subject` and `conversationId` carry the per-invocation identity that
+     * lets you distinguish callers within that shared session:
+     *
+     * ```
+     * 1 MCP session  (ctx.session.sessionId)             — shared across ALL users
+     *   N subjects   (ctx.client.user()?.subject)        — one per ChatGPT user account
+     *     M threads  (ctx.client.user()?.conversationId) — one per chat conversation
+     * ```
+     *
+     * **Available fields:**
+     * - `subject` — stable opaque user identifier (e.g. `openai/subject`)
+     * - `conversationId` — current chat thread ID (e.g. `openai/session`)
+     * - `locale` — BCP-47 locale, e.g. `"it-IT"`
+     * - `location` — `{ city, region, country, timezone, latitude, longitude }`
+     * - `userAgent` — browser / host user-agent string
+     * - `timezoneOffsetMinutes` — UTC offset in minutes
+     *
+     * @example Basic usage
+     * ```typescript
+     * server.tool({ name: "greet", schema: z.object({}) }, async (_p, ctx) => {
+     *   const caller = ctx.client.user();
+     *   if (caller) {
+     *     // Personalise by subject (stable across conversations)
+     *     // and conversationId (this specific chat thread)
+     *     console.log(`User: ${caller.subject}`);
+     *     console.log(`Chat: ${caller.conversationId}`);
+     *
+     *     const city = caller.location?.city ?? "there";
+     *     const greeting = caller.locale?.startsWith("it") ? "Ciao" : "Hello";
+     *     return text(`${greeting} from ${city}!`);
+     *   }
+     *   return text("Hello!");
+     * });
+     * ```
+     *
+     * @example Comparing ChatGPT IDs to MCP session ID
+     * ```typescript
+     * async (_p, ctx) => {
+     *   const caller = ctx.client.user();
+     *   return object({
+     *     mcpSession: ctx.session.sessionId,   // shared transport session
+     *     user: caller?.subject ?? null,        // ChatGPT user ID
+     *     conversation: caller?.conversationId ?? null, // chat thread
+     *   });
+     * }
+     * ```
+     */
+    user(): UserContext | undefined;
   };
 
   /**

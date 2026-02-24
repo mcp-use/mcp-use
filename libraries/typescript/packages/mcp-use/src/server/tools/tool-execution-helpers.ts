@@ -26,9 +26,133 @@ import type {
 } from "../types/index.js";
 import type { SessionData } from "../sessions/session-manager.js";
 import { Telemetry } from "../../telemetry/index.js";
+import { getRequestContext } from "../context-storage.js";
 
 // Re-export SessionData for backwards compatibility
 export type { SessionData };
+
+/**
+ * Normalized end-user context extracted from per-request metadata.
+ *
+ * Populated from `params._meta` sent on each `tools/call` request by
+ * clients that include user-level context (e.g. ChatGPT via `openai/*` keys).
+ * `undefined` on clients that do not send request-level metadata (Inspector,
+ * Claude Desktop, CLI, etc.).
+ *
+ * **Important:** This data is client-reported and **unverified**. Do not treat
+ * it as a trusted identity. For verified identity use `ctx.auth` (OAuth).
+ *
+ * **ChatGPT multi-tenant model:**
+ * ChatGPT establishes a single MCP session for all users of a deployed app.
+ * The `subject` and `conversationId` fields carry the per-invocation identity
+ * that lets you distinguish between callers within that shared session:
+ *
+ * ```
+ * 1 MCP session (ctx.session.sessionId)
+ *   N subjects  (ctx.client.user()?.subject)      — one per ChatGPT user account
+ *     M threads (ctx.client.user()?.conversationId) — one per chat conversation
+ * ```
+ */
+export interface UserContext {
+  /** Browser / host user-agent string (openai/userAgent). */
+  userAgent?: string;
+  /**
+   * BCP-47 locale tag, e.g. `"it-IT"` (openai/locale).
+   *
+   * **Server-side source:** Detected by ChatGPT from the user's account
+   * language settings at session start and attached to each `tools/call`
+   * request via HTTP `params._meta`.
+   *
+   * **Widget equivalent:** Inside a widget, use `useWidget().locale` instead —
+   * it normalizes the same preference from two client-side channels:
+   * - ChatGPT Apps SDK: `window.openai.locale` (injected into the iframe)
+   * - SEP-1865 hosts: `HostContext.locale` (sent via `ui/initialize`)
+   *
+   * The values are usually identical, but may differ when the user's account
+   * language differs from their browser language, or after a locale change
+   * mid-session (the `params._meta` value is set at session start; the widget
+   * value is fresh at render time).
+   */
+  locale?: string;
+  /** Approximate geographic location of the end user (openai/userLocation). */
+  location?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    timezone?: string;
+    latitude?: string;
+    longitude?: string;
+  };
+  /** UTC offset in minutes (timezone_offset_minutes). */
+  timezoneOffsetMinutes?: number;
+  /**
+   * Stable, opaque identifier for the end user (openai/subject).
+   * Suitable for per-user personalisation or audit logs.
+   * Remains constant across different chat conversations for the same user.
+   */
+  subject?: string;
+  /**
+   * Identifier for the current chat / conversation thread (openai/session).
+   * Distinct from the MCP session ID (`ctx.session.sessionId`) — this is the
+   * host application's conversation thread ID, not the MCP transport session.
+   * Changes each time the user starts a new chat conversation.
+   */
+  conversationId?: string;
+}
+
+/**
+ * Extract and normalize end-user context from tools/call `params._meta`.
+ *
+ * Handles the ChatGPT `openai/*` key convention and returns `undefined`
+ * when no recognisable user metadata is present.
+ */
+export function normalizeUserContext(
+  rawMeta: Record<string, unknown> | undefined
+): UserContext | undefined {
+  if (!rawMeta) return undefined;
+
+  const userAgent = rawMeta["openai/userAgent"] as string | undefined;
+  const locale = rawMeta["openai/locale"] as string | undefined;
+  const rawLocation = rawMeta["openai/userLocation"] as
+    | Record<string, unknown>
+    | undefined;
+  const timezoneOffsetMinutes =
+    typeof rawMeta["timezone_offset_minutes"] === "number"
+      ? rawMeta["timezone_offset_minutes"]
+      : undefined;
+  const subject = rawMeta["openai/subject"] as string | undefined;
+  const conversationId = rawMeta["openai/session"] as string | undefined;
+
+  const location: UserContext["location"] = rawLocation
+    ? {
+        city: rawLocation.city as string | undefined,
+        region: rawLocation.region as string | undefined,
+        country: rawLocation.country as string | undefined,
+        timezone: rawLocation.timezone as string | undefined,
+        latitude: rawLocation.latitude as string | undefined,
+        longitude: rawLocation.longitude as string | undefined,
+      }
+    : undefined;
+
+  const hasAnyField =
+    userAgent !== undefined ||
+    locale !== undefined ||
+    location !== undefined ||
+    timezoneOffsetMinutes !== undefined ||
+    subject !== undefined ||
+    conversationId !== undefined;
+
+  if (!hasAnyField) return undefined;
+
+  return {
+    ...(userAgent !== undefined && { userAgent }),
+    ...(locale !== undefined && { locale }),
+    ...(location !== undefined && { location }),
+    ...(timezoneOffsetMinutes !== undefined && { timezoneOffsetMinutes }),
+    ...(subject !== undefined && { subject }),
+    ...(conversationId !== undefined && { conversationId }),
+  };
+}
 
 /**
  * Result of session context lookup
@@ -58,34 +182,20 @@ export function findSessionContext(
     params: Record<string, any>;
   }) => Promise<void>
 ): SessionContextResult {
-  let requestContext = initialRequestContext;
+  const requestContext = initialRequestContext;
   let session: SessionData | undefined;
   let progressToken = extraProgressToken;
   let sendNotification = extraSendNotification;
 
-  // First pass: find requestContext if not provided
-  if (!requestContext) {
-    for (const [, s] of sessions.entries()) {
-      if (s.context) {
-        requestContext = s.context;
-        break;
-      }
-    }
-  }
-
-  // Second pass: find session matching context or use first session
-  // We ALWAYS need to find the session (for sessionId), not just when metadata is missing
+  // Match session by the request context object reference.
+  // No fallback scans — returning undefined is safer than returning a random
+  // session's data when the correct session cannot be determined.
   if (requestContext) {
     for (const [, s] of sessions.entries()) {
       if (s.context === requestContext) {
         session = s;
         break;
       }
-    }
-  } else {
-    const firstSession = sessions.values().next().value;
-    if (firstSession) {
-      session = firstSession;
     }
   }
 
@@ -574,7 +684,8 @@ export function supportsApps(
  */
 export function createClientCapabilityChecker(
   clientCapabilities: Record<string, any> | undefined,
-  clientInfo?: Record<string, any>
+  clientInfo?: Record<string, any>,
+  requestMeta?: Record<string, unknown>
 ) {
   const caps = clientCapabilities || {};
 
@@ -630,6 +741,49 @@ export function createClientCapabilityChecker(
      */
     supportsApps(): boolean {
       return supportsApps(caps);
+    },
+
+    /**
+     * Returns normalized end-user context from `params._meta` sent by the
+     * client on this specific tool invocation.
+     *
+     * **Scope:** Per-invocation — unlike other `ctx.client` methods which
+     * are stable for the lifetime of the MCP session, `user()` can return
+     * a different value on every tool call.
+     *
+     * **Returns `undefined`** when the client does not include user metadata
+     * (e.g. Inspector, Claude Desktop, CLI, most non-ChatGPT clients).
+     *
+     * **Advisory only:** This data is self-reported by the client and
+     * unverified. For verified identity use `ctx.auth` (requires OAuth).
+     *
+     * **ChatGPT multi-tenant model:**
+     * ChatGPT uses a single MCP session for all users of your app. Use
+     * `subject` to identify the human and `conversationId` to identify the
+     * chat thread — both vary per invocation within the same MCP session:
+     *
+     * ```
+     * 1 MCP session  (ctx.session.sessionId)        — shared across all users
+     *   N subjects   (ctx.client.user()?.subject)   — one per ChatGPT user
+     *     M threads  (ctx.client.user()?.conversationId) — one per chat
+     * ```
+     *
+     * @example
+     * ```typescript
+     * server.tool({ name: "greet", schema: z.object({}) }, async (_p, ctx) => {
+     *   const caller = ctx.client.user();
+     *   if (caller) {
+     *     // Personalise by locale or location
+     *     const greeting = caller.locale?.startsWith("it") ? "Ciao" : "Hello";
+     *     const city = caller.location?.city ?? "there";
+     *     return text(`${greeting} from ${city}!`);
+     *   }
+     *   return text("Hello!");
+     * });
+     * ```
+     */
+    user(): UserContext | undefined {
+      return normalizeUserContext(requestMeta);
     },
   };
 }
@@ -736,7 +890,8 @@ export function createEnhancedContext(
   clientCapabilities?: Record<string, unknown>,
   sessionId?: string,
   sessions?: Map<string, SessionData>,
-  clientInfo?: Record<string, unknown>
+  clientInfo?: Record<string, unknown>,
+  requestMeta?: Record<string, unknown>
 ): Context & {
   sample: ReturnType<typeof createSampleMethod>;
   elicit: ReturnType<typeof createElicitMethod>;
@@ -766,9 +921,11 @@ export function createEnhancedContext(
 
   enhancedContext.log = createLogMethod(sendNotification, minLogLevel);
 
+  // Pass requestMeta into the checker so ctx.client.user() is per-invocation
   enhancedContext.client = createClientCapabilityChecker(
     clientCapabilities,
-    clientInfo
+    clientInfo,
+    requestMeta
   );
 
   // Add session information
@@ -794,4 +951,34 @@ export function createEnhancedContext(
   }
 
   return enhancedContext;
+}
+
+/**
+ * Build the base handler context shared by prompt and resource wrappedHandlers.
+ *
+ * Resolves the correct session by keying directly off the closure `sessionId`
+ * (which is always authoritative for a given connection), then builds an
+ * enhanced context object with `ctx.client` already populated.
+ *
+ * Tools use `createEnhancedContext` instead because they need the richer
+ * context (sample, elicit, reportProgress, etc.), but they call the same
+ * session-resolution logic via the closure `sessionId`.
+ */
+export function buildHandlerContext(
+  sessionId: string | undefined,
+  sessions: Map<string, SessionData>
+): { session: SessionData | undefined; enhancedCtx: any } {
+  const session = sessionId ? sessions.get(sessionId) : undefined;
+  const requestContext = getRequestContext() || session?.context;
+  const enhancedCtx: any = requestContext ? Object.create(requestContext) : {};
+  Object.defineProperty(enhancedCtx, "client", {
+    value: createClientCapabilityChecker(
+      session?.clientCapabilities,
+      session?.clientInfo
+    ),
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+  return { session, enhancedCtx };
 }

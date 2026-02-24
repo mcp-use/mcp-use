@@ -72,7 +72,7 @@ import { setupOAuthForServer } from "./oauth/setup.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
 import {
-  createClientCapabilityChecker,
+  buildHandlerContext,
   createEnhancedContext,
   findSessionContext,
   isValidLogLevel,
@@ -1086,7 +1086,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // like ctx.log(), ctx.sample(), ctx.elicit(), etc.
     const wrapHandler = (
       rawHandler: unknown,
-      session: { server?: any }
+      session: { server?: any },
+      sessionId?: string
     ): ((
       params: Record<string, unknown>,
       extra?: {
@@ -1128,6 +1129,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           extraSendNotification
         );
 
+        // Prefer the closure sessionId (always correct for this connection).
+        const resolvedSession =
+          (sessionId ? sessions.get(sessionId) : undefined) ?? foundSession;
+
+        const requestMeta =
+          extra?._meta &&
+          Object.keys(extra._meta).some((k) => k !== "progressToken")
+            ? (Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([k]) => k !== "progressToken"
+                )
+              ) as Record<string, unknown>)
+            : undefined;
+
         const nativeServer = session.server;
         const enhancedContext = createEnhancedContext(
           requestContext,
@@ -1136,11 +1151,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             (async () => ({ action: "decline" as const })),
           progressToken,
           sendNotification,
-          foundSession?.logLevel,
-          foundSession?.clientCapabilities,
-          undefined,
-          undefined,
-          foundSession?.clientInfo
+          resolvedSession?.logLevel,
+          resolvedSession?.clientCapabilities,
+          sessionId,
+          sessions,
+          resolvedSession?.clientInfo,
+          requestMeta
         );
 
         const executeCallback = async () => {
@@ -1163,7 +1179,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: ToolDefinition,
       handler: unknown,
       nativeServer: any,
-      session?: { server?: any }
+      session?: { server?: any },
+      sessionId?: string
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
@@ -1181,7 +1198,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Wrap the raw handler with session context so that ctx.log(), ctx.sample(),
       // ctx.elicit(), etc. work correctly after HMR updates
       const wrappedHandler = session?.server
-        ? wrapHandler(handler, session)
+        ? wrapHandler(handler, session, sessionId)
         : handler;
 
       return {
@@ -1362,7 +1379,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             enrichedConfig,
             handler,
             nativeServer,
-            session
+            session,
+            sessionCtx.sessionId
           );
           nativeServer._registeredTools[key] = newEntry;
           if (refs?.tools) {
@@ -2559,24 +2577,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
 
-        const { requestContext, session, progressToken, sendNotification } =
-          findSessionContext(
-            this.sessions,
-            initialRequestContext,
-            extraProgressToken,
-            extraSendNotification
-          );
+        const {
+          requestContext,
+          session: foundSession,
+          progressToken,
+          sendNotification,
+        } = findSessionContext(
+          this.sessions,
+          initialRequestContext,
+          extraProgressToken,
+          extraSendNotification
+        );
 
-        // Find the sessionId by looking up the session in the sessions map
-        let sessionId: string | undefined;
-        if (session) {
-          for (const [id, s] of this.sessions.entries()) {
-            if (s === session) {
-              sessionId = id;
-              break;
-            }
-          }
-        }
+        // Prefer the closure sessionId — it is always the correct session for
+        // this connection. Fall back to findSessionContext's result only when
+        // no sessionId is available (e.g. stdio transport without session IDs).
+        const session =
+          (sessionId ? this.sessions.get(sessionId) : undefined) ??
+          foundSession;
 
         // Use the session server's native createMessage and elicitInput
         // These are already properly connected to the transport
@@ -2605,6 +2623,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           }
         };
 
+        const requestMeta =
+          extra?._meta &&
+          Object.keys(extra._meta).some((k) => k !== "progressToken")
+            ? (Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([k]) => k !== "progressToken"
+                )
+              ) as Record<string, unknown>)
+            : undefined;
+
         const enhancedContext = createEnhancedContext(
           requestContext,
           createMessageWithLogging,
@@ -2615,7 +2643,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           session?.clientCapabilities,
           sessionId,
           this.sessions,
-          session?.clientInfo
+          session?.clientInfo,
+          requestMeta
         );
 
         const executeCallback = async () => {
@@ -2692,21 +2721,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let errorType: string | null = null;
 
         try {
-          // Build enhanced context so ctx.client is available in prompt callbacks
-          const session = sessionId ? this.sessions.get(sessionId) : undefined;
-          const requestContext = getRequestContext() || session?.context;
-          const enhancedCtx: any = requestContext
-            ? Object.create(requestContext)
-            : {};
-          Object.defineProperty(enhancedCtx, "client", {
-            value: createClientCapabilityChecker(
-              session?.clientCapabilities,
-              session?.clientInfo
-            ),
-            writable: true,
-            enumerable: true,
-            configurable: true,
-          });
+          const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
 
           const result = await (handler as any)(
             params,
@@ -2762,21 +2777,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let contents: any[] = [];
 
         try {
-          // Build enhanced context so ctx.client is available in resource callbacks
-          const session = sessionId ? this.sessions.get(sessionId) : undefined;
-          const requestContext = getRequestContext() || session?.context;
-          const enhancedCtx: any = requestContext
-            ? Object.create(requestContext)
-            : {};
-          Object.defineProperty(enhancedCtx, "client", {
-            value: createClientCapabilityChecker(
-              session?.clientCapabilities,
-              session?.clientInfo
-            ),
-            writable: true,
-            enumerable: true,
-            configurable: true,
-          });
+          const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
 
           const result = await (handler as any)(
             (handler as any).length >= 1 ? enhancedCtx : undefined

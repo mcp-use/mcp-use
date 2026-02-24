@@ -1220,7 +1220,10 @@ program
           const ready = await waitForServer(port, browserHost);
           if (ready) {
             const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const autoConnectEndpoint = tunnelUrl
+              ? `${tunnelUrl}/mcp`
+              : mcpEndpoint;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1438,7 +1441,10 @@ program
           const ready = await waitForServer(port, browserHost);
           if (ready) {
             const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const autoConnectEndpoint = tunnelUrl
+              ? `${tunnelUrl}/mcp`
+              : mcpEndpoint;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));

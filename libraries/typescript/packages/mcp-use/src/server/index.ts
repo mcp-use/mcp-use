@@ -26,7 +26,10 @@ export {
 } from "./context-storage.js";
 
 // Client capability utilities
-export { supportsApps } from "./tools/tool-execution-helpers.js";
+export {
+  supportsApps,
+  type UserContext,
+} from "./tools/tool-execution-helpers.js";
 
 // Response helper utilities for tools and resources
 export {
