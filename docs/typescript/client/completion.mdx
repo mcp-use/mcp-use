@@ -77,6 +77,48 @@ function AutocompleteExample() {
 ```
 </CodeGroup>
 
+## Using with McpClientProvider
+
+When using `McpClientProvider` with multiple servers, get completions via `useMcpServer`:
+
+<CodeGroup>
+```typescript React
+import { useState } from 'react'
+import { McpClientProvider, useMcpServer } from 'mcp-use/react'
+
+function AutocompleteWithProvider() {
+  const server = useMcpServer('my-server-id')
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
+  const handleInputChange = async (value: string) => {
+    if (server?.state === 'ready' && value.length > 0) {
+      const result = await server.complete({
+        ref: { type: 'ref/prompt', name: 'code-review' },
+        argument: { name: 'language', value }
+      })
+      setSuggestions(result.completion.values)
+    }
+  }
+
+  return (
+    <input onChange={(e) => handleInputChange(e.target.value)} />
+  )
+}
+
+function App() {
+  return (
+    <McpClientProvider
+      mcpServers={{
+        'my-server-id': { url: 'http://localhost:3000/sse' }
+      }}
+    >
+      <AutocompleteWithProvider />
+    </McpClientProvider>
+  )
+}
+```
+</CodeGroup>
+
 ## Completion Request Parameters
 
 The `complete()` method accepts a `CompleteRequestParams` object with the following structure:
