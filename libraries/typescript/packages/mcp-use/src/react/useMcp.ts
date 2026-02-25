@@ -95,6 +95,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     logLevel: logLevelOption,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
+    reconnectionOptions,
     transportType = "auto",
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
@@ -210,6 +211,40 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         "https://inspector.mcp-use.com/inspector/api/proxy",
     };
   }, [autoProxyFallback]);
+
+  // Normalize autoReconnect into a consistent config object
+  const autoReconnectConfig = useMemo(() => {
+    if (autoReconnect === false) {
+      return {
+        enabled: false,
+        initialDelay: 0,
+        healthCheckInterval: false as const,
+        healthCheckTimeout: 30000,
+      };
+    }
+    if (autoReconnect === true) {
+      return {
+        enabled: true,
+        initialDelay: DEFAULT_RECONNECT_DELAY,
+        healthCheckInterval: 10000,
+        healthCheckTimeout: 30000,
+      };
+    }
+    if (typeof autoReconnect === "number") {
+      return {
+        enabled: true,
+        initialDelay: autoReconnect,
+        healthCheckInterval: 10000,
+        healthCheckTimeout: 30000,
+      };
+    }
+    return {
+      enabled: autoReconnect.enabled !== false,
+      initialDelay: autoReconnect.initialDelay ?? DEFAULT_RECONNECT_DELAY,
+      healthCheckInterval: autoReconnect.healthCheckInterval ?? 10000,
+      healthCheckTimeout: autoReconnect.healthCheckTimeout ?? 30000,
+    };
+  }, [autoReconnect]);
 
   // Track whether we've already tried proxy fallback
   const hasTriedProxyFallbackRef = useRef(false);
@@ -631,6 +666,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           ...(customFetch && { fetch: customFetch }),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
+          // Pass user-configurable reconnection options for streamable HTTP transport
+          ...(reconnectionOptions && { reconnectionOptions }),
         };
 
         // Add gateway URL if using proxy
@@ -764,8 +801,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
-        // Only set up monitoring if autoReconnect is enabled
-        if (autoReconnect) {
+        // Only set up monitoring if autoReconnect is enabled and health checks are not disabled
+        if (
+          autoReconnectConfig.enabled &&
+          autoReconnectConfig.healthCheckInterval !== false
+        ) {
           const cleanup = startConnectionHealthMonitoring({
             gatewayUrl,
             url,
@@ -790,7 +830,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             setState,
             addLog,
             connect,
-            defaultReconnectDelay: DEFAULT_RECONNECT_DELAY,
+            defaultReconnectDelay: autoReconnectConfig.initialDelay,
+            healthCheckIntervalMs: autoReconnectConfig.healthCheckInterval,
+            healthCheckTimeoutMs: autoReconnectConfig.healthCheckTimeout,
           });
 
           // Store cleanup function for later
