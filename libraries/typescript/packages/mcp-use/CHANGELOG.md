@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.21.0-canary.6
+
+### Patch Changes
+
+- d9f946a: feat(mcp-use): enhance reconnection and health check options
+  - @mcp-use/cli@2.17.0-canary.6
+  - @mcp-use/inspector@0.24.0-canary.6
+
 ## 1.21.0-canary.5
 
 ### Patch Changes
