@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ans.protocol/schemas/v0.1/heartbeat.json",
+  "title": "ANS Agent Heartbeat",
+  "description": "Payload sent by an agent to report its health status to the registry",
+  "type": "object",
+  "required": ["status"],
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["healthy", "degraded", "unhealthy"],
+      "description": "Current operational status of the agent"
+    },
+    "latency_p50_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "50th percentile request latency in milliseconds over the last reporting period"
+    },
+    "latency_p95_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "95th percentile request latency in milliseconds"
+    },
+    "latency_p99_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "99th percentile request latency in milliseconds"
+    },
+    "requests_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of requests handled since last heartbeat"
+    },
+    "requests_succeeded": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of requests that completed successfully"
+    },
+    "requests_failed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of requests that failed"
+    },
+    "active_connections": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of currently active connections"
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Optional human-readable status message (e.g., reason for degraded state)"
+    }
+  },
+  "examples": [
+    {
+      "status": "healthy",
+      "latency_p50_ms": 120,
+      "latency_p95_ms": 450,
+      "latency_p99_ms": 800,
+      "requests_total": 142,
+      "requests_succeeded": 141,
+      "requests_failed": 1
+    },
+    {
+      "status": "degraded",
+      "latency_p50_ms": 2500,
+      "message": "Upstream search API experiencing high latency"
+    }
+  ]
+}

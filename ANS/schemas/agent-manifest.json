@@ -1,0 +1,303 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ans.protocol/schemas/v0.1/agent-manifest.json",
+  "title": "ANS Agent Capability Manifest",
+  "description": "The signed capability manifest that every ANS-registered agent must publish",
+  "type": "object",
+  "required": ["ans_version", "id", "name", "description", "version", "endpoint", "transport", "capabilities", "trust", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "ans_version": {
+      "type": "string",
+      "description": "ANS protocol version this manifest conforms to",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "examples": ["0.1", "1.0"]
+    },
+    "id": {
+      "type": "string",
+      "description": "Globally unique ANS identifier in dot-notation: <service>.<namespace>.<agent-name>",
+      "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+\\.[a-z0-9-]+$",
+      "examples": [
+        "search.acme-corp.web-researcher",
+        "assistant.public.notion-sync",
+        "compute.anthropic.claude-agent"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "description": "Natural language description of what the agent does",
+      "minLength": 10,
+      "maxLength": 2000
+    },
+    "version": {
+      "type": "string",
+      "description": "Agent version following semver",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.]+)?(\\+[a-zA-Z0-9.]+)?$",
+      "examples": ["1.0.0", "2.3.1-beta"]
+    },
+    "endpoint": {
+      "type": "string",
+      "description": "The primary URL where this agent can be reached",
+      "format": "uri",
+      "examples": ["https://agents.acme-corp.com/web-researcher"]
+    },
+    "transport": {
+      "type": "array",
+      "description": "Supported transport protocols, in order of preference",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["http", "mcp", "grpc", "ws"],
+        "description": "http=REST over HTTPS, mcp=Model Context Protocol, grpc=gRPC, ws=WebSocket"
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "List of capabilities (operations) this agent exposes",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "input_schema"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Capability identifier (snake_case)",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what this capability does"
+          },
+          "input_schema": {
+            "type": "object",
+            "description": "JSON Schema describing the input parameters"
+          },
+          "output_schema": {
+            "type": "object",
+            "description": "JSON Schema describing the output format"
+          },
+          "examples": {
+            "type": "array",
+            "description": "Example input/output pairs for documentation",
+            "items": {
+              "type": "object",
+              "properties": {
+                "input": {},
+                "output": {},
+                "description": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Operational constraints and limits of this agent",
+      "additionalProperties": false,
+      "properties": {
+        "rate_limit": {
+          "type": "string",
+          "description": "Rate limit in the format <count>/<unit> where unit is second/minute/hour/day",
+          "pattern": "^[0-9]+/(second|minute|hour|day)$",
+          "examples": ["100/hour", "10/second"]
+        },
+        "max_context_tokens": {
+          "type": "integer",
+          "description": "Maximum number of tokens this agent can process in a single call",
+          "minimum": 1
+        },
+        "max_response_tokens": {
+          "type": "integer",
+          "description": "Maximum number of tokens this agent can return in a single response",
+          "minimum": 1
+        },
+        "supported_languages": {
+          "type": "array",
+          "description": "ISO 639-1 language codes this agent supports",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+          },
+          "examples": [["en", "it", "fr"]]
+        },
+        "estimated_latency_ms": {
+          "type": "object",
+          "description": "Declared latency percentiles in milliseconds",
+          "properties": {
+            "p50": { "type": "number", "minimum": 0 },
+            "p95": { "type": "number", "minimum": 0 },
+            "p99": { "type": "number", "minimum": 0 }
+          }
+        },
+        "requires_auth": {
+          "type": "boolean",
+          "description": "Whether calls to this agent require caller authentication",
+          "default": false
+        },
+        "auth_schemes": {
+          "type": "array",
+          "description": "Supported authentication schemes if requires_auth is true",
+          "items": {
+            "type": "string",
+            "enum": ["bearer", "api_key", "oauth2", "ans_signature"]
+          }
+        }
+      }
+    },
+    "trust": {
+      "type": "object",
+      "description": "Cryptographic identity and trust information",
+      "required": ["public_key", "signature"],
+      "additionalProperties": false,
+      "properties": {
+        "public_key": {
+          "type": "string",
+          "description": "Ed25519 public key, prefixed with algorithm identifier",
+          "pattern": "^ed25519:[A-Za-z0-9+/]+=*$",
+          "examples": ["ed25519:MCowBQYDK2VwAyEA..."]
+        },
+        "certificate": {
+          "type": "string",
+          "description": "JWT certificate issued by the ANS registry node (populated after registration)",
+          "pattern": "^[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]+\\.[A-Za-z0-9-_]*$"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Base64-encoded Ed25519 signature of the canonical manifest JSON (excluding the signature field itself)",
+          "pattern": "^[A-Za-z0-9+/]+=*$"
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "description": "Metadata for discovery and administration",
+      "required": ["created_at"],
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when this agent was first created"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last manifest update"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Free-form tags for discovery and categorization",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "maxLength": 50
+          },
+          "examples": [["web", "search", "research"]]
+        },
+        "license": {
+          "type": "string",
+          "description": "SPDX license identifier or proprietary",
+          "examples": ["MIT", "Apache-2.0", "proprietary"]
+        },
+        "contact": {
+          "type": "string",
+          "description": "Contact email for the agent operator",
+          "format": "email"
+        },
+        "homepage": {
+          "type": "string",
+          "description": "URL for agent documentation or homepage",
+          "format": "uri"
+        },
+        "source": {
+          "type": "string",
+          "description": "URL to the agent's source code (if open source)",
+          "format": "uri"
+        },
+        "documentation": {
+          "type": "string",
+          "description": "URL to the agent's API documentation",
+          "format": "uri"
+        },
+        "namespace_verified": {
+          "type": "boolean",
+          "description": "Whether the namespace has been verified by the registry as belonging to this operator",
+          "default": false
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "ans_version": "0.1",
+      "id": "search.acme-corp.web-researcher",
+      "name": "Web Researcher",
+      "description": "Searches the web and synthesizes information into structured reports. Supports queries in English, Italian, and French.",
+      "version": "1.2.0",
+      "endpoint": "https://agents.acme-corp.com/web-researcher",
+      "transport": ["mcp", "http"],
+      "capabilities": [
+        {
+          "name": "search",
+          "description": "Search the web for information on a given topic",
+          "input_schema": {
+            "type": "object",
+            "required": ["query"],
+            "properties": {
+              "query": { "type": "string", "description": "The search query" },
+              "max_results": { "type": "integer", "default": 10, "minimum": 1, "maximum": 50 },
+              "language": { "type": "string", "default": "en" }
+            }
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": { "type": "string" },
+                    "url": { "type": "string", "format": "uri" },
+                    "snippet": { "type": "string" }
+                  }
+                }
+              },
+              "summary": { "type": "string" }
+            }
+          }
+        }
+      ],
+      "constraints": {
+        "rate_limit": "100/hour",
+        "max_context_tokens": 32000,
+        "supported_languages": ["en", "it", "fr"],
+        "estimated_latency_ms": { "p50": 800, "p95": 3000, "p99": 8000 },
+        "requires_auth": false
+      },
+      "trust": {
+        "public_key": "ed25519:MCowBQYDK2VwAyEAEXAMPLE...",
+        "signature": "BASE64_SIGNATURE_HERE=="
+      },
+      "meta": {
+        "created_at": "2025-01-15T10:00:00Z",
+        "updated_at": "2026-02-01T08:30:00Z",
+        "tags": ["web", "search", "research"],
+        "license": "proprietary",
+        "contact": "agents@acme-corp.com",
+        "homepage": "https://acme-corp.com/agents/web-researcher"
+      }
+    }
+  ]
+}
