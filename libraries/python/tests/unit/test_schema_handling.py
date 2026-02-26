@@ -79,7 +79,7 @@ class TestRefResolution(unittest.TestCase):
         self.assertEqual(fixed["properties"]["item"]["$ref"], "#/definitions/MyType")
 
     def test_circular_ref_does_not_recurse_infinitely(self):
-        """A self-referencing $ref does not cause infinite recursion."""
+        """A self-referencing $ref does not cause infinite recursion and is left intact."""
         schema = {
             "type": "object",
             "properties": {
@@ -88,6 +88,8 @@ class TestRefResolution(unittest.TestCase):
         }
         fixed = self.adapter.fix_schema(schema)
         self.assertIsInstance(fixed, dict)
+        # The circular ref cannot be resolved, so it must be left as-is
+        self.assertIn("$ref", fixed["properties"]["self_ref"])
 
     def test_unresolvable_ref_left_intact(self):
         """A $ref to a non-existent path is left as-is without raising."""
@@ -115,6 +117,33 @@ class TestRefResolution(unittest.TestCase):
         sub_schemas = rotation["allOf"]
         self.assertTrue(any(s.get("type") == "object" for s in sub_schemas))
         self.assertTrue(any(s.get("description") == "The rotation" for s in sub_schemas))
+
+    def test_sibling_keys_allof_produces_valid_pydantic_model(self):
+        """A $ref with sibling keys (allOf merge) is accepted by jsonschema_to_pydantic.
+
+        Regression test: verifies the allOf structure produced for sibling-key $refs
+        does not prevent Pydantic model generation.
+        """
+        schema = {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "number"},
+                        "y": {"type": "number"},
+                        "z": {"type": "number"},
+                    },
+                },
+                "rotation": {"$ref": "#/properties/position", "description": "The rotation"},
+            },
+            "required": ["position", "rotation"],
+        }
+        fixed = self.adapter.fix_schema(schema)
+        model = jsonschema_to_pydantic(fixed)
+        self.assertIsNotNone(model)
+        self.assertIn("position", model.model_fields)
+        self.assertIn("rotation", model.model_fields)
 
     def test_property_ref_produces_valid_pydantic_model(self):
         """A schema with inlined property $refs is accepted by jsonschema_to_pydantic.
