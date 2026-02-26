@@ -11,6 +11,7 @@ import { Auth0OAuthProvider } from "./providers/auth0.js";
 import { KeycloakOAuthProvider } from "./providers/keycloak.js";
 import { WorkOSOAuthProvider } from "./providers/workos.js";
 import { CustomOAuthProvider } from "./providers/custom.js";
+import { ClerkOAuthProvider } from "./providers/clerk.js";
 import type { UserInfo } from "./providers/types.js";
 import { getEnv } from "../utils/runtime.js";
 
@@ -49,6 +50,14 @@ export interface WorkOSProviderConfig {
   subdomain: string;
   clientId?: string;
   apiKey?: string;
+  verifyJwt?: boolean;
+}
+
+/**
+ * Configuration for Clerk OAuth provider
+ */
+export interface ClerkProviderConfig {
+  domain: string;
   verifyJwt?: boolean;
 }
 
@@ -330,6 +339,54 @@ export function oauthWorkOSProvider(
     subdomain,
     clientId,
     apiKey,
+    verifyJwt: config.verifyJwt,
+  });
+}
+
+/**
+ * Create a Clerk OAuth provider
+ *
+ * Supports zero-config setup via environment variables:
+ * - MCP_USE_OAUTH_CLERK_DOMAIN (required)
+ *
+ * @param config - Optional Clerk configuration (overrides environment variables)
+ * @returns OAuthProvider instance
+ *
+ * @example Zero-config with environment variables
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthClerkProvider()
+ * });
+ * ```
+ *
+ * @example With explicit configuration
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthClerkProvider({
+ *     domain: 'my-app.clerk.accounts.dev'
+ *   })
+ * });
+ * ```
+ */
+export function oauthClerkProvider(
+  config: Partial<ClerkProviderConfig> = {}
+): OAuthProvider {
+  const domain = config.domain ?? getEnv("MCP_USE_OAUTH_CLERK_DOMAIN");
+
+  if (!domain) {
+    throw new Error(
+      "Clerk domain is required. " +
+        "Set MCP_USE_OAUTH_CLERK_DOMAIN environment variable or pass domain in config."
+    );
+  }
+
+  return new ClerkOAuthProvider({
+    provider: "clerk",
+    domain,
     verifyJwt: config.verifyJwt,
   });
 }
