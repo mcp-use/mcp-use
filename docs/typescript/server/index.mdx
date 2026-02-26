@@ -175,7 +175,10 @@ class McpServer {
   resourceTemplate(definition: ResourceTemplateDefinition): this
   prompt(definition: PromptDefinition): this
   uiResource(definition: UIResourceDefinition): this
-  
+
+  // Middleware hooks (intercept protocol operations)
+  use(middleware: Middleware): this
+
   listen(port?: number): Promise<void>
 
   // Hono proxy - all HTTP methods available
@@ -185,6 +188,7 @@ class McpServer {
 
 **Additional Features:**
 - **[OAuth Authentication](/typescript/server/authentication)**: Configure OAuth providers for secure authentication
+- **[Middleware Hooks](/typescript/server/middleware-hooks)**: Intercept protocol operations to filter tools, enforce authorization, and add cross-cutting logic
 - **[Sampling](/typescript/client/sampling)**: Request LLM completions from the client during tool execution
 - **[Notifications](/typescript/server/notifications)**: Send real-time notifications to connected clients
 - **[Inspector UI](/inspector)**: Interactive debugging interface automatically served at `/inspector` endpoint
@@ -203,6 +207,9 @@ class McpServer {
   </Card>
   <Card title="UI Widgets" icon="palette" href="/typescript/server/ui-widgets">
     Build interactive React components with auto-registration
+  </Card>
+  <Card title="Middleware Hooks" icon="layers" href="/typescript/server/middleware-hooks">
+    Filter tools, enforce authorization, and add cross-cutting logic per-request
   </Card>
   <Card title="Configuration" icon="cog" href="/typescript/server/configuration">
     Configure your server for production deployment

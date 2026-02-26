@@ -65,6 +65,20 @@ export {
   ToolAnnotations,
 } from "./tool.js";
 
+// Middleware types
+export {
+  Middleware,
+  MiddlewareContext,
+  OnListToolsHook,
+  OnCallToolHook,
+  OnListPromptsHook,
+  OnListResourcesHook,
+  ToolInfo,
+  PromptInfo,
+  ResourceInfo,
+  CallToolResultLike,
+} from "./middleware.js";
+
 // Prompt types
 export {
   PromptCallback,

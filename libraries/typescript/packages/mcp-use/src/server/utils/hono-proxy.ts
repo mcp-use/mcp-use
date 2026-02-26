@@ -68,64 +68,86 @@ export function createHonoProxy<T extends object>(
   target: T,
   app: HonoType
 ): T & HonoType {
-  return new Proxy(target, {
+  const proxy = new Proxy(target, {
     get(target, prop) {
       // Special handling for 'use' method to auto-detect and adapt Express middleware
+      // or to delegate MCP middleware objects to MCPServerClass.use()
       if (prop === "use") {
-        return async (...args: any[]) => {
-          // Hono's use signature: use(path?, ...handlers)
-          // Check if the first arg is a path (string) or a handler (function)
-          const hasPath = typeof args[0] === "string";
-          const path = hasPath ? args[0] : "*";
-          const handlers = hasPath ? args.slice(1) : args;
-
-          // Adapt each handler if it's Express middleware
-          const adaptedHandlers = handlers.map((handler: any) => {
-            if (isExpressMiddleware(handler)) {
-              // Return a promise-wrapped adapter since adaptConnectMiddleware is async
-              // We'll handle this in the actual app.use call
-              return { __isExpressMiddleware: true, handler, path };
-            }
-            return handler;
-          });
-
-          // Check if we have any Express middleware to adapt
-          const hasExpressMiddleware = adaptedHandlers.some(
-            (h: any) => h.__isExpressMiddleware
-          );
-
-          if (hasExpressMiddleware) {
-            // We need to handle async adaptation
-            // Await the adaptation to ensure middleware is registered before proceeding
-            await Promise.all(
-              adaptedHandlers.map(async (h: any) => {
-                if (h.__isExpressMiddleware) {
-                  const adapted = await adaptConnectMiddleware(
-                    h.handler,
-                    h.path
-                  );
-                  // Call app.use with the adapted middleware
-                  if (hasPath) {
-                    (app as any).use(path, adapted);
-                  } else {
-                    (app as any).use(adapted);
-                  }
-                } else {
-                  // Regular Hono middleware
-                  if (hasPath) {
-                    (app as any).use(path, h);
-                  } else {
-                    (app as any).use(h);
-                  }
-                }
-              })
-            );
-
-            return target;
+        return (...args: any[]) => {
+          // Detect MCP middleware objects (plain objects with onListTools, onCallTool, etc.)
+          // and delegate to the target's use() method for MCP protocol middleware.
+          // This branch returns synchronously to support chaining: server.use(mw1).use(mw2)
+          if (
+            args.length === 1 &&
+            args[0] != null &&
+            typeof args[0] === "object" &&
+            !Array.isArray(args[0]) &&
+            typeof args[0] !== "function" &&
+            ("onListTools" in args[0] ||
+              "onCallTool" in args[0] ||
+              "onListPrompts" in args[0] ||
+              "onListResources" in args[0])
+          ) {
+            (target as any).use(args[0]);
+            return proxy;
           }
 
-          // No Express middleware, call normally
-          return (app as any).use(...args);
+          // Delegate to the async Hono/Express middleware adaptation path
+          return (async () => {
+            // Hono's use signature: use(path?, ...handlers)
+            // Check if the first arg is a path (string) or a handler (function)
+            const hasPath = typeof args[0] === "string";
+            const path = hasPath ? args[0] : "*";
+            const handlers = hasPath ? args.slice(1) : args;
+
+            // Adapt each handler if it's Express middleware
+            const adaptedHandlers = handlers.map((handler: any) => {
+              if (isExpressMiddleware(handler)) {
+                // Return a promise-wrapped adapter since adaptConnectMiddleware is async
+                // We'll handle this in the actual app.use call
+                return { __isExpressMiddleware: true, handler, path };
+              }
+              return handler;
+            });
+
+            // Check if we have any Express middleware to adapt
+            const hasExpressMiddleware = adaptedHandlers.some(
+              (h: any) => h.__isExpressMiddleware
+            );
+
+            if (hasExpressMiddleware) {
+              // We need to handle async adaptation
+              // Await the adaptation to ensure middleware is registered before proceeding
+              await Promise.all(
+                adaptedHandlers.map(async (h: any) => {
+                  if (h.__isExpressMiddleware) {
+                    const adapted = await adaptConnectMiddleware(
+                      h.handler,
+                      h.path
+                    );
+                    // Call app.use with the adapted middleware
+                    if (hasPath) {
+                      (app as any).use(path, adapted);
+                    } else {
+                      (app as any).use(adapted);
+                    }
+                  } else {
+                    // Regular Hono middleware
+                    if (hasPath) {
+                      (app as any).use(path, h);
+                    } else {
+                      (app as any).use(h);
+                    }
+                  }
+                })
+              );
+
+              return target;
+            }
+
+            // No Express middleware, call normally
+            return (app as any).use(...args);
+          })();
         };
       }
 
@@ -160,4 +182,5 @@ export function createHonoProxy<T extends object>(
       return typeof value === "function" ? value.bind(app) : value;
     },
   }) as T & HonoType;
+  return proxy;
 }

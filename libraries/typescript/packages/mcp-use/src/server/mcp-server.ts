@@ -16,6 +16,13 @@ import { z } from "zod";
 import { Telemetry } from "../telemetry/index.js";
 import { getPackageVersion } from "../version.js";
 
+import {
+  buildCallToolChain,
+  buildListPromptsChain,
+  buildListResourcesChain,
+  buildListToolsChain,
+} from "./middleware/hooks.js";
+import type { Middleware, MiddlewareContext } from "./types/middleware.js";
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
 import { mountInspectorUI } from "./inspector/index.js";
 import { registerPrompt } from "./prompts/index.js";
@@ -68,6 +75,7 @@ import {
   sendToolsListChanged,
 } from "./notifications/index.js";
 import type { OAuthProvider } from "./oauth/providers/types.js";
+import { getAuth } from "./oauth/utils.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
@@ -376,6 +384,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     >(),
   };
+
+  /**
+   * Registered middleware hooks for intercepting MCP protocol operations.
+   * @internal
+   */
+  private middlewares: Middleware[] = [];
 
   /**
    * Storage for widget definitions, used to inject metadata into tool responses
@@ -2454,6 +2468,198 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Register a middleware to intercept MCP protocol operations.
+   *
+   * Middlewares execute in registration order using an onion model:
+   * each middleware wraps the next, with the SDK's default handler at the center.
+   *
+   * @param middleware - Middleware definition with optional hook functions
+   * @returns This server instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * server.use({
+   *   name: "role-filter",
+   *   onListTools: async (ctx, callNext) => {
+   *     const tools = await callNext();
+   *     return tools.filter(t => !t.name.startsWith("admin-"));
+   *   },
+   * });
+   * ```
+   */
+  public use(middleware: Middleware): this {
+    this.middlewares.push(middleware);
+    return this;
+  }
+
+  /**
+   * Build a MiddlewareContext for the current request.
+   * @internal
+   */
+  private buildMiddlewareContext(sessionId?: string): MiddlewareContext {
+    const requestContext = getRequestContext();
+    let auth: MiddlewareContext["auth"];
+    if (requestContext) {
+      // getAuth reads context.get("auth") set by the OAuth middleware.
+      // Returns undefined (typed as AuthInfo) when OAuth is not configured.
+      const result = getAuth(requestContext as any);
+      if (result) auth = result;
+    }
+    return {
+      auth,
+      request: requestContext,
+      sessionId,
+      server: {
+        name: this.config.name,
+        version: this.config.version,
+      },
+    };
+  }
+
+  /**
+   * Install middleware-wrapped request handlers on a per-session SDK server.
+   *
+   * After the SDK's default handlers have been registered via
+   * `setToolRequestHandlers()` etc., this method replaces them with
+   * middleware-wrapped versions using `server.setRequestHandler()`.
+   *
+   * @internal
+   */
+  private installMiddlewareHandlers(
+    newServer: OfficialMcpServer,
+    sessionId?: string
+  ): void {
+    const protocol = newServer.server;
+
+    // NOTE: The following blocks access private internals of
+    // @modelcontextprotocol/sdk (tested against ^1.26.0).
+    // If you upgrade the SDK and middleware stops working, check whether
+    // _requestHandlers, _registeredPrompts, or _registeredResources have been
+    // renamed or removed and update accordingly.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handlersMap: Map<string, (...args: any[]) => any> | undefined =
+      (protocol as any)._requestHandlers;
+    if (!handlersMap) {
+      console.warn(
+        "[mcp-use] middleware: Server._requestHandlers not found. " +
+          "Middleware hooks will be skipped. This may happen after an SDK upgrade — " +
+          "please open an issue at https://github.com/mcp-use/mcp-use/issues."
+      );
+      return;
+    }
+
+    // --- tools/list ---
+    if (this.middlewares.some((m) => m.onListTools)) {
+      // Capture the SDK's handler *before* replacing it so the base function
+      // goes through the SDK's own schema conversion (normalizeObjectSchema +
+      // toJsonSchemaCompat). This ensures middleware sees proper JSON Schema
+      // objects — not raw Zod schema internals.
+      const originalListToolsHandler = handlersMap.get("tools/list");
+      const baseFn = async () => {
+        if (originalListToolsHandler) {
+          const result = await originalListToolsHandler(
+            { method: "tools/list", params: {} },
+            {}
+          );
+          return result.tools ?? [];
+        }
+        return [];
+      };
+      const chain = buildListToolsChain(this.middlewares, baseFn);
+      protocol.setRequestHandler(
+        z.object({ method: z.literal("tools/list") }).passthrough(),
+        (async () => {
+          const ctx = this.buildMiddlewareContext(sessionId);
+          const tools = await chain(ctx);
+          return { tools };
+        }) as any
+      );
+    }
+
+    // --- tools/call ---
+    if (this.middlewares.some((m) => m.onCallTool)) {
+      // Capture the original CallTool handler from the protocol's internal map.
+      // We need to grab it *before* we replace it.
+      const originalCallToolHandler = handlersMap.get("tools/call");
+
+      // Build the hook chain once per session (hook-filtering loop runs here).
+      // baseFn is passed per-request below so it can close over request/extra.
+      const chain = buildCallToolChain(this.middlewares);
+
+      protocol.setRequestHandler(
+        z.object({ method: z.literal("tools/call") }).passthrough(),
+        (async (request: any, extra: any) => {
+          const ctx = this.buildMiddlewareContext(sessionId);
+          const params = {
+            name: request.params.name as string,
+            arguments: request.params.arguments as
+              | Record<string, unknown>
+              | undefined,
+          };
+          const baseFn = async () => {
+            if (originalCallToolHandler) {
+              return await originalCallToolHandler(request, extra);
+            }
+            throw new McpError(
+              ErrorCode.InternalError,
+              "No base tools/call handler found"
+            );
+          };
+          return await chain(ctx, params, baseFn);
+        }) as any
+      );
+    }
+
+    // --- prompts/list ---
+    if (this.middlewares.some((m) => m.onListPrompts)) {
+      const originalPromptsListHandler = handlersMap.get("prompts/list");
+      const baseFn = async () => {
+        if (originalPromptsListHandler) {
+          const result = await originalPromptsListHandler(
+            { method: "prompts/list", params: {} },
+            {}
+          );
+          return result.prompts ?? [];
+        }
+        return [];
+      };
+      const chain = buildListPromptsChain(this.middlewares, baseFn);
+      protocol.setRequestHandler(
+        z.object({ method: z.literal("prompts/list") }).passthrough(),
+        (async () => {
+          const ctx = this.buildMiddlewareContext(sessionId);
+          const prompts = await chain(ctx);
+          return { prompts };
+        }) as any
+      );
+    }
+
+    // --- resources/list ---
+    if (this.middlewares.some((m) => m.onListResources)) {
+      const originalResourcesListHandler = handlersMap.get("resources/list");
+      const baseFn = async () => {
+        if (originalResourcesListHandler) {
+          const result = await originalResourcesListHandler(
+            { method: "resources/list", params: {} },
+            {}
+          );
+          return result.resources ?? [];
+        }
+        return [];
+      };
+      const chain = buildListResourcesChain(this.middlewares, baseFn);
+      protocol.setRequestHandler(
+        z.object({ method: z.literal("resources/list") }).passthrough(),
+        (async () => {
+          const ctx = this.buildMiddlewareContext(sessionId);
+          const resources = await chain(ctx);
+          return { resources };
+        }) as any
+      );
+    }
+  }
+
+  /**
    * Create a new server instance for a session following official SDK pattern.
    * This is called for each initialize request to create an isolated server.
    *
@@ -2964,6 +3170,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Store refs for hot reload support (if sessionId provided)
     if (sessionId) {
       this.sessionRegisteredRefs.set(sessionId, sessionRefs);
+    }
+
+    // Install middleware-wrapped handlers if any middlewares are registered
+    if (this.middlewares.length > 0) {
+      this.installMiddlewareHandlers(newServer, sessionId);
     }
 
     return newServer;

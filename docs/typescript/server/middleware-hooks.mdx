@@ -1,0 +1,304 @@
+---
+title: "Middleware Hooks"
+description: "Intercept and filter MCP protocol operations per-request — filter tools by role, enforce authorization, and add cross-cutting logic."
+icon: "layers"
+---
+
+Middleware hooks let you intercept MCP protocol operations — `tools/list`, `tools/call`, `prompts/list`, and `resources/list` — before they reach the client. This is useful for:
+
+- **Role-based access control**: Show or hide tools based on user roles
+- **Authorization**: Block tool calls the user isn't allowed to make
+- **Audit logging**: Record every tool invocation
+- **Dynamic filtering**: Change what's visible based on session context
+
+## Quick Start
+
+Register a middleware with `server.use()`:
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+import type { Middleware } from "mcp-use/server";
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" });
+
+server.use({
+  name: "role-filter",
+  onListTools: async (ctx, callNext) => {
+    const tools = await callNext();
+    // Hide admin tools from non-admin users
+    // `roles` is a custom JWT claim — see the Note below the full example
+    if ((ctx.auth?.user as any)?.roles?.includes("admin")) return tools;
+    return tools.filter((t) => !t.name.startsWith("admin-"));
+  },
+});
+```
+
+## How It Works
+
+Middlewares form an **onion chain**: each middleware wraps the next, with the SDK's default handler at the center. They execute in **registration order** — the first `server.use()` call is the outermost layer.
+
+```
+Request → middleware-1 → middleware-2 → SDK default handler
+                                              ↓
+Response ← middleware-1 ← middleware-2 ←────────
+```
+
+Each hook receives a `callNext` function that invokes the rest of the chain. You can inspect or transform the result before returning it.
+
+## API Reference
+
+### `server.use(middleware)`
+
+Registers a middleware and returns `this` for chaining.
+
+```typescript
+server
+  .use({ name: "logger", onListTools: loggerHook })
+  .use({ name: "filter", onListTools: filterHook });
+```
+
+### `Middleware` interface
+
+```typescript
+interface Middleware {
+  name?: string;              // Optional label for debugging
+  onListTools?: OnListToolsHook;
+  onCallTool?: OnCallToolHook;
+  onListPrompts?: OnListPromptsHook;
+  onListResources?: OnListResourcesHook;
+}
+```
+
+A middleware can implement any combination of hooks. Hooks not defined are skipped.
+
+### `MiddlewareContext`
+
+Every hook receives a context object:
+
+```typescript
+interface MiddlewareContext {
+  auth?: AuthInfo;       // OAuth user info (when authentication is configured)
+  request?: unknown;     // Raw Hono request context
+  sessionId?: string;    // Active session ID
+  server: {
+    name: string;
+    version: string;
+  };
+}
+```
+
+The `auth` field is populated automatically when you use [OAuth authentication](/typescript/server/authentication).
+
+## Hook Types
+
+### `onListTools`
+
+Intercepts `tools/list`. Filter or reorder the tool list before it's sent to the client.
+
+```typescript
+type OnListToolsHook = (
+  ctx: MiddlewareContext,
+  callNext: () => Promise<ToolInfo[]>
+) => Promise<ToolInfo[]>;
+```
+
+### `onCallTool`
+
+Intercepts `tools/call`. Block unauthorized calls, wrap execution, or modify results.
+
+```typescript
+type OnCallToolHook = (
+  ctx: MiddlewareContext,
+  params: { name: string; arguments?: Record<string, unknown> },
+  callNext: () => Promise<CallToolResultLike>
+) => Promise<CallToolResultLike>;
+```
+
+### `onListPrompts`
+
+Intercepts `prompts/list`.
+
+```typescript
+type OnListPromptsHook = (
+  ctx: MiddlewareContext,
+  callNext: () => Promise<PromptInfo[]>
+) => Promise<PromptInfo[]>;
+```
+
+### `onListResources`
+
+Intercepts `resources/list`.
+
+```typescript
+type OnListResourcesHook = (
+  ctx: MiddlewareContext,
+  callNext: () => Promise<ResourceInfo[]>
+) => Promise<ResourceInfo[]>;
+```
+
+## Examples
+
+### Role-based tool filtering
+
+Show different tools to different users. Requires [OAuth authentication](/typescript/server/authentication).
+
+```typescript
+import { MCPServer, oauthAuth0Provider, McpError, ErrorCode } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider({
+    domain: "your-tenant.auth0.com",
+    audience: "https://your-api.example.com",
+  }),
+});
+
+server.tool(
+  { name: "search", description: "Search documents", schema: z.object({ query: z.string() }) },
+  async ({ query }) => text(`Results for: ${query}`)
+);
+
+server.tool(
+  { name: "admin-delete", description: "Delete records (admin only)", schema: z.object({ id: z.string() }) },
+  async ({ id }) => text(`Deleted ${id}`)
+);
+
+server.use({
+  name: "role-filter",
+
+  // Only show admin tools to admins in the tool list
+  onListTools: async (ctx, callNext) => {
+    const tools = await callNext();
+    // `roles` is a custom JWT claim — configure it in your OAuth provider
+    const isAdmin = (ctx.auth?.user as any)?.roles?.includes("admin") ?? false;
+    return isAdmin ? tools : tools.filter((t) => !t.name.startsWith("admin-"));
+  },
+
+  // Block admin tool calls even if the client somehow calls one
+  onCallTool: async (ctx, params, callNext) => {
+    if (params.name.startsWith("admin-")) {
+      const isAdmin = (ctx.auth?.user as any)?.roles?.includes("admin") ?? false;
+      if (!isAdmin) {
+        throw new McpError(ErrorCode.InvalidParams, "Unauthorized: admin role required");
+      }
+    }
+    return callNext();
+  },
+});
+```
+
+<Note>
+`ctx.auth?.user` contains the standard fields from your JWT (`userId`, `name`, `email`). Custom claims like `roles` or `tenantId` are set by your OAuth provider and accessed via a type cast. See your provider's docs for how to include them in the token.
+</Note>
+
+### Audit logging
+
+Record every tool invocation with user context:
+
+```typescript
+server.use({
+  name: "audit-log",
+  onCallTool: async (ctx, params, callNext) => {
+    const userId = ctx.auth?.user?.userId ?? "anonymous";
+    console.log(`[AUDIT] ${userId} called ${params.name}`, params.arguments);
+
+    const start = Date.now();
+    try {
+      const result = await callNext();
+      console.log(`[AUDIT] ${params.name} succeeded in ${Date.now() - start}ms`);
+      return result;
+    } catch (err) {
+      console.error(`[AUDIT] ${params.name} failed:`, err);
+      throw err;
+    }
+  },
+});
+```
+
+### Tenant-based isolation
+
+Multi-tenant servers where each user only sees their own resources:
+
+```typescript
+server.use({
+  name: "tenant-filter",
+  onListResources: async (ctx, callNext) => {
+    const resources = await callNext();
+    const tenantId = ctx.auth?.user?.["tenantId"] as string | undefined;
+    if (!tenantId) return [];
+    return resources.filter((r) => r.uri.startsWith(`tenant://${tenantId}/`));
+  },
+});
+```
+
+### Composing multiple middlewares
+
+Middlewares stack in registration order. Each is independent:
+
+```typescript
+server
+  .use({ name: "audit",  onCallTool: auditHook })
+  .use({ name: "filter", onListTools: filterHook, onCallTool: authHook })
+  .use({ name: "metrics", onCallTool: metricsHook });
+
+// Execution order for tools/call:
+// audit → filter → metrics → SDK handler → metrics → filter → audit
+```
+
+## Middleware Without Authentication
+
+Middleware works without OAuth too. Use `ctx.sessionId` or `ctx.request` for session-based logic:
+
+```typescript
+server.use({
+  name: "rate-limit",
+  onCallTool: async (ctx, params, callNext) => {
+    const key = `${ctx.sessionId}:${params.name}`;
+    if (rateLimiter.isExceeded(key)) {
+      throw new McpError(ErrorCode.InvalidParams, "Rate limit exceeded");
+    }
+    rateLimiter.record(key);
+    return callNext();
+  },
+});
+```
+
+## TypeScript Imports
+
+```typescript
+import type {
+  Middleware,
+  MiddlewareContext,
+  OnListToolsHook,
+  OnCallToolHook,
+  OnListPromptsHook,
+  OnListResourcesHook,
+  ToolInfo,
+  PromptInfo,
+  ResourceInfo,
+  CallToolResultLike,
+} from "mcp-use/server";
+```
+
+## Known Limitations
+
+Middleware hooks cover the four most common MCP list/call operations. The following operations **cannot** currently be intercepted:
+
+| Operation | Interceptable? |
+|---|---|
+| `tools/list` | Yes — `onListTools` |
+| `tools/call` | Yes — `onCallTool` |
+| `prompts/list` | Yes — `onListPrompts` |
+| `resources/list` | Yes — `onListResources` |
+| `prompts/get` | No |
+| `resources/read` | No |
+
+For access control on `resources/read` or `prompts/get`, validate permissions inside the resource/prompt handler itself for now.
+
+## Related
+
+- [Authentication](/typescript/server/authentication) — Configure OAuth to populate `ctx.auth`
+- [Tools](/typescript/server/tools) — Building the tools that middleware intercepts
+- [Notifications](/typescript/server/notifications) — Push updates to connected clients
