@@ -68,7 +68,6 @@ class ServerRunner:
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
-        debug: bool = False,
     ) -> None:
         """Run the MCP server.
 
@@ -77,7 +76,6 @@ class ServerRunner:
             host: Host to bind to
             port: Port to bind to
             reload: Whether to enable auto-reload
-            debug: Whether to enable debug mode
         """
 
         if transport not in get_args(TransportType):
@@ -88,9 +86,6 @@ class ServerRunner:
                 case "stdio":
                     anyio.run(self.server.run_stdio_async)
                 case "streamable-http":
-                    if debug and not self.server.debug:
-                        self.server._add_dev_routes()
-                        self.server.app = self.server.streamable_http_app()
                     anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
                 case "sse":
                     logger.warning("SSE transport is not supported anymore. Use streamable-http instead.")

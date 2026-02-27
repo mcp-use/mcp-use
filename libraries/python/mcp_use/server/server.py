@@ -474,6 +474,10 @@ class MCPServer(FastMCP):
         # Override debug_level if debug=True is passed to run()
         if debug and self.debug_level < 1:
             self.debug_level = 1
+            self._add_dev_routes()
+            # Rebuild the Starlette app so the new routes are included
+            self._session_manager = None
+            self.app = self.streamable_http_app()
 
         self._transport_type = transport
         track_server_run_from_server(self, transport, final_host, final_port, _telemetry)
@@ -481,7 +485,7 @@ class MCPServer(FastMCP):
         self._wrap_handlers_with_middleware()
 
         runner = ServerRunner(self)
-        runner.run(transport=transport, host=final_host, port=final_port, reload=reload, debug=debug)
+        runner.run(transport=transport, host=final_host, port=final_port, reload=reload)
 
     def get_context(self) -> MCPContext:  # type: ignore[override]
         """Use the extended MCP-Use context that adds convenience helpers."""
