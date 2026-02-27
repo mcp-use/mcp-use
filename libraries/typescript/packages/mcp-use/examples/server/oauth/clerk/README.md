@@ -37,7 +37,7 @@ Clerk requires a pre-registered OAuth client for MCP authentication:
    - **Name**: `mcp-use`
    - **Redirect URI**: `http://localhost:3000/oauth/callback`
 4. Click **Create**
-5. Note your **Client ID** — it looks like `client_xxxxxxxxxxxxxxxxxx`
+5. Make sure that dynamic client registration has been toggled on in the OAuth applications Setting.
 
 ### 3. Get Your Secret Key
 
@@ -53,9 +53,6 @@ Create a `.env` file in this directory:
 ```bash
 # Required: Your Clerk domain (from Configure → Domains)
 MCP_USE_OAUTH_CLERK_DOMAIN=your-app.clerk.accounts.dev
-
-# Required: OAuth Application Client ID (from Configure → SSO → OAuth Applications)
-MCP_USE_OAUTH_CLERK_CLIENT_ID=client_xxxxxxxxxxxxxxxxxx
 
 # Required for get-clerk-user-profile in Inspector / browser flows
 # Get from: Clerk Dashboard → API Keys

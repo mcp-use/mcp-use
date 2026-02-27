@@ -163,7 +163,6 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
 export interface ClerkOAuthConfig extends BaseOAuthConfig {
   provider: "clerk";
   domain: string;        // e.g. "my-app.clerk.accounts.dev" or custom domain
-  clientId?: string;
   verifyJwt?: boolean;   // defaults to true, disabled only for local dev
 }
 
