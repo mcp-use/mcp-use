@@ -58,6 +58,7 @@ export interface WorkOSProviderConfig {
  */
 export interface ClerkProviderConfig {
   domain: string;
+  clientId?: string;
   verifyJwt?: boolean;
 }
 
@@ -376,6 +377,7 @@ export function oauthClerkProvider(
   config: Partial<ClerkProviderConfig> = {}
 ): OAuthProvider {
   const domain = config.domain ?? getEnv("MCP_USE_OAUTH_CLERK_DOMAIN");
+  const clientId = config.clientId ?? getEnv("MCP_USE_OAUTH_CLERK_CLIENT_ID");
 
   if (!domain) {
     throw new Error(
@@ -387,6 +389,7 @@ export function oauthClerkProvider(
   return new ClerkOAuthProvider({
     provider: "clerk",
     domain,
+    clientId,             
     verifyJwt: config.verifyJwt,
   });
 }

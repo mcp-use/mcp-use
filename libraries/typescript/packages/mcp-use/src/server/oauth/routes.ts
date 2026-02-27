@@ -165,51 +165,61 @@ export function setupOAuthRoutes(
   }
 
   /**
-   * OAuth Authorization Server Metadata
-   * As per RFC 8414: https://tools.ietf.org/html/rfc8414
+   * Fetch provider metadata with OIDC fallback.
    *
-   * In direct mode: Fetches and returns metadata from the provider
-   * In proxy mode: Returns MCP server's proxy endpoints
+   * Tries:
+   * 1. RFC 8414 OAuth 2.0 metadata
+   * 2. OpenID Connect discovery fallback
+   */
+  async function fetchProviderMetadata(issuer: string): Promise<any> {
+    const oauth2Url = `${issuer}/.well-known/oauth-authorization-server`;
+    const oidcUrl = `${issuer}/.well-known/openid-configuration`;
+
+    console.log(`[OAuth] Trying OAuth 2.0 metadata path: ${oauth2Url}`);
+
+    try {
+      const response = await fetch(oauth2Url);
+      if (response.ok) {
+        console.log(`[OAuth] OAuth 2.0 metadata found`);
+        return await response.json();
+      }
+      console.log(
+        `[OAuth] OAuth 2.0 metadata not found (${response.status}), falling back to OIDC`
+      );
+    } catch {
+      console.log(`[OAuth] OAuth 2.0 metadata fetch failed, trying OIDC`);
+    }
+
+    console.log(`[OAuth] Trying OIDC discovery path: ${oidcUrl}`);
+
+    const oidcResponse = await fetch(oidcUrl);
+    if (!oidcResponse.ok) {
+      throw new Error(
+        `Provider metadata not found at ${oauth2Url} or ${oidcUrl}`
+      );
+    }
+
+    console.log(`[OAuth] OIDC metadata found`);
+    return await oidcResponse.json();
+  }
+
+  /**
+   * Authorization Server Metadata
+   *
+   * Direct mode:
+   *   - Fetch from provider (with OIDC fallback)
+   *
+   * Proxy mode:
+   *   - Return MCP server endpoints
    */
   const handleAuthorizationServerMetadata = async (c: Context) => {
-    const requestPath = new URL(c.req.url).pathname;
-    console.log(`[OAuth] Metadata request: ${requestPath} (mode: ${mode})`);
+    console.log(`[OAuth] Metadata request (mode: ${mode})`);
 
     if (mode === "direct") {
-      // Direct mode: Fetch metadata from provider
       try {
-        const metadataUrl = `${provider.getIssuer()}/.well-known/oauth-authorization-server`;
-        console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
-        const response = await fetch(metadataUrl);
-
-        if (!response.ok) {
-          console.error(
-            `[OAuth] Failed to fetch provider metadata: ${response.status}`
-          );
-          return c.json(
-            {
-              error: "server_error",
-              error_description: `Failed to fetch provider metadata: ${response.status}`,
-            },
-            500
-          );
-        }
-
-        const metadata = await response.json();
-
-        // Check if provider has a pre-registered client (stored in provider config)
-        // If so, remove registration_endpoint to prevent clients from using DCR
-        const hasRegisteredClient =
-          provider.getRegistrationEndpoint &&
-          (provider as any).config?.clientId;
-
-        if (hasRegisteredClient) {
-          console.log(
-            `[OAuth] Provider has pre-registered client - removing DCR endpoint`
-          );
-          // Remove registration_endpoint to signal that DCR is not available
-          delete metadata.registration_endpoint;
-        }
+        const metadata = await fetchProviderMetadata(
+          provider.getIssuer()
+        );
 
         console.log(`[OAuth] Provider metadata retrieved successfully`);
         console.log(`[OAuth]   - Issuer: ${metadata.issuer}`);
@@ -230,20 +240,20 @@ export function setupOAuthRoutes(
     } else {
       // Proxy mode: Return MCP server endpoints
       console.log(`[OAuth] Returning proxy mode metadata`);
-      return c.json({
-        issuer: provider.getIssuer(),
-        authorization_endpoint: `${baseUrl}/authorize`,
-        token_endpoint: `${baseUrl}/token`,
-        response_types_supported: ["code"],
-        grant_types_supported: provider.getGrantTypesSupported(),
-        code_challenge_methods_supported: ["S256"],
-        token_endpoint_auth_methods_supported: [
-          "client_secret_post",
-          "client_secret_basic",
-          "none",
-        ],
-        scopes_supported: provider.getScopesSupported(),
-      });
+    return c.json({
+      issuer: provider.getIssuer(),
+      authorization_endpoint: `${baseUrl}/authorize`,
+      token_endpoint: `${baseUrl}/token`,
+      response_types_supported: ["code"],
+      grant_types_supported: provider.getGrantTypesSupported(),
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: [
+        "client_secret_post",
+        "client_secret_basic",
+        "none",
+      ],
+      scopes_supported: provider.getScopesSupported(),
+    });
     }
   };
 
@@ -273,10 +283,6 @@ export function setupOAuthRoutes(
       resource: baseUrl,
       authorization_servers: [provider.getIssuer()],
       bearer_methods_supported: ["header"],
-      resource_documentation:
-        mode === "direct"
-          ? "This resource uses direct OAuth flow. Clients communicate directly with the authorization server."
-          : undefined,
     });
   });
 

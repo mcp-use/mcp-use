@@ -6,10 +6,10 @@
  * and permissions extraction — following the same pattern as Auth0OAuthProvider.
  */
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { OAuthProvider, UserInfo, ClerkOAuthConfig } from "./types.js";
+import type { OAuthProvider, OAuthMode, UserInfo, ClerkOAuthConfig } from "./types.js";
 
 export class ClerkOAuthProvider implements OAuthProvider {
-  private config: ClerkOAuthConfig;
+  protected config: ClerkOAuthConfig;
   private issuer: string;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
@@ -115,5 +115,18 @@ export class ClerkOAuthProvider implements OAuthProvider {
 
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token"];
+  }
+
+
+  getMode(): OAuthMode {
+    return "direct";
+  }
+
+  getRegistrationEndpoint(): string | undefined {
+    return undefined;
+  }
+
+  usesOidcDiscovery(): boolean {
+    return true;
   }
 }

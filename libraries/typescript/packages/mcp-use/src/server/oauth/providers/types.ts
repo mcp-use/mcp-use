@@ -65,11 +65,20 @@ export interface OAuthProvider {
    */
   getMode?(): OAuthMode;
 
-  /**
+   /**
    * Get the registration endpoint URL (for direct mode with dynamic client registration)
    * @returns The registration endpoint URL, or undefined if not supported
    */
   getRegistrationEndpoint?(): string | undefined;
+
+  /**
+   *
+   * When true, the MCP server advertises itself as the authorization_server
+   * in protected resource metadata so that MCP clients fetch auth metadata
+   * from the local server. The server then proxies the request to the
+   * provider using the OIDC discovery endpoint.
+   */
+  usesOidcDiscovery?(): boolean;
 }
 
 /**
@@ -154,6 +163,7 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
 export interface ClerkOAuthConfig extends BaseOAuthConfig {
   provider: "clerk";
   domain: string;        // e.g. "my-app.clerk.accounts.dev" or custom domain
+  clientId?: string;
   verifyJwt?: boolean;   // defaults to true, disabled only for local dev
 }
 
