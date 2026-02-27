@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.21.0-canary.7
+
+### Minor Changes
+
+- 6f66801: feat(widgets): allow sendFollowUp to accept multiple mime types and not just text
+
+### Patch Changes
+
+- @mcp-use/cli@2.17.0-canary.7
+- @mcp-use/inspector@0.24.0-canary.7
+
 ## 1.21.0-canary.6
 
 ### Patch Changes
