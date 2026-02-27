@@ -166,7 +166,21 @@ poetry add mcp-use
 ```
 </CodeGroup>
 
-Create a simple MCP server:
+### Scaffold a new project
+
+```bash
+# Via uvx (from PyPI)
+uvx --from mcp-use create-mcp-use my-server
+
+# Or if mcp-use is installed locally
+create-mcp-use my-server
+
+# Start the server
+cd my-server
+python server.py
+```
+
+### Create a MCP server manually:
 
 ```python
 from mcp_use import MCPServer
