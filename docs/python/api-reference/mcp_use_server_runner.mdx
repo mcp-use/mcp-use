@@ -52,7 +52,6 @@ Run the MCP server.
 ><ParamField body="host" type="str" default='127.0.0.1' >   Host to bind to </ParamField>
 ><ParamField body="port" type="int" default="8000" >   Port to bind to </ParamField>
 ><ParamField body="reload" type="bool" default="False" >   Whether to enable auto-reload </ParamField>
-><ParamField body="debug" type="bool" default="False" >   Whether to enable debug mode </ParamField>
 
 **Signature**
 ```python wrap
@@ -60,8 +59,7 @@ def run(
 transport: Literal = "streamable-http",
     host: str = "127.0.0.1",
     port: int = 8000,
-    reload: bool = False,
-    debug: bool = False
+    reload: bool = False
 ):
 ```
 
