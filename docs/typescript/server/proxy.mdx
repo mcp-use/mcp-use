@@ -1,0 +1,112 @@
+---
+title: "Server Proxying & Composition"
+description: "Learn how to compose multiple MCP servers together into a unified aggregator server."
+---
+
+The `mcp-use` TypeScript SDK allows you to easily proxy and compose multiple MCP servers into a single unified "Aggregator" server.
+
+This is extremely useful when you have multiple microservices or specialized MCP servers (like a database server, a weather server, and an internal API server) and you want to expose all of their tools, resources, and prompts through a single unified endpoint.
+
+## High-Level API (Config Object)
+
+The most elegant way to proxy servers is to pass a configuration object directly to `server.proxy()`. The keys of the object act as the **namespaces** for the child servers, preventing any naming collisions.
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+import path from "node:path";
+
+const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
+
+// The SDK handles all connections, sessions, and synchronization automatically
+await server.proxy({
+  // Proxy a local TypeScript server (using the 'tsx' runner)
+  database: {
+    command: "tsx",
+    args: [path.resolve(__dirname, "./db-server.ts")]
+  },
+  
+  // Proxy a local Python FastMCP server
+  weather: {
+    command: "uv",
+    args: ["run", "weather_server.py"],
+    env: { ...process.env, FASTMCP_LOG_LEVEL: "ERROR" }
+  },
+  
+  // Proxy a remote server over HTTP
+  manufact: {
+    url: "https://manufact.com/docs/mcp"
+  }
+});
+
+// Expose our own tools alongside the proxied ones
+server.tool({
+  name: "aggregator_status",
+  description: "Check aggregator status",
+}, async () => ({ content: [{ type: "text", text: "All systems operational" }] }));
+
+// Start the unified server
+await server.listen(3000);
+```
+
+In the example above, the `database` tools will be prefixed with `database_` (e.g. `database_query`), the `weather` tools will be prefixed with `weather_` (e.g. `weather_get_forecast`), and so on.
+
+## Low-Level API (Explicit Session)
+
+For advanced use cases—such as dynamically determining auth headers, managing complex connection lifecycles, or using custom connectors—you can inject an explicit `MCPSession` directly into the `proxy` method using the `mcp-use` Client SDK.
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+import { MCPClient } from "mcp-use/client";
+
+const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
+
+// Create a custom client orchestration
+const customClient = new MCPClient({
+  mcpServers: {
+    secure_db: {
+      url: "https://secure-db.example.com/mcp"
+    }
+  }
+});
+
+// Manage the session manually
+const dbSession = await customClient.createSession("secure_db");
+
+// Proxy the active session, manually specifying the namespace
+await server.proxy(dbSession, { namespace: "secure_db" });
+
+await server.listen(3000);
+```
+
+## Example Usage
+
+<Card title="Proxy Server Example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/proxy">
+  See a fully working example of server composition in the mcp-use repository.
+</Card>
+
+## How It Works
+
+When you proxy a server, the `mcp-use` SDK automatically:
+
+1. **Introspects** the child server by calling `listTools()`, `listResources()`, and `listPrompts()`.
+2. **Translates** the raw JSON Schemas returned by the child server into runtime `Zod` schemas for perfect compatibility with the `mcp-use` validation pipeline.
+3. **Namespaces** the component names to prevent collisions.
+4. **Relays** execution. When a client calls a proxied tool, the Aggregator intercepts it and forwards the execution to the child server.
+5. **Synchronizes** state. The Aggregator listens to `notifications/tools/list_changed` (and other list_changed events) emitted by the child server and instantly forwards them to all clients connected to the Aggregator.
+
+## Advanced Features
+
+The `mcp-use` proxying system goes far beyond simple tool forwarding. It transparently supports the most advanced features of the Model Context Protocol:
+
+### LLM Sampling & Elicitation 
+If a child server requests LLM Sampling (`sampling/createMessage`) or Elicitation (`elicitation/create`), the Aggregator automatically intercepts the out-of-band JSONRPC request, dynamically resolves the HTTP context of the specific user who triggered the tool, and routes the request back to that specific user's client.
+
+If a request context is somehow lost (e.g., executing a tool via a headless script), the Aggregator provides graceful fallbacks so the child server doesn't hang.
+
+### Progress Tracking
+If a child tool emits `notifications/progress/report` events, the Aggregator catches those events and pipes them directly through the unified `ToolContext` back to the parent client.
+
+### Resource URIs
+To prevent URI collisions across different servers, the proxy automatically prepends the namespace to the resource URI protocol.
+
+For example, if the `weather` server exposes a resource at `app://settings`, the Aggregator will expose it as `weather://app://settings`. When a client reads that resource, the Aggregator strips the prefix and requests the original URI from the child server.

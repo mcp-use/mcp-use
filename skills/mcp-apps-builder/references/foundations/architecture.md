@@ -58,6 +58,7 @@ High-level methods for defining MCP primitives:
 server.tool({ ... }, async (input) => { ... });
 server.resource({ ... }, async () => { ... });
 server.prompt({ ... }, async (input) => { ... });
+server.proxy({ child: { url: "..." } });
 ```
 
 ---

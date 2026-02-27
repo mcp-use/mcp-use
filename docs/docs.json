@@ -596,6 +596,7 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/server/proxy",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
