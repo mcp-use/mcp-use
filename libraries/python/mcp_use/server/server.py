@@ -324,7 +324,7 @@ class MCPServer(FastMCP):
                 subscribers = self._resource_subscriptions.get(str(uri))
                 if subscribers:
                     subscribers.discard(session)
-                    if not len(subscribers):
+                    if not subscribers:
                         del self._resource_subscriptions[str(uri)]
 
         # Patch capabilities to advertise subscribe support
