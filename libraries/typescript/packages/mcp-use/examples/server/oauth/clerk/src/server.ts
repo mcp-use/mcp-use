@@ -53,26 +53,59 @@ server.tool(
 server.tool(
   {
     name: "get-clerk-user-profile",
-    description: "Fetch user profile from Clerk using the authenticated token",
+    description: "Fetch full user profile from Clerk",
   },
   async (_args, ctx) => {
     try {
       const domain = process.env.MCP_USE_OAUTH_CLERK_DOMAIN;
-      if (!domain) {
-        return error("Clerk domain not configured");
+      if (!domain) return error("MCP_USE_OAUTH_CLERK_DOMAIN is not set");
+
+      const token = ctx.auth.accessToken as string;
+
+      // Opaque OAuth tokens (oat_...) — issued to real MCP clients.
+      // Call /oauth/userinfo directly with the token.
+      if (token.startsWith("oat_")) {
+        const res = await fetch(`https://${domain}/oauth/userinfo`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return error(`Clerk userinfo failed: ${res.status} ${res.statusText}`);
+        return object(await res.json());
       }
 
-      const res = await fetch(`https://${domain}/oauth/userinfo`, {
+      // JWT session tokens — issued in Inspector / browser flows.
+      // Use Clerk Backend API to fetch full user profile by sub (user ID).
+      const secretKey = process.env.CLERK_SECRET_KEY;
+      if (!secretKey) {
+        return error(
+          "CLERK_SECRET_KEY is not set. Add it to .env to fetch full user profiles in Inspector/browser flows. " +
+          "Real MCP clients (Cursor, Claude Code) receive oat_ tokens which work without a secret key."
+        );
+      }
+
+      const userId = ctx.auth.user.userId;
+      const res = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
         headers: {
-          Authorization: `Bearer ${ctx.auth.accessToken}`,
+          Authorization: `Bearer ${secretKey}`,
+          "Content-Type": "application/json",
         },
       });
 
-      if (!res.ok) {
-        return error(`Clerk userinfo request failed: ${res.status} ${res.statusText}`);
-      }
+      if (!res.ok) return error(`Clerk API request failed: ${res.status} ${res.statusText}`);
 
-      return object(await res.json());
+      const user = await res.json();
+      return object({
+        id:             user.id,
+        email:          user.email_addresses?.[0]?.email_address,
+        email_verified: user.email_addresses?.[0]?.verification?.status === "verified",
+        first_name:     user.first_name,
+        last_name:      user.last_name,
+        name:           [user.first_name, user.last_name].filter(Boolean).join(" ") || undefined,
+        username:       user.username,
+        picture:        user.image_url,
+        created_at:     user.created_at ? new Date(user.created_at).toISOString() : undefined,
+        last_sign_in:   user.last_sign_in_at ? new Date(user.last_sign_in_at).toISOString() : undefined,
+        public_metadata: user.public_metadata,
+      });
     } catch (err) {
       return error(`Failed to fetch Clerk user profile: ${err}`);
     }

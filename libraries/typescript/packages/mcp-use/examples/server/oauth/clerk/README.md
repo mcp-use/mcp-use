@@ -9,6 +9,7 @@ A production-ready example of an MCP server with Clerk OAuth 2.1 authentication,
 - **Bearer Token Authentication**: Secure MCP endpoints with verified Clerk access tokens
 - **User Context**: Tools that access authenticated user information from the Clerk JWT
 - **Organization Claims**: Access Clerk org_id, org_role, and org_permissions in your tools
+- **Dual Token Handling**: Supports both opaque `oat_` tokens (real MCP clients) and JWT session tokens (Inspector)
 - **MCP Inspector**: Built-in web UI for testing OAuth flows
 - **Configurable Security**: Toggle JWT verification for development vs production
 
@@ -22,48 +23,46 @@ A production-ready example of an MCP server with Clerk OAuth 2.1 authentication,
 ### 1. Create a Clerk Application
 
 1. Go to [dashboard.clerk.com](https://dashboard.clerk.com) and sign in
-2. Click **Create application**
-3. Give it a name (e.g. `mcp-use-test`) and click **Create**
-4. Your application will be assigned a unique domain:
+2. Click **Create application**, give it a name, and click **Create**
+3. Your application will be assigned a unique domain — find it under **Configure → Domains**
    - Format: `your-app.clerk.accounts.dev`
-   - Find it in **Configure → Domains** in the dashboard
-5. Create a Clerk application, and make sure that **dynamic client registration** has been toggled on in the dashboard.
 
-### 2. Verify Your Clerk Endpoints
+### 2. Create an OAuth Application
 
-Before running the server, confirm Clerk's OIDC endpoints are live for your domain.
-Open these URLs in your browser (replace with your actual domain):
+Clerk requires a pre-registered OAuth client for MCP authentication:
 
-```
-# Should return JSON with all endpoint URLs:
-https://YOUR-DOMAIN/.well-known/openid-configuration
+1. In the Clerk Dashboard, go to **Configure → SSO → OAuth Applications**
+2. Click **Create OAuth Application**
+3. Fill in:
+   - **Name**: `mcp-use`
+   - **Redirect URI**: `http://localhost:3000/oauth/callback`
+4. Click **Create**
+5. Note your **Client ID** — it looks like `client_xxxxxxxxxxxxxxxxxx`
 
-# Should return JSON with Clerk's public signing keys:
-https://YOUR-DOMAIN/.well-known/jwks.json
-```
+### 3. Get Your Secret Key
 
-Both must return valid JSON. If they do, your Clerk account is ready.
+1. In the Clerk Dashboard, go to **API Keys**
+2. Copy the **Secret key** — it starts with `sk_test_` (dev) or `sk_live_` (prod)
 
-### 3. Set Environment Variables
+This is required for `get-clerk-user-profile` to fetch full user profiles when testing with the MCP Inspector. Real MCP clients (Cursor, Claude Code) receive opaque `oat_` tokens which call Clerk's `/oauth/userinfo` endpoint directly without needing a secret key.
+
+### 4. Set Environment Variables
 
 Create a `.env` file in this directory:
 
 ```bash
-# Required: Your Clerk domain (from Configure → Domains in the Clerk dashboard)
+# Required: Your Clerk domain (from Configure → Domains)
 MCP_USE_OAUTH_CLERK_DOMAIN=your-app.clerk.accounts.dev
-MCP_USE_OAUTH_CLERK_CLIENT_ID=your-client-id
-# Optional: Disable JWT verification for local dev only — never in production
-# VERIFY_JWT=false
+
+# Required: OAuth Application Client ID (from Configure → SSO → OAuth Applications)
+MCP_USE_OAUTH_CLERK_CLIENT_ID=client_xxxxxxxxxxxxxxxxxx
+
+# Required for get-clerk-user-profile in Inspector / browser flows
+# Get from: Clerk Dashboard → API Keys
+CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxx
 ```
 
-Or export directly:
-
-```bash
-export MCP_USE_OAUTH_CLERK_DOMAIN=your-app.clerk.accounts.dev
-export MCP_USE_OAUTH_CLERK_CLIENT_ID=your-client-id
-```
-
-### 4. Install Dependencies
+### 5. Install Dependencies
 
 From the workspace root:
 
@@ -71,7 +70,7 @@ From the workspace root:
 pnpm install
 ```
 
-### 5. Start the Server
+### 6. Start the Server
 
 ```bash
 # Development mode with hot reload
@@ -81,7 +80,7 @@ pnpm dev
 pnpm --filter clerk-oauth-example dev
 ```
 
-This starts the MCP server on port **3000**.
+This starts the MCP server on port **3000** with the Inspector at http://localhost:3000/inspector.
 
 ## Usage
 
@@ -92,48 +91,15 @@ This starts the MCP server on port **3000**.
 3. You will be prompted to authenticate via OAuth
 4. Complete the Clerk login flow
 5. Once authenticated, try the available tools:
-   - **`get-user-info`** — Returns user details extracted from the Clerk JWT
-   - **`get-clerk-user-profile`** — Fetches the full profile from Clerk's userinfo endpoint
-   - **`get-user-greeting`** — Returns a personalized greeting for the authenticated user
-
-### Testing with curl
-
-Verify the server correctly rejects unauthenticated requests:
-
-```bash
-# Should return 401 Unauthorized
-curl http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
-```
-
-Test with a valid Clerk token (obtain from the Clerk dashboard → Users → your user → Sessions):
-
-```bash
-# Should return the list of available tools
-curl http://localhost:3000/mcp \
-  -H "Authorization: Bearer YOUR_CLERK_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
-```
-
-### OAuth Flow Details
-
-The server implements the complete OAuth 2.1 flow:
-
-1. **Authorization Request**: MCP client discovers the OAuth requirement via `WWW-Authenticate` header
-2. **Redirect to Clerk**: Client is redirected to Clerk's login page at `/oauth/authorize`
-3. **User Authentication**: User logs in via Clerk's hosted login page
-4. **Authorization Code**: Clerk redirects back with a short-lived code
-5. **Token Exchange**: Client exchanges the code for an access token at `/oauth/token`
-6. **Bearer Token**: Client includes the token on all MCP requests via `Authorization: Bearer <token>`
-7. **JWKS Verification**: Server verifies the token signature using Clerk's public keys
+   - **`get-user-info`** — User details extracted from the Clerk JWT
+   - **`get-clerk-user-profile`** — Full profile from Clerk API (requires `CLERK_SECRET_KEY`)
+   - **`get-user-greeting`** — Personalized greeting for the authenticated user
 
 ## Available Tools
 
 ### get-user-info
 
-Returns user information extracted directly from the Clerk JWT — no extra network call required.
+Returns user information extracted directly from the verified Clerk JWT — no extra network call required. Includes Clerk-specific organization claims.
 
 ```json
 {
@@ -143,23 +109,34 @@ Returns user information extracted directly from the Clerk JWT — no extra netw
   "picture": "https://img.clerk.com/...",
   "org_id": "org_xyz",
   "org_role": "admin",
-  "org_permissions": ["read", "write"],
+  "org_permissions": ["read:documents", "write:documents"],
   "permissions": [],
-  "scopes": ["openid", "profile", "email"]
+  "scopes": ["email", "offline_access", "profile"]
 }
 ```
 
 ### get-clerk-user-profile
 
-Fetches the complete user profile from Clerk's `/oauth/userinfo` endpoint using the access token.
+Fetches the complete user profile from Clerk. Handles both Clerk token types automatically:
+
+| Token type | How it works | When issued |
+|---|---|---|
+| `oat_...` opaque token | Calls Clerk `/oauth/userinfo` directly | Real MCP clients (Cursor, Claude Code) |
+| JWT session token | Calls Clerk Backend API `/v1/users/:id` | Inspector / browser flows |
 
 ```json
 {
-  "sub": "user_2abc123xyz",
+  "id": "user_2abc123xyz",
   "email": "user@example.com",
+  "email_verified": true,
+  "first_name": "Jane",
+  "last_name": "Doe",
   "name": "Jane Doe",
-  "given_name": "Jane",
-  "family_name": "Doe"
+  "username": "janedoe",
+  "picture": "https://img.clerk.com/...",
+  "created_at": "2024-01-01T00:00:00.000Z",
+  "last_sign_in": "2024-06-01T12:00:00.000Z",
+  "public_metadata": {}
 }
 ```
 
@@ -174,13 +151,22 @@ Returns a personalized greeting for the authenticated user.
 }
 ```
 
+## Token Types
+
+Clerk issues two different token types depending on how the client authenticates:
+
+**Opaque tokens (`oat_...`)** are issued to real MCP clients (Cursor, Claude Code, Windsurf). They must be validated by calling Clerk's `/oauth/userinfo` endpoint — they cannot be decoded locally.
+
+**JWT session tokens** are issued in browser-based flows (MCP Inspector). They are signed JWTs verified locally using Clerk's JWKS endpoint. User profile data is fetched from the Clerk Backend API using the user's `sub` claim and a secret key.
+
+The `get-clerk-user-profile` tool handles both cases automatically.
+
 ## Project Structure
 
 ```
 clerk-oauth/
 ├── src/
-│   └── server.ts       # MCP server with Clerk OAuth
-├── dist/               # Built files
+│   └── server.ts     # MCP server with Clerk OAuth
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -201,23 +187,24 @@ clerk-oauth/
 
 ### "JWT verification failed"
 
-Common causes:
-- **Wrong domain**: Ensure `MCP_USE_OAUTH_CLERK_DOMAIN` does not include `https://` — just the bare domain
-- **Expired token**: Clerk access tokens expire quickly. Re-authenticate to get a fresh token
-- **JWKS unreachable**: Verify `https://YOUR-DOMAIN/.well-known/jwks.json` returns JSON in your browser
+- Ensure `MCP_USE_OAUTH_CLERK_DOMAIN` does not include `https://` — just the bare domain
+- Verify `https://YOUR-DOMAIN/.well-known/jwks.json` returns valid JSON in your browser
+- Re-authenticate to get a fresh token if the current one has expired
 
-### "Clerk domain not configured"
+### "Clerk API request failed: 401 Unauthorized"
 
-Ensure `MCP_USE_OAUTH_CLERK_DOMAIN` is set in your `.env` file or exported in your shell before starting the server.
+- Verify `CLERK_SECRET_KEY` is set in your `.env` file
+- Confirm the key starts with `sk_test_` (development) or `sk_live_` (production)
+- The secret key must belong to the same Clerk application as your domain
 
-### "401 even with a valid token"
+### "Clerk userinfo failed: 401 Unauthorized"
 
-The issuer URL built inside `ClerkOAuthProvider` must exactly match the `iss` claim in your JWT. They should both be `https://YOUR-DOMAIN`. You can decode your JWT at [jwt.io](https://jwt.io) to inspect the `iss` claim and compare.
+This is expected when testing with the Inspector — Inspector flows issue JWT session tokens, not opaque `oat_` tokens. The tool automatically falls back to the Clerk Backend API. Ensure `CLERK_SECRET_KEY` is set.
 
 ### Port already in use
 
 ```bash
-export PORT=3002
+PORT=3002 pnpm dev
 ```
 
 ## Security Considerations
@@ -232,16 +219,17 @@ export PORT=3002
 
 1. **Use HTTPS**: Always use HTTPS in production
 2. **Never disable `verifyJwt`**: The `verifyJwt: false` option is for local dev only
-3. **Rotate secrets**: Regularly rotate your Clerk API keys
-4. **Set token lifetime**: Configure appropriate token expiration in the Clerk dashboard
+3. **Use `sk_live_` keys**: Switch from `sk_test_` to `sk_live_` in production
+4. **Rotate secrets**: Regularly rotate your Clerk API keys
 
 ## Learn More
 
-- [Clerk OIDC Discovery](https://clerk.com/docs/backend-requests/making/jwt-templates#oidc-discovery)
+- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/clerk)
+- [Clerk Documentation](https://clerk.com/docs)
 - [Clerk JWT Verification](https://clerk.com/docs/backend-requests/handling/manual-jwt)
+- [Clerk Organizations](https://clerk.com/docs/organizations/overview)
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [MCP Authentication Specification](https://modelcontextprotocol.io/docs/specification/authentication)
-- [mcp-use Documentation](https://mcp-use.com/docs)
 
 ## License
 
