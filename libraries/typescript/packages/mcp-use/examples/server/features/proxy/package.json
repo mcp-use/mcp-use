@@ -1,0 +1,18 @@
+{
+  "name": "proxy-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "@modelcontextprotocol/sdk": "latest",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

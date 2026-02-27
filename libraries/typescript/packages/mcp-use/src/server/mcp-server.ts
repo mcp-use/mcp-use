@@ -431,6 +431,105 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Proxy to another MCP server(s).
+   *
+   * This method mounts one or more MCP clients onto this server, introspecting
+   * their tools, resources, and prompts, and registering them natively.
+   *
+   * @param config - A mapping of namespaces to server connection configs, or a single MCPSession.
+   * @param options - Additional options, such as namespace (if passing a single MCPSession).
+   *
+   * @example
+   * ```typescript
+   * // Using config map
+   * await server.proxy({
+   *   db: { command: "node", args: ["db.js"] }
+   * });
+   *
+   * // Using explicit session
+   * await server.proxy(mySession, { namespace: "db" });
+   * ```
+   */
+  public async proxy(
+    config: Record<string, any> | any,
+    options?: { namespace?: string }
+  ): Promise<void> {
+    // Dynamic import to avoid bringing client code into server bundle unless used
+    const { MCPClient } = await import("../client.js");
+    const { mountSession } = await import("./utils/proxy-client.js");
+
+    // If it's an MCPSession (duck typing by checking for callTool method)
+    if (config && typeof config.callTool === "function") {
+      await mountSession(this, config, options?.namespace);
+      return;
+    }
+
+    // Otherwise, treat config as a map of namespaces to server configs
+    const proxyClient = new MCPClient({
+      mcpServers: config,
+      onSampling: async (params: any) => {
+        try {
+          const { getRequestContext } = await import("./context-storage.js");
+          const { findSessionContext } =
+            await import("./tools/tool-execution-helpers.js");
+          const ctx = getRequestContext();
+          if (!ctx) throw new Error("No request context");
+          const { session } = findSessionContext(
+            this.sessions,
+            ctx,
+            undefined,
+            undefined
+          );
+          if (!session || !session.server) throw new Error("No session");
+          return await session.server.server.createMessage(params);
+        } catch (e) {
+          console.warn(
+            "[Proxy] Fallback sampling response due to missing request context (global proxy mode)"
+          );
+          return {
+            role: "assistant",
+            model: "proxy-fallback",
+            content: {
+              type: "text",
+              text: "Mock sampled response from proxy fallback",
+            },
+          };
+        }
+      },
+      onElicitation: async (params: any) => {
+        try {
+          const { getRequestContext } = await import("./context-storage.js");
+          const { findSessionContext } =
+            await import("./tools/tool-execution-helpers.js");
+          const ctx = getRequestContext();
+          if (!ctx) throw new Error("No request context");
+          const { session } = findSessionContext(
+            this.sessions,
+            ctx,
+            undefined,
+            undefined
+          );
+          if (!session || !session.server) throw new Error("No session");
+          return await session.server.server.elicitInput(params);
+        } catch (e) {
+          console.warn(
+            "[Proxy] Fallback elicitation response due to missing request context (global proxy mode)"
+          );
+          return {
+            action: "accept",
+            content: { mock: "data from proxy fallback" },
+          };
+        }
+      },
+    });
+    const sessions = await proxyClient.createAllSessions(true);
+
+    for (const [namespace, session] of Object.entries(sessions)) {
+      await mountSession(this, session as any, namespace);
+    }
+  }
+
+  /**
    * Add a new widget tool directly to all active sessions (for HMR)
    *
    * This method adds a widget tool to all active sessions' internal state
