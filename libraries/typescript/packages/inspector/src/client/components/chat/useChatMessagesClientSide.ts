@@ -43,10 +43,17 @@ export function useChatMessagesClientSide({
   const lastDisabledToolsRef = useRef<string>("");
 
   const sendMessage = useCallback(
-    async (userInput: string, promptResults: PromptResult[]) => {
+    async (
+      userInput: string,
+      promptResults: PromptResult[],
+      extraAttachments?: MessageAttachment[]
+    ) => {
+      const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       // Can send if there's text, prompt results, or attachments
       const hasContent =
-        userInput.trim() || promptResults.length > 0 || attachments.length > 0;
+        userInput.trim() ||
+        promptResults.length > 0 ||
+        allAttachments.length > 0;
       if (!hasContent || !llmConfig || !isConnected) {
         return;
       }
@@ -60,13 +67,13 @@ export function useChatMessagesClientSide({
         role: "user",
         content: userInput.trim(),
         timestamp: Date.now(),
-        attachments: attachments.length > 0 ? [...attachments] : undefined,
+        attachments: allAttachments.length > 0 ? allAttachments : undefined,
       };
 
       // Only add user message to UI if there's actual user input or user-uploaded attachments
       // Don't show it when only using prompt results (they create their own messages)
       const userMessages: Message[] = [...promptResultsMessages];
-      if (userInput.trim() || attachments.length > 0) {
+      if (userInput.trim() || allAttachments.length > 0) {
         userMessages.push(userMessage);
       }
 
@@ -218,17 +225,25 @@ export function useChatMessagesClientSide({
           }
         }
 
-        // Stream events from agent
-        // Don't include the new userMessage here - streamEvents() appends it internally
-        // as new HumanMessage(query), so including it would cause duplication
+        // Stream events from agent.
+        // For text-only messages, streamEvents() appends userInput internally as a
+        // new HumanMessage(query), so we exclude userMessage from externalHistory to
+        // avoid duplication.
+        // For messages with image attachments, we must include the full multimodal
+        // userMessage in externalHistory so the LLM can see the images. In that case
+        // we pass "" as the query so streamEvents() doesn't add a duplicate plain-text
+        // message on top of the image-bearing message already in history.
+        const hasImageAttachments = (userMessage.attachments?.length ?? 0) > 0;
         const externalHistory = convertMessagesToLangChain([
           ...messages,
           ...promptResultsMessages,
           ...widgetContextMessages,
+          ...(hasImageAttachments ? [userMessage] : []),
         ]);
+        const effectiveInput = hasImageAttachments ? "" : userInput;
 
         for await (const event of agentRef.current.streamEvents(
-          userInput,
+          effectiveInput,
           10, // maxSteps
           false, // manageConnector - don't manage, already connected
           externalHistory, // externalHistory - keep history external to include prompt results AND new message

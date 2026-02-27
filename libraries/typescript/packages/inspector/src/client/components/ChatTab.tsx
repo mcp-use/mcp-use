@@ -670,7 +670,7 @@ export function ChatTab({
             serverId={connection.url}
             readResource={readResource}
             tools={connection.tools}
-            sendMessage={(msg) => sendMessage(msg, [])}
+            sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
             serverBaseUrl={connection.url}
           />
         )}

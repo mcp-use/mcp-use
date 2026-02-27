@@ -208,7 +208,7 @@ const {
 | `locale` | string | User locale (default: 'en') |
 | `timeZone` | string | IANA timezone identifier |
 | `callTool` | (name, args) => Promise | Call another MCP tool |
-| `sendFollowUpMessage` | (prompt) => Promise | Trigger LLM response |
+| `sendFollowUpMessage` | `(content: string \| MessageContentBlock[]) => Promise<void>` | Trigger LLM response; string shorthand or content block array |
 | `openExternal` | (href) => void | Open external URL |
 | `requestDisplayMode` | (mode) => Promise | Request display mode change |
 | `mcp_url` | string | MCP server base URL |
@@ -266,11 +266,20 @@ if (displayMode === "fullscreen") {
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
-// Trigger LLM to respond based on widget state
+// String shorthand (most common)
 <button onClick={() => sendFollowUpMessage("Analyze the selected items and recommend the best one")}>
   Get AI Recommendation
 </button>
+
+// Full content array — supports text, image, and resource blocks (MCP Apps / SEP-1865)
+<button onClick={() => sendFollowUpMessage([
+  { type: "text", text: "Analyze the selected items and recommend the best one" },
+])}>
+  Get AI Recommendation
+</button>
 ```
+
+When running inside ChatGPT (Apps SDK), only text blocks are used since the SDK accepts a plain string prompt.
 
 ### openExternal Usage
 

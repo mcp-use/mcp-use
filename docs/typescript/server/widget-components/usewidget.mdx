@@ -96,7 +96,7 @@ useWidget<
 | Method                  | Signature                                                                    | Description                                                  |
 | ----------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `callTool`              | `(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>` | Call a tool on the MCP server                                |
-| `sendFollowUpMessage`   | `(prompt: string) => Promise<void>`                                          | Send a follow-up message to the ChatGPT conversation         |
+| `sendFollowUpMessage`   | `(content: string \| MessageContentBlock[]) => Promise<void>`                | Send a follow-up message; string shorthand or full content block array (SEP-1865) |
 | `openExternal`          | `(href: string) => void`                                                     | Open an external URL in a new tab                            |
 | `requestDisplayMode`    | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>`                      | Request a different display mode                             |
 | `notifyIntrinsicHeight` | `(height: number) => Promise<void>`                                          | Notify OpenAI about intrinsic height changes for auto-sizing |
@@ -418,13 +418,21 @@ const handleSearch = async () => {
 
 ### 7. Follow-up Messages
 
-Send messages to the ChatGPT conversation:
+Send messages to the conversation. Accepts a plain string shorthand or a full content block array per the SEP-1865 `ui/message` spec:
 
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
+// String shorthand (most common)
 const handleRequestInfo = async () => {
   await sendFollowUpMessage("Show me more details about this product");
+};
+
+// Full content array (MCP Apps — supports text, image, resource blocks)
+const handleRichMessage = async () => {
+  await sendFollowUpMessage([
+    { type: "text", text: "Show me more details about this product" },
+  ]);
 };
 ```
 

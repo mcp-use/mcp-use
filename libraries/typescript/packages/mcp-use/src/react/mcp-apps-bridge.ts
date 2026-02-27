@@ -12,7 +12,11 @@ import {
   type JsonRpcResponse,
 } from "../server/utils/jsonrpc-helpers.js";
 import { MCP_APPS_BRIDGE_CONFIG } from "./constants.js";
-import type { DisplayMode, Theme } from "./widget-types.js";
+import type {
+  DisplayMode,
+  MessageContentBlock,
+  Theme,
+} from "./widget-types.js";
 
 // JSON-RPC message types (using imported types with compatible names)
 type JSONRPCRequest = JsonRpcRequest;
@@ -607,9 +611,12 @@ class McpAppsBridge {
   }
 
   /**
-   * Send a message to the conversation
+   * Send a message to the conversation.
+   * Accepts a single content block or an array of blocks per the SEP-1865 ui/message spec.
    */
-  async sendMessage(content: { type: string; text: string }): Promise<void> {
+  async sendMessage(
+    content: MessageContentBlock | MessageContentBlock[]
+  ): Promise<void> {
     const contentArray = Array.isArray(content) ? content : [content];
     await this.sendRequest("ui/message", {
       role: "user",

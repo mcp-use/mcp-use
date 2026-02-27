@@ -248,12 +248,22 @@ Widgets can send messages to the conversation on behalf of the user using `sendF
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
+// String shorthand (most common)
 <button onClick={() => sendFollowUpMessage("Tell me more about mangoes")}>
+  Ask the AI
+</button>
+
+// Full content array — supports text, image, and resource blocks per SEP-1865
+<button onClick={() => sendFollowUpMessage([
+  { type: "text", text: "Tell me more about mangoes" },
+])}>
   Ask the AI
 </button>
 ```
 
-Per the MCP Apps specification, this maps to the `ui/message` JSON-RPC request. The host adds the message to the conversation and triggers the model to respond.
+Per the MCP Apps specification, this maps to the `ui/message` JSON-RPC request with `role: "user"` and a `content` array. The host adds the message to the conversation and triggers the model to respond.
+
+When running inside ChatGPT (Apps SDK), only the text content of the blocks is used since `window.openai.sendFollowUpMessage` accepts a plain string prompt.
 
 ## Host Context: Locale, Theme, and More
 
