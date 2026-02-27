@@ -65,10 +65,10 @@ export interface OAuthProvider {
    */
   getMode?(): OAuthMode;
 
-   /**
-   * Get the registration endpoint URL (for direct mode with dynamic client registration)
-   * @returns The registration endpoint URL, or undefined if not supported
-   */
+  /**
+  * Get the registration endpoint URL (for direct mode with dynamic client registration)
+  * @returns The registration endpoint URL, or undefined if not supported
+  */
   getRegistrationEndpoint?(): string | undefined;
 
   /**

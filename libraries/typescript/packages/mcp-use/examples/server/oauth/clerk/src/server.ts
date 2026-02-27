@@ -49,7 +49,7 @@ server.tool(
 
 // fetches the full user profile from Clerk's userinfo endpoint
 // using the authenticated access token.
- 
+
 server.tool(
   {
     name: "get-clerk-user-profile",
@@ -94,16 +94,16 @@ server.tool(
 
       const user = await res.json();
       return object({
-        id:             user.id,
-        email:          user.email_addresses?.[0]?.email_address,
+        id: user.id,
+        email: user.email_addresses?.[0]?.email_address,
         email_verified: user.email_addresses?.[0]?.verification?.status === "verified",
-        first_name:     user.first_name,
-        last_name:      user.last_name,
-        name:           [user.first_name, user.last_name].filter(Boolean).join(" ") || undefined,
-        username:       user.username,
-        picture:        user.image_url,
-        created_at:     user.created_at ? new Date(user.created_at).toISOString() : undefined,
-        last_sign_in:   user.last_sign_in_at ? new Date(user.last_sign_in_at).toISOString() : undefined,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        name: [user.first_name, user.last_name].filter(Boolean).join(" ") || undefined,
+        username: user.username,
+        picture: user.image_url,
+        created_at: user.created_at ? new Date(user.created_at).toISOString() : undefined,
+        last_sign_in: user.last_sign_in_at ? new Date(user.last_sign_in_at).toISOString() : undefined,
         public_metadata: user.public_metadata,
       });
     } catch (err) {

@@ -240,20 +240,20 @@ export function setupOAuthRoutes(
     } else {
       // Proxy mode: Return MCP server endpoints
       console.log(`[OAuth] Returning proxy mode metadata`);
-    return c.json({
-      issuer: provider.getIssuer(),
-      authorization_endpoint: `${baseUrl}/authorize`,
-      token_endpoint: `${baseUrl}/token`,
-      response_types_supported: ["code"],
-      grant_types_supported: provider.getGrantTypesSupported(),
-      code_challenge_methods_supported: ["S256"],
-      token_endpoint_auth_methods_supported: [
-        "client_secret_post",
-        "client_secret_basic",
-        "none",
-      ],
-      scopes_supported: provider.getScopesSupported(),
-    });
+      return c.json({
+        issuer: provider.getIssuer(),
+        authorization_endpoint: `${baseUrl}/authorize`,
+        token_endpoint: `${baseUrl}/token`,
+        response_types_supported: ["code"],
+        grant_types_supported: provider.getGrantTypesSupported(),
+        code_challenge_methods_supported: ["S256"],
+        token_endpoint_auth_methods_supported: [
+          "client_secret_post",
+          "client_secret_basic",
+          "none",
+        ],
+        scopes_supported: provider.getScopesSupported(),
+      });
     }
   };
 

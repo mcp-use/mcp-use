@@ -117,7 +117,7 @@ export function oauthSupabaseProvider(
   if (!projectId) {
     throw new Error(
       "Supabase projectId is required. " +
-        "Set MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable or pass projectId in config."
+      "Set MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable or pass projectId in config."
     );
   }
 
@@ -169,14 +169,14 @@ export function oauthAuth0Provider(
   if (!domain) {
     throw new Error(
       "Auth0 domain is required. " +
-        "Set MCP_USE_OAUTH_AUTH0_DOMAIN environment variable or pass domain in config."
+      "Set MCP_USE_OAUTH_AUTH0_DOMAIN environment variable or pass domain in config."
     );
   }
 
   if (!audience) {
     throw new Error(
       "Auth0 audience is required. " +
-        "Set MCP_USE_OAUTH_AUTH0_AUDIENCE environment variable or pass audience in config."
+      "Set MCP_USE_OAUTH_AUTH0_AUDIENCE environment variable or pass audience in config."
     );
   }
 
@@ -233,14 +233,14 @@ export function oauthKeycloakProvider(
   if (!serverUrl) {
     throw new Error(
       "Keycloak serverUrl is required. " +
-        "Set MCP_USE_OAUTH_KEYCLOAK_SERVER_URL environment variable or pass serverUrl in config."
+      "Set MCP_USE_OAUTH_KEYCLOAK_SERVER_URL environment variable or pass serverUrl in config."
     );
   }
 
   if (!realm) {
     throw new Error(
       "Keycloak realm is required. " +
-        "Set MCP_USE_OAUTH_KEYCLOAK_REALM environment variable or pass realm in config."
+      "Set MCP_USE_OAUTH_KEYCLOAK_REALM environment variable or pass realm in config."
     );
   }
 
@@ -310,7 +310,7 @@ export function oauthWorkOSProvider(
   if (!subdomain) {
     throw new Error(
       "WorkOS subdomain is required. " +
-        "Set MCP_USE_OAUTH_WORKOS_SUBDOMAIN environment variable or pass subdomain in config."
+      "Set MCP_USE_OAUTH_WORKOS_SUBDOMAIN environment variable or pass subdomain in config."
     );
   }
 
@@ -380,13 +380,13 @@ export function oauthClerkProvider(
   if (!domain) {
     throw new Error(
       "Clerk domain is required. " +
-        "Set MCP_USE_OAUTH_CLERK_DOMAIN environment variable or pass domain in config."
+      "Set MCP_USE_OAUTH_CLERK_DOMAIN environment variable or pass domain in config."
     );
   }
 
   return new ClerkOAuthProvider({
     provider: "clerk",
-    domain,           
+    domain,
     verifyJwt: config.verifyJwt,
   });
 }
