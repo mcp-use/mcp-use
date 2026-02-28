@@ -4,7 +4,7 @@ import path from "node:path";
 import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
-import { isLoggedIn } from "../utils/config.js";
+import { getWebUrl, isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { loginCommand } from "./auth.js";
@@ -487,11 +487,13 @@ async function displayDeploymentProgress(
       const mcpServerUrl = getMcpServerUrl(finalDeployment);
 
       // Determine dashboard URL if server exists
+      // Uses /cloud/servers/[id] - frontend redirects to /cloud/[org-slug]/servers/[id]
       let dashboardUrl: string | null = null;
+      const webUrl = (await getWebUrl()).replace(/\/$/, "");
       if (finalDeployment.serverSlug) {
-        dashboardUrl = `https://manufact.com/cloud/servers/${finalDeployment.serverSlug}`;
+        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverSlug}`;
       } else if (finalDeployment.serverId) {
-        dashboardUrl = `https://manufact.com/cloud/servers/${finalDeployment.serverId}`;
+        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverId}`;
       }
 
       const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(
