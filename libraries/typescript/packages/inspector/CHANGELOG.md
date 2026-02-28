@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.24.0-canary.9
+
+### Minor Changes
+
+- 3aa578a: feat(inspector): fix build to allow inspectro embedding
+
+### Patch Changes
+
+- mcp-use@1.21.0-canary.9
+
 ## 0.24.0-canary.8
 
 ### Patch Changes
