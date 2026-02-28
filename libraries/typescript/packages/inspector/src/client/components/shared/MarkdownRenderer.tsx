@@ -233,10 +233,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <p className="text-foreground mb-2 leading-relaxed">{children}</p>
           ),
           ul: ({ children }: { children: React.ReactNode }) => (
-            <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>
+            <ul className="list-disc list-outside pl-6 mb-3 space-y-1">
+              {children}
+            </ul>
           ),
           ol: ({ children }: { children: React.ReactNode }) => (
-            <ol className="list-decimal list-inside mb-3 space-y-1">
+            <ol className="list-decimal list-outside pl-6 mb-3 space-y-1">
               {children}
             </ol>
           ),
