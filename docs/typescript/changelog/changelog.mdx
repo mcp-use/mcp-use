@@ -18,6 +18,29 @@ tag: "New"
 - **Update**: Updated @mcp-use/cli to v2.15.1
 </Update>
 
+<Update label="v1.21.0" description="March 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.21.0&title=Proxy%20Servers%20%26%20Client%20Completion&date=2026-03&lang=typescript" alt="Release 1.21.0" />
+  </Frame>
+  ## Proxy Servers & Client Completion
+  Minor release with server composition, client-side completion, user context, and Express middleware types.
+
+- **New**: `MCPServer.proxy()` for composing multiple MCP servers into a single aggregator — automatic orchestration, schema translation, namespacing, list-changed multiplexing
+- **New**: Client-side completion support — `complete()` on BaseConnector, MCPSession, and `useMcp`; `refreshResourceTemplates()`; prompt argument and resource template URI autocomplete
+- **New**: `ctx.client.user()` for per-invocation end-user metadata (`subject`, `conversationId`) from tools/call params
+- **Enhancement**: `ctx.client.supportsApps()` now correctly returns true for MCP Apps clients (fixed ClientCapabilitiesSchema `extensions` stripping)
+- **Enhancement**: `autoReconnect` options — configurable health check interval, reconnection delay, timeout via `reconnectionOptions`
+- **Enhancement**: `sendFollowUpMessage` accepts `MessageContentBlock` arrays (text, image, resource blocks) per SEP-1865
+- **Enhancement**: Host info and capabilities — `hostInfo`, `hostCapabilities` in `useWidget`; `getHostInfo`, `getHostCapabilities` on `McpAppsBridge`
+- **Fix**: Express middleware types — proper TypeScript types for `server.use()` with Express middleware (auto-detected and adapted)
+- **Fix**: Session isolation — `findSessionContext` no longer falls back to arbitrary session, preventing metadata leakage
+- **Fix**: Remove deprecated `@types/tar`; update tar to latest (cli, create-mcp-use-app)
+- **Update**: Updated @mcp-use/inspector to v0.24.0
+- **Update**: Updated @mcp-use/cli to v2.17.0
+- **Update**: Updated create-mcp-use-app to v0.14.3
+- **Documentation**: Per-server elicitation and sampling callbacks examples; proxy servers section
+</Update>
+
 <Update label="v1.20.0" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.20.0&title=Widget%20Debug%20%26%20CSP%20Improvements&date=2026-02&lang=typescript" alt="Release 1.20.0" />
