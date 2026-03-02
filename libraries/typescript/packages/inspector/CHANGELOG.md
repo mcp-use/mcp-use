@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.0-canary.11
+
+### Patch Changes
+
+- 71fd188: fix(inspector): sandbox url for dev inspector was incorrectly computed as -dev instead of .dev
+  - mcp-use@1.21.0-canary.11
+
 ## 0.24.0-canary.10
 
 ### Patch Changes
