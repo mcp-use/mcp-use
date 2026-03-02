@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.21.0-canary.13
+
+### Minor Changes
+
+- a903dd8: feat(server): improve mcp server landing page
+
+### Patch Changes
+
+- @mcp-use/cli@2.17.0-canary.13
+- @mcp-use/inspector@0.24.0-canary.13
+
 ## 1.21.0-canary.12
 
 ### Patch Changes
