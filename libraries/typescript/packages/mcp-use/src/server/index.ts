@@ -160,7 +160,12 @@ export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 
 // Landing page generator for browser requests
-export { generateLandingPage } from "./landing.js";
+export {
+  generateLandingPage,
+  type LandingPageTool,
+  type LandingPagePrompt,
+  type LandingPageResource,
+} from "./landing.js";
 
 // Tool registry type generator (for CLI generate-types command)
 export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
