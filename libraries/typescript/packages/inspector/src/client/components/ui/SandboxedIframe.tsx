@@ -122,8 +122,15 @@ export const SandboxedIframe = forwardRef<
       sandboxHost = currentHost; // Keep same origin
     } else {
       // Priority 3: Production - use convention: sandbox-{hostname}
-      // e.g., inspector.mcp-use.com -> sandbox-inspector.mcp-use.com
-      sandboxHost = `sandbox-${currentHost}`;
+      // Special case: dev.{domain} -> sandbox-inspector.dev.{domain}
+      // (not sandbox-dev.{domain}) so the sandbox subdomain consistently
+      // includes "inspector"
+      if (currentHost.startsWith("dev.")) {
+        const rest = currentHost.slice(4); // "dev.".length
+        sandboxHost = `sandbox-inspector.dev.${rest}`;
+      } else {
+        sandboxHost = `sandbox-${currentHost}`;
+      }
     }
 
     const portSuffix = currentPort ? `:${currentPort}` : "";
