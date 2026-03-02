@@ -669,7 +669,7 @@ if (container && Component) {
             name: widgetName,
             type: widgetType,
             description: description as string,
-            metadata: enrichedCspMetadata,
+            metadata: metadata.metadata ? enrichedCspMetadata : undefined,
           };
 
           // Build dual-protocol _meta for the tool definition:
@@ -722,7 +722,9 @@ if (container && Component) {
         const slugifiedName = slugifyWidgetName(widgetName);
         const metadataToRegister = {
           ...metadata,
-          metadata: enrichedCspMetadata ?? metadata.metadata,
+          metadata: metadata.metadata
+            ? (enrichedCspMetadata ?? metadata.metadata)
+            : undefined,
           ...(metadata.description
             ? {}
             : { description: `Widget: ${widgetName}` }),
@@ -1360,7 +1362,9 @@ export default PostHog;
 
     const metadataToRegister = {
       ...metadata,
-      metadata: enrichedCspMetadata ?? metadata.metadata,
+      metadata: metadata.metadata
+        ? (enrichedCspMetadata ?? metadata.metadata)
+        : undefined,
       ...(metadata.description ? {} : { description: widget.description }),
     } as Record<string, unknown>;
 
