@@ -20,6 +20,7 @@ export default [
       "packages/*/build/**",
       "packages/*/node_modules/**",
       "test_app/**",
+      "**/playwright-report/**",
     ],
   },
   {
