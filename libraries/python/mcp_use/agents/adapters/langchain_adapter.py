@@ -12,7 +12,6 @@ from langchain_core.tools import BaseTool
 from mcp.types import (
     CallToolResult,
     Prompt,
-    ReadResourceRequestParams,
     Resource,
 )
 from mcp.types import (
@@ -24,6 +23,56 @@ from mcp_use.agents.adapters.base import BaseAdapter
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
+
+
+class _EmptyInput(BaseModel):
+    """Empty input schema for tools that take no arguments."""
+
+    pass
+
+
+def _resolve_ref(schema: Any, root_schema: Any, seen_refs: frozenset[str] = frozenset()) -> Any:
+    """Follow a local JSON Pointer $ref within root_schema (including $defs refs).
+
+    Unlike fix_schema, this resolves all #/ refs — including #/$defs — so that
+    _schema_allows_null can detect nullability through definition references.
+    """
+    if not isinstance(schema, dict):
+        return schema
+    ref = schema.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#/") or ref in seen_refs:
+        return schema
+    try:
+        resolved: Any = root_schema
+        for part in ref[2:].split("/"):
+            part = part.replace("~1", "/").replace("~0", "~")  # RFC 6901
+            resolved = resolved[int(part) if isinstance(resolved, list) else part]
+    except (KeyError, TypeError, IndexError, ValueError):
+        return schema
+    return _resolve_ref(resolved, root_schema, seen_refs | {ref})
+
+
+def _schema_allows_null(schema: Any, root_schema: Any) -> bool:
+    """Return True if schema or any of its branches permit a null value."""
+    if not isinstance(schema, dict):
+        return False
+    resolved = _resolve_ref(schema, root_schema)
+    if resolved is not schema:
+        return _schema_allows_null(resolved, root_schema)
+    schema_type = schema.get("type")
+    if schema_type == "null":
+        return True
+    if isinstance(schema_type, list) and "null" in schema_type:
+        return True
+    for combinator in ("anyOf", "oneOf"):
+        options = schema.get(combinator)
+        if isinstance(options, list) and any(_schema_allows_null(option, root_schema) for option in options):
+            return True
+    # Be conservative for allOf: preserve null if any branch allows it.
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list) and any(_schema_allows_null(option, root_schema) for option in all_of):
+        return True
+    return False
 
 
 class LangChainAdapter(BaseAdapter[BaseTool]):
@@ -62,13 +111,25 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
 
         # This is a dynamic class creation, we need to work with the self reference
         adapter_self = self
+        fixed_input_schema = adapter_self.fix_schema(mcp_tool.inputSchema)
+
+        nullable_optional_fields: set[str] = set()
+        if isinstance(fixed_input_schema, dict):
+            required_fields = set(fixed_input_schema.get("required", []))
+            properties = fixed_input_schema.get("properties", {})
+            if isinstance(properties, dict):
+                nullable_optional_fields = {
+                    field_name
+                    for field_name, field_schema in properties.items()
+                    if field_name not in required_fields and _schema_allows_null(field_schema, fixed_input_schema)
+                }
 
         class McpToLangChainAdapter(BaseTool):
             name: str = mcp_tool.name or "NO NAME"
             description: str = mcp_tool.description or ""
             # Convert JSON schema to Pydantic model for argument validation
             args_schema: type[BaseModel] = jsonschema_to_pydantic(
-                adapter_self.fix_schema(mcp_tool.inputSchema)  # Apply schema conversion
+                fixed_input_schema  # Apply schema conversion
             )
             tool_connector: BaseConnector = connector  # Renamed variable to avoid name conflict
             handle_tool_error: bool = True
@@ -99,8 +160,21 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 """
                 logger.debug(f'MCP tool: "{self.name}" received input: {kwargs}')
 
+                # Strip None values for optional fields so they are sent as
+                # absent rather than JSON null. Keep None when the MCP schema
+                # explicitly allows null or the field is required.
+                filtered_kwargs: dict[str, Any] = {}
+                for key, value in kwargs.items():
+                    if value is not None:
+                        filtered_kwargs[key] = value
+                        continue
+
+                    field_info = self.args_schema.model_fields.get(key)
+                    if (field_info and field_info.is_required()) or key in nullable_optional_fields:
+                        filtered_kwargs[key] = value
+
                 try:
-                    tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
+                    tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, filtered_kwargs)
                     try:
                         # Use the helper function to parse the result
                         return str(tool_result.content)
@@ -131,7 +205,7 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
             description: str = (
                 mcp_resource.description or f"Return the content of the resource located at URI {mcp_resource.uri}."
             )
-            args_schema: type[BaseModel] = ReadResourceRequestParams
+            args_schema: type[BaseModel] = _EmptyInput
             tool_connector: BaseConnector = connector
             handle_tool_error: bool = True
 
