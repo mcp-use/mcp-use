@@ -443,7 +443,7 @@ server.use("*", cors());
 - [Auth0 Documentation](https://auth0.com/docs)
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [RFC 9068: JWT Profile for OAuth 2.0 Access Tokens](https://datatracker.ietf.org/doc/html/rfc9068)
-- [MCP Authentication Specification](https://modelcontextprotocol.io/docs/specification/authentication)
+- [MCP Authentication Specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
 - [mcp-use Documentation](https://mcp-use.com/docs)
 - [PKCE Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce)
 

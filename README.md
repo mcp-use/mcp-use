@@ -89,7 +89,7 @@ await server.listen(3000);
 // Inspector at http://localhost:3000/inspector
 ```
 
-[**→ Full TypeScript Server Documentation**](https://mcp-use.com/docs/typescript/server/getting-started)
+[**→ Full TypeScript Server Documentation**](https://mcp-use.com/docs/typescript/server)
 
 ## MCP Apps
 
