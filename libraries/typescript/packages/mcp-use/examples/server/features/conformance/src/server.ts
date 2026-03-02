@@ -37,6 +37,14 @@ const server = new MCPServer({
   version: "1.0.0",
   description:
     "MCP Conformance Test Server implementing all supported features.",
+  favicon: "icon.svg",
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"],
+    },
+  ],
   // Keep DNS rebinding protection enabled for conformance runs.
   allowedOrigins: [
     `http://localhost:${SERVER_PORT}`,
