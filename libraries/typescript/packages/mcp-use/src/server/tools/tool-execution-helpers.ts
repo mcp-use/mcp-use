@@ -25,7 +25,7 @@ import type {
   ElicitUrlParams,
 } from "../types/index.js";
 import type { SessionData } from "../sessions/session-manager.js";
-import { Telemetry } from "../../telemetry/index.js";
+import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { getRequestContext } from "../context-storage.js";
 
 // Re-export SessionData for backwards compatibility

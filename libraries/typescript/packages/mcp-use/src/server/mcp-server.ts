@@ -13,7 +13,7 @@ import type {
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
-import { Telemetry } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";

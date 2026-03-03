@@ -19,7 +19,8 @@ import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
 import { ObservabilityManager } from "../observability/index.js";
 import type { MCPSession } from "../session.js";
-import { extractModelInfo, Telemetry } from "../telemetry/index.js";
+import { extractModelInfo } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 import { createSystemMessage } from "./prompts/system_prompt_builder.js";
 import {
