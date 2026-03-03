@@ -356,6 +356,8 @@ class MCPServer(FastMCP):
         """
         subscribers = self._resource_subscriptions.get(uri)
         if not subscribers:
+            # Clean up empty entry left behind after all sessions were GC'd
+            self._resource_subscriptions.pop(uri, None)
             return
 
         # Iterate a snapshot; the WeakSet may shrink during iteration
