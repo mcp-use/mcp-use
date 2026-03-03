@@ -88,9 +88,15 @@ export default defineConfig([
   // mcp_agent.ts and connectors/base.ts (exported from src/browser.ts) import
   // telemetry-node.ts. The plugin below substitutes that with telemetry-browser
   // at build time so the browser bundle contains zero Node.js built-in calls.
+  //
+  // Use object entry syntax to preserve the src/ prefix in output paths so that
+  // dist/src/browser.js and dist/src/react/index.js match package.json exports.
   {
     ...sharedConfig,
-    entry: ["src/browser.ts", "src/react/index.ts"],
+    entry: {
+      "src/browser": "src/browser.ts",
+      "src/react/index": "src/react/index.ts",
+    },
     esbuildPlugins: [telemetryBrowserPlugin],
     esbuildOptions(options) {
       // Preserve node: prefix for Deno compatibility
