@@ -1,5 +1,103 @@
 # mcp-use
 
+## 1.21.0
+
+### Minor Changes
+
+- 405fac7: Add client-side completion support for prompt arguments and resource template URIs
+
+  This adds the ability for clients to request autocomplete suggestions from MCP servers:
+  - New `complete()` method in BaseConnector, MCPSession, and useMcp hook
+  - Support for both prompt argument completion and resource template URI completion
+  - Fix `resourceTemplates` state population in useMcp (was never populated)
+  - New `refreshResourceTemplates()` method in useMcp hook
+  - Comprehensive documentation in docs/typescript/client/completion.mdx
+  - Integration and unit tests for completion functionality
+
+  The completion feature allows servers to provide static lists or dynamic callbacks for suggesting values based on partial user input, improving the autocomplete experience in client applications.
+
+- 405fac7: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- 405fac7: feat(server): improve mcp server landing page
+- 405fac7: feat(widgets): allow sendFollowUp to accept multiple mime types and not just text
+- 405fac7: feat(auth): enhance OAuth flow and CORS handling
+- 405fac7: Added robust SDK-level server composition and proxying functionality via `MCPServer.proxy()`.
+
+  You can now natively compose multiple disparate MCP servers into a single unified aggregator server. The SDK automatically orchestrates connections, proxies JSON-RPC execution (including tools, prompts, resources, LLM Sampling, Elicitation, and Progress), translates schemas on the fly, prefixes namespaces to prevent collisions, and multiplexes list-changed notifications up to the parent connection.
+
+  ### Example
+
+  ```typescript
+  import { MCPServer } from "mcp-use/server";
+  const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
+
+  await server.proxy({
+    database: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://..."],
+    },
+    weather: {
+      url: "https://weather-mcp.example.com/mcp",
+    },
+  });
+
+  await server.listen(3000);
+  ```
+
+- 405fac7: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- 405fac7: Fix TypeScript type errors when passing Express middleware to server.use(). Added proper type definitions to accept both Hono and Express middleware, with Express middleware automatically detected and adapted at runtime.
+- 405fac7: feat(mcp-use): enhance reconnection and health check options
+- 405fac7: Fix unwanted GET polling when autoReconnect is disabled and spurious duplicate server warning in StrictMode
+  - When `autoReconnect: false` is set, the SDK transport's internal SSE reconnection is now also disabled (`maxRetries: 0`), preventing recurring GET requests every ~2 seconds to streamable HTTP servers.
+  - `getServer()` now checks `serverConfigs` in addition to the reactive `servers` state, so a `!getServer(id)` guard works correctly in React StrictMode double-mount scenarios. The duplicate `addServer` log has been downgraded to debug level.
+
+- 405fac7: fix(widgets): fix metadata enrichment in dev
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+  - @mcp-use/inspector@0.24.0
+  - @mcp-use/cli@2.17.0
+
 ## 1.21.0-canary.14
 
 ### Minor Changes
