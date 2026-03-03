@@ -3,19 +3,20 @@ import React, { useEffect, useState } from "react";
 
 /**
  * Demonstrates dynamically adding an MCP server after mount using
- * McpClientProvider + useMcpClient, with a getServer guard to prevent
- * duplicate additions. Mirrors a common auth-gated pattern where the
+ * McpClientProvider + useMcpClient. addServer is idempotent, so no
+ * getServer guard is needed — duplicate calls with the same id are
+ * silently ignored. Mirrors a common auth-gated pattern where the
  * server is only added once the user is authenticated.
  */
 
 const MCP_SERVER_URL = "http://localhost:4567/mcp";
 
 const ProtectedRoute: React.FC = () => {
-  const { addServer, getServer, servers } = useMcpClient();
+  const { addServer, servers } = useMcpClient();
   const [isAuthenticated] = useState(true);
 
   useEffect(() => {
-    if (isAuthenticated && !getServer("my-server")) {
+    if (isAuthenticated) {
       addServer("my-server", {
         url: MCP_SERVER_URL,
         transportType: "http",
@@ -24,7 +25,7 @@ const ProtectedRoute: React.FC = () => {
         logLevel: "silent",
       });
     }
-  }, [addServer, getServer, isAuthenticated]);
+  }, [addServer, isAuthenticated]);
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
@@ -32,9 +33,9 @@ const ProtectedRoute: React.FC = () => {
 
       <p>
         This example shows how to dynamically add an MCP server after mount
-        using <code>addServer</code> with a <code>getServer</code> guard,
-        mimicking a protected-route pattern where the server is added only after
-        authentication.
+        using <code>addServer</code>, mimicking a protected-route pattern where
+        the server is only added after authentication. <code>addServer</code> is
+        idempotent&mdash;calling it multiple times with the same id is safe.
       </p>
 
       <div style={{ marginBottom: "20px" }}>

@@ -108,6 +108,7 @@ export interface McpServerOptions extends Omit<
  */
 export interface McpClientContextType {
   servers: McpServer[];
+  /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
   updateServer: (
@@ -1163,14 +1164,8 @@ export function McpClientProvider({
   );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
-    providerLogger.debug("[McpClientProvider] addServer called:", id, options);
     setServerConfigs((prev) => {
-      if (prev.find((s) => s.id === id)) {
-        providerLogger.debug(
-          `[McpClientProvider] Server with id "${id}" already exists, skipping`
-        );
-        return prev;
-      }
+      if (prev.find((s) => s.id === id)) return prev;
       providerLogger.debug(
         "[McpClientProvider] Adding new server to configs:",
         id
@@ -1251,18 +1246,9 @@ export function McpClientProvider({
 
   const getServer = useCallback(
     (id: string) => {
-      const server = servers.find((s) => s.id === id);
-      if (server) return server;
-      // Return a minimal placeholder when the config exists but the
-      // McpServer object hasn't been created yet. This prevents false
-      // negatives in guard patterns like `if (!getServer(id)) addServer(...)`.
-      const config = serverConfigs.find((s) => s.id === id);
-      if (config) {
-        return { id, state: "discovering" } as McpServer;
-      }
-      return undefined;
+      return servers.find((s) => s.id === id);
     },
-    [servers, serverConfigs]
+    [servers]
   );
 
   const contextValue = useMemo(
