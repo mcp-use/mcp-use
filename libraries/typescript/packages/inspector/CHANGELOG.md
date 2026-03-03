@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.24.0-canary.14
+
+### Patch Changes
+
+- cb89d47: feat(auth): enhance OAuth flow and CORS handling
+- Updated dependencies [cb89d47]
+  - mcp-use@1.21.0-canary.14
+
 ## 0.24.0-canary.13
 
 ### Patch Changes
