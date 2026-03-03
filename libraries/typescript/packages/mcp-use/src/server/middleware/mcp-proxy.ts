@@ -125,6 +125,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         "mcp-protocol-version",
         "X-Server-Id",
         "X-Requested-With",
+        "X-Connection-URL",
       ],
       exposeHeaders: ["*"],
     })

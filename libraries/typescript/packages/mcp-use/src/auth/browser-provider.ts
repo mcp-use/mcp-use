@@ -44,6 +44,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private connectionUrl?: string; // MCP proxy URL that client connected to
   private originalFetch?: typeof fetch;
   private pendingCodeVerifier: string | null = null;
+  private _lastOriginalResource: string | null = null;
   private _cachedAuthServerUrl: string | null = null;
   private _cachedMetadata: AuthorizationServerMetadata | null = null;
   private _refreshPromise: Promise<OAuthTokens | null> | null = null;
@@ -125,10 +126,10 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     );
 
     // Create interceptor
-    window.fetch = async function interceptedFetch(
+    window.fetch = async (
       input: RequestInfo | URL,
       init?: RequestInit
-    ): Promise<Response> {
+    ): Promise<Response> => {
       const url =
         typeof input === "string"
           ? input
@@ -200,6 +201,24 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             method: "GET",
             headers,
           });
+          try {
+            const contentType =
+              metadataResponse.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+              const metadataJson = await metadataResponse.clone().json();
+              const originalResource =
+                metadataJson &&
+                typeof metadataJson === "object" &&
+                typeof metadataJson._original_resource === "string"
+                  ? metadataJson._original_resource
+                  : null;
+              if (originalResource) {
+                this._lastOriginalResource = originalResource;
+              }
+            }
+          } catch {
+            // Ignore metadata parsing errors for caching; request continues normally.
+          }
           return metadataResponse;
         }
 
@@ -276,6 +295,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       const storedRedirectUris = Array.isArray(clientInfo.redirect_uris)
         ? clientInfo.redirect_uris
         : [];
+      // length === 0 means the server didn't include redirect_uris in the
+      // registration response — skip the check rather than invalidating valid creds.
       const hasMatchingRedirect =
         storedRedirectUris.length === 0 ||
         storedRedirectUris.includes(this.redirectUrl);
@@ -444,6 +465,31 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * @returns The full authorization URL with state parameter.
    */
   async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
+    const originalResourceParam = authorizationUrl.searchParams.get("resource");
+    const looksLikeLocalProxyResource = Boolean(
+      originalResourceParam &&
+      (originalResourceParam.includes("/inspector/api/proxy") ||
+        originalResourceParam.includes("/api/proxy") ||
+        originalResourceParam.includes("localhost:3000"))
+    );
+    const matchesConnectionUrl = Boolean(
+      originalResourceParam &&
+      this.connectionUrl &&
+      originalResourceParam === this.connectionUrl
+    );
+    const shouldRewriteResource = Boolean(
+      originalResourceParam &&
+      (this._lastOriginalResource || this.serverUrl) &&
+      (matchesConnectionUrl || looksLikeLocalProxyResource)
+    );
+    const rewriteTargetResource = this._lastOriginalResource || this.serverUrl;
+
+    // If metadata resource was rewritten to the local proxy for SDK validation,
+    // restore the real MCP endpoint in the outbound authorize URL.
+    if (shouldRewriteResource && rewriteTargetResource) {
+      authorizationUrl.searchParams.set("resource", rewriteTargetResource);
+    }
+
     // Generate a unique state parameter for this authorization request
     const state = globalThis.crypto.randomUUID();
     const stateKey = `${this.storageKeyPrefix}:state_${state}`;
