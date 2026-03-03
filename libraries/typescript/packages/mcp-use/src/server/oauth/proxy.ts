@@ -370,9 +370,32 @@ export function mountOAuthProxy(
         return c.json({ error: "Invalid URL format" }, 400);
       }
 
+      // Normalize gateway-embedded target URLs like:
+      // https://<gateway>/https://provider.com/register
+      try {
+        const isGatewayHost =
+          targetUrl.hostname.endsWith(".run.mcp-use.com") ||
+          targetUrl.hostname.endsWith(".run.dev.mcp-use.com") ||
+          targetUrl.hostname.endsWith(".mcp-use.run");
+        if (isGatewayHost) {
+          const embeddedTargetMatch = targetUrl.pathname.match(
+            /^\/(https?:\/\/[^/]+|https?:%2F%2F[^/]+)(\/.*)?$/i
+          );
+          if (embeddedTargetMatch) {
+            const decodedOrigin = decodeURIComponent(embeddedTargetMatch[1]);
+            const normalizedOrigin = new URL(decodedOrigin).origin;
+            const targetPath = embeddedTargetMatch[2] || "/";
+            const normalizedTarget = `${normalizedOrigin}${targetPath}${targetUrl.search}`;
+            targetUrl = new URL(normalizedTarget);
+          }
+        }
+      } catch {
+        // If normalization fails, continue with the original URL.
+      }
+
       // Optional target validation
       if (validateTarget) {
-        const isValid = await validateTarget(url, c);
+        const isValid = await validateTarget(targetUrl.toString(), c);
         if (!isValid) {
           return c.json({ error: "Target URL not allowed" }, 403);
         }

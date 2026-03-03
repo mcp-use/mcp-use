@@ -10,11 +10,26 @@ import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
 const app = new Hono();
 
 // Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
+// NOTE: Authorization must be listed explicitly in allowHeaders — the wildcard * does NOT cover it
+// per the Fetch spec. Without this, browsers block requests with Authorization headers.
 app.use(
   "*",
   cors({
     origin: "*",
-    exposeHeaders: ["*"], // Expose all headers since this is a proxy
+    allowHeaders: [
+      "Authorization",
+      "Content-Type",
+      "Accept",
+      "X-Target-URL",
+      "X-MCP-Target",
+      "Mcp-Session-Id",
+      "mcp-session-id",
+      "mcp-protocol-version",
+      "X-Server-Id",
+      "X-Requested-With",
+      "X-Connection-URL",
+    ],
+    exposeHeaders: ["*"],
   })
 );
 

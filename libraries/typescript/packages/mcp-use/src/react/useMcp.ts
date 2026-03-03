@@ -656,6 +656,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const serverConfig: any = {
           url: url, // Use original URL, not transformed proxy URL
           transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
+          timeout,
+          sseReadTimeout,
           // Only disable SSE fallback when user explicitly set transportType: "http"
           // Don't disable it when we're in auto mode and just trying HTTP first
           disableSseFallback: transportType === "http",
