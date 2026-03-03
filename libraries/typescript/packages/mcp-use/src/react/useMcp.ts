@@ -629,6 +629,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           ...(customFetch && { fetch: customFetch }),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
+          // When autoReconnect is disabled, also disable the SDK transport's
+          // SSE reconnection to prevent unwanted GET polling requests
+          ...(autoReconnect === false && {
+            reconnectionOptions: { maxRetries: 0 },
+          }),
         };
 
         // Add gateway URL if using proxy

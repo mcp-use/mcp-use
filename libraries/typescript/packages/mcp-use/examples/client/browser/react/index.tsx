@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import DynamicServerExample from "./dynamic-server-example";
 import MultiServerExample from "./multi-server-example";
 import OAuthCallback from "./oauth-callback";
 import ReactExample from "./react_example";
@@ -39,6 +40,16 @@ function Navigation() {
         >
           Multi-Server
         </a>
+        <a
+          href="/dynamic-server"
+          style={{
+            color: currentPath === "/dynamic-server" ? "#4CAF50" : "#fff",
+            textDecoration: "none",
+            fontWeight: currentPath === "/dynamic-server" ? "bold" : "normal",
+          }}
+        >
+          Dynamic Server
+        </a>
       </nav>
     </div>
   );
@@ -57,7 +68,13 @@ function App() {
   return (
     <div>
       <Navigation />
-      {path === "/multi-server" ? <MultiServerExample /> : <ReactExample />}
+      {path === "/dynamic-server" ? (
+        <DynamicServerExample />
+      ) : path === "/multi-server" ? (
+        <MultiServerExample />
+      ) : (
+        <ReactExample />
+      )}
     </div>
   );
 }

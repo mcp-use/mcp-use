@@ -29,8 +29,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "mcp-use/browser": resolve(__dirname, "../../../dist/src/browser.js"),
-      "mcp-use/react": resolve(__dirname, "../../../dist/src/react/index.js"),
+      "mcp-use/browser": resolve(__dirname, "../../../../dist/src/browser.js"),
+      "mcp-use/react": resolve(
+        __dirname,
+        "../../../../dist/src/react/index.js"
+      ),
     },
     conditions: ["browser", "module", "import", "default"],
   },
