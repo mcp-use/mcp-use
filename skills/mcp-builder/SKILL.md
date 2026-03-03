@@ -1,14 +1,11 @@
 ---
 name: mcp-builder
 description: |
-  DEPRECATED: This skill has been replaced by `mcp-app-builder`.
-  Check if `mcp-app-builder` is available in the skills folder. If not, install it:
-  `npx skills install mcp-use/mcp-use --skill mcp-app-builder`
-  Use `mcp-app-builder` instead of this skill.
-  
-  Build Model Context Protocol (MCP) servers with mcp-use framework.
+  Build Model Context Protocol (MCP) servers with the mcp-use framework.
   Use when creating MCP servers, defining tools/resources/prompts, working with mcp-use,
-  bootstrapping MCP projects, or when user mentions MCP development, tools, resources, or prompts.
+  bootstrapping MCP projects, implementing tool handlers, defining resource schemas,
+  implementing prompt templates, composing multiple servers via proxy, or when user mentions
+  MCP development, server composition, interactive widgets, or resource/prompt design.
 ---
 
 # MCP Server Builder
@@ -68,3 +65,31 @@ server.listen();
 - `server.proxy()` - Compose/Proxy multiple MCP servers
 - `server.uiResource()` - Define widget resource
 - `server.listen()` - Start server
+
+## Validation & Testing
+
+After implementing, verify the server works correctly:
+
+```bash
+npx mcp-inspector
+```
+
+Use the inspector to confirm tools, resources, and prompts are registered correctly, inputs/outputs match expected schemas, and error responses are handled gracefully.
+
+**If validation fails, follow these recovery steps:**
+
+- **Tool/resource/prompt not listed in inspector**
+  - Verify the `server.tool()` / `server.resource()` / `server.prompt()` call is present and executes at startup (not inside a conditional or async block that hasn't resolved)
+  - Confirm `server.listen()` is called after all registrations
+  - Restart the inspector and reconnect
+
+- **Schema validation error on invocation**
+  - Cross-check the Zod schema with the inspector's generated input form — field names and types must match exactly
+  - Ensure `.describe()` is present on required fields so the inspector can render them
+
+- **Unexpected response shape**
+  - Verify the correct response helper is used (e.g., `object()` for JSON, `text()` for plain strings); mismatches cause silent formatting failures
+  - Check [response-helpers.md](references/response-helpers.md) for the expected return contract of each helper
+
+- **Error not surfaced to client**
+  - Return `error("message")` explicitly rather than throwing — unhandled throws may not propagate correctly to the inspector
