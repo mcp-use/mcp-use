@@ -109,11 +109,25 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
+  // NOTE: Authorization must be listed explicitly — the wildcard * does NOT cover it per the Fetch spec.
   app.use(
     `${basePath}/*`,
     cors({
       origin: "*",
-      exposeHeaders: ["*"], // Expose all headers including Mcp-Session-Id for FastMCP
+      allowHeaders: [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Target-URL",
+        "X-MCP-Target",
+        "Mcp-Session-Id",
+        "mcp-session-id",
+        "mcp-protocol-version",
+        "X-Server-Id",
+        "X-Requested-With",
+        "X-Connection-URL",
+      ],
+      exposeHeaders: ["*"],
     })
   );
 
@@ -334,8 +348,25 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       }
 
-      // Return the proxied response unchanged for non-OAuth discovery responses
-      return new Response(response.body, {
+      // For streaming SSE responses (GET without content-length), pass through the body stream.
+      // For all other responses, buffer the body and set Content-Length so browsers
+      // don't hang waiting for a ReadableStream that may not signal EOF promptly.
+      const isSSE = contentType.includes("text/event-stream");
+      const isGetRequest = c.req.method === "GET";
+      const upstreamContentLength = response.headers.get("content-length");
+      const isTrueStream = isSSE && isGetRequest && !upstreamContentLength;
+
+      if (isTrueStream) {
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+        });
+      }
+
+      const bodyBuffer = await response.arrayBuffer();
+      responseHeaders["Content-Length"] = String(bodyBuffer.byteLength);
+      return new Response(bodyBuffer, {
         status: response.status,
         statusText: response.statusText,
         headers: responseHeaders,
