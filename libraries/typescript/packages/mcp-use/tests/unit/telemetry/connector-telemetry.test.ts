@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockTrackConnectorInit = vi.fn().mockResolvedValue(undefined);
 
 // Mock the telemetry module
-vi.mock("../../../src/telemetry/index.js", () => ({
+vi.mock("../../../src/telemetry/telemetry-node.js", () => ({
   Telemetry: {
     getInstance: vi.fn(() => ({
       trackConnectorInit: mockTrackConnectorInit,

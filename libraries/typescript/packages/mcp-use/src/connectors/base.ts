@@ -24,7 +24,7 @@ import {
 import { logger } from "../logging.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
-import { Telemetry } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 
 /**
  * Handler function for server notifications

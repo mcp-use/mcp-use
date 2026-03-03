@@ -7,7 +7,7 @@
 
 import type { Context, Hono as HonoType } from "hono";
 import { join } from "node:path";
-import { Telemetry } from "../../telemetry/index.js";
+import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { generateLandingPage } from "../landing.js";
 import type { SessionData } from "../sessions/index.js";
 import {
