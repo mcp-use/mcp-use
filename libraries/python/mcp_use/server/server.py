@@ -4,6 +4,7 @@ import inspect
 import logging
 import os
 import time
+import weakref
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -305,13 +306,16 @@ class MCPServer(FastMCP):
             self._client_log_level = str(level)
 
         # resources/subscribe + unsubscribe — track per-URI subscriptions
-        self._resource_subscriptions: dict[str, set[int]] = {}  # uri -> set of session ids
+        # Uses WeakSet so that subscriptions are automatically cleaned up when
+        # a client disconnects and its session object is garbage-collected,
+        # preventing the memory leak described in GitHub issue #1092.
+        self._resource_subscriptions: dict[str, weakref.WeakSet] = {}  # uri -> WeakSet of sessions
 
         @self._mcp_server.subscribe_resource()
         async def _handle_subscribe(uri: Any) -> None:
             session = self._current_session()
             if session:
-                self._resource_subscriptions.setdefault(str(uri), set()).add(id(session))
+                self._resource_subscriptions.setdefault(str(uri), weakref.WeakSet()).add(session)
 
         @self._mcp_server.unsubscribe_resource()
         async def _handle_unsubscribe(uri: Any) -> None:
@@ -319,7 +323,7 @@ class MCPServer(FastMCP):
             if session:
                 subscribers = self._resource_subscriptions.get(str(uri))
                 if subscribers:
-                    subscribers.discard(id(session))
+                    subscribers.discard(session)
                     if not subscribers:
                         del self._resource_subscriptions[str(uri)]
 
@@ -352,14 +356,17 @@ class MCPServer(FastMCP):
         """
         subscribers = self._resource_subscriptions.get(uri)
         if not subscribers:
+            # Clean up empty entry left behind after all sessions were GC'd
+            self._resource_subscriptions.pop(uri, None)
             return
 
-        for session in list(MiddlewareServerSession._active_sessions):
-            if id(session) in subscribers:
-                try:
-                    await session.send_resource_updated(uri=uri)
-                except Exception:
-                    pass  # Session may have disconnected
+        # Iterate a snapshot; the WeakSet may shrink during iteration
+        # if sessions are garbage-collected concurrently.
+        for session in list(subscribers):
+            try:
+                await session.send_resource_updated(uri=uri)
+            except Exception:
+                pass  # Session may have disconnected
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
