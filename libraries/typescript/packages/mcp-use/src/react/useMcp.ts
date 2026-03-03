@@ -668,8 +668,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           ...(customFetch && { fetch: customFetch }),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
-          // Pass user-configurable reconnection options for streamable HTTP transport
-          ...(reconnectionOptions && { reconnectionOptions }),
+          // Pass user-configurable reconnection options, or when autoReconnect
+          // is disabled, disable SDK transport SSE reconnection to prevent
+          // unwanted GET polling requests
+          ...(reconnectionOptions
+            ? { reconnectionOptions }
+            : autoReconnect === false
+              ? { reconnectionOptions: { maxRetries: 0 } }
+              : {}),
         };
 
         // Add gateway URL if using proxy

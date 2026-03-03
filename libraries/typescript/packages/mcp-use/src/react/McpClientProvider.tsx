@@ -108,6 +108,7 @@ export interface McpServerOptions extends Omit<
  */
 export interface McpClientContextType {
   servers: McpServer[];
+  /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
   updateServer: (
@@ -1163,15 +1164,8 @@ export function McpClientProvider({
   );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
-    providerLogger.debug("[McpClientProvider] addServer called:", id, options);
     setServerConfigs((prev) => {
-      // Check if already exists
-      if (prev.find((s) => s.id === id)) {
-        providerLogger.warn(
-          `[McpClientProvider] Server with id "${id}" already exists`
-        );
-        return prev;
-      }
+      if (prev.find((s) => s.id === id)) return prev;
       providerLogger.debug(
         "[McpClientProvider] Adding new server to configs:",
         id
