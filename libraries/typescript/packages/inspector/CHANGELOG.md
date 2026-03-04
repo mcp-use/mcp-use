@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.1-canary.1
+
+### Patch Changes
+
+- 3e3767e: fix(inspector): allow set initial messages for exported chat components
+  - mcp-use@1.21.1-canary.1
+
 ## 0.24.1-canary.0
 
 ### Patch Changes

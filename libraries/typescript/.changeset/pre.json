@@ -10,6 +10,7 @@
   "changesets": [
     "chubby-bees-rule",
     "fix-inspector-dark-mode-buttons",
-    "funky-windows-lose"
+    "funky-windows-lose",
+    "fuzzy-carpets-sleep"
   ]
 }
