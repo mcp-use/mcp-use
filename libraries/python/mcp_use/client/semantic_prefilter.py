@@ -23,7 +23,7 @@ from mcp_use.logging import logger
 class SemanticPreFilter:
     """
     Semantic pre-filtering engine for tools and enum parameters.
-    
+
     Uses embedding-based semantic search with optional reranking to reduce
     large toolsets to semantically relevant subsets before Code Mode operates.
     """
@@ -61,12 +61,8 @@ class SemanticPreFilter:
         )
 
         # API keys
-        self.embeddings_api_key = embeddings_api_key or os.getenv(
-            "DEEPINFRA_API_KEY", os.getenv("OPENAI_API_KEY", "")
-        )
-        self.reranker_api_key = reranker_api_key or os.getenv(
-            "DEEPINFRA_API_KEY", os.getenv("OPENAI_API_KEY", "")
-        )
+        self.embeddings_api_key = embeddings_api_key or os.getenv("DEEPINFRA_API_KEY", os.getenv("OPENAI_API_KEY", ""))
+        self.reranker_api_key = reranker_api_key or os.getenv("DEEPINFRA_API_KEY", os.getenv("OPENAI_API_KEY", ""))
 
         self.top_k_initial = top_k_initial
         self.top_k_final = top_k_final
@@ -103,12 +99,10 @@ class SemanticPreFilter:
                 if "/inference/" in parsed_url.path:
                     # Replace /inference/ with /embeddings in the path
                     new_path = parsed_url.path.replace("/inference/", "/embeddings")
-                    embeddings_url = urlunparse(
-                        parsed_url._replace(path=new_path)
-                    )
+                    embeddings_url = urlunparse(parsed_url._replace(path=new_path))
                 else:
                     embeddings_url = self.embeddings_url
-                
+
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(
                         embeddings_url,
@@ -169,12 +163,10 @@ class SemanticPreFilter:
                 if "/inference/" in parsed_url.path:
                     # Replace /inference/ with /embeddings in the path
                     new_path = parsed_url.path.replace("/inference/", "/embeddings")
-                    embeddings_url = urlunparse(
-                        parsed_url._replace(path=new_path)
-                    )
+                    embeddings_url = urlunparse(parsed_url._replace(path=new_path))
                 else:
                     embeddings_url = self.embeddings_url
-                
+
                 async with httpx.AsyncClient(timeout=60.0) as client:
                     response = await client.post(
                         embeddings_url,
@@ -215,9 +207,7 @@ class SemanticPreFilter:
             # Fallback to individual requests
             return [await self._get_embedding(text) for text in texts]
 
-    async def _rerank(
-        self, query: str, texts: list[str], scores: list[float] | None = None
-    ) -> list[tuple[int, float]]:
+    async def _rerank(self, query: str, texts: list[str], scores: list[float] | None = None) -> list[tuple[int, float]]:
         """
         Rerank texts using the reranker API.
 
@@ -258,9 +248,7 @@ class SemanticPreFilter:
 
                 # Combine with initial scores if provided
                 if scores and len(scores) == len(rerank_scores):
-                    combined_scores = [
-                        (rerank_scores[i] + scores[i]) / 2 for i in range(len(rerank_scores))
-                    ]
+                    combined_scores = [(rerank_scores[i] + scores[i]) / 2 for i in range(len(rerank_scores))]
                 else:
                     combined_scores = rerank_scores
 
@@ -372,9 +360,7 @@ class SemanticPreFilter:
             return filtered_tools, list(range(len(tools)))
 
         # Calculate similarity scores
-        scores = [
-            self._cosine_similarity(query_embedding, tool_emb) for tool_emb in tool_embeddings
-        ]
+        scores = [self._cosine_similarity(query_embedding, tool_emb) for tool_emb in tool_embeddings]
 
         # Get top K initial results
         indexed_scores = list(enumerate(scores))
@@ -482,9 +468,7 @@ class SemanticPreFilter:
                 schema["enum"] = enum_values[: self.enum_reduction_threshold]
                 schema["_enum_filtered"] = True
                 schema["_enum_original_count"] = len(enum_values)
-                logger.debug(
-                    f"Filtered enum from {len(enum_values)} to {self.enum_reduction_threshold} values"
-                )
+                logger.debug(f"Filtered enum from {len(enum_values)} to {self.enum_reduction_threshold} values")
 
         # Recursively filter in properties
         if "properties" in schema and isinstance(schema["properties"], dict):
@@ -515,9 +499,8 @@ class SemanticPreFilter:
         else:
             # Add new entry
             self._embedding_cache[key] = value
-            
+
             # Evict oldest entry if cache exceeds max size
             if len(self._embedding_cache) > self._max_cache_size:
                 # Remove oldest (first) entry
                 self._embedding_cache.popitem(last=False)
-

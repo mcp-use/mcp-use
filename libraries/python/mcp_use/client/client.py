@@ -12,8 +12,8 @@ from typing import TYPE_CHECKING, Any
 from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.types import Root
 
-from mcp_use.client.config import create_connector_from_config, load_config_file
 from mcp_use.client.code_mode_config import CodeModeConfig
+from mcp_use.client.config import create_connector_from_config, load_config_file
 from mcp_use.client.connectors.sandbox import SandboxOptions
 from mcp_use.client.middleware import Middleware, default_logging_middleware
 from mcp_use.client.session import MCPSession
@@ -74,7 +74,7 @@ class MCPClient:
         self.logging_callback = logging_callback
         self.roots = roots
         self.list_roots_callback = list_roots_callback
-        
+
         # Handle code_mode as bool or CodeModeConfig
         if isinstance(code_mode, bool):
             self.code_mode_config = CodeModeConfig.from_bool(code_mode)
@@ -82,7 +82,7 @@ class MCPClient:
             self.code_mode_config = code_mode
         else:
             self.code_mode_config = CodeModeConfig.from_bool(False)
-        
+
         self.code_mode = self.code_mode_config.enabled
         self._code_executor: CodeExecutor | None = None
         self._record_telemetry = True
@@ -127,12 +127,12 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
-            message_handler: MessageHandlerFnT | None = None,
-            logging_callback: LoggingFnT | None = None,
-            code_mode: bool | CodeModeConfig = False,
-            verify: bool | None = True,
-            roots: list[Root] | None = None,
-            list_roots_callback: ListRootsFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
+        code_mode: bool | CodeModeConfig = False,
+        verify: bool | None = True,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a dictionary.
 
@@ -168,12 +168,12 @@ class MCPClient:
         sandbox_options: SandboxOptions | None = None,
         sampling_callback: SamplingFnT | None = None,
         elicitation_callback: ElicitationFnT | None = None,
-            message_handler: MessageHandlerFnT | None = None,
-            logging_callback: LoggingFnT | None = None,
-            code_mode: bool | CodeModeConfig = False,
-            verify: bool | None = True,
-            roots: list[Root] | None = None,
-            list_roots_callback: ListRootsFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
+        code_mode: bool | CodeModeConfig = False,
+        verify: bool | None = True,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ) -> "MCPClient":
         """Create a MCPClient from a configuration file.
 

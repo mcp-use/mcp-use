@@ -97,6 +97,30 @@ class TestSemanticPreFilter:
         similarity = prefilter._cosine_similarity([], [])
         assert similarity == 0.0
 
+        # Test mismatched lengths
+        similarity = prefilter._cosine_similarity([1.0, 2.0], [1.0])
+        assert similarity == 0.0
+
+    def test_create_tool_text(self):
+        """Test that tool text representation is created correctly."""
+        prefilter = SemanticPreFilter()
+
+        class MockTool:
+            def __init__(self, name, description, input_schema):
+                self.name = name
+                self.description = description
+                self.inputSchema = input_schema
+
+        tool = MockTool(
+            "read_file",
+            "Read a file from the filesystem",
+            {"type": "object", "properties": {"path": {"type": "string", "description": "File path to read"}}},
+        )
+        tool_text = prefilter._create_tool_text(tool)
+        assert "read_file" in tool_text
+        assert "Read a file" in tool_text
+        assert "path" in tool_text
+
     def test_filter_schema_enums(self):
         """Test enum filtering in JSON schema."""
         prefilter = SemanticPreFilter(enum_reduction_threshold=3)
@@ -159,4 +183,3 @@ class TestSemanticPreFilter:
 
         # Array items enum should be filtered
         assert len(schema["properties"]["array"]["items"]["enum"]) == 2
-

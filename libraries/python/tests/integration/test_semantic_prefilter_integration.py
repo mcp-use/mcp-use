@@ -7,7 +7,7 @@ with Code Mode, including tool filtering and enum parameter reduction.
 
 import pytest
 
-from mcp_use import MCPClient, CodeModeConfig, SemanticPreFilterConfig
+from mcp_use import CodeModeConfig, MCPClient, SemanticPreFilterConfig
 
 
 class TestSemanticPreFilterIntegration:
@@ -95,4 +95,3 @@ class TestSemanticPreFilterIntegration:
         assert config.enum_reduction_threshold == 15
         assert config.use_reranking is False
         assert config.query == "custom query"
-

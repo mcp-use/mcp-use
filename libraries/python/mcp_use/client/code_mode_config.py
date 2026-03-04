@@ -2,8 +2,6 @@
 Configuration classes for Code Mode with semantic pre-filtering.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 
@@ -78,4 +76,3 @@ class CodeModeConfig(BaseModel):
             CodeModeConfig instance
         """
         return cls(enabled=value)
-
