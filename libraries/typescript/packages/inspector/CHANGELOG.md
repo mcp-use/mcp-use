@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 0.24.1-canary.0
+
+### Patch Changes
+
+- f0a872a: fix(inspector): strip infra headers from proxied requests
+- ef8a0cf: Fix tools selection and attachment button icons invisible in dark mode. Add explicit `text-muted-foreground` and `hover:text-foreground` to the paperclip and wrench buttons so they have proper contrast against the dark input background.
+  - mcp-use@1.21.1-canary.0
+
 ## 0.24.0
 
 ### Minor Changes

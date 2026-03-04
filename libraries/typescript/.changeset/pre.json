@@ -7,5 +7,9 @@
     "@mcp-use/inspector": "0.24.0",
     "mcp-use": "1.21.0"
   },
-  "changesets": []
+  "changesets": [
+    "chubby-bees-rule",
+    "fix-inspector-dark-mode-buttons",
+    "funky-windows-lose"
+  ]
 }
