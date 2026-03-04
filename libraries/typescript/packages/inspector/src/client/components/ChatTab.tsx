@@ -40,6 +40,10 @@ export interface ChatTabProps {
   /** Custom API endpoint URL for server-side chat streaming (used when useClientSide=false).
    *  Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
+  /** When chatApiUrl is not yet available, called before sending to resolve the URL. Useful for background initialization. */
+  waitForChatApiUrl?: () => Promise<string | undefined>;
+  /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
+  initialMessages?: import("./chat/types").Message[];
   /** Externally-managed LLM config. When provided, bypasses localStorage-based config
    *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
   managedLlmConfig?: import("./chat/types").LLMConfig;
@@ -82,6 +86,8 @@ export function ChatTab({
   callPrompt,
   readResource,
   chatApiUrl,
+  waitForChatApiUrl,
+  initialMessages,
   managedLlmConfig,
   clearButtonLabel,
   hideTitle,
@@ -155,7 +161,9 @@ export function ChatTab({
     authConfig: userAuthConfig,
     isConnected,
     chatApiUrl,
+    waitForChatApiUrl,
     widgetModelContexts,
+    initialMessages,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
