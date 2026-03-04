@@ -2004,6 +2004,10 @@ program
     "Environment variables (can be used multiple times)"
   )
   .option("--env-file <path>", "Path to .env file with environment variables")
+  .option(
+    "--root-dir <path>",
+    "Root directory within repo to deploy from (for monorepos)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -2013,6 +2017,7 @@ program
       new: options.new,
       env: options.env,
       envFile: options.envFile,
+      rootDir: options.rootDir,
     });
   });
 
