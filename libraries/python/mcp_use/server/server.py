@@ -41,6 +41,7 @@ from mcp_use.server.middleware.server_session import MiddlewareServerSession
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
+from mcp_use.server.utils.json_schema import simplify_optional_schema
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
 from mcp_use.telemetry.utils import track_server_run_from_server
@@ -201,6 +202,44 @@ class MCPServer(FastMCP):
 
         self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
+
+    def add_tool(
+        self,
+        fn: AnyFunction,
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: Any = None,
+        icons: Any = None,
+        meta: dict[str, Any] | None = None,
+        structured_output: bool | None = None,
+    ) -> None:
+        """Register a tool, simplifying Pydantic's nullable ``anyOf`` schemas.
+
+        Pydantic emits ``{"anyOf": [{"type": "T"}, {"type": "null"}]}`` for
+        ``Optional[T]`` fields.  MCP expresses optionality by omitting the
+        property from ``required``, so the ``anyOf``/null wrapper is redundant
+        and breaks description rendering in several MCP clients.
+
+        This override lets the upstream ``FastMCP`` build the tool as usual,
+        then rewrites its ``parameters`` schema into the simpler form.
+        """
+        super().add_tool(
+            fn,
+            name=name,
+            title=title,
+            description=description,
+            annotations=annotations,
+            icons=icons,
+            meta=meta,
+            structured_output=structured_output,
+        )
+        # The tool was registered under its resolved name — look it up and
+        # simplify the schema that Pydantic generated.
+        tool_name = name or fn.__name__
+        tool = self._tool_manager.get_tool(tool_name)
+        if tool is not None:
+            tool.parameters = simplify_optional_schema(tool.parameters)
 
     @telemetry("server_router_used")
     def include_router(self, router: MCPRouter, prefix: str = "", enabled: bool = True) -> None:
