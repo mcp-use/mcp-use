@@ -21,8 +21,12 @@ interface UseChatMessagesProps {
   isConnected: boolean;
   /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
+  /** When chatApiUrl is not yet available, called before sending to resolve the URL. Useful for background initialization. */
+  waitForChatApiUrl?: () => Promise<string | undefined>;
   /** Active widget model contexts to inject into the LLM conversation */
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
+  /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
+  initialMessages?: Message[];
 }
 
 export function useChatMessages({
@@ -31,9 +35,11 @@ export function useChatMessages({
   authConfig,
   isConnected,
   chatApiUrl,
+  waitForChatApiUrl,
   widgetModelContexts,
+  initialMessages,
 }: UseChatMessagesProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -131,35 +137,37 @@ export function useChatMessages({
           }
         }
 
-        const response = await fetch(
-          chatApiUrl ?? "/inspector/api/chat/stream",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            signal: abortControllerRef.current.signal,
-            body: JSON.stringify({
-              mcpServerUrl,
-              llmConfig,
-              authConfig: authConfigWithTokens,
-              messages: [
-                ...[...messages, ...userMessages].map((m) => ({
-                  role: m.role,
-                  content:
-                    m.content ||
-                    (m.parts
-                      ?.filter((p) => p.type === "text")
-                      .map((p) => p.text)
-                      .join("") ??
-                      ""),
-                  attachments: m.attachments,
-                })),
-                ...widgetContextMessages,
-              ],
-            }),
-          }
-        );
+        const resolvedUrl =
+          chatApiUrl ??
+          (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
+          "/inspector/api/chat/stream";
+
+        const response = await fetch(resolvedUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: abortControllerRef.current.signal,
+          body: JSON.stringify({
+            mcpServerUrl,
+            llmConfig,
+            authConfig: authConfigWithTokens,
+            messages: [
+              ...[...messages, ...userMessages].map((m) => ({
+                role: m.role,
+                content:
+                  m.content ||
+                  (m.parts
+                    ?.filter((p) => p.type === "text")
+                    .map((p) => p.text)
+                    .join("") ??
+                    ""),
+                attachments: m.attachments,
+              })),
+              ...widgetContextMessages,
+            ],
+          }),
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -423,6 +431,7 @@ export function useChatMessages({
       authConfig,
       attachments,
       chatApiUrl,
+      waitForChatApiUrl,
     ]
   );
 
