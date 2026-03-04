@@ -9,7 +9,7 @@ import type { Context, Hono as HonoType } from "hono";
 import { join } from "node:path";
 import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { generateLandingPage } from "../landing.js";
-import type { SessionData } from "../sessions/index.js";
+import type { SessionData, StreamManager } from "../sessions/index.js";
 import {
   FileSystemSessionStore,
   InMemorySessionStore,
@@ -17,7 +17,121 @@ import {
   startIdleCleanup,
 } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
+import {
+  isJsonRpcRequest,
+  isJsonRpcResponse,
+} from "../utils/jsonrpc-helpers.js";
 import { generateUUID } from "../utils/runtime.js";
+
+// ---------------------------------------------------------------------------
+// Helpers for distributed SSE stream routing via StreamManager
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a transport's send() method so that standalone SSE messages (notifications,
+ * server-to-client requests) are routed through the StreamManager when the local
+ * transport does not hold the SSE stream. Also registers outbound server-to-client
+ * requests for distributed response correlation.
+ */
+function wrapTransportForStreamManager(
+  transport: any,
+  sessionId: string,
+  streamManager: StreamManager
+): void {
+  const originalSend = transport.send.bind(transport);
+  transport.send = async (message: any, options?: any) => {
+    await originalSend(message, options);
+
+    // Replicate the SDK's requestId resolution so we can tell standalone-SSE
+    // messages apart from request-specific (POST response) messages.
+    let requestId = options?.relatedRequestId;
+    if (isJsonRpcResponse(message)) {
+      requestId = (message as any).id;
+    }
+
+    if (requestId !== undefined) return; // POST-response stream — SDK handled it
+
+    const sseStreamId = transport._standaloneSseStreamId || "_GET_stream";
+    const hasLocalStream = transport._streamMapping?.has(sseStreamId);
+
+    if (!hasLocalStream) {
+      // SDK stored the event for replay but could not deliver — route via StreamManager
+      const sseData = `event: message\ndata: ${JSON.stringify(message)}\n\n`;
+      try {
+        await streamManager.send([sessionId], sseData);
+      } catch (err) {
+        console.warn(
+          `[MCP] StreamManager send failed for session ${sessionId}:`,
+          err
+        );
+      }
+    }
+
+    // For server-to-client requests (sampling, elicitation, roots), register
+    // the outbound request so responses can be routed back to this server.
+    if (isJsonRpcRequest(message) && streamManager.registerOutboundRequest) {
+      try {
+        await streamManager.registerOutboundRequest(
+          (message as any).id,
+          sessionId
+        );
+      } catch (err) {
+        console.warn(`[MCP] Failed to register outbound request:`, err);
+      }
+    }
+  };
+}
+
+/**
+ * After a GET request creates a standalone SSE stream inside the SDK transport,
+ * extract the controller and register it with the StreamManager so cross-server
+ * messages can be delivered.
+ */
+async function registerSseStream(
+  transport: any,
+  sessionId: string,
+  streamManager: StreamManager
+): Promise<void> {
+  const sseStreamId = transport._standaloneSseStreamId || "_GET_stream";
+  const streamEntry = transport._streamMapping?.get(sseStreamId);
+  if (streamEntry?.controller) {
+    try {
+      await streamManager.create(sessionId, streamEntry.controller);
+    } catch (err) {
+      console.warn(
+        `[MCP] Failed to register SSE stream with StreamManager:`,
+        err
+      );
+    }
+  }
+}
+
+/**
+ * For POST requests that may contain JSON-RPC responses to server-to-client
+ * requests (sampling, elicitation, roots), check if they need to be forwarded
+ * to another server instance via the StreamManager.
+ *
+ * Clones the request so the original body remains readable for the SDK transport.
+ */
+async function maybeForwardResponses(
+  request: Request,
+  sessionId: string,
+  streamManager: StreamManager
+): Promise<void> {
+  if (!streamManager.forwardInboundResponse) return;
+  try {
+    const cloned = request.clone();
+    const body = await cloned.json();
+    const messages = Array.isArray(body) ? body : [body];
+    for (const msg of messages) {
+      if (isJsonRpcResponse(msg)) {
+        await streamManager.forwardInboundResponse(msg as any, sessionId);
+      }
+    }
+  } catch {
+    // Not JSON or parsing error — not all POSTs carry routable responses
+  }
+}
 
 /**
  * Mount MCP server endpoints at /mcp and /sse
@@ -57,10 +171,23 @@ export async function mountMcp(
 
   // Initialize stream manager (pluggable - can be Redis Pub/Sub, Postgres NOTIFY, etc.)
   // Manages active SSE connections for notifications, sampling, resource subscriptions
-  const streamManager = config.streamManager ?? new InMemoryStreamManager();
+  const streamManager: StreamManager =
+    config.streamManager ?? new InMemoryStreamManager();
 
   // Map to store transports by session ID (following official Hono example from PR #1209)
   const transports = new Map<string, any>();
+
+  // Set up distributed response forwarding: when another server forwards a
+  // JSON-RPC response (e.g. a sampling result) to us via Redis Pub/Sub, feed
+  // it into the local transport so the SDK Protocol resolves the pending Promise.
+  if (streamManager.onForwardedResponse) {
+    streamManager.onForwardedResponse((message: unknown, sid: string) => {
+      const transport = transports.get(sid);
+      if (transport?.onmessage) {
+        transport.onmessage(message);
+      }
+    });
+  }
 
   // Warn if deprecated option is used
   if (config.autoCreateSessionOnInvalidId !== undefined) {
@@ -251,105 +378,25 @@ export async function mountMcp(
         return new Response(null, { status: 200 });
       }
 
-      // Check if session ID exists in store but not in transports (server restart scenario)
+      // Session metadata exists in store but transport was lost (server restart / deploy)
+      // Recreate the transport and restore its initialized state so any request type
+      // (not just initialize) works immediately after recovery.
+      // See: https://github.com/mcp-use/mcp-use/issues/1133
       if (
         sessionId &&
         (await sessionStore.has(sessionId)) &&
         !transports.has(sessionId)
       ) {
-        // Session metadata exists but transport was lost (server restart in dev mode)
-        // Create a new transport but reuse the existing session ID
         console.log(
-          `[MCP] Session metadata found but transport lost (likely hot reload): ${sessionId} - recreating transport`
+          `[MCP] Session metadata found but transport lost (restart/hot-reload): ${sessionId} - recovering`
         );
 
         const server = mcpServerInstance.getServerForSession(sessionId);
         const transport = new WebStandardStreamableHTTPServerTransport({
-          sessionIdGenerator: () => sessionId, // Reuse existing session ID
+          sessionIdGenerator: () => sessionId,
 
           onsessioninitialized: async (sid: string) => {
-            console.log(`[MCP] Session reconnected: ${sid}`);
-            transports.set(sid, transport);
-
-            // Restore session data from store
-            const metadata = await sessionStore.get(sid);
-            const sessionData: SessionData = {
-              transport,
-              server,
-              lastAccessedAt: Date.now(),
-              context: c,
-              honoContext: c,
-              ...(metadata || {}),
-            };
-            sessions.set(sid, sessionData);
-
-            // Re-register oninitialized handler
-            server.server.oninitialized = async () => {
-              const clientCapabilities = server.server.getClientCapabilities();
-              const clientInfo =
-                server.server.getClientVersion?.() ||
-                (server.server as any).getClientInfo?.() ||
-                {};
-              const protocolVersion =
-                (server.server as any).getProtocolVersion?.() || "unknown";
-
-              const metadata = await sessionStore.get(sid);
-              if (metadata) {
-                metadata.clientCapabilities = clientCapabilities;
-                metadata.clientInfo = clientInfo;
-                metadata.protocolVersion = String(protocolVersion);
-                await sessionStore.set(sid, metadata);
-              }
-
-              const sessionData = sessions.get(sid);
-              if (sessionData) {
-                sessionData.clientCapabilities = clientCapabilities;
-                sessionData.clientInfo = clientInfo;
-              }
-
-              Telemetry.getInstance()
-                .trackServerInitialize({
-                  protocolVersion: String(protocolVersion),
-                  clientInfo: clientInfo || {},
-                  clientCapabilities: clientCapabilities || {},
-                  sessionId: sid,
-                })
-                .catch((e) =>
-                  console.debug(`Failed to track server initialize: ${e}`)
-                );
-
-              // Send list_changed notifications after reconnected session is ready
-              // This triggers the client to refresh its cached lists after hot reload
-              if (!isProductionMode) {
-                console.log(
-                  `[MCP] Development mode: Sending list_changed notifications to reconnected session ${sid}`
-                );
-                try {
-                  const { sendNotificationToSession } =
-                    await import("../sessions/notifications.js");
-                  await sendNotificationToSession(
-                    sessions,
-                    sid,
-                    "notifications/tools/list_changed"
-                  );
-                  await sendNotificationToSession(
-                    sessions,
-                    sid,
-                    "notifications/resources/list_changed"
-                  );
-                  await sendNotificationToSession(
-                    sessions,
-                    sid,
-                    "notifications/prompts/list_changed"
-                  );
-                } catch (err) {
-                  console.debug(
-                    `[MCP] Failed to send list_changed notification:`,
-                    err
-                  );
-                }
-              }
-            };
+            console.log(`[MCP] Session re-initialized: ${sid}`);
           },
 
           onsessionclosed: async (sid: string) => {
@@ -363,8 +410,39 @@ export async function mountMcp(
           },
         });
 
+        wrapTransportForStreamManager(transport, sessionId, streamManager);
+
         await server.connect(transport);
-        return transport.handleRequest(c.req.raw);
+
+        // The SDK transport only sets _initialized and sessionId when it processes
+        // an actual `initialize` request. Since this session was already established
+        // before the restart, we restore that state directly so the transport
+        // accepts any request type (tools/call, resources/read, etc.).
+        (transport as any)._initialized = true;
+        (transport as any).sessionId = sessionId;
+
+        // Register immediately — don't wait for onsessioninitialized which only
+        // fires on initialize requests and won't trigger for recovered sessions.
+        transports.set(sessionId, transport);
+        const metadata = await sessionStore.get(sessionId);
+        const sessionData: SessionData = {
+          transport,
+          server,
+          lastAccessedAt: Date.now(),
+          context: c,
+          honoContext: c,
+          ...(metadata || {}),
+        };
+        sessions.set(sessionId, sessionData);
+
+        if (c.req.method === "POST") {
+          await maybeForwardResponses(c.req.raw, sessionId, streamManager);
+        }
+        const recoveryResponse = await transport.handleRequest(c.req.raw);
+        if (c.req.method === "GET") {
+          await registerSseStream(transport, sessionId, streamManager);
+        }
+        return recoveryResponse;
       }
 
       // Check if session ID doesn't exist in store at all (truly invalid)
@@ -404,8 +482,14 @@ export async function mountMcp(
           sessionData.honoContext = c;
         }
 
-        // Pass Web Standard Request directly - no adapter needed!
-        return transport.handleRequest(c.req.raw);
+        if (c.req.method === "POST") {
+          await maybeForwardResponses(c.req.raw, sessionId, streamManager);
+        }
+        const existingResponse = await transport.handleRequest(c.req.raw);
+        if (c.req.method === "GET") {
+          await registerSseStream(transport, sessionId, streamManager);
+        }
+        return existingResponse;
       }
 
       // For new sessions or initialization, create new transport and server
@@ -507,11 +591,16 @@ export async function mountMcp(
         },
       });
 
+      wrapTransportForStreamManager(transport, newSessionId, streamManager);
+
       // Connect server to transport
       await server.connect(transport);
 
-      // Pass Web Standard Request directly - no adapter needed!
-      return transport.handleRequest(c.req.raw);
+      const newSessionResponse = await transport.handleRequest(c.req.raw);
+      if (c.req.method === "GET") {
+        await registerSseStream(transport, newSessionId, streamManager);
+      }
+      return newSessionResponse;
     }
   };
 

@@ -46,7 +46,7 @@ Sessions can end in several ways:
 
 - **Client closes**: Client sends DELETE request to `/mcp`
 - **Idle timeout**: Session expires after inactivity (default: 1 day)
-- **Server restart**: In-memory sessions are lost (see [Storage Providers](/typescript/server/session-management/memory-storage))
+- **Server restart**: In-memory sessions are lost; use [Redis Storage](/typescript/server/session-management/redis-storage) to persist sessions across restarts
 
 ### 4. Session Not Found (404)
 
@@ -209,9 +209,14 @@ const server = new MCPServer({
 
 **Characteristics:**
 - ✅ Session metadata persists across restarts
+- ✅ Clients resume sessions without re-initializing after a deploy
 - ✅ Notifications work (single server)
 - ❌ Can't distribute across multiple instances
-- ⚠️ Active SSE connections still lost on restart
+- ⚠️ Active SSE connections still lost on restart (clients must reconnect)
+
+<Card title="Redis Session Example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/session-management">
+  Complete runnable example with session recovery and notifications across restarts.
+</Card>
 
 ### Distributed
 Complete horizontal scaling with all MCP features:

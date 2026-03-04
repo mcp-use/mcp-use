@@ -79,6 +79,48 @@ export interface StreamManager {
    * Should be called on server shutdown
    */
   close?(): Promise<void>;
+
+  // --- Distributed request/response routing (optional) ---
+  // These methods enable server-to-client requests (sampling, elicitation, roots)
+  // to work across load-balanced servers where the client's response POST may
+  // land on a different server than the one that sent the request.
+
+  /**
+   * Register a pending outbound server-to-client request so that the response
+   * can be routed back to this server instance from any other instance.
+   *
+   * @param requestId - The JSON-RPC request ID
+   * @param sessionId - The session this request belongs to
+   */
+  registerOutboundRequest?(
+    requestId: string | number,
+    sessionId: string
+  ): Promise<void>;
+
+  /**
+   * Check if an inbound JSON-RPC response should be forwarded to another server.
+   * If the response matches a pending outbound request on a different server,
+   * forward it via the message bus and return true.
+   *
+   * @param message - The JSON-RPC response message (must have an `id` field)
+   * @param sessionId - The session this response belongs to
+   * @returns true if the response was forwarded to a remote server, false if local
+   */
+  forwardInboundResponse?(
+    message: { id: string | number; [key: string]: unknown },
+    sessionId: string
+  ): Promise<boolean>;
+
+  /**
+   * Register a handler for responses that have been forwarded from other servers.
+   * The handler should feed the response into the local transport so the SDK
+   * Protocol can resolve the pending request Promise.
+   *
+   * @param handler - Called with the JSON-RPC response message and its sessionId
+   */
+  onForwardedResponse?(
+    handler: (message: unknown, sessionId: string) => void
+  ): void;
 }
 
 export * from "./memory.js";
