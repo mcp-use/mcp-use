@@ -207,17 +207,23 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       const method = c.req.method;
       const headers: Record<string, string> = {};
 
-      // Copy relevant headers, excluding proxy-specific ones and encoding preferences
+      // Copy relevant headers, stripping proxy/infrastructure headers that would
+      // confuse the target (e.g. X-Forwarded-Host from our own chain causes the
+      // gateway to resolve the wrong hostname and return 404).
       const requestHeaders = c.req.header();
       for (const [key, value] of Object.entries(requestHeaders)) {
         const lowerKey = key.toLowerCase();
         if (
           !lowerKey.startsWith("x-proxy-") &&
           !lowerKey.startsWith("x-target-") &&
+          !lowerKey.startsWith("x-mcp-") &&
+          !lowerKey.startsWith("x-forwarded-") &&
+          !lowerKey.startsWith("cf-") &&
+          lowerKey !== "x-original-host" &&
           lowerKey !== "host" &&
-          lowerKey !== "accept-encoding"
+          lowerKey !== "accept-encoding" &&
+          lowerKey !== "cdn-loop"
         ) {
-          // Don't forward accept-encoding to prevent compression issues
           headers[key] = value;
         }
       }
