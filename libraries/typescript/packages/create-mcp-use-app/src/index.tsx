@@ -34,19 +34,24 @@ function runPackageManager(
   packageManager: string,
   args: string[],
   cwd: string
-): Promise<void> {
+): Promise<{ stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn(packageManager, args, {
       cwd,
-      stdio: "inherit",
-      shell: false, // Disable shell to prevent command injection
+      stdio: ["ignore", "pipe", "pipe"],
+      shell: false,
+    });
+
+    let stderr = "";
+    child.stderr?.on("data", (data: Buffer) => {
+      stderr += data.toString();
     });
 
     child.on("close", (code) => {
       if (code === 0) {
-        resolve();
+        resolve({ stderr });
       } else {
-        reject(new Error(`Process exited with code ${code}`));
+        reject(new Error(`${packageManager} install failed:\n${stderr}`));
       }
     });
 
@@ -703,14 +708,14 @@ program
 
           let installed = false;
           for (const pm of managersToTry) {
-            const spinner = ora(`Installing packages with ${pm}... `).start();
+            const spinner = ora(`Installing packages with ${pm}...`).start();
             try {
               await runPackageManager(pm, getInstallArgs(pm), projectPath);
               usedPackageManager = pm;
               spinner.succeed(`Packages installed successfully with ${pm}`);
               installed = true;
               break;
-            } catch {
+            } catch (err) {
               const remaining = managersToTry.slice(
                 managersToTry.indexOf(pm) + 1
               );
@@ -718,6 +723,9 @@ program
                 spinner.warn(`${pm} not available, trying ${remaining[0]}...`);
               } else {
                 spinner.fail("Package installation failed");
+                if (err instanceof Error) {
+                  console.error(chalk.red(err.message));
+                }
               }
             }
           }
