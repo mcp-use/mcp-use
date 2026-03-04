@@ -78,7 +78,9 @@ export function ToolSelector({
               disabled={disabled}
               className={cn(
                 "h-auto w-auto aspect-square rounded-full p-2 relative",
-                someDisabled && "text-amber-500 dark:text-amber-400"
+                someDisabled
+                  ? "text-amber-500 dark:text-amber-400"
+                  : "text-muted-foreground hover:text-foreground"
               )}
               type="button"
               data-testid="chat-tool-selector"

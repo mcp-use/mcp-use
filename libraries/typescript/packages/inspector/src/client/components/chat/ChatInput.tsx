@@ -136,7 +136,7 @@ export function ChatInput({
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={!isConnected || isLoading}
-            className="h-auto w-auto aspect-square rounded-full p-2"
+            className="h-auto w-auto aspect-square rounded-full p-2 text-muted-foreground hover:text-foreground"
             title="Attach images"
             type="button"
             data-testid="chat-attach-button"
