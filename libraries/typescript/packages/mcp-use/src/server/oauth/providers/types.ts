@@ -149,6 +149,16 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
+  /** User info endpoint URL */
+  userInfoEndpoint?: string;
+  /** OAuth client ID */
+  clientId?: string;
+  /** OAuth client secret */
+  clientSecret?: string;
+  /** OAuth mode: 'proxy' or 'direct' */
+  mode?: OAuthMode;
+  /** Audience for JWT verification */
+  audience?: string;
 }
 
 /**

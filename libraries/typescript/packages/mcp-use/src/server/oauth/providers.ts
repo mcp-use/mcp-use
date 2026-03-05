@@ -57,12 +57,28 @@ export interface WorkOSProviderConfig {
  */
 export interface CustomProviderConfig {
   issuer: string;
-  jwksUrl: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  scopesSupported?: string[];
-  grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<any>;
+  /** JWKS URL for key discovery (alias: jwksUri) */
+  jwksUrl?: string;
+  /** JWKS URI for key discovery (alias: jwksUrl) */
+  jwksUri?: string;
+  /** User info endpoint URL */
+  userInfoEndpoint?: string;
+  /** OAuth client ID */
+  clientId?: string;
+  /** OAuth client secret */
+  clientSecret?: string;
+  /** OAuth mode: 'proxy' or 'direct' */
+  mode?: "proxy" | "direct";
+  /** Supported scopes (alias: scopesSupported) */
+  scopes?: string[];
+  /** Supported scopes (alias: scopes) */
+  scopesSupported?: string[];
+  /** Audience for JWT verification */
+  audience?: string;
+  grantTypesSupported?: string[];
   getUserInfo?: (payload: any) => UserInfo;
 }
 
@@ -361,8 +377,24 @@ export function oauthWorkOSProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
+  // Resolve aliases: jwksUrl/jwksUri → jwksUrl, scopes/scopesSupported → scopesSupported
+  const jwksUrl = config.jwksUrl ?? config.jwksUri;
+  const scopesSupported = config.scopesSupported ?? config.scopes;
+
   return new CustomOAuthProvider({
     provider: "custom",
-    ...config,
+    issuer: config.issuer,
+    jwksUrl: jwksUrl ?? "",
+    authEndpoint: config.authEndpoint,
+    tokenEndpoint: config.tokenEndpoint,
+    scopesSupported,
+    grantTypesSupported: config.grantTypesSupported,
+    verifyToken: config.verifyToken,
+    getUserInfo: config.getUserInfo,
+    userInfoEndpoint: config.userInfoEndpoint,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    mode: config.mode,
+    audience: config.audience,
   });
 }
