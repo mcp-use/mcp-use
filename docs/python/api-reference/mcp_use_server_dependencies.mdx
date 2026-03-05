@@ -1,0 +1,71 @@
+---
+title: "Dependencies"
+description: "Dependencies API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/dependencies.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/dependencies.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/dependencies.py</a>
+</Callout>
+
+## Depends
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> Depends</div>
+
+Marks a parameter as an injected dependency.
+
+    Usage:
+        @server.tool()
+        def my_tool(query: str, db: Database = Depends(get_database)) -> str:
+            ...
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.dependencies import Depends
+```
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="dependency" type="Callable[..., Any]" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(dependency: Callable[..., Any]):
+```
+
+</Card>
+</div>
+
+
+## wrap_tool_with_dependencies
+<Card type="info">
+### `function` wrap_tool_with_dependencies
+
+Wrap a tool function so that Depends() parameters are resolved at call time
+    and excluded from the MCP tool schema.
+
+```python
+from mcp_use.server.dependencies import wrap_tool_with_dependencies
+```
+
+**Parameters**
+><ParamField body="fn" type="Callable[..., Any]" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Callable[..., Any]" />
+
+**Signature**
+```python wrap
+def wrap_tool_with_dependencies(fn: Callable[..., Any]):
+```
+
+</Card>
