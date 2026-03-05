@@ -17,6 +17,7 @@ from mcp.types import (
     CompleteRequest,
     Completion,
     GetPromptRequest,
+    Icon,
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
@@ -68,6 +69,7 @@ class MCPServer(FastMCP):
         name: str | None = None,
         version: str | None = None,
         instructions: str | None = None,
+        icons: list[Icon] | None = None,
         auth: BearerAuthProvider | None = None,
         middleware: list[Middleware] | None = None,
         debug: bool = False,
@@ -87,6 +89,7 @@ class MCPServer(FastMCP):
             name: Server name for identification
             version: Server version string
             instructions: Instructions for the AI model using this server
+            icons: Optional list of icons for the server implementation
             middleware: List of middleware to apply to requests
             debug: Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints)
             mcp_path: Path for MCP endpoint (default: "/mcp")
@@ -106,6 +109,7 @@ class MCPServer(FastMCP):
         super().__init__(
             name=name or "mcp-use server",
             instructions=instructions,
+            icons=icons,
             host=host,
             port=port,
         )
