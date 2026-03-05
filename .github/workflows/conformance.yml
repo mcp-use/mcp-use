@@ -89,6 +89,7 @@ jobs:
   conformance-test:
     name: Run Conformance Tests
     needs: detect-changes
+    if: needs.detect-changes.outputs.python == 'true' || needs.detect-changes.outputs.typescript == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
