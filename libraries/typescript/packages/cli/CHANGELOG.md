@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.18.0-canary.2
+
+### Minor Changes
+
+- c5d5a75: feat(deploy): add --root-dir option for monorepo support
+
+### Patch Changes
+
+- mcp-use@1.21.1-canary.2
+- @mcp-use/inspector@0.24.1-canary.2
+
 ## 2.17.1-canary.1
 
 ### Patch Changes
