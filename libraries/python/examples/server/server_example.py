@@ -23,7 +23,7 @@ Then open http://localhost:8000/inspector to browse tools, resources, and prompt
 from datetime import datetime
 from typing import Annotated, Literal
 
-from mcp.types import ToolAnnotations
+from mcp.types import Icon, ToolAnnotations
 from pydantic import Field
 
 from mcp_use import MCPServer
@@ -34,6 +34,7 @@ server = MCPServer(
     instructions="An example server showcasing tool parameter patterns.",
     debug=True,
     pretty_print_jsonrpc=True,
+    icons=[Icon(src="https://cdn.mcp-use.com/mcpuse_logo_circle_light.svg", mime_type="image/png")],
 )
 
 
@@ -45,6 +46,7 @@ server = MCPServer(
     name="create_event",
     description="Create a calendar event. Shows required, optional, and nullable parameter patterns.",
     annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False),
+    icons=[Icon(src="https://cdn.mcp-use.com/mcpuse_logo_circle_light.svg", mime_type="image/png")],
 )
 async def create_event(
     # Required — no default, will be in the "required" array
