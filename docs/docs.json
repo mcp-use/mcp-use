@@ -421,6 +421,7 @@
                     "icon": "tool",
                     "pages": [
                       "python/api-reference/mcp_use_server_utils_inspector",
+                      "python/api-reference/mcp_use_server_utils_json_schema",
                       "python/api-reference/mcp_use_server_utils_openmcp",
                       "python/api-reference/mcp_use_server_utils_routes",
                       "python/api-reference/mcp_use_server_utils_utils"
