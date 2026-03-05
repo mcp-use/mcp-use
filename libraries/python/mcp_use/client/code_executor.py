@@ -17,6 +17,7 @@ from mcp_use.logging import logger
 
 if TYPE_CHECKING:
     from mcp_use.client.client import MCPClient
+    from mcp_use.client.code_mode_config import CodeModeConfig
 
 
 class CodeExecutor:
@@ -26,14 +27,32 @@ class CodeExecutor:
     can call MCP tools through dynamically generated wrapper functions.
     """
 
-    def __init__(self, client: "MCPClient"):
+    def __init__(self, client: "MCPClient", code_mode_config: "CodeModeConfig | None" = None):
         """Initialize the code executor.
 
         Args:
             client: The MCPClient instance to use for tool calls.
+            code_mode_config: Optional CodeModeConfig for semantic pre-filtering.
         """
         self.client = client
+        self.code_mode_config = code_mode_config
         self._tool_cache: dict[str, dict[str, Any]] = {}
+        self._semantic_prefilter = None
+
+        # Initialize semantic pre-filter if enabled
+        if code_mode_config and code_mode_config.semantic_prefilter and code_mode_config.semantic_prefilter.enabled:
+            from mcp_use.client.semantic_prefilter import SemanticPreFilter
+
+            prefilter_config = code_mode_config.semantic_prefilter
+            self._semantic_prefilter = SemanticPreFilter(
+                embeddings_url=prefilter_config.embeddings_url,
+                reranker_url=prefilter_config.reranker_url,
+                embeddings_api_key=prefilter_config.embeddings_api_key,
+                reranker_api_key=prefilter_config.reranker_api_key,
+                top_k_initial=prefilter_config.top_k_initial,
+                top_k_final=prefilter_config.top_k_final,
+                enum_reduction_threshold=prefilter_config.enum_reduction_threshold,
+            )
 
     async def execute(self, code: str, timeout: float = 30.0) -> dict[str, Any]:
         """Execute Python code with access to MCP tools.
@@ -187,11 +206,88 @@ class CodeExecutor:
 
         logger.debug(f"Building execution namespace from sessions: {list(self.client.sessions.keys())}")
 
+        # Collect all tools first for pre-filtering if enabled
+        all_tools_by_server: dict[str, list[Any]] = {}
+
         for server_name, session in self.client.sessions.items():
             # Get tools for this server
             try:
                 tools = await session.list_tools()
+                if tools:
+                    all_tools_by_server[server_name] = tools
+            except Exception as e:
+                logger.error(f"Failed to load tools for server {server_name}: {e}")
 
+        # Apply semantic pre-filtering if enabled.
+        # Reranking is applied per MCP server so each server keeps its own top-k tools,
+        # avoiding aggressive global top-k that could discard an entire server's context.
+        if (
+            self._semantic_prefilter
+            and self.code_mode_config
+            and self.code_mode_config.semantic_prefilter
+            and all_tools_by_server
+        ):
+            prefilter_config = self.code_mode_config.semantic_prefilter
+            query = prefilter_config.query
+
+            if query:
+                # Per-server semantic filtering: each server gets its own top_k_final tools.
+                total_before = sum(len(t) for t in all_tools_by_server.values())
+                new_all_tools_by_server: dict[str, list[Any]] = {}
+                for server_name, tools in all_tools_by_server.items():
+                    if len(tools) > prefilter_config.top_k_final:
+                        logger.info(f"Pre-filtering {len(tools)} tools for server '{server_name}' (query: {query})")
+                        filtered_tools, _ = await self._semantic_prefilter.filter_tools(
+                            tools,
+                            query=query,
+                            use_reranking=prefilter_config.use_reranking,
+                        )
+                        new_all_tools_by_server[server_name] = filtered_tools
+                    else:
+                        # Few tools: still filter enum parameters only
+                        filtered_tools, _ = await self._semantic_prefilter.filter_tools(
+                            tools,
+                            query=None,
+                            use_reranking=False,
+                        )
+                        new_all_tools_by_server[server_name] = filtered_tools
+                all_tools_by_server = new_all_tools_by_server
+                total_after = sum(len(t) for t in all_tools_by_server.values())
+                logger.info(
+                    f"Per-server pre-filter: {total_before} tools -> {total_after} tools "
+                    f"across {len(all_tools_by_server)} server(s)"
+                )
+            else:
+                # No query: filter enum parameters only, keep all tools.
+                logger.debug(
+                    "No query provided for semantic pre-filtering. "
+                    "Filtering enum parameters only, keeping all tools available."
+                )
+                all_tools_flat: list[tuple[str, Any]] = []
+                for sname, tlist in all_tools_by_server.items():
+                    for tool in tlist:
+                        all_tools_flat.append((sname, tool))
+                tools_list = [tool for _, tool in all_tools_flat]
+                filtered_tools, _ = await self._semantic_prefilter.filter_tools(
+                    tools_list,
+                    query=None,
+                    use_reranking=False,
+                )
+                if len(filtered_tools) != len(all_tools_flat):
+                    logger.warning(
+                        f"Enum filtering returned {len(filtered_tools)} tools but expected {len(all_tools_flat)}. "
+                        "Some tools may be missing."
+                    )
+                n = min(len(all_tools_flat), len(filtered_tools))
+                all_tools_by_server = {}
+                for (server_name, _), filtered_tool in zip(all_tools_flat[:n], filtered_tools[:n], strict=True):
+                    if server_name not in all_tools_by_server:
+                        all_tools_by_server[server_name] = []
+                    all_tools_by_server[server_name].append(filtered_tool)
+
+        # Create namespaces from (potentially filtered) tools
+        for server_name, tools in all_tools_by_server.items():
+            try:
                 # Skip if no tools found
                 if not tools:
                     continue
@@ -217,7 +313,7 @@ class CodeExecutor:
                 logger.debug(f"Added namespace '{server_name}' with {len(tools)} tools")
 
             except Exception as e:
-                logger.error(f"Failed to load tools for server {server_name}: {e}")
+                logger.error(f"Failed to process tools for server {server_name}: {e}")
 
         # Add all server namespaces to the execution namespace
         namespace.update(tool_namespaces)
@@ -331,13 +427,79 @@ class CodeExecutor:
             # Filter by query if provided
             filtered_tools = all_tools
             if query:
-                filtered_tools = []
-                for tool_info in all_tools:
-                    tool_name_match = query_lower in tool_info["name"].lower()
-                    desc_match = query_lower in tool_info.get("description", "").lower()
-                    server_match = query_lower in tool_info["server"].lower()
-                    if tool_name_match or desc_match or server_match:
-                        filtered_tools.append(tool_info)
+                # Use semantic pre-filtering if enabled, otherwise use string matching
+                if (
+                    self._semantic_prefilter
+                    and self.code_mode_config
+                    and self.code_mode_config.semantic_prefilter
+                    and len(all_tools) > self.code_mode_config.semantic_prefilter.top_k_final
+                ):
+                    prefilter_config = self.code_mode_config.semantic_prefilter
+                    # Convert tool info back to tool objects for filtering
+                    # Optimize by building server->tools mapping once per server
+                    tool_objects = []
+                    tool_info_to_tool = {}
+                    server_tools_cache: dict[str, list[Any]] = {}
+
+                    for tool_info in all_tools:
+                        # Find the original tool object
+                        server_name = tool_info["server"]
+                        tool_name = tool_info["name"]
+
+                        try:
+                            # Cache tools per server to avoid repeated list_tools calls
+                            if server_name not in server_tools_cache:
+                                session = self.client.get_session(server_name)
+                                server_tools_cache[server_name] = await session.list_tools()
+
+                            tools = server_tools_cache[server_name]
+                            # Use dict lookup for faster tool finding (if tools support it)
+                            # Otherwise fall back to linear search
+                            tool_found = None
+                            for tool in tools:
+                                if tool.name == tool_name:
+                                    tool_found = tool
+                                    break
+
+                            if tool_found:
+                                tool_objects.append(tool_found)
+                                tool_info_to_tool[id(tool_found)] = tool_info
+                        except Exception as e:
+                            logger.debug(f"Failed to find tool '{tool_name}' in server '{server_name}': {e}")
+                            continue
+
+                    if tool_objects:
+                        filtered_tool_objects, filtered_indices = await self._semantic_prefilter.filter_tools(
+                            tool_objects,
+                            query=query,
+                            use_reranking=prefilter_config.use_reranking,
+                        )
+                        # Map filtered tools back to tool_info using indices
+                        filtered_tools = []
+                        for idx in filtered_indices:
+                            if idx < len(tool_objects):
+                                original_tool = tool_objects[idx]
+                                original_tool_id = id(original_tool)
+                                if original_tool_id in tool_info_to_tool:
+                                    filtered_tools.append(tool_info_to_tool[original_tool_id])
+                    else:
+                        # Fallback to string matching
+                        filtered_tools = []
+                        for tool_info in all_tools:
+                            tool_name_match = query_lower in tool_info["name"].lower()
+                            desc_match = query_lower in tool_info.get("description", "").lower()
+                            server_match = query_lower in tool_info["server"].lower()
+                            if tool_name_match or desc_match or server_match:
+                                filtered_tools.append(tool_info)
+                else:
+                    # Use string matching
+                    filtered_tools = []
+                    for tool_info in all_tools:
+                        tool_name_match = query_lower in tool_info["name"].lower()
+                        desc_match = query_lower in tool_info.get("description", "").lower()
+                        server_match = query_lower in tool_info["server"].lower()
+                        if tool_name_match or desc_match or server_match:
+                            filtered_tools.append(tool_info)
 
             # Return metadata along with results
             return {
