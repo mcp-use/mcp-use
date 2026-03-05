@@ -1,5 +1,5 @@
 """
-Unit tests for MCPServer host/port configuration and debug mode.
+Unit tests for MCPServer configuration.
 
 These tests verify that:
 1. Default host/port values are cloud-friendly (0.0.0.0:8000)
@@ -7,11 +7,13 @@ These tests verify that:
 3. run() can override host/port from __init__
 4. Settings are correctly passed to FastMCP
 5. Debug routes are registered correctly
+6. Icons parameter is passed through to FastMCP
 """
 
 from unittest.mock import patch
 
 import pytest
+from mcp.types import Icon
 
 from mcp_use.server import MCPServer
 
@@ -125,3 +127,26 @@ class TestDebugRoutes:
         assert "/inspector" in paths
         assert "/openmcp.json" in paths
         assert server.debug_level == 1
+
+
+class TestServerIcons:
+    """Test that the icons parameter propagates to FastMCP."""
+
+    def test_no_icons_by_default(self):
+        server = MCPServer(name="test-server")
+        assert server._mcp_server.icons is None
+
+    def test_icons_passed_through(self):
+        icons = [Icon(src="https://example.com/icon.png", mimeType="image/png")]
+        server = MCPServer(name="test-server", icons=icons)
+        assert server._mcp_server.icons == icons
+
+    def test_multiple_icons(self):
+        icons = [
+            Icon(src="https://example.com/light.svg", mimeType="image/svg+xml"),
+            Icon(src="https://example.com/dark.png", mimeType="image/png"),
+        ]
+        server = MCPServer(name="test-server", icons=icons)
+        assert len(server._mcp_server.icons) == 2
+        assert server._mcp_server.icons[0].src == "https://example.com/light.svg"
+        assert server._mcp_server.icons[1].src == "https://example.com/dark.png"
