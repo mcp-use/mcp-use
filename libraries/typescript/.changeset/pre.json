@@ -8,6 +8,7 @@
     "mcp-use": "1.21.0"
   },
   "changesets": [
+    "build-includes-type-generation",
     "chubby-bees-rule",
     "fix-inspector-dark-mode-buttons",
     "funky-windows-lose",
