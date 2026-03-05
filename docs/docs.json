@@ -421,6 +421,7 @@
                     "icon": "tool",
                     "pages": [
                       "python/api-reference/mcp_use_server_utils_inspector",
+                      "python/api-reference/mcp_use_server_utils_json_schema",
                       "python/api-reference/mcp_use_server_utils_openmcp",
                       "python/api-reference/mcp_use_server_utils_routes",
                       "python/api-reference/mcp_use_server_utils_utils"
@@ -743,7 +744,7 @@
       {
         "label": "",
         "icon": "x-twitter",
-        "href": "https://x.com/mcpuse"
+        "href": "https://x.com/manufact"
       }
     ],
     "primary": {
@@ -754,7 +755,7 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mcp_use",
+      "x": "https://x.com/manufact",
       "linkedin": "https://www.linkedin.com/company/mcp-use",
       "github": "https://github.com/mcp-use",
       "discord": "https://discord.gg/XkNkSkMz3V"
