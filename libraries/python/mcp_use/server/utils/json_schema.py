@@ -48,7 +48,13 @@ def _is_nullable_any_of(any_of: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _simplify_property(prop: dict[str, Any]) -> dict[str, Any]:
-    """Simplify a single property schema in place."""
+    """Return a simplified version of a single property schema.
+
+    If *prop* contains a nullable ``anyOf`` of the form ``[<type>, null]``,
+    returns a new dict based on the non-null branch with metadata preserved
+    from the outer property.  For all other schemas the original *prop* dict
+    is returned unchanged.  The input is never mutated.
+    """
     any_of = prop.get("anyOf")
     if any_of is None:
         return prop
@@ -69,7 +75,11 @@ def _simplify_property(prop: dict[str, Any]) -> dict[str, Any]:
 
 
 def simplify_optional_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    """Return a copy of *schema* with nullable ``anyOf`` patterns simplified.
+    """Return *schema* with nullable ``anyOf`` patterns simplified.
+
+    Returns a deep copy when properties need simplification.  When the schema
+    has no ``properties`` key (or it is empty), the original dict is returned
+    as-is since there is nothing to transform.
 
     Only touches ``properties`` of the top-level object schema — nested
     ``$defs`` and deeply nested objects are left as-is since MCP tool schemas
