@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.21.1-canary.5
+
+### Patch Changes
+
+- fb91a61: fix(stream-manager): remove console warn for session disconnetion in dev mode to avoid noise caused by hmr
+  - @mcp-use/cli@2.18.0-canary.5
+  - @mcp-use/inspector@0.24.1-canary.5
+
 ## 1.21.1-canary.4
 
 ### Patch Changes
