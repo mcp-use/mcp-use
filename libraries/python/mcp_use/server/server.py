@@ -79,6 +79,7 @@ class MCPServer(FastMCP):
         openmcp_path: str = "/openmcp.json",
         show_inspector_logs: bool = False,
         pretty_print_jsonrpc: bool = False,
+        mcp_logs_only: bool = False,
         host: str = "0.0.0.0",
         port: int = 8000,
         dns_rebinding_protection: bool = False,
@@ -98,6 +99,7 @@ class MCPServer(FastMCP):
             openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
             show_inspector_logs: Show inspector-related logs
             pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
+            mcp_logs_only: Only show MCP protocol logs, suppress HTTP access logs (default: False)
             host: Default host for server binding (default: "0.0.0.0"). Can be overridden in run().
             port: Default port for server binding (default: 8000). Can be overridden in run().
             dns_rebinding_protection: Enable DNS rebinding protection by validating Host/Origin
@@ -143,6 +145,7 @@ class MCPServer(FastMCP):
         self.openmcp_path = openmcp_path
         self.show_inspector_logs = show_inspector_logs
         self.pretty_print_jsonrpc = pretty_print_jsonrpc
+        self.mcp_logs_only = mcp_logs_only
         self._transport_type: TransportType = "streamable-http"
 
         self.middleware_manager = MiddlewareManager()

@@ -83,10 +83,13 @@ class MCPAccessFormatter(AccessFormatter):
     Enhanced Uvicorn access formatter that shows MCP method information.
 
     For MCP requests, enhances the log with JSON-RPC method info from thread-local storage.
+    When mcp_logs_only is True, suppresses all uvicorn access logs since the
+    MCPLoggingMiddleware already prints enriched MCP: lines directly to stdout.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, mcp_logs_only: bool = False, **kwargs):
         super().__init__()
+        self.mcp_logs_only = mcp_logs_only
 
     def formatMessage(self, record):
         args = record.args
@@ -99,6 +102,11 @@ class MCPAccessFormatter(AccessFormatter):
         access_args = UvicornAccessArgs.from_record_args(args)
         if access_args is None:
             return record.getMessage()
+
+        # When mcp_logs_only is set, suppress all uvicorn access logs.
+        # MCP protocol logs are already printed by MCPLoggingMiddleware directly to stdout.
+        if self.mcp_logs_only:
+            return ""
 
         # Pad HTTP method for visual alignment (GET, POST, PUT, etc.)
         padded_method = f"{access_args.method:<4}"

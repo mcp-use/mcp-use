@@ -46,6 +46,7 @@ class ServerRunner:
                 debug_level=self.server.debug_level,
                 show_inspector_logs=self.server.show_inspector_logs,
                 inspector_path=self.server.inspector_path or "/inspector",
+                mcp_logs_only=self.server.mcp_logs_only,
             ),
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )

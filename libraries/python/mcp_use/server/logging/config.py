@@ -23,7 +23,11 @@ class InspectorLogFilter(logging.Filter):
 
 
 def setup_logging(
-    debug_level: int = 0, log_level: str = "INFO", show_inspector_logs: bool = False, inspector_path: str = "/inspector"
+    debug_level: int = 0,
+    log_level: str = "INFO",
+    show_inspector_logs: bool = False,
+    inspector_path: str = "/inspector",
+    mcp_logs_only: bool = False,
 ) -> dict:
     """Set up logging configuration for MCP server.
 
@@ -32,6 +36,8 @@ def setup_logging(
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
         show_inspector_logs: Whether to show inspector-related access logs (default: False)
         inspector_path: Path prefix for inspector routes
+        mcp_logs_only: When True, suppress all uvicorn access logs (MCP logs are printed
+            directly by the middleware). Default: False.
 
     Returns:
         Uvicorn logging configuration dict
@@ -86,6 +92,7 @@ def setup_logging(
         "formatters": {
             "access": {
                 "()": MCPAccessFormatter,
+                "mcp_logs_only": mcp_logs_only,
             },
             "error": {
                 "()": MCPErrorFormatter,
