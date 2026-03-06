@@ -38,7 +38,9 @@ def get_available_templates() -> list[str]:
 def validate_project_name(name: str) -> str:
     """Check if the inserted name is a valid project name."""
     if not re.match(r"^[a-zA-Z0-9_-]+$", name):
-        console.print(f"[red]Error:[/red] Invalid project name '{name}'. Use only letters, numbers, hyphens, underscores.")
+        console.print(
+            f"[red]Error:[/red] Invalid project name '{name}'. Use only letters, numbers, hyphens, underscores."
+        )
         sys.exit(1)
     if name in {"src", "dist", ".git", ".env", "node_modules"}:
         console.print(f"[red]Error:[/red] '{name}' is a reserved name.")
@@ -166,7 +168,10 @@ def main():
     }
 
     console.print(LOGO)
-    console.print(f"  Creating MCP server [bold cyan]{project_name}[/bold cyan] with template [bold]{args.template}[/bold]...\n")
+    console.print(
+        f"  Creating MCP server [bold cyan]{project_name}[/bold cyan] "
+        f"with template [bold]{args.template}[/bold]...\n"
+    )
     copy_template(template_dir, target_dir, context)
     console.print(f"  [green]✓[/green] Project created at [bold]./{project_name}/[/bold]")
 
@@ -208,4 +213,4 @@ def main():
 
     console.print()
     console.print(Panel(steps, title="[bold]Get started[/bold]", border_style="cyan", padding=(1, 2)))
-    console.print(f"  Docs: [link=https://mcp-use.com/docs/python/server]https://mcp-use.com/docs/python/server[/link]\n")
+    console.print("  Docs: [link=https://mcp-use.com/docs/python/server]https://mcp-use.com/docs/python/server[/link]\n")
