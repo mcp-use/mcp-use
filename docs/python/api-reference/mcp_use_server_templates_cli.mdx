@@ -18,7 +18,7 @@ CLI tool to scaffold a new MCP server project using mcp-use.
 <Card type="info">
 ### `function` copy_template
 
-Cope the template to the target folder after replacing placeholders
+Copy the template to the target folder after replacing placeholders.
 
 ```python
 from mcp_use.server.templates.cli import copy_template
@@ -32,6 +32,27 @@ from mcp_use.server.templates.cli import copy_template
 **Signature**
 ```python wrap
 def copy_template(template_dir: pathlib.Path, target_dir: pathlib.Path, context: dict[str, str]):
+```
+
+</Card>
+
+
+## detect_installer
+<Card type="info">
+### `function` detect_installer
+
+Detect the best available package installer. Returns (name, install_command).
+
+```python
+from mcp_use.server.templates.cli import detect_installer
+```
+
+**Returns**
+><ResponseField name="returns" type="tuple[str, list[str]]" />
+
+**Signature**
+```python wrap
+def detect_installer():
 ```
 
 </Card>
@@ -53,6 +74,30 @@ from mcp_use.server.templates.cli import get_available_templates
 **Signature**
 ```python wrap
 def get_available_templates():
+```
+
+</Card>
+
+
+## install_dependencies
+<Card type="info">
+### `function` install_dependencies
+
+Prompt user to install dependencies and run the installer. Returns True if installed.
+
+```python
+from mcp_use.server.templates.cli import install_dependencies
+```
+
+**Parameters**
+><ParamField body="target_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def install_dependencies(target_dir: pathlib.Path):
 ```
 
 </Card>
@@ -94,6 +139,32 @@ from mcp_use.server.templates.cli import render_template
 **Signature**
 ```python wrap
 def render_template(content: str, context: dict[str, str]):
+```
+
+</Card>
+
+
+## run_install
+<Card type="info">
+### `function` run_install
+
+Run the installer, capturing output. Returns True on success.
+
+```python
+from mcp_use.server.templates.cli import run_install
+```
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="cmd" type="list[str]" required="True" >   List of items </ParamField>
+><ParamField body="target_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def run_install(name: str, cmd: list[str], target_dir: pathlib.Path):
 ```
 
 </Card>
