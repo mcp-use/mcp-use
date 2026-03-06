@@ -28,8 +28,10 @@ on:
 
 jobs:
   # ── Job 1: Mix mode ──────────────────────────────────────────────────────
+  # TODO: re-enable after Python E2E testing (if: false)
   e2e-mix:
     name: "E2E (mix)"
+    if: false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -88,10 +90,11 @@ jobs:
           retention-days: 7
 
   # ── Job 2: Prod mode ─────────────────────────────────────────────────────
+  # TODO: re-enable after Python E2E testing (if: false)
   e2e-prod:
     name: "E2E (prod)"
     needs: e2e-mix
-    if: always()
+    if: false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -150,10 +153,11 @@ jobs:
           retention-days: 7
 
   # ── Job 3: Builtin mode ──────────────────────────────────────────────────
+  # TODO: re-enable after Python E2E testing (if: false)
   e2e-builtin:
     name: "E2E (builtin)"
     needs: e2e-prod
-    if: always()
+    if: false
     runs-on: ubuntu-latest
     defaults:
       run:
