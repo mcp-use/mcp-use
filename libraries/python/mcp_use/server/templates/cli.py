@@ -169,8 +169,7 @@ def main():
 
     console.print(LOGO)
     console.print(
-        f"  Creating MCP server [bold cyan]{project_name}[/bold cyan] "
-        f"with template [bold]{args.template}[/bold]...\n"
+        f"  Creating MCP server [bold cyan]{project_name}[/bold cyan] with template [bold]{args.template}[/bold]...\n"
     )
     copy_template(template_dir, target_dir, context)
     console.print(f"  [green]✓[/green] Project created at [bold]./{project_name}/[/bold]")
@@ -194,13 +193,15 @@ def main():
         from mcp_use.telemetry.events import CreateMCPUseEvent
 
         telemetry = Telemetry()
-        telemetry.capture(CreateMCPUseEvent(
-            project_name=project_name,
-            template=args.template,
-            install_deps=not args.no_install,
-            deps_installed=installed,
-            installer=installer_name,
-        ))
+        telemetry.capture(
+            CreateMCPUseEvent(
+                project_name=project_name,
+                template=args.template,
+                install_deps=not args.no_install,
+                deps_installed=installed,
+                installer=installer_name,
+            )
+        )
         telemetry.flush()
     except Exception:
         pass
@@ -213,4 +214,6 @@ def main():
 
     console.print()
     console.print(Panel(steps, title="[bold]Get started[/bold]", border_style="cyan", padding=(1, 2)))
-    console.print("  Docs: [link=https://mcp-use.com/docs/python/server]https://mcp-use.com/docs/python/server[/link]\n")
+    console.print(
+        "  Docs: [link=https://mcp-use.com/docs/python/server]https://mcp-use.com/docs/python/server[/link]\n"
+    )
