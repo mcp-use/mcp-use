@@ -44,16 +44,23 @@ function App() {
     [isEmbedded]
   );
 
+  // Read the proxy path injected by the inspector server (undefined when served
+  // from a Python/custom server that fetches static HTML and has no proxy).
+  const injectedProxyPath = (window as Window & { __MCP_PROXY_URL__?: string })
+    .__MCP_PROXY_URL__;
+  const proxyAddress = injectedProxyPath
+    ? `${window.location.origin}${injectedProxyPath}`
+    : undefined;
+
   return (
     <ThemeProvider forcedTheme={forcedTheme || undefined}>
       <WidgetDebugProvider>
         <McpClientProvider
           storageProvider={storageProvider}
           enableRpcLogging={true}
-          defaultAutoProxyFallback={{
-            enabled: true,
-            proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-          }}
+          defaultAutoProxyFallback={
+            proxyAddress ? { enabled: true, proxyAddress } : false
+          }
           clientInfo={{
             name: "mcp-use Inspector",
             version: (window as any).__INSPECTOR_VERSION__,

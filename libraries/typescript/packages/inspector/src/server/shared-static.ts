@@ -35,6 +35,8 @@ interface RuntimeConfig {
   devMode?: boolean;
   /** Override sandbox origin for MCP Apps widgets behind reverse proxies */
   sandboxOrigin?: string | null;
+  /** Relative path to the MCP proxy (e.g. "/inspector/api/proxy"). When set, the client uses it for autoProxyFallback. Omit when the proxy is not available (e.g. Python server serving inspector). */
+  proxyUrl?: string | null;
 }
 
 /**
@@ -53,6 +55,12 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
   if (config.sandboxOrigin) {
     scripts.push(
       `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+    );
+  }
+
+  if (config.proxyUrl !== undefined) {
+    scripts.push(
+      `<script>window.__MCP_PROXY_URL__ = ${JSON.stringify(config.proxyUrl)};</script>`
     );
   }
 
@@ -78,6 +86,11 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     if (config.sandboxOrigin) {
       scripts.push(
         `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+      );
+    }
+    if (config.proxyUrl !== undefined) {
+      scripts.push(
+        `<script>window.__MCP_PROXY_URL__ = ${JSON.stringify(config.proxyUrl)};</script>`
       );
     }
     return scripts.join("\n    ");
@@ -150,8 +163,19 @@ export function registerStaticRoutes(
   clientDistPath?: string,
   runtimeConfig?: RuntimeConfig
 ) {
+  // When the inspector's own server serves, the proxy is always available.
+  // Default proxyUrl so the client can use it; callers may override with null to disable.
+  const effectiveConfig: RuntimeConfig = {
+    ...runtimeConfig,
+    proxyUrl:
+      runtimeConfig?.proxyUrl !== undefined
+        ? runtimeConfig.proxyUrl
+        : "/inspector/api/proxy",
+  };
+
   if (USE_CDN) {
-    const serveShell = (c: any) => c.html(generateCdnShellHtml(runtimeConfig));
+    const serveShell = (c: any) =>
+      c.html(generateCdnShellHtml(effectiveConfig));
 
     app.get("/", (c) => {
       const url = new URL(c.req.url);
@@ -218,7 +242,7 @@ export function registerStaticRoutes(
     if (existsSync(indexPath)) {
       const content = injectRuntimeConfig(
         readFileSync(indexPath, "utf-8"),
-        runtimeConfig
+        effectiveConfig
       );
       return c.html(content);
     }
@@ -245,7 +269,7 @@ export function registerStaticRoutes(
     if (existsSync(indexPath)) {
       const content = injectRuntimeConfig(
         readFileSync(indexPath, "utf-8"),
-        runtimeConfig
+        effectiveConfig
       );
       return c.html(content);
     }
