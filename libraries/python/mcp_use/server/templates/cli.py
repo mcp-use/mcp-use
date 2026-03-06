@@ -2,12 +2,30 @@
 
 import argparse
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Confirm
+from rich.status import Status
+
+console = Console()
 
 TEMPLATES_DIR = Path(__file__).parent
 
 TEMPLATE_SUFFIX = ".tmpl"
+
+LOGO = r"""
+ [bold white] ███╗   ███╗   ██████╗  ██████╗         ██╗   ██╗  ███████╗  ███████╗[/bold white]
+ [bold white] ████╗ ████║  ██╔════╝  ██╔══██╗        ██║   ██║  ██╔════╝  ██╔════╝[/bold white]
+ [bold white] ██╔████╔██║  ██║       ██████╔╝  ━━━━  ██║   ██║  ███████╗  █████╗  [/bold white]
+ [bold white] ██║╚██╔╝██║  ██║       ██╔═══╝   ━━━━  ██║   ██║  ╚════██║  ██╔══╝  [/bold white]
+ [bold white] ██║ ╚═╝ ██║  ╚██████╗  ██║             ╚██████╔╝  ███████║  ███████╗[/bold white]
+ [bold white] ╚═╝     ╚═╝   ╚═════╝  ╚═╝              ╚═════╝   ╚══════╝  ╚══════╝[/bold white]
+"""
 
 
 def get_available_templates() -> list[str]:
@@ -20,10 +38,10 @@ def get_available_templates() -> list[str]:
 def validate_project_name(name: str) -> str:
     """Check if the inserted name is a valid project name."""
     if not re.match(r"^[a-zA-Z0-9_-]+$", name):
-        print(f"Error: Invalid project name '{name}'. Use only letters, numbers, hyphens, underscores.")
+        console.print(f"[red]Error:[/red] Invalid project name '{name}'. Use only letters, numbers, hyphens, underscores.")
         sys.exit(1)
     if name in {"src", "dist", ".git", ".env", "node_modules"}:
-        print(f"Error: '{name}' is a reserved name.")
+        console.print(f"[red]Error:[/red] '{name}' is a reserved name.")
         sys.exit(1)
     return name
 
@@ -36,7 +54,7 @@ def render_template(content: str, context: dict[str, str]) -> str:
 
 
 def copy_template(template_dir: Path, target_dir: Path, context: dict[str, str]) -> None:
-    """Cope the template to the target folder after replacing placeholders"""
+    """Copy the template to the target folder after replacing placeholders."""
     for src_path in template_dir.rglob("*"):
         if src_path.is_dir() or "__pycache__" in src_path.parts:
             continue
@@ -58,6 +76,46 @@ def copy_template(template_dir: Path, target_dir: Path, context: dict[str, str])
         dest_path.write_text(rendered, encoding="utf-8")
 
 
+def detect_installer() -> tuple[str, list[str]]:
+    """Detect the best available package installer. Returns (name, install_command)."""
+    if shutil.which("uv"):
+        return ("uv", ["uv", "pip", "install", "."])
+    if shutil.which("pip"):
+        return ("pip", ["pip", "install", "."])
+    return ("", [])
+
+
+def run_install(name: str, cmd: list[str], target_dir: Path) -> bool:
+    """Run the installer, capturing output. Returns True on success."""
+    with Status(f"  Installing dependencies with [bold]{name}[/bold]...", console=console):
+        result = subprocess.run(cmd, cwd=target_dir, capture_output=True, text=True)
+    if result.returncode == 0:
+        console.print("  [green]✓[/green] Dependencies installed.")
+        return True
+    else:
+        console.print("  [red]✗[/red] Installation failed.")
+        if result.stderr:
+            console.print(f"\n{result.stderr.strip()}")
+        console.print(f"\n  Run manually:\n    cd {target_dir.name}\n    {' '.join(cmd)}")
+        return False
+
+
+def install_dependencies(target_dir: Path) -> bool:
+    """Prompt user to install dependencies and run the installer. Returns True if installed."""
+    name, cmd = detect_installer()
+    if not name:
+        console.print("[yellow]No package installer found (uv or pip).[/yellow]")
+        console.print(f"  Install dependencies manually:\n    cd {target_dir.name}\n    pip install .")
+        return False
+
+    try:
+        if Confirm.ask(f"\n  Install dependencies with [bold]{name}[/bold]?", default=True, console=console):
+            return run_install(name, cmd, target_dir)
+    except (EOFError, KeyboardInterrupt):
+        console.print()
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="create-mcp-use", description="Scaffold a new MCP server project using mcp-use"
@@ -73,6 +131,8 @@ def main():
         help="Template to use (default: starter)",
     )
     parser.add_argument("--list-templates", action="store_true", help="List available templates")
+    parser.add_argument("--install", action="store_true", default=None, help="Install dependencies automatically")
+    parser.add_argument("--no-install", action="store_true", help="Skip installing dependencies")
 
     args = parser.parse_args()
 
@@ -80,21 +140,21 @@ def main():
         parser.error("project_name is required")
 
     if args.list_templates:
-        print("Available templates:")
+        console.print("\n[bold]Available templates:[/bold]")
         for t in get_available_templates():
-            print(f"  {t}")
+            console.print(f"  • {t}")
         sys.exit(0)
 
     project_name = validate_project_name(args.project_name)
     target_dir = Path.cwd() / project_name
 
     if target_dir.exists():
-        print(f"Error: Directory '{project_name}' already exists.")
+        console.print(f"[red]Error:[/red] Directory '{project_name}' already exists.")
         sys.exit(1)
 
     template_dir = TEMPLATES_DIR / args.template
     if not template_dir.exists():
-        print(f"Error: Template '{args.template}' not found.")
+        console.print(f"[red]Error:[/red] Template '{args.template}' not found.")
         sys.exit(1)
 
     # Derive a Python safe module name for use in imports
@@ -105,14 +165,47 @@ def main():
         "MODULE_NAME": module_name,
     }
 
-    print(f"Creating MCP server '{project_name}' with template '{args.template}'...")
+    console.print(LOGO)
+    console.print(f"  Creating MCP server [bold cyan]{project_name}[/bold cyan] with template [bold]{args.template}[/bold]...\n")
     copy_template(template_dir, target_dir, context)
+    console.print(f"  [green]✓[/green] Project created at [bold]./{project_name}/[/bold]")
 
-    print()
-    print(f"  Project created at ./{project_name}/")
-    print()
-    print("  To get started:")
-    print(f"    cd {project_name}")
-    print("     python server.py")
-    print()
-    print("  Docs: https://mcp-use.com/docs/python/server")
+    # Handle dependency installation
+    installed = False
+    installer_name = None
+    if args.no_install:
+        pass
+    elif args.install:
+        installer_name, cmd = detect_installer()
+        if installer_name:
+            installed = run_install(installer_name, cmd, target_dir)
+    else:
+        installer_name, _ = detect_installer()
+        installed = install_dependencies(target_dir)
+
+    # Track CLI usage
+    try:
+        from mcp_use.telemetry import Telemetry
+        from mcp_use.telemetry.events import CreateMCPUseEvent
+
+        telemetry = Telemetry()
+        telemetry.capture(CreateMCPUseEvent(
+            project_name=project_name,
+            template=args.template,
+            install_deps=not args.no_install,
+            deps_installed=installed,
+            installer=installer_name,
+        ))
+        telemetry.flush()
+    except Exception:
+        pass
+
+    # Build the "get started" instructions
+    steps = f"cd {project_name}\n"
+    if not installed:
+        steps += "pip install .\n"
+    steps += "python server.py"
+
+    console.print()
+    console.print(Panel(steps, title="[bold]Get started[/bold]", border_style="cyan", padding=(1, 2)))
+    console.print(f"  Docs: [link=https://mcp-use.com/docs/python/server]https://mcp-use.com/docs/python/server[/link]\n")

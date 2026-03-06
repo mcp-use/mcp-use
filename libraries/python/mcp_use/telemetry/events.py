@@ -183,6 +183,19 @@ class AdapterUsageEvent(BaseEvent):
     framework: str  # "openai", "anthropic", "google", "unknown"
 
 
+@dataclass
+class CreateMCPUseEvent(BaseEvent):
+    """Event for tracking create-mcp-use CLI usage"""
+
+    EVENT_NAME: str = field(default="create_mcp_use", init=False)
+
+    project_name: str
+    template: str
+    install_deps: bool
+    deps_installed: bool
+    installer: str | None = None
+
+
 # Supporting dataclasses for telemetry - simplified versions of MCP types
 
 
@@ -250,6 +263,7 @@ TelemetryEvent = (
     | MCPClientInitEvent
     | ConnectorInitEvent
     | AdapterUsageEvent
+    | CreateMCPUseEvent
 )
 
 # Export all event classes
@@ -266,6 +280,7 @@ __all__ = [
     "MCPClientInitEvent",
     "ConnectorInitEvent",
     "AdapterUsageEvent",
+    "CreateMCPUseEvent",
     "TelemetryTool",
     "TelemetryResource",
     "TelemetryPrompt",
