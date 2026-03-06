@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [bdeaadb]
+  - mcp-use@1.21.1-canary.4
+
 ## 0.24.1-canary.3
 
 ### Patch Changes
