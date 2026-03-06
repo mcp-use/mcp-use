@@ -1,14 +1,19 @@
 """
-Unit tests for MCPServer host/port configuration.
+Unit tests for MCPServer configuration.
 
 These tests verify that:
 1. Default host/port values are cloud-friendly (0.0.0.0:8000)
 2. Custom host/port can be set at initialization
 3. run() can override host/port from __init__
 4. Settings are correctly passed to FastMCP
+5. Debug routes are registered correctly
+6. Icons parameter is passed through to FastMCP
 """
 
+from unittest.mock import patch
+
 import pytest
+from mcp.types import Icon
 
 from mcp_use.server import MCPServer
 
@@ -81,3 +86,67 @@ class TestRunHostOverride:
             server.settings.transport_security is None
             or server.settings.transport_security.enable_dns_rebinding_protection is False
         )
+
+
+class TestDebugRoutes:
+    """Test that debug routes are registered correctly."""
+
+    def _get_route_paths(self, server: MCPServer) -> list[str]:
+        return [r.path for r in server._custom_starlette_routes]
+
+    def test_debug_false_no_dev_routes(self):
+        """debug=False should not register dev routes."""
+        server = MCPServer(name="test-server", debug=False)
+        paths = self._get_route_paths(server)
+        assert "/docs" not in paths
+        assert "/inspector" not in paths
+        assert "/openmcp.json" not in paths
+
+    def test_debug_true_at_init_registers_routes(self):
+        """debug=True at init should register dev routes."""
+        server = MCPServer(name="test-server", debug=True)
+        paths = self._get_route_paths(server)
+        assert "/docs" in paths
+        assert "/inspector" in paths
+        assert "/openmcp.json" in paths
+
+    def test_debug_true_at_run_registers_routes(self):
+        """debug=True passed to run() should register dev routes even if init had debug=False.
+
+        Regression test for https://github.com/mcp-use/mcp-use/issues/1099
+        """
+        server = MCPServer(name="test-server", debug=False)
+        assert "/docs" not in self._get_route_paths(server)
+
+        # Patch ServerRunner.run to prevent actually starting the server
+        with patch("mcp_use.server.server.ServerRunner.run"):
+            server.run(debug=True)
+
+        paths = self._get_route_paths(server)
+        assert "/docs" in paths
+        assert "/inspector" in paths
+        assert "/openmcp.json" in paths
+        assert server.debug_level == 1
+
+
+class TestServerIcons:
+    """Test that the icons parameter propagates to FastMCP."""
+
+    def test_no_icons_by_default(self):
+        server = MCPServer(name="test-server")
+        assert server._mcp_server.icons is None
+
+    def test_icons_passed_through(self):
+        icons = [Icon(src="https://example.com/icon.png", mimeType="image/png")]
+        server = MCPServer(name="test-server", icons=icons)
+        assert server._mcp_server.icons == icons
+
+    def test_multiple_icons(self):
+        icons = [
+            Icon(src="https://example.com/light.svg", mimeType="image/svg+xml"),
+            Icon(src="https://example.com/dark.png", mimeType="image/png"),
+        ]
+        server = MCPServer(name="test-server", icons=icons)
+        assert len(server._mcp_server.icons) == 2
+        assert server._mcp_server.icons[0].src == "https://example.com/light.svg"
+        assert server._mcp_server.icons[1].src == "https://example.com/dark.png"

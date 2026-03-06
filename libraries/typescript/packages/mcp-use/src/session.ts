@@ -1,5 +1,7 @@
 import type {
   CallToolResult,
+  CompleteRequestParams,
+  CompleteResult,
   Notification,
   Root,
   Tool,
@@ -358,6 +360,30 @@ export class MCPSession {
    */
   async listResourceTemplates(options?: RequestOptions) {
     return this.connector.listResourceTemplates(options);
+  }
+
+  /**
+   * Request completion suggestions for a prompt or resource template argument.
+   *
+   * @param params - Completion request parameters
+   * @param options - Request options
+   * @returns Completion suggestions from the server
+   *
+   * @example
+   * ```typescript
+   * // Complete a prompt argument
+   * const result = await session.complete({
+   *   ref: { type: "ref/prompt", name: "my-prompt" },
+   *   argument: { name: "language", value: "py" }
+   * });
+   * console.log(result.completion.values); // ["python"]
+   * ```
+   */
+  async complete(
+    params: CompleteRequestParams,
+    options?: RequestOptions
+  ): Promise<CompleteResult> {
+    return this.connector.complete(params, options);
   }
 
   /**

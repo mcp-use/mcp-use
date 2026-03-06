@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MessageContentBlock } from "mcp-use/react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
@@ -34,7 +35,7 @@ interface ToolResultRendererProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
-  onSendFollowUp?: (text: string) => void;
+  onSendFollowUp?: (content: MessageContentBlock[]) => void;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
   /** Partial/streaming tool arguments (forwarded to widget as partialToolInput) */

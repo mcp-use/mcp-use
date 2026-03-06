@@ -1,5 +1,308 @@
 # mcp-use
 
+## 1.21.0
+
+### Minor Changes
+
+- 405fac7: Add client-side completion support for prompt arguments and resource template URIs
+
+  This adds the ability for clients to request autocomplete suggestions from MCP servers:
+  - New `complete()` method in BaseConnector, MCPSession, and useMcp hook
+  - Support for both prompt argument completion and resource template URI completion
+  - Fix `resourceTemplates` state population in useMcp (was never populated)
+  - New `refreshResourceTemplates()` method in useMcp hook
+  - Comprehensive documentation in docs/typescript/client/completion.mdx
+  - Integration and unit tests for completion functionality
+
+  The completion feature allows servers to provide static lists or dynamic callbacks for suggesting values based on partial user input, improving the autocomplete experience in client applications.
+
+- 405fac7: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- 405fac7: feat(server): improve mcp server landing page
+- 405fac7: feat(widgets): allow sendFollowUp to accept multiple mime types and not just text
+- 405fac7: feat(auth): enhance OAuth flow and CORS handling
+- 405fac7: Added robust SDK-level server composition and proxying functionality via `MCPServer.proxy()`.
+
+  You can now natively compose multiple disparate MCP servers into a single unified aggregator server. The SDK automatically orchestrates connections, proxies JSON-RPC execution (including tools, prompts, resources, LLM Sampling, Elicitation, and Progress), translates schemas on the fly, prefixes namespaces to prevent collisions, and multiplexes list-changed notifications up to the parent connection.
+
+  ### Example
+
+  ```typescript
+  import { MCPServer } from "mcp-use/server";
+  const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
+
+  await server.proxy({
+    database: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://..."],
+    },
+    weather: {
+      url: "https://weather-mcp.example.com/mcp",
+    },
+  });
+
+  await server.listen(3000);
+  ```
+
+- 405fac7: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- 405fac7: Fix TypeScript type errors when passing Express middleware to server.use(). Added proper type definitions to accept both Hono and Express middleware, with Express middleware automatically detected and adapted at runtime.
+- 405fac7: feat(mcp-use): enhance reconnection and health check options
+- 405fac7: Fix unwanted GET polling when autoReconnect is disabled and spurious duplicate server warning in StrictMode
+  - When `autoReconnect: false` is set, the SDK transport's internal SSE reconnection is now also disabled (`maxRetries: 0`), preventing recurring GET requests every ~2 seconds to streamable HTTP servers.
+  - `getServer()` now checks `serverConfigs` in addition to the reactive `servers` state, so a `!getServer(id)` guard works correctly in React StrictMode double-mount scenarios. The duplicate `addServer` log has been downgraded to debug level.
+
+- 405fac7: fix(widgets): fix metadata enrichment in dev
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+  - @mcp-use/inspector@0.24.0
+  - @mcp-use/cli@2.17.0
+
+## 1.21.0-canary.14
+
+### Minor Changes
+
+- cb89d47: feat(auth): enhance OAuth flow and CORS handling
+
+### Patch Changes
+
+- Updated dependencies [cb89d47]
+  - @mcp-use/inspector@0.24.0-canary.14
+  - @mcp-use/cli@2.17.0-canary.14
+
+## 1.21.0-canary.13
+
+### Minor Changes
+
+- a903dd8: feat(server): improve mcp server landing page
+
+### Patch Changes
+
+- @mcp-use/cli@2.17.0-canary.13
+- @mcp-use/inspector@0.24.0-canary.13
+
+## 1.21.0-canary.12
+
+### Patch Changes
+
+- 2f6a6a0: fix(widgets): fix metadata enrichment in dev
+  - @mcp-use/cli@2.17.0-canary.12
+  - @mcp-use/inspector@0.24.0-canary.12
+
+## 1.21.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [71fd188]
+  - @mcp-use/inspector@0.24.0-canary.11
+  - @mcp-use/cli@2.17.0-canary.11
+
+## 1.21.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [28dc5bf]
+  - @mcp-use/cli@2.17.0-canary.10
+  - @mcp-use/inspector@0.24.0-canary.10
+
+## 1.21.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [3aa578a]
+  - @mcp-use/inspector@0.24.0-canary.9
+  - @mcp-use/cli@2.17.0-canary.9
+
+## 1.21.0-canary.8
+
+### Minor Changes
+
+- 0747144: Added robust SDK-level server composition and proxying functionality via `MCPServer.proxy()`.
+
+  You can now natively compose multiple disparate MCP servers into a single unified aggregator server. The SDK automatically orchestrates connections, proxies JSON-RPC execution (including tools, prompts, resources, LLM Sampling, Elicitation, and Progress), translates schemas on the fly, prefixes namespaces to prevent collisions, and multiplexes list-changed notifications up to the parent connection.
+
+  ### Example
+
+  ```typescript
+  import { MCPServer } from "mcp-use/server";
+  const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
+
+  await server.proxy({
+    database: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-postgres", "postgresql://..."],
+    },
+    weather: {
+      url: "https://weather-mcp.example.com/mcp",
+    },
+  });
+
+  await server.listen(3000);
+  ```
+
+### Patch Changes
+
+- @mcp-use/cli@2.17.0-canary.8
+- @mcp-use/inspector@0.24.0-canary.8
+
+## 1.21.0-canary.7
+
+### Minor Changes
+
+- 6f66801: feat(widgets): allow sendFollowUp to accept multiple mime types and not just text
+
+### Patch Changes
+
+- @mcp-use/cli@2.17.0-canary.7
+- @mcp-use/inspector@0.24.0-canary.7
+
+## 1.21.0-canary.6
+
+### Patch Changes
+
+- d9f946a: feat(mcp-use): enhance reconnection and health check options
+  - @mcp-use/cli@2.17.0-canary.6
+  - @mcp-use/inspector@0.24.0-canary.6
+
+## 1.21.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [2a8a9d1]
+  - @mcp-use/inspector@0.24.0-canary.5
+  - @mcp-use/cli@2.17.0-canary.5
+
+## 1.21.0-canary.4
+
+### Minor Changes
+
+- 22a596e: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- 22a596e: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- Updated dependencies [22a596e]
+- Updated dependencies [22a596e]
+  - @mcp-use/inspector@0.24.0-canary.4
+  - @mcp-use/cli@2.17.0-canary.4
+
+## 1.21.0-canary.3
+
+### Minor Changes
+
+- 560a0ae: Add client-side completion support for prompt arguments and resource template URIs
+
+  This adds the ability for clients to request autocomplete suggestions from MCP servers:
+  - New `complete()` method in BaseConnector, MCPSession, and useMcp hook
+  - Support for both prompt argument completion and resource template URI completion
+  - Fix `resourceTemplates` state population in useMcp (was never populated)
+  - New `refreshResourceTemplates()` method in useMcp hook
+  - Comprehensive documentation in docs/typescript/client/completion.mdx
+  - Integration and unit tests for completion functionality
+
+  The completion feature allows servers to provide static lists or dynamic callbacks for suggesting values based on partial user input, improving the autocomplete experience in client applications.
+
+### Patch Changes
+
+- @mcp-use/cli@2.16.1-canary.3
+- @mcp-use/inspector@0.23.2-canary.3
+
+## 1.20.6-canary.2
+
+### Patch Changes
+
+- Updated dependencies [869eafa]
+  - @mcp-use/cli@2.16.1-canary.2
+  - @mcp-use/inspector@0.23.2-canary.2
+
+## 1.20.6-canary.1
+
+### Patch Changes
+
+- 1c8d340: Fix TypeScript type errors when passing Express middleware to server.use(). Added proper type definitions to accept both Hono and Express middleware, with Express middleware automatically detected and adapted at runtime.
+  - @mcp-use/cli@2.16.1-canary.1
+  - @mcp-use/inspector@0.23.2-canary.1
+
+## 1.20.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [85f4bff]
+  - @mcp-use/inspector@0.23.2-canary.0
+  - @mcp-use/cli@2.16.1-canary.0
+
 ## 1.20.5
 
 ### Patch Changes
@@ -2552,13 +2855,13 @@
 
   **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
 
-  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+  **Learn more:** [LangChain Integration](https://mcp-use.com/docs/typescript/agent/llm-integration)
 
   ### WebSocket Transport Removed
 
   WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
 
-  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+  **Learn more:** [Client Configuration](https://mcp-use.com/docs/typescript/client/client-configuration)
 
   ## Features
 
@@ -2615,7 +2918,7 @@
   **Deprecated:**
   - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
 
-  **Learn more:** [Session Management](/typescript/server/session-management)
+  **Learn more:** [Session Management](https://mcp-use.com/docs/typescript/server/session-management)
 
   ### Favicon Support for Widgets
 
@@ -2633,13 +2936,13 @@
   - CLI build process includes favicon in widget HTML pages
   - Long-term caching (1 year) for favicon assets
 
-  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://mcp-use.com/docs/typescript/server/configuration)
 
   ### CLI Client Support
 
   Added dedicated CLI client support for better command-line integration and testing.
 
-  **Learn more:** [CLI Client](/typescript/client/cli)
+  **Learn more:** [CLI Client](https://mcp-use.com/docs/typescript/client/cli)
 
   ### Enhanced Session Methods
   - `callTool()` method now defaults args to an empty object
@@ -2669,7 +2972,7 @@
 
   Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
 
-  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+  **Learn more:** [useMcp Hook](https://mcp-use.com/docs/typescript/client/usemcp)
 
   ### Session & Transport Fixes
   - Fixed transport cleanup when session becomes idle

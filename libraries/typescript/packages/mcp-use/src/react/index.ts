@@ -3,7 +3,11 @@
  * Provides the useMcp hook and related types.
  */
 
-export type { UseMcpOptions, UseMcpResult } from "./types.js";
+export type {
+  UseMcpOptions,
+  UseMcpResult,
+  ReconnectionOptions,
+} from "./types.js";
 export { useMcp } from "./useMcp.js";
 
 // Re-export auth callback handler for OAuth flow
@@ -41,6 +45,7 @@ export {
 export type {
   API,
   CallToolResponse,
+  MessageContentBlock,
   DeviceType,
   DisplayMode,
   OpenAiGlobals,

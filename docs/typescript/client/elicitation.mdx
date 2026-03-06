@@ -107,6 +107,64 @@ async function onElicitation(
 const client = new MCPClient(config, { onElicitation });
 ```
 
+### Per-Server Elicitation Callbacks
+
+When connecting to multiple MCP servers, each server can use a different elicitation callback. Define `onElicitation` directly in a server's config to override the global default.
+
+```typescript
+import {
+  acceptWithDefaults,
+  MCPClient,
+  type OnElicitationCallback,
+} from "mcp-use";
+
+const terminalElicitation: OnElicitationCallback = async (params) => {
+  if (params.mode === "url") {
+    console.log(`Visit: ${params.url}`);
+    return { action: "accept" };
+  }
+  const input = await promptTerminal(params.message, params.requestedSchema);
+  return { action: "accept", content: input };
+};
+
+const webElicitation: OnElicitationCallback = async (params) => {
+  if (params.mode === "url") {
+    window.open(params.url, "_blank");
+    return { action: "accept" };
+  }
+  const formData = await showWebForm(params.message, params.requestedSchema);
+  return formData ? { action: "accept", content: formData } : { action: "cancel" };
+};
+
+const client = new MCPClient(
+  {
+    mcpServers: {
+      cliTool: {
+        url: "https://cli.example.com/mcp",
+        onElicitation: terminalElicitation,
+      },
+      webService: {
+        url: "https://web.example.com/mcp",
+        onElicitation: webElicitation,
+      },
+      internalService: {
+        url: "https://internal.example.com/mcp",
+      },
+    },
+  },
+  { onElicitation: async (params) => acceptWithDefaults(params) }
+);
+```
+
+**Precedence order** (first match wins):
+
+| Priority | Source |
+|----------|--------|
+| 1 | Per-server `onElicitation` |
+| 2 | Per-server `elicitationCallback` (deprecated) |
+| 3 | Global `onElicitation` (second MCPClient arg) |
+| 4 | Global `elicitationCallback` (deprecated) |
+
 ### With React Hook
 
 Use the `onElicitation` prop in the `useMcp` hook:

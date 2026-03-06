@@ -316,12 +316,26 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
         waitForWidgets: true,
       });
 
-      // Navigate back to Resources tab and select weather-display
-      await navigateToResourcesAndSelectWeather(page);
+      // Navigate back to Resources tab and select weather-display.
+      // Don't use navigateToResourcesAndSelectWeather here because the
+      // persisted preset means the widget renders immediately (no "requires props" wall).
+      await page
+        .getByRole("tab", { name: /Resources/ })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Resources" })
+      ).toBeVisible();
+      await page.getByTestId("resource-item-weather-display").click();
 
       // Open props popover and verify preset is available
-      await page.getByTestId("debugger-props-button").click();
-      await expect(page.getByTestId("debugger-props-popover")).toBeVisible();
+      const resourcePreview = page.getByTestId("resource-widget-preview");
+      await expect(resourcePreview).toBeVisible({ timeout: 10000 });
+      const popover = page.getByTestId("debugger-props-popover");
+      if (!(await popover.isVisible().catch(() => false))) {
+        await resourcePreview.getByTestId("debugger-props-button").click();
+      }
+      await expect(popover).toBeVisible();
 
       // Find the preset by looking for a button containing "Berlin Weather"
       const berlinPresetButton = page.getByRole("button", {

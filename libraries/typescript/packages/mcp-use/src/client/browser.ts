@@ -69,8 +69,11 @@ export class BrowserMCPClient extends BaseMCPClient {
       clientOptions,
       disableSseFallback,
       preferSse,
+      timeout,
+      sseReadTimeout,
       gatewayUrl,
       serverId,
+      reconnectionOptions,
     } = serverConfig;
 
     if (!url) {
@@ -102,9 +105,12 @@ export class BrowserMCPClient extends BaseMCPClient {
       onNotification: resolved.onNotification,
       disableSseFallback,
       preferSse,
+      timeout,
+      sseReadTimeout,
       clientInfo,
       gatewayUrl,
       serverId,
+      reconnectionOptions,
     };
 
     logger.debug(

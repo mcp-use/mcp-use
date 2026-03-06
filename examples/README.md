@@ -48,12 +48,12 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
 ## TypeScript Examples
 
 ### Client Examples
-- **[Basic HTTP](../libraries/typescript/packages/mcp-use/examples/client/basic/http_example.ts)** - Basic HTTP client
-- **[CommonJS Example](../libraries/typescript/packages/mcp-use/examples/client/basic/commonjs_example.cjs)** - CommonJS usage
+- **[Node HTTP Client](../libraries/typescript/packages/mcp-use/examples/client/node/full-features-example.ts)** - Node/HTTP client with tool calls, sampling, elicitation, notifications
+- **[CommonJS Example](../libraries/typescript/packages/mcp-use/examples/client/browser/commonjs/commonjs_example.cjs)** - CommonJS usage
 - **[CLI Examples](../libraries/typescript/packages/mcp-use/examples/client/cli/)** - Command-line interface examples
-- **[React Integration](../libraries/typescript/packages/mcp-use/examples/client/react/)** - React client examples
-- **[Notifications Client](../libraries/typescript/packages/mcp-use/examples/client/communication/notification-client.ts)** - Notification handling
-- **[Sampling Client](../libraries/typescript/packages/mcp-use/examples/client/communication/sampling-client.ts)** - Sampling configuration
+- **[React Integration](../libraries/typescript/packages/mcp-use/examples/client/browser/react/)** - React client examples
+- **[Notifications Client](../libraries/typescript/packages/mcp-use/examples/client/node/communication/notification-client.ts)** - Notification handling
+- **[Sampling Client](../libraries/typescript/packages/mcp-use/examples/client/node/communication/sampling-client.ts)** - Sampling configuration
 
 ### Server Examples
 - **[Basic Server](../libraries/typescript/packages/mcp-use/examples/server/basic/simple/)** - Simple server implementation

@@ -7,7 +7,7 @@
 
 import type { Context, Hono as HonoType } from "hono";
 import { join } from "node:path";
-import { Telemetry } from "../../telemetry/index.js";
+import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { generateLandingPage } from "../landing.js";
 import type { SessionData } from "../sessions/index.js";
 import {
@@ -113,11 +113,58 @@ export async function mountMcp(
 
       if (isBrowser) {
         const fullUrl = getFullUrl(c);
+        const origin = new URL(fullUrl).origin;
+        const instance = mcpServerInstance as {
+          favicon?: string;
+          config?: { icons?: Array<{ src: string }>; favicon?: string };
+          registrations?: {
+            tools: Map<string, { config: { description?: string } }>;
+            prompts: Map<string, { config: { description?: string } }>;
+            resources: Map<
+              string,
+              { config: { uri: string; name?: string; description?: string } }
+            >;
+          };
+        };
+        let iconUrl: string | undefined;
+        const iconSrc =
+          instance.favicon ??
+          instance.config?.favicon ??
+          instance.config?.icons?.[0]?.src;
+        if (iconSrc) {
+          iconUrl = iconSrc.startsWith("http")
+            ? iconSrc
+            : `${origin}/mcp-use/public/${iconSrc.replace(/^\//, "")}`;
+        }
+        const regs = instance.registrations;
+        const landingTools =
+          regs?.tools &&
+          Array.from(regs.tools.entries()).map(([name, r]) => ({
+            name,
+            description: r.config.description,
+          }));
+        const landingPrompts =
+          regs?.prompts &&
+          Array.from(regs.prompts.entries()).map(([name, r]) => ({
+            name,
+            description: r.config.description || undefined,
+          }));
+        const landingResources =
+          regs?.resources &&
+          Array.from(regs.resources.values()).map((r) => ({
+            uri: r.config.uri,
+            name: r.config.name,
+            description: r.config.description,
+          }));
         const landingPage = generateLandingPage(
           config.name,
           config.version,
           fullUrl,
-          config.description
+          config.description,
+          landingTools?.length ? landingTools : undefined,
+          landingPrompts?.length ? landingPrompts : undefined,
+          landingResources?.length ? landingResources : undefined,
+          iconUrl
         );
         return new Response(landingPage, {
           status: 200,
@@ -239,7 +286,10 @@ export async function mountMcp(
             // Re-register oninitialized handler
             server.server.oninitialized = async () => {
               const clientCapabilities = server.server.getClientCapabilities();
-              const clientInfo = (server.server as any).getClientInfo?.() || {};
+              const clientInfo =
+                server.server.getClientVersion?.() ||
+                (server.server as any).getClientInfo?.() ||
+                {};
               const protocolVersion =
                 (server.server as any).getProtocolVersion?.() || "unknown";
 
@@ -254,6 +304,7 @@ export async function mountMcp(
               const sessionData = sessions.get(sid);
               if (sessionData) {
                 sessionData.clientCapabilities = clientCapabilities;
+                sessionData.clientInfo = clientInfo;
               }
 
               Telemetry.getInstance()
@@ -387,7 +438,10 @@ export async function mountMcp(
           // The server.oninitialized callback fires after the client sends the initialized notification
           server.server.oninitialized = async () => {
             const clientCapabilities = server.server.getClientCapabilities();
-            const clientInfo = (server.server as any).getClientInfo?.() || {};
+            const clientInfo =
+              server.server.getClientVersion?.() ||
+              (server.server as any).getClientInfo?.() ||
+              {};
             const protocolVersion =
               (server.server as any).getProtocolVersion?.() || "unknown";
 
@@ -417,6 +471,7 @@ export async function mountMcp(
             const sessionData = sessions.get(sid);
             if (sessionData) {
               sessionData.clientCapabilities = clientCapabilities;
+              sessionData.clientInfo = clientInfo;
             }
 
             // Track server initialize event

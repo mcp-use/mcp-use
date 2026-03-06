@@ -162,6 +162,59 @@ server.tool(
 - `ctx.sample(prompt: string)` - Ask the LLM for help (requires client support)
 - `ctx.client.can(capability: string)` - Check if client supports a feature
 
+### Client Identity & Caller Context
+
+`ctx.client` also exposes per-invocation caller context from `params._meta`:
+
+```typescript
+server.tool({ name: "personalise", schema: z.object({}) }, async (_p, ctx) => {
+  // Session-level (stable for the connection lifetime)
+  const { name, version } = ctx.client.info();   // "openai-mcp", "1.0.0"
+  const isAppsClient = ctx.client.supportsApps(); // true for ChatGPT
+
+  // Per-invocation — may differ on every tool call
+  const caller = ctx.client.user();
+  if (caller) {
+    const city = caller.location?.city ?? "there";
+    const greeting = caller.locale?.startsWith("it") ? "Ciao" : "Hello";
+    return text(`${greeting} from ${city}! (via ${name})`);
+  }
+  return text(`Hello! (via ${name})`);
+});
+```
+
+**`ctx.client.user()` fields:**
+- `subject` — stable opaque user ID (same across conversations, e.g. `openai/subject`)
+- `conversationId` — current chat thread ID (changes per chat, e.g. `openai/session`)
+- `locale` — BCP-47 locale, e.g. `"it-IT"` (server-side; inside widgets prefer `useWidget().locale` which is client-side and fresher)
+- `location` — `{ city, region, country, timezone, latitude, longitude }`
+- `userAgent` — browser/host user-agent string
+- `timezoneOffsetMinutes` — UTC offset in minutes
+
+**Key rules:**
+- Returns `undefined` on clients that don't send this metadata (Inspector, CLI, non-ChatGPT clients)
+- **Unverified / advisory** — self-reported by the client, not suitable for access control
+- For verified identity, use `ctx.auth` (requires OAuth)
+
+**ChatGPT multi-tenant model:**
+ChatGPT uses a single MCP session for ALL users of a deployed app. Use `ctx.client.user()` to distinguish callers:
+
+```
+1 MCP session  ctx.session.sessionId              — shared across ALL users
+  N subjects   ctx.client.user()?.subject         — one per ChatGPT user account
+    M threads  ctx.client.user()?.conversationId  — one per chat conversation
+```
+
+```typescript
+// Identify who is calling this specific invocation
+const caller = ctx.client.user();
+return object({
+  mcpSession: ctx.session.sessionId,           // shared transport session
+  user: caller?.subject ?? null,                // ChatGPT user ID
+  conversation: caller?.conversationId ?? null, // this chat thread
+});
+```
+
 ---
 
 ## Error Handling
@@ -387,7 +440,7 @@ server.use(rateLimiter({
 
 > Adjust the key generator depending on your hosting environment.
 
-**Note:** mcp-use is built on Hono. Use Hono-compatible middleware — Express middleware (e.g., `express-rate-limit`) is **not** compatible. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
+**Note:** mcp-use is built on Hono and supports both Hono-compatible middleware and Express middleware. Express middleware (e.g., `express-rate-limit`, `morgan`) is automatically detected and adapted. For custom middleware or advanced routing, see [../foundations/architecture.md](../foundations/architecture.md).
 
 ---
 

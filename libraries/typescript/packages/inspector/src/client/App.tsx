@@ -59,6 +59,13 @@ function App() {
             version: (window as any).__INSPECTOR_VERSION__,
             websiteUrl: "https://mcp-use.com",
             icons: [{ src: "https://mcp-use.com/logo.png" }],
+            capabilities: {
+              extensions: {
+                "io.modelcontextprotocol/ui": {
+                  mimeTypes: ["text/html;profile=mcp-app"],
+                },
+              },
+            },
           }}
           onServerAdded={(id: string, server: McpServer) => {
             console.log("[Inspector] Server added:", id, server.state);

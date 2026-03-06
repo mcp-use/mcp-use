@@ -165,6 +165,87 @@ async def long_task(
     return "\n".join(results)
 ```
 
+## Parameter Types and JSON Schema
+
+Every tool parameter becomes a property in the tool's `inputSchema`. mcp-use uses [Pydantic](https://docs.pydantic.dev/) to generate [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) from your Python type hints.
+
+### Type mapping
+
+| Python type | JSON Schema | Notes |
+|-------------|-------------|-------|
+| `str` | `{"type": "string"}` | |
+| `int` | `{"type": "integer"}` | |
+| `float` | `{"type": "number"}` | |
+| `bool` | `{"type": "boolean"}` | |
+| `list[str]` | `{"type": "array", "items": {"type": "string"}}` | Works with any item type |
+| `dict[str, Any]` | `{"type": "object"}` | |
+| `Literal["a", "b"]` | `{"type": "string", "enum": ["a", "b"]}` | Renders as a dropdown in the Inspector |
+
+### Required, optional, and nullable
+
+How you declare a parameter determines whether it appears in the `required` array:
+
+```python
+@server.tool()
+def example(
+    # Required — no default, goes into "required"
+    name: Annotated[str, Field(description="User name")],
+
+    # Optional with default — NOT in "required", default shown in schema
+    limit: Annotated[int, Field(description="Max results")] = 10,
+
+    # Nullable — NOT in "required", type stays "string" (not anyOf)
+    company: Annotated[str | None, Field(description="Company filter")] = None,
+) -> str: ...
+```
+
+This produces:
+
+```json
+{
+  "properties": {
+    "name":    { "type": "string",  "description": "User name" },
+    "limit":   { "type": "integer", "description": "Max results", "default": 10 },
+    "company": { "type": "string",  "description": "Company filter", "default": null }
+  },
+  "required": ["name"]
+}
+```
+
+<Tip>
+`Optional[str]` and `str | None` are identical at runtime and produce the same schema.
+</Tip>
+
+### Enum parameters with Literal
+
+Use `Literal` to restrict a parameter to a fixed set of values. MCP clients like the Inspector render these as dropdown selects:
+
+```python
+from typing import Literal
+
+@server.tool()
+def create_event(
+    title: Annotated[str, Field(description="Event title")],
+    visibility: Annotated[
+        Literal["public", "private", "team"],
+        Field(description="Who can see this event"),
+    ],
+    recurrence: Annotated[
+        Literal["none", "daily", "weekly", "monthly"],
+        Field(description="Recurrence pattern"),
+    ] = "none",
+) -> dict: ...
+```
+
+Produces `{"type": "string", "enum": ["public", "private", "team"]}` in the schema.
+
+<Note>
+mcp-use automatically simplifies Pydantic's nullable `anyOf` schemas. Without this,
+`str | None` would produce `{"anyOf": [{"type": "string"}, {"type": "null"}]}` which
+breaks description rendering in the MCP Inspector and fails validation in some clients
+like Google's Gemini API. mcp-use collapses this into `{"type": "string", "default": null}`.
+</Note>
+
 ## Complex Input Types
 
 Use Pydantic models for complex inputs:

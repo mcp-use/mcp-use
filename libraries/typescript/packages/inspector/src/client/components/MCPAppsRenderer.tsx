@@ -22,6 +22,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
+import type { MessageContentBlock } from "mcp-use/react";
 import {
   memo,
   useCallback,
@@ -103,7 +104,7 @@ interface MCPAppsRendererProps {
   partialToolInput?: Record<string, unknown>;
   resourceUri: string;
   readResource: (uri: string) => Promise<any>;
-  onSendFollowUp?: (text: string) => void;
+  onSendFollowUp?: (content: MessageContentBlock[]) => void;
   className?: string;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
@@ -539,9 +540,8 @@ function MCPAppsRendererBase({
     };
 
     bridge.onmessage = async ({ content }) => {
-      const textContent = content.find((item) => item.type === "text")?.text;
-      if (textContent && onSendFollowUp) {
-        onSendFollowUp(textContent);
+      if (content.length > 0 && onSendFollowUp) {
+        onSendFollowUp(content as MessageContentBlock[]);
       }
       return {};
     };

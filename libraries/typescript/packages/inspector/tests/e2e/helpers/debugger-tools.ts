@@ -294,14 +294,24 @@ export async function openPropsDialog(page: Page): Promise<void> {
   // Scope to resource widget preview when present (Resources tab) to avoid
   // clicking the wrong props button (Tools tab can have its own debug controls).
   const resourcePreview = page.getByTestId("resource-widget-preview");
-  const propsButton =
-    (await resourcePreview.count()) > 0
-      ? resourcePreview.getByTestId("debugger-props-button")
-      : page.getByTestId("debugger-props-button");
+  const popover = page.getByTestId("debugger-props-popover");
 
-  await propsButton.click();
-  await expect(page.getByTestId("debugger-props-popover")).toBeVisible();
-  // Wait for Create Preset button to be stable (avoids "element was detached" race)
+  // The popover auto-opens when required props are missing.
+  // Only click the button if the popover isn't already visible;
+  // otherwise clicking toggles it closed, the useEffect reopens it,
+  // and the rapid close/reopen detaches the Create Preset button.
+  if (!(await popover.isVisible().catch(() => false))) {
+    const propsButton =
+      (await resourcePreview.count()) > 0
+        ? resourcePreview.getByTestId("debugger-props-button")
+        : page.getByTestId("debugger-props-button");
+    await propsButton.click();
+  }
+  await expect(popover).toBeVisible();
+
+  // Wait for popover open animation to settle
+  await page.waitForTimeout(300);
+
   const createPreset = page.getByTestId("debugger-props-create-preset");
   await expect(createPreset).toBeVisible();
   await createPreset.click();

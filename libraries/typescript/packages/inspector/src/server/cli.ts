@@ -13,6 +13,7 @@ import { findAvailablePort, isValidUrl } from "./utils.js";
 const args = process.argv.slice(2);
 let mcpUrl: string | undefined;
 let startPort = 8080;
+let noOpen = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--url" && i + 1 < args.length) {
@@ -34,6 +35,8 @@ for (let i = 0; i < args.length; i++) {
     }
     startPort = parsedPort;
     i++;
+  } else if (args[i] === "--no-open") {
+    noOpen = true;
   } else if (args[i] === "--help" || args[i] === "-h") {
     console.log(`
 MCP Inspector - Inspect and debug MCP servers
@@ -44,6 +47,7 @@ Usage:
 Options:
   --url <url>    MCP server URL to auto-connect to (e.g., http://localhost:3000/mcp)
   --port <port>  Starting port to try (default: 8080, will find next available)
+  --no-open      Do not auto-open inspector in browser
   --help, -h     Show this help message
 
 Examples:
@@ -90,14 +94,16 @@ async function startServer() {
     if (mcpUrl) {
       console.log(`📡 Auto-connecting to: ${mcpUrl}`);
     }
-    // Auto-open browser
-    try {
-      await open(`http://localhost:${port}/inspector`);
-      console.log(`🌐 Browser opened`);
-    } catch {
-      console.log(
-        `🌐 Please open http://localhost:${port}/inspector in your browser`
-      );
+    // Auto-open browser (unless --no-open flag is present)
+    if (!noOpen) {
+      try {
+        await open(`http://localhost:${port}/inspector`);
+        console.log(`🌐 Browser opened`);
+      } catch {
+        console.log(
+          `🌐 Please open http://localhost:${port}/inspector in your browser`
+        );
+      }
     }
     return { port, fetch: app.fetch };
   } catch (error) {

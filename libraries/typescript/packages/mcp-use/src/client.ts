@@ -27,7 +27,7 @@ import {
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
-import { Tel } from "./telemetry/index.js";
+import { Tel } from "./telemetry/telemetry-node.js";
 import { getPackageVersion } from "./version.js";
 
 /**

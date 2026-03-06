@@ -96,7 +96,7 @@ useWidget<
 | Method                  | Signature                                                                    | Description                                                  |
 | ----------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `callTool`              | `(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>` | Call a tool on the MCP server                                |
-| `sendFollowUpMessage`   | `(prompt: string) => Promise<void>`                                          | Send a follow-up message to the ChatGPT conversation         |
+| `sendFollowUpMessage`   | `(content: string \| MessageContentBlock[]) => Promise<void>`                | Send a follow-up message; string shorthand or full content block array (SEP-1865) |
 | `openExternal`          | `(href: string) => void`                                                     | Open an external URL in a new tab                            |
 | `requestDisplayMode`    | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>`                      | Request a different display mode                             |
 | `notifyIntrinsicHeight` | `(height: number) => Promise<void>`                                          | Notify OpenAI about intrinsic height changes for auto-sizing |
@@ -109,6 +109,30 @@ useWidget<
 | `isPending`         | `boolean`            | Whether the tool is currently executing. When `true`, props will be empty `{}`                                                             |
 | `partialToolInput`  | `Partial<TProps> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
 | `isStreaming`       | `boolean`            | Whether tool arguments are currently being streamed (partial input received but complete input not yet available). `false` in ChatGPT Apps SDK or when the host does not stream. |
+
+### Host Identity (MCP Apps only)
+
+| Property           | Type                                          | Description                                                                                                     |
+| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `hostInfo`         | `{ name: string; version: string } \| undefined` | Name and version of the MCP Apps host, from the `ui/initialize` handshake. `undefined` in ChatGPT Apps SDK.  |
+| `hostCapabilities` | `Record<string, unknown> \| undefined`        | Capabilities advertised by the MCP Apps host (SEP-1865 `HostCapabilities`). `undefined` in ChatGPT Apps SDK.   |
+
+These fields are only populated when the widget is running inside an MCP Apps host (Claude, Goose, or any client implementing SEP-1865). They are `undefined` in the ChatGPT Apps SDK environment.
+
+```tsx
+const { hostInfo, hostCapabilities } = useWidget();
+
+// Identify the host
+if (hostInfo) {
+  console.log(`Running inside ${hostInfo.name} ${hostInfo.version}`);
+  // e.g. "claude-desktop 1.2.0"
+}
+
+// Check for optional host features
+if (hostCapabilities?.openLinks) {
+  // Host supports opening external URLs via ui/open-link
+}
+```
 
 ## Complete Example
 
@@ -394,13 +418,21 @@ const handleSearch = async () => {
 
 ### 7. Follow-up Messages
 
-Send messages to the ChatGPT conversation:
+Send messages to the conversation. Accepts a plain string shorthand or a full content block array per the SEP-1865 `ui/message` spec:
 
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
+// String shorthand (most common)
 const handleRequestInfo = async () => {
   await sendFollowUpMessage("Show me more details about this product");
+};
+
+// Full content array (MCP Apps — supports text, image, resource blocks)
+const handleRichMessage = async () => {
+  await sendFollowUpMessage([
+    { type: "text", text: "Show me more details about this product" },
+  ]);
 };
 ```
 

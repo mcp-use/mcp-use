@@ -5,21 +5,48 @@ import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
-import { isPortAvailable, parsePortFromArgs } from "./utils.js";
+import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
 
 const app = new Hono();
 
 // Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
+// NOTE: Authorization must be listed explicitly in allowHeaders — the wildcard * does NOT cover it
+// per the Fetch spec. Without this, browsers block requests with Authorization headers.
 app.use(
   "*",
   cors({
     origin: "*",
-    exposeHeaders: ["*"], // Expose all headers since this is a proxy
+    allowHeaders: [
+      "Authorization",
+      "Content-Type",
+      "Accept",
+      "X-Target-URL",
+      "X-MCP-Target",
+      "Mcp-Session-Id",
+      "mcp-session-id",
+      "mcp-protocol-version",
+      "X-Server-Id",
+      "X-Requested-With",
+      "X-Connection-URL",
+    ],
+    exposeHeaders: ["*"],
   })
 );
 
-// Apply logger middleware to API routes for request/response logging
-app.use("/inspector/api/*", logger());
+// Apply logger middleware to API routes for request/response logging.
+// Filter out noisy endpoints (telemetry, RPC stream/log) to reduce log spam.
+const noisyPaths = [
+  "/inspector/api/tel/",
+  "/inspector/api/rpc/stream",
+  "/inspector/api/rpc/log",
+];
+app.use(
+  "/inspector/api/*",
+  logger((message, ...rest) => {
+    if (noisyPaths.some((p) => message.includes(p))) return;
+    console.log(message, ...rest);
+  })
+);
 
 // Register all API routes
 registerInspectorRoutes(app);
@@ -99,8 +126,8 @@ async function startServer() {
       console.warn(`🚀 MCP Inspector running on http://localhost:${port}`);
     }
 
-    // Auto-open browser in development
-    if (process.env.NODE_ENV !== "production") {
+    // Auto-open browser in development (unless --no-open flag is present)
+    if (process.env.NODE_ENV !== "production" && !hasNoOpenFlag()) {
       try {
         const url = isDev
           ? "http://localhost:3000"

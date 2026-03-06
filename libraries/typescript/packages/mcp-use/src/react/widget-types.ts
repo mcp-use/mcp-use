@@ -70,6 +70,18 @@ export type CallToolResponse = {
   _meta?: Record<string, unknown>;
 };
 
+/**
+ * A single content block for a user message, per the SEP-1865 `ui/message` spec.
+ *
+ * The `sendFollowUpMessage` action accepts either a plain string shorthand (automatically
+ * wrapped as a `text` block) or an explicit array of these blocks for richer content.
+ */
+export type MessageContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string }
+  | { type: "resource"; resource: { uri: string; [key: string]: unknown } }
+  | { type: string; [key: string]: unknown };
+
 export interface OpenAiGlobals<
   ToolInput extends UnknownObject = UnknownObject,
   ToolOutput extends UnknownObject = UnknownObject,
@@ -360,7 +372,9 @@ interface UseWidgetResultBase<
    * user selects an item and you want the model to generate a contextual
    * response.
    */
-  sendFollowUpMessage: (prompt: string) => Promise<void>;
+  sendFollowUpMessage: (
+    content: string | MessageContentBlock[]
+  ) => Promise<void>;
 
   /**
    * Ask the host to open a URL in the user's default browser or a new tab.
@@ -431,6 +445,41 @@ interface UseWidgetResultBase<
    * @see partialToolInput
    */
   isStreaming: boolean;
+
+  /**
+   * Name and version of the MCP Apps host as reported during the
+   * `ui/initialize` handshake (SEP-1865).
+   *
+   * `undefined` when running inside ChatGPT (Apps SDK path) or outside a
+   * supported MCP Apps host. Use this to conditionally tailor the UI for
+   * specific host environments.
+   *
+   * @example
+   * ```tsx
+   * const { hostInfo } = useWidget();
+   * console.log(hostInfo?.name); // "claude-desktop"
+   * ```
+   */
+  hostInfo?: { name: string; version: string };
+
+  /**
+   * Host capabilities advertised during the `ui/initialize` handshake
+   * (SEP-1865 `HostCapabilities` object).
+   *
+   * `undefined` when running inside ChatGPT (Apps SDK path), outside a
+   * supported MCP Apps host, or when the host did not include capabilities.
+   * Use this to check for optional host features such as `openLinks`,
+   * `serverTools`, or `serverResources`.
+   *
+   * @example
+   * ```tsx
+   * const { hostCapabilities } = useWidget();
+   * if (hostCapabilities?.openLinks) {
+   *   // Host can open external links
+   * }
+   * ```
+   */
+  hostCapabilities?: Record<string, unknown>;
 }
 
 /**

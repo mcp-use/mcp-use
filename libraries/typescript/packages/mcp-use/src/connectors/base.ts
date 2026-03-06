@@ -5,6 +5,8 @@ import type {
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   CallToolResult,
+  CompleteRequestParams,
+  CompleteResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequestFormParams,
@@ -22,7 +24,7 @@ import {
 import { logger } from "../logging.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
-import { Telemetry } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 
 /**
  * Handler function for server notifications
@@ -95,6 +97,16 @@ export interface ConnectorInitOptions {
    * When provided, registered as initial notification handler.
    */
   onNotification?: NotificationHandler;
+  /**
+   * Reconnection options for streamable HTTP transport.
+   * Controls retry behavior of the underlying `StreamableHTTPClientTransport`.
+   */
+  reconnectionOptions?: {
+    maxReconnectionDelay?: number;
+    initialReconnectionDelay?: number;
+    reconnectionDelayGrowFactor?: number;
+    maxRetries?: number;
+  };
 }
 
 /**
@@ -590,6 +602,28 @@ export abstract class BaseConnector {
 
     logger.debug("Listing resource templates");
     return await this.client.listResourceTemplates(undefined, options);
+  }
+
+  /**
+   * Request completion suggestions for a prompt or resource template argument
+   *
+   * @param params - Completion request parameters
+   * @param options - Request options
+   * @returns Completion suggestions from the server
+   */
+  async complete(
+    params: CompleteRequestParams,
+    options?: RequestOptions
+  ): Promise<CompleteResult> {
+    if (!this.client) {
+      throw new Error("MCP client is not connected");
+    }
+    logger.debug("[complete] Requesting completions for:", params.ref);
+    const result = await this.client.complete(params, options);
+    logger.debug(
+      `[complete] Received ${result.completion.values.length} suggestions`
+    );
+    return result;
   }
 
   /** Read a resource by URI. */

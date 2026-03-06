@@ -29,6 +29,22 @@ export {
 // Context providers
 export { ThemeProvider } from "./context/ThemeContext.js";
 export { WidgetDebugProvider } from "./context/WidgetDebugContext.js";
+export {
+  InspectorProvider,
+  useInspector,
+  type EmbeddedConfig,
+  type TabType,
+} from "./context/InspectorContext.js";
+
+// ---------------------------------------------------------------------------
+// Tab components – full inspector tabs for embedding
+// ---------------------------------------------------------------------------
+export { ToolsTab, type ToolsTabRef } from "./components/ToolsTab.js";
+export {
+  ResourcesTab,
+  type ResourcesTabRef,
+} from "./components/ResourcesTab.js";
+export { PromptsTab, type PromptsTabRef } from "./components/PromptsTab.js";
 
 // ---------------------------------------------------------------------------
 // Chat components – embeddable chat UI for MCP servers

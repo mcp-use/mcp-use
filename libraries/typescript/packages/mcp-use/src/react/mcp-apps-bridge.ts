@@ -12,7 +12,11 @@ import {
   type JsonRpcResponse,
 } from "../server/utils/jsonrpc-helpers.js";
 import { MCP_APPS_BRIDGE_CONFIG } from "./constants.js";
-import type { DisplayMode, Theme } from "./widget-types.js";
+import type {
+  DisplayMode,
+  MessageContentBlock,
+  Theme,
+} from "./widget-types.js";
 
 // JSON-RPC message types (using imported types with compatible names)
 type JSONRPCRequest = JsonRpcRequest;
@@ -101,6 +105,8 @@ class McpAppsBridge {
   private toolOutput: Record<string, unknown> | null = null;
   private toolResponseMetadata: Record<string, unknown> | null = null;
   private hostContext: HostContext | null = null;
+  private hostInfo: { name: string; version: string } | null = null;
+  private hostCapabilities: Record<string, unknown> | null = null;
   private initialized = false;
 
   // Event handlers
@@ -482,6 +488,17 @@ class McpAppsBridge {
         console.log("[MCP Apps Bridge] Host context:", this.hostContext);
       }
 
+      // Store host info and capabilities
+      if (result.hostInfo) {
+        this.hostInfo = result.hostInfo;
+      }
+      if (result.hostCapabilities) {
+        this.hostCapabilities = result.hostCapabilities as Record<
+          string,
+          unknown
+        >;
+      }
+
       // Send initialized notification
       this.sendNotification("ui/notifications/initialized", {});
 
@@ -536,6 +553,20 @@ class McpAppsBridge {
   }
 
   /**
+   * Get host info (name and version of the MCP Apps host)
+   */
+  getHostInfo(): { name: string; version: string } | null {
+    return this.hostInfo;
+  }
+
+  /**
+   * Get host capabilities advertised during the ui/initialize handshake
+   */
+  getHostCapabilities(): Record<string, unknown> | null {
+    return this.hostCapabilities;
+  }
+
+  /**
    * Subscribe to tool input changes
    */
   onToolInput(handler: (input: Record<string, unknown>) => void): () => void {
@@ -580,9 +611,12 @@ class McpAppsBridge {
   }
 
   /**
-   * Send a message to the conversation
+   * Send a message to the conversation.
+   * Accepts a single content block or an array of blocks per the SEP-1865 ui/message spec.
    */
-  async sendMessage(content: { type: string; text: string }): Promise<void> {
+  async sendMessage(
+    content: MessageContentBlock | MessageContentBlock[]
+  ): Promise<void> {
     const contentArray = Array.isArray(content) ? content : [content];
     await this.sendRequest("ui/message", {
       role: "user",

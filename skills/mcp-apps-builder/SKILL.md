@@ -122,6 +122,10 @@ Load these before diving into tools/resources/widgets sections.
   - When: Formatting responses from tools/resources (text, JSON, markdown, images, errors)
   - Covers: `text()`, `object()`, `markdown()`, `image()`, `error()`, `mix()`
 
+- **[proxy.md](references/server/proxy.md)**
+  - When: Composing multiple MCP servers into one unified aggregator server
+  - Covers: `server.proxy()`, config API, explicit sessions, sampling routing
+
 ---
 
 ### 🎨 Building Visual Widgets (Interactive UI)?
@@ -334,4 +338,14 @@ server.listen();
 | `mix()` | Multiple contents | `mix(text("Hi"), image(url))` |
 | `error()` | Error responses | `error("Failed to fetch data")` |
 | `resource()` | Embed resource refs | `resource("docs://guide", "text/markdown")` |
+
+**Server methods:**
+- `server.tool()` - Define executable tool
+- `server.resource()` - Define static/dynamic resource
+- `server.resourceTemplate()` - Define parameterized resource
+- `server.prompt()` - Define prompt template
+- `server.proxy()` - Compose/Proxy multiple MCP servers
+- `server.uiResource()` - Define widget resource
+- `server.listen()` - Start server
+
 

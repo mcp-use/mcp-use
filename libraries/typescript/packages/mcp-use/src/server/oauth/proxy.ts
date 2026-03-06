@@ -238,14 +238,70 @@ export function mountOAuthProxy(
         if (enableLogging && !discoveredFromWWWAuth) {
           console.log(`[OAuth Proxy] Trying standard metadata path: ${url}`);
         }
+        const fallbackUrls: string[] = [metadataUrl.toString()];
+        const mcpServerUrl = c.req.query("mcp_url");
 
-        response = await fetch(metadataUrl.toString(), {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "User-Agent": "mcp-use/1.0",
-          },
-        });
+        // If the incoming metadata URL points to our own host (proxy/gateway URL),
+        // also try deriving well-known metadata from the actual MCP server URL.
+        // This handles servers that don't send resource_metadata in WWW-Authenticate.
+        if (mcpServerUrl) {
+          try {
+            const parsedMcpUrl = new URL(mcpServerUrl);
+            const requestHost = new URL(c.req.url).host;
+            const metadataLooksLocal =
+              metadataUrl.host === requestHost ||
+              metadataUrl.host === "localhost:3000" ||
+              metadataUrl.pathname.includes("/inspector/api/");
+
+            if (metadataLooksLocal) {
+              const mcpPath = parsedMcpUrl.pathname.replace(/\/+$/, "");
+              if (url.includes("/.well-known/oauth-protected-resource")) {
+                const scoped = `${parsedMcpUrl.origin}/.well-known/oauth-protected-resource${mcpPath}`;
+                const root = `${parsedMcpUrl.origin}/.well-known/oauth-protected-resource`;
+                if (!fallbackUrls.includes(scoped)) fallbackUrls.push(scoped);
+                if (!fallbackUrls.includes(root)) fallbackUrls.push(root);
+              } else if (
+                url.includes("/.well-known/oauth-authorization-server")
+              ) {
+                const authServer = `${parsedMcpUrl.origin}/.well-known/oauth-authorization-server`;
+                if (!fallbackUrls.includes(authServer))
+                  fallbackUrls.push(authServer);
+              } else if (url.includes("/.well-known/openid-configuration")) {
+                const openid = `${parsedMcpUrl.origin}/.well-known/openid-configuration`;
+                if (!fallbackUrls.includes(openid)) fallbackUrls.push(openid);
+              }
+            }
+          } catch {
+            // Ignore malformed mcp_url and continue with default fallback.
+          }
+        }
+
+        const attempted: Array<{ url: string; status: number; ok: boolean }> =
+          [];
+        for (const fallbackUrl of fallbackUrls) {
+          response = await fetch(fallbackUrl, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "User-Agent": "mcp-use/1.0",
+            },
+          });
+          attempted.push({
+            url: fallbackUrl,
+            status: response.status,
+            ok: response.ok,
+          });
+          if (response.ok) {
+            break;
+          }
+        }
+      }
+
+      if (!response) {
+        return c.json(
+          { error: "Failed to fetch OAuth metadata: no response" },
+          502
+        );
       }
 
       if (!response.ok) {
@@ -270,35 +326,11 @@ export function mountOAuthProxy(
       // when making the authorization request to the OAuth server.
       if (metadata.resource && metadata.authorization_servers) {
         // Check if request includes X-Connection-URL header (set by client when using MCP proxy)
-        let connectionUrl = c.req.header("X-Connection-URL");
+        const connectionUrl = c.req.header("X-Connection-URL");
 
-        // If not provided, infer from OAuth proxy base path
-        // OAuth proxy at /inspector/api/oauth -> MCP proxy at /inspector/api/proxy
-        if (!connectionUrl) {
-          const requestUrl = new URL(c.req.url);
-
-          // Detect the actual protocol the client is using
-          let clientProtocol = requestUrl.protocol.replace(":", "");
-          const xForwardedProto = c.req.header("X-Forwarded-Proto");
-          if (xForwardedProto) {
-            clientProtocol = xForwardedProto.split(",")[0].trim();
-          }
-
-          // Detect the actual host the client is using
-          let clientHost = requestUrl.host;
-          const xForwardedHost = c.req.header("X-Forwarded-Host");
-          if (xForwardedHost) {
-            clientHost = xForwardedHost.split(",")[0].trim();
-          }
-
-          // Extract base path before /oauth
-          const pathParts = requestUrl.pathname.split("/");
-          const oauthIndex = pathParts.findIndex((part) => part === "oauth");
-          if (oauthIndex > 0) {
-            const basePath = pathParts.slice(0, oauthIndex).join("/");
-            connectionUrl = `${clientProtocol}://${clientHost}${basePath}/proxy`;
-          }
-        }
+        // IMPORTANT: only rewrite when client explicitly passes X-Connection-URL.
+        // Inferring from /oauth route can break callback flows where resource must
+        // remain the original MCP endpoint for SDK resource matching.
 
         if (connectionUrl) {
           // Store the original resource URL in a custom field
@@ -372,7 +404,7 @@ export function mountOAuthProxy(
 
       // Optional target validation
       if (validateTarget) {
-        const isValid = await validateTarget(url, c);
+        const isValid = await validateTarget(targetUrl.toString(), c);
         if (!isValid) {
           return c.json({ error: "Target URL not allowed" }, 403);
         }

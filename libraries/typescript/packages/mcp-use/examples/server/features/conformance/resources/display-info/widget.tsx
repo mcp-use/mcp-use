@@ -16,7 +16,7 @@ export const widgetMetadata: WidgetMetadata = {
   description:
     "Display information with title and message (demonstrates subfolder auto-exposed pattern)",
   props: propSchema,
-  // exposeAsTool: true is the default, so this widget will be auto-registered as a tool
+  exposeAsTool: true, // false is the default, so this widget will be auto-registered as a tool
 };
 
 type DisplayInfoProps = z.infer<typeof propSchema>;

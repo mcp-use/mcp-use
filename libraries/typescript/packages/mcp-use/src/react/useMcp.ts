@@ -3,6 +3,8 @@ import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { probeAuthParams } from "../auth/probe-www-auth.js";
 import type {
+  CompleteRequestParams,
+  CompleteResult,
   Prompt,
   Resource,
   ResourceTemplate,
@@ -93,6 +95,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     logLevel: logLevelOption,
     autoRetry = false,
     autoReconnect = DEFAULT_RECONNECT_DELAY,
+    reconnectionOptions,
     transportType = "auto",
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
@@ -208,6 +211,40 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         "https://inspector.mcp-use.com/inspector/api/proxy",
     };
   }, [autoProxyFallback]);
+
+  // Normalize autoReconnect into a consistent config object
+  const autoReconnectConfig = useMemo(() => {
+    if (autoReconnect === false) {
+      return {
+        enabled: false,
+        initialDelay: 0,
+        healthCheckInterval: false as const,
+        healthCheckTimeout: 30000,
+      };
+    }
+    if (autoReconnect === true) {
+      return {
+        enabled: true,
+        initialDelay: DEFAULT_RECONNECT_DELAY,
+        healthCheckInterval: 10000,
+        healthCheckTimeout: 30000,
+      };
+    }
+    if (typeof autoReconnect === "number") {
+      return {
+        enabled: true,
+        initialDelay: autoReconnect,
+        healthCheckInterval: 10000,
+        healthCheckTimeout: 30000,
+      };
+    }
+    return {
+      enabled: autoReconnect.enabled !== false,
+      initialDelay: autoReconnect.initialDelay ?? DEFAULT_RECONNECT_DELAY,
+      healthCheckInterval: autoReconnect.healthCheckInterval ?? 10000,
+      healthCheckTimeout: autoReconnect.healthCheckTimeout ?? 30000,
+    };
+  }, [autoReconnect]);
 
   // Track whether we've already tried proxy fallback
   const hasTriedProxyFallbackRef = useRef(false);
@@ -619,6 +656,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const serverConfig: any = {
           url: url, // Use original URL, not transformed proxy URL
           transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
+          timeout,
+          sseReadTimeout,
           // Only disable SSE fallback when user explicitly set transportType: "http"
           // Don't disable it when we're in auto mode and just trying HTTP first
           disableSseFallback: transportType === "http",
@@ -629,6 +668,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           ...(customFetch && { fetch: customFetch }),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
+          // Pass user-configurable reconnection options, or when autoReconnect
+          // is disabled, disable SDK transport SSE reconnection to prevent
+          // unwanted GET polling requests
+          ...(reconnectionOptions
+            ? { reconnectionOptions }
+            : autoReconnect === false
+              ? { reconnectionOptions: { maxRetries: 0 } }
+              : {}),
         };
 
         // Add gateway URL if using proxy
@@ -762,8 +809,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setState("ready");
         successfulTransportRef.current = transportTypeParam;
 
-        // Only set up monitoring if autoReconnect is enabled
-        if (autoReconnect) {
+        // Only set up monitoring if autoReconnect is enabled and health checks are not disabled
+        if (
+          autoReconnectConfig.enabled &&
+          autoReconnectConfig.healthCheckInterval !== false
+        ) {
           const cleanup = startConnectionHealthMonitoring({
             gatewayUrl,
             url,
@@ -788,7 +838,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             setState,
             addLog,
             connect,
-            defaultReconnectDelay: DEFAULT_RECONNECT_DELAY,
+            defaultReconnectDelay: autoReconnectConfig.initialDelay,
+            healthCheckIntervalMs: autoReconnectConfig.healthCheckInterval,
+            healthCheckTimeoutMs: autoReconnectConfig.healthCheckTimeout,
           });
 
           // Store cleanup function for later
@@ -827,6 +879,22 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           return "failed";
         }
         setPrompts(promptsResult.prompts || []);
+
+        // Fetch resource templates if server supports them
+        if (session.connector.serverCapabilities?.resourceTemplates) {
+          const templatesResult =
+            await session.connector.listResourceTemplates();
+          if (!isMountedRef.current) {
+            addLog(
+              "debug",
+              "Connection aborted after listing resource templates - component unmounted"
+            );
+            return "failed";
+          }
+          setResourceTemplates(templatesResult.resourceTemplates || []);
+        } else {
+          setResourceTemplates([]);
+        }
 
         // Get serverInfo and capabilities from the connector (populated during initialize)
         const serverInfo = session.connector.serverInfo;
@@ -1679,13 +1747,56 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [addLog]);
 
   /**
-   * Refresh all lists (tools, resources, prompts) from the server
+   * Refresh the resource templates list from the server
+   * Called manually by user when needed
+   */
+  const refreshResourceTemplates = useCallback(async () => {
+    if (stateRef.current !== "ready" || !clientRef.current) {
+      addLog("debug", "Cannot refresh resource templates - client not ready");
+      return;
+    }
+    addLog("debug", "Refreshing resource templates list");
+    try {
+      const serverName = USE_MCP_SERVER_NAME;
+      const session = clientRef.current.getSession(serverName);
+      if (!session) throw new Error("No active session found");
+
+      const result = await session.connector.listResourceTemplates();
+      if (isMountedRef.current) {
+        setResourceTemplates(result.resourceTemplates || []);
+        addLog(
+          "info",
+          `Resource templates refreshed: ${result.resourceTemplates?.length || 0} templates`
+        );
+      }
+    } catch (err) {
+      addLog("error", "Failed to refresh resource templates:", err);
+      throw err;
+    }
+  }, [addLog]);
+
+  /**
+   * Refresh all lists (tools, resources, resource templates, prompts) from the server
    * Useful after reconnection or for manual refresh
    */
   const refreshAll = useCallback(async () => {
-    addLog("info", "Refreshing all lists (tools, resources, prompts)");
-    await Promise.all([refreshTools(), refreshResources(), refreshPrompts()]);
-  }, [refreshTools, refreshResources, refreshPrompts, addLog]);
+    addLog(
+      "info",
+      "Refreshing all lists (tools, resources, resource templates, prompts)"
+    );
+    await Promise.all([
+      refreshTools(),
+      refreshResources(),
+      refreshResourceTemplates(),
+      refreshPrompts(),
+    ]);
+  }, [
+    refreshTools,
+    refreshResources,
+    refreshResourceTemplates,
+    refreshPrompts,
+    addLog,
+  ]);
 
   /**
    * Get a prompt template with arguments
@@ -1726,7 +1837,60 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         throw err;
       }
     },
-    [state]
+    [state, addLog]
+  );
+
+  /**
+   * Request completion suggestions for a prompt or resource template argument
+   *
+   * @param params - Completion request parameters
+   * @returns Completion suggestions from the server
+   * @throws {Error} If client is not ready or completion request fails
+   *
+   * @example
+   * ```typescript
+   * // Complete a prompt argument
+   * const result = await mcp.complete({
+   *   ref: { type: "ref/prompt", name: "code-review" },
+   *   argument: { name: "language", value: "py" }
+   * });
+   * console.log(result.completion.values); // ["python"]
+   * ```
+   */
+  const complete = useCallback(
+    async (params: CompleteRequestParams): Promise<CompleteResult> => {
+      if (stateRef.current !== "ready" || !clientRef.current) {
+        throw new Error(
+          `MCP client is not ready (current state: ${state}). Cannot request completion.`
+        );
+      }
+
+      const refType =
+        params.ref.type === "ref/prompt" ? "prompt" : "resource template";
+      const refId =
+        params.ref.type === "ref/prompt"
+          ? (params.ref as any).name
+          : (params.ref as any).uri;
+
+      addLog("info", `Requesting completions for ${refType} "${refId}"`);
+
+      try {
+        const serverName = USE_MCP_SERVER_NAME;
+        const session = clientRef.current.getSession(serverName);
+        if (!session) throw new Error("No active session found");
+
+        const result = await session.complete(params);
+        addLog(
+          "info",
+          `Received ${result.completion.values.length} completion suggestions`
+        );
+        return result;
+      } catch (err) {
+        addLog("error", "Completion request failed:", err);
+        throw err;
+      }
+    },
+    [state, addLog]
   );
 
   // ===== Effects =====
@@ -1992,8 +2156,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     listResources,
     listPrompts,
     getPrompt,
+    complete,
     refreshTools,
     refreshResources,
+    refreshResourceTemplates,
     refreshPrompts,
     refreshAll,
     retry,

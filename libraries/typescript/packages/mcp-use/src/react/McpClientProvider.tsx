@@ -108,6 +108,7 @@ export interface McpServerOptions extends Omit<
  */
 export interface McpClientContextType {
   servers: McpServer[];
+  /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
   updateServer: (
@@ -158,6 +159,12 @@ interface McpServerWrapperProps {
       sizes?: string[];
     }>;
     websiteUrl?: string;
+    /**
+     * Default capabilities advertised to all servers managed by this provider.
+     * Per-server `clientOptions.capabilities` are merged on top, with per-server
+     * values taking precedence. Stripped from the MCP `clientInfo` wire field.
+     */
+    capabilities?: Record<string, unknown>;
   };
   cachedMetadata?: import("./storage/StorageProvider.js").CachedServerMetadata;
   onUpdate: (server: McpServer) => void;
@@ -705,8 +712,13 @@ export interface McpClientProviderProps {
       };
 
   /**
-   * Client info for all servers (used for OAuth registration and server capabilities)
-   * Can be overridden per-server in addServer() options
+   * Client info for all servers (used for OAuth registration and server capabilities).
+   * Can be overridden per-server in addServer() options.
+   *
+   * The optional `capabilities` field sets default MCP capabilities advertised to
+   * every server managed by this provider (e.g. MCP Apps / SEP-1865 extensions).
+   * It is merged with per-server `clientOptions.capabilities` (per-server takes
+   * precedence) and is stripped from the actual MCP `clientInfo` wire field.
    */
   clientInfo?: {
     /** Client name displayed on OAuth consent pages (required) */
@@ -725,6 +737,21 @@ export interface McpClientProviderProps {
     }>;
     /** Client website URL (used as client_uri for OAuth) */
     websiteUrl?: string;
+    /**
+     * Default capabilities advertised to all servers managed by this provider.
+     * Per-server `clientOptions.capabilities` are merged on top, with per-server
+     * values taking precedence. Stripped from the MCP `clientInfo` wire field.
+     *
+     * @example
+     * ```tsx
+     * capabilities: {
+     *   extensions: {
+     *     "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] },
+     *   },
+     * }
+     * ```
+     */
+    capabilities?: Record<string, unknown>;
   };
 
   /**
@@ -1137,15 +1164,8 @@ export function McpClientProvider({
   );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
-    providerLogger.debug("[McpClientProvider] addServer called:", id, options);
     setServerConfigs((prev) => {
-      // Check if already exists
-      if (prev.find((s) => s.id === id)) {
-        providerLogger.warn(
-          `[McpClientProvider] Server with id "${id}" already exists`
-        );
-        return prev;
-      }
+      if (prev.find((s) => s.id === id)) return prev;
       providerLogger.debug(
         "[McpClientProvider] Adding new server to configs:",
         id
@@ -1243,18 +1263,52 @@ export function McpClientProvider({
     [servers, addServer, removeServer, updateServer, getServer, storageLoaded]
   );
 
+  // Strip `capabilities` from clientInfo — it is a provider-level default for
+  // MCP capabilities, not a standard MCP clientInfo wire field.
+  const { capabilities: defaultCapabilities, ...clientInfoWithoutCaps } =
+    clientInfo || {};
+  const clientInfoForWrapper = useMemo(
+    () =>
+      Object.keys(clientInfoWithoutCaps).length
+        ? (clientInfoWithoutCaps as typeof clientInfo)
+        : undefined,
+    [clientInfo]
+  );
+
+  // Merge defaultCapabilities into each server's clientOptions.capabilities.
+  // Memoized so the merged options objects are stable references across renders —
+  // a new object on every render would cause McpServerWrapper to reconnect.
+  const mergedServerConfigs = useMemo(
+    () =>
+      serverConfigs.map((config) => ({
+        id: config.id,
+        options: defaultCapabilities
+          ? ({
+              ...config.options,
+              clientOptions: {
+                ...config.options.clientOptions,
+                capabilities: {
+                  ...defaultCapabilities,
+                  ...config.options.clientOptions?.capabilities,
+                },
+              },
+            } as McpServerOptions)
+          : config.options,
+      })),
+    [serverConfigs, defaultCapabilities]
+  );
+
   return (
     <McpClientContext.Provider value={contextValue}>
       {children}
-      {/* Render a wrapper for each configured server */}
-      {serverConfigs.map((config) => (
+      {mergedServerConfigs.map((config) => (
         <McpServerWrapper
           key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
           id={config.id}
           options={config.options}
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
-          clientInfo={clientInfo}
+          clientInfo={clientInfoForWrapper}
           cachedMetadata={cachedMetadataRef.current[config.id]}
           onUpdate={handleServerUpdate}
           rpcWrapTransport={rpcWrapTransport}

@@ -58,6 +58,7 @@ High-level methods for defining MCP primitives:
 server.tool({ ... }, async (input) => { ... });
 server.resource({ ... }, async () => { ... });
 server.prompt({ ... }, async (input) => { ... });
+server.proxy({ child: { url: "..." } });
 ```
 
 ---
@@ -107,7 +108,9 @@ server.app.use(async (c, next) => {
 
 ### Using Middleware Packages
 
-Use Hono-compatible middleware packages. Express middleware (e.g., `express-rate-limit`, `helmet`) is **not** compatible with `server.use()`.
+mcp-use supports both **Hono middleware** and **Express middleware**. Express middleware is automatically detected and adapted to work with Hono.
+
+#### Hono-Compatible Middleware
 
 ```typescript
 import { rateLimiter } from "hono-rate-limiter";
@@ -123,7 +126,25 @@ server.use(rateLimiter({
 }));
 ```
 
-**Recommended:** Use established Hono-compatible packages rather than writing custom middleware.
+#### Express Middleware (Auto-Adapted)
+
+Express middleware packages work seamlessly with `server.use()`. The server automatically detects Express middleware signatures and adapts them:
+
+```typescript
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+
+// Express middleware - automatically adapted
+server.use(morgan("combined"));
+
+server.use("/api", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: "Too many requests, please try again later.",
+}));
+```
+
+**Note:** Express middleware is detected by function signature (3-4 parameters) and pattern matching for Express-specific code patterns (e.g., `res.send`, `req.body`). Hono middleware uses 2 parameters and Hono-specific patterns (e.g., `c.req`, `c.json`). Both types can be mixed in the same application.
 
 ---
 

@@ -13,7 +13,7 @@ import type {
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
-import { Telemetry } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
@@ -72,6 +72,7 @@ import { setupOAuthForServer } from "./oauth/setup.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
 import {
+  buildHandlerContext,
   createEnhancedContext,
   findSessionContext,
   isValidLogLevel,
@@ -427,6 +428,105 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public cleanupSessionRefs(sessionId: string): void {
     this.sessionRegisteredRefs.delete(sessionId);
+  }
+
+  /**
+   * Proxy to another MCP server(s).
+   *
+   * This method mounts one or more MCP clients onto this server, introspecting
+   * their tools, resources, and prompts, and registering them natively.
+   *
+   * @param config - A mapping of namespaces to server connection configs, or a single MCPSession.
+   * @param options - Additional options, such as namespace (if passing a single MCPSession).
+   *
+   * @example
+   * ```typescript
+   * // Using config map
+   * await server.proxy({
+   *   db: { command: "node", args: ["db.js"] }
+   * });
+   *
+   * // Using explicit session
+   * await server.proxy(mySession, { namespace: "db" });
+   * ```
+   */
+  public async proxy(
+    config: Record<string, any> | any,
+    options?: { namespace?: string }
+  ): Promise<void> {
+    // Dynamic import to avoid bringing client code into server bundle unless used
+    const { MCPClient } = await import("../client.js");
+    const { mountSession } = await import("./utils/proxy-client.js");
+
+    // If it's an MCPSession (duck typing by checking for callTool method)
+    if (config && typeof config.callTool === "function") {
+      await mountSession(this, config, options?.namespace);
+      return;
+    }
+
+    // Otherwise, treat config as a map of namespaces to server configs
+    const proxyClient = new MCPClient({
+      mcpServers: config,
+      onSampling: async (params: any) => {
+        try {
+          const { getRequestContext } = await import("./context-storage.js");
+          const { findSessionContext } =
+            await import("./tools/tool-execution-helpers.js");
+          const ctx = getRequestContext();
+          if (!ctx) throw new Error("No request context");
+          const { session } = findSessionContext(
+            this.sessions,
+            ctx,
+            undefined,
+            undefined
+          );
+          if (!session || !session.server) throw new Error("No session");
+          return await session.server.server.createMessage(params);
+        } catch (e) {
+          console.warn(
+            "[Proxy] Fallback sampling response due to missing request context (global proxy mode)"
+          );
+          return {
+            role: "assistant",
+            model: "proxy-fallback",
+            content: {
+              type: "text",
+              text: "Mock sampled response from proxy fallback",
+            },
+          };
+        }
+      },
+      onElicitation: async (params: any) => {
+        try {
+          const { getRequestContext } = await import("./context-storage.js");
+          const { findSessionContext } =
+            await import("./tools/tool-execution-helpers.js");
+          const ctx = getRequestContext();
+          if (!ctx) throw new Error("No request context");
+          const { session } = findSessionContext(
+            this.sessions,
+            ctx,
+            undefined,
+            undefined
+          );
+          if (!session || !session.server) throw new Error("No session");
+          return await session.server.server.elicitInput(params);
+        } catch (e) {
+          console.warn(
+            "[Proxy] Fallback elicitation response due to missing request context (global proxy mode)"
+          );
+          return {
+            action: "accept",
+            content: { mock: "data from proxy fallback" },
+          };
+        }
+      },
+    });
+    const sessions = await proxyClient.createAllSessions(true);
+
+    for (const [namespace, session] of Object.entries(sessions)) {
+      await mountSession(this, session as any, namespace);
+    }
   }
 
   /**
@@ -1085,7 +1185,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // like ctx.log(), ctx.sample(), ctx.elicit(), etc.
     const wrapHandler = (
       rawHandler: unknown,
-      session: { server?: any }
+      session: { server?: any },
+      sessionId?: string
     ): ((
       params: Record<string, unknown>,
       extra?: {
@@ -1127,6 +1228,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           extraSendNotification
         );
 
+        // Prefer the closure sessionId (always correct for this connection).
+        const resolvedSession =
+          (sessionId ? sessions.get(sessionId) : undefined) ?? foundSession;
+
+        const requestMeta =
+          extra?._meta &&
+          Object.keys(extra._meta).some((k) => k !== "progressToken")
+            ? (Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([k]) => k !== "progressToken"
+                )
+              ) as Record<string, unknown>)
+            : undefined;
+
         const nativeServer = session.server;
         const enhancedContext = createEnhancedContext(
           requestContext,
@@ -1135,8 +1250,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             (async () => ({ action: "decline" as const })),
           progressToken,
           sendNotification,
-          foundSession?.logLevel,
-          foundSession?.clientCapabilities
+          resolvedSession?.logLevel,
+          resolvedSession?.clientCapabilities,
+          sessionId,
+          sessions,
+          resolvedSession?.clientInfo,
+          requestMeta
         );
 
         const executeCallback = async () => {
@@ -1159,7 +1278,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: ToolDefinition,
       handler: unknown,
       nativeServer: any,
-      session?: { server?: any }
+      session?: { server?: any },
+      sessionId?: string
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
@@ -1177,7 +1297,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Wrap the raw handler with session context so that ctx.log(), ctx.sample(),
       // ctx.elicit(), etc. work correctly after HMR updates
       const wrappedHandler = session?.server
-        ? wrapHandler(handler, session)
+        ? wrapHandler(handler, session, sessionId)
         : handler;
 
       return {
@@ -1358,7 +1478,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             enrichedConfig,
             handler,
             nativeServer,
-            session
+            session,
+            sessionCtx.sessionId
           );
           nativeServer._registeredTools[key] = newEntry;
           if (refs?.tools) {
@@ -2555,24 +2676,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
 
-        const { requestContext, session, progressToken, sendNotification } =
-          findSessionContext(
-            this.sessions,
-            initialRequestContext,
-            extraProgressToken,
-            extraSendNotification
-          );
+        const {
+          requestContext,
+          session: foundSession,
+          progressToken,
+          sendNotification,
+        } = findSessionContext(
+          this.sessions,
+          initialRequestContext,
+          extraProgressToken,
+          extraSendNotification
+        );
 
-        // Find the sessionId by looking up the session in the sessions map
-        let sessionId: string | undefined;
-        if (session) {
-          for (const [id, s] of this.sessions.entries()) {
-            if (s === session) {
-              sessionId = id;
-              break;
-            }
-          }
-        }
+        // Prefer the closure sessionId — it is always the correct session for
+        // this connection. Fall back to findSessionContext's result only when
+        // no sessionId is available (e.g. stdio transport without session IDs).
+        const session =
+          (sessionId ? this.sessions.get(sessionId) : undefined) ??
+          foundSession;
 
         // Use the session server's native createMessage and elicitInput
         // These are already properly connected to the transport
@@ -2601,6 +2722,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           }
         };
 
+        const requestMeta =
+          extra?._meta &&
+          Object.keys(extra._meta).some((k) => k !== "progressToken")
+            ? (Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([k]) => k !== "progressToken"
+                )
+              ) as Record<string, unknown>)
+            : undefined;
+
         const enhancedContext = createEnhancedContext(
           requestContext,
           createMessageWithLogging,
@@ -2610,7 +2741,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           session?.logLevel,
           session?.clientCapabilities,
           sessionId,
-          this.sessions
+          this.sessions,
+          session?.clientInfo,
+          requestMeta
         );
 
         const executeCallback = async () => {
@@ -2687,7 +2820,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let errorType: string | null = null;
 
         try {
-          const result = await (handler as any)(params, extra);
+          const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
+
+          const result = await (handler as any)(
+            params,
+            (handler as any).length >= 2 ? enhancedCtx : undefined
+          );
 
           // If it's already a GetPromptResult, return as-is
           if ("messages" in result && Array.isArray(result.messages)) {
@@ -2738,7 +2876,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let contents: any[] = [];
 
         try {
-          const result = await (handler as any)(extra);
+          const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
+
+          const result = await (handler as any)(
+            (handler as any).length >= 1 ? enhancedCtx : undefined
+          );
           // If it's already a ReadResourceResult, return as-is
           if ("contents" in result && Array.isArray(result.contents)) {
             contents = result.contents;

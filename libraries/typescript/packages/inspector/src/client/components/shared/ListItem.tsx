@@ -13,7 +13,7 @@ interface ListItemProps {
   /** Primary title text */
   title: ReactNode;
   /** Optional description text */
-  description?: string;
+  description?: ReactNode;
   /** Optional metadata to display (like badges, tags, etc.) */
   metadata?: ReactNode;
   /** Click handler */

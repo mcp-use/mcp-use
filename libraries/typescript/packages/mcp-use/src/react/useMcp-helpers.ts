@@ -104,7 +104,7 @@ export function startConnectionHealthMonitoring(params: {
   getAuthHeaders?: () => Promise<Record<string, string>>;
   isMountedRef: { current: boolean };
   stateRef: { current: string };
-  autoReconnectRef: { current: boolean | number };
+  autoReconnectRef: { current: boolean | number | Record<string, unknown> };
   setState: (state: "discovering") => void;
   addLog: (level: LogLevel, message: string, ...args: unknown[]) => void;
   connect: () => void;

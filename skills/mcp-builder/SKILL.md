@@ -27,6 +27,7 @@ Read [design-and-architecture.md](references/design-and-architecture.md): when p
 - **Visual widgets (React TSX)** → [widgets.md](references/widgets.md): when creating interactive UI widgets in `resources/` folder
 - **Response helper API** → [response-helpers.md](references/response-helpers.md): when choosing how to format tool/resource return values
 - **URI template patterns** → [resource-templates.md](references/resource-templates.md): when defining parameterized resources
+- **Server proxying & composition** → [proxy.md](references/proxy.md): when composing multiple MCP servers into a unified aggregator
 
 ## Quick Reference
 
@@ -59,4 +60,11 @@ server.listen();
 
 **Response helpers:** `text()`, `object()`, `markdown()`, `html()`, `image()`, `audio()`, `binary()`, `error()`, `mix()`, `widget()`
 
-**Server methods:** `server.tool()`, `server.resource()`, `server.resourceTemplate()`, `server.prompt()`, `server.listen()`
+**Server methods:**
+- `server.tool()` - Define executable tool
+- `server.resource()` - Define static/dynamic resource
+- `server.resourceTemplate()` - Define parameterized resource
+- `server.prompt()` - Define prompt template
+- `server.proxy()` - Compose/Proxy multiple MCP servers
+- `server.uiResource()` - Define widget resource
+- `server.listen()` - Start server

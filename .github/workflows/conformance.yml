@@ -45,8 +45,51 @@ on:
 permissions:
   contents: read
 jobs:
+  # Detect which languages had changes so we only run the relevant tests.
+  # On workflow_dispatch the manual inputs take precedence instead.
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.compute.outputs.python }}
+      typescript: ${{ steps.compute.outputs.typescript }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          filters: |
+            python:
+              - 'libraries/python/**'
+              - '.github/workflows/conformance.yml'
+            typescript:
+              - 'libraries/typescript/**'
+              - '.github/workflows/conformance.yml'
+      - name: Compute outputs
+        id: compute
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual dispatch: use the explicit inputs
+            if [ "${{ inputs.typescript_only }}" = "true" ]; then
+              echo "python=false" >> $GITHUB_OUTPUT
+            else
+              echo "python=true" >> $GITHUB_OUTPUT
+            fi
+            if [ "${{ inputs.python_only }}" = "true" ]; then
+              echo "typescript=false" >> $GITHUB_OUTPUT
+            else
+              echo "typescript=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Push / PR: use path detection
+            echo "python=${{ steps.filter.outputs.python }}" >> $GITHUB_OUTPUT
+            echo "typescript=${{ steps.filter.outputs.typescript }}" >> $GITHUB_OUTPUT
+          fi
+
   conformance-test:
     name: Run Conformance Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.python == 'true' || needs.detect-changes.outputs.typescript == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -55,27 +98,31 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: needs.detect-changes.outputs.python == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install uv
+        if: needs.detect-changes.outputs.python == 'true'
         uses: astral-sh/setup-uv@v4
         with:
           version: "latest"
 
       - name: Set up Node.js
+        if: needs.detect-changes.outputs.typescript == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Install pnpm
+        if: needs.detect-changes.outputs.typescript == 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10
 
       - name: Prepare Python
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.typescript_only }}
+        if: needs.detect-changes.outputs.python == 'true'
         working-directory: libraries/python
         run: |
           uv venv
@@ -83,19 +130,19 @@ jobs:
           uv pip install -e ".[dev]"
 
       - name: Prepare TypeScript server
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.python_only }}
+        if: needs.detect-changes.outputs.typescript == 'true'
         working-directory: libraries/typescript
         run: |
           pnpm install
           pnpm build
 
       - name: Install TypeScript conformance server dependencies
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.python_only }}
+        if: needs.detect-changes.outputs.typescript == 'true'
         working-directory: libraries/typescript/packages/mcp-use/examples/server/features/conformance
         run: pnpm install
 
       - name: Install TypeScript conformance client dependencies
-        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.python_only }}
+        if: needs.detect-changes.outputs.typescript == 'true'
         working-directory: libraries/typescript/packages/mcp-use/examples/client/conformance
         run: pnpm install
 
@@ -103,10 +150,10 @@ jobs:
         id: build-servers
         run: |
           SERVERS='['
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.typescript_only }}" != "true" ]; then
+          if [ "${{ needs.detect-changes.outputs.python }}" = "true" ]; then
             SERVERS+='{"name":"python","start-command":"source .venv/bin/activate && python tests/integration/servers_for_testing/conformance_server.py --transport streamable-http --port 8000","url":"http://127.0.0.1:8000/mcp","working-directory":"libraries/python"}'
           fi
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.python_only }}" != "true" ]; then
+          if [ "${{ needs.detect-changes.outputs.typescript }}" = "true" ]; then
             if [[ $SERVERS != '[' ]]; then
               SERVERS+=','
             fi
@@ -119,10 +166,10 @@ jobs:
         id: build-clients
         run: |
           CLIENTS='['
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.typescript_only }}" != "true" ]; then
+          if [ "${{ needs.detect-changes.outputs.python }}" = "true" ]; then
             CLIENTS+='{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
           fi
-          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ "${{ inputs.python_only }}" != "true" ]; then
+          if [ "${{ needs.detect-changes.outputs.typescript }}" = "true" ]; then
             if [[ $CLIENTS != '[' ]]; then
               CLIENTS+=','
             fi
