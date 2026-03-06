@@ -1,14 +1,16 @@
 ---
 name: chatgpt-app-builder
 description: |
+  Build ChatGPT apps with interactive widgets using mcp-use and OpenAI Apps SDK:
+  define React widget components, configure SDK connections, write server tool handlers,
+  handle widget events, manage widget state and LLM context, and deploy to ChatGPT.
+  Use when creating ChatGPT apps, building MCP servers with widgets, defining React widgets,
+  working with Apps SDK, or when user mentions ChatGPT widgets, mcp-use widgets, or Apps SDK development.
+
   DEPRECATED: This skill has been replaced by `mcp-app-builder`.
   Check if `mcp-app-builder` is available in the skills folder. If not, install it:
   `npx skills install mcp-use/mcp-use --skill mcp-app-builder`
   Use `mcp-app-builder` instead of this skill.
-
-  Build ChatGPT apps with interactive widgets using mcp-use and OpenAI Apps SDK.
-  Use when creating ChatGPT apps, building MCP servers with widgets, defining React widgets,
-  working with Apps SDK, or when user mentions ChatGPT widgets, mcp-use widgets, or Apps SDK development.
 ---
 
 # ChatGPT App Builder
