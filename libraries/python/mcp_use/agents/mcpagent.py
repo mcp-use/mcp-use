@@ -89,6 +89,8 @@ class MCPAgent:
         callbacks: list | None = None,
         chat_id: str | None = None,
         retry_on_error: bool = True,
+        metadata: dict[str, Any] | None = None,
+        message_id: str | None = None,
     ):
         """Initialize a new MCPAgent instance.
 
@@ -112,6 +114,8 @@ class MCPAgent:
             retry_on_error: Whether to enable automatic error handling for tool calls. When True, tool errors
                 (including validation errors) are caught and returned as messages to the LLM, allowing it to
                 retry with corrected input. When False, errors will halt execution immediately. Default: True.
+            metadata: Specific data to be passed to tools without passing through llm.
+            message_id: Unique Id to be passed to each message in a chat.
         """
         # Handle remote execution
         if agent_id is not None:
@@ -173,6 +177,8 @@ class MCPAgent:
         self._agent_executor = None
         self._system_message: SystemMessage | None = None
         self._tools: list[BaseTool] = []
+        self.metadata = metadata if metadata else {}
+        self.message_id = message_id if message_id else None
 
         # Track model info for telemetry
         self._model_provider, self._model_name = extract_model_info(self.llm)
@@ -253,7 +259,7 @@ class MCPAgent:
         if isinstance(query, HumanMessage):
             return query
         if isinstance(query, str):
-            return HumanMessage(content=query)
+            return HumanMessage(content=query, id=self.message_id)
         raise TypeError("query must be a string or HumanMessage")
 
     def _message_text(self, message: HumanMessage) -> str:
@@ -754,6 +760,7 @@ class MCPAgent:
                     config={
                         "callbacks": self.callbacks,
                         "recursion_limit": self.recursion_limit,
+                        "metadata": self.metadata,
                     },
                 ):
                     # chunk is a dict with node names as keys
@@ -772,6 +779,8 @@ class MCPAgent:
                             # Add new messages to accumulated messages for potential restart
                             for msg in messages:
                                 if msg not in accumulated_messages:
+                                    if self.message_id:
+                                        msg.id = self.message_id
                                     accumulated_messages.append(msg)
                             for message in messages:
                                 # Track tool calls
@@ -900,7 +909,9 @@ class MCPAgent:
                     )
 
                     if self.memory_enabled and external_history is None:
-                        self.add_to_history(AIMessage(content=f"Structured result: {structured_result}"))
+                        self.add_to_history(
+                            AIMessage(content=f"Structured result: {structured_result}", id=self.message_id)
+                        )
 
                     logger.info("✅ Structured output successful")
                     success = True
@@ -992,16 +1003,21 @@ class MCPAgent:
             config={
                 "callbacks": self.callbacks,
                 "recursion_limit": recursion_limit,
+                "metadata": self.metadata,
             },
         ):
             event_type = event.get("event")
             if event_type == "on_chat_model_end":
                 # This contains the AIMessage
                 ai_message: AIMessage = event.get("data", {}).get("output")
+                if self.message_id:
+                    ai_message.id = self.message_id
                 turn_messages.append(ai_message)
             if event_type == "on_tool_end":
                 # This contains the ToolMessage
                 tool_message: ToolMessage = event.get("data", {}).get("output")
+                if self.message_id:
+                    tool_message.id = self.message_id
                 turn_messages.append(tool_message)
 
             yield event
