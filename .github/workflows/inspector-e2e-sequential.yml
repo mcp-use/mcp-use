@@ -16,22 +16,16 @@ permissions:
 # - prod: Built server :3002, built inspector :3000 (production simulation)
 # - builtin: Dev server with built-in inspector :3000 (HMR tests)
 #
-# Triggered on:
-# - PRs targeting canary/main (workflow file read from PR head branch)
-# - Manual dispatch (workflow_dispatch)
+# Triggered on: Manual dispatch only (workflow_dispatch)
 #
 
 on:
-  pull_request:
-    branches: [canary, main]
   workflow_dispatch:
 
 jobs:
   # ── Job 1: Mix mode ──────────────────────────────────────────────────────
-  # TODO: re-enable after Python E2E testing (if: false)
   e2e-mix:
     name: "E2E (mix)"
-    if: false
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -90,11 +84,10 @@ jobs:
           retention-days: 7
 
   # ── Job 2: Prod mode ─────────────────────────────────────────────────────
-  # TODO: re-enable after Python E2E testing (if: false)
   e2e-prod:
     name: "E2E (prod)"
     needs: e2e-mix
-    if: false
+    if: always()
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -153,11 +146,10 @@ jobs:
           retention-days: 7
 
   # ── Job 3: Builtin mode ──────────────────────────────────────────────────
-  # TODO: re-enable after Python E2E testing (if: false)
   e2e-builtin:
     name: "E2E (builtin)"
     needs: e2e-prod
-    if: false
+    if: always()
     runs-on: ubuntu-latest
     defaults:
       run:
