@@ -132,5 +132,15 @@ async def template_message(template_name: str) -> str:
         return "This is a template message."
 
 
+# ---------------------------------------------------------------------------
+# Tool: echo (used by E2E tests)
+# ---------------------------------------------------------------------------
+@server.tool(name="echo", description="Echoes the provided message back.")
+async def echo(
+    message: Annotated[str, Field(description="Message to echo")],
+) -> str:
+    return f"You said: {message}"
+
+
 if __name__ == "__main__":
     server.run(transport="streamable-http", host="127.0.0.1", port=8000)

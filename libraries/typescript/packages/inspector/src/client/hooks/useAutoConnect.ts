@@ -287,14 +287,29 @@ export function useAutoConnect({
 
       console.log("[useAutoConnect] Final custom headers:", finalCustomHeaders);
 
-      // Always provide proxyAddress so the OAuth fetch interceptor gets installed.
+      // Provide proxyAddress so the OAuth fetch interceptor gets installed.
       // Without it, OAuth metadata/registration requests go directly to the
       // external provider and get CORS-blocked in the browser.
+      //
+      // However, skip the proxy when the inspector is served by the MCP server
+      // itself (same origin as the target URL): in that case /inspector/api/proxy
+      // doesn't exist on the host and routing through it breaks direct connections.
+      let proxyAddress: string | undefined;
+      try {
+        const targetOrigin = new URL(url).origin;
+        const inspectorOrigin = window.location.origin;
+        if (inspectorOrigin !== targetOrigin) {
+          proxyAddress = `${inspectorOrigin}/inspector/api/proxy`;
+        }
+      } catch {
+        proxyAddress = `${window.location.origin}/inspector/api/proxy`;
+      }
+
       const proxyConfig: {
-        proxyAddress: string;
+        proxyAddress?: string;
         headers?: Record<string, string>;
       } = {
-        proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+        ...(proxyAddress ? { proxyAddress } : {}),
         ...(Object.keys(finalCustomHeaders).length > 0 && {
           headers: finalCustomHeaders,
         }),
