@@ -248,11 +248,9 @@ export class RedisStreamManager implements StreamManager {
         if (localController) {
           try {
             localController.enqueue(this.textEncoder.encode(message));
-          } catch (error) {
-            console.warn(
-              `[RedisStreamManager] Failed to enqueue message for ${sessionId}:`,
-              error
-            );
+          } catch {
+            // Client disconnected or stream closed - remove stale entry
+            this.localControllers.delete(sessionId);
           }
         }
       });
