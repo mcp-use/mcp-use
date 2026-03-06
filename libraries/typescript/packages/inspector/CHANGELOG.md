@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.2-canary.0
+
+### Patch Changes
+
+- 76320f0: fix(inspector): disable proxy on python builtin server
+  - mcp-use@1.21.2-canary.0
+
 ## 0.24.1
 
 ### Patch Changes
