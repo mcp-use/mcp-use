@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.1-canary.6
+
+### Patch Changes
+
+- 3cae276: Refactor clipboard operations across components to use a centralized `copyToClipboard` utility
+  - mcp-use@1.21.1-canary.6
+
 ## 0.24.1-canary.5
 
 ### Patch Changes
