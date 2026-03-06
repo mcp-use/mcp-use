@@ -6,6 +6,15 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.24.2" description="March 2026">
+  ## Embedded Inspector Proxy Fix
+  Patch release fixing auto-connect when inspector is served from MCP server (Python, custom servers).
+
+- **Fix**: Skip proxy when inspector origin matches MCP server origin — no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix**: Detect proxy availability via runtime config injection (`__MCP_PROXY_URL__`); disable autoProxyFallback when no proxy is available
+- **Update**: Updated mcp-use to v1.21.2
+</Update>
+
 <Update label="v0.24.1" description="March 2026">
   ## Chat Components & Dark Mode Fixes
   Patch release with exported chat component enhancements and proxy header handling.

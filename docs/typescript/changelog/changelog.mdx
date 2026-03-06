@@ -6,6 +6,16 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.21.2" description="March 2026">
+  ## Inspector Proxy Fix for Embedded Servers
+  Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
+
+- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
+- **Update**: Updated @mcp-use/inspector to v0.24.2
+- **Update**: Updated @mcp-use/cli to v2.18.1
+</Update>
+
 <Update label="v1.21.1" description="March 2026">
   ## Session Persistence & CLI Improvements
   Patch release with session recovery fix, CLI enhancements, and create-mcp-use-app install improvements.
