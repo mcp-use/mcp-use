@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.21.1" description="March 2026">
+  ## Session Persistence & CLI Improvements
+  Patch release with session recovery fix, CLI enhancements, and create-mcp-use-app install improvements.
+
+- **Fix**: Session recovery after restart returns 400 fix; distributed SSE stream routing via Redis Pub/Sub
+- **Enhancement** (@mcp-use/cli): `mcp-use build` runs tool registry type generation before TypeScript compilation when server file exists
+- **Enhancement** (@mcp-use/cli): `--root-dir` option for deploy command for monorepo support
+- **Fix** (create-mcp-use-app): Remove flickering behaviour from `npm i`
+- **Update**: Updated @mcp-use/inspector to v0.24.1
+- **Update**: Updated @mcp-use/cli to v2.18.0
+- **Update**: Updated create-mcp-use-app to v0.14.4
+</Update>
+
 <Update label="v1.20.1" description="February 2026">
   ## Widget Status Texts & CSP Handling
   Patch release with widget metadata enhancements and CSP improvements.
