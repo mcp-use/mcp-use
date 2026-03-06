@@ -15,6 +15,7 @@ import {
   NotificationResultDisplay,
   type NotificationResult,
 } from "./notifications";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { formatRelativeTime } from "@/client/utils/time";
 
 interface NotificationsTabProps {
@@ -196,7 +197,7 @@ export function NotificationsTab({
   const handleCopy = useCallback(async () => {
     if (!selectedNotification) return;
     try {
-      await navigator.clipboard.writeText(
+      await copyToClipboard(
         JSON.stringify(
           {
             method: selectedNotification.method,

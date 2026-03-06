@@ -1,4 +1,5 @@
 import { cn } from "@/client/lib/utils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import {
   ChevronDown,
   ChevronRight,
@@ -98,7 +99,7 @@ function LogEntry({ log }: { log: ConsoleLogEntry }) {
     e.stopPropagation();
     try {
       const text = log.args.map(formatArg).join("\n");
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       toast.success("Copied to clipboard");
     } catch {
       toast.error("Failed to copy");
@@ -362,7 +363,7 @@ export function IframeConsole({
         })
         .join("\n\n");
 
-      await navigator.clipboard.writeText(formattedLogs);
+      await copyToClipboard(formattedLogs);
       toast.success(`Copied ${filteredLogs.length} logs to clipboard`);
     } catch {
       toast.error("Failed to copy logs to clipboard");

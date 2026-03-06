@@ -13,6 +13,7 @@ import {
   ElicitationRequestDisplay,
 } from "./elicitation";
 import { useInspector } from "@/client/context/InspectorContext";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { formatRelativeTime } from "@/client/utils/time";
 
 interface ElicitationTabProps {
@@ -277,7 +278,7 @@ export function ElicitationTab({
   const handleCopy = useCallback(async () => {
     if (!selectedRequest) return;
     try {
-      await navigator.clipboard.writeText(
+      await copyToClipboard(
         JSON.stringify(
           {
             id: selectedRequest.id,

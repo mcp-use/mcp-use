@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import Markdown from "markdown-to-jsx";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { usePrismTheme } from "@/client/hooks/usePrismTheme";
@@ -49,7 +50,7 @@ function CodeBlock({
   const codeContent = String(children).trim();
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(codeContent);
+    await copyToClipboard(codeContent);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };

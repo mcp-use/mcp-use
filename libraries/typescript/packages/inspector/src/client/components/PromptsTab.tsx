@@ -25,6 +25,7 @@ import {
   SavedPromptsList,
 } from "./prompts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { RpcPanel } from "./shared";
 
 export interface PromptsTabRef {
@@ -329,7 +330,7 @@ export function PromptsTab({
 
   const handleCopyResult = useCallback(async (index: number, result: any) => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+      await copyToClipboard(JSON.stringify(result, null, 2));
       setCopiedResult(index);
       setTimeout(() => setCopiedResult(null), 2000);
     } catch (error) {

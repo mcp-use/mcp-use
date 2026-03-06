@@ -1,5 +1,4 @@
 import { Check, Copy, Loader2, Wrench, X } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/client/components/ui/button";
 import {
   Sheet,
@@ -10,8 +9,9 @@ import {
   SheetTrigger,
 } from "@/client/components/ui/sheet";
 import { cn } from "@/client/lib/utils";
-import { JSONDisplay } from "../shared/JSONDisplay";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { analyzeJSON } from "@/client/utils/jsonUtils";
+import { JSONDisplay } from "../shared/JSONDisplay";
 
 interface ToolCallDisplayProps {
   toolName: string;
@@ -28,7 +28,6 @@ export function ToolCallDisplay({
   state = "result",
   partialArgs,
 }: ToolCallDisplayProps) {
-  const [_copied, setCopied] = useState(false);
   const displayArgs = state === "call" && partialArgs ? partialArgs : args;
 
   const getStatusIcon = () => {
@@ -61,12 +60,6 @@ export function ToolCallDisplay({
       default:
         return " bg-emerald-500/20 dark:bg-emerald-500/20";
     }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const formatContent = (content: any): string => {

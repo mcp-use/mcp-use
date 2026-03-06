@@ -6,6 +6,7 @@ import {
 } from "@/client/components/ui/dialog";
 import type { McpServer } from "mcp-use/react";
 import { Copy } from "lucide-react";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -37,9 +38,9 @@ export function ServerCapabilitiesModal({
 
   const capabilities = connection.capabilities || {};
 
-  const copyUrl = () => {
+  const copyUrl = async () => {
     if (connection.url) {
-      navigator.clipboard.writeText(connection.url);
+      await copyToClipboard(connection.url);
       toast.success("URL copied");
     }
   };

@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { MarkdownRenderer } from "@/client/components/shared/MarkdownRenderer";
+import { copyToClipboard } from "@/client/utils/clipboard";
 
 /**
  * Button that copies the provided text to the clipboard and shows a brief visual confirmation.
@@ -12,7 +13,7 @@ function CopyButton({ text }: { text: string }) {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
