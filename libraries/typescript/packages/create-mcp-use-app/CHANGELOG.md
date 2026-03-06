@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.4
+
+### Patch Changes
+
+- ed1b034: fix(create-mcp-use-app): remove flickering behaviour from npm i
+
 ## 0.14.4-canary.0
 
 ### Patch Changes

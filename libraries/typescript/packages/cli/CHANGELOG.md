@@ -1,5 +1,26 @@
 # @mcp-use/cli
 
+## 2.18.0
+
+### Minor Changes
+
+- ed1b034: feat(deploy): add --root-dir option for monorepo support
+
+### Patch Changes
+
+- ed1b034: feat(build): run tool registry type generation during build
+
+  `mcp-use build` now generates `.mcp-use/tool-registry.d.ts` before TypeScript compilation when a server file exists. This fixes intermittent TS errors (e.g. `useCallTool` args typed as `null`) when `postinstall` typegen runs before source files are present (e.g. in Docker multi-stage builds). The `generate-types` command now uses the same shared helper.
+
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+  - @mcp-use/inspector@0.24.1
+  - mcp-use@1.21.1
+
 ## 2.18.0-canary.6
 
 ### Patch Changes

@@ -1,5 +1,25 @@
 # mcp-use
 
+## 1.21.1
+
+### Patch Changes
+
+- ed1b034: fix(server): session recovery after restart returns 400 and distributed SSE stream routing
+  - Fixed #1133: session recovery after server deploy/restart no longer returns `400 Bad Request: Server not initialized`. The transport's internal `_initialized` flag is now set during session recovery so reconnecting clients work seamlessly.
+  - Integrated `StreamManager` into the server's notification and request flow so that standalone SSE messages (notifications, server-to-client requests) are routed through Redis Pub/Sub in distributed/load-balanced deployments.
+  - Added distributed request/response correlation: server-to-client requests (sampling, elicitation, roots listing) are now correctly routed back to the originating server instance when the client's response POST lands on a different server.
+  - Made `RedisStreamManager.create()` idempotent to handle SSE reconnects without duplicate Pub/Sub subscriptions.
+
+- ed1b034: fix(stream-manager): remove console warn for session disconnetion in dev mode to avoid noise caused by hmr
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+  - @mcp-use/cli@2.18.0
+  - @mcp-use/inspector@0.24.1
+
 ## 1.21.1-canary.6
 
 ### Patch Changes

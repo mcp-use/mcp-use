@@ -1,5 +1,17 @@
 # @mcp-use/inspector
 
+## 0.24.1
+
+### Patch Changes
+
+- ed1b034: fix(inspector): strip infra headers from proxied requests
+- ed1b034: Fix tools selection and attachment button icons invisible in dark mode. Add explicit `text-muted-foreground` and `hover:text-foreground` to the paperclip and wrench buttons so they have proper contrast against the dark input background.
+- ed1b034: fix(inspector): allow set initial messages for exported chat components
+- ed1b034: Refactor clipboard operations across components to use a centralized `copyToClipboard` utility
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+  - mcp-use@1.21.1
+
 ## 0.24.1-canary.6
 
 ### Patch Changes
