@@ -1,6 +1,7 @@
 """Server runner for different transport types."""
 
 import logging
+import socket
 import sys
 from functools import partial
 from typing import TYPE_CHECKING, get_args
@@ -20,6 +21,25 @@ from starlette.applications import Starlette
 logger = logging.getLogger(__name__)
 
 
+def _is_port_available(host: str, port: int) -> bool:
+    """Check if a port is available for binding."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _find_available_port(host: str, port: int, max_retries: int = 10) -> int:
+    """Find an available port starting from the given port."""
+    for i in range(max_retries):
+        candidate = port + i
+        if _is_port_available(host, candidate):
+            return candidate
+    raise RuntimeError(f"No available port found in range {port}-{port + max_retries - 1}")
+
+
 class ServerRunner:
     """Handles running the server with different transport types."""
 
@@ -34,6 +54,12 @@ class ServerRunner:
         transport: TransportType | None = None,
         reload: bool = False,
     ) -> None:
+        # Find an available port if the requested one is in use
+        original_port = port
+        port = _find_available_port(host, port)
+        if port != original_port:
+            logger.info(f"Port {original_port} is in use, using port {port} instead.")
+
         # Display startup information
         await display_startup_info(self.server, host, port, transport, self.server._start_time)
         config = uvicorn.Config(
