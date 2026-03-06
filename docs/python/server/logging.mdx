@@ -196,6 +196,35 @@ INFO: 127.0.0.1:58478 - "GET /inspector/config.json HTTP/1.1" 200
 MCP:  127.0.0.1:58478 - "POST /mcp [tools/list] HTTP/1.1" 200
 ```
 
+### MCP Logs Only (`mcp_logs_only`)
+
+By default, the server shows both `MCP:` protocol logs and `INFO:` HTTP access logs. Enable `mcp_logs_only` to suppress all HTTP access logs and only show MCP protocol traffic:
+
+```python
+# Show all logs (default)
+server = MCPServer("my-server", mcp_logs_only=False)
+
+# Only show MCP protocol logs
+server = MCPServer("my-server", mcp_logs_only=True)
+```
+
+**With `mcp_logs_only=False` (default):**
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [initialize] HTTP/1.1" 200
+INFO: 127.0.0.1:58478 - "POST /mcp HTTP/1.1" 200
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/list] HTTP/1.1" 200
+INFO: 127.0.0.1:58478 - "POST /mcp HTTP/1.1" 200
+INFO: 127.0.0.1:58478 - "GET  /docs HTTP/1.1" 200
+```
+
+**With `mcp_logs_only=True`:**
+```
+MCP:  127.0.0.1:58478 - "POST /mcp [initialize] HTTP/1.1" 200
+MCP:  127.0.0.1:58478 - "POST /mcp [tools/list] HTTP/1.1" 200
+```
+
+This removes the duplicate `INFO:` lines for MCP requests and hides non-MCP HTTP traffic (`/docs`, `/inspector`, static files), giving you a clean view of only MCP protocol activity.
+
 ### Pretty Print JSON-RPC (`pretty_print_jsonrpc`)
 
 Enable pretty printing to display JSON-RPC requests and responses as formatted Rich panels:
@@ -235,6 +264,7 @@ server = MCPServer(
     name="my-server",
     debug=True,
     show_inspector_logs=False,    # Hide inspector noise
+    mcp_logs_only=True,           # Only show MCP protocol logs
     pretty_print_jsonrpc=True,    # Pretty-printed JSON-RPC panels
 )
 server.run(transport="streamable-http")
