@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { ToolInputForm } from "./ToolInputForm";
 
@@ -84,21 +85,28 @@ export function ToolExecutionPanel({
   }, [selectedTool?.description]);
 
   // Copy metadata to clipboard
-  const copyMetadataToClipboard = () => {
+  const copyMetadataToClipboard = async () => {
     if (!selectedTool) return;
-    // Copy the full tool definition instead of cherry-picking fields
-    navigator.clipboard.writeText(JSON.stringify(selectedTool, null, 2));
-    setCopiedMetadata(true);
-    setTimeout(() => setCopiedMetadata(false), 2000);
+    try {
+      await copyToClipboard(JSON.stringify(selectedTool, null, 2));
+      setCopiedMetadata(true);
+      setTimeout(() => setCopiedMetadata(false), 2000);
+    } catch {
+      // Silently fail - no toast in this component
+    }
   };
 
   // Copy payload to clipboard (use payloadToSend when provided - reflects what will actually be sent)
-  const copyPayloadToClipboard = () => {
+  const copyPayloadToClipboard = async () => {
     if (!selectedTool) return;
-    const payload = payloadToSend ?? toolArgs;
-    navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-    setCopiedPayload(true);
-    setTimeout(() => setCopiedPayload(false), 2000);
+    try {
+      const payload = payloadToSend ?? toolArgs;
+      await copyToClipboard(JSON.stringify(payload, null, 2));
+      setCopiedPayload(true);
+      setTimeout(() => setCopiedPayload(false), 2000);
+    } catch {
+      // Silently fail - no toast in this component
+    }
   };
 
   // Handle Cmd/Ctrl + Enter keyboard shortcut

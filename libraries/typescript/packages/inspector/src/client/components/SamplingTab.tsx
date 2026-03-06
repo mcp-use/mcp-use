@@ -13,6 +13,7 @@ import {
   SamplingRequestDisplay,
 } from "./sampling";
 import { useInspector } from "@/client/context/InspectorContext";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { formatRelativeTime } from "@/client/utils/time";
 import { useConfig } from "./chat/useConfig";
 
@@ -268,7 +269,7 @@ export function SamplingTab({
   const handleCopy = useCallback(async () => {
     if (!selectedRequest) return;
     try {
-      await navigator.clipboard.writeText(
+      await copyToClipboard(
         JSON.stringify(
           {
             id: selectedRequest.id,

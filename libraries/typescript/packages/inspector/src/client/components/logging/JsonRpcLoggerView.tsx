@@ -15,6 +15,7 @@ import {
 } from "mcp-use/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/client/utils/clipboard";
 
 interface RenderableRpcItem {
   id: string;
@@ -77,10 +78,10 @@ export function JsonRpcLoggerView({
     }
   };
 
-  const copyToClipboard = async (payload: unknown) => {
+  const copyMessageToClipboard = async (payload: unknown) => {
     try {
       const jsonString = JSON.stringify(payload, null, 2);
-      await navigator.clipboard.writeText(jsonString);
+      await copyToClipboard(jsonString);
       toast.success("Message copied to clipboard");
     } catch (error) {
       console.error("Failed to copy message:", error);
@@ -91,7 +92,7 @@ export function JsonRpcLoggerView({
   const exportAllMessages = async () => {
     try {
       const jsonString = JSON.stringify(filteredItems, null, 2);
-      await navigator.clipboard.writeText(jsonString);
+      await copyToClipboard(jsonString);
       toast.success(
         `All messages copied to clipboard (${filteredItems.length})`
       );
@@ -320,7 +321,7 @@ export function JsonRpcLoggerView({
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            copyToClipboard(it.payload);
+                            copyMessageToClipboard(it.payload);
                           }}
                           className="h-6 px-2"
                           title="Copy message to clipboard"

@@ -28,6 +28,7 @@ import {
   generateVSCodeDeepLink,
   generateVSCodeInsidersDeepLink,
 } from "@/client/utils/mcpClientUtils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { toast } from "sonner";
 import { McpUseLogo } from "./McpUseLogo";
 import { ServerIcon } from "./ServerIcon";
@@ -161,7 +162,7 @@ export function CommandPalette({
               serverName,
               serverHeaders
             );
-            navigator.clipboard.writeText(command);
+            copyToClipboard(command);
             toast.success("Command copied to clipboard");
             onOpenChange(false);
           },
@@ -236,7 +237,7 @@ export function CommandPalette({
               serverName,
               serverHeaders
             );
-            navigator.clipboard.writeText(command);
+            copyToClipboard(command);
             toast.success("Command copied to clipboard");
             onOpenChange(false);
           },
@@ -253,7 +254,7 @@ export function CommandPalette({
               serverName,
               serverHeaders
             );
-            navigator.clipboard.writeText(config);
+            copyToClipboard(config);
             toast.success("Config copied to clipboard");
             onOpenChange(false);
           },

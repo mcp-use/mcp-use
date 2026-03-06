@@ -25,6 +25,7 @@ import {
 } from "./resources";
 import { RpcPanel } from "./shared";
 import { useConfig } from "./chat/useConfig";
+import { copyToClipboard } from "@/client/utils/clipboard";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -331,9 +332,7 @@ export function ResourcesTab({
   const handleCopy = useCallback(async () => {
     if (!currentResult) return;
     try {
-      await navigator.clipboard.writeText(
-        JSON.stringify(currentResult.result, null, 2)
-      );
+      await copyToClipboard(JSON.stringify(currentResult.result, null, 2));
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {

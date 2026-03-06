@@ -13,6 +13,7 @@ import {
   generatePythonSDKCode,
   generateTypeScriptSDKCode,
 } from "@/client/utils/mcpClientUtils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { Button } from "./ui/button";
 
 interface SdkIntegrationModalProps {
@@ -55,7 +56,7 @@ export function SdkIntegrationModal({
       : generatePythonSDKCode(serverUrl, serverName, serverId, headers);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
+    await copyToClipboard(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

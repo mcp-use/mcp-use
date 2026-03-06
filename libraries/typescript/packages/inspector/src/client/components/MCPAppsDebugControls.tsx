@@ -28,6 +28,7 @@ import {
 } from "../context/WidgetDebugContext";
 import { useResourceProps, type PropPreset } from "../hooks/useResourceProps";
 import type { LLMConfig } from "./chat/types";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { IframeConsole } from "./IframeConsole";
 import { PropsConfigDialog } from "./resources/PropsConfigDialog";
 import { JSONDisplay } from "./shared/JSONDisplay";
@@ -783,10 +784,14 @@ export function MCPAppsDebugControls({
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 shrink-0"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        navigator.clipboard.writeText(effectivePolicy);
-                        toast.success("Policy copied to clipboard");
+                        try {
+                          await copyToClipboard(effectivePolicy);
+                          toast.success("Policy copied to clipboard");
+                        } catch {
+                          toast.error("Failed to copy");
+                        }
                       }}
                       aria-label="Copy policy"
                     >
@@ -834,10 +839,14 @@ export function MCPAppsDebugControls({
                       variant="ghost"
                       size="sm"
                       className="h-7 w-7 p-0 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-200/50 dark:hover:bg-amber-800/30"
-                      onClick={(e) => {
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        navigator.clipboard.writeText(agentPrompt);
-                        toast.success("Prompt copied to clipboard");
+                        try {
+                          await copyToClipboard(agentPrompt);
+                          toast.success("Prompt copied to clipboard");
+                        } catch {
+                          toast.error("Failed to copy");
+                        }
                       }}
                       aria-label="Copy prompt for agents"
                     >

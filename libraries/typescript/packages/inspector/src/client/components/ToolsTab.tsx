@@ -48,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/client/components/ui/alert-dialog";
+import { copyToClipboard } from "@/client/utils/clipboard";
 
 export interface ToolsTabRef {
   focusSearch: () => void;
@@ -901,7 +902,7 @@ export function ToolsTab({
 
   const handleCopyResult = useCallback(async (index: number, text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       setCopiedResult(index);
       setTimeout(() => setCopiedResult(null), 2000);
     } catch (error) {
