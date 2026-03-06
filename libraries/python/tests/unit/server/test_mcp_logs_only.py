@@ -1,8 +1,8 @@
-"""Tests for mcp_logs_only feature in MCPAccessFormatter."""
+"""Tests for MCPLogsOnlyFilter."""
 
 import logging
 
-from mcp_use.server.logging.formatters import MCPAccessFormatter
+from mcp_use.server.logging.config import MCPLogsOnlyFilter
 
 
 def _make_access_record(client: str, method: str, path: str, status: int = 200) -> logging.LogRecord:
@@ -19,31 +19,28 @@ def _make_access_record(client: str, method: str, path: str, status: int = 200) 
     return record
 
 
-class TestMCPLogsOnly:
-    """Tests for mcp_logs_only=True suppressing all uvicorn access logs."""
+class TestMCPLogsOnlyFilter:
+    """Tests for MCPLogsOnlyFilter dropping uvicorn access log records."""
 
-    def test_suppresses_non_mcp_request(self):
-        formatter = MCPAccessFormatter(mcp_logs_only=True)
+    def test_drops_non_mcp_request(self):
+        f = MCPLogsOnlyFilter()
         record = _make_access_record("127.0.0.1:5000", "GET", "/docs")
-        result = formatter.formatMessage(record)
-        assert result == ""
+        assert f.filter(record) is False
 
-    def test_suppresses_mcp_request(self):
-        """MCP access logs are suppressed because MCPLoggingMiddleware prints them directly."""
-        formatter = MCPAccessFormatter(mcp_logs_only=True)
+    def test_drops_mcp_request(self):
+        """MCP access logs are dropped because MCPLoggingMiddleware prints them directly."""
+        f = MCPLogsOnlyFilter()
         record = _make_access_record("127.0.0.1:5000", "POST", "/mcp")
-        result = formatter.formatMessage(record)
-        assert result == ""
+        assert f.filter(record) is False
 
-    def test_suppresses_inspector_request(self):
-        formatter = MCPAccessFormatter(mcp_logs_only=True)
+    def test_drops_inspector_request(self):
+        f = MCPLogsOnlyFilter()
         record = _make_access_record("127.0.0.1:5000", "GET", "/inspector")
-        result = formatter.formatMessage(record)
-        assert result == ""
+        assert f.filter(record) is False
 
     def test_passes_non_uvicorn_records(self):
-        """Non-uvicorn log records (no args) should pass through regardless."""
-        formatter = MCPAccessFormatter(mcp_logs_only=True)
+        """Non-uvicorn log records (no args) should pass through."""
+        f = MCPLogsOnlyFilter()
         record = logging.LogRecord(
             name="uvicorn.access",
             level=logging.INFO,
@@ -53,20 +50,4 @@ class TestMCPLogsOnly:
             args=None,
             exc_info=None,
         )
-        result = formatter.formatMessage(record)
-        assert result == "Server started"
-
-    def test_default_does_not_suppress(self):
-        """With mcp_logs_only=False (default), access logs are not suppressed."""
-        formatter = MCPAccessFormatter(mcp_logs_only=False)
-        record = _make_access_record("127.0.0.1:5000", "GET", "/docs")
-        # formatMessage should NOT return empty string
-        # (it will try to format via uvicorn which may fail in test env,
-        #  but the key assertion is that it doesn't return "")
-        try:
-            result = formatter.formatMessage(record)
-            assert result != ""
-        except (ValueError, KeyError):
-            # uvicorn formatter needs full environment — that's fine,
-            # the point is it didn't return "" (it tried to format)
-            pass
+        assert f.filter(record) is True
