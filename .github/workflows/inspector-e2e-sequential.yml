@@ -16,10 +16,14 @@ permissions:
 # - prod: Built server :3002, built inspector :3000 (production simulation)
 # - builtin: Dev server with built-in inspector :3000 (HMR tests)
 #
-# Triggered on: Manual dispatch only (workflow_dispatch)
+# Triggered on:
+# - PRs targeting canary/main (workflow file read from PR head branch)
+# - Manual dispatch (workflow_dispatch)
 #
 
 on:
+  pull_request:
+    branches: [canary, main]
   workflow_dispatch:
 
 jobs:
