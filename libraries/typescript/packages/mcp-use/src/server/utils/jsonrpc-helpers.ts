@@ -167,3 +167,32 @@ export const JsonRpcErrorCode = {
   // Application-specific errors (from -32000 to -32099)
   APPLICATION_ERROR: -32000,
 } as const;
+
+/**
+ * Runtime type guard: checks if a message is a JSON-RPC response (success or error).
+ * Uses duck-typing for speed — no Zod parsing overhead.
+ */
+export function isJsonRpcResponse(
+  msg: unknown
+): msg is JsonRpcResponse | JsonRpcError {
+  return (
+    !!msg &&
+    typeof msg === "object" &&
+    "id" in msg &&
+    ("result" in msg || "error" in msg)
+  );
+}
+
+/**
+ * Runtime type guard: checks if a message is a JSON-RPC request (has id + method, not a response).
+ */
+export function isJsonRpcRequest(msg: unknown): msg is JsonRpcRequest {
+  return (
+    !!msg &&
+    typeof msg === "object" &&
+    "id" in msg &&
+    "method" in msg &&
+    !("result" in msg) &&
+    !("error" in msg)
+  );
+}

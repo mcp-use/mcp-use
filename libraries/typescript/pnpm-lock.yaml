@@ -958,6 +958,25 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/mcp-use/examples/server/features/session-management:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      redis:
+        specifier: ^5.10.0
+        version: 5.10.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/mcp-use/examples/server/features/streaming-props:
     dependencies:
       mcp-use:
@@ -9578,27 +9597,22 @@ snapshots:
   '@redis/bloom@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
-    optional: true
 
   '@redis/client@5.10.0':
     dependencies:
       cluster-key-slot: 1.1.2
-    optional: true
 
   '@redis/json@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
-    optional: true
 
   '@redis/search@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
-    optional: true
 
   '@redis/time-series@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
-    optional: true
 
   '@remote-dom/core@1.10.1(@preact/signals-core@1.12.2)':
     dependencies:
@@ -10616,8 +10630,7 @@ snapshots:
 
   clsx@2.1.1: {}
 
-  cluster-key-slot@1.1.2:
-    optional: true
+  cluster-key-slot@1.1.2: {}
 
   cmdk@1.1.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
@@ -13666,7 +13679,6 @@ snapshots:
       '@redis/json': 5.10.0(@redis/client@5.10.0)
       '@redis/search': 5.10.0(@redis/client@5.10.0)
       '@redis/time-series': 5.10.0(@redis/client@5.10.0)
-    optional: true
 
   refa@0.12.1:
     dependencies:
