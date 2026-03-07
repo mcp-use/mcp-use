@@ -66,10 +66,19 @@ export interface OAuthProvider {
   getMode?(): OAuthMode;
 
   /**
-   * Get the registration endpoint URL (for direct mode with dynamic client registration)
-   * @returns The registration endpoint URL, or undefined if not supported
-   */
+  * Get the registration endpoint URL (for direct mode with dynamic client registration)
+  * @returns The registration endpoint URL, or undefined if not supported
+  */
   getRegistrationEndpoint?(): string | undefined;
+
+  /**
+   *
+   * When true, the MCP server advertises itself as the authorization_server
+   * in protected resource metadata so that MCP clients fetch auth metadata
+   * from the local server. The server then proxies the request to the
+   * provider using the OIDC discovery endpoint.
+   */
+  usesOidcDiscovery?(): boolean;
 }
 
 /**
@@ -151,6 +160,12 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
 }
 
+export interface ClerkOAuthConfig extends BaseOAuthConfig {
+  provider: "clerk";
+  domain: string;        // e.g. "my-app.clerk.accounts.dev" or custom domain
+  verifyJwt?: boolean;   // defaults to true, disabled only for local dev
+}
+
 /**
  * Union type of all OAuth provider configurations
  */
@@ -159,4 +174,5 @@ export type OAuthConfig =
   | Auth0OAuthConfig
   | KeycloakOAuthConfig
   | WorkOSOAuthConfig
-  | CustomOAuthConfig;
+  | CustomOAuthConfig
+  | ClerkOAuthConfig;
