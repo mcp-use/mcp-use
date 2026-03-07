@@ -330,6 +330,7 @@
                     "pages": [
                       "python/api-reference/mcp_use_client_connectors_base",
                       "python/api-reference/mcp_use_client_connectors_code_mode",
+                      "python/api-reference/mcp_use_client_connectors_factory",
                       "python/api-reference/mcp_use_client_connectors_http",
                       "python/api-reference/mcp_use_client_connectors_sandbox",
                       "python/api-reference/mcp_use_client_connectors_stdio",

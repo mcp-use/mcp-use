@@ -22,22 +22,22 @@ Authentication models for mcp-use server.
 
 Validated access token with user claims.
 
-    Attributes:
-        token: The original bearer token
-        claims: User information (email, sub, name, etc.)
-        scopes: Optional list of permissions/scopes
+Attributes:
+    token: The original bearer token
+    claims: User information (email, sub, name, etc.)
+    scopes: Optional list of permissions/scopes
 
-    Example:
-        ```python
-        from mcp_use.server.auth import get_access_token
+Example:
+    ```python
+    from mcp_use.server.auth import get_access_token
 
-        @server.tool()
-        def whoami() -> str:
-            token = get_access_token()
-            if token:
-                return f"Hello \{token.claims.get('email')\}"
-            return "Not authenticated"
-        ```
+    @server.tool()
+    def whoami() -> str:
+        token = get_access_token()
+        if token:
+            return f"Hello \{token.claims.get('email')\}"
+        return "Not authenticated"
+    ```
 
 </div>
 </RandomGradientBackground>
@@ -59,10 +59,10 @@ from mcp_use.server.auth.models import AccessToken
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
+Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.
 
-        `self` is explicitly positional-only to allow `self` as a field name.
+`self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>

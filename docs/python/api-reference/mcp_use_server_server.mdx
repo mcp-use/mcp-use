@@ -77,25 +77,25 @@ def debug():
 
 Include a router's tools, resources, and prompts into this server.
 
-        Similar to FastAPI's include_router, this allows you to organize your
-        MCP server into multiple files/modules.
+Similar to FastAPI's include_router, this allows you to organize your
+MCP server into multiple files/modules.
 
-        Example:
-            ```python
-            from mcp_use.server import MCPServer, MCPRouter
+Example:
+    ```python
+    from mcp_use.server import MCPServer, MCPRouter
 
-            # In routes/math.py
-            router = MCPRouter()
+    # In routes/math.py
+    router = MCPRouter()
 
-            @router.tool()
-            def add(a: int, b: int) -> int:
-                return a + b
+    @router.tool()
+    def add(a: int, b: int) -> int:
+        return a + b
 
-            # In main.py
-            server = MCPServer(name="my-server")
-            server.include_router(router, prefix="math")  # Tool becomes "math_add"
-            server.include_router(other_router, enabled=False)  # Skip this router
-            ```
+    # In main.py
+    server = MCPServer(name="my-server")
+    server.include_router(router, prefix="math")  # Tool becomes "math_add"
+    server.include_router(other_router, enabled=False)  # Skip this router
+    ```
 
 
 **Parameters**
@@ -115,10 +115,10 @@ def include_router(router: MCPRouter, prefix: str = "", enabled: bool = True):
 
 Notify all subscribed sessions that a resource has been updated.
 
-        Broadcasts a ``notifications/resources/updated`` message to every session
-        that called ``resources/subscribe`` for this URI.
+Broadcasts a ``notifications/resources/updated`` message to every session
+that called ``resources/subscribe`` for this URI.
 
-        Can be called from within a tool handler or from any async context.
+Can be called from within a tool handler or from any async context.
 
 
 
