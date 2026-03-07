@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import (
     AnyFunction,
     CallToolRequest,
+    CallToolResult,
     CompleteRequest,
     Completion,
     GetPromptRequest,
@@ -21,10 +22,12 @@ from mcp.types import (
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
+    ListToolsResult,
     ReadResourceRequest,
     ServerResult,
     SetLevelRequest,
     SubscribeRequest,
+    Tool,
     UnsubscribeRequest,
 )
 
@@ -54,6 +57,7 @@ lowlevel.ServerSession = MiddlewareServerSession
 if TYPE_CHECKING:
     from mcp.server.session import ServerSession
 
+    from mcp_use.client.connectors.base import BaseConnector
     from mcp_use.server.router import MCPRouter
 
 
@@ -147,6 +151,12 @@ class MCPServer(FastMCP):
         self.pretty_print_jsonrpc = pretty_print_jsonrpc
         self.mcp_logs_only = mcp_logs_only
         self._transport_type: TransportType = "streamable-http"
+        self._mounted_connectors: list[tuple[str, BaseConnector]] = []
+        self._mounted_tool_map: dict[str, tuple[BaseConnector, str]] = {}
+        self._mounted_tools_cache: list[Tool] = []
+        self._mounted_tool_cache_built = False
+        self._middleware_handlers_wrapped = False
+        self._mount_handlers_wrapped = False
 
         self.middleware_manager = MiddlewareManager()
         self.middleware_manager.add_middleware(TelemetryMiddleware())
@@ -318,6 +328,73 @@ class MCPServer(FastMCP):
                 description=prompt.description,
             )(prompt.fn)
 
+    def mount(self, connector: BaseConnector, prefix: str) -> None:
+        """Mount an external connector's tools on this server."""
+        normalized_prefix = prefix.strip()
+        if not normalized_prefix:
+            raise ValueError("Mounted connector prefix must be non-empty")
+
+        if any(existing_prefix == normalized_prefix for existing_prefix, _ in self._mounted_connectors):
+            raise ValueError(f"Mounted connector prefix '{normalized_prefix}' is already registered")
+
+        self._mounted_connectors.append((normalized_prefix, connector))
+        self._mounted_tool_cache_built = False
+
+    async def _connect_mounted_connectors(self) -> None:
+        """Connect mounted connectors and build the cached prefixed tool map."""
+        if not self._mounted_connectors:
+            return
+
+        for _, connector in self._mounted_connectors:
+            await connector.connect()
+            await connector.initialize()
+
+        await self._build_mounted_tool_cache()
+
+    async def _disconnect_mounted_connectors(self) -> None:
+        """Disconnect mounted connectors and clear cached mounted tools."""
+        for _, connector in reversed(self._mounted_connectors):
+            try:
+                await connector.disconnect()
+            except Exception as exc:
+                logger.warning("Error disconnecting mounted connector %s: %s", connector.public_identifier, exc)
+
+        self._mounted_tool_map.clear()
+        self._mounted_tools_cache = []
+        self._mounted_tool_cache_built = False
+
+    async def _build_mounted_tool_cache(self) -> None:
+        """Build prefixed tool metadata for all mounted connectors."""
+        mounted_tool_map: dict[str, tuple[BaseConnector, str]] = {}
+        mounted_tools_cache: list[Tool] = []
+
+        for prefix, connector in self._mounted_connectors:
+            tools = await connector.list_tools()
+            for tool in tools:
+                prefixed_name = f"{prefix}_{tool.name}"
+                mounted_tool_map[prefixed_name] = (connector, tool.name)
+                mounted_tools_cache.append(tool.model_copy(update={"name": prefixed_name}))
+
+        self._mounted_tool_map = mounted_tool_map
+        self._mounted_tools_cache = mounted_tools_cache
+        self._mounted_tool_cache_built = True
+
+    async def _ensure_mounted_tool_cache(self) -> None:
+        """Build mounted tool metadata once before serving lookups."""
+        if self._mounted_connectors and not self._mounted_tool_cache_built:
+            await self._build_mounted_tool_cache()
+
+    async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> CallToolResult:
+        """Call a mounted tool by its prefixed name."""
+        await self._ensure_mounted_tool_cache()
+
+        mounted_tool = self._mounted_tool_map.get(name)
+        if mounted_tool is None:
+            raise ValueError(f"Unknown mounted tool: {name}")
+
+        connector, original_name = mounted_tool
+        return await connector.call_tool(original_name, arguments or {})
+
     def _apply_dns_rebinding_protection(self, host: str) -> None:
         """Configure transport security to reject non-localhost Host/Origin headers."""
         from mcp.server.transport_security import TransportSecuritySettings
@@ -450,6 +527,9 @@ class MCPServer(FastMCP):
         return app
 
     def _wrap_handlers_with_middleware(self) -> None:
+        if self._middleware_handlers_wrapped:
+            return
+
         handlers = self._mcp_server.request_handlers
 
         if self.debug_level >= 1:
@@ -490,6 +570,51 @@ class MCPServer(FastMCP):
         wrap_request(SubscribeRequest, "resources/subscribe")
         wrap_request(UnsubscribeRequest, "resources/unsubscribe")
         wrap_request(CompleteRequest, "completion/complete")
+        self._middleware_handlers_wrapped = True
+
+    def _wrap_handlers_for_mounts(self) -> None:
+        if self._mount_handlers_wrapped:
+            return
+
+        handlers = self._mcp_server.request_handlers
+
+        if CallToolRequest in handlers:
+            original_call_tool = handlers[CallToolRequest]
+
+            async def wrapped_call_tool(request: Any) -> ServerResult:
+                tool_name = request.params.name
+                await self._ensure_mounted_tool_cache()
+
+                mounted_tool = self._mounted_tool_map.get(tool_name)
+                if mounted_tool is None:
+                    return await original_call_tool(request)
+
+                connector, original_name = mounted_tool
+                result = await connector.call_tool(original_name, request.params.arguments or {})
+                return ServerResult(result)
+
+            handlers[CallToolRequest] = wrapped_call_tool
+
+        if ListToolsRequest in handlers:
+            original_list_tools = handlers[ListToolsRequest]
+
+            async def wrapped_list_tools(request: Any) -> ServerResult:
+                result = await original_list_tools(request)
+
+                if not self._mounted_tools_cache:
+                    return result
+
+                tools_result = getattr(result, "root", result)
+                if not isinstance(tools_result, ListToolsResult):
+                    return result
+
+                merged_tools = [*tools_result.tools, *self._mounted_tools_cache]
+                merged_result = tools_result.model_copy(update={"tools": merged_tools})
+                return ServerResult(merged_result)
+
+            handlers[ListToolsRequest] = wrapped_list_tools
+
+        self._mount_handlers_wrapped = True
 
     def run(  # type: ignore[override]
         self,
@@ -535,6 +660,7 @@ class MCPServer(FastMCP):
         self._transport_type = transport
         track_server_run_from_server(self, transport, final_host, final_port, _telemetry)
 
+        self._wrap_handlers_for_mounts()
         self._wrap_handlers_with_middleware()
 
         runner = ServerRunner(self)
