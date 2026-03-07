@@ -41,7 +41,12 @@ from mcp_use.server.middleware import (
 from mcp_use.server.middleware.server_session import MiddlewareServerSession
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
-from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
+from mcp_use.server.utils.inspector import (
+    inspector_index,
+    inspector_static,
+    inspector_telemetry_noop,
+    make_inspector_proxy,
+)
 from mcp_use.server.utils.json_schema import simplify_optional_schema
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
@@ -205,10 +210,32 @@ class MCPServer(FastMCP):
 
         # Inspector routes - wrap to pass mcp_path
         async def inspector_index_handler(request):
-            return await _inspector_index(request, mcp_path=self.mcp_path)
+            return await inspector_index(request, mcp_path=self.mcp_path)
 
+        proxy_base = f"{self.inspector_path}/api/proxy"
+        proxy_methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+        proxy_handler = make_inspector_proxy(proxy_base)
+
+        # API routes (proxy + telemetry) under the configured inspector path
+        self.custom_route(proxy_base, methods=proxy_methods)(proxy_handler)
+        self.custom_route(f"{proxy_base}/{{path:path}}", methods=proxy_methods)(proxy_handler)
+        self.custom_route(f"{self.inspector_path}/api/tel/{{path:path}}", methods=["POST"])(inspector_telemetry_noop)
+
+        # The CDN-hosted inspector JS hardcodes /inspector/api/proxy and
+        # /inspector/api/tel/* as its endpoints.  When the user picks a custom
+        # inspector_path we alias just the API routes under /inspector so the
+        # JS keeps working.  The UI pages (index + static) are NOT aliased —
+        # they live only under the custom path.
+        if self.inspector_path != "/inspector":
+            default_proxy_base = "/inspector/api/proxy"
+            default_proxy_handler = make_inspector_proxy(default_proxy_base)
+            self.custom_route(default_proxy_base, methods=proxy_methods)(default_proxy_handler)
+            self.custom_route(f"{default_proxy_base}/{{path:path}}", methods=proxy_methods)(default_proxy_handler)
+            self.custom_route("/inspector/api/tel/{path:path}", methods=["POST"])(inspector_telemetry_noop)
+
+        # UI routes (index + static) only under the configured inspector path
         self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
-        self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
+        self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(inspector_static)
 
     def add_tool(
         self,
