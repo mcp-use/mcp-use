@@ -1,6 +1,6 @@
 ---
 title: "Inspector"
-description: "Inspector API Documentation"
+description: "Route handlers for the MCP inspector UI and its proxy endpoints API Documentation"
 icon: "code"
 github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/inspector.py"
 ---
@@ -10,3 +10,115 @@ import {RandomGradientBackground} from "/snippets/gradient.jsx"
 <Callout type="info" title="Source Code">
 View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/inspector.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/inspector.py</a>
 </Callout>
+
+Route handlers for the MCP inspector UI and its proxy endpoints.
+
+
+## inspector_index
+<Card type="info">
+### `function` inspector_index
+
+Serve the inspector index.html file with autoconnect parameter.
+
+```python
+from mcp_use.server.utils.inspector import inspector_index
+```
+
+**Parameters**
+><ParamField body="request" type="starlette.requests.Request" required="True" >   Parameter value </ParamField>
+><ParamField body="mcp_path" type="str" default='/mcp' >   File path </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="starlette.responses.Response" />
+
+**Signature**
+```python wrap
+def inspector_index(request: starlette.requests.Request, mcp_path: str = "/mcp"):
+```
+
+</Card>
+
+
+## inspector_static
+<Card type="info">
+### `function` inspector_static
+
+Serve static files from the CDN.
+
+```python
+from mcp_use.server.utils.inspector import inspector_static
+```
+
+**Parameters**
+><ParamField body="request" type="starlette.requests.Request" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="starlette.responses.Response" />
+
+**Signature**
+```python wrap
+def inspector_static(request: starlette.requests.Request):
+```
+
+</Card>
+
+
+## inspector_telemetry_noop
+<Card type="info">
+### `function` inspector_telemetry_noop
+
+Silently accept inspector telemetry POSTs (PostHog / Scarf).
+
+The inspector JS fires analytics to ``/inspector/api/tel/posthog`` and
+``/inspector/api/tel/scarf``.  In the standalone TS inspector these are
+forwarded server-side; in the embedded Python inspector we simply return
+200 so the browser does not log noisy 405 errors.
+
+```python
+from mcp_use.server.utils.inspector import inspector_telemetry_noop
+```
+
+**Parameters**
+><ParamField body="request" type="starlette.requests.Request" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="starlette.responses.Response" />
+
+**Signature**
+```python wrap
+def inspector_telemetry_noop(request: starlette.requests.Request):
+```
+
+</Card>
+
+
+## make_inspector_proxy
+<Card type="info">
+### `function` make_inspector_proxy
+
+Return an ASGI handler that proxies inspector requests to an MCP server.
+
+The inspector JS routes MCP traffic through ``/inspector/api/proxy`` to
+avoid browser CORS restrictions.  The handler:
+
+* reads the target from the ``X-Target-URL`` header (normal mode) or the
+  ``__mcp_target`` query parameter (OAuth discovery mode);
+* strips infrastructure/CDN headers before forwarding;
+* follows one redirect hop server-side so the browser stays same-origin;
+* streams ``text/event-stream`` responses chunk-by-chunk;
+* rewrites the ``resource`` field in OAuth protected-resource metadata so
+  the browser's validation sees the proxy URL, not the upstream origin.
+
+```python
+from mcp_use.server.utils.inspector import make_inspector_proxy
+```
+
+**Parameters**
+><ParamField body="proxy_base" type="str" required="True" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def make_inspector_proxy(proxy_base: str):
+```
+
+</Card>

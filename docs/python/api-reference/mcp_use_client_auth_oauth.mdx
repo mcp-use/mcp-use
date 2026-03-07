@@ -22,8 +22,8 @@ OAuth authentication support for MCP clients.
 
 Dynamic Client Registration response.
 
-    It represents the response from an OAuth server
-    when you dinamically register a new OAuth client.
+It represents the response from an OAuth server
+when you dinamically register a new OAuth client.
 
 </div>
 </RandomGradientBackground>
@@ -51,10 +51,10 @@ from mcp_use.client.auth.oauth import ClientRegistrationResponse
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
+Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.
 
-        `self` is explicitly positional-only to allow `self` as a field name.
+`self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
@@ -76,12 +76,12 @@ def __init__(data: Any):
 
 File-based token storage.
 
-    It's responsible for:
+It's responsible for:
 
-    - Saving OAuth tokens to disk after auth
-    - Loading saved tokens when the app restarts
-    - Deleting tokens when they're revoked
-    - Organizing tokens by server URL
+- Saving OAuth tokens to disk after auth
+- Loading saved tokens when the app restarts
+- Deleting tokens when they're revoked
+- Organizing tokens by server URL
 
 </div>
 </RandomGradientBackground>
@@ -167,12 +167,12 @@ def save_tokens(server_url: str, tokens: dict[str, Any]):
 
 OAuth authentication handler for MCP clients.
 
-    This is the main class that handles all the authentication
-    It has several features:
+This is the main class that handles all the authentication
+It has several features:
 
-    - Discovers OAuth server capabilities automatically
-    - Registers client dynamically when possible
-    - Manages token storage and refresh automaticlly
+- Discovers OAuth server capabilities automatically
+- Registers client dynamically when possible
+- Manages token storage and refresh automaticlly
 
 </div>
 </RandomGradientBackground>
@@ -264,8 +264,8 @@ def refresh_token():
 
 OAuth client provider configuration for a specific server.
 
-    This contains all the information needed to authenticate with an OAuth server
-    without needing to discover metadata or register clients dynamically.
+This contains all the information needed to authenticate with an OAuth server
+without needing to discover metadata or register clients dynamically.
 
 </div>
 </RandomGradientBackground>
@@ -278,7 +278,7 @@ from mcp_use.client.auth.oauth import OAuthClientProvider
 >
 <ParamField body="id" type="str" required="True" >   String value </ParamField>
 <ParamField body="display_name" type="str" required="True" >   Name identifier </ParamField>
-<ParamField body="metadata" type="mcp_use.client.auth.oauth.ServerOAuthMetadata | dict[str, typing.Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+<ParamField body="metadata" type="mcp_use.client.auth.oauth.ServerOAuthMetadata | dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
 
 </Card>
 
@@ -287,10 +287,10 @@ from mcp_use.client.auth.oauth import OAuthClientProvider
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
+Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.
 
-        `self` is explicitly positional-only to allow `self` as a field name.
+`self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
@@ -327,8 +327,8 @@ def oauth_metadata():
 <div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ProtectedResourceMetadata</div>
 
 PRM (Protected Resource Metadata) can have metadata
-    describing their configuration. It could contain information
-    about the OAuth metadata.
+describing their configuration. It could contain information
+about the OAuth metadata.
 
 </div>
 </RandomGradientBackground>
@@ -350,10 +350,10 @@ from mcp_use.client.auth.oauth import ProtectedResourceMetadata
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
+Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.
 
-        `self` is explicitly positional-only to allow `self` as a field name.
+`self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
@@ -374,12 +374,12 @@ def __init__(data: Any):
 <div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ServerOAuthMetadata</div>
 
 OAuth metadata from MCP server with flexible field support.
-    It is essentially a configuration that tells MCP client:
+It is essentially a configuration that tells MCP client:
 
-    - Where to send users for authorization
-    - Where to exchange the codes for tokens
-    - Which OAuth features are supported
-    - Where to register new users with DCR
+- Where to send users for authorization
+- Where to exchange the codes for tokens
+- Which OAuth features are supported
+- Where to register new users with DCR
 
 </div>
 </RandomGradientBackground>
@@ -414,10 +414,10 @@ from mcp_use.client.auth.oauth import ServerOAuthMetadata
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
+Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.
 
-        `self` is explicitly positional-only to allow `self` as a field name.
+`self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
@@ -439,8 +439,8 @@ def __init__(data: Any):
 
 OAuth token data.
 
-    This is the information received after
-    successfull authentication
+This is the information received after
+successfull authentication
 
 </div>
 </RandomGradientBackground>
@@ -464,10 +464,10 @@ from mcp_use.client.auth.oauth import TokenData
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-        validated to form a valid model.
+Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.
 
-        `self` is explicitly positional-only to allow `self` as a field name.
+`self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>
