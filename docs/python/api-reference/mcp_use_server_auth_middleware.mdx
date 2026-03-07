@@ -22,11 +22,11 @@ Authentication middleware for mcp-use server.
 
 Middleware that validates Bearer tokens on MCP endpoints.
 
-This middleware:
-1. Extracts Bearer token from Authorization header
-2. Validates token with the configured BearerAuthProvider
-3. Sets the AccessToken in context for tools to access via get_access_token()
-4. Returns 401 for unauthenticated requests to protected paths
+    This middleware:
+    1. Extracts Bearer token from Authorization header
+    2. Validates token with the configured BearerAuthProvider
+    3. Sets the AccessToken in context for tools to access via get_access_token()
+    4. Returns 401 for unauthenticated requests to protected paths
 
 </div>
 </RandomGradientBackground>

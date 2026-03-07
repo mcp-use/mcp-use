@@ -52,7 +52,7 @@ def __init__(fmt = None, datefmt = None):
 
 Enhanced Uvicorn access formatter that shows MCP method information.
 
-For MCP requests, enhances the log with JSON-RPC method info from thread-local storage.
+    For MCP requests, enhances the log with JSON-RPC method info from thread-local storage.
 
 </div>
 </RandomGradientBackground>
@@ -94,17 +94,17 @@ from mcp_use.server.logging.formatters import MCPErrorFormatter
 
 Initialize the formatter with specified format strings.
 
-Initialize the formatter either with the specified format string, or a
-default as described above. Allow for specialized date formatting with
-the optional datefmt argument. If datefmt is omitted, you get an
-ISO8601-like (or RFC 3339-like) format.
+        Initialize the formatter either with the specified format string, or a
+        default as described above. Allow for specialized date formatting with
+        the optional datefmt argument. If datefmt is omitted, you get an
+        ISO8601-like (or RFC 3339-like) format.
 
-Use a style parameter of '%', '\{' or '$' to specify that you want to
-use one of %-formatting, :meth:`str.format` (``\{\}``) formatting or
-:class:`string.Template` formatting in your format string.
+        Use a style parameter of '%', '\{' or '$' to specify that you want to
+        use one of %-formatting, :meth:`str.format` (``\{\}``) formatting or
+        :class:`string.Template` formatting in your format string.
 
-.. versionchanged:: 3.2
-   Added the ``style`` parameter.
+        .. versionchanged:: 3.2
+           Added the ``style`` parameter.
 
 **Parameters**
 ><ParamField body="fmt" default="None" >   Parameter value </ParamField>
@@ -130,8 +130,8 @@ def __init__(fmt = None, datefmt = None, style = "%", validate = True, defaults 
 
 Uvicorn access logs use a tuple format: (client_addr, method, path, ...).
 
-This class provides named access to make the code more readable.
-See: https://github.com/encode/uvicorn/blob/master/uvicorn/logging.py
+    This class provides named access to make the code more readable.
+    See: https://github.com/encode/uvicorn/blob/master/uvicorn/logging.py
 
 </div>
 </RandomGradientBackground>

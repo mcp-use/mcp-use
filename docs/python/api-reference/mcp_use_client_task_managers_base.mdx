@@ -25,8 +25,8 @@ managers used in MCP connectors.
 
 Abstract base class for connection managers.
 
-This class defines the interface for different types of connection managers
-used with MCP connectors.
+    This class defines the interface for different types of connection managers
+    used with MCP connectors.
 
 </div>
 </RandomGradientBackground>
@@ -84,13 +84,13 @@ def start():
 
 Stop the connection manager and close the connection.
 
-This method ensures graceful shutdown by waiting for the connection task
-to complete and cleanup to finish. If operations exceed the timeout,
-forced cleanup is performed to prevent resource leaks.
+        This method ensures graceful shutdown by waiting for the connection task
+        to complete and cleanup to finish. If operations exceed the timeout,
+        forced cleanup is performed to prevent resource leaks.
 
-Note:
-    This method does not raise exceptions and guarantees graceful shutdown
-    even if cleanup times out.
+        Note:
+            This method does not raise exceptions and guarantees graceful shutdown
+            even if cleanup times out.
 
 
 **Parameters**

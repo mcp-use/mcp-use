@@ -25,8 +25,8 @@ which handles authentication, initialization, and tool discovery.
 
 Session manager for MCP connections.
 
-This class manages the lifecycle of an MCP connection, including
-authentication, initialization, and tool discovery.
+    This class manages the lifecycle of an MCP connection, including
+    authentication, initialization, and tool discovery.
 
 </div>
 </RandomGradientBackground>
@@ -112,14 +112,14 @@ Get a prompt by name.
 
 **Parameters**
 ><ParamField body="name" type="str" required="True" >   The name of the prompt to get. </ParamField>
-><ParamField body="arguments" type="dict[str, Any] | None" default="None" >   Optional arguments for the prompt. </ParamField>
+><ParamField body="arguments" type="dict[str, typing.Any] | None" default="None" >   Optional arguments for the prompt. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="mcp.types.GetPromptResult" >The prompt result with messages.</ResponseField>
 
 **Signature**
 ```python wrap
-def get_prompt(name: str, arguments: dict[str, Any] | None = None):
+def get_prompt(name: str, arguments: dict[str, typing.Any] | None = None):
 ```
 
 </Card>

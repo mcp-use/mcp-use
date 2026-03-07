@@ -25,8 +25,8 @@ through WebSocket connections.
 
 Connector for MCP implementations using WebSocket transport.
 
-This connector uses WebSockets to communicate with remote MCP implementations,
-using a connection manager to handle the proper lifecycle management.
+    This connector uses WebSockets to communicate with remote MCP implementations,
+    using a connection manager to handle the proper lifecycle management.
 
 </div>
 </RandomGradientBackground>
@@ -43,11 +43,11 @@ Initialize a new WebSocket connector.
 **Parameters**
 ><ParamField body="url" type="str" required="True" >   The WebSocket URL to connect to. </ParamField>
 ><ParamField body="headers" type="dict[str, str] | None" default="None" >   Optional additional headers. </ParamField>
-><ParamField body="auth" type="str | dict[str, Any] | httpx.Auth | None" default="None" >   Authentication method - can be: </ParamField>
+><ParamField body="auth" type="str | dict[str, typing.Any] | httpx.Auth | None" default="None" >   Authentication method - can be: </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(url: str, headers: dict[str, str] | None = None, auth: str | dict[str, Any] | httpx.Auth | None = None):
+def __init__(url: str, headers: dict[str, str] | None = None, auth: str | dict[str, typing.Any] | httpx.Auth | None = None):
 ```
 
 </Card>
@@ -59,14 +59,14 @@ Send a raw request to the MCP implementation.
 
 **Parameters**
 ><ParamField body="method" type="str" required="True" >   String value </ParamField>
-><ParamField body="params" type="dict[str, Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+><ParamField body="params" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="Any" />
 
 **Signature**
 ```python wrap
-def request(method: str, params: dict[str, Any] | None = None):
+def request(method: str, params: dict[str, typing.Any] | None = None):
 ```
 
 </Card>

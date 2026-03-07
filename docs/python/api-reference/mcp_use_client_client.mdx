@@ -25,8 +25,8 @@ and sessions from configuration.
 
 Client for managing MCP servers and sessions.
 
-This class provides a unified interface for working with MCP servers,
-handling configuration, connector creation, and session management.
+    This class provides a unified interface for working with MCP servers,
+    handling configuration, connector creation, and session management.
 
 </div>
 </RandomGradientBackground>
@@ -41,7 +41,7 @@ Initialize a new MCP client.
 
 
 **Parameters**
-><ParamField body="config" type="str | dict[str, Any] | None" default="None" >   Either a dict containing configuration or a path to a JSON config file. </ParamField>
+><ParamField body="config" type="str | dict[str, typing.Any] | None" default="None" >   Either a dict containing configuration or a path to a JSON config file. </ParamField>
 ><ParamField body="allowed_servers" type="list[str] | None" default="None" >   Server name or configuration </ParamField>
 ><ParamField body="sandbox" type="bool" default="False" >   Whether to use sandboxed execution mode for running MCP servers. </ParamField>
 ><ParamField body="sandbox_options" type="mcp_use.client.connectors.sandbox.SandboxOptions | None" default="None" >   Optional sandbox configuration options. </ParamField>
@@ -57,7 +57,7 @@ Initialize a new MCP client.
 
 **Signature**
 ```python wrap
-def __init__(config: str | dict[str, Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.client.connectors.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, roots: list[mcp.types.Root] | None = None, list_roots_callback: mcp.client.session.ListRootsFnT | None = None, code_mode: bool = False, verify: bool | None = True):
+def __init__(config: str | dict[str, typing.Any] | None = None, allowed_servers: list[str] | None = None, sandbox: bool = False, sandbox_options: mcp_use.client.connectors.sandbox.SandboxOptions | None = None, sampling_callback: mcp.client.session.SamplingFnT | None = None, elicitation_callback: mcp.client.session.ElicitationFnT | None = None, message_handler: mcp.client.session.MessageHandlerFnT | None = None, logging_callback: mcp.client.session.LoggingFnT | None = None, middleware: list[mcp_use.client.middleware.middleware.Middleware] | None = None, roots: list[mcp.types.Root] | None = None, list_roots_callback: mcp.client.session.ListRootsFnT | None = None, code_mode: bool = False, verify: bool | None = True):
 ```
 
 </Card>
@@ -101,7 +101,7 @@ def add_server(name: str, server_config: dict[str, Any]):
 
 Close all active sessions.
 
-This method ensures all sessions are closed even if some fail.
+        This method ensures all sessions are closed even if some fail.
 
 
 **Signature**
@@ -174,30 +174,30 @@ def create_session(server_name: str, auto_initialize: bool = True):
 
 Execute Python code with access to MCP tools (code mode).
 
-This method allows agents to interact with MCP tools through Python code
-instead of direct tool calls, enabling more efficient context usage and
-data processing.
+        This method allows agents to interact with MCP tools through Python code
+        instead of direct tool calls, enabling more efficient context usage and
+        data processing.
 
-Example:
-    ```python
-    client = MCPClient(config="config.json", code_mode=True)
-    await client.create_all_sessions()
+        Example:
+            ```python
+            client = MCPClient(config="config.json", code_mode=True)
+            await client.create_all_sessions()
 
-    result = await client.execute_code('''
-    tools = await search_tools("github")
-    print(f"Found \{len(tools)\} tools")
+            result = await client.execute_code('''
+            tools = await search_tools("github")
+            print(f"Found \{len(tools)\} tools")
 
-    pr = await github.get_pull_request(
-        owner="facebook",
-        repo="react",
-        number=12345
-    )
-    return \{"title": pr["title"]\}
-    ''')
+            pr = await github.get_pull_request(
+                owner="facebook",
+                repo="react",
+                number=12345
+            )
+            return \{"title": pr["title"]\}
+            ''')
 
-    print(result['result'])  # \{'title': 'Fix bug in...'\}
-    print(result['logs'])    # ['Found 5 tools']
-    ```
+            print(result['result'])  # \{'title': 'Fix bug in...'\}
+            print(result['logs'])    # ['Found 5 tools']
+            ```
 
 
 **Parameters**
@@ -307,14 +307,14 @@ def save_config(filepath: str):
 
 Search available MCP tools across all active sessions.
 
-Example:
-    ```python
-    # Search for GitHub-related tools
-    result = await client.search_tools("github pull")
-    print(f"Found \{result['meta']['result_count']\} tools out of \{result['meta']['total_tools']\} total")
-    for tool in result['results']:
-        print(f"\{tool['server']\}.\{tool['name']\}: \{tool['description']\}")
-    ```
+        Example:
+            ```python
+            # Search for GitHub-related tools
+            result = await client.search_tools("github pull")
+            print(f"Found \{result['meta']['result_count']\} tools out of \{result['meta']['total_tools']\} total")
+            for tool in result['results']:
+                print(f"\{tool['server']\}.\{tool['name']\}: \{tool['description']\}")
+            ```
 
 
 **Parameters**

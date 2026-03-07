@@ -31,8 +31,8 @@ LangChain 1.0.0 Migration:
 
 Main class for using MCP tools with various LLM providers.
 
-This class provides a unified interface for using MCP tools with different LLM providers
-through LangChain's agent framework, with customizable system prompts and conversation memory.
+    This class provides a unified interface for using MCP tools with different LLM providers
+    through LangChain's agent framework, with customizable system prompts and conversation memory.
 
 </div>
 </RandomGradientBackground>
@@ -187,23 +187,23 @@ def initialize():
 
 Run a query using LangChain 1.0.0's agent and return the final result.
 
-Example:
-    ```python
-    # Regular usage
-    result = await agent.run("What's the weather like?")
+        Example:
+            ```python
+            # Regular usage
+            result = await agent.run("What's the weather like?")
 
-    # Structured output usage
-    from pydantic import BaseModel, Field
+            # Structured output usage
+            from pydantic import BaseModel, Field
 
-    class WeatherInfo(BaseModel):
-        temperature: float = Field(description="Temperature in Celsius")
-        condition: str = Field(description="Weather condition")
+            class WeatherInfo(BaseModel):
+                temperature: float = Field(description="Temperature in Celsius")
+                condition: str = Field(description="Weather condition")
 
-    weather: WeatherInfo = await agent.run(
-        "What's the weather like?",
-        output_schema=WeatherInfo
-    )
-    ```
+            weather: WeatherInfo = await agent.run(
+                "What's the weather like?",
+                output_schema=WeatherInfo
+            )
+            ```
 
 
 **Parameters**
@@ -211,7 +211,7 @@ Example:
 ><ParamField body="max_steps" type="int | None" default="None" >   Optional maximum number of steps to take. </ParamField>
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
-><ParamField body="output_schema" type="type | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="str | mcp_use.agents.mcpagent.T" >The result of running the query as a string, or if output_schema is provided, an instance of the specified Pydantic model.</ResponseField>
@@ -223,7 +223,7 @@ query: str | langchain_core.messages.human.HumanMessage,
     max_steps: int | None = None,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
-    output_schema: type | None = None
+    output_schema: type[~T] | None = None
 ):
 ```
 
@@ -234,7 +234,7 @@ query: str | langchain_core.messages.human.HumanMessage,
 
 Set the list of tools that should not be available to the agent.
 
-This will take effect the next time the agent is initialized.
+        This will take effect the next time the agent is initialized.
 
 
 
@@ -270,26 +270,26 @@ def set_system_message(message: str):
 
 Async generator using LangChain 1.0.0's create_agent and astream.
 
-This method leverages the LangChain 1.0.0 API where create_agent returns
-a CompiledStateGraph that handles the agent loop internally via astream.
+        This method leverages the LangChain 1.0.0 API where create_agent returns
+        a CompiledStateGraph that handles the agent loop internally via astream.
 
-**Tool Updates with Server Manager:**
-When using server_manager mode, this method handles dynamic tool updates:
-- **Before execution:** Updates are applied immediately to the new stream
-- **During execution:** When tools change, we wait for a "safe restart point"
-  (after tool results complete), then interrupt the stream, recreate the agent
-  with new tools, and resume execution with accumulated messages.
-- **Safe restart points:** Only restart after tool results to ensure message
-  pairs (tool_use + tool_result) are complete, satisfying LLM API requirements.
-- **Max restarts:** Limited to 3 restarts to prevent infinite loops
+        **Tool Updates with Server Manager:**
+        When using server_manager mode, this method handles dynamic tool updates:
+        - **Before execution:** Updates are applied immediately to the new stream
+        - **During execution:** When tools change, we wait for a "safe restart point"
+          (after tool results complete), then interrupt the stream, recreate the agent
+          with new tools, and resume execution with accumulated messages.
+        - **Safe restart points:** Only restart after tool results to ensure message
+          pairs (tool_use + tool_result) are complete, satisfying LLM API requirements.
+        - **Max restarts:** Limited to 3 restarts to prevent infinite loops
 
-This interrupt-and-restart approach ensures that tools added mid-execution
-(e.g., via connect_to_mcp_server) are immediately available to the agent,
-maintaining the same behavior as the legacy implementation while respecting
-API constraints.
+        This interrupt-and-restart approach ensures that tools added mid-execution
+        (e.g., via connect_to_mcp_server) are immediately available to the agent,
+        maintaining the same behavior as the legacy implementation while respecting
+        API constraints.
 
-Yields:
-    Intermediate steps and final result from the agent execution.
+        Yields:
+            Intermediate steps and final result from the agent execution.
 
 
 **Parameters**
@@ -298,7 +298,7 @@ Yields:
 ><ParamField body="manage_connector" type="bool" default="True" >   Whether to handle the connector lifecycle internally. </ParamField>
 ><ParamField body="external_history" type="list[langchain_core.messages.base.BaseMessage] | None" default="None" >   Optional external history to use instead of the </ParamField>
 ><ParamField body="track_execution" type="bool" default="True" >   Boolean flag </ParamField>
-><ParamField body="output_schema" type="type | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
+><ParamField body="output_schema" type="type[~T] | None" default="None" >   Optional Pydantic BaseModel class for structured output. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="AsyncGenerator" />
@@ -311,7 +311,7 @@ query: str | langchain_core.messages.human.HumanMessage,
     manage_connector: bool = True,
     external_history: list[langchain_core.messages.base.BaseMessage] | None = None,
     track_execution: bool = True,
-    output_schema: type | None = None
+    output_schema: type[~T] | None = None
 ):
 ```
 
@@ -322,10 +322,10 @@ query: str | langchain_core.messages.human.HumanMessage,
 
 Asynchronous streaming interface.
 
-Example::
+        Example::
 
-    async for chunk in agent.stream_events("hello"):
-        print(chunk)
+            async for chunk in agent.stream_events("hello"):
+                print(chunk)
 
 
 **Parameters**

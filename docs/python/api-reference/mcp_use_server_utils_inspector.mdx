@@ -69,10 +69,10 @@ def inspector_static(request: starlette.requests.Request):
 
 Silently accept inspector telemetry POSTs (PostHog / Scarf).
 
-The inspector JS fires analytics to ``/inspector/api/tel/posthog`` and
-``/inspector/api/tel/scarf``.  In the standalone TS inspector these are
-forwarded server-side; in the embedded Python inspector we simply return
-200 so the browser does not log noisy 405 errors.
+    The inspector JS fires analytics to ``/inspector/api/tel/posthog`` and
+    ``/inspector/api/tel/scarf``.  In the standalone TS inspector these are
+    forwarded server-side; in the embedded Python inspector we simply return
+    200 so the browser does not log noisy 405 errors.
 
 ```python
 from mcp_use.server.utils.inspector import inspector_telemetry_noop
@@ -98,16 +98,16 @@ def inspector_telemetry_noop(request: starlette.requests.Request):
 
 Return an ASGI handler that proxies inspector requests to an MCP server.
 
-The inspector JS routes MCP traffic through ``/inspector/api/proxy`` to
-avoid browser CORS restrictions.  The handler:
+    The inspector JS routes MCP traffic through ``/inspector/api/proxy`` to
+    avoid browser CORS restrictions.  The handler:
 
-* reads the target from the ``X-Target-URL`` header (normal mode) or the
-  ``__mcp_target`` query parameter (OAuth discovery mode);
-* strips infrastructure/CDN headers before forwarding;
-* follows one redirect hop server-side so the browser stays same-origin;
-* streams ``text/event-stream`` responses chunk-by-chunk;
-* rewrites the ``resource`` field in OAuth protected-resource metadata so
-  the browser's validation sees the proxy URL, not the upstream origin.
+    * reads the target from the ``X-Target-URL`` header (normal mode) or the
+      ``__mcp_target`` query parameter (OAuth discovery mode);
+    * strips infrastructure/CDN headers before forwarding;
+    * follows one redirect hop server-side so the browser stays same-origin;
+    * streams ``text/event-stream`` responses chunk-by-chunk;
+    * rewrites the ``resource`` field in OAuth protected-resource metadata so
+      the browser's validation sees the proxy URL, not the upstream origin.
 
 ```python
 from mcp_use.server.utils.inspector import make_inspector_proxy

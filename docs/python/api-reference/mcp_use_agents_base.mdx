@@ -24,8 +24,8 @@ This module provides a base class for agents that use MCP tools.
 
 Base class for agents that use MCP tools.
 
-This abstract class defines the interface for agents that use MCP tools.
-Agents are responsible for integrating LLMs with MCP tools.
+    This abstract class defines the interface for agents that use MCP tools.
+    Agents are responsible for integrating LLMs with MCP tools.
 
 </div>
 </RandomGradientBackground>
@@ -53,8 +53,8 @@ def __init__(session: mcp_use.client.session.MCPSession):
 
 Initialize the agent.
 
-This method should prepare the agent for use, including initializing
-the MCP session and setting up any necessary components.
+        This method should prepare the agent for use, including initializing
+        the MCP session and setting up any necessary components.
 
 
 **Signature**
@@ -94,14 +94,14 @@ Perform a single step of the agent.
 
 **Parameters**
 ><ParamField body="query" type="str" required="True" >   The query to run. </ParamField>
-><ParamField body="previous_steps" type="list[dict[str, Any]] | None" default="None" >   Optional list of previous steps. </ParamField>
+><ParamField body="previous_steps" type="list[dict[str, typing.Any]] | None" default="None" >   Optional list of previous steps. </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="dict[str, Any]" >The result of the step.</ResponseField>
 
 **Signature**
 ```python wrap
-def step(query: str, previous_steps: list[dict[str, Any]] | None = None):
+def step(query: str, previous_steps: list[dict[str, typing.Any]] | None = None):
 ```
 
 </Card>

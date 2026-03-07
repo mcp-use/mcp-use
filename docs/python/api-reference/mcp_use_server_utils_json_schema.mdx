@@ -29,13 +29,13 @@ nullable ``anyOf`` into the simpler ``\{"type": "T"\}`` form.
 
 Return *schema* with nullable ``anyOf`` patterns simplified.
 
-Returns a deep copy when properties need simplification.  When the schema
-has no ``properties`` key (or it is empty), the original dict is returned
-as-is since there is nothing to transform.
+    Returns a deep copy when properties need simplification.  When the schema
+    has no ``properties`` key (or it is empty), the original dict is returned
+    as-is since there is nothing to transform.
 
-Only touches ``properties`` of the top-level object schema — nested
-``$defs`` and deeply nested objects are left as-is since MCP tool schemas
-are typically flat.
+    Only touches ``properties`` of the top-level object schema — nested
+    ``$defs`` and deeply nested objects are left as-is since MCP tool schemas
+    are typically flat.
 
 ```python
 from mcp_use.server.utils.json_schema import simplify_optional_schema

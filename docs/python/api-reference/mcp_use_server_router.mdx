@@ -22,27 +22,27 @@ MCP Router for organizing tools, resources, and prompts into modules.
 
 Router for organizing MCP tools, resources, and prompts into reusable modules.
 
-Similar to FastAPI's APIRouter, this allows you to define tools and resources
-in separate files and then include them in your main server.
+    Similar to FastAPI's APIRouter, this allows you to define tools and resources
+    in separate files and then include them in your main server.
 
-Example:
-    ```python
-    # routes/math.py
-    from mcp_use.server import MCPRouter
+    Example:
+        ```python
+        # routes/math.py
+        from mcp_use.server import MCPRouter
 
-    router = MCPRouter()
+        router = MCPRouter()
 
-    @router.tool()
-    def add(a: int, b: int) -> int:
-        return a + b
+        @router.tool()
+        def add(a: int, b: int) -> int:
+            return a + b
 
-    # main.py
-    from mcp_use.server import MCPServer
-    from routes.math import router as math_router
+        # main.py
+        from mcp_use.server import MCPServer
+        from routes.math import router as math_router
 
-    server = MCPServer(name="my-server")
-    server.include_router(math_router, prefix="math")
-    ```
+        server = MCPServer(name="my-server")
+        server.include_router(math_router, prefix="math")
+        ```
 
 </div>
 </RandomGradientBackground>
@@ -71,7 +71,7 @@ def __init__(prefix: str = "", tags: list[str] | None = None):
 
 Include another router's tools, resources, and prompts into this router.
 
-This allows for nested router organization.
+        This allows for nested router organization.
 
 
 
@@ -91,12 +91,12 @@ def include_router(router: MCPRouter, prefix: str = ""):
 
 Decorator to register a prompt with this router.
 
-Example:
-    ```python
-    @router.prompt()
-    def greeting_prompt(name: str) -> str:
-        return f"Hello, \{name\}! How can I help you today?"
-    ```
+        Example:
+            ```python
+            @router.prompt()
+            def greeting_prompt(name: str) -> str:
+                return f"Hello, \{name\}! How can I help you today?"
+            ```
 
 
 **Parameters**
@@ -134,12 +134,12 @@ def prompts():
 
 Decorator to register a resource with this router.
 
-Example:
-    ```python
-    @router.resource(uri="config://app")
-    def get_config() -> str:
-        return '\{"setting": "value"\}'
-    ```
+        Example:
+            ```python
+            @router.resource(uri="config://app")
+            def get_config() -> str:
+                return '\{"setting": "value"\}'
+            ```
 
 
 **Parameters**
@@ -184,13 +184,13 @@ def resources():
 
 Decorator to register a tool with this router.
 
-Example:
-    ```python
-    @router.tool()
-    def my_tool(arg: str) -> str:
-        '''Tool description here.'''
-        return f"Result: \{arg\}"
-    ```
+        Example:
+            ```python
+            @router.tool()
+            def my_tool(arg: str) -> str:
+                '''Tool description here.'''
+                return f"Result: \{arg\}"
+            ```
 
 
 **Parameters**

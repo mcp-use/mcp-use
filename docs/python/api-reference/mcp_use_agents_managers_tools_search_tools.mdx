@@ -59,7 +59,7 @@ def __init__(server_manager):
 <div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ToolSearchEngine</div>
 
 Provides semantic search capabilities for MCP tools.
-Uses vector similarity for semantic search with optional result caching.
+    Uses vector similarity for semantic search with optional result caching.
 
 </div>
 </RandomGradientBackground>
@@ -186,10 +186,10 @@ from mcp_use.agents.managers.tools.search_tools import ToolSearchInput
 
 Create a new model by parsing and validating input data from keyword arguments.
 
-Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
-validated to form a valid model.
+        Raises [`ValidationError`][pydantic_core.ValidationError] if the input data cannot be
+        validated to form a valid model.
 
-`self` is explicitly positional-only to allow `self` as a field name.
+        `self` is explicitly positional-only to allow `self` as a field name.
 
 **Parameters**
 ><ParamField body="data" type="Any" required="True" >   Parameter value </ParamField>

@@ -51,9 +51,9 @@ def __init__(inspector_path: str = "/inspector"):
 
 Filter that drops all uvicorn access log records.
 
-MCP protocol logs are printed directly to stdout by MCPLoggingMiddleware,
-bypassing the logging system entirely. This filter drops all uvicorn access
-records so only the MCP: lines remain.
+    MCP protocol logs are printed directly to stdout by MCPLoggingMiddleware,
+    bypassing the logging system entirely. This filter drops all uvicorn access
+    records so only the MCP: lines remain.
 
 </div>
 </RandomGradientBackground>
@@ -66,9 +66,9 @@ from mcp_use.server.logging.config import MCPLogsOnlyFilter
 
 Initialize a filter.
 
-Initialize with the name of the logger which, together with its
-children, will have its events allowed through the filter. If no
-name is specified, allow every event.
+        Initialize with the name of the logger which, together with its
+        children, will have its events allowed through the filter. If no
+        name is specified, allow every event.
 
 **Parameters**
 ><ParamField body="name" default='' >   Name identifier </ParamField>
