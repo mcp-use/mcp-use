@@ -1403,7 +1403,7 @@ program
           // tsImport handles TypeScript compilation and does not cache loaded modules,
           // so the entire dependency tree is re-evaluated on each call.
           // The ?t= timestamp is kept as a safety measure for edge cases.
-          await tsImport(`${serverFilePath}?t=${Date.now()}`, {
+          await tsImport(`${serverFileUrl}?t=${Date.now()}`, {
             parentURL: import.meta.url,
             onImport: (file: string) => {
               const filePath = file.startsWith("file://")
