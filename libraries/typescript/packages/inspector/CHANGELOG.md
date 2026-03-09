@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.24.3
+
+### Patch Changes
+
+- d8d6d06: Fix sandbox host derivation for cloud-embedded inspector pages. Apex hosts (e.g. manufact.com) now correctly resolve to sandbox-inspector.{domain} instead of sandbox-{domain}.
+  - mcp-use@1.21.3
+
 ## 0.24.3-canary.0
 
 ### Patch Changes
