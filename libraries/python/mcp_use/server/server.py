@@ -61,6 +61,17 @@ logger = logging.getLogger(__name__)
 _telemetry = Telemetry()
 
 
+def _normalize_inspector_path(path: str) -> str:
+    """Normalize inspector path input into a concrete route ending in `/inspector`."""
+    if not path or path == "/":
+        return "/inspector"
+
+    normalized = f"/{path.strip('/')}"
+    if normalized.endswith("/inspector"):
+        return normalized
+    return f"{normalized}/inspector"
+
+
 class MCPServer(FastMCP):
     """Main MCP Server class with integrated inspector and development tools."""
 
@@ -75,7 +86,7 @@ class MCPServer(FastMCP):
         debug: bool = False,
         mcp_path: str = "/mcp",
         docs_path: str = "/docs",
-        inspector_path: str = "/inspector",
+        inspector_path: str = "/",
         openmcp_path: str = "/openmcp.json",
         show_inspector_logs: bool = False,
         pretty_print_jsonrpc: bool = False,
@@ -95,7 +106,8 @@ class MCPServer(FastMCP):
             debug: Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints)
             mcp_path: Path for MCP endpoint (default: "/mcp")
             docs_path: Path for documentation endpoint (default: "/docs")
-            inspector_path: Path for inspector UI (default: "/inspector")
+            inspector_path: Base path prefix for the inspector UI. The inspector is always
+                  mounted at `<prefix>/inspector` (default: "/")
             openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
             show_inspector_logs: Show inspector-related logs
             pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
@@ -141,7 +153,7 @@ class MCPServer(FastMCP):
         # Set route paths
         self.mcp_path = mcp_path
         self.docs_path = docs_path
-        self.inspector_path = inspector_path
+        self.inspector_path = _normalize_inspector_path(inspector_path)
         self.openmcp_path = openmcp_path
         self.show_inspector_logs = show_inspector_logs
         self.pretty_print_jsonrpc = pretty_print_jsonrpc

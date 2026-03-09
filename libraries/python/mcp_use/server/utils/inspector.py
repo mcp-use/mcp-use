@@ -41,8 +41,8 @@ async def _inspector_index(
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(INDEX_URL, follow_redirects=True)
             if response.status_code == 200:
-                html = response.text.replace('src="/inspector/', f'src="{inspector_path}/')
-                html = html.replace('href="/inspector/', f'href="{inspector_path}/')
+                html = response.text.replace('src="/inspector/assets/', f'src="{INSPECTOR_CDN_BASE_URL}/assets/')
+                html = html.replace('href="/inspector/assets/', f'href="{INSPECTOR_CDN_BASE_URL}/assets/')
                 return HTMLResponse(html)
             else:
                 logger.warning(
