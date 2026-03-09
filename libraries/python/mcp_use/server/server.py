@@ -205,7 +205,11 @@ class MCPServer(FastMCP):
 
         # Inspector routes - wrap to pass mcp_path
         async def inspector_index_handler(request):
-            return await _inspector_index(request, mcp_path=self.mcp_path)
+            return await _inspector_index(
+                request,
+                mcp_path=self.mcp_path,
+                inspector_path=self.inspector_path,
+            )
 
         self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
