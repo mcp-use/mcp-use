@@ -42,7 +42,7 @@ Initialize an MCP server.
 ><ParamField body="debug" type="bool" default="False" >   Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints) </ParamField>
 ><ParamField body="mcp_path" type="str" default='/mcp' >   Path for MCP endpoint (default: "/mcp") </ParamField>
 ><ParamField body="docs_path" type="str" default='/docs' >   Path for documentation endpoint (default: "/docs") </ParamField>
-><ParamField body="inspector_path" type="str" default='/inspector' >   Path for inspector UI (default: "/inspector") </ParamField>
+><ParamField body="inspector_path" type="str" default='/' >   Base path prefix for the inspector UI; final route is `<prefix>/inspector`. </ParamField>
 ><ParamField body="openmcp_path" type="str" default='/openmcp.json' >   Path for OpenMCP metadata (default: "/openmcp.json") </ParamField>
 ><ParamField body="show_inspector_logs" type="bool" default="False" >   Show inspector-related logs </ParamField>
 ><ParamField body="pretty_print_jsonrpc" type="bool" default="False" >   Pretty print JSON-RPC messages in logs </ParamField>
@@ -53,7 +53,7 @@ Initialize an MCP server.
 
 **Signature**
 ```python wrap
-def __init__(name: str | None = None, version: str | None = None, instructions: str | None = None, icons: list[Icon] | None = None, auth: BearerAuthProvider | None = None, middleware: list[Middleware] | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/inspector", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False, mcp_logs_only: bool = False, host: str = "0.0.0.0", port: int = 8000, dns_rebinding_protection: bool = False):
+def __init__(name: str | None = None, version: str | None = None, instructions: str | None = None, icons: list[Icon] | None = None, auth: BearerAuthProvider | None = None, middleware: list[Middleware] | None = None, debug: bool = False, mcp_path: str = "/mcp", docs_path: str = "/docs", inspector_path: str = "/", openmcp_path: str = "/openmcp.json", show_inspector_logs: bool = False, pretty_print_jsonrpc: bool = False, mcp_logs_only: bool = False, host: str = "0.0.0.0", port: int = 8000, dns_rebinding_protection: bool = False):
 ```
 
 </Card>

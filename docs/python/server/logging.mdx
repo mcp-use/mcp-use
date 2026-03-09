@@ -163,9 +163,14 @@ server = MCPServer(
     debug=True,
     mcp_path="/api/mcp",  # Custom MCP endpoint
     docs_path="/custom-docs",
-    inspector_path="/custom-inspector"
+    inspector_path="/custom"
 )
 server.run(transport="streamable-http")
+
+# Effective routes:
+# - MCP:       /api/mcp
+# - Docs:      /custom-docs
+# - Inspector: /custom/inspector
 ```
 
 ## Logging Options

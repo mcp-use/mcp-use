@@ -28,17 +28,59 @@ The Inspector UI is only available when the server is running in **debug mode**.
 
 ## Accessing the Inspector
 
-Once your mcp-use server is running in debug mode, you can access the Inspector UI by navigating to the `/inspector` endpoint in your web browser.
+Once your mcp-use server is running in debug mode, you can access the Inspector UI in your browser.
 
-For a server running on `http://localhost:3001`, the Inspector will be available at:
+By default, the Inspector lives at `/inspector`.
+
+For a server running on `http://localhost:3001`, the default Inspector URL is:
 `http://localhost:3001/inspector`
+
+### `inspector_path` semantics
+
+`inspector_path` is a **base prefix**, not a replacement for `/inspector`.
+
+- `inspector_path="/"` or omitting it keeps the default route at `/inspector`
+- `inspector_path="/mcp"` mounts the Inspector at `/mcp/inspector`
+- `inspector_path="/internal/debug"` mounts the Inspector at `/internal/debug/inspector`
+- `inspector_path="/mcp/inspector"` is still accepted for backward compatibility and normalizes to the same final route
+
+This is independent from `mcp_path`:
+
+- `mcp_path="/mcp"` and default `inspector_path` gives you `/mcp` for MCP traffic and `/inspector` for the Inspector
+- `mcp_path="/mcp"` and `inspector_path="/mcp"` gives you `/mcp` for MCP traffic and `/mcp/inspector` for the Inspector
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    debug=True,
+    mcp_path="/mcp",
+    inspector_path="/mcp",
+)
+
+# MCP endpoint:       /mcp
+# Inspector endpoint: /mcp/inspector
+```
 
 ## Demo
 <img src="https://cdn.mcp-use.com/docs/python/mcp_use_inspector.gif" alt="Description of the GIF" />
 
 ## Configuration
 
-The Inspector UI is automatically enabled when running in debug mode and disabled in production. Configuration details will be documented once the implementation is complete.
+The Inspector UI is automatically enabled when running in debug mode and disabled in production.
+
+```python
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="my-server",
+    debug=True,
+    inspector_path="/internal",
+)
+
+# Inspector endpoint: /internal/inspector
+```
 
 ## Next Steps
 

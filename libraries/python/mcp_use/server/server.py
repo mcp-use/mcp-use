@@ -106,8 +106,9 @@ class MCPServer(FastMCP):
             debug: Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints)
             mcp_path: Path for MCP endpoint (default: "/mcp")
             docs_path: Path for documentation endpoint (default: "/docs")
-            inspector_path: Base path prefix for the inspector UI. The inspector is always
-                  mounted at `<prefix>/inspector` (default: "/")
+            inspector_path: Base path prefix for the inspector UI; final route is `<prefix>/inspector`.
+                  Examples: `/` -> `/inspector`, `/mcp` -> `/mcp/inspector`.
+                  Passing `/mcp/inspector` is also accepted for backward compatibility.
             openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
             show_inspector_logs: Show inspector-related logs
             pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
