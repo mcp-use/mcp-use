@@ -121,15 +121,17 @@ export const SandboxedIframe = forwardRef<
     ) {
       sandboxHost = currentHost; // Keep same origin
     } else {
-      // Priority 3: Production - use convention: sandbox-{hostname}
-      // Special case: dev.{domain} -> sandbox-inspector.dev.{domain}
-      // (not sandbox-dev.{domain}) so the sandbox subdomain consistently
-      // includes "inspector"
+      // Priority 3: Production - preserve the inspector namespace when deriving
+      // the sandbox host. Cloud embeds run on apex hosts such as manufact.com,
+      // while direct inspector pages run on inspector.{domain}; both should
+      // resolve to sandbox-inspector.{domain}.
       if (currentHost.startsWith("dev.")) {
         const rest = currentHost.slice(4); // "dev.".length
         sandboxHost = `sandbox-inspector.dev.${rest}`;
-      } else {
+      } else if (currentHost.startsWith("inspector.")) {
         sandboxHost = `sandbox-${currentHost}`;
+      } else {
+        sandboxHost = `sandbox-inspector.${currentHost}`;
       }
     }
 
