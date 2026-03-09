@@ -76,9 +76,7 @@ async def _inspector_static(request: Request):
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(cdn_url, follow_redirects=True)
             if response.status_code == 200:
-                return Response(
-                    content=response.content, media_type=response.headers.get("Content-Type", "text/plain")
-                )
+                return Response(content=response.content, media_type=response.headers.get("Content-Type", "text/plain"))
             else:
                 logger.warning(
                     f"Failed to fetch static file from CDN: {cdn_url} returned status {response.status_code}"

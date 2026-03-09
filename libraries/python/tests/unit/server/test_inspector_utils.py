@@ -60,10 +60,7 @@ async def test_inspector_index_redirects_to_prefixed_path():
     )
 
     assert response.status_code == 302
-    assert (
-        response.headers["location"]
-        == "http://testserver/mcp/inspector?autoConnect=http%3A%2F%2Ftestserver%2Fmcp"
-    )
+    assert response.headers["location"] == "http://testserver/mcp/inspector?autoConnect=http%3A%2F%2Ftestserver%2Fmcp"
 
 
 @pytest.mark.anyio
@@ -91,9 +88,9 @@ async def test_inspector_index_rewrites_asset_paths_for_custom_mount(monkeypatch
 
     body = response.body.decode("utf-8")
     assert response.status_code == 200
-    assert f'{inspector_utils.INSPECTOR_CDN_BASE_URL}/assets/index.js' in body
-    assert f'{inspector_utils.INSPECTOR_CDN_BASE_URL}/assets/index.css' in body
-    assert '/inspector/assets/' not in body
+    assert f"{inspector_utils.INSPECTOR_CDN_BASE_URL}/assets/index.js" in body
+    assert f"{inspector_utils.INSPECTOR_CDN_BASE_URL}/assets/index.css" in body
+    assert "/inspector/assets/" not in body
 
 
 def test_server_normalizes_inspector_prefix_and_legacy_full_path():
