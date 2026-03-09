@@ -279,9 +279,9 @@ export default [
       },
     },
   },
-  // mcp-use-ts package
+  // mcp-use package
   {
-    files: ["packages/mcp-use-ts/**/*.ts"],
+    files: ["packages/mcp-use/**/*.ts"],
     rules: {
       "import/no-extraneous-dependencies": [
         "error",

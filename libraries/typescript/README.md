@@ -10,9 +10,9 @@
 
 <p align="center">
     <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
-        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
+        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
+        <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
@@ -610,7 +610,7 @@ We welcome contributions! Check out our [Contributing Guide](../../CONTRIBUTING.
 ```bash
 # Clone the repository
 git clone https://github.com/mcp-use/mcp-use.git
-cd mcp-use-ts
+cd mcp-use/libraries/typescript
 
 # Install dependencies
 pnpm install
