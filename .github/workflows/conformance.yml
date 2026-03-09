@@ -192,3 +192,74 @@ jobs:
           clients: ${{ steps.build-clients.outputs.clients }}
           badge-gist-id: ${{ secrets.CONFORMANCE_GIST_ID }}
           badge-gist-token: ${{ secrets.GIST_SECRET }}
+
+      - name: Download conformance results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: conformance-results
+          path: conformance-results
+
+      - name: Validate conformance results
+        env:
+          PYTHON_CHANGED: ${{ needs.detect-changes.outputs.python }}
+          TYPESCRIPT_CHANGED: ${{ needs.detect-changes.outputs.typescript }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          results_dir = pathlib.Path("conformance-results")
+          expected_files = []
+
+          if os.environ["PYTHON_CHANGED"] == "true":
+              expected_files.extend([
+                  "python-results.json",
+                  "python-client-results.json",
+              ])
+
+          if os.environ["TYPESCRIPT_CHANGED"] == "true":
+              expected_files.extend([
+                  "typescript-results.json",
+                  "typescript-node-client-results.json",
+                  "typescript-browser-client-results.json",
+                  "typescript-react-client-results.json",
+              ])
+
+          failures = []
+          for filename in expected_files:
+              path = results_dir / filename
+              if not path.exists():
+                  failures.append(f"Missing conformance result file: {filename}")
+                  continue
+
+              with path.open() as f:
+                  payload = json.load(f)
+
+              total = payload.get("total", 0)
+              passed = payload.get("passed", 0)
+              failed = payload.get("failed", 0)
+              raw_output = (payload.get("rawOutput") or "").strip()
+
+              if total <= 0:
+                  failures.append(
+                      f"{filename} reported total={total}. "
+                      "The conformance runner did not produce executable results."
+                  )
+              elif passed + failed > total:
+                  failures.append(
+                      f"{filename} is inconsistent: passed={passed}, failed={failed}, total={total}."
+                  )
+
+              if total <= 0 and raw_output:
+                  failures.append(f"{filename} raw output starts with: {raw_output[:200]!r}")
+
+          if failures:
+              print("Conformance result validation failed:", file=sys.stderr)
+              for failure in failures:
+                  print(f"- {failure}", file=sys.stderr)
+              sys.exit(1)
+
+          print("Conformance results validated successfully.")
+          PY
