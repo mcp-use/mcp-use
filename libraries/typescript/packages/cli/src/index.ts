@@ -1103,6 +1103,7 @@ program
       if (options.withInspector) {
         console.log(chalk.gray("  Inspector included"));
       }
+      process.exit(0);
     } catch (error) {
       console.error(chalk.red("Build failed:"), error);
       process.exit(1);
