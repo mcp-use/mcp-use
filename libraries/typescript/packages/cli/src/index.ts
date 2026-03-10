@@ -342,8 +342,10 @@ async function generateToolRegistryTypesForServer(
     (globalThis as any).__mcpUseHmrMode = true;
     (globalThis as any).__mcpUseLastServer = undefined;
 
+    const { pathToFileURL: pathToFileURL2 } = await import("node:url");
+    const serverFileUrl2 = pathToFileURL2(serverFile).href;
     const { tsImport } = await import("tsx/esm/api");
-    await tsImport(serverFile, {
+    await tsImport(serverFileUrl2, {
       parentURL: import.meta.url,
       tsconfig: path.join(projectPath, "tsconfig.json"),
     });
@@ -1403,7 +1405,7 @@ program
           // tsImport handles TypeScript compilation and does not cache loaded modules,
           // so the entire dependency tree is re-evaluated on each call.
           // The ?t= timestamp is kept as a safety measure for edge cases.
-          await tsImport(`${serverFilePath}?t=${Date.now()}`, {
+          await tsImport(`${serverFileUrl}?t=${Date.now()}`, {
             parentURL: import.meta.url,
             onImport: (file: string) => {
               const filePath = file.startsWith("file://")
