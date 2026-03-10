@@ -342,8 +342,10 @@ async function generateToolRegistryTypesForServer(
     (globalThis as any).__mcpUseHmrMode = true;
     (globalThis as any).__mcpUseLastServer = undefined;
 
+    const { pathToFileURL: pathToFileURL2 } = await import("node:url");
+    const serverFileUrl2 = pathToFileURL2(serverFile).href;
     const { tsImport } = await import("tsx/esm/api");
-    await tsImport(serverFile, {
+    await tsImport(serverFileUrl2, {
       parentURL: import.meta.url,
       tsconfig: path.join(projectPath, "tsconfig.json"),
     });
