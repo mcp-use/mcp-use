@@ -16,6 +16,26 @@ tag: "New"
 - **Update**: Updated @mcp-use/cli to v2.18.1
 </Update>
 
+<Update label="v1.21.3" description="March 2026">
+  ## Inspector Sandbox Host Fix
+  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+
+- **Fix** (@mcp-use/inspector): Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
+- **Update**: Updated @mcp-use/inspector to v0.24.3
+- **Update**: Updated @mcp-use/cli to v2.18.2
+</Update>
+
+<Update label="v1.21.4" description="March 2026">
+  ## Request Context, CLI Build & README Fixes
+  Patch release fixing request context propagation, CLI build hang, and stale monorepo references.
+
+- **Fix**: `ctx.auth` and other request context properties were `undefined` in tool callbacks; `mountMcp()` now wraps `transport.handleRequest()` with `runWithContext()` so `getRequestContext()` is populated
+- **Fix** (@mcp-use/cli): `mcp-use build` no longer hangs — add `process.exit(0)` on success (tsImport creates active handles)
+- **Fix**: Update stale mcp-use-ts references in README badges, image URLs, eslint config to mcp-use monorepo
+- **Update**: Updated @mcp-use/inspector to v0.24.4
+- **Update**: Updated @mcp-use/cli to v2.18.3
+</Update>
+
 <Update label="v1.21.1" description="March 2026">
   ## Session Persistence & CLI Improvements
   Patch release with session recovery fix, CLI enhancements, and create-mcp-use-app install improvements.
