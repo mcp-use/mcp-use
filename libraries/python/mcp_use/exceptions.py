@@ -18,6 +18,12 @@ from mcp_use.client.exceptions import (
 from mcp_use.client.exceptions import (
     OAuthDiscoveryError as _OAuthDiscoveryError,
 )
+from mcp_use.client.exceptions import (
+    ToolNameCollisionError as _ToolNameCollisionError,
+)
+from mcp_use.client.exceptions import (
+    ToolNotFoundError as _ToolNotFoundError,
+)
 
 warnings.warn(
     "mcp_use.exceptions is deprecated. Use mcp_use.client.exceptions. This import will be removed in version 2.0.0",
@@ -44,3 +50,11 @@ class ConnectionError(_ConnectionError): ...
 
 @deprecated("Use mcp_use.client.exceptions.ConfigurationError")
 class ConfigurationError(_ConfigurationError): ...
+
+
+@deprecated("Use mcp_use.client.exceptions.ToolNotFoundError")
+class ToolNotFoundError(_ToolNotFoundError): ...
+
+
+@deprecated("Use mcp_use.client.exceptions.ToolNameCollisionError")
+class ToolNameCollisionError(_ToolNameCollisionError): ...
