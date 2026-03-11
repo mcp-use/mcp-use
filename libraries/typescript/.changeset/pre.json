@@ -8,6 +8,7 @@
     "mcp-use": "1.21.3"
   },
   "changesets": [
+    "fix-readme-references",
     "fresh-clouds-report"
   ]
 }

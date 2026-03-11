@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.21.4-canary.1
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [d4f479d]
+  - @mcp-use/cli@2.18.3-canary.1
+  - @mcp-use/inspector@0.24.4-canary.1
+
 ## 1.21.4-canary.0
 
 ### Patch Changes
