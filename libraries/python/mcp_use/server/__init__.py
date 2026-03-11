@@ -1,4 +1,5 @@
 from .context import Context
+from .dependencies import Depends
 from .middleware import Middleware, TelemetryMiddleware
 from .router import MCPRouter
 from .server import MCPServer
@@ -11,6 +12,7 @@ __all__ = [
     "MCPRouter",
     "FastMCP",
     "Context",
+    "Depends",
     "Middleware",
     "TelemetryMiddleware",
 ]
