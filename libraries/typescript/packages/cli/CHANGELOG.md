@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 2.18.3
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- dd77c3c: Fix `mcp-use build` hanging after completion by adding `process.exit(0)` to the build command's success path
+- Updated dependencies [dd77c3c]
+- Updated dependencies [dd77c3c]
+  - mcp-use@1.21.4
+  - @mcp-use/inspector@0.24.4
+
 ## 2.18.3-canary.2
 
 ### Patch Changes
