@@ -13,16 +13,16 @@ from mcp_use.client.exceptions import (
     MCPError as _MCPError,
 )
 from mcp_use.client.exceptions import (
-    ToolNotFoundError as _ToolNotFoundError,
+    OAuthAuthenticationError as _OAuthAuthenticationError,
+)
+from mcp_use.client.exceptions import (
+    OAuthDiscoveryError as _OAuthDiscoveryError,
 )
 from mcp_use.client.exceptions import (
     ToolNameCollisionError as _ToolNameCollisionError,
 )
 from mcp_use.client.exceptions import (
-    OAuthAuthenticationError as _OAuthAuthenticationError,
-)
-from mcp_use.client.exceptions import (
-    OAuthDiscoveryError as _OAuthDiscoveryError,
+    ToolNotFoundError as _ToolNotFoundError,
 )
 
 warnings.warn(
