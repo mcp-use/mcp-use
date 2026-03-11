@@ -3,6 +3,7 @@
 import logging
 import socket
 import sys
+from collections.abc import Awaitable, Callable
 from functools import partial
 from typing import TYPE_CHECKING, get_args
 
@@ -46,6 +47,14 @@ class ServerRunner:
     def __init__(self, server: "MCPServer"):
         self.server = server
 
+    async def _run_with_mounted_connectors(self, serve_fn: Callable[[], Awaitable[None]]) -> None:
+        """Run a server transport while mounted connectors are connected."""
+        try:
+            await self.server._connect_mounted_connectors()
+            await serve_fn()
+        finally:
+            await self.server._disconnect_mounted_connectors()
+
     async def serve_starlette_app(
         self,
         starlette_app: Starlette,
@@ -81,13 +90,26 @@ class ServerRunner:
 
     async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
         """Run the server using StreamableHTTP transport."""
-        starlette_app = self.server.streamable_http_app()
-        await self.serve_starlette_app(starlette_app, host, port, "streamable-http", reload)
+
+        async def serve() -> None:
+            starlette_app = self.server.streamable_http_app()
+            await self.serve_starlette_app(starlette_app, host, port, "streamable-http", reload)
+
+        await self._run_with_mounted_connectors(serve)
 
     async def run_sse_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
         """Run the server using SSE transport."""
-        starlette_app = self.server.sse_app(self.server.mcp_path)
-        await self.serve_starlette_app(starlette_app, host, port, "sse", reload)
+
+        async def serve() -> None:
+            starlette_app = self.server.sse_app(self.server.mcp_path)
+            await self.serve_starlette_app(starlette_app, host, port, "sse", reload)
+
+        await self._run_with_mounted_connectors(serve)
+
+    async def run_stdio_async(self) -> None:
+        """Run the server using stdio transport with mounted connector lifecycle."""
+
+        await self._run_with_mounted_connectors(self.server.run_stdio_async)
 
     def run(
         self,
@@ -111,7 +133,7 @@ class ServerRunner:
         try:
             match transport:
                 case "stdio":
-                    anyio.run(self.server.run_stdio_async)
+                    anyio.run(self.run_stdio_async)
                 case "streamable-http":
                     anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
                 case "sse":
