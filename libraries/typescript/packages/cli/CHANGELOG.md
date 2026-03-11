@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.18.3-canary.0
+
+### Patch Changes
+
+- 98f6521: Fix `mcp-use build` hanging after completion by adding `process.exit(0)` to the build command's success path
+  - mcp-use@1.21.4-canary.0
+  - @mcp-use/inspector@0.24.4-canary.0
+
 ## 2.18.2
 
 ### Patch Changes
