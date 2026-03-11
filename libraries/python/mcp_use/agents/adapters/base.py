@@ -4,6 +4,7 @@ Base adapter interface for MCP tools.
 This module provides the abstract base class that all MCP tool adapters should inherit from.
 """
 
+import copy
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
@@ -70,8 +71,15 @@ class BaseAdapter(Generic[T], ABC):
             # Fallback for unexpected types
             return str(tool_result)
 
-    def fix_schema(self, schema: Any) -> Any:
-        """Convert JSON Schema 'type': ['string', 'null'] to 'anyOf' format and fix enum handling.
+    def fix_schema(self, schema: Any, _root: Any = None, _resolving: frozenset[str] | None = None) -> Any:
+        """Convert JSON Schema to a form compatible with jsonschema_to_pydantic.
+
+        Performs three normalizations:
+        - Resolves local ``$ref`` pointers (e.g. ``#/properties/position``) that
+          ``jsonschema_to_pydantic`` cannot handle.  Refs targeting ``$defs`` or
+          ``definitions`` are left intact so that the library can resolve them itself.
+        - Converts ``"type": ["string", "null"]`` arrays to ``anyOf`` form.
+        - Adds ``"type": "string"`` to ``enum`` fields that lack an explicit type.
 
         Args:
             schema: The JSON schema to fix.
@@ -79,19 +87,45 @@ class BaseAdapter(Generic[T], ABC):
         Returns:
             The fixed JSON schema.
         """
+        if _root is None:
+            _root = schema
+        if _resolving is None:
+            _resolving = frozenset()
+
         if isinstance(schema, dict):
+            # Inline $ref pointers that jsonschema_to_pydantic cannot resolve.
+            # Refs targeting $defs / definitions are left intact for that library to handle.
+            if "$ref" in schema:
+                ref = schema["$ref"]
+                if isinstance(ref, str) and ref.startswith("#/"):
+                    parts = ref[2:].split("/")
+                    if parts and parts[0] not in ("$defs", "definitions") and ref not in _resolving:
+                        try:
+                            resolved = _root
+                            for part in parts:
+                                part = part.replace("~1", "/").replace("~0", "~")  # RFC 6901
+                                resolved = resolved[int(part) if isinstance(resolved, list) else part]
+                            resolved = copy.deepcopy(resolved)
+                            sibling_keys = {k: v for k, v in schema.items() if k != "$ref"}
+                            if sibling_keys and isinstance(resolved, dict):
+                                # Wrap in allOf so sibling constraints are combined without
+                                # overwriting any keyword already present in the resolved schema.
+                                resolved = {"allOf": [resolved, sibling_keys]}
+                            return self.fix_schema(resolved, _root, _resolving | {ref})
+                        except (KeyError, TypeError, IndexError, ValueError):
+                            pass
+
             if "type" in schema and isinstance(schema["type"], list):
                 schema["anyOf"] = [{"type": t} for t in schema["type"]]
-                del schema["type"]  # Remove 'type' and standardize to 'anyOf'
+                del schema["type"]
 
-            # Fix enum handling - ensure enum fields are properly typed as strings
             if "enum" in schema and "type" not in schema:
                 schema["type"] = "string"
 
             for key, value in schema.items():
-                schema[key] = self.fix_schema(value)  # Apply recursively
+                schema[key] = self.fix_schema(value, _root, _resolving)
         elif isinstance(schema, list):
-            return [self.fix_schema(item) for item in schema]
+            return [self.fix_schema(item, _root, _resolving) for item in schema]
         return schema
 
     async def _get_connectors(self, client: MCPClient) -> list[BaseConnector]:
