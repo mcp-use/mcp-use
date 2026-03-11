@@ -11,6 +11,7 @@ import { Auth0OAuthProvider } from "./providers/auth0.js";
 import { KeycloakOAuthProvider } from "./providers/keycloak.js";
 import { WorkOSOAuthProvider } from "./providers/workos.js";
 import { CustomOAuthProvider } from "./providers/custom.js";
+import { ClerkOAuthProvider } from "./providers/clerk.js";
 import type { UserInfo } from "./providers/types.js";
 import { getEnv } from "../utils/runtime.js";
 
@@ -49,6 +50,14 @@ export interface WorkOSProviderConfig {
   subdomain: string;
   clientId?: string;
   apiKey?: string;
+  verifyJwt?: boolean;
+}
+
+/**
+ * Configuration for Clerk OAuth provider
+ */
+export interface ClerkProviderConfig {
+  domain: string;
   verifyJwt?: boolean;
 }
 
@@ -108,7 +117,7 @@ export function oauthSupabaseProvider(
   if (!projectId) {
     throw new Error(
       "Supabase projectId is required. " +
-        "Set MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable or pass projectId in config."
+      "Set MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable or pass projectId in config."
     );
   }
 
@@ -160,14 +169,14 @@ export function oauthAuth0Provider(
   if (!domain) {
     throw new Error(
       "Auth0 domain is required. " +
-        "Set MCP_USE_OAUTH_AUTH0_DOMAIN environment variable or pass domain in config."
+      "Set MCP_USE_OAUTH_AUTH0_DOMAIN environment variable or pass domain in config."
     );
   }
 
   if (!audience) {
     throw new Error(
       "Auth0 audience is required. " +
-        "Set MCP_USE_OAUTH_AUTH0_AUDIENCE environment variable or pass audience in config."
+      "Set MCP_USE_OAUTH_AUTH0_AUDIENCE environment variable or pass audience in config."
     );
   }
 
@@ -224,14 +233,14 @@ export function oauthKeycloakProvider(
   if (!serverUrl) {
     throw new Error(
       "Keycloak serverUrl is required. " +
-        "Set MCP_USE_OAUTH_KEYCLOAK_SERVER_URL environment variable or pass serverUrl in config."
+      "Set MCP_USE_OAUTH_KEYCLOAK_SERVER_URL environment variable or pass serverUrl in config."
     );
   }
 
   if (!realm) {
     throw new Error(
       "Keycloak realm is required. " +
-        "Set MCP_USE_OAUTH_KEYCLOAK_REALM environment variable or pass realm in config."
+      "Set MCP_USE_OAUTH_KEYCLOAK_REALM environment variable or pass realm in config."
     );
   }
 
@@ -301,7 +310,7 @@ export function oauthWorkOSProvider(
   if (!subdomain) {
     throw new Error(
       "WorkOS subdomain is required. " +
-        "Set MCP_USE_OAUTH_WORKOS_SUBDOMAIN environment variable or pass subdomain in config."
+      "Set MCP_USE_OAUTH_WORKOS_SUBDOMAIN environment variable or pass subdomain in config."
     );
   }
 
@@ -330,6 +339,54 @@ export function oauthWorkOSProvider(
     subdomain,
     clientId,
     apiKey,
+    verifyJwt: config.verifyJwt,
+  });
+}
+
+/**
+ * Create a Clerk OAuth provider
+ *
+ * Supports zero-config setup via environment variables:
+ * - MCP_USE_OAUTH_CLERK_DOMAIN (required)
+ *
+ * @param config - Optional Clerk configuration (overrides environment variables)
+ * @returns OAuthProvider instance
+ *
+ * @example Zero-config with environment variables
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthClerkProvider()
+ * });
+ * ```
+ *
+ * @example With explicit configuration
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthClerkProvider({
+ *     domain: 'my-app.clerk.accounts.dev'
+ *   })
+ * });
+ * ```
+ */
+export function oauthClerkProvider(
+  config: Partial<ClerkProviderConfig> = {}
+): OAuthProvider {
+  const domain = config.domain ?? getEnv("MCP_USE_OAUTH_CLERK_DOMAIN");
+
+  if (!domain) {
+    throw new Error(
+      "Clerk domain is required. " +
+      "Set MCP_USE_OAUTH_CLERK_DOMAIN environment variable or pass domain in config."
+    );
+  }
+
+  return new ClerkOAuthProvider({
+    provider: "clerk",
+    domain,
     verifyJwt: config.verifyJwt,
   });
 }

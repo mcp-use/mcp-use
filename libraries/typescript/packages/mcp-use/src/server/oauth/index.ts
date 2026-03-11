@@ -2,7 +2,7 @@
  * OAuth Integration for MCP Use
  *
  * Provides zero-config OAuth authentication for MCP servers with support for
- * Supabase, Auth0, Keycloak, WorkOS, and custom OAuth providers.
+ * Supabase, Auth0, Keycloak, WorkOS, Clerk, and custom OAuth providers.
  */
 
 // Export types
@@ -11,11 +11,13 @@ export type { OAuthProvider, UserInfo } from "./providers/types.js";
 // Export provider factory functions
 export {
   oauthAuth0Provider,
+  oauthClerkProvider,
   oauthCustomProvider,
   oauthKeycloakProvider,
   oauthSupabaseProvider,
   oauthWorkOSProvider,
   type Auth0ProviderConfig,
+  type ClerkProviderConfig,
   type CustomProviderConfig,
   type KeycloakProviderConfig,
   type SupabaseProviderConfig,
