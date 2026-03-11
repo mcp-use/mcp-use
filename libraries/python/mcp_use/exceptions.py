@@ -13,6 +13,12 @@ from mcp_use.client.exceptions import (
     MCPError as _MCPError,
 )
 from mcp_use.client.exceptions import (
+    ToolNotFoundError as _ToolNotFoundError,
+)
+from mcp_use.client.exceptions import (
+    ToolNameCollisionError as _ToolNameCollisionError,
+)
+from mcp_use.client.exceptions import (
     OAuthAuthenticationError as _OAuthAuthenticationError,
 )
 from mcp_use.client.exceptions import (
@@ -44,3 +50,11 @@ class ConnectionError(_ConnectionError): ...
 
 @deprecated("Use mcp_use.client.exceptions.ConfigurationError")
 class ConfigurationError(_ConfigurationError): ...
+
+
+@deprecated("Use mcp_use.client.exceptions.ToolNotFoundError")
+class ToolNotFoundError(_ToolNotFoundError): ...
+
+
+@deprecated("Use mcp_use.client.exceptions.ToolNameCollisionError")
+class ToolNameCollisionError(_ToolNameCollisionError): ...
