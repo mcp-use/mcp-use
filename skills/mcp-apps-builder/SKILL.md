@@ -126,6 +126,10 @@ Load these before diving into tools/resources/widgets sections.
   - When: Composing multiple MCP servers into one unified aggregator server
   - Covers: `server.proxy()`, config API, explicit sessions, sampling routing
 
+- **[architecture.md](references/foundations/architecture.md)**
+  - When: Adding cross-cutting logic (logging, auth checks, rate limiting, tool filtering) that spans multiple tools/resources
+  - Covers: `server.use('mcp:...')` middleware, `MiddlewareContext` (method, params, auth, state), pattern matching, HTTP vs MCP middleware
+
 ---
 
 ### 🎨 Building Visual Widgets (Interactive UI)?
@@ -181,6 +185,9 @@ What do you need?
 │
 ├─ Reusable prompt template
 │  └─> Use Prompt: server/prompts.md
+│
+├─ Cross-cutting logic (logging, auth checks, rate limiting, tool filtering)
+│  └─> Use Middleware: architecture.md#mcp-middleware
 │
 ├─ Visual/interactive UI
 │  └─> Use Widget: widgets/basics.md
@@ -347,5 +354,8 @@ server.listen();
 - `server.proxy()` - Compose/Proxy multiple MCP servers
 - `server.uiResource()` - Define widget resource
 - `server.listen()` - Start server
+- `server.use('mcp:tools/call', fn)` - MCP middleware (tools, resources, prompts, list ops)
+- `server.use('mcp:*', fn)` - Catch-all MCP middleware
+- `server.use(fn)` - HTTP middleware (Hono)
 
 
