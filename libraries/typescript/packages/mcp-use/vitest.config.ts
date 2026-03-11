@@ -20,7 +20,13 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": "./src",
+      // Stub the inspector package for tests to avoid build errors
+      // The server code uses dynamic imports with try-catch, so this won't affect runtime
+      "@mcp-use/inspector": "./tests/helpers/inspector-stub.js",
     },
     extensions: [".ts", ".tsx", ".js", ".jsx"],
+  },
+  optimizeDeps: {
+    exclude: ["@mcp-use/inspector"],
   },
 });
