@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.21.4-canary.2
+
+### Patch Changes
+
+- 4a5e680: Fix regression where `ctx.auth` and other request context properties were `undefined` in tool callbacks. `mountMcp()` now wraps all `transport.handleRequest()` calls with `runWithContext()` so that `getRequestContext()` (AsyncLocalStorage) is properly populated during the MCP request lifecycle.
+  - @mcp-use/cli@2.18.3-canary.2
+  - @mcp-use/inspector@0.24.4-canary.2
+
 ## 1.21.4-canary.1
 
 ### Patch Changes
