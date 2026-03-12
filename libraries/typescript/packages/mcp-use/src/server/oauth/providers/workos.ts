@@ -106,6 +106,10 @@ export class WorkOSOAuthProvider implements OAuthProvider {
     return "proxy";
   }
 
+  getClientId(): string | undefined {
+    return this.config.clientId;
+  }
+
   getRegistrationEndpoint(): string | undefined {
     // Only provide registration endpoint when NOT using a pre-registered client
     if (this.config.clientId) {
