@@ -11,10 +11,12 @@ import uuid
 from typing import Any
 
 import httpx
-from mcp.types import Tool
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
+from mcp.types import Root, Tool
 from websockets import ClientConnection
 
 from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.middleware import Middleware
 from mcp_use.client.task_managers import ConnectionManager, WebSocketConnectionManager
 from mcp_use.logging import logger
 
@@ -31,6 +33,13 @@ class WebSocketConnector(BaseConnector):
         url: str,
         headers: dict[str, str] | None = None,
         auth: str | dict[str, Any] | httpx.Auth | None = None,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
+        roots: list[Root] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
         """Initialize a new WebSocket connector.
 
@@ -41,12 +50,27 @@ class WebSocketConnector(BaseConnector):
                 - A string token: Use Bearer token authentication
                 - A dict: Not supported for WebSocket (will log warning)
                 - An httpx.Auth object: Not supported for WebSocket (will log warning)
+            sampling_callback: Optional sampling callback.
+            elicitation_callback: Optional elicitation callback.
+            message_handler: Optional callback to handle messages.
+            logging_callback: Optional callback to handle log messages.
+            middleware: Optional list of middleware.
+            roots: Optional initial list of roots to advertise to the server.
+            list_roots_callback: Optional custom callback to handle roots/list requests.
         """
+        super().__init__(
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
+            middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
+        )
         self.url = url
         self.headers = headers or {}
 
         # Handle authentication - WebSocket only supports bearer tokens
-        # An auth field it's not needed
         if auth is not None:
             if isinstance(auth, str):
                 self.headers["Authorization"] = f"Bearer {auth}"
@@ -54,11 +78,8 @@ class WebSocketConnector(BaseConnector):
                 logger.warning("WebSocket connector only supports bearer token authentication")
 
         self.ws: ClientConnection | None = None
-        self._connection_manager: ConnectionManager | None = None
         self._receiver_task: asyncio.Task | None = None
         self.pending_requests: dict[str, asyncio.Future] = {}
-        self._tools: list[Tool] | None = None
-        self._connected = False
 
     async def connect(self) -> None:
         """Establish a connection to the MCP implementation."""
