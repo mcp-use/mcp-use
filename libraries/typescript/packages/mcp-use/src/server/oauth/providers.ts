@@ -461,7 +461,7 @@ export function oauthCustomProvider(
   return new CustomOAuthProvider({
     provider: "custom",
     issuer: config.issuer,
-    jwksUrl: jwksUrl ?? "",
+    jwksUrl,
     authEndpoint: config.authEndpoint,
     tokenEndpoint: config.tokenEndpoint,
     scopesSupported,
