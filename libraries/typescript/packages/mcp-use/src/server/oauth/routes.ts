@@ -200,8 +200,7 @@ export function setupOAuthRoutes(
         // Check if provider has a pre-registered client (stored in provider config)
         // If so, remove registration_endpoint to prevent clients from using DCR
         const hasRegisteredClient =
-          provider.getRegistrationEndpoint &&
-          (provider as any).config?.clientId;
+          provider.getRegistrationEndpoint && provider.getClientId?.();
 
         if (hasRegisteredClient) {
           console.log(
