@@ -59,30 +59,36 @@ def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContent
             case TextContent():
                 blocks.append({"type": "text", "text": item.text})
             case ImageContent():
-                blocks.append({
-                    "type": "image",
-                    "source_type": "base64",
-                    "data": item.data,
-                    "mime_type": item.mimeType,
-                })
+                blocks.append(
+                    {
+                        "type": "image",
+                        "source_type": "base64",
+                        "data": item.data,
+                        "mime_type": item.mimeType,
+                    }
+                )
             case AudioContent():
-                blocks.append({
-                    "type": "audio",
-                    "source_type": "base64",
-                    "data": item.data,
-                    "mime_type": item.mimeType,
-                })
+                blocks.append(
+                    {
+                        "type": "audio",
+                        "source_type": "base64",
+                        "data": item.data,
+                        "mime_type": item.mimeType,
+                    }
+                )
             case EmbeddedResource():
                 resource = item.resource
                 if isinstance(resource, TextResourceContents):
                     blocks.append({"type": "text", "text": resource.text})
                 elif isinstance(resource, BlobResourceContents):
-                    blocks.append({
-                        "type": "file",
-                        "source_type": "base64",
-                        "data": resource.blob,
-                        "mime_type": resource.mimeType or "application/octet-stream",
-                    })
+                    blocks.append(
+                        {
+                            "type": "file",
+                            "source_type": "base64",
+                            "data": resource.blob,
+                            "mime_type": resource.mimeType or "application/octet-stream",
+                        }
+                    )
                 else:
                     blocks.append({"type": "text", "text": str(resource)})
             case _:
