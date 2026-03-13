@@ -34,6 +34,7 @@ import {
 import type { McpServer } from "mcp-use/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { getServerDisplayName } from "@/client/utils/serverNames";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
@@ -217,11 +218,7 @@ export function LayoutHeader({
             <div className="flex-1 flex justify-end items-center gap-2">
               {selectedServer &&
                 (() => {
-                  // Extract display name the same way ServerDropdown does
-                  const displayName =
-                    selectedServer.serverInfo?.title ||
-                    selectedServer.serverInfo?.name ||
-                    selectedServer.name;
+                  const displayName = getServerDisplayName(selectedServer);
                   return (
                     <>
                       <AddToClientDropdown
@@ -539,11 +536,7 @@ export function LayoutHeader({
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             {selectedServer &&
               (() => {
-                // Extract display name the same way ServerDropdown does
-                const displayName =
-                  selectedServer.serverInfo?.title ||
-                  selectedServer.serverInfo?.name ||
-                  selectedServer.name;
+                const displayName = getServerDisplayName(selectedServer);
                 return (
                   <>
                     <AddToClientDropdown
