@@ -25,7 +25,7 @@ must implement.
 
 Base class for MCP connectors.
 
-    This class defines the interface that all MCP connectors must implement.
+This class defines the interface that all MCP connectors must implement.
 
 </div>
 </RandomGradientBackground>
@@ -131,14 +131,14 @@ Get a prompt by name.
 
 **Parameters**
 ><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
-><ParamField body="arguments" type="dict[str, typing.Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
+><ParamField body="arguments" type="dict[str, Any] | None" default="None" >   Dictionary of key-value pairs </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="mcp.types.GetPromptResult" />
 
 **Signature**
 ```python wrap
-def get_prompt(name: str, arguments: dict[str, typing.Any] | None = None):
+def get_prompt(name: str, arguments: dict[str, Any] | None = None):
 ```
 
 </Card>
@@ -181,8 +181,8 @@ def initialize():
 
 Check if the connector is actually connected and the connection is alive.
 
-        This property checks not only the connected flag but also verifies that
-        the underlying connection manager and streams are still active.
+This property checks not only the connected flag but also verifies that
+the underlying connection manager and streams are still active.
 
 
 
@@ -233,7 +233,7 @@ def list_resources():
 
 Get the list_roots_callback to pass to ClientSession.
 
-        This always returns a callback to ensure the roots capability is advertised.
+This always returns a callback to ensure the roots capability is advertised.
 
 
 **Returns**
@@ -267,10 +267,10 @@ def list_tools():
 
 Get the list of available prompts.
 
-        .. deprecated::
-            This property is deprecated because it may return stale data when the server
-            sends list change notifications. Use `await list_prompts()' instead to ensure
-            you always get the latest data.
+.. deprecated::
+    This property is deprecated because it may return stale data when the server
+    sends list change notifications. Use `await list_prompts()' instead to ensure
+    you always get the latest data.
 
 
 **Returns**
@@ -323,10 +323,10 @@ def read_resource(uri: pydantic.networks.AnyUrl):
 
 Get the list of available resources.
 
-        .. deprecated::
-            This property is deprecated because it may return stale data when the server
-            sends list change notifications. Use `await list_resources()` instead to ensure
-            you always get the latest data.
+.. deprecated::
+    This property is deprecated because it may return stale data when the server
+    sends list change notifications. Use `await list_resources()` instead to ensure
+    you always get the latest data.
 
 
 **Returns**
@@ -344,15 +344,15 @@ def resources():
 
 Set the roots and notify the server if connected.
 
-        Roots represent directories or files that the client has access to.
+Roots represent directories or files that the client has access to.
 
-        Example:
-            ```python
-            await connector.set_roots([
-                Root(uri="file:///home/user/project", name="My Project"),
-                Root(uri="file:///home/user/data"),
-            ])
-            ```
+Example:
+    ```python
+    await connector.set_roots([
+        Root(uri="file:///home/user/project", name="My Project"),
+        Root(uri="file:///home/user/data"),
+    ])
+    ```
 
 
 **Parameters**
@@ -370,10 +370,10 @@ def set_roots(roots: list[mcp.types.Root]):
 
 Get the list of available tools.
 
-        .. deprecated::
-            This property is deprecated because it may return stale data when the server
-            sends list change notifications. Use `await list_tools()` instead to ensure
-            you always get the latest data.
+.. deprecated::
+    This property is deprecated because it may return stale data when the server
+    sends list change notifications. Use `await list_tools()` instead to ensure
+    you always get the latest data.
 
 
 **Returns**
