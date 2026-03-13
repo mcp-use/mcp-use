@@ -1,35 +1,14 @@
 ---
 name: mcp-apps-builder
 description: |
-  **MANDATORY for ALL MCP server work** - mcp-use framework best practices and patterns.
-
-  **READ THIS FIRST** before any MCP server work, including:
-  - Creating new MCP servers
-  - Modifying existing MCP servers (adding/updating tools, resources, prompts, widgets)
-  - Debugging MCP server issues or errors
-  - Reviewing MCP server code for quality, security, or performance
-  - Answering questions about MCP development or mcp-use patterns
-  - Making ANY changes to server.tool(), server.resource(), server.prompt(), or widgets
-
-  This skill contains critical architecture decisions, security patterns, and common pitfalls.
-  Always consult the relevant reference files BEFORE implementing MCP features.
----
-
-# IMPORTANT: How to Use This Skill
-
-This file provides a NAVIGATION GUIDE ONLY. Before implementing any MCP server features, you MUST:
-
-1. Read this overview to understand which reference files are relevant
-2. **ALWAYS read the specific reference file(s)** for the features you're implementing
-3. Apply the detailed patterns from those files to your implementation
-
-**Do NOT rely solely on the quick reference examples in this file** - they are minimal examples only. The reference files contain critical best practices, security considerations, and advanced patterns.
-
+  Implements mcp-use framework patterns for building production-ready MCP servers. Use when creating new MCP servers with `npx create-mcp-use-app`, implementing `server.tool()` handlers with Zod schemas, defining `server.resource()` or `server.resourceTemplate()` endpoints, authoring `server.prompt()` templates, building React-based visual widgets with `useWidget()` and `useCallTool()`, configuring OAuth authentication (WorkOS, Supabase, or custom providers), formatting tool responses with `text()`, `object()`, `markdown()`, `widget()`, or `error()` helpers, composing multiple MCP servers via `server.proxy()`, deploying to Manufact Cloud or Docker, debugging MCP server errors, or reviewing MCP server code for quality and security. Always consult before modifying any MCP server feature.
 ---
 
 # MCP Server Best Practices
 
 Comprehensive guide for building production-ready MCP servers with tools, resources, prompts, and widgets using mcp-use.
+
+> **Before implementing any feature, identify your path in Quick Navigation below and read the relevant reference file(s). The examples in this file are minimal — full best practices, security guidance, and advanced patterns live in the references.**
 
 ## ⚠️ FIRST: New Project or Existing Project?
 
@@ -162,101 +141,16 @@ Load these before diving into tools/resources/widgets sections.
 
 ---
 
-## Decision Tree
+## 🔒 Principles & Golden Rules
 
-```
-What do you need?
+1. **Tools for actions, Resources for data, Prompts for templates, Widgets for UI** — use the right primitive; prefer widgets for browsing/comparing multiple items.
+2. **One Tool = One Capability** — ❌ `manage-users` → ✅ `create-user`, `delete-user`, `list-users`
+3. **Return complete data upfront** — tool calls are expensive; avoid lazy-loading: ❌ `list-products` + `get-product-details` → ✅ `list-products` returns full details
+4. **Widgets own their UI state** — manage selections/filters with `useState`/`setState`, not tool calls
+5. **Validate at boundaries only** — validate user input and external API responses; trust internal framework guarantees
+6. **Mock data first** — prototype quickly, connect APIs later
 
-├─ New project from scratch
-│  └─> quickstart.md (scaffolding + setup)
-│
-├─ OAuth / user authentication
-│  └─> authentication/overview.md → provider-specific guide
-│
-├─ Simple backend action (no UI)
-│  └─> Use Tool: server/tools.md
-│
-├─ Read-only data for clients
-│  └─> Use Resource: server/resources.md
-│
-├─ Reusable prompt template
-│  └─> Use Prompt: server/prompts.md
-│
-├─ Visual/interactive UI
-│  └─> Use Widget: widgets/basics.md
-│
-└─ Deploy to production
-   └─> deployment.md (cloud deploy, self-hosting, Docker)
-```
-
----
-
-## Core Principles
-
-1. **Tools for actions** - Backend operations with input/output
-2. **Resources for data** - Read-only data clients can fetch
-3. **Prompts for templates** - Reusable message templates
-4. **Widgets for UI** - Visual interfaces when helpful
-5. **Mock data first** - Prototype quickly, connect APIs later
-
----
-
-## ❌ Common Mistakes
-
-Avoid these anti-patterns found in production MCP servers:
-
-### Tool Definition
-- ❌ Returning raw objects instead of using response helpers
-  - ✅ Use `text()`, `object()`, `widget()`, `error()` helpers
-- ❌ Skipping Zod schema `.describe()` on every field
-  - ✅ Add descriptions to all schema fields for better AI understanding
-- ❌ No input validation or sanitization
-  - ✅ Validate inputs with Zod, sanitize user-provided data
-- ❌ Throwing errors instead of returning `error()` helper
-  - ✅ Use `error("message")` for graceful error responses
-
-### Widget Development
-- ❌ Accessing `props` without checking `isPending`
-  - ✅ Always check `if (isPending) return <Loading/>`
-- ❌ Widget handles server state (filters, selections)
-  - ✅ Widgets manage their own UI state with `useState`
-- ❌ Missing `McpUseProvider` wrapper or `autoSize`
-  - ✅ Wrap root component: `<McpUseProvider autoSize>`
-- ❌ Inline styles without theme awareness
-  - ✅ Use `useWidgetTheme()` for light/dark mode support
-
-### Security & Production
-- ❌ Hardcoded API keys or secrets in code
-  - ✅ Use `process.env.API_KEY`, document in `.env.example`
-- ❌ No error handling in tool handlers
-  - ✅ Wrap in try/catch, return `error()` on failure
-- ❌ Expensive operations without caching
-  - ✅ Cache API calls, computations with TTL
-- ❌ Missing CORS configuration
-  - ✅ Configure CORS for production deployments
-
----
-
-## 🔒 Golden Rules
-
-**Opinionated architectural guidelines:**
-
-### 1. One Tool = One Capability
-Split broad actions into focused tools:
-- ❌ `manage-users` (too vague)
-- ✅ `create-user`, `delete-user`, `list-users`
-
-### 2. Return Complete Data Upfront
-Tool calls are expensive. Avoid lazy-loading:
-- ❌ `list-products` + `get-product-details` (2 calls)
-- ✅ `list-products` returns full data including details
-
-### 3. Widgets Own Their State
-UI state lives in the widget, not in separate tools:
-- ❌ `select-item` tool, `set-filter` tool
-- ✅ Widget manages with `useState` or `setState`
-
-### 4. `exposeAsTool` Defaults to `false`
+### `exposeAsTool` Defaults to `false`
 Widgets are registered as resources only by default. Use a custom tool (recommended) or set `exposeAsTool: true` to expose a widget to the model:
 
 ```typescript
@@ -287,16 +181,29 @@ export default function MyWidget() {
 
 ⚠️ **Common mistake:** Only doing steps 1-2 but skipping 3-4 (loses type safety)
 
-### 5. Validate at Boundaries Only
-- Trust internal code and framework guarantees
-- Validate user input, external API responses
-- Don't add error handling for scenarios that can't happen
+---
 
-### 6. Prefer Widgets for Browsing/Comparing
-When in doubt, add a widget. Visual UI improves:
-- Browsing multiple items
-- Comparing data side-by-side
-- Interactive selection workflows
+## ❌ Common Mistakes
+
+Avoid these anti-patterns found in production MCP servers:
+
+### Tool Definition
+- ❌ Returning raw objects → ✅ Use `text()`, `object()`, `widget()`, `error()` helpers
+- ❌ Skipping Zod schema `.describe()` on fields → ✅ Add descriptions to all schema fields
+- ❌ No input validation → ✅ Validate with Zod, sanitize user-provided data
+- ❌ Throwing errors → ✅ Use `error("message")` for graceful error responses
+
+### Widget Development
+- ❌ Accessing `props` without checking `isPending` → ✅ Always render `<Loading/>` guard first
+- ❌ Widget handles server state (filters, selections) → ✅ Use `useState` for UI state
+- ❌ Missing `McpUseProvider` wrapper or `autoSize` → ✅ Wrap root: `<McpUseProvider autoSize>`
+- ❌ Inline styles without theme awareness → ✅ Use `useWidgetTheme()` for light/dark support
+
+### Security & Production
+- ❌ Hardcoded API keys → ✅ Use `process.env.API_KEY`, document in `.env.example`
+- ❌ No error handling in tool handlers → ✅ Wrap in try/catch, return `error()` on failure
+- ❌ Expensive operations without caching → ✅ Cache API calls with TTL
+- ❌ Missing CORS configuration → ✅ Configure CORS for production deployments
 
 ---
 
@@ -347,5 +254,3 @@ server.listen();
 - `server.proxy()` - Compose/Proxy multiple MCP servers
 - `server.uiResource()` - Define widget resource
 - `server.listen()` - Start server
-
-

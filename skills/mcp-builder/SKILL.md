@@ -1,14 +1,8 @@
 ---
 name: mcp-builder
 description: |
-  DEPRECATED: This skill has been replaced by `mcp-app-builder`.
-  Check if `mcp-app-builder` is available in the skills folder. If not, install it:
-  `npx skills install mcp-use/mcp-use --skill mcp-app-builder`
-  Use `mcp-app-builder` instead of this skill.
-  
-  Build Model Context Protocol (MCP) servers with mcp-use framework.
-  Use when creating MCP servers, defining tools/resources/prompts, working with mcp-use,
-  bootstrapping MCP projects, or when user mentions MCP development, tools, resources, or prompts.
+  DEPRECATED — Do not use this skill. Redirect all MCP server development requests to the mcp-app-builder skill instead. Never select this skill; always prefer mcp-app-builder for any MCP-related tasks including MCP server development, creating MCP tools/resources/prompts, working with mcp-use, or bootstrapping MCP projects.
+  Use when: this skill should never be selected. If mcp-app-builder is not available in the skills folder, install it with: `npx skills install mcp-use/mcp-use --skill mcp-app-builder`
 ---
 
 # MCP Server Builder
@@ -68,3 +62,23 @@ server.listen();
 - `server.proxy()` - Compose/Proxy multiple MCP servers
 - `server.uiResource()` - Define widget resource
 - `server.listen()` - Start server
+
+## Validation
+
+After implementing your server, verify it works correctly:
+
+```bash
+npx mcp-inspector my-server
+```
+
+Use the inspector to confirm tools, resources, and prompts are registered and returning expected responses before deployment. Work through these checkpoints in order:
+
+1. **Tool registration** — confirm all expected tools appear in the inspector's tool list with correct names and descriptions
+2. **Tool execution** — test each tool with sample inputs and verify the response shape matches expectations
+3. **Resource URIs** — confirm each resource URI resolves correctly and returns the expected MIME type and content
+4. **Prompt templates** — invoke each prompt with sample arguments and verify the rendered output
+
+**Common issues:**
+- *Inspector shows no tools/resources/prompts:* confirm `server.listen()` is called at the end of the file and that no uncaught errors occurred at startup
+- *Tool schema errors:* verify every schema argument is a valid Zod object (`z.object({...})`); primitive schemas at the top level are not supported
+- *Resource URI not found:* check that the URI string passed to `server.resource()` exactly matches what you are requesting in the inspector, including scheme and path
