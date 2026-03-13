@@ -31,8 +31,11 @@ from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
 
+LangChainContentBlock = dict[str, Any]
+LangChainToolResult = str | LangChainContentBlock | list[LangChainContentBlock]
 
-def _mcp_content_to_langchain(content: list) -> str | list[dict]:
+
+def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContentBlock]:
     """Convert MCP tool result content to LangChain-compatible format.
 
     Maps MCP content types to LangChain content blocks:
@@ -50,7 +53,7 @@ def _mcp_content_to_langchain(content: list) -> str | list[dict]:
     if len(content) == 1 and isinstance(content[0], TextContent):
         return content[0].text
 
-    blocks: list[dict] = []
+    blocks: list[LangChainContentBlock] = []
     for item in content:
         match item:
             case TextContent():
@@ -80,9 +83,14 @@ def _mcp_content_to_langchain(content: list) -> str | list[dict]:
                         "data": resource.blob,
                         "mime_type": resource.mimeType or "application/octet-stream",
                     })
+                else:
+                    blocks.append({"type": "text", "text": str(resource)})
             case _:
                 # Fallback for unknown types
                 blocks.append({"type": "text", "text": str(item)})
+
+    if not blocks:
+        return ""
 
     # If all blocks are text, join them as a plain string
     if all(b["type"] == "text" for b in blocks):
@@ -150,7 +158,7 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 """
                 raise NotImplementedError("MCP tools only support async operations")
 
-            async def _arun(self, **kwargs: Any) -> str | dict:
+            async def _arun(self, **kwargs: Any) -> LangChainToolResult:
                 """Asynchronously execute the tool with given arguments.
 
                 Args:
@@ -166,12 +174,25 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
 
                 try:
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
+                    converted_content: LangChainToolResult | None = None
                     try:
-                        return _mcp_content_to_langchain(tool_result.content)
+                        converted_content = _mcp_content_to_langchain(tool_result.content)
+                        if tool_result.isError:
+                            error_message = (
+                                converted_content
+                                if isinstance(converted_content, str)
+                                else "MCP tool returned an error result"
+                            )
+                            raise RuntimeError(error_message or "MCP tool returned an empty error result")
+                        return converted_content
                     except Exception as e:
                         # Log the exception for debugging
                         logger.error(f"Error parsing tool result: {e}")
-                        return format_error(e, tool=self.name, tool_content=tool_result.content)
+                        return format_error(
+                            e,
+                            tool=self.name,
+                            tool_content=converted_content if converted_content is not None else tool_result.content,
+                        )
 
                 except Exception as e:
                     if self.handle_tool_error:
