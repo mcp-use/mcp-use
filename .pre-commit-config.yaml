@@ -35,6 +35,16 @@ repos:
         files: ^libraries/typescript/.*\.(ts|tsx|js|jsx)$
         pass_filenames: false
 
+  # C# hooks - only run on C# files
+  - repo: local
+    hooks:
+      - id: csharp-format
+        name: C# Format
+        entry: bash -c 'cd libraries/csharp && dotnet format --include "$@" --verbosity minimal' --
+        language: system
+        files: ^libraries/csharp/.*\.cs$
+        pass_filenames: true
+
 # Define configuration for the Python checks
 default_language_version:
   python: python3.11
