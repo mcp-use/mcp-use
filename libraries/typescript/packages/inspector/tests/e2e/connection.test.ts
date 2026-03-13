@@ -138,6 +138,40 @@ test.describe("Inspector MCP Server Connections", () => {
     });
   });
 
+  test("should save and show a server alias from edit connection settings", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    await page.getByTestId("server-tile-settings").click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByTestId("connection-form-alias-input")
+    ).toBeVisible();
+    await dialog
+      .getByTestId("connection-form-alias-input")
+      .fill("QA Conformance");
+    await dialog.getByTestId("connection-form-connect-button").click();
+
+    await expect(
+      page.getByText("Connection settings updated").first()
+    ).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(
+      page.getByRole("heading", { name: "QA Conformance" })
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "QA Conformance" })
+    ).toBeVisible();
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
   test("should update connection settings from server dropdown", async ({
     page,
   }) => {

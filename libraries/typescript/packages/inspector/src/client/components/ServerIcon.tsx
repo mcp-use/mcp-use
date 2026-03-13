@@ -2,6 +2,7 @@ import { BlurFade } from "@/client/components/ui/blur-fade";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
+import { getServerDisplayName } from "@/client/utils/serverNames";
 import type { UseMcpResult } from "mcp-use/react";
 import { useEffect, useState } from "react";
 
@@ -57,7 +58,7 @@ export function ServerIcon({
   }, [iconUrl]);
 
   // Get server display name
-  const displayName = server.serverInfo?.name || server.name || "MCP";
+  const displayName = getServerDisplayName(server);
 
   // If no icon available, show gradient with initials
   if (!iconUrl || imageError) {

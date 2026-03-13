@@ -26,6 +26,10 @@ import {
 import { useMcpClient, type McpServerOptions } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import {
+  getConfiguredServerAlias,
+  getServerDisplayName,
+} from "@/client/utils/serverNames";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
@@ -195,6 +199,7 @@ export function InspectorDashboard() {
   }, []); // Only run once on mount
 
   // Form state
+  const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
   const [connectionType, setConnectionType] = useState("Direct");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
@@ -270,7 +275,7 @@ export function InspectorDashboard() {
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
       url: normalizedUrl,
-      name: normalizedUrl,
+      name: alias.trim() || normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       clientOptions: {
@@ -314,13 +319,14 @@ export function InspectorDashboard() {
       });
 
     // Reset form
+    setAlias("");
     setUrl("");
     setCustomHeaders([]);
     setClientId("");
     setScope("");
 
     toast.success("Server added successfully");
-  }, [url, connectionType, proxyAddress, customHeaders, addServer]);
+  }, [url, alias, connectionType, proxyAddress, customHeaders, addServer]);
 
   const handleClearAllConnections = () => {
     // Remove all connections
@@ -381,7 +387,9 @@ export function InspectorDashboard() {
 
       const config = {
         url: connection.url,
-        name: connection.name,
+        ...(getConfiguredServerAlias(storedConfig || connection)
+          ? { name: getConfiguredServerAlias(storedConfig || connection) }
+          : {}),
         transportType: connection.transportType || "http",
         connectionType,
         proxyConfig,
@@ -609,9 +617,7 @@ export function InspectorDashboard() {
                       <div className="flex items-center gap-3">
                         <ServerIcon server={connection} size="md" />
                         <h4 className="font-semibold text-sm">
-                          {connection.serverInfo?.title ||
-                            connection.serverInfo?.name ||
-                            connection.name}
+                          {getServerDisplayName(connection)}
                         </h4>
                         <div className="flex items-center gap-2">
                           {updatingConnections.has(connection.id) ? (
@@ -928,6 +934,8 @@ export function InspectorDashboard() {
       <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <ConnectionSettingsForm
+            alias={alias}
+            setAlias={setAlias}
             transportType="SSE"
             setTransportType={() => {}}
             url={url}
