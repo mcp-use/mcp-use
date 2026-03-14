@@ -64,5 +64,5 @@ const server = new MCPServer({
 
 ## Related docs
 
-- [Session Management Overview](https://mcp-use.io/typescript/server/session-management)
-- [Redis Storage](https://mcp-use.io/typescript/server/session-management/redis-storage)
+- [Session Management Overview](https://mcp-use.io/typescript/server/sessions)
+- [Redis Storage](https://mcp-use.io/typescript/server/sessions/redis-storage)
