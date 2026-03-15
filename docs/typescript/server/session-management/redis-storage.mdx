@@ -1,7 +1,7 @@
 ---
 title: "Redis Storage"
 description: "Using Redis for persistent, distributed session storage with full MCP feature support"
-icon: "); -webkit-mask-image: url('/images/icons/redis.svg'); mask-image: url('/images/icons/redis.svg');/*"
+icon: "/images/icons/redis.svg"
 ---
 
 Redis storage consists of two components:
@@ -84,6 +84,10 @@ const server = new MCPServer({
 server.start({ port: 3000 });
 ```
 
+
+## Full Example
+
+See the [Redis session management example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/session-management) for a complete, runnable server with session recovery and notifications across restarts.
 
 ## Related Documentation
 

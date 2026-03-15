@@ -8,6 +8,9 @@ export interface StoredState {
   expiry: number;
   metadata?: OAuthMetadata; // Optional: might not be needed if auth() rediscovers
   serverUrlHash: string;
+  // Snapshot of PKCE verifier captured at auth initiation time.
+  // Used to avoid verifier drift when multiple auth attempts overlap.
+  codeVerifier?: string;
   // Add provider options needed on callback:
   providerOptions: {
     serverUrl: string;

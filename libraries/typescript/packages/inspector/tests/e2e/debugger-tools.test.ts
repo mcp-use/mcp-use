@@ -231,13 +231,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Navigate to Resources tab and select weather-display
       await navigateToResourcesAndSelectWeather(page);
 
-      // Get initial frame
-      const initialFrame = getWeatherResourceFrame(page);
-      // Wait for widget to load
-      await expect(initialFrame.locator("body")).toBeVisible({
-        timeout: 5000,
-      });
-
       // Open props dialog
       await openPropsDialog(page);
 
@@ -277,12 +270,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Navigate to Resources tab and select weather-display
       await navigateToResourcesAndSelectWeather(page);
 
-      // Get initial frame
-      const initialFrame = getWeatherResourceFrame(page);
-      await expect(initialFrame.locator("body")).toBeVisible({
-        timeout: 5000,
-      });
-
       // Open props dialog
       await openPropsDialog(page);
 
@@ -303,12 +290,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
     test("props presets persist after page refresh", async ({ page }) => {
       // Navigate to Resources tab and select weather-display
       await navigateToResourcesAndSelectWeather(page);
-
-      // Get initial frame
-      const initialFrame = getWeatherResourceFrame(page);
-      await expect(initialFrame.locator("body")).toBeVisible({
-        timeout: 5000,
-      });
 
       // Open props dialog and create a preset
       await openPropsDialog(page);
@@ -335,14 +316,26 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
         waitForWidgets: true,
       });
 
-      // Navigate back to Resources tab and select weather-display
-      await navigateToResourcesAndSelectWeather(page);
-      frame = getWeatherResourceFrame(page);
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      // Navigate back to Resources tab and select weather-display.
+      // Don't use navigateToResourcesAndSelectWeather here because the
+      // persisted preset means the widget renders immediately (no "requires props" wall).
+      await page
+        .getByRole("tab", { name: /Resources/ })
+        .first()
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Resources" })
+      ).toBeVisible();
+      await page.getByTestId("resource-item-weather-display").click();
 
       // Open props popover and verify preset is available
-      await page.getByTestId("debugger-props-button").click();
-      await expect(page.getByTestId("debugger-props-popover")).toBeVisible();
+      const resourcePreview = page.getByTestId("resource-widget-preview");
+      await expect(resourcePreview).toBeVisible({ timeout: 10000 });
+      const popover = page.getByTestId("debugger-props-popover");
+      if (!(await popover.isVisible().catch(() => false))) {
+        await resourcePreview.getByTestId("debugger-props-button").click();
+      }
+      await expect(popover).toBeVisible();
 
       // Find the preset by looking for a button containing "Berlin Weather"
       const berlinPresetButton = page.getByRole("button", {
@@ -368,7 +361,16 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Navigate to Resources tab and select weather-display
       await navigateToResourcesAndSelectWeather(page);
 
-      // Wait for widget to load
+      // Configure props so widget renders (required before display mode works)
+      await openPropsDialog(page);
+      await configurePropsManually(page, "Display Mode Test", {
+        city: "Tokyo",
+        temperature: "22",
+        conditions: "Partly Cloudy",
+        humidity: "60",
+        windSpeed: "12",
+      });
+
       const frame = getWeatherResourceFrame(page);
       await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
 
@@ -398,7 +400,16 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Navigate to Resources tab and select weather-display
       await navigateToResourcesAndSelectWeather(page);
 
-      // Wait for widget to load
+      // Configure props so widget renders (required before display mode works)
+      await openPropsDialog(page);
+      await configurePropsManually(page, "Display Mode Test", {
+        city: "Tokyo",
+        temperature: "22",
+        conditions: "Partly Cloudy",
+        humidity: "60",
+        windSpeed: "12",
+      });
+
       const frame = getWeatherResourceFrame(page);
       await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
 

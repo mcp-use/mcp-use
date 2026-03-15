@@ -23,33 +23,51 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { ToolInputForm } from "./ToolInputForm";
 
 interface ToolExecutionPanelProps {
   selectedTool: Tool | null;
   toolArgs: Record<string, unknown>;
+  payloadToSend?: Record<string, unknown>;
   isExecuting: boolean;
   isConnected: boolean;
   onArgChange: (key: string, value: string) => void;
   onExecute: () => void;
   onSave: () => void;
   onCancel?: () => void;
+  onBulkPaste?: (pastedText: string, fieldKey: string) => Promise<boolean>;
+  autoFilledFields?: Set<string>;
+  setFields?: Set<string>;
+  sendEmptyFields?: Set<string>;
+  onToggleEmpty?: (
+    key: string,
+    expectedType: "string" | "object" | "array",
+    pressed: boolean
+  ) => void;
 }
 
 export function ToolExecutionPanel({
   selectedTool,
   toolArgs,
+  payloadToSend,
   isExecuting,
   isConnected,
   onArgChange,
   onExecute,
   onSave,
   onCancel,
+  onBulkPaste,
+  autoFilledFields,
+  setFields,
+  sendEmptyFields,
+  onToggleEmpty,
 }: ToolExecutionPanelProps) {
   const [showCancelButton, setShowCancelButton] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [copiedMetadata, setCopiedMetadata] = useState(false);
+  const [copiedPayload, setCopiedPayload] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
   const descriptionRef = useRef<HTMLParagraphElement>(null);
@@ -67,16 +85,28 @@ export function ToolExecutionPanel({
   }, [selectedTool?.description]);
 
   // Copy metadata to clipboard
-  const copyMetadataToClipboard = () => {
+  const copyMetadataToClipboard = async () => {
     if (!selectedTool) return;
-    const metadata = {
-      name: selectedTool.name,
-      description: selectedTool.description || "",
-      _meta: (selectedTool as any)._meta,
-    };
-    navigator.clipboard.writeText(JSON.stringify(metadata, null, 2));
-    setCopiedMetadata(true);
-    setTimeout(() => setCopiedMetadata(false), 2000);
+    try {
+      await copyToClipboard(JSON.stringify(selectedTool, null, 2));
+      setCopiedMetadata(true);
+      setTimeout(() => setCopiedMetadata(false), 2000);
+    } catch {
+      // Silently fail - no toast in this component
+    }
+  };
+
+  // Copy payload to clipboard (use payloadToSend when provided - reflects what will actually be sent)
+  const copyPayloadToClipboard = async () => {
+    if (!selectedTool) return;
+    try {
+      const payload = payloadToSend ?? toolArgs;
+      await copyToClipboard(JSON.stringify(payload, null, 2));
+      setCopiedPayload(true);
+      setTimeout(() => setCopiedPayload(false), 2000);
+    } catch {
+      // Silently fail - no toast in this component
+    }
   };
 
   // Handle Cmd/Ctrl + Enter keyboard shortcut
@@ -143,6 +173,31 @@ export function ToolExecutionPanel({
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View tool definition metadata</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    data-testid="tool-execution-copy-payload-button"
+                    variant="outline"
+                    onClick={copyPayloadToClipboard}
+                    disabled={isExecuting}
+                    size="sm"
+                    className="lg:size-default gap-2"
+                    title="Copy payload as JSON"
+                  >
+                    {copiedPayload ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {copiedPayload ? "Copied!" : "Payload"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Copy payload as JSON</p>
                 </TooltipContent>
               </Tooltip>
               <Button
@@ -271,6 +326,11 @@ export function ToolExecutionPanel({
           selectedTool={selectedTool}
           toolArgs={toolArgs}
           onArgChange={onArgChange}
+          onBulkPaste={onBulkPaste}
+          autoFilledFields={autoFilledFields}
+          setFields={setFields}
+          sendEmptyFields={sendEmptyFields}
+          onToggleEmpty={onToggleEmpty}
         />
       </div>
 
@@ -296,11 +356,7 @@ export function ToolExecutionPanel({
           </DialogHeader>
 
           <JSONDisplay
-            data={{
-              name: selectedTool.name,
-              description: selectedTool.description || "(no description)",
-              _meta: (selectedTool as any)._meta || null,
-            }}
+            data={selectedTool}
             filename={`tool-definition-${selectedTool.name}-${Date.now()}.json`}
           />
         </DialogContent>

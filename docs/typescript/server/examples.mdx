@@ -8,13 +8,42 @@ icon: "code"
 
 This page provides complete, production-ready examples of MCP servers built with the `mcp-use/server` framework. Each example demonstrates different capabilities and best practices.
 
+## DNS Rebinding Protection Example
+
+Use the dedicated DNS rebinding example to understand default permissive behavior and explicit `allowedOrigins` protection.
+
+**Example location:** `libraries/typescript/packages/mcp-use/examples/server/features/dns-rebinding`
+
+**Run from package root:**
+
+```bash
+pnpm run example:server:dns-rebinding
+```
+
+This example also includes copy-paste `curl` commands to verify:
+- spoofed `Host` is rejected (`403`)
+- valid localhost `Host` is accepted (`2xx`)
+
+## Streaming Tool Props Example
+
+Demonstrates **streaming tool arguments** to widgets: when an LLM streams tool call arguments, the widget receives partial input in real time via `partialToolInput` and `isStreaming` from [useWidget](/typescript/server/widget-components/usewidget#streaming-tool-arguments), enabling live code or JSON previews as the model generates them.
+
+**Example location:** `libraries/typescript/packages/mcp-use/examples/server/features/streaming-props`
+
+**Run from package root (mcp-use package):**
+
+```bash
+pnpm run example:server:streaming-props
+```
+
+Tools include `generate-code` and `generate-json` with a code-preview widget that updates live while arguments stream. Test in the [MCP Inspector](/inspector/index) by invoking those tools and watching the widget.
+
 ## Weather Service Server
 
 A complete weather information server with tools, resources, and UI widgets.
 
 ```typescript
 import { MCPServer } from 'mcp-use/server'
-import express from 'express'
 import axios from 'axios'
 
 // Types
@@ -250,28 +279,30 @@ server.uiResource({
 })
 
 // API endpoints for widget data
-server.get('/api/weather/:city', async (req, res) => {
+server.get('/api/weather/:city', async (c) => {
   try {
-    const weather = await weatherService.getCurrentWeather(req.params.city)
-    res.json(weather)
+    const city = c.req.param('city')
+    const weather = await weatherService.getCurrentWeather(city)
+    return c.json(weather)
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return c.json({ error: error.message }, 500)
   }
 })
 
-server.get('/api/forecast/:city', async (req, res) => {
-  const days = parseInt(req.query.days as string) || 3
+server.get('/api/forecast/:city', async (c) => {
+  const city = c.req.param('city')
+  const days = parseInt(c.req.query('days') || '3')
   try {
-    const forecast = await weatherService.getForecast(req.params.city, days)
-    res.json(forecast)
+    const forecast = await weatherService.getForecast(city, days)
+    return c.json(forecast)
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return c.json({ error: error.message }, 500)
   }
 })
 
 // Health check
-server.get('/health', (req, res) => {
-  res.json({
+server.get('/health', (c) => {
+  return c.json({
     status: 'healthy',
     service: 'weather-service',
     version: '2.0.0',
@@ -524,22 +555,22 @@ SELECT * FROM users LIMIT 10;
 })
 
 // API endpoint for query execution
-server.post('/api/query', async (req, res) => {
-  const { query } = req.body
+server.post('/api/query', async (c) => {
+  const { query } = await c.req.json()
 
   // Security: Only allow SELECT
   if (!query.trim().toLowerCase().startsWith('select')) {
-    return res.status(400).json({ error: 'Only SELECT queries allowed' })
+    return c.json({ error: 'Only SELECT queries allowed' }, 400)
   }
 
   try {
     const result = await pool.query(query)
-    res.json({
+    return c.json({
       rowCount: result.rowCount,
       rows: result.rows
     })
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    return c.json({ error: error.message }, 500)
   }
 })
 

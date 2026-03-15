@@ -6,49 +6,67 @@ icon: "file"
 
 Resources expose data to MCP clients. Unlike tools (which perform actions), resources provide read-only access to content like files, database records, or live data.
 
-## Basic Resource Definition
-
-Use the `@server.resource()` decorator to define a resource:
-
-```python
-from mcp_use.server import MCPServer
-
-server = MCPServer(name="My Server")
-
-@server.resource(uri="config://app")
-def app_config() -> str:
-    """Application configuration."""
-    return '{"debug": true, "version": "1.0.0"}'
-```
-
-## Resource Options
-
-The `@server.resource()` decorator accepts several options:
+## Example
 
 ```python
 @server.resource(
-    uri="data://users",           # Unique resource identifier
-    name="users_list",            # Internal name
-    title="User List",            # Human-readable title
-    description="All users",      # Resource description
-    mime_type="application/json", # Content type
+    uri="config://{section}",
+    name="app_config",
+    title="Application Config",
+    description="Get configuration for a specific section",
+    mime_type="application/json",
 )
-def get_users() -> str:
-    return '[{"id": 1, "name": "Alice"}]'
+def get_config(section: str) -> str:
+    """Get configuration for a specific section."""
+    configs = {
+        "database": '{"host": "localhost", "port": 5432}',
+        "cache": '{"enabled": true, "ttl": 3600}',
+    }
+    return configs.get(section, '{"error": "Section not found"}')
 ```
 
-### Common MIME Types
+## Anatomy of a Resource
 
-| MIME Type | Use Case |
-|-----------|----------|
-| `text/plain` | Plain text content |
-| `application/json` | JSON data |
-| `text/markdown` | Markdown documents |
-| `text/html` | HTML content |
+When a client calls `resources/list`, the server returns metadata for each resource. Resources with URI templates (like `{section}`) are returned via `resources/templates/list` instead.
+
+Here's the JSON-RPC response that the example above produces when a client calls `resources/templates/list`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "resourceTemplates": [
+      {
+        "uriTemplate": "config://{section}",
+        "name": "app_config",
+        "title": "Application Config",
+        "description": "Get configuration for a specific section",
+        "mimeType": "application/json"
+      }
+    ]
+  }
+}
+```
+
+Here's what maps to what:
+
+| Python | MCP Schema | Notes |
+|--------|-----------|-------|
+| `uri="config://{section}"` | `"uriTemplate"` | `{section}` makes it a template; without it, it would be a static `"uri"` |
+| `name="app_config"` | `"name"` | Falls back to function name if omitted |
+| `title="Application Config"` | `"title"` | Human-readable display name |
+| `description="Get configuration..."` | `"description"` | Falls back to docstring if omitted |
+| `mime_type="application/json"` | `"mimeType"` | Tells clients how to interpret the content |
+| `section: str` | *(extracted from URI)* | Parameter matched from the URI template |
+
+<Tip>
+If your URI contains `{param}` placeholders, the resource is registered as a **template**. Otherwise, it's registered as a **static resource**.
+</Tip>
 
 ## Static Resources
 
-For simple static content:
+Resources without URI parameters are static — they always return at the same URI:
 
 ```python
 from datetime import datetime
@@ -57,7 +75,7 @@ from datetime import datetime
     uri="time://current",
     name="current_time",
     title="Current Time",
-    mime_type="text/plain"
+    mime_type="text/plain",
 )
 def current_time() -> str:
     """Returns the current server time."""
@@ -66,7 +84,7 @@ def current_time() -> str:
 
 ## Resource Templates
 
-Use URI templates to create dynamic resources with parameters:
+Use `{param}` placeholders in the URI to create dynamic resources:
 
 ```python
 @server.resource(
@@ -74,17 +92,16 @@ Use URI templates to create dynamic resources with parameters:
     name="user_profile",
     title="User Profile",
     description="Get a user's profile by ID",
-    mime_type="application/json"
+    mime_type="application/json",
 )
 def get_user(user_id: str) -> str:
     """Fetch user profile by ID."""
-    # user_id is extracted from the URI
     users = {"1": "Alice", "2": "Bob"}
     name = users.get(user_id, "Unknown")
     return f'{{"id": "{user_id}", "name": "{name}"}}'
 ```
 
-Clients can request `user://123` and the function receives `user_id="123"`.
+Clients request `user://123` and the function receives `user_id="123"`.
 
 ### Multiple Parameters
 
@@ -94,11 +111,10 @@ Templates support multiple parameters:
 @server.resource(
     uri="file://{folder}/{filename}",
     name="file_content",
-    mime_type="text/plain"
+    mime_type="text/plain",
 )
 def get_file(folder: str, filename: str) -> str:
     """Read a file from a folder."""
-    # folder and filename extracted from URI
     return f"Content of {folder}/{filename}"
 ```
 
@@ -111,7 +127,7 @@ import httpx
 
 @server.resource(
     uri="api://weather",
-    mime_type="application/json"
+    mime_type="application/json",
 )
 async def weather_data() -> str:
     """Fetch current weather data."""
@@ -127,85 +143,12 @@ Return bytes for binary content:
 ```python
 @server.resource(
     uri="image://logo",
-    mime_type="image/png"
+    mime_type="image/png",
 )
 def logo_image() -> bytes:
     """Return the application logo."""
     with open("logo.png", "rb") as f:
         return f.read()
-```
-
-## File System Resources
-
-Expose files from the filesystem:
-
-```python
-from pathlib import Path
-
-@server.resource(
-    uri="docs://{path:path}",
-    name="documentation",
-    mime_type="text/markdown"
-)
-def read_docs(path: str) -> str:
-    """Read documentation files."""
-    docs_dir = Path("./docs")
-    file_path = docs_dir / path
-
-    # Security: ensure path is within docs directory
-    if not file_path.resolve().is_relative_to(docs_dir.resolve()):
-        raise ValueError("Access denied")
-
-    return file_path.read_text()
-```
-
-## Complete Example
-
-```python
-from datetime import datetime
-from mcp_use.server import MCPServer
-
-server = MCPServer(name="Data Server", version="1.0.0")
-
-# Static resource
-@server.resource(
-    uri="status://health",
-    name="health_check",
-    title="Health Status",
-    mime_type="application/json"
-)
-def health_status() -> str:
-    """Server health status."""
-    return '{"status": "healthy", "uptime": "99.9%"}'
-
-# Dynamic resource with template
-@server.resource(
-    uri="config://{section}",
-    name="config_section",
-    title="Configuration Section",
-    description="Get configuration by section name",
-    mime_type="application/json"
-)
-def get_config(section: str) -> str:
-    """Get configuration for a specific section."""
-    configs = {
-        "database": '{"host": "localhost", "port": 5432}',
-        "cache": '{"enabled": true, "ttl": 3600}',
-        "logging": '{"level": "INFO", "format": "json"}'
-    }
-    return configs.get(section, '{"error": "Section not found"}')
-
-# Time-based resource
-@server.resource(
-    uri="time://current",
-    name="current_time",
-    mime_type="text/plain"
-)
-def current_time() -> str:
-    return datetime.now().isoformat()
-
-if __name__ == "__main__":
-    server.run(transport="streamable-http", debug=True)
 ```
 
 ## Resource Subscriptions
@@ -224,10 +167,6 @@ MCPServer handles subscribe/unsubscribe tracking automatically — you just need
 ### Example
 
 ```python
-from mcp_use.server import MCPServer
-
-server = MCPServer(name="Live Data Server")
-
 current_price = 100.0
 
 @server.resource(uri="data://price", name="stock_price", mime_type="text/plain")
@@ -245,13 +184,19 @@ async def update_price(new_price: float) -> str:
 
 When a client subscribes to `data://price` and then any client calls `update_price`, all subscribers receive the notification and can re-read the resource.
 
-### Broadcasting
-
-`notify_resource_updated()` broadcasts to **all sessions** that subscribed to the URI, not just the current session. This means if multiple clients are connected and subscribed, they all get notified.
-
 <Note>
 Subscriptions are session-scoped — they're automatically cleaned up when a client disconnects. If the server restarts, clients need to re-subscribe.
 </Note>
+
+## Common MIME Types
+
+| MIME Type | Use Case |
+|-----------|----------|
+| `text/plain` | Plain text content |
+| `application/json` | JSON data |
+| `text/markdown` | Markdown documents |
+| `text/html` | HTML content |
+| `image/png` | PNG images |
 
 ## Resources vs Tools
 

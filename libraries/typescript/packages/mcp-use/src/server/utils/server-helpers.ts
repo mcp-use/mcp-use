@@ -6,6 +6,7 @@
 
 import { Hono, type Hono as HonoType } from "hono";
 import { cors } from "hono/cors";
+import { hostHeaderValidation } from "../middleware/host-validation.js";
 import { getEnv } from "./runtime.js";
 
 /**
@@ -39,11 +40,59 @@ export function getDefaultCorsOptions(): Parameters<typeof cors>[0] {
  * @param requestLogger - Request logging middleware function
  * @returns Configured Hono app instance
  */
-export function createHonoApp(requestLogger: any): HonoType {
+interface CreateHonoAppOptions {
+  allowedOrigins?: string[];
+  cors?: Partial<Parameters<typeof cors>[0]>;
+}
+
+function parseAllowedHostname(value: string): string | null {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  try {
+    return new URL(trimmedValue).hostname.toLowerCase();
+  } catch {
+    try {
+      return new URL(`http://${trimmedValue}`).hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+}
+
+function getAllowedHostnames(allowedOrigins?: string[]): string[] {
+  if (!allowedOrigins || allowedOrigins.length === 0) {
+    return [];
+  }
+
+  const hostnames = allowedOrigins
+    .map((origin) => parseAllowedHostname(origin))
+    .filter((hostname): hostname is string => Boolean(hostname));
+
+  return [...new Set(hostnames)];
+}
+
+export function createHonoApp(
+  requestLogger: any,
+  options: CreateHonoAppOptions = {}
+): HonoType {
   const app = new Hono();
 
-  // Enable CORS by default
-  app.use("*", cors(getDefaultCorsOptions()));
+  const allowedHostnames = getAllowedHostnames(options.allowedOrigins);
+
+  if (allowedHostnames.length > 0) {
+    app.use("*", hostHeaderValidation(allowedHostnames));
+  }
+
+  // Enable CORS by default, with optional config overrides
+  app.use(
+    "*",
+    cors(
+      (options.cors ?? getDefaultCorsOptions()) as Parameters<typeof cors>[0]
+    )
+  );
 
   // Request logging middleware
   app.use("*", requestLogger);

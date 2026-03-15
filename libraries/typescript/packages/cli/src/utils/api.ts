@@ -19,6 +19,7 @@ export interface GitHubSource {
   type: "github";
   repo: string;
   branch?: string;
+  rootDir?: string;
   startCommand?: string;
   runtime?: "node" | "python";
   port?: number;
@@ -84,6 +85,7 @@ export interface RedeploymentConfig {
   startCommand?: string;
   port?: number;
   env?: Record<string, string>;
+  rootDir?: string;
 }
 
 export interface DeploymentListResponse {
@@ -138,7 +140,7 @@ export interface GitHubReposResponse {
 }
 
 /**
- * API client for mcp-use cloud
+ * API client for Manufact cloud
  */
 export class McpUseAPI {
   private baseUrl: string;

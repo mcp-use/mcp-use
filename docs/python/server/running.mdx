@@ -67,6 +67,23 @@ server.run(host="127.0.0.1", port=8080)  # Switches to localhost with DNS protec
 | `host` | `"0.0.0.0"` | Bind address. Use `"127.0.0.1"` for local-only access |
 | `port` | `8000` | Port number |
 
+## Automatic Port Retry
+
+When the requested port is already in use (e.g., another server is running on port 8000), the server automatically tries the next available port instead of crashing:
+
+```
+Port 8000 is in use, using port 8001 instead.
+
+- Local:        http://0.0.0.0:8001
+- MCP:          http://0.0.0.0:8001/mcp
+```
+
+The server tries up to 10 consecutive ports (8000, 8001, ..., 8009). If none are available, it raises an error. This makes it easy to run multiple MCP servers simultaneously during development without manually specifying different ports.
+
+<Tip>
+The startup output always shows the actual port the server bound to, so you'll know where to connect.
+</Tip>
+
 ## Cloud and Proxy Deployments
 
 When deploying behind reverse proxies (Cloudflare, nginx, Fly.io, etc.), the server

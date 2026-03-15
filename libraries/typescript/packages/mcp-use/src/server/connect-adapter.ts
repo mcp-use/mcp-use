@@ -19,37 +19,66 @@ export function isExpressMiddleware(middleware: any): boolean {
   // Hono middleware typically has 2 parameters (c, next)
   const paramCount = middleware.length;
 
+  // Get function string for pattern matching
+  const fnString = middleware.toString();
+
+  // Look for Express-specific patterns in the function body
+  // Common Express patterns: res.send, res.json, res.status, req.body, req.params, etc.
+  const expressPatterns = [
+    /\bres\.(send|json|status|end|redirect|render|sendFile|download)\b/,
+    /\breq\.(body|params|query|cookies|session)\b/,
+    /\breq\.get\s*\(/,
+    /\bres\.set\s*\(/,
+    /\bres\.statusCode\s*=/,
+    /\bres\.writeHead\s*\(/,
+  ];
+
+  const hasExpressPattern = expressPatterns.some((pattern) =>
+    pattern.test(fnString)
+  );
+
   // Express/Connect middleware has 3 or 4 parameters
   if (paramCount === 3 || paramCount === 4) {
+    // For 3-4 params, verify it uses Express patterns to be more robust
+    // This handles edge cases where someone might write a Hono middleware with 3 params
+    if (hasExpressPattern) {
+      return true;
+    }
+    // If it has 3-4 params but no Express patterns, still assume Express
+    // (most Express middleware will have these patterns, but some simple ones might not)
     return true;
   }
 
   // Hono middleware has 2 parameters
   if (paramCount === 2) {
-    // Additional heuristic: check if the middleware uses Express-specific patterns
-    const fnString = middleware.toString();
-
-    // Look for Express-specific patterns in the function body
-    // Common Express patterns: res.send, res.json, res.status, req.body, req.params, etc.
-    const expressPatterns = [
-      /\bres\.(send|json|status|end|redirect|render|sendFile|download)\b/,
-      /\breq\.(body|params|query|cookies|session)\b/,
-      /\breq\.get\s*\(/,
-      /\bres\.set\s*\(/,
-    ];
-
-    const hasExpressPattern = expressPatterns.some((pattern) =>
-      pattern.test(fnString)
-    );
+    // Check if it uses Express-specific patterns (unlikely but possible)
     if (hasExpressPattern) {
       return true;
     }
 
-    // If it has 2 parameters and no Express patterns, assume it's Hono
+    // Check for Hono-specific patterns
+    const honoPatterns = [
+      /\bc\.(req|res|json|text|html|status|header)\b/,
+      /\bc\.get\s*\(/,
+      /\bc\.set\s*\(/,
+      /\bc\.newResponse\s*\(/,
+    ];
+
+    const hasHonoPattern = honoPatterns.some((pattern) =>
+      pattern.test(fnString)
+    );
+
+    // If it has Hono patterns, it's definitely Hono middleware
+    if (hasHonoPattern) {
+      return false;
+    }
+
+    // If it has 2 parameters and no clear patterns, assume it's Hono
+    // (default assumption since Hono is the native middleware format)
     return false;
   }
 
-  // For other parameter counts or edge cases, default to Hono
+  // For other parameter counts (0, 1, 5+), default to Hono
   return false;
 }
 
@@ -87,40 +116,7 @@ export async function adaptConnectMiddleware(
   connectMiddleware: any,
   middlewarePath: string
 ): Promise<MiddlewareHandler> {
-  // Dynamically import required modules (optional dependencies)
-  // Use createRequire to resolve from user's project directory
-  let createRequest: any;
-  let createResponse: any;
-
-  try {
-    // Use createRequire to resolve modules from the user's project directory
-    const { createRequire } = await import("node:module");
-    const { pathToFileURL } = await import("node:url");
-
-    // Create a require function that resolves from the user's project directory
-    const userProjectRequire = createRequire(
-      pathToFileURL(
-        // Use process.cwd() since this is a runtime utility that should work from user's project
-        process.cwd() + "/package.json"
-      ).href
-    );
-
-    // Resolve the actual module path from the user's project
-    const httpMocksPath = userProjectRequire.resolve("node-mocks-http");
-
-    const httpMocks = await import(httpMocksPath);
-    createRequest = httpMocks.createRequest;
-    createResponse = httpMocks.createResponse;
-  } catch (error) {
-    throw new Error(
-      "❌ Widget middleware dependencies not installed!\n\n" +
-        "To use Connect middleware adapters with MCP widgets, you need to install:\n\n" +
-        "  npm install node-mocks-http\n" +
-        "  # or\n" +
-        "  pnpm add node-mocks-http\n\n" +
-        "This dependency is automatically included in projects created with 'create-mcp-use-app'."
-    );
-  }
+  const { createRequest, createResponse } = await import("node-mocks-http");
 
   // Normalize middleware path: remove trailing * and /
   let normalizedPath = middlewarePath;
@@ -154,7 +150,8 @@ export async function adaptConnectMiddleware(
 
     // Transform Hono request to IncomingMessage-like object
     const mockRequest = createRequest({
-      method: request.method.toUpperCase(),
+      method:
+        request.method.toUpperCase() as import("node-mocks-http").RequestMethod,
       url: middlewarePathname + parsedURL.search,
       headers:
         request.headers && typeof request.headers.entries === "function"
@@ -172,7 +169,7 @@ export async function adaptConnectMiddleware(
     const res = await new Promise<Response | undefined>((resolve) => {
       const originalEnd = mockResponse.end.bind(mockResponse);
 
-      mockResponse.end = (...args: Parameters<typeof originalEnd>) => {
+      (mockResponse as any).end = (...args: Parameters<typeof originalEnd>) => {
         const result = originalEnd(...args);
 
         if (!responseResolved && mockResponse.writableEnded) {
@@ -239,7 +236,7 @@ export async function adaptConnectMiddleware(
 
           if (noBodyStatuses.includes(statusCode)) {
             // For no-body status codes, return a response without body
-            resolve(c.newResponse(null, statusCode));
+            resolve(c.newResponse(null, statusCode as any));
           } else if (responseBody) {
             resolve(c.body(responseBody));
           } else {

@@ -4,6 +4,7 @@ import inspect
 import logging
 import os
 import time
+import weakref
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -16,6 +17,7 @@ from mcp.types import (
     CompleteRequest,
     Completion,
     GetPromptRequest,
+    Icon,
     ListPromptsRequest,
     ListResourcesRequest,
     ListToolsRequest,
@@ -40,6 +42,7 @@ from mcp_use.server.middleware.server_session import MiddlewareServerSession
 from mcp_use.server.runner import ServerRunner
 from mcp_use.server.types import TransportType
 from mcp_use.server.utils.inspector import _inspector_index, _inspector_static
+from mcp_use.server.utils.json_schema import simplify_optional_schema
 from mcp_use.server.utils.routes import docs_ui, openmcp_json
 from mcp_use.telemetry.telemetry import Telemetry, telemetry
 from mcp_use.telemetry.utils import track_server_run_from_server
@@ -58,6 +61,17 @@ logger = logging.getLogger(__name__)
 _telemetry = Telemetry()
 
 
+def _normalize_inspector_path(path: str) -> str:
+    """Normalize inspector path input into a concrete route ending in `/inspector`."""
+    if not path or path == "/":
+        return "/inspector"
+
+    normalized = f"/{path.strip('/')}"
+    if normalized.endswith("/inspector"):
+        return normalized
+    return f"{normalized}/inspector"
+
+
 class MCPServer(FastMCP):
     """Main MCP Server class with integrated inspector and development tools."""
 
@@ -66,15 +80,17 @@ class MCPServer(FastMCP):
         name: str | None = None,
         version: str | None = None,
         instructions: str | None = None,
+        icons: list[Icon] | None = None,
         auth: BearerAuthProvider | None = None,
         middleware: list[Middleware] | None = None,
         debug: bool = False,
         mcp_path: str = "/mcp",
         docs_path: str = "/docs",
-        inspector_path: str = "/inspector",
+        inspector_path: str = "/",
         openmcp_path: str = "/openmcp.json",
         show_inspector_logs: bool = False,
         pretty_print_jsonrpc: bool = False,
+        mcp_logs_only: bool = False,
         host: str = "0.0.0.0",
         port: int = 8000,
         dns_rebinding_protection: bool = False,
@@ -85,14 +101,18 @@ class MCPServer(FastMCP):
             name: Server name for identification
             version: Server version string
             instructions: Instructions for the AI model using this server
+            icons: Optional list of icons for the server implementation
             middleware: List of middleware to apply to requests
             debug: Enable debug mode (adds /docs, /inspector, /openmcp.json endpoints)
             mcp_path: Path for MCP endpoint (default: "/mcp")
             docs_path: Path for documentation endpoint (default: "/docs")
-            inspector_path: Path for inspector UI (default: "/inspector")
+            inspector_path: Base path prefix for the inspector UI; final route is `<prefix>/inspector`.
+                  Examples: `/` -> `/inspector`, `/mcp` -> `/mcp/inspector`.
+                  Passing `/mcp/inspector` is also accepted for backward compatibility.
             openmcp_path: Path for OpenMCP metadata (default: "/openmcp.json")
             show_inspector_logs: Show inspector-related logs
             pretty_print_jsonrpc: Pretty print JSON-RPC messages in logs
+            mcp_logs_only: Only show MCP protocol logs, suppress HTTP access logs (default: False)
             host: Default host for server binding (default: "0.0.0.0"). Can be overridden in run().
             port: Default port for server binding (default: 8000). Can be overridden in run().
             dns_rebinding_protection: Enable DNS rebinding protection by validating Host/Origin
@@ -104,6 +124,7 @@ class MCPServer(FastMCP):
         super().__init__(
             name=name or "mcp-use server",
             instructions=instructions,
+            icons=icons,
             host=host,
             port=port,
         )
@@ -133,10 +154,11 @@ class MCPServer(FastMCP):
         # Set route paths
         self.mcp_path = mcp_path
         self.docs_path = docs_path
-        self.inspector_path = inspector_path
+        self.inspector_path = _normalize_inspector_path(inspector_path)
         self.openmcp_path = openmcp_path
         self.show_inspector_logs = show_inspector_logs
         self.pretty_print_jsonrpc = pretty_print_jsonrpc
+        self.mcp_logs_only = mcp_logs_only
         self._transport_type: TransportType = "streamable-http"
 
         self.middleware_manager = MiddlewareManager()
@@ -196,10 +218,52 @@ class MCPServer(FastMCP):
 
         # Inspector routes - wrap to pass mcp_path
         async def inspector_index_handler(request):
-            return await _inspector_index(request, mcp_path=self.mcp_path)
+            return await _inspector_index(
+                request,
+                mcp_path=self.mcp_path,
+                inspector_path=self.inspector_path,
+            )
 
         self.custom_route(self.inspector_path, methods=["GET"])(inspector_index_handler)
         self.custom_route(f"{self.inspector_path}/{{path:path}}", methods=["GET"])(_inspector_static)
+
+    def add_tool(
+        self,
+        fn: AnyFunction,
+        name: str | None = None,
+        title: str | None = None,
+        description: str | None = None,
+        annotations: Any = None,
+        icons: Any = None,
+        meta: dict[str, Any] | None = None,
+        structured_output: bool | None = None,
+    ) -> None:
+        """Register a tool, simplifying Pydantic's nullable ``anyOf`` schemas.
+
+        Pydantic emits ``{"anyOf": [{"type": "T"}, {"type": "null"}]}`` for
+        ``Optional[T]`` fields.  MCP expresses optionality by omitting the
+        property from ``required``, so the ``anyOf``/null wrapper is redundant
+        and breaks description rendering in several MCP clients.
+
+        This override lets the upstream ``FastMCP`` build the tool as usual,
+        then rewrites its ``parameters`` schema into the simpler form.
+        """
+        super().add_tool(
+            fn,
+            name=name,
+            title=title,
+            description=description,
+            annotations=annotations,
+            icons=icons,
+            meta=meta,
+            structured_output=structured_output,
+        )
+        # The tool was registered under its resolved name — look it up and
+        # simplify the schema that Pydantic generated.
+        tool_name = name or fn.__name__
+        tool = self._tool_manager.get_tool(tool_name)
+        if tool is not None:
+            tool.parameters = simplify_optional_schema(tool.parameters)
 
     @telemetry("server_router_used")
     def include_router(self, router: MCPRouter, prefix: str = "", enabled: bool = True) -> None:
@@ -305,13 +369,16 @@ class MCPServer(FastMCP):
             self._client_log_level = str(level)
 
         # resources/subscribe + unsubscribe — track per-URI subscriptions
-        self._resource_subscriptions: dict[str, set[int]] = {}  # uri -> set of session ids
+        # Uses WeakSet so that subscriptions are automatically cleaned up when
+        # a client disconnects and its session object is garbage-collected,
+        # preventing the memory leak described in GitHub issue #1092.
+        self._resource_subscriptions: dict[str, weakref.WeakSet] = {}  # uri -> WeakSet of sessions
 
         @self._mcp_server.subscribe_resource()
         async def _handle_subscribe(uri: Any) -> None:
             session = self._current_session()
             if session:
-                self._resource_subscriptions.setdefault(str(uri), set()).add(id(session))
+                self._resource_subscriptions.setdefault(str(uri), weakref.WeakSet()).add(session)
 
         @self._mcp_server.unsubscribe_resource()
         async def _handle_unsubscribe(uri: Any) -> None:
@@ -319,7 +386,7 @@ class MCPServer(FastMCP):
             if session:
                 subscribers = self._resource_subscriptions.get(str(uri))
                 if subscribers:
-                    subscribers.discard(id(session))
+                    subscribers.discard(session)
                     if not subscribers:
                         del self._resource_subscriptions[str(uri)]
 
@@ -352,14 +419,17 @@ class MCPServer(FastMCP):
         """
         subscribers = self._resource_subscriptions.get(uri)
         if not subscribers:
+            # Clean up empty entry left behind after all sessions were GC'd
+            self._resource_subscriptions.pop(uri, None)
             return
 
-        for session in list(MiddlewareServerSession._active_sessions):
-            if id(session) in subscribers:
-                try:
-                    await session.send_resource_updated(uri=uri)
-                except Exception:
-                    pass  # Session may have disconnected
+        # Iterate a snapshot; the WeakSet may shrink during iteration
+        # if sessions are garbage-collected concurrently.
+        for session in list(subscribers):
+            try:
+                await session.send_resource_updated(uri=uri)
+            except Exception:
+                pass  # Session may have disconnected
 
     def streamable_http_app(self):
         """Override to add our custom middleware."""
@@ -474,6 +544,10 @@ class MCPServer(FastMCP):
         # Override debug_level if debug=True is passed to run()
         if debug and self.debug_level < 1:
             self.debug_level = 1
+            self._add_dev_routes()
+            # Rebuild the Starlette app so the new routes are included
+            self._session_manager = None
+            self.app = self.streamable_http_app()
 
         self._transport_type = transport
         track_server_run_from_server(self, transport, final_host, final_port, _telemetry)
@@ -481,7 +555,7 @@ class MCPServer(FastMCP):
         self._wrap_handlers_with_middleware()
 
         runner = ServerRunner(self)
-        runner.run(transport=transport, host=final_host, port=final_port, reload=reload, debug=debug)
+        runner.run(transport=transport, host=final_host, port=final_port, reload=reload)
 
     def get_context(self) -> MCPContext:  # type: ignore[override]
         """Use the extended MCP-Use context that adds convenience helpers."""

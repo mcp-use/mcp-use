@@ -24,7 +24,7 @@ import { z } from "zod";
  * ```
  */
 export function convertZodSchemaToParams(
-  zodSchema: z.ZodObject<any>
+  zodSchema: z.ZodTypeAny
 ): Record<string, z.ZodSchema> {
   // Validate that it's a ZodObject using duck-typing to support both zod and zod/v3 imports
   // Check for _def.typeName === "ZodObject" instead of instanceof to support different zod versions
@@ -39,7 +39,7 @@ export function convertZodSchemaToParams(
   }
 
   // Extract the shape from the Zod object schema
-  const shape = zodSchema.shape;
+  const shape = (zodSchema as z.ZodObject<any>).shape;
   const params: Record<string, z.ZodSchema> = {};
 
   // Convert each property in the shape

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useMcpClient, type McpServerOptions } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
@@ -272,6 +273,15 @@ export function InspectorDashboard() {
       name: normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
+      clientOptions: {
+        capabilities: {
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: ["text/html;profile=mcp-app"],
+            },
+          },
+        },
+      },
       ...(proxyConfig
         ? {
             proxyConfig,
@@ -321,7 +331,7 @@ export function InspectorDashboard() {
 
   const handleCopyError = async (errorMessage: string) => {
     try {
-      await navigator.clipboard.writeText(errorMessage);
+      await copyToClipboard(errorMessage);
       toast.success("Error message copied to clipboard");
     } catch {
       toast.error("Failed to copy error message");
@@ -382,7 +392,7 @@ export function InspectorDashboard() {
         oauth: connection.oauth,
       };
 
-      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      await copyToClipboard(JSON.stringify(config, null, 2));
       toast.success("Connection configuration copied to clipboard");
     } catch {
       toast.error("Failed to copy connection configuration");
@@ -460,12 +470,9 @@ export function InspectorDashboard() {
 
   const handleReconnect = (connection: any) => {
     console.log("[InspectorDashboard] Reconnecting server:", connection.id);
-    if (connection.retry) {
+    if (connection.state === "failed" && connection.retry) {
       connection.retry();
     } else {
-      console.warn(
-        "[InspectorDashboard] No retry method available, using connectServer fallback"
-      );
       connectServer(connection.id);
     }
   };
@@ -661,10 +668,14 @@ export function InspectorDashboard() {
                           <TooltipTrigger asChild>
                             <button
                               type="button"
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                navigator.clipboard.writeText(connection.url);
-                                toast.success("URL copied to clipboard");
+                                try {
+                                  await copyToClipboard(connection.url);
+                                  toast.success("URL copied to clipboard");
+                                } catch {
+                                  toast.error("Failed to copy URL");
+                                }
                               }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
                               title="Copy URL"
@@ -762,7 +773,8 @@ export function InspectorDashboard() {
                         </TooltipContent>
                       </Tooltip>
                       {(connection.state === "ready" ||
-                        connection.state === "failed") && (
+                        connection.state === "failed" ||
+                        connection.state === "discovering") && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -783,7 +795,9 @@ export function InspectorDashboard() {
                             <p>
                               {connection.state === "failed"
                                 ? "Retry connection"
-                                : "Resync connection"}
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -832,7 +846,8 @@ export function InspectorDashboard() {
                             Edit connection settings
                           </DropdownMenuItem>
                           {(connection.state === "ready" ||
-                            connection.state === "failed") && (
+                            connection.state === "failed" ||
+                            connection.state === "discovering") && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -842,7 +857,9 @@ export function InspectorDashboard() {
                               <RotateCcw className="h-4 w-4 mr-2" />
                               {connection.state === "failed"
                                 ? "Retry connection"
-                                : "Resync connection"}
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem

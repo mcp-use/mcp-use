@@ -12,7 +12,11 @@ import {
   type JsonRpcResponse,
 } from "../server/utils/jsonrpc-helpers.js";
 import { MCP_APPS_BRIDGE_CONFIG } from "./constants.js";
-import type { DisplayMode, Theme } from "./widget-types.js";
+import type {
+  DisplayMode,
+  MessageContentBlock,
+  Theme,
+} from "./widget-types.js";
 
 // JSON-RPC message types (using imported types with compatible names)
 type JSONRPCRequest = JsonRpcRequest;
@@ -67,6 +71,10 @@ interface ToolInputNotification {
   arguments: Record<string, unknown>;
 }
 
+interface ToolInputPartialNotification {
+  arguments: Record<string, unknown>;
+}
+
 interface ToolResultNotification {
   content?: Array<{
     type: string;
@@ -83,6 +91,7 @@ interface ToolResultNotification {
  */
 class McpAppsBridge {
   private connected = false;
+  private connectPromise: Promise<void> | null = null;
   private requestId = 1;
   private pendingRequests = new Map<
     number | string,
@@ -92,12 +101,19 @@ class McpAppsBridge {
 
   // State
   private toolInput: Record<string, unknown> | null = null;
+  private partialToolInput: Record<string, unknown> | null = null;
   private toolOutput: Record<string, unknown> | null = null;
+  private toolResponseMetadata: Record<string, unknown> | null = null;
   private hostContext: HostContext | null = null;
+  private hostInfo: { name: string; version: string } | null = null;
+  private hostCapabilities: Record<string, unknown> | null = null;
   private initialized = false;
 
   // Event handlers
   private toolInputHandlers = new Set<
+    (input: Record<string, unknown>) => void
+  >();
+  private toolInputPartialHandlers = new Set<
     (input: Record<string, unknown>) => void
   >();
   private toolResultHandlers = new Set<
@@ -314,13 +330,27 @@ class McpAppsBridge {
         this.toolInputHandlers.forEach((handler) => handler(params.arguments));
         break;
       }
+      case "ui/notifications/tool-input-partial": {
+        const params =
+          notification.params as unknown as ToolInputPartialNotification;
+        console.log(
+          "[MCP Apps Bridge] Partial tool input received:",
+          params.arguments
+        );
+        this.partialToolInput = params.arguments;
+        this.toolInputPartialHandlers.forEach((handler) =>
+          handler(params.arguments)
+        );
+        break;
+      }
       case "ui/notifications/tool-result": {
         const params = notification.params as ToolResultNotification;
-        // Prefer structuredContent, fall back to parsing text content
         const output =
           params.structuredContent || this.parseTextContent(params);
-        console.log("[MCP Apps Bridge] Tool result received:", output);
+        const meta = (params._meta as Record<string, unknown>) || null;
         this.toolOutput = output;
+        this.toolResponseMetadata = meta;
+        this.partialToolInput = null;
         this.toolResultHandlers.forEach((handler) => handler(output));
         break;
       }
@@ -412,7 +442,10 @@ class McpAppsBridge {
   }
 
   /**
-   * Initialize connection with MCP Apps host
+   * Initialize connection with MCP Apps host.
+   * Concurrent calls share the same in-flight connection attempt so that
+   * React StrictMode double-invocations and multiple useWidget() hooks
+   * only produce a single ui/initialize request.
    */
   async connect(): Promise<void> {
     if (this.connected) return;
@@ -423,6 +456,17 @@ class McpAppsBridge {
       return;
     }
 
+    if (!this.connectPromise) {
+      this.connectPromise = this.doConnect();
+      this.connectPromise.catch(() => {
+        this.connectPromise = null;
+      });
+    }
+
+    return this.connectPromise;
+  }
+
+  private async doConnect(): Promise<void> {
     console.log("[MCP Apps Bridge] Connecting to MCP Apps host...");
 
     try {
@@ -442,6 +486,17 @@ class McpAppsBridge {
       if (result.hostContext) {
         this.hostContext = result.hostContext;
         console.log("[MCP Apps Bridge] Host context:", this.hostContext);
+      }
+
+      // Store host info and capabilities
+      if (result.hostInfo) {
+        this.hostInfo = result.hostInfo;
+      }
+      if (result.hostCapabilities) {
+        this.hostCapabilities = result.hostCapabilities as Record<
+          string,
+          unknown
+        >;
       }
 
       // Send initialized notification
@@ -470,10 +525,24 @@ class McpAppsBridge {
   }
 
   /**
-   * Get current tool output
+   * Get current partial/streaming tool input
+   */
+  getPartialToolInput(): Record<string, unknown> | null {
+    return this.partialToolInput;
+  }
+
+  /**
+   * Get current tool output (structuredContent from tool result)
    */
   getToolOutput(): Record<string, unknown> | null {
     return this.toolOutput;
+  }
+
+  /**
+   * Get tool response metadata (_meta from tool result)
+   */
+  getToolResponseMetadata(): Record<string, unknown> | null {
+    return this.toolResponseMetadata;
   }
 
   /**
@@ -484,11 +553,35 @@ class McpAppsBridge {
   }
 
   /**
+   * Get host info (name and version of the MCP Apps host)
+   */
+  getHostInfo(): { name: string; version: string } | null {
+    return this.hostInfo;
+  }
+
+  /**
+   * Get host capabilities advertised during the ui/initialize handshake
+   */
+  getHostCapabilities(): Record<string, unknown> | null {
+    return this.hostCapabilities;
+  }
+
+  /**
    * Subscribe to tool input changes
    */
   onToolInput(handler: (input: Record<string, unknown>) => void): () => void {
     this.toolInputHandlers.add(handler);
     return () => this.toolInputHandlers.delete(handler);
+  }
+
+  /**
+   * Subscribe to partial/streaming tool input changes
+   */
+  onToolInputPartial(
+    handler: (input: Record<string, unknown>) => void
+  ): () => void {
+    this.toolInputPartialHandlers.add(handler);
+    return () => this.toolInputPartialHandlers.delete(handler);
   }
 
   /**
@@ -518,12 +611,16 @@ class McpAppsBridge {
   }
 
   /**
-   * Send a message to the conversation
+   * Send a message to the conversation.
+   * Accepts a single content block or an array of blocks per the SEP-1865 ui/message spec.
    */
-  async sendMessage(content: { type: string; text: string }): Promise<void> {
+  async sendMessage(
+    content: MessageContentBlock | MessageContentBlock[]
+  ): Promise<void> {
+    const contentArray = Array.isArray(content) ? content : [content];
     await this.sendRequest("ui/message", {
       role: "user",
-      content,
+      content: contentArray,
     });
   }
 
@@ -540,6 +637,18 @@ class McpAppsBridge {
   async requestDisplayMode(mode: DisplayMode): Promise<{ mode: DisplayMode }> {
     const result = await this.sendRequest("ui/request-display-mode", { mode });
     return result as { mode: DisplayMode };
+  }
+
+  /**
+   * Update the host's model context (SEP-1865 ui/update-model-context).
+   * The host will include this data in the model's context on future turns.
+   * Each call overwrites the previous context.
+   */
+  async updateModelContext(params: {
+    content?: Array<{ type: string; text: string }>;
+    structuredContent?: Record<string, unknown>;
+  }): Promise<void> {
+    await this.sendRequest("ui/update-model-context", params);
   }
 
   /**
@@ -562,9 +671,11 @@ class McpAppsBridge {
     this.listeners.clear();
     this.pendingRequests.clear();
     this.toolInputHandlers.clear();
+    this.toolInputPartialHandlers.clear();
     this.toolResultHandlers.clear();
     this.hostContextHandlers.clear();
     this.connected = false;
+    this.connectPromise = null;
   }
 }
 
@@ -584,4 +695,9 @@ export function getMcpAppsBridge(): McpAppsBridge {
 /**
  * Type exports
  */
-export type { HostContext, ToolInputNotification, ToolResultNotification };
+export type {
+  HostContext,
+  ToolInputNotification,
+  ToolInputPartialNotification,
+  ToolResultNotification,
+};

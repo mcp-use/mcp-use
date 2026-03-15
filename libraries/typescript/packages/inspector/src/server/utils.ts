@@ -72,6 +72,15 @@ export function parsePortFromArgs(): number | null {
 }
 
 /**
+ * Checks if the `--no-open` flag is present in command-line arguments.
+ *
+ * @returns `true` if `--no-open` is present, `false` otherwise.
+ */
+export function hasNoOpenFlag(): boolean {
+  return process.argv.includes("--no-open");
+}
+
+/**
  * Helper function to format error responses with context and timestamp
  */
 export function formatErrorResponse(error: unknown, context: string) {

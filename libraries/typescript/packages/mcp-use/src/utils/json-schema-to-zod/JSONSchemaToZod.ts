@@ -220,28 +220,35 @@ export class JSONSchemaToZod {
    * @returns {ZodTypeAny} - The ZodTypeAny schema.
    */
   private static parseSchema(schema: JSONSchema): ZodTypeAny {
+    let result: ZodTypeAny;
+
     // Handle array of types (e.g., ['string', 'null'] for nullable types)
     if (Array.isArray(schema.type)) {
-      return this.handleTypeArray(schema);
+      result = this.handleTypeArray(schema);
     }
-
     // Handle combinators (oneOf, anyOf, allOf)
-    if (schema.oneOf || schema.anyOf || schema.allOf) {
-      return this.parseCombinator(schema);
+    else if (schema.oneOf || schema.anyOf || schema.allOf) {
+      result = this.parseCombinator(schema);
     }
-
     // Handle if-then-else conditional validation
-    if (schema["if"] && schema["then"]) {
-      return this.parseObject(schema);
+    else if (schema["if"] && schema["then"]) {
+      result = this.parseObject(schema);
     }
-
     // Handle object schema without explicit type but with properties
-    if (schema.properties && (!schema.type || schema.type === "object")) {
-      return this.parseObject(schema);
+    else if (schema.properties && (!schema.type || schema.type === "object")) {
+      result = this.parseObject(schema);
+    }
+    // Handle all other types
+    else {
+      result = this.handleSingleType(schema);
     }
 
-    // Handle all other types
-    return this.handleSingleType(schema);
+    // Preserve description metadata from JSON Schema on the Zod schema
+    if (schema.description && typeof result.describe === "function") {
+      result = result.describe(schema.description);
+    }
+
+    return result;
   }
 
   /**
@@ -657,6 +664,19 @@ export class JSONSchemaToZod {
     // Handle conditional validation (if-then-else) first
     if (schema["if"] && schema["then"]) {
       return this.parseConditional(schema);
+    }
+
+    // Handle pure record/map types: object with no named properties but with
+    // additionalProperties as a schema object. Use z.record() instead of
+    // z.object({}).catchall() because catchall doesn't roundtrip correctly
+    // through @langchain/core's toJsonSchema().
+    if (
+      !schema.properties &&
+      schema.additionalProperties &&
+      typeof schema.additionalProperties === "object"
+    ) {
+      const valueSchema = this.parseSchema(schema.additionalProperties);
+      return z.record(z.string(), valueSchema);
     }
 
     // Create shape object for Zod

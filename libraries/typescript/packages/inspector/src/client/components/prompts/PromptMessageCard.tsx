@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/client/components/ui/badge";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { MarkdownRenderer } from "@/client/components/shared/MarkdownRenderer";
 import { Button } from "@/client/components/ui/button";
 
@@ -103,7 +104,7 @@ export function PromptMessageCard({ message, index }: PromptMessageCardProps) {
 
   const handleCopy = async () => {
     const text = extractTextFromContent(message.content);
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };

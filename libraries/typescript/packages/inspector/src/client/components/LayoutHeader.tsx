@@ -34,6 +34,7 @@ import {
 import type { McpServer } from "mcp-use/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
@@ -175,7 +176,7 @@ export function LayoutHeader({
     if (!tunnelUrl) return;
 
     try {
-      await navigator.clipboard.writeText(`${tunnelUrl}/mcp`);
+      await copyToClipboard(`${tunnelUrl}/mcp`);
       setCopied(true);
       toast.success("Tunnel URL copied to clipboard");
       setTimeout(() => setCopied(false), 2000);

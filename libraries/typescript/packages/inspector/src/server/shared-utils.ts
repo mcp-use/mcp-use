@@ -184,8 +184,10 @@ export async function* handleChatRequestStream(requestBody: {
     client,
     maxSteps: 10,
     memoryEnabled: false, // Use externalHistory instead
+    exposeResourcesAsTools: false,
+    exposePromptsAsTools: false,
     systemPrompt:
-      "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
   });
 
   // Import LangChain message types for history conversion
@@ -446,8 +448,10 @@ export async function handleChatRequest(requestBody: {
     client,
     maxSteps: 10,
     memoryEnabled: false, // Use externalHistory instead
+    exposeResourcesAsTools: false,
+    exposePromptsAsTools: false,
     systemPrompt:
-      "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
   });
 
   // Import LangChain message types for history conversion
@@ -613,6 +617,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     widgetCSP,
+    mcpAppsCsp,
+    mcpAppsPermissions,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
@@ -664,6 +670,8 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolId,
     timestamp: Date.now(),
     widgetCSP,
+    mcpAppsCsp,
+    mcpAppsPermissions,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
@@ -700,16 +708,12 @@ export function generateWidgetContainerHtml(
       <script>
         (async function() {
           try {
-            // Change URL to "/" BEFORE loading widget (for React Router)
-            //history.replaceState(null, '', '/');
-
             // Fetch the actual widget HTML using toolId
             const response = await fetch('${basePath}/api/resources/widget-content/${toolId}');
             const html = await response.text();
 
             // Replace entire document with widget HTML using proper method
             document.open();
-            // Write the HTML content - the browser will parse it properly
             document.write(html);
             document.close();
           } catch (error) {
@@ -738,7 +742,6 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     toolResponseMetadata,
     resourceData,
     toolId,
-    devServerBaseUrl,
     theme,
     playground,
   } = widgetData;
@@ -830,20 +833,74 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
       (function() {
         'use strict';
 
-        // Change URL to "/" for React Router compatibility
-        // Skip if running in Inspector dev-widget proxy to prevent redirecting iframe to Inspector home
-        if (window.location.pathname !== '/' && !window.location.pathname.includes('/dev-widget/')) {
+        // Change URL to "/" for React Router compatibility.
+        // Skip when loaded inside the inspector (widget-content endpoint)
+        // to prevent Vite HMR reloads from navigating to "/" (inspector SPA).
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/inspector/')) {
           history.replaceState(null, '', '/');
         }
 
-        // Inject MCP widget utilities for Image component and file access
-        // __mcpServerUrl provides the server origin for widgets to use in API calls
-        // (e.g., fetch(window.__mcpServerUrl + '/api/fruits') instead of hardcoding localhost)
-        window.__mcpServerUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}"` : '""'};
-        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
-        window.__getFile = function(filename) {
-          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
-        };
+        function emitWidgetRuntimeError(payload) {
+          var args = [{
+            message: payload && payload.message ? payload.message : "Unknown widget runtime error",
+            stack: payload && payload.stack ? payload.stack : undefined,
+            source: payload && payload.source ? payload.source : undefined,
+            fileName: payload && payload.fileName ? payload.fileName : undefined,
+            line: payload && payload.line ? payload.line : undefined,
+            column: payload && payload.column ? payload.column : undefined,
+            timestamp: payload && payload.timestamp ? payload.timestamp : Date.now(),
+          }];
+          try {
+            window.parent.postMessage(
+              {
+                type: "iframe-console-log",
+                level: "error",
+                args: args,
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                toolId: ${safeToolId},
+              },
+              "*"
+            );
+          } catch (emitErr) {}
+        }
+
+        window.addEventListener("error", function(event) {
+          var err = event && event.error;
+          var message =
+            (err && err.message) ||
+            (event && event.message) ||
+            "Unknown widget runtime error";
+          emitWidgetRuntimeError({
+            source: "window.error",
+            message: String(message),
+            stack: err && err.stack ? String(err.stack) : undefined,
+            fileName: event && event.filename ? String(event.filename) : undefined,
+            line: event && typeof event.lineno === "number" ? event.lineno : undefined,
+            column: event && typeof event.colno === "number" ? event.colno : undefined,
+            timestamp: Date.now(),
+          });
+        });
+
+        window.addEventListener("unhandledrejection", function(event) {
+          var reason = event ? event.reason : undefined;
+          var message = "Unhandled promise rejection";
+          var stack = undefined;
+          if (reason && typeof reason === "object") {
+            message = String(reason.message || message);
+            stack = reason.stack ? String(reason.stack) : undefined;
+          } else if (typeof reason === "string") {
+            message = reason;
+          } else if (reason != null) {
+            message = String(reason);
+          }
+          emitWidgetRuntimeError({
+            source: "window.unhandledrejection",
+            message: message,
+            stack: stack,
+            timestamp: Date.now(),
+          });
+        });
 
         const openaiAPI = {
           toolInput: ${safeToolInput},
@@ -946,6 +1003,23 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           }
         };
 
+        // Report CSP violations to the inspector host
+        document.addEventListener('securitypolicyviolation', function(e) {
+          window.parent.postMessage({
+            type: 'openai:csp-violation',
+            toolId: ${safeToolId},
+            directive: e.violatedDirective,
+            effectiveDirective: e.effectiveDirective,
+            blockedUri: e.blockedURI,
+            sourceFile: e.sourceFile || null,
+            lineNumber: e.lineNumber,
+            columnNumber: e.columnNumber,
+            originalPolicy: e.originalPolicy,
+            disposition: e.disposition,
+            timestamp: Date.now(),
+          }, '*');
+        });
+
         Object.defineProperty(window, 'openai', {
           value: openaiAPI,
           writable: false,
@@ -960,27 +1034,9 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           enumerable: true
         });
 
-        setTimeout(() => {
-          try {
-            const globalsEvent = new CustomEvent('openai:set_globals', {
-              detail: {
-                globals: {
-                  toolInput: openaiAPI.toolInput,
-                  toolOutput: openaiAPI.toolOutput,
-                  toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
-                  widgetState: openaiAPI.widgetState,
-                  displayMode: openaiAPI.displayMode,
-                  maxHeight: openaiAPI.maxHeight,
-                  theme: openaiAPI.theme,
-                  locale: openaiAPI.locale,
-                  safeArea: openaiAPI.safeArea,
-                  userAgent: openaiAPI.userAgent
-                }
-              }
-            });
-            window.dispatchEvent(globalsEvent);
-          } catch (err) {}
-        }, 0);
+        // Do not fire openai:set_globals here — window.openai is already set synchronously.
+        // useSyncExternalStore reads it on first render. Firing the event would cause a
+        // redundant second render (double flash at pending/final state).
 
         // Listen for widget state requests from inspector
         window.addEventListener('message', (event) => {
@@ -1248,14 +1304,10 @@ export function getWidgetSecurityHeaders(
     frameSrc = `'self' blob: ${frameDomains.join(" ")}`;
   }
 
-  // Determine frame-ancestors policy
-  let frameAncestorsPolicy = "'self'"; // Default: same-origin only
-
-  // In dev mode with no explicit override, allow all origins for easier embedding
-  if (devServerOrigin && !frameAncestors) {
-    frameAncestorsPolicy = "*";
-  } else if (frameAncestors) {
-    frameAncestorsPolicy = frameAncestors;
+  // When frameAncestors param is set (e.g. MCP_INSPECTOR_FRAME_ANCESTORS): extend 'self' with it. When unset: allow all (*).
+  let frameAncestorsPolicy = "*";
+  if (frameAncestors) {
+    frameAncestorsPolicy = `'self' ${frameAncestors}`.trim();
   }
 
   const headers: Record<string, string> = {

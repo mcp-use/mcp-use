@@ -153,7 +153,7 @@ To learn more about the MCP Client, see the [MCP Client](/typescript/client) doc
 
 ## MCP Server
 **mcp-use** has a complete MCP server framework implementation for TypeScript. 
-It improves the official Model Context Protocol SDK with support for Edge Runtime, ChatGPT Apps SDK and MCP-UI. In addition, it supports all official MCP features and achieves a conformance score of 100/100 based on the official MCP Conformance Tests.
+It improves the official Model Context Protocol SDK with support for Edge Runtime, MCP Apps, ChatGPT Apps SDK, and MCP-UI. In addition, it supports all official MCP features and achieves a conformance score of 100/100 based on the official MCP Conformance Tests.
 
 ```bash
 npx create-mcp-use-app my-mcp-server
@@ -166,7 +166,7 @@ npm run dev
 This command will create a new MCP server with:
 - A complete TypeScript MCP server project structure.
 - Example MCP Tools and Resources to get you started.
-- Example UI Widgets React components in `resources/` folder exposed as tools and resources in Apps SDK for ChatGPT and MCP-UI format.
+- Example UI Widgets React components in `resources/` folder exposed as tools and resources in MCP Apps and ChatGPT Apps SDK format.
 - Pre-configured server metadata (title, icons, websiteUrl) with your project name.
 - Hot Module Reloading (HMR) - modify tools/prompts/resources without restarting or dropping connections.
 - Automatically launches an MCP Inspector in your browser to test your server.
@@ -177,12 +177,15 @@ After creation, your project will have this structure:
 
 ```
 my-mcp-server/
-├── resources/
-│   └── component.tsx  # React widgets for Apps SDK and MCP-UI
-├── public/            # Static assets (icons, favicon, etc.)
-│   ├── icon.svg       # Server icon (mcp-use branding by default)
-│   └── favicon.ico    # Browser favicon
-├── index.ts           # MCP server entry point with serverInfo configured
+├── resources/                     # React widgets (MCP Apps + ChatGPT)
+│   └── product-search-result/
+│       ├── widget.tsx             # Widget entry point
+│       ├── components/            # Sub-components
+│       └── types.ts
+├── public/                        # Static assets (icons, images, etc.)
+│   ├── icon.svg
+│   └── favicon.ico
+├── index.ts                       # MCP server entry point
 ├── package.json
 ├── tsconfig.json
 └── README.md
@@ -192,26 +195,13 @@ my-mcp-server/
 
 Commands:
 
-<CodeGroup>
-```bash yarn
-yarn dev   # start the development server
-yarn build # build the server
-yarn start # start the production server
-yarn deploy # deploy the server to mcp-use cloud
-```
-```bash npm
+```bash 
 npm run dev   # start the development server
 npm run build # build the server
 npm run start # start the production server
-npm run deploy # deploy the server to mcp-use cloud
+npm run deploy # deploy the server to Manufact cloud
 ```
-```bash pnpm
-pnpm dev   # start the development server
-pnpm build # build the server
-pnpm start # start the production server
-pnpm deploy # deploy the server to mcp-use cloud
-```
-</CodeGroup>
+
 
 When you run your MCP server, it will be available at:
 - **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
@@ -220,7 +210,7 @@ When you run your MCP server, it will be available at:
 
 ### Deploy Your MCP Server
 You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.
-Or you can deploy it on [mcp-use Cloud](https://mcp-use.com).
+Or you can deploy it on [Manufact Cloud](https://manufact.com).
 For detailed instructions, see the [Deploy Your Server](/typescript/server/deployment/mcp-use) guide.
 
 
@@ -229,7 +219,8 @@ For detailed instructions, see the [Deploy Your Server](/typescript/server/deplo
 ### Next Steps
 
 - [Core features](/typescript/server/tools): Learn how to create MCP tools, prompts and resources.
-- [UI Widgets](/typescript/server/ui-widgets): Expose UI components to chat clients compatible with ChatGPT Apps SDK and MCP-UI.
+- [MCP Apps](/typescript/server/mcp-apps): Build interactive widgets with the standard MCP Apps protocol (works with ChatGPT and MCP clients).
+- [ChatGPT Apps SDK](/typescript/server/ui-widgets): ChatGPT-specific widget protocol details.
 - [Configuration](/typescript/server/configuration): Advanced configuration and deployment options.
 - [Deploy Your Server](/typescript/server/deployment/mcp-use) - Deploy to production with one command
 
@@ -242,8 +233,8 @@ For detailed instructions, see the [Deploy Your Server](/typescript/server/deplo
   <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
     Configure your Agent and connected MCP servers
   </Card>
-  <Card title="UI Widgets" icon="app-window-mac" href="/typescript/server/ui-widgets">
-    Create your own UI widgets for ChatGPT Apps SDK and MCP-UI.
+  <Card title="MCP Apps" icon="app-window-mac" href="/typescript/server/mcp-apps">
+    Build interactive widgets for ChatGPT and MCP Apps clients.
   </Card>
   <Card title="Deployment" icon="cloud" href="/typescript/server/deployment/mcp-use">
     Deploy your MCP server to production with one command.

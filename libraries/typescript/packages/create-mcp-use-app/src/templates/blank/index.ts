@@ -26,13 +26,7 @@ const server = new MCPServer({
  * Just export widgetMetadata with description and Zod schema,
  * and mcp-use handles the rest!
  *
- * It will automatically add to your MCP server:
- * - server.tool('kanban-board')
- * - server.tool('display-weather')
- * - server.resource('ui://widget/kanban-board')
- * - server.resource('ui://widget/display-weather')
- *
- * Docs: https://mcp-use.com/docs/typescript/server/ui-widgets
+ * Docs: https://mcp-use.com/docs/typescript/server/mcp-apps
  */
 
 /*

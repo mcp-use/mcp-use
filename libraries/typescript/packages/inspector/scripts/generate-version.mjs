@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packagePath = join(__dirname, "../package.json");
-const outputPath = join(__dirname, "../src/client/utils/version.ts");
+const clientOutputPath = join(__dirname, "../src/client/utils/version.ts");
+const serverOutputPath = join(__dirname, "../src/server/version.ts");
 
 const pkg = JSON.parse(readFileSync(packagePath, "utf-8"));
 
@@ -28,5 +29,6 @@ export function getInspectorVersion(): string {
 }
 `;
 
-writeFileSync(outputPath, content);
+writeFileSync(clientOutputPath, content);
+writeFileSync(serverOutputPath, content);
 console.log(`Generated version.ts with version: ${pkg.version}`);

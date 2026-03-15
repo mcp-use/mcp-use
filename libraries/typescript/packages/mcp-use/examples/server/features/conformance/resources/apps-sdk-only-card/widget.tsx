@@ -22,6 +22,8 @@ type AppsSdkOnlyCardProps = z.infer<typeof propSchema>;
 const AppsSdkOnlyCard: React.FC = () => {
   const { props, isPending, theme } = useWidget<AppsSdkOnlyCardProps>();
   const isDark = theme === "dark";
+  // Props = merged (toolInput + structuredContent); useWidget handles expose-as-tool vs returned-by-tool
+  const message = props?.message;
 
   return (
     <McpUseProvider debugger viewControls autoSize>
@@ -55,8 +57,7 @@ const AppsSdkOnlyCard: React.FC = () => {
               isDark ? "text-white" : "text-gray-900"
             }`}
           >
-            {props.message ||
-              "This widget uses appsSdkMetadata only (no metadata)."}
+            {message ?? "This widget uses appsSdkMetadata only (no metadata)."}
           </p>
         </div>
       )}

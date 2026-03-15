@@ -51,6 +51,8 @@ interface SandboxedIframeProps {
   permissive?: boolean;
   /** Callback when sandbox proxy is ready */
   onProxyReady?: () => void;
+  /** Callback when the outer iframe has loaded */
+  onLoad?: () => void;
   /** Callback for messages from guest UI (excluding sandbox-internal messages) */
   onMessage: (event: MessageEvent) => void;
   /** CSS class for the outer iframe */
@@ -80,6 +82,7 @@ export const SandboxedIframe = forwardRef<
     permissions,
     permissive,
     onProxyReady,
+    onLoad,
     onMessage,
     className,
     style,
@@ -118,9 +121,18 @@ export const SandboxedIframe = forwardRef<
     ) {
       sandboxHost = currentHost; // Keep same origin
     } else {
-      // Priority 3: Production - use convention: sandbox-{hostname}
-      // e.g., inspector.mcp-use.com -> sandbox-inspector.mcp-use.com
-      sandboxHost = `sandbox-${currentHost}`;
+      // Priority 3: Production - preserve the inspector namespace when deriving
+      // the sandbox host. Cloud embeds run on apex hosts such as manufact.com,
+      // while direct inspector pages run on inspector.{domain}; both should
+      // resolve to sandbox-inspector.{domain}.
+      if (currentHost.startsWith("dev.")) {
+        const rest = currentHost.slice(4); // "dev.".length
+        sandboxHost = `sandbox-inspector.dev.${rest}`;
+      } else if (currentHost.startsWith("inspector.")) {
+        sandboxHost = `sandbox-${currentHost}`;
+      } else {
+        sandboxHost = `sandbox-inspector.${currentHost}`;
+      }
     }
 
     const portSuffix = currentPort ? `:${currentPort}` : "";
@@ -178,10 +190,9 @@ export const SandboxedIframe = forwardRef<
   }, [handleMessage]);
 
   // Send HTML to proxy when ready
+  // CAUTION: Each run causes proxy to set inner.srcdoc = html, fully reloading the widget
   useEffect(() => {
     if (!proxyReady || !html || !outerRef.current?.contentWindow) return;
-
-    console.log("[SandboxedIframe] Sending HTML to sandbox proxy");
 
     // Send HTML via JSON-RPC notification per SEP-1865
     outerRef.current.contentWindow.postMessage(
@@ -217,6 +228,7 @@ export const SandboxedIframe = forwardRef<
       title={title}
       sandbox={sandbox}
       allow="web-share"
+      onLoad={onLoad}
     />
   );
 });

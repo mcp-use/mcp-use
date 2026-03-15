@@ -66,7 +66,7 @@ Main hook that provides access to all widget functionality.
   
   // Actions
   callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResponse>;
-  sendFollowUpMessage: (prompt: string) => Promise<void>;
+  sendFollowUpMessage: (content: string | MessageContentBlock[]) => Promise<void>;
   openExternal: (href: string) => void;
   requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>;
   

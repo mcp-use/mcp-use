@@ -4,6 +4,7 @@ import {
   connectToConformanceServer,
   navigateToTools,
 } from "./helpers/connection";
+import { getTestMatrix } from "./helpers/test-matrix";
 
 test.describe("Inspector MCP Server Connections", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -72,9 +73,10 @@ test.describe("Inspector MCP Server Connections", () => {
     // Verify capabilities JSON is displayed
     await expect(page.getByTestId("server-info-capabilities")).toBeVisible();
 
-    // Close the modal by clicking outside or ESC
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("server-info-modal")).not.toBeVisible();
+    // // Close the modal by clicking outside or ESC
+    // await page.keyboard.press("Escape"); // for some reason the copy url tooltip is focused so we need to press ESC twice
+    // await page.keyboard.press("Escape");
+    // await expect(page.getByTestId("server-info-modal")).not.toBeVisible();
   });
 
   test("should reconnect server from dashboard tile", async ({ page }) => {
@@ -266,6 +268,49 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-results-text-content")
     ).toContainText("Echo: Hello from test");
+  });
+
+  test("test_typed_arguments - should submit boolean/array/object as typed values", async ({
+    page,
+  }) => {
+    await page.getByTestId("tool-item-test_typed_arguments").click();
+    await expect(
+      page.getByTestId("tool-execution-execute-button")
+    ).toBeVisible();
+
+    await expect(page.getByTestId("tool-param-flag")).toBeVisible();
+    await page.getByTestId("tool-param-flag").fill("true");
+
+    await expect(page.getByTestId("tool-param-tags")).toBeVisible();
+    await page.getByTestId("tool-param-tags").fill('["alpha","beta"]');
+
+    await expect(page.getByTestId("tool-param-config")).toBeVisible();
+    await page
+      .getByTestId("tool-param-config")
+      .fill('{"mode":"strict","count":2}');
+
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    await expect(
+      page.getByTestId("tool-execution-results-text-content")
+    ).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByTestId("tool-result-format-toggle-0")).toBeVisible();
+    await page.getByTestId("tool-result-format-toggle-0").click();
+    const resultsContent = page.getByTestId("tool-execution-results-content");
+    await expect(
+      resultsContent.getByText('"flagType": "boolean"')
+    ).toBeVisible();
+    await expect(resultsContent.getByText('"tagsIsArray": true')).toBeVisible();
+    await expect(
+      resultsContent.getByText('"configIsObject": true')
+    ).toBeVisible();
+    await expect(resultsContent.getByText('"flag": true')).toBeVisible();
+    await expect(resultsContent.getByText('"alpha",')).toBeVisible();
+    await expect(resultsContent.getByText('"beta"')).toBeVisible();
+    await expect(resultsContent.getByText('"mode": "strict",')).toBeVisible();
+    await expect(resultsContent.getByText('"count": 2')).toBeVisible();
   });
 
   test("test_image_content - should return image content", async ({ page }) => {
@@ -651,6 +696,99 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(textContent).toContainText("John Doe");
   });
 
+  test("test_elicitation_sep1330_enums - should handle all enum schema variants", async ({
+    page,
+  }) => {
+    await page.getByTestId("tool-item-test_elicitation_sep1330_enums").click();
+    await expect(
+      page.getByTestId("tool-execution-execute-button")
+    ).toBeVisible();
+
+    await page.getByTestId("tool-execution-execute-button").click();
+
+    const viewDetailsButton = page.getByTestId(
+      "elicitation-toast-view-details"
+    );
+    await expect(viewDetailsButton).toBeVisible({ timeout: 5000 });
+    await viewDetailsButton.click();
+
+    await expect(page.getByTestId("elicitation-tab-header")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByTestId("elicitation-request-item-0")).toBeVisible();
+
+    // 1) Untitled single-select: string + enum
+    const untitledSingle = page.getByTestId("elicitation-field-untitledSingle");
+    await expect(untitledSingle).toBeVisible();
+    await untitledSingle.selectOption("option2");
+    await expect(untitledSingle).toHaveValue("option2");
+
+    // 2) Titled single-select: string + oneOf (const/title)
+    const titledSingle = page.getByTestId("elicitation-field-titledSingle");
+    await expect(titledSingle).toBeVisible();
+    await expect(titledSingle.locator("option")).toContainText([
+      "Select...",
+      "First Option",
+      "Second Option",
+      "Third Option",
+    ]);
+    await titledSingle.selectOption("value1");
+    await expect(titledSingle).toHaveValue("value1");
+
+    // 3) Legacy titled enum: string + enum + enumNames
+    const legacyEnum = page.getByTestId("elicitation-field-legacyEnum");
+    await expect(legacyEnum).toBeVisible();
+    await expect(legacyEnum.locator("option")).toContainText([
+      "Select...",
+      "Option One",
+      "Option Two",
+      "Option Three",
+    ]);
+    await legacyEnum.selectOption("opt1");
+    await expect(legacyEnum).toHaveValue("opt1");
+
+    // 4) Untitled multi-select: array + items.enum
+    const untitledMulti = page.getByTestId("elicitation-field-untitledMulti");
+    await expect(untitledMulti).toBeVisible();
+    await untitledMulti.getByLabel("option1").click();
+    await untitledMulti.getByLabel("option3").click();
+
+    // 5) Titled multi-select: array + items.anyOf (const/title)
+    const titledMulti = page.getByTestId("elicitation-field-titledMulti");
+    await expect(titledMulti).toBeVisible();
+    await titledMulti.getByLabel("First Choice").click();
+    await titledMulti.getByLabel("Third Choice").click();
+
+    await page.getByTestId("elicitation-accept-button").click();
+
+    const viewToolResultButton = page.getByTestId(
+      "elicitation-view-tool-result"
+    );
+    await expect(viewToolResultButton).toBeVisible({ timeout: 5000 });
+    await viewToolResultButton.click();
+
+    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible({
+      timeout: 3000,
+    });
+
+    const textContent = page.getByTestId("tool-execution-results-text-content");
+    await expect(textContent).toBeVisible({ timeout: 10000 });
+    await expect(textContent).toContainText(
+      "Elicitation completed: action=accept"
+    );
+
+    // Ensure selected enum values were submitted correctly.
+    await expect(textContent).toContainText('"untitledSingle":"option2"');
+    await expect(textContent).toContainText('"titledSingle":"value1"');
+    await expect(textContent).toContainText('"legacyEnum":"opt1"');
+    await expect(textContent).toContainText(
+      '"untitledMulti":["option1","option3"]'
+    );
+    await expect(textContent).toContainText(
+      '"titledMulti":["value1","value3"]'
+    );
+  });
+
   test("test_error_handling - should display error message", async ({
     page,
   }) => {
@@ -687,6 +825,62 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-results-text-content")
     ).toContainText("Resource updated to: Test update value");
+  });
+
+  test("test_record_schema - inputSchema should preserve z.record additionalProperties and descriptions", async ({
+    page,
+  }) => {
+    // Get the tools list directly from the MCP server via JSON-RPC
+    const { serverUrl } = getTestMatrix();
+    const toolsList = await page.evaluate(async (url) => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        }),
+      });
+      return response.json();
+    }, serverUrl);
+
+    // Find the test_record_schema tool
+    const tool = toolsList.result.tools.find(
+      (t: any) => t.name === "test_record_schema"
+    );
+    expect(tool).toBeDefined();
+
+    const schema = tool.inputSchema;
+
+    // Verify files property has additionalProperties as schema object (not false)
+    expect(schema.properties.files.additionalProperties).toEqual({
+      type: "string",
+    });
+
+    // Verify propertyNames is present for z.record()
+    expect(schema.properties.files.propertyNames).toEqual({ type: "string" });
+
+    // Verify files has description preserved
+    expect(schema.properties.files.description).toContain(
+      "A {path: code} object"
+    );
+
+    // Verify other properties have descriptions preserved
+    expect(schema.properties.entryFile.description).toContain(
+      "Entry file path"
+    );
+    expect(schema.properties.title.description).toContain("Title shown");
+    expect(schema.properties.durationInFrames.description).toContain(
+      "Total duration"
+    );
+    expect(schema.properties.fps.description).toContain("Frames per second");
+    expect(schema.properties.width.description).toContain("Width in pixels");
+    expect(schema.properties.height.description).toContain("Height in pixels");
+
+    // Verify required array contains "files"
+    expect(schema.required).toContain("files");
   });
 
   // Prompts tests

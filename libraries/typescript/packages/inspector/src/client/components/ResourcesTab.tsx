@@ -7,7 +7,7 @@ import {
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import {
   useCallback,
@@ -25,6 +25,7 @@ import {
 } from "./resources";
 import { RpcPanel } from "./shared";
 import { useConfig } from "./chat/useConfig";
+import { copyToClipboard } from "@/client/utils/clipboard";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -183,7 +184,10 @@ export function ResourcesTab({
             uri: resource.uri,
             result,
             timestamp,
-            resourceAnnotations: resource.annotations as Record<string, any>,
+            resourceAnnotations: {
+              ...(resource.annotations as Record<string, any>),
+              ...(((resource as any)._meta as Record<string, any>) || {}),
+            },
           });
         } catch (error) {
           // Track failed resource read
@@ -209,7 +213,10 @@ export function ResourcesTab({
             },
             error: error instanceof Error ? error.message : "Unknown error",
             timestamp,
-            resourceAnnotations: resource.annotations as Record<string, any>,
+            resourceAnnotations: {
+              ...(resource.annotations as Record<string, any>),
+              ...(((resource as any)._meta as Record<string, any>) || {}),
+            },
           });
         } finally {
           setIsLoading(false);
@@ -325,9 +332,7 @@ export function ResourcesTab({
   const handleCopy = useCallback(async () => {
     if (!currentResult) return;
     try {
-      await navigator.clipboard.writeText(
-        JSON.stringify(currentResult.result, null, 2)
-      );
+      await copyToClipboard(JSON.stringify(currentResult.result, null, 2));
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {

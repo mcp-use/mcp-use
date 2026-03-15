@@ -13,7 +13,7 @@ import type {
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import type { Hono as HonoType } from "hono";
 import { z } from "zod";
-import { Telemetry } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
@@ -29,7 +29,6 @@ import {
   createParamsSchema,
   toolRegistration,
 } from "./tools/index.js";
-import { AppsSdkAdapter, McpAppsAdapter } from "./widgets/adapters/index.js";
 import {
   mountWidgets,
   setupFaviconRoute,
@@ -37,6 +36,7 @@ import {
   uiResourceRegistration,
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
+import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
 // Import and re-export tool context types for public API
@@ -72,12 +72,17 @@ import { setupOAuthForServer } from "./oauth/setup.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
 import {
+  buildHandlerContext,
   createEnhancedContext,
   findSessionContext,
   isValidLogLevel,
 } from "./tools/tool-execution-helpers.js";
 import type { ServerConfig } from "./types/index.js";
-import type { PromptCallback, PromptDefinition } from "./types/prompt.js";
+import type {
+  InferPromptInput,
+  PromptCallback,
+  PromptDefinition,
+} from "./types/prompt.js";
 import type {
   ReadResourceCallback,
   ReadResourceTemplateCallback,
@@ -423,6 +428,105 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public cleanupSessionRefs(sessionId: string): void {
     this.sessionRegisteredRefs.delete(sessionId);
+  }
+
+  /**
+   * Proxy to another MCP server(s).
+   *
+   * This method mounts one or more MCP clients onto this server, introspecting
+   * their tools, resources, and prompts, and registering them natively.
+   *
+   * @param config - A mapping of namespaces to server connection configs, or a single MCPSession.
+   * @param options - Additional options, such as namespace (if passing a single MCPSession).
+   *
+   * @example
+   * ```typescript
+   * // Using config map
+   * await server.proxy({
+   *   db: { command: "node", args: ["db.js"] }
+   * });
+   *
+   * // Using explicit session
+   * await server.proxy(mySession, { namespace: "db" });
+   * ```
+   */
+  public async proxy(
+    config: Record<string, any> | any,
+    options?: { namespace?: string }
+  ): Promise<void> {
+    // Dynamic import to avoid bringing client code into server bundle unless used
+    const { MCPClient } = await import("../client.js");
+    const { mountSession } = await import("./utils/proxy-client.js");
+
+    // If it's an MCPSession (duck typing by checking for callTool method)
+    if (config && typeof config.callTool === "function") {
+      await mountSession(this, config, options?.namespace);
+      return;
+    }
+
+    // Otherwise, treat config as a map of namespaces to server configs
+    const proxyClient = new MCPClient({
+      mcpServers: config,
+      onSampling: async (params: any) => {
+        try {
+          const { getRequestContext } = await import("./context-storage.js");
+          const { findSessionContext } =
+            await import("./tools/tool-execution-helpers.js");
+          const ctx = getRequestContext();
+          if (!ctx) throw new Error("No request context");
+          const { session } = findSessionContext(
+            this.sessions,
+            ctx,
+            undefined,
+            undefined
+          );
+          if (!session || !session.server) throw new Error("No session");
+          return await session.server.server.createMessage(params);
+        } catch (e) {
+          console.warn(
+            "[Proxy] Fallback sampling response due to missing request context (global proxy mode)"
+          );
+          return {
+            role: "assistant",
+            model: "proxy-fallback",
+            content: {
+              type: "text",
+              text: "Mock sampled response from proxy fallback",
+            },
+          };
+        }
+      },
+      onElicitation: async (params: any) => {
+        try {
+          const { getRequestContext } = await import("./context-storage.js");
+          const { findSessionContext } =
+            await import("./tools/tool-execution-helpers.js");
+          const ctx = getRequestContext();
+          if (!ctx) throw new Error("No request context");
+          const { session } = findSessionContext(
+            this.sessions,
+            ctx,
+            undefined,
+            undefined
+          );
+          if (!session || !session.server) throw new Error("No session");
+          return await session.server.server.elicitInput(params);
+        } catch (e) {
+          console.warn(
+            "[Proxy] Fallback elicitation response due to missing request context (global proxy mode)"
+          );
+          return {
+            action: "accept",
+            content: { mock: "data from proxy fallback" },
+          };
+        }
+      },
+    });
+    const sessions = await proxyClient.createAllSessions(true);
+
+    for (const [namespace, session] of Object.entries(sessions)) {
+      await mountSession(this, session as any, namespace);
+    }
   }
 
   /**
@@ -829,10 +933,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       registration.config.description = updates.description;
     }
     if (updates._meta !== undefined) {
-      // Merge _meta to preserve existing fields like openai/outputTemplate
+      // Deep-merge _meta: shallow spread for top-level keys, but deep-merge
+      // the `ui` object so nested fields (e.g. resourceUri) are preserved
+      const existingMeta = registration.config._meta || {};
+      const incomingMeta = updates._meta;
+      const mergedUi =
+        existingMeta.ui || incomingMeta.ui
+          ? {
+              ...(existingMeta.ui as Record<string, unknown> | undefined),
+              ...(incomingMeta.ui as Record<string, unknown> | undefined),
+            }
+          : undefined;
       registration.config._meta = {
-        ...registration.config._meta,
-        ...updates._meta,
+        ...existingMeta,
+        ...incomingMeta,
+        ...(mergedUi !== undefined ? { ui: mergedUi } : {}),
       };
     }
     if ("schema" in updates) {
@@ -849,10 +964,25 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           toolEntry.description = updates.description;
         }
         if (updates._meta !== undefined) {
-          // Merge _meta to preserve existing fields like openai/outputTemplate
+          // Deep-merge _meta: shallow spread for top-level keys, but deep-merge
+          // the `ui` object so nested CSP/description/resourceUri fields are preserved
+          const existingEntryMeta = toolEntry._meta || {};
+          const incomingEntryMeta = updates._meta;
+          const mergedEntryUi =
+            existingEntryMeta.ui || incomingEntryMeta.ui
+              ? {
+                  ...(existingEntryMeta.ui as
+                    | Record<string, unknown>
+                    | undefined),
+                  ...(incomingEntryMeta.ui as
+                    | Record<string, unknown>
+                    | undefined),
+                }
+              : undefined;
           toolEntry._meta = {
-            ...toolEntry._meta,
-            ...updates._meta,
+            ...existingEntryMeta,
+            ...incomingEntryMeta,
+            ...(mergedEntryUi !== undefined ? { ui: mergedEntryUi } : {}),
           };
         }
         if ("schema" in updates) {
@@ -1055,7 +1185,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // like ctx.log(), ctx.sample(), ctx.elicit(), etc.
     const wrapHandler = (
       rawHandler: unknown,
-      session: { server?: any }
+      session: { server?: any },
+      sessionId?: string
     ): ((
       params: Record<string, unknown>,
       extra?: {
@@ -1097,6 +1228,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           extraSendNotification
         );
 
+        // Prefer the closure sessionId (always correct for this connection).
+        const resolvedSession =
+          (sessionId ? sessions.get(sessionId) : undefined) ?? foundSession;
+
+        const requestMeta =
+          extra?._meta &&
+          Object.keys(extra._meta).some((k) => k !== "progressToken")
+            ? (Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([k]) => k !== "progressToken"
+                )
+              ) as Record<string, unknown>)
+            : undefined;
+
         const nativeServer = session.server;
         const enhancedContext = createEnhancedContext(
           requestContext,
@@ -1105,8 +1250,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             (async () => ({ action: "decline" as const })),
           progressToken,
           sendNotification,
-          foundSession?.logLevel,
-          foundSession?.clientCapabilities
+          resolvedSession?.logLevel,
+          resolvedSession?.clientCapabilities,
+          sessionId,
+          sessions,
+          resolvedSession?.clientInfo,
+          requestMeta
         );
 
         const executeCallback = async () => {
@@ -1129,11 +1278,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: ToolDefinition,
       handler: unknown,
       nativeServer: any,
-      session?: { server?: any }
+      session?: { server?: any },
+      sessionId?: string
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
       // Use the original schema directly, or create z.object({}) for empty schemas
-      let inputSchema: z.ZodObject<any> | Record<string, z.ZodSchema>;
+      let inputSchema: z.ZodTypeAny | Record<string, z.ZodSchema>;
       if (config.schema) {
         // Pass the Zod schema directly - it will be used for validation
         inputSchema = config.schema;
@@ -1147,7 +1297,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Wrap the raw handler with session context so that ctx.log(), ctx.sample(),
       // ctx.elicit(), etc. work correctly after HMR updates
       const wrappedHandler = session?.server
-        ? wrapHandler(handler, session)
+        ? wrapHandler(handler, session, sessionId)
         : handler;
 
       return {
@@ -1194,7 +1344,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Widget tools are managed by the Vite file watcher, not by index.ts.
       shouldRemove: (_key, reg) => {
         const meta = (reg.config as any)?._meta;
-        return !meta?.["mcp-use/widget"];
+        const hasWidgetConfig = !!(reg.config as any)?.widget;
+        const hasUiResourceUri = !!(meta?.ui as any)?.resourceUri;
+        return !hasWidgetConfig && !hasUiResourceUri;
       },
       sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
         sessionId,
@@ -1290,12 +1442,44 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
         // Update in place to preserve order
         if (nativeServer._registeredTools?.[key]) {
+          let enrichedConfig = config as ToolDefinition;
+
+          // Check if this is a widget tool
+          const isWidgetTool = !!(config as any)?.widget;
+
+          // For widget tools, preserve dual-protocol metadata from the existing tool
+          // The new config from HMR only has basic metadata from server.tool() call
+          // We need to preserve ui/*, openai/widgetCSP, etc. from the initial registration
+          const oldEntry = nativeServer._registeredTools?.[key];
+          if (isWidgetTool && oldEntry?._meta) {
+            const oldMeta = oldEntry._meta || {};
+            const newMeta = enrichedConfig._meta || {};
+
+            // Deep merge: preserve dual-protocol metadata, update basic fields.
+            // IMPORTANT: Mutate config._meta directly (not create a new object) so that
+            // the change is reflected in syncPrimitive's updatedRegistrations map, which
+            // holds a reference to the same config object. If we create a detached object,
+            // syncPrimitive replaces this.registrations.tools and the enrichment is lost.
+            const mergedMeta = {
+              ...oldMeta, // Keep all dual-protocol metadata
+              ...newMeta, // Update with new basic metadata
+              // Deep merge the ui object specifically to preserve both old and new fields
+              ui: {
+                ...((oldMeta.ui as Record<string, unknown>) || {}),
+                ...((newMeta.ui as Record<string, unknown>) || {}),
+              },
+            };
+            (config as any)._meta = mergedMeta;
+            enrichedConfig = config as ToolDefinition;
+          }
+
           const newEntry = createToolEntry(
             key,
-            config as ToolDefinition,
+            enrichedConfig,
             handler,
             nativeServer,
-            session
+            session,
+            sessionCtx.sessionId
           );
           nativeServer._registeredTools[key] = newEntry;
           if (refs?.tools) {
@@ -1845,10 +2029,63 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     }
 
+    // Patch tool _meta for tools with widget config that were registered
+    // before widget definitions were synced. During HMR, server.tool() runs
+    // on the new server where widgetDefinitions is empty, so it can only set
+    // Apps SDK metadata. Now that definitions are available, fill in MCP Apps
+    // metadata for mcpApps widgets. We use Object.assign to MUTATE the
+    // existing _meta object in place, because session-level _registeredTools
+    // entries share the same _meta reference (see createToolEntry).
+    for (const [, toolReg] of this.registrations.tools) {
+      const config = toolReg.config as any;
+      const widgetConfig = config?.widget;
+      const widgetName = widgetConfig?.name;
+      if (!widgetConfig || !widgetName || !config._meta) continue;
+      if (config._meta.ui?.resourceUri) continue;
+
+      const widgetDef = this.widgetDefinitions.get(widgetName);
+      const widgetType = widgetDef?.widgetType as string | undefined;
+      if (widgetType !== "mcpApps") continue;
+
+      const outputTemplate = config._meta["openai/outputTemplate"];
+      if (!outputTemplate) continue;
+
+      const adapterDef = {
+        type: "mcpApps" as const,
+        name: widgetName,
+        metadata: widgetDef?.metadata,
+      };
+      const dualMeta = buildDualProtocolMetadata(
+        adapterDef as any,
+        outputTemplate
+      );
+      Object.assign(config._meta, dualMeta);
+    }
+
     // Update tracking arrays
     this.registeredTools = Array.from(this.registrations.tools.keys());
     this.registeredPrompts = Array.from(this.registrations.prompts.keys());
     this.registeredResources = Array.from(this.registrations.resources.keys());
+
+    // Regenerate tool registry types if tools changed
+    if (
+      process.env.NODE_ENV !== "production" &&
+      (toolsResult.changes.added.length ||
+        toolsResult.changes.removed.length ||
+        toolsResult.changes.updated.length)
+    ) {
+      // Dynamic import to avoid issues in browser/edge environments
+      import("./utils/tool-registry-generator.js")
+        .then(({ generateToolRegistryTypes }) =>
+          generateToolRegistryTypes(this.registrations.tools)
+        )
+        .catch((error) => {
+          console.debug(
+            "[TypeGen] Failed to regenerate tool registry:",
+            error instanceof Error ? error.message : String(error)
+          );
+        });
+    }
 
     // --- CUSTOM HTTP ROUTES ---
     // Sync custom HTTP route handlers (registered via server.get(), server.post(), etc.)
@@ -1998,7 +2235,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.oauth - Optional OAuth provider configuration
    * @param config.stateless - Whether to use stateless mode (auto-detected for Deno)
    * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 86400000 = 1 day)
-   * @param config.allowedOrigins - Allowed CORS origins (see {@link ServerConfig.allowedOrigins})
+   * @param config.cors - Optional CORS configuration overrides
+   * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation
    *
    * @returns Proxied server instance supporting both MCP and Hono methods
    *
@@ -2120,7 +2358,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Create and configure Hono app with default middleware
-    this.app = createHonoApp(requestLogger);
+    this.app = createHonoApp(requestLogger, {
+      cors: this.config.cors,
+      allowedOrigins: this.config.allowedOrigins,
+    });
 
     // Install the custom routes middleware FIRST (before any other routes).
     // This single middleware dispatches from the mutable _customRoutes map,
@@ -2185,51 +2426,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
         // Look up widget type to determine if dual-protocol metadata is needed
         const widgetDef = self.widgetDefinitions.get(widgetName);
-        const widgetType = widgetDef?.["mcp-use/widgetType"] as
-          | string
-          | undefined;
-
+        const widgetType = widgetDef?.widgetType as string | undefined;
         if (widgetType === "mcpApps") {
-          // Generate dual-protocol metadata for mcpApps widgets
-          const mcpAppsAdapter = new McpAppsAdapter();
-          const appsSdkAdapter = new AppsSdkAdapter();
-
-          // Create a definition for adapter calls with metadata field
           const adapterDef = {
             type: "mcpApps" as const,
             name: widgetName,
-            _meta: widgetDef,
-            metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
+            metadata: widgetDef?.metadata,
           };
 
-          // Build both tool and resource metadata
-          const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
+          // Build dual-protocol tool metadata. Per SEP-1865: tool _meta.ui
+          // only has resourceUri. CSP belongs on the resource, not the tool.
+          const dualMeta = buildDualProtocolMetadata(
             adapterDef as any,
-            outputTemplate
+            outputTemplate,
+            toolDefinition._meta
           );
-          const mcpAppsResourceMeta = mcpAppsAdapter.buildResourceMetadata(
-            adapterDef as any
-          );
-          const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
-            adapterDef as any,
-            outputTemplate
-          );
-          const appsSdkResourceMeta = appsSdkAdapter.buildResourceMetadata(
-            adapterDef as any
-          );
-
-          // Deep merge the ui metadata
-          const mergedUiMeta = {
-            ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
-            ...(mcpAppsResourceMeta._meta?.ui || {}),
-          };
 
           toolDefinition._meta = {
-            ...toolDefinition._meta,
-            ...mcpAppsToolMeta,
-            ...appsSdkToolMeta,
-            ...(appsSdkResourceMeta._meta || {}),
-            ui: mergedUiMeta,
+            ...dualMeta,
             "openai/toolInvocation/invoking":
               widgetConfig.invoking ?? `Loading ${widgetName}...`,
             "openai/toolInvocation/invoked":
@@ -2239,7 +2453,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               widgetConfig.resultCanProduceWidget ?? true,
           };
         } else {
-          // Legacy Apps SDK only metadata
           toolDefinition._meta = {
             ...toolDefinition._meta,
             "openai/outputTemplate": outputTemplate,
@@ -2262,95 +2475,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         actualCallback = (async (params: any, ctx: any) => {
           const result = await originalCallback(params, ctx);
 
-          // Look up the widget definition and inject its metadata into the response
-          // Use self (the running server) because widgetDefinitions are synced TO the running server during HMR
-          const widgetDef = self.widgetDefinitions.get(widgetName);
-          const widgetType = widgetDef?.["mcp-use/widgetType"] as
-            | string
-            | undefined;
-
+          // Per OpenAI Apps SDK docs and SEP-1865: protocol fields belong on the
+          // tool DEFINITION (tools/list), not on every tool call result.
+          // The tool call result _meta is only for app-specific widget data.
+          // We only fill in an empty text placeholder if needed.
           if (result && typeof result === "object") {
-            // Generate unique URI for this invocation
-            const randomId = Math.random().toString(36).substring(2, 15);
-            const buildIdPart = self.buildId ? `-${self.buildId}` : "";
-            const uniqueUri = `ui://widget/${widgetName}${buildIdPart}-${randomId}.html`;
-
-            // Build response metadata based on widget type
-            let responseMeta: Record<string, unknown>;
-
-            if (widgetType === "mcpApps") {
-              // Generate dual-protocol metadata for mcpApps widgets
-              const mcpAppsAdapter = new McpAppsAdapter();
-              const appsSdkAdapter = new AppsSdkAdapter();
-
-              // Create a definition for adapter calls with metadata field
-              const adapterDef = {
-                type: "mcpApps" as const,
-                name: widgetName,
-                _meta: widgetDef,
-                metadata: (widgetDef?.["mcp-use/widget"] as any)?.metadata,
-              };
-
-              // Build both tool and resource metadata
-              const mcpAppsToolMeta = mcpAppsAdapter.buildToolMetadata(
-                adapterDef as any,
-                uniqueUri
-              );
-              const mcpAppsResourceMeta = mcpAppsAdapter.buildResourceMetadata(
-                adapterDef as any
-              );
-              const appsSdkToolMeta = appsSdkAdapter.buildToolMetadata(
-                adapterDef as any,
-                uniqueUri
-              );
-              const appsSdkResourceMeta = appsSdkAdapter.buildResourceMetadata(
-                adapterDef as any
-              );
-
-              // Deep merge the ui metadata
-              const mergedUiMeta = {
-                ...((mcpAppsToolMeta.ui as Record<string, unknown>) || {}),
-                ...(mcpAppsResourceMeta._meta?.ui || {}),
-              };
-
-              responseMeta = {
-                ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
-                ...mcpAppsToolMeta,
-                ...appsSdkToolMeta,
-                ...(appsSdkResourceMeta._meta || {}),
-                ui: mergedUiMeta,
-                "openai/toolInvocation/invoking":
-                  widgetConfig.invoking ?? `Loading ${widgetName}...`,
-                "openai/toolInvocation/invoked":
-                  widgetConfig.invoked ?? `${widgetName} ready`,
-                "openai/widgetAccessible":
-                  widgetConfig.widgetAccessible ?? true,
-                "openai/resultCanProduceWidget":
-                  widgetConfig.resultCanProduceWidget ?? true,
-              };
-            } else {
-              // Legacy Apps SDK only metadata
-              responseMeta = {
-                ...(widgetDef || {}), // Include mcp-use/widget and other widget metadata
-                "openai/outputTemplate": uniqueUri,
-                "openai/toolInvocation/invoking":
-                  widgetConfig.invoking ?? `Loading ${widgetName}...`,
-                "openai/toolInvocation/invoked":
-                  widgetConfig.invoked ?? `${widgetName} ready`,
-                "openai/widgetAccessible":
-                  widgetConfig.widgetAccessible ?? true,
-                "openai/resultCanProduceWidget":
-                  widgetConfig.resultCanProduceWidget ?? true,
-              };
-            }
-
-            // Set _meta on the result, merging with any existing _meta (e.g., from widget() helper)
-            (result as any)._meta = {
-              ...(result._meta || {}),
-              ...responseMeta,
-            };
-
-            // Update message if empty
             if (
               (result as any).content?.[0]?.type === "text" &&
               !(result as any).content[0].text
@@ -2372,11 +2501,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       return originalTool.call(self, toolDefinition, actualCallback as any);
     }) as any;
 
-    this.prompt = ((
-      promptDefinition:
+    this.prompt = (<
+      T extends
         | import("./types/index.js").PromptDefinition<any, HasOAuth>
         | import("./types/index.js").PromptDefinitionWithoutCallback,
-      callback?: import("./types/index.js").PromptCallback<any, HasOAuth>
+    >(
+      promptDefinition: T,
+      callback?: import("./types/index.js").PromptCallback<
+        import("./types/index.js").InferPromptInput<T>,
+        HasOAuth
+      >
     ) => {
       // First call originalPrompt which creates the wrapped handler with conversion logic
       const result = originalPrompt.call(
@@ -2517,6 +2651,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Tools - with context wrapping for ctx.sample(), ctx.elicit()
     for (const [name, registration] of this.registrations.tools) {
       const { config, handler: actualCallback } = registration;
+
       let inputSchema: Record<string, any>;
       if (config.schema) {
         inputSchema = this.convertZodSchemaToParams(config.schema);
@@ -2541,24 +2676,24 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const extraProgressToken = extra?._meta?.progressToken;
         const extraSendNotification = extra?.sendNotification;
 
-        const { requestContext, session, progressToken, sendNotification } =
-          findSessionContext(
-            this.sessions,
-            initialRequestContext,
-            extraProgressToken,
-            extraSendNotification
-          );
+        const {
+          requestContext,
+          session: foundSession,
+          progressToken,
+          sendNotification,
+        } = findSessionContext(
+          this.sessions,
+          initialRequestContext,
+          extraProgressToken,
+          extraSendNotification
+        );
 
-        // Find the sessionId by looking up the session in the sessions map
-        let sessionId: string | undefined;
-        if (session) {
-          for (const [id, s] of this.sessions.entries()) {
-            if (s === session) {
-              sessionId = id;
-              break;
-            }
-          }
-        }
+        // Prefer the closure sessionId — it is always the correct session for
+        // this connection. Fall back to findSessionContext's result only when
+        // no sessionId is available (e.g. stdio transport without session IDs).
+        const session =
+          (sessionId ? this.sessions.get(sessionId) : undefined) ??
+          foundSession;
 
         // Use the session server's native createMessage and elicitInput
         // These are already properly connected to the transport
@@ -2587,6 +2722,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           }
         };
 
+        const requestMeta =
+          extra?._meta &&
+          Object.keys(extra._meta).some((k) => k !== "progressToken")
+            ? (Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([k]) => k !== "progressToken"
+                )
+              ) as Record<string, unknown>)
+            : undefined;
+
         const enhancedContext = createEnhancedContext(
           requestContext,
           createMessageWithLogging,
@@ -2596,7 +2741,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           session?.logLevel,
           session?.clientCapabilities,
           sessionId,
-          this.sessions
+          this.sessions,
+          session?.clientInfo,
+          requestMeta
         );
 
         const executeCallback = async () => {
@@ -2673,7 +2820,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let errorType: string | null = null;
 
         try {
-          const result = await (handler as any)(params, extra);
+          const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
+
+          const result = await (handler as any)(
+            params,
+            (handler as any).length >= 2 ? enhancedCtx : undefined
+          );
 
           // If it's already a GetPromptResult, return as-is
           if ("messages" in result && Array.isArray(result.messages)) {
@@ -2724,7 +2876,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let contents: any[] = [];
 
         try {
-          const result = await (handler as any)(extra);
+          const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
+
+          const result = await (handler as any)(
+            (handler as any).length >= 1 ? enhancedCtx : undefined
+          );
           // If it's already a ReadResourceResult, return as-is
           if ("contents" in result && Array.isArray(result.contents)) {
             contents = result.contents;
@@ -3026,7 +3182,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link ToolCallback} for callback signature
    */
   public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
-    toolDefinition: T,
+    toolDefinition: T & ToolDefinition<any, any, HasOAuth>,
     callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
   ) => this;
 
@@ -3208,11 +3364,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @see {@link PromptDefinition} for all configuration options
    */
-  public prompt!: (
-    promptDefinition:
+  public prompt!: <
+    T extends
       | PromptDefinition<any, HasOAuth>
       | import("./types/index.js").PromptDefinitionWithoutCallback,
-    callback?: PromptCallback<any, HasOAuth>
+  >(
+    promptDefinition: T &
+      (
+        | PromptDefinition<any, HasOAuth>
+        | import("./types/index.js").PromptDefinitionWithoutCallback
+      ),
+    callback?: PromptCallback<InferPromptInput<T>, HasOAuth>
   ) => this;
 
   /**
@@ -3564,6 +3726,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Log registered items before starting server
     this.logRegisteredItems();
 
+    // Generate tool registry types for development
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const { generateToolRegistryTypes } =
+          await import("./utils/tool-registry-generator.js");
+        await generateToolRegistryTypes(this.registrations.tools);
+      } catch (error) {
+        // Don't crash if type generation fails
+        console.debug(
+          "[TypeGen] Failed to generate tool registry:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
     // Track server run event
     this._trackServerRun("http");
 
@@ -3770,9 +3947,9 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  * @param config.description - Server description
  * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
  * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
- * @param config.allowedOrigins - Allowed origins for DNS rebinding protection
- *   - **Development mode** (NODE_ENV !== "production"): If not set, all origins are allowed
- *   - **Production mode** (NODE_ENV === "production"): Only uses explicitly configured origins
+ * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation (global when configured)
+ *   - If not set: host validation is disabled
+ *   - If set: host validation is enabled for all routes
  *   - See {@link ServerConfig.allowedOrigins} for detailed documentation
  * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
  * @returns McpServerInstance with both MCP and Hono methods

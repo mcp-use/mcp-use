@@ -1,6 +1,12 @@
 import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
@@ -10,12 +16,15 @@ import { ChatLandingForm } from "./chat/ChatLandingForm";
 import { ConfigurationDialog } from "./chat/ConfigurationDialog";
 import { ConfigureEmptyState } from "./chat/ConfigureEmptyState";
 import { MessageList } from "./chat/MessageList";
+import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
+import { useWidgetDebug } from "../context/WidgetDebugContext";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
+type ChatMessage = import("./chat/types").Message;
 
 export interface ChatTabProps {
   connection: MCPConnection;
@@ -31,6 +40,10 @@ export interface ChatTabProps {
   /** Custom API endpoint URL for server-side chat streaming (used when useClientSide=false).
    *  Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
+  /** When chatApiUrl is not yet available, called before sending to resolve the URL. Useful for background initialization. */
+  waitForChatApiUrl?: () => Promise<string | undefined>;
+  /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
+  initialMessages?: import("./chat/types").Message[];
   /** Externally-managed LLM config. When provided, bypasses localStorage-based config
    *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
   managedLlmConfig?: import("./chat/types").LLMConfig;
@@ -48,6 +61,14 @@ export interface ChatTabProps {
   clearButtonHideShortcut?: boolean;
   /** Button variant for the clear/new-chat button. Default: "default". */
   clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
+  /** When true, hides the "New Chat" / clear button entirely. */
+  hideClearButton?: boolean;
+  /** When true, hides the tool selector (wrench icon) in the chat input. */
+  hideToolSelector?: boolean;
+  /** Initial quick questions shown below the landing input. */
+  chatQuickQuestions?: string[];
+  /** Initial followups shown above input in active chat mode. */
+  chatFollowups?: string[];
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -65,6 +86,8 @@ export function ChatTab({
   callPrompt,
   readResource,
   chatApiUrl,
+  waitForChatApiUrl,
+  initialMessages,
   managedLlmConfig,
   clearButtonLabel,
   hideTitle,
@@ -73,13 +96,30 @@ export function ChatTab({
   clearButtonHideIcon,
   clearButtonHideShortcut,
   clearButtonVariant,
+  hideClearButton,
+  hideToolSelector,
+  chatQuickQuestions = [],
+  chatFollowups = [],
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
   const [promptFocusedIndex, setPromptFocusedIndex] = useState(-1);
+  const [quickQuestions, setQuickQuestions] =
+    useState<string[]>(chatQuickQuestions);
+  const [followups, setFollowups] = useState<string[]>(chatFollowups);
+  const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
+
+  const toolInfos: ToolInfo[] = useMemo(
+    () =>
+      (connection.tools ?? []).map((t) => ({
+        name: t.name,
+        description: t.description,
+      })),
+    [connection.tools]
+  );
 
   // Use custom hooks for configuration, chat messages and mcp prompts handling
   const {
@@ -101,12 +141,18 @@ export function ChatTab({
   const llmConfig = managedLlmConfig ?? localLlmConfig;
   const isManaged = !!managedLlmConfig;
 
+  const { getAllModelContexts } = useWidgetDebug();
+
+  const widgetModelContexts = getAllModelContexts();
+
   // Use client-side or server-side chat implementation
   const chatHookParams = {
     connection,
     llmConfig,
     isConnected,
     readResource,
+    widgetModelContexts,
+    disabledTools,
   };
 
   const serverSideChat = useChatMessages({
@@ -115,6 +161,9 @@ export function ChatTab({
     authConfig: userAuthConfig,
     isConnected,
     chatApiUrl,
+    waitForChatApiUrl,
+    widgetModelContexts,
+    initialMessages,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
@@ -124,6 +173,7 @@ export function ChatTab({
     attachments,
     sendMessage,
     clearMessages,
+    setMessages,
     stop,
     addAttachment,
     removeAttachment,
@@ -143,6 +193,197 @@ export function ChatTab({
     callPrompt,
     serverId,
   });
+
+  const sanitizeStringList = useCallback((input: unknown): string[] => {
+    if (!Array.isArray(input)) return [];
+    return input
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+  }, []);
+
+  const serializeMessageContent = useCallback((message: ChatMessage) => {
+    if (typeof message.content === "string") return message.content;
+    if (Array.isArray(message.content)) {
+      return message.content
+        .map((item) => (typeof item === "string" ? item : (item.text ?? "")))
+        .join("");
+    }
+    return "";
+  }, []);
+
+  const getSerializedMessages = useCallback(() => {
+    return messages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: serializeMessageContent(message),
+      timestamp: message.timestamp,
+    }));
+  }, [messages, serializeMessageContent]);
+
+  const postBridgeEvent = useCallback(
+    (type: string, payload: Record<string, unknown> = {}) => {
+      if (typeof window === "undefined" || window.parent === window) return;
+      window.parent.postMessage(
+        {
+          type,
+          serverId,
+          ...payload,
+        },
+        "*"
+      );
+    },
+    [serverId]
+  );
+
+  useEffect(() => {
+    postBridgeEvent("mcp-inspector:chat:ready", {
+      capabilities: {
+        send: true,
+        clear: true,
+        getState: true,
+        setQuickQuestions: true,
+        setFollowups: true,
+        loadMessages: true,
+      },
+    });
+  }, [postBridgeEvent]);
+
+  useEffect(() => {
+    postBridgeEvent("mcp-inspector:chat:state_changed", {
+      isLoading,
+      messageCount: messages.length,
+      messages: getSerializedMessages(),
+      quickQuestions,
+      followups,
+    });
+  }, [
+    followups,
+    getSerializedMessages,
+    isLoading,
+    messages.length,
+    postBridgeEvent,
+    quickQuestions,
+  ]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== "object") return;
+
+      const data = event.data as {
+        type?: string;
+        requestId?: string;
+        serverId?: string;
+        message?: string;
+        prompt?: string;
+        questions?: unknown;
+        followups?: unknown;
+      };
+
+      if (!data.type?.startsWith("mcp-inspector:chat:")) return;
+      if (data.serverId && data.serverId !== serverId) return;
+
+      const requestId = data.requestId;
+      const postResult = (ok: boolean, extra: Record<string, unknown> = {}) => {
+        postBridgeEvent("mcp-inspector:chat:command_result", {
+          requestId,
+          ok,
+          ...extra,
+        });
+      };
+
+      if (data.type === "mcp-inspector:chat:send") {
+        const text = (data.message ?? data.prompt ?? "").trim();
+        if (!text) {
+          postResult(false, { error: "Missing message" });
+          return;
+        }
+        if (!llmConfig || !isConnected) {
+          postResult(false, { error: "Chat is not ready to send messages" });
+          return;
+        }
+        void sendMessage(text, [])
+          .then(() => {
+            postBridgeEvent("mcp-inspector:chat:message_sent", {
+              requestId,
+              message: text,
+              source: "bridge",
+            });
+            postResult(true);
+          })
+          .catch((error: unknown) => {
+            postResult(false, {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:clear") {
+        clearMessages();
+        postBridgeEvent("mcp-inspector:chat:cleared", { requestId });
+        postResult(true);
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:get_state") {
+        postBridgeEvent("mcp-inspector:chat:state", {
+          requestId,
+          isLoading,
+          messageCount: messages.length,
+          messages: getSerializedMessages(),
+          quickQuestions,
+          followups,
+        });
+        postResult(true);
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:set_quick_questions") {
+        const values = sanitizeStringList(data.questions);
+        setQuickQuestions(values);
+        postResult(true, { quickQuestions: values });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:set_followups") {
+        const values = sanitizeStringList(data.followups);
+        setFollowups(values);
+        postResult(true, { followups: values });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:load_messages") {
+        const rawMessages = (data as unknown as { messages?: unknown })
+          .messages;
+        if (!Array.isArray(rawMessages)) {
+          postResult(false, { error: "messages must be an array" });
+          return;
+        }
+        setMessages(rawMessages as ChatMessage[]);
+        postResult(true, { count: rawMessages.length });
+        return;
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [
+    clearMessages,
+    setMessages,
+    followups,
+    getSerializedMessages,
+    isLoading,
+    messages.length,
+    postBridgeEvent,
+    quickQuestions,
+    sanitizeStringList,
+    sendMessage,
+    serverId,
+    llmConfig,
+    isConnected,
+  ]);
 
   // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
   useKeyboardShortcuts(
@@ -305,6 +546,34 @@ export function ChatTab({
     clearMessages();
   }, [clearConfig, clearMessages]);
 
+  const handleQuickQuestionSelect = useCallback(
+    (question: string) => {
+      if (!question.trim()) return;
+      if (!llmConfig || !isConnected) return;
+      void sendMessage(question, []).then(() => {
+        postBridgeEvent("mcp-inspector:chat:message_sent", {
+          message: question,
+          source: "quick_question",
+        });
+      });
+    },
+    [postBridgeEvent, sendMessage, llmConfig, isConnected]
+  );
+
+  const handleFollowupSelect = useCallback(
+    (followup: string) => {
+      if (!followup.trim()) return;
+      if (!llmConfig || !isConnected) return;
+      void sendMessage(followup, []).then(() => {
+        postBridgeEvent("mcp-inspector:chat:message_sent", {
+          message: followup,
+          source: "followup",
+        });
+      });
+    },
+    [postBridgeEvent, sendMessage, llmConfig, isConnected]
+  );
+
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
     return (
@@ -343,6 +612,11 @@ export function ChatTab({
           selectedPrompt={selectedPrompt}
           promptResults={results}
           attachments={attachments}
+          tools={hideToolSelector ? undefined : toolInfos}
+          disabledTools={hideToolSelector ? undefined : disabledTools}
+          onDisabledToolsChange={
+            hideToolSelector ? undefined : setDisabledTools
+          }
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
@@ -358,6 +632,8 @@ export function ChatTab({
           onAttachmentRemove={removeAttachment}
           hideModelBadge={hideModelBadge}
           hideServerUrl={hideServerUrl}
+          quickQuestions={quickQuestions}
+          onQuickQuestionSelect={handleQuickQuestionSelect}
         />
       </div>
     );
@@ -386,6 +662,7 @@ export function ChatTab({
         clearButtonHideIcon={clearButtonHideIcon}
         clearButtonHideShortcut={clearButtonHideShortcut}
         clearButtonVariant={clearButtonVariant}
+        hideClearButton={hideClearButton}
       />
 
       {/* Messages Area */}
@@ -401,7 +678,7 @@ export function ChatTab({
             serverId={connection.url}
             readResource={readResource}
             tools={connection.tools}
-            sendMessage={(msg) => sendMessage(msg, [])}
+            sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
             serverBaseUrl={connection.url}
           />
         )}
@@ -420,6 +697,11 @@ export function ChatTab({
           promptResults={results}
           selectedPrompt={selectedPrompt}
           attachments={attachments}
+          tools={hideToolSelector ? undefined : toolInfos}
+          disabledTools={hideToolSelector ? undefined : disabledTools}
+          onDisabledToolsChange={
+            hideToolSelector ? undefined : setDisabledTools
+          }
           onDeletePromptResult={handleDeleteResult}
           onPromptSelect={handlePromptSelect}
           onInputChange={setInputValue}
@@ -430,6 +712,8 @@ export function ChatTab({
           onStopStreaming={stop}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
+          followups={followups}
+          onFollowupSelect={handleFollowupSelect}
         />
       )}
     </div>

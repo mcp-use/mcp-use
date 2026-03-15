@@ -136,23 +136,29 @@ export default function MyWidget() { ... }
 |---|---|---|---|
 | `description` | `string` | Yes | What the widget displays |
 | `props` | `z.ZodObject` | Yes | Zod schema for widget input data |
-| `exposeAsTool` | `boolean` | No | Auto-register as tool (default: `true`) |
+| `exposeAsTool` | `boolean` | No | Auto-register as tool (default: `false`) |
 | `toolOutput` | `CallToolResult \| (params => CallToolResult)` | No | What the AI model sees |
 | `title` | `string` | No | Display title |
 | `annotations` | `object` | No | `readOnlyHint`, `destructiveHint`, etc. |
-| `metadata` | `object` | No | CSP, border, resize config |
+| `metadata` | `object` | No | CSP, border, resize config, invocation status text |
+| `metadata.invoking` | `string` | No | Status text while tool runs — shown as shimmer in inspector (auto-default: `"Loading {name}..."`) |
+| `metadata.invoked` | `string` | No | Status text after tool completes — shown in inspector (auto-default: `"{name} ready"`) |
 
-### `exposeAsTool: false`
+**Invocation status text** in `metadata` is protocol-agnostic and works for both `mcpApps` and `appsSdk` widgets. For tools using `widget: { name, invoking, invoked }` in the tool config, the `invoking`/`invoked` values in `widget:` take effect instead.
 
-When you define a custom tool with `widget: { name: "my-widget" }`, set `exposeAsTool: false` on the widget to avoid duplicate tool registration:
+### `exposeAsTool` defaults to `false`
+
+Widgets are registered as MCP resources only by default. When you define a custom tool with `widget: { name: "my-widget" }`, omitting `exposeAsTool` is correct — the custom tool handles making the widget callable:
 
 ```typescript
 export const widgetMetadata: WidgetMetadata = {
   description: "Weather display",
   props: z.object({ city: z.string(), temp: z.number() }),
-  exposeAsTool: false,  // Custom tool handles registration
+  // exposeAsTool defaults to false — custom tool handles registration
 };
 ```
+
+Set `exposeAsTool: true` to auto-register a widget as a tool without a custom tool definition.
 
 ### `toolOutput`
 
@@ -194,7 +200,7 @@ const {
 
   // Actions
   callTool,           // Call another MCP tool: callTool("tool-name", { args })
-  sendFollowUpMessage,// Trigger LLM response: sendFollowUpMessage("analyze this")
+  sendFollowUpMessage,// Trigger LLM response: sendFollowUpMessage("analyze this") or sendFollowUpMessage([{ type: "text", text: "..." }])
   openExternal,       // Open external URL: openExternal("https://example.com")
   requestDisplayMode, // Request mode change: requestDisplayMode("fullscreen")
   mcp_url,            // MCP server base URL for custom API requests
@@ -233,10 +239,20 @@ const handleRefresh = async () => {
 
 ### Triggering LLM Response
 
+Accepts a plain string shorthand or a full content block array per the SEP-1865 `ui/message` spec:
+
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
+// String shorthand (most common)
 <button onClick={() => sendFollowUpMessage("Compare the weather in these cities")}>
+  Ask AI to Compare
+</button>
+
+// Full content array (MCP Apps — supports text, image, resource blocks)
+<button onClick={() => sendFollowUpMessage([
+  { type: "text", text: "Compare the weather in these cities" },
+])}>
   Ask AI to Compare
 </button>
 ```

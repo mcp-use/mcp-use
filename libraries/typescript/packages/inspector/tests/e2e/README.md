@@ -33,10 +33,13 @@ pnpm test:e2e:mix
 
 - **builtin**: Tests HMR (hot module reload) functionality with the server running in dev mode with built-in inspector on a single port
   - Skips: auth-flows tests, connection tests, setup tests (not applicable for single-port builtin mode)
+  - Execution: Serial (1 worker) - HMR tests modify files and must not run concurrently
 - **prod**: Tests the full production build of both inspector and server, catching build/minification issues
-  - Skips: auth-flows tests
+  - Skips: auth-flows tests, HMR tests
+  - Execution: Parallel (3 workers) - No file modifications, improved test speed
 - **mix**: Tests dev inspector against a built server (default testing mode, fastest iteration)
-  - Skips: auth-flows tests
+  - Skips: auth-flows tests, HMR tests
+  - Execution: Serial (1 worker) - Dev server can be affected by concurrent operations
 
 **Run specific test files or individual tests:**
 
@@ -62,6 +65,22 @@ pnpm test:e2e:mix tests/e2e/chat.test.ts --debug
 
 **Note:** The `-g` or `--grep` flag filters tests by name. You can use partial matches or regex patterns.
 
+### Python server E2E
+
+Runs a subset of E2E tests against the Python MCP server (from `libraries/python/examples/server/server_example.py`). The runner builds the inspector, serves `dist/web` with `npx http-server` (so the Python server can load the inspector from that URL when `INSPECTOR_CDN_BASE_URL` is set), starts the Python server, then runs `tests/e2e/python.test.ts`.
+
+**Requirements:** Python with `mcp_use` installed (e.g. `pip install -e .` from `libraries/python`).
+
+```bash
+pnpm test:e2e:python
+```
+
+With Infisical for secrets (e.g. `OPENAI_API_KEY` for the chat test):
+
+```bash
+infisical run --env=dev --projectId=13272018-648f-41fd-911c-908a27c9901e -- pnpm test:e2e:python
+```
+
 **Note on HMR tests:**
 
 HMR tests (`hmr.test.ts`) modify the conformance server source files during testing. The test runner automatically:
@@ -69,6 +88,16 @@ HMR tests (`hmr.test.ts`) modify the conformance server source files during test
 - Runs HMR tests serially with `--workers=1` to prevent file conflicts
 - Restores modified files after tests complete (using `git restore`)
 - This happens automatically when running `test:e2e:builtin` or when explicitly running `hmr.test.ts`
+
+**Parallelization & Test Isolation:**
+
+Production mode (`test:e2e:prod`) runs tests in parallel (3 workers) for improved speed:
+
+- **Safe parallelization**: Tests in different files run concurrently (e.g., `setup.test.ts` and `chat.test.ts`)
+- **Sequential within files**: Tests within the same file run sequentially (e.g., all tests in `connection.test.ts` run one after another)
+- **Browser isolation**: Each test gets its own browser context with isolated localStorage/cookies
+- **Stateless server**: The conformance MCP server is stateless for most operations, preventing test interference
+- **No file modifications**: Prod mode skips HMR tests, eliminating the risk of concurrent file modifications
 
 ### Manual Testing (Advanced)
 
@@ -116,6 +145,22 @@ pnpm test:e2e:codegen
 - `fixtures/conformance-server.ts` - Helper to start real conformance server
 
 Tests use the **real MCP conformance server** from `examples/server/features/conformance` instead of mocks.
+
+### Elicitation Tests
+
+`connection.test.ts` includes elicitation coverage for:
+
+- `test_elicitation`: baseline form-mode elicitation flow
+- `test_elicitation_sep1034_defaults`: default values for primitive fields
+- `test_elicitation_sep1330_enums`: all SEP-1330 enum schema variants
+
+The SEP-1330 test verifies inspector rendering and submission behavior for:
+
+- `string + enum` (untitled single-select)
+- `string + oneOf[{ const, title }]` (titled single-select)
+- `string + enum + enumNames` (legacy titled enum)
+- `array + items.enum` (untitled multi-select)
+- `array + items.anyOf[{ const, title }]` (titled multi-select)
 
 ## Writing Tests
 
@@ -231,7 +276,8 @@ See `playwright.config.ts` for configuration options.
 Key settings:
 
 - **Base URL**: `http://localhost:3000/inspector`
-- **Timeout**: 30s default
+- **Timeout**: 90s default (tests with LLM can be slow)
 - **Retries**: 2 in CI, 0 locally
+- **Workers**: 3 for production mode (parallel), 1 for dev/builtin modes (serial)
 - **Artifacts**: Screenshots and videos on failure only
 - **Auto Server**: Automatically starts/stops dev or production server

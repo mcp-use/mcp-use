@@ -27,6 +27,14 @@ export interface CspViolation {
   lineNumber?: number;
   columnNumber?: number;
   timestamp: number;
+  originalPolicy?: string;
+}
+
+export interface WidgetDeclaredCsp {
+  connectDomains?: string[];
+  resourceDomains?: string[];
+  frameDomains?: string[];
+  baseUriDomains?: string[];
 }
 
 export interface WidgetInfo {
@@ -34,6 +42,8 @@ export interface WidgetInfo {
   protocol: WidgetProtocol;
   hostContext?: any;
   cspViolations: CspViolation[];
+  declaredCsp?: WidgetDeclaredCsp;
+  effectivePolicy?: string;
   modelContext?: {
     content?: any[];
     structuredContent?: Record<string, unknown>;
@@ -77,8 +87,14 @@ interface WidgetDebugContextType extends WidgetDebugState {
     context: WidgetInfo["modelContext"]
   ) => void;
   setWidgetState: (widgetId: string, state: any) => void;
+  setWidgetDeclaredCsp: (
+    widgetId: string,
+    csp: WidgetDeclaredCsp | undefined,
+    effectivePolicy?: string
+  ) => void;
   updatePlaygroundSettings: (settings: Partial<PlaygroundSettings>) => void;
   clearAllWidgets: () => void;
+  getAllModelContexts: () => Map<string, WidgetInfo["modelContext"]>;
 }
 
 const WidgetDebugContext = createContext<WidgetDebugContextType | undefined>(
@@ -161,11 +177,15 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
         const widget = prev.widgets.get(widgetId);
         if (!widget) return prev;
 
-        const newWidgets = new Map(prev.widgets);
-        newWidgets.set(widgetId, {
-          ...widget,
+        const updates: Partial<WidgetInfo> = {
           cspViolations: [...widget.cspViolations, violation],
-        });
+        };
+        if (violation.originalPolicy && widget.effectivePolicy === undefined) {
+          updates.effectivePolicy = violation.originalPolicy;
+        }
+
+        const newWidgets = new Map(prev.widgets);
+        newWidgets.set(widgetId, { ...widget, ...updates });
         return { ...prev, widgets: newWidgets };
       });
     },
@@ -217,6 +237,30 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setWidgetDeclaredCsp = useCallback(
+    (
+      widgetId: string,
+      csp: WidgetDeclaredCsp | undefined,
+      effectivePolicy?: string
+    ) => {
+      setState((prev) => {
+        const widget = prev.widgets.get(widgetId);
+        if (!widget) return prev;
+
+        const newWidgets = new Map(prev.widgets);
+        newWidgets.set(widgetId, {
+          ...widget,
+          declaredCsp: csp,
+          ...(effectivePolicy !== undefined && {
+            effectivePolicy,
+          }),
+        });
+        return { ...prev, widgets: newWidgets };
+      });
+    },
+    []
+  );
+
   const updatePlaygroundSettings = useCallback(
     (settings: Partial<PlaygroundSettings>) => {
       setState((prev) => ({
@@ -238,6 +282,16 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const getAllModelContexts = useCallback(() => {
+    const contexts = new Map<string, WidgetInfo["modelContext"]>();
+    for (const [id, widget] of state.widgets) {
+      if (widget.modelContext) {
+        contexts.set(id, widget.modelContext);
+      }
+    }
+    return contexts;
+  }, [state.widgets]);
+
   // Memoize context value to prevent unnecessary re-renders of consumers
   const value = useMemo<WidgetDebugContextType>(
     () => ({
@@ -250,8 +304,10 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       clearCspViolations,
       setWidgetModelContext,
       setWidgetState,
+      setWidgetDeclaredCsp,
       updatePlaygroundSettings,
       clearAllWidgets,
+      getAllModelContexts,
     }),
     [
       state,
@@ -263,8 +319,10 @@ export function WidgetDebugProvider({ children }: { children: ReactNode }) {
       clearCspViolations,
       setWidgetModelContext,
       setWidgetState,
+      setWidgetDeclaredCsp,
       updatePlaygroundSettings,
       clearAllWidgets,
+      getAllModelContexts,
     ]
   );
 

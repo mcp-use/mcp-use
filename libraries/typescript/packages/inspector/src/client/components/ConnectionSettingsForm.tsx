@@ -17,6 +17,7 @@ import {
 } from "@/client/components/ui/select";
 import { Switch } from "@/client/components/ui/switch";
 import { cn } from "@/client/lib/utils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { Cog, Copy, FileText, Shield } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -173,7 +174,7 @@ export function ConnectionSettingsForm({
     };
 
     try {
-      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      await copyToClipboard(JSON.stringify(config, null, 2));
       toast.success("Configuration copied to clipboard");
     } catch {
       toast.error("Failed to copy configuration to clipboard");

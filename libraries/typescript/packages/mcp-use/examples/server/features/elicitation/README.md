@@ -8,6 +8,7 @@ This example demonstrates elicitation support in MCP, showing how servers can re
 🛡️ **Server-Side Validation**: Automatic Zod validation of returned data
 🎯 **Type Safety**: Full TypeScript type inference from Zod schemas
 📝 **Comprehensive Examples**: Form mode, URL mode, and validation demos
+📚 **SEP-1330 Patterns**: Reference enum schema patterns for advanced elicitation clients
 
 ## Elicitation Modes
 
@@ -50,6 +51,42 @@ const result = await ctx.elicit(
 );
 ```
 
+### SEP-1330 Enum Patterns
+
+For advanced enum schemas (titled options and multi-select), use the verbose form API:
+
+```typescript
+const result = await ctx.elicit({
+  message: "Choose options",
+  requestedSchema: {
+    type: "object",
+    properties: {
+      untitledSingle: { type: "string", enum: ["option1", "option2"] },
+      titledSingle: {
+        type: "string",
+        oneOf: [{ const: "v1", title: "First Option" }],
+      },
+      legacyEnum: {
+        type: "string",
+        enum: ["v1"],
+        enumNames: ["First Option"],
+      },
+      untitledMulti: {
+        type: "array",
+        items: { type: "string", enum: ["option1", "option2"] },
+      },
+      titledMulti: {
+        type: "array",
+        items: { anyOf: [{ const: "v1", title: "First Choice" }] },
+      },
+    },
+  },
+});
+```
+
+The full conformance implementation for SEP-1330 lives in:
+`examples/server/features/conformance/src/server.ts` via `test_elicitation_sep1330_enums`.
+
 ## Running the Server
 
 ```bash
@@ -65,6 +102,9 @@ The server will start on port 3000 by default.
 2. **test_elicitation** - Conformance test tool (matches MCP test suite)
 3. **authorize-service** - URL mode for OAuth-like flows
 4. **test-required-validation** - Demonstrates required field validation
+
+For expanded conformance coverage (including `test_elicitation_sep1034_defaults` and `test_elicitation_sep1330_enums`), see the conformance feature server at:
+`examples/server/features/conformance/src/server.ts`.
 
 ## Testing
 

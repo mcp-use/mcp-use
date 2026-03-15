@@ -6,7 +6,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
-import { Check, Copy, History, Maximize, Minimize, Zap } from "lucide-react";
+import {
+  Check,
+  Copy,
+  History,
+  Maximize,
+  Minimize,
+  Play,
+  Zap,
+} from "lucide-react";
 import React, {
   useCallback,
   useEffect,
@@ -15,6 +23,7 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import type { MessageContentBlock } from "mcp-use/react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
@@ -63,6 +72,19 @@ interface ToolResultDisplayProps {
   onFullscreen: (index: number) => void;
   onMaximize?: () => void;
   isMaximized?: boolean;
+  onRerunTool?: () => void;
+}
+
+// Isolated component so 1s interval doesn't re-render parent (and thus widget iframe)
+function RelativeTimeDisplay({ timestamp }: { timestamp: number }) {
+  const [label, setLabel] = useState(() => getRelativeTime(timestamp));
+  useEffect(() => {
+    const update = () => setLabel(getRelativeTime(timestamp));
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [timestamp]);
+  return <span>{label}</span>;
 }
 
 // Helper function to format relative time
@@ -118,6 +140,22 @@ function isValidJSON(str: string): boolean {
 
 // Component to render formatted content
 function FormattedContentDisplay({ content }: { content: any[] }) {
+  const [formattedIndices, setFormattedIndices] = useState<Set<number>>(
+    new Set()
+  );
+
+  const toggleFormat = useCallback((idx: number) => {
+    setFormattedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  }, []);
+
   if (!Array.isArray(content) || content.length === 0) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">No content</div>
@@ -130,36 +168,45 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
         // Handle text content
         if (item.type === "text") {
           const text = item.text || "";
+          const isFormatted = formattedIndices.has(idx);
+          const canFormat = isValidJSON(text);
+          const parsed = canFormat
+            ? (() => {
+                try {
+                  return JSON.parse(text);
+                } catch {
+                  return null;
+                }
+              })()
+            : null;
 
-          // Check if it's stringified JSON
-          if (isValidJSON(text)) {
-            try {
-              const parsed = JSON.parse(text);
-              return (
-                <div key={idx} className="space-y-2">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                    Text Content (JSON)
-                  </div>
-                  <JSONDisplay data={parsed} filename={`content-${idx}.json`} />
-                </div>
-              );
-            } catch {
-              // Fall through to plain text
-            }
-          }
-
-          // Plain text
           return (
             <div key={idx} className="space-y-2">
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                Text Content
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Text Content{isFormatted ? " (formatted)" : ""}
+                </div>
+                {canFormat && (
+                  <button
+                    type="button"
+                    onClick={() => toggleFormat(idx)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    data-testid={`tool-result-format-toggle-${idx}`}
+                  >
+                    {isFormatted ? "Show as text" : "Try to format"}
+                  </button>
+                )}
               </div>
-              <div
-                className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-sm whitespace-pre-wrap break-words"
-                data-testid="tool-execution-results-text-content"
-              >
-                {text}
-              </div>
+              {isFormatted && parsed !== null ? (
+                <JSONDisplay data={parsed} filename={`content-${idx}.json`} />
+              ) : (
+                <div
+                  className="bg-gray-50 dark:bg-zinc-900 rounded-lg p-3 font-mono text-sm whitespace-pre-wrap break-words"
+                  data-testid="tool-execution-results-text-content"
+                >
+                  {text}
+                </div>
+              )}
             </div>
           );
         }
@@ -358,9 +405,9 @@ export function ToolResultDisplay({
   onCopy,
   onMaximize,
   isMaximized = false,
+  onRerunTool,
 }: ToolResultDisplayProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [relativeTime, setRelativeTime] = useState<string>("");
   const [formattedMode, setFormattedMode] = useState(true); // true = formatted, false = raw
   const [viewMode, setViewMode] = useState<ViewMode | null>(null); // Let effect initialize
   const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
@@ -411,19 +458,6 @@ export function ToolResultDisplay({
     setViewMode(null);
   }, [currentResult?.toolName]);
 
-  // Update relative time every second
-  useEffect(() => {
-    const updateTime = () => {
-      if (result) {
-        setRelativeTime(getRelativeTime(result.timestamp));
-      }
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, [result]);
-
   // Memoize result.args and result.result to prevent unnecessary re-renders
   // in OpenAIComponentRenderer when only relativeTime changes
   // Use stable identifiers (timestamp, selectedIndex) instead of the objects themselves
@@ -446,12 +480,31 @@ export function ToolResultDisplay({
 
   // Memoize onSendFollowUp to prevent infinite re-render loop
   // This callback is used in MCPAppsRenderer's effect dependency array
-  const memoizedOnSendFollowUp = useCallback((text: string) => {
-    toast.info("Message received", {
-      description: text,
-      duration: 5000,
-    });
-  }, []);
+  const memoizedOnSendFollowUp = useCallback(
+    (content: MessageContentBlock[]) => {
+      const text = content
+        .filter(
+          (c): c is { type: "text"; text: string } =>
+            c.type === "text" && "text" in c
+        )
+        .map((c) => c.text)
+        .join("\n");
+      const imageCount = content.filter((c) => c.type === "image").length;
+      const resourceCount = content.filter((c) => c.type === "resource").length;
+      const extras = [
+        imageCount > 0 && `${imageCount} image${imageCount > 1 ? "s" : ""}`,
+        resourceCount > 0 &&
+          `${resourceCount} resource${resourceCount > 1 ? "s" : ""}`,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      toast.info("Widget follow-up", {
+        description: [text, extras].filter(Boolean).join(" — "),
+        duration: 5000,
+      });
+    },
+    []
+  );
 
   // Get widget debug context for protocol selection
   const { playground } = useWidgetDebug();
@@ -534,6 +587,15 @@ export function ToolResultDisplay({
   );
   const hasMcpUIResources = mcpUIResources.length > 0;
 
+  const activeUri = useMemo(
+    () =>
+      appsSdkUri ||
+      mcpAppsResourceUri ||
+      mcpUIResources[0]?.resource?.uri ||
+      null,
+    [appsSdkUri, mcpAppsResourceUri, mcpUIResources]
+  );
+
   // Check if result has content or structuredContent (for formatted/raw toggle)
   const hasContentOrStructured = useMemo(
     () =>
@@ -559,14 +621,14 @@ export function ToolResultDisplay({
   const availableViews = useMemo(() => {
     const views: Array<{ mode: ViewMode; label: string }> = [];
 
-    // Check for ChatGPT Apps SDK
-    if (hasAppsSdkResource || (supportsBothProtocols && openaiOutputTemplate)) {
-      views.push({ mode: "chatgpt-app", label: "Component (Apps SDK)" });
-    }
-
-    // Check for MCP Apps (SEP-1865)
+    // Check for MCP Apps (SEP-1865) - Add first as default
     if (hasMcpAppsResource || (supportsBothProtocols && mcpAppsResourceUri)) {
       views.push({ mode: "mcp-apps", label: "Component (MCP Apps)" });
+    }
+
+    // Check for ChatGPT Apps SDK - Add second
+    if (hasAppsSdkResource || (supportsBothProtocols && openaiOutputTemplate)) {
+      views.push({ mode: "chatgpt-app", label: "Component (Apps SDK)" });
     }
 
     // Check for MCP-UI
@@ -636,11 +698,11 @@ export function ToolResultDisplay({
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
+    <div className="relative flex flex-col h-full bg-white dark:bg-black border-t dark:border-zinc-700">
       <div className="flex-1 overflow-y-auto h-full">
         <div className="space-y-0 flex flex-col flex-1 h-full">
           <div
-            className={`sticky top-0 z-20 flex items-center gap-2 px-4 pt-2 backdrop-blur-xs bg-white/50 dark:bg-black/50 ${
+            className={`sticky top-0 z-40 flex items-center gap-2 px-4 pt-2 backdrop-blur-xs bg-white/50 dark:bg-black/50 ${
               hasMcpAppsResource ||
               hasMcpUIResources ||
               hasAppsSdkResource ||
@@ -665,19 +727,6 @@ export function ToolResultDisplay({
               hasMcpAppsResource ||
               hasMcpUIResources) && (
               <div className="flex items-center gap-4 sm:ml-4">
-                {/* Show URI if available */}
-                {(appsSdkUri ||
-                  mcpAppsResourceUri ||
-                  mcpUIResources[0]?.resource?.uri) && (
-                  <span className="hidden sm:inline text-xs text-gray-500 dark:text-gray-400">
-                    URI:{" "}
-                    {appsSdkUri ||
-                      mcpAppsResourceUri ||
-                      mcpUIResources[0]?.resource?.uri ||
-                      "No URI"}
-                  </span>
-                )}
-
                 {/* Dynamic view mode buttons */}
                 <div className="flex items-center gap-2">
                   {availableViews.map((view, index) => (
@@ -729,6 +778,18 @@ export function ToolResultDisplay({
             )}
 
             <div className="ml-auto flex items-center gap-1">
+              {isMaximized && onRerunTool && (
+                <Button
+                  data-testid="tool-result-rerun"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRerunTool}
+                  title="Re-run with same arguments"
+                >
+                  <Play className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-1">Re-run</span>
+                </Button>
+              )}
               {(hasMcpAppsResource ||
                 hasAppsSdkResource ||
                 hasMcpUIResources) &&
@@ -758,7 +819,7 @@ export function ToolResultDisplay({
                     <SelectValue>
                       <div className="flex items-center gap-1">
                         <History className="h-3 w-3" />
-                        <span>{relativeTime}</span>
+                        <RelativeTimeDisplay timestamp={result.timestamp} />
                       </div>
                     </SelectValue>
                   </SelectTrigger>
@@ -812,7 +873,7 @@ export function ToolResultDisplay({
             }
 
             // Render based on selected view mode
-            return (() => {
+            const widgetContent = (() => {
               // Show loading state while view mode is initializing
               if (!viewMode) {
                 return (
@@ -871,6 +932,16 @@ export function ToolResultDisplay({
                         serverId={serverId}
                         readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
+                        invoking={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoking"
+                          ] as string
+                        }
+                        invoked={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoked"
+                          ] as string
+                        }
                       />
                     </div>
                   );
@@ -890,22 +961,10 @@ export function ToolResultDisplay({
                     );
                   }
 
-                  // Extract widget props from toolOutput._meta (same as OpenAI renderer)
-                  const metaSource = memoizedResult?._meta;
-                  const widgetProps = metaSource?.["mcp-use/props"] || null;
-
-                  // Merge widget props (from output) with custom props (from debug controls) and tool args
-                  // Priority: activeProps > widgetProps > memoizedArgs
-                  const finalToolInput = {
-                    ...(memoizedArgs || {}),
-                    ...(widgetProps || {}),
-                    ...(activeProps || {}),
-                  };
-
                   return (
                     <div className="flex-1 relative">
                       {/* Floating controls in top-right */}
-                      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+                      <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
                         <MCPAppsDebugControls
                           toolCallId={`tool-${result.timestamp}`}
                           displayMode={mcpAppsDisplayMode}
@@ -923,17 +982,29 @@ export function ToolResultDisplay({
                       <MCPAppsRenderer
                         key={`mcp-apps-${result.timestamp}`}
                         serverId={serverId}
+                        invoking={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoking"
+                          ] as string
+                        }
+                        invoked={
+                          result.toolMeta?.[
+                            "openai/toolInvocation/invoked"
+                          ] as string
+                        }
                         toolCallId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
-                        toolInput={finalToolInput}
+                        toolInput={memoizedArgs}
                         toolOutput={memoizedResult}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
                         readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
+                        customProps={activeProps || undefined}
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}
+                        onRerun={onRerunTool}
                       />
                     </div>
                   );
@@ -1049,9 +1120,22 @@ export function ToolResultDisplay({
                   return null;
               }
             })();
+
+            return widgetContent;
           })()}
         </div>
       </div>
+
+      {activeUri &&
+        (viewMode === "chatgpt-app" ||
+          viewMode === "mcp-apps" ||
+          viewMode === "mcp-ui") && (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">
+              {activeUri}
+            </span>
+          </div>
+        )}
     </div>
   );
 }

@@ -1,10 +1,16 @@
 // browser-provider.ts
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import {
+  discoverOAuthProtectedResourceMetadata,
+  discoverAuthorizationServerMetadata,
+  refreshAuthorization,
+} from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { AuthorizationServerMetadata } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 // Assuming StoredState is defined in ./types.js and includes fields for provider options
 import type { StoredState } from "./types.js"; // Adjust path if necessary
@@ -37,6 +43,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private oauthProxyUrl?: string;
   private connectionUrl?: string; // MCP proxy URL that client connected to
   private originalFetch?: typeof fetch;
+  private pendingCodeVerifier: string | null = null;
+  private _lastOriginalResource: string | null = null;
+  private _cachedAuthServerUrl: string | null = null;
+  private _cachedMetadata: AuthorizationServerMetadata | null = null;
+  private _refreshPromise: Promise<OAuthTokens | null> | null = null;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -110,16 +121,15 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     const connectionUrl = this.connectionUrl; // Capture connectionUrl in closure
     const serverUrl = this.serverUrl; // Capture serverUrl for WWW-Authenticate discovery
     const originalFetch = this.originalFetch;
-
     console.log(
       `[BrowserOAuthProvider] Installing fetch interceptor with proxy: ${oauthProxyUrl}`
     );
 
     // Create interceptor
-    window.fetch = async function interceptedFetch(
+    window.fetch = async (
       input: RequestInfo | URL,
       init?: RequestInit
-    ): Promise<Response> {
+    ): Promise<Response> => {
       const url =
         typeof input === "string"
           ? input
@@ -158,57 +168,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       try {
         const isMetadata = url.includes("/.well-known/");
 
-        // IMPORTANT: When using a gateway/proxy, the SDK's OAuth client may construct
-        // metadata URLs using the gateway URL instead of the actual server URL.
-        // We need to detect and rewrite these to use the actual server URL.
-        let metadataUrl = url;
-        if (isMetadata && serverUrl) {
-          try {
-            const urlObj = new URL(url);
-            const serverUrlObj = new URL(serverUrl);
-
-            // Check if the URL is using a non-https scheme (like http://localhost)
-            // which indicates it's using the gateway URL instead of the actual server
-            if (
-              urlObj.protocol === "http:" &&
-              serverUrlObj.protocol === "https:"
-            ) {
-              // This is likely a gateway URL, replace with server URL
-              // Extract just the .well-known path (without any proxy path that may have been appended)
-              const pathMatch = urlObj.pathname.match(/(\/.well-known\/[^/]+)/);
-              const wellKnownPath = pathMatch ? pathMatch[1] : urlObj.pathname;
-              metadataUrl = `${serverUrlObj.origin}${wellKnownPath}`;
-              console.log(
-                `[OAuth Proxy] Rewrote gateway metadata URL ${url} to server URL ${metadataUrl}`
-              );
-            } else if (connectionUrl) {
-              // Also check if the URL origin matches the connection/gateway origin
-              const connectionUrlObj = new URL(connectionUrl);
-              if (
-                urlObj.origin === connectionUrlObj.origin &&
-                urlObj.origin !== serverUrlObj.origin
-              ) {
-                // Using gateway origin, rewrite to server origin
-                // Extract just the .well-known path
-                const pathMatch = urlObj.pathname.match(
-                  /(\/.well-known\/[^/]+)/
-                );
-                const wellKnownPath = pathMatch
-                  ? pathMatch[1]
-                  : urlObj.pathname;
-                metadataUrl = `${serverUrlObj.origin}${wellKnownPath}`;
-                console.log(
-                  `[OAuth Proxy] Rewrote gateway metadata URL ${url} to server URL ${metadataUrl}`
-                );
-              }
-            }
-          } catch (e) {
-            console.error(`[OAuth Proxy] Error rewriting metadata URL:`, e);
-          }
-        }
-
         const proxyEndpoint = isMetadata
-          ? `${oauthProxyUrl}/metadata?url=${encodeURIComponent(metadataUrl)}`
+          ? `${oauthProxyUrl}/metadata?url=${encodeURIComponent(url)}`
           : `${oauthProxyUrl}/proxy`;
 
         console.log(
@@ -235,80 +196,39 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             proxyUrl.searchParams.set("mcp_url", serverUrl);
           }
 
-          return await originalFetch(proxyUrl.toString(), {
+          const metadataResponse = await originalFetch(proxyUrl.toString(), {
             ...init,
             method: "GET",
             headers,
           });
-        }
-
-        // OAuth endpoint requests: serialize and proxy the full request
-        // IMPORTANT: For authorize requests, rewrite the resource parameter to use the actual server URL
-        // The metadata proxy stores the original resource in _original_resource for this purpose
-        let requestUrl = url;
-        if (url.includes("/authorize") && serverUrl) {
           try {
-            const urlObj = new URL(url);
-            const resourceParam = urlObj.searchParams.get("resource");
-
-            // If resource parameter exists, rewrite it to the actual server URL
-            // (it was temporarily set to gateway URL to pass SDK validation)
-            if (resourceParam && connectionUrl) {
-              const connectionUrlObj = new URL(connectionUrl);
-
-              // Check if resource is using the gateway URL (which SDK required for validation)
-              if (
-                resourceParam.startsWith(connectionUrlObj.origin) ||
-                resourceParam === connectionUrl
-              ) {
-                // Replace with the actual server URL for Supabase OAuth validation
-                urlObj.searchParams.set("resource", serverUrl);
-                requestUrl = urlObj.toString();
-                console.log(
-                  `[OAuth Proxy] Rewrote authorize resource parameter from ${resourceParam} to ${serverUrl}`
-                );
+            const contentType =
+              metadataResponse.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+              const metadataJson = await metadataResponse.clone().json();
+              const originalResource =
+                metadataJson &&
+                typeof metadataJson === "object" &&
+                typeof metadataJson._original_resource === "string"
+                  ? metadataJson._original_resource
+                  : null;
+              if (originalResource) {
+                this._lastOriginalResource = originalResource;
               }
             }
-          } catch (e) {
-            console.error(`[OAuth Proxy] Error rewriting authorize URL:`, e);
+          } catch {
+            // Ignore metadata parsing errors for caching; request continues normally.
           }
+          return metadataResponse;
         }
 
-        let body = init?.body ? await serializeBody(init.body) : undefined;
-
-        // IMPORTANT: For token requests, rewrite the resource parameter in the body
-        // The body is URL-encoded form data, and resource needs to be the actual server URL
-        if (url.includes("/token") && serverUrl && connectionUrl && body) {
-          try {
-            // Body is URL-encoded form data string
-            const params = new URLSearchParams(body);
-            const resourceParam = params.get("resource");
-
-            if (resourceParam) {
-              const connectionUrlObj = new URL(connectionUrl);
-
-              // Check if resource is using the gateway URL
-              if (
-                resourceParam.startsWith(connectionUrlObj.origin) ||
-                resourceParam === connectionUrl
-              ) {
-                // Replace with the actual server URL for Supabase OAuth validation
-                params.set("resource", serverUrl);
-                body = params.toString();
-                console.log(
-                  `[OAuth Proxy] Rewrote token resource parameter from ${resourceParam} to ${serverUrl}`
-                );
-              }
-            }
-          } catch (e) {
-            console.error(`[OAuth Proxy] Error rewriting token body:`, e);
-          }
-        }
+        // OAuth endpoint requests: serialize and proxy the full request unchanged.
+        const body = init?.body ? await serializeBody(init.body) : undefined;
         const response = await originalFetch(proxyEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            url: requestUrl,
+            url,
             method: init?.method || "POST",
             headers: init?.headers
               ? Object.fromEntries(new Headers(init.headers as HeadersInit))
@@ -369,7 +289,29 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     if (!data) return undefined;
     try {
       // TODO: Add validation using a schema
-      return JSON.parse(data) as OAuthClientInformation;
+      const clientInfo = JSON.parse(data) as OAuthClientInformation & {
+        redirect_uris?: string[];
+      };
+      const storedRedirectUris = Array.isArray(clientInfo.redirect_uris)
+        ? clientInfo.redirect_uris
+        : [];
+      // length === 0 means the server didn't include redirect_uris in the
+      // registration response — skip the check rather than invalidating valid creds.
+      const hasMatchingRedirect =
+        storedRedirectUris.length === 0 ||
+        storedRedirectUris.includes(this.redirectUrl);
+
+      if (!hasMatchingRedirect) {
+        console.info(
+          `[${this.storageKeyPrefix}] Invalidating cached OAuth client info due to redirect URI mismatch.`
+        );
+        localStorage.removeItem(key);
+        localStorage.removeItem(this.getKey("tokens"));
+        localStorage.removeItem(this.getKey("last_auth_url"));
+        return undefined;
+      }
+
+      return clientInfo;
     } catch (e) {
       console.warn(
         `[${this.storageKeyPrefix}] Failed to parse client information:`,
@@ -395,8 +337,23 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     const data = localStorage.getItem(key);
     if (!data) return undefined;
     try {
-      // TODO: Add validation
-      return JSON.parse(data) as OAuthTokens;
+      const tokens = JSON.parse(data) as OAuthTokens;
+      if (tokens.access_token && tokens.refresh_token) {
+        try {
+          const payload = JSON.parse(atob(tokens.access_token.split(".")[1]));
+          if (payload.exp && Date.now() >= (payload.exp - 30) * 1000) {
+            console.log("[tokens] Access token expiring soon, refreshing...");
+            const refreshed = await this._dedupedRefresh(tokens);
+            if (refreshed) {
+              console.log("[tokens] Refreshed successfully");
+              return refreshed;
+            }
+          }
+        } catch {
+          // Can't decode JWT, return as-is
+        }
+      }
+      return tokens;
     } catch (e) {
       console.warn(`[${this.storageKeyPrefix}] Failed to parse tokens:`, e);
       localStorage.removeItem(key);
@@ -410,11 +367,82 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     // Clean up code verifier and last auth URL after successful token save
     localStorage.removeItem(this.getKey("code_verifier"));
     localStorage.removeItem(this.getKey("last_auth_url"));
+    this.pendingCodeVerifier = null;
+  }
+
+  private async _refresh(tokens: OAuthTokens): Promise<OAuthTokens | null> {
+    try {
+      if (!this._cachedAuthServerUrl || !this._cachedMetadata) {
+        const resourceMetadata = await discoverOAuthProtectedResourceMetadata(
+          this.serverUrl
+        );
+        const authServerUrl = resourceMetadata.authorization_servers?.[0];
+        if (!authServerUrl) return null;
+        const metadata =
+          await discoverAuthorizationServerMetadata(authServerUrl);
+        if (!metadata) return null;
+        this._cachedAuthServerUrl = authServerUrl;
+        this._cachedMetadata = metadata as AuthorizationServerMetadata;
+      }
+
+      const clientInfo = await this.clientInformation();
+      if (!clientInfo) return null;
+
+      const newTokens = await refreshAuthorization(this._cachedAuthServerUrl, {
+        metadata: this._cachedMetadata,
+        clientInformation: clientInfo,
+        refreshToken: tokens.refresh_token!,
+      });
+      await this.saveTokens(newTokens);
+      return newTokens;
+    } catch {
+      return null;
+    }
+  }
+
+  private async _dedupedRefresh(
+    tokens: OAuthTokens
+  ): Promise<OAuthTokens | null> {
+    if (this._refreshPromise) return this._refreshPromise;
+    this._refreshPromise = this._refresh(tokens);
+    try {
+      return await this._refreshPromise;
+    } finally {
+      this._refreshPromise = null;
+    }
+  }
+
+  async invalidateCredentials(
+    scope: "all" | "client" | "tokens" | "verifier"
+  ): Promise<void> {
+    switch (scope) {
+      case "all":
+        localStorage.removeItem(this.getKey("tokens"));
+        localStorage.removeItem(this.getKey("client_info"));
+        localStorage.removeItem(this.getKey("code_verifier"));
+        localStorage.removeItem(this.getKey("last_auth_url"));
+        this.pendingCodeVerifier = null;
+        break;
+      case "client":
+        localStorage.removeItem(this.getKey("client_info"));
+        break;
+      case "tokens":
+        localStorage.removeItem(this.getKey("tokens"));
+        break;
+      case "verifier":
+        localStorage.removeItem(this.getKey("code_verifier"));
+        this.pendingCodeVerifier = null;
+        break;
+      default:
+        // Ignore invalid scope
+        break;
+    }
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
     const key = this.getKey("code_verifier");
     localStorage.setItem(key, codeVerifier);
+    this.pendingCodeVerifier = codeVerifier;
   }
 
   async codeVerifier(): Promise<string> {
@@ -437,39 +465,43 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * @returns The full authorization URL with state parameter.
    */
   async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
-    // IMPORTANT: Rewrite the resource parameter from the gateway URL back to the actual server URL
-    // The metadata was modified to pass SDK validation (resource = connectionUrl),
-    // but Supabase needs the actual MCP server URL
-    if (this.connectionUrl && this.serverUrl) {
-      const resourceParam = authorizationUrl.searchParams.get("resource");
-      if (resourceParam) {
-        try {
-          const connectionUrlObj = new URL(this.connectionUrl);
-          // Check if resource is using the gateway URL (which SDK required for validation)
-          if (
-            resourceParam.startsWith(connectionUrlObj.origin) ||
-            resourceParam === this.connectionUrl
-          ) {
-            // Replace with the actual server URL for Supabase OAuth validation
-            authorizationUrl.searchParams.set("resource", this.serverUrl);
-            console.log(
-              `[OAuth] Rewrote authorize resource parameter from ${resourceParam} to ${this.serverUrl}`
-            );
-          }
-        } catch (e) {
-          console.error(`[OAuth] Error rewriting resource parameter:`, e);
-        }
-      }
+    const originalResourceParam = authorizationUrl.searchParams.get("resource");
+    const looksLikeLocalProxyResource = Boolean(
+      originalResourceParam &&
+      (originalResourceParam.includes("/inspector/api/proxy") ||
+        originalResourceParam.includes("/api/proxy") ||
+        originalResourceParam.includes("localhost:3000"))
+    );
+    const matchesConnectionUrl = Boolean(
+      originalResourceParam &&
+      this.connectionUrl &&
+      originalResourceParam === this.connectionUrl
+    );
+    const shouldRewriteResource = Boolean(
+      originalResourceParam &&
+      (this._lastOriginalResource || this.serverUrl) &&
+      (matchesConnectionUrl || looksLikeLocalProxyResource)
+    );
+    const rewriteTargetResource = this._lastOriginalResource || this.serverUrl;
+
+    // If metadata resource was rewritten to the local proxy for SDK validation,
+    // restore the real MCP endpoint in the outbound authorize URL.
+    if (shouldRewriteResource && rewriteTargetResource) {
+      authorizationUrl.searchParams.set("resource", rewriteTargetResource);
     }
 
     // Generate a unique state parameter for this authorization request
     const state = globalThis.crypto.randomUUID();
     const stateKey = `${this.storageKeyPrefix}:state_${state}`;
+    const codeVerifierSnapshot =
+      this.pendingCodeVerifier ||
+      localStorage.getItem(this.getKey("code_verifier"));
 
     // Store context needed by the callback handler, associated with the state param
     const stateData: StoredState = {
       serverUrlHash: this.serverUrlHash,
       expiry: Date.now() + 1000 * 60 * 10, // State expires in 10 minutes
+      codeVerifier: codeVerifierSnapshot || undefined,
       // Store provider options needed to reconstruct on callback
       providerOptions: {
         serverUrl: this.serverUrl,
@@ -502,7 +534,6 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
     // Sanitize the authorization URL to prevent XSS attacks
     const sanitizedAuthUrl = sanitizeUrl(authUrlString);
-
     // Persist the exact auth URL in case the popup fails and manual navigation is needed
     localStorage.setItem(this.getKey("last_auth_url"), sanitizedAuthUrl);
 
@@ -581,7 +612,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    */
   getLastAttemptedAuthUrl(): string | null {
     const storedUrl = localStorage.getItem(this.getKey("last_auth_url"));
-    return storedUrl ? sanitizeUrl(storedUrl) : null;
+    if (!storedUrl) return null;
+    return sanitizeUrl(storedUrl);
   }
 
   clearStorage(): number {

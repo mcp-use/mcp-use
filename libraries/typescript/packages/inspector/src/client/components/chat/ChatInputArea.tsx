@@ -7,6 +7,7 @@ import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
+import type { ToolInfo } from "./ToolSelector";
 import type { MessageAttachment } from "./types";
 
 interface ChatInputAreaProps {
@@ -20,6 +21,9 @@ interface ChatInputAreaProps {
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
   attachments: MessageAttachment[];
+  tools?: ToolInfo[];
+  disabledTools?: Set<string>;
+  onDisabledToolsChange?: (disabledTools: Set<string>) => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -30,6 +34,10 @@ interface ChatInputAreaProps {
   onDeletePromptResult: (index: number) => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
+  /** Optional followup suggestions rendered above the chat input. */
+  followups?: string[];
+  /** Called when a followup suggestion is selected. */
+  onFollowupSelect?: (followup: string) => void;
 }
 
 export function ChatInputArea({
@@ -43,6 +51,9 @@ export function ChatInputArea({
   selectedPrompt,
   promptResults,
   attachments,
+  tools,
+  disabledTools,
+  onDisabledToolsChange,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -53,6 +64,8 @@ export function ChatInputArea({
   onDeletePromptResult,
   onAttachmentAdd,
   onAttachmentRemove,
+  followups = [],
+  onFollowupSelect,
 }: ChatInputAreaProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -61,6 +74,23 @@ export function ChatInputArea({
   return (
     <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 sm:pt-0 text-foreground">
       <div className="relative w-full max-w-3xl backdrop-blur-xl">
+        {followups.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {followups.map((followup) => (
+              <Button
+                key={followup}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => onFollowupSelect?.(followup)}
+                disabled={isLoading || !isConnected}
+              >
+                {followup}
+              </Button>
+            ))}
+          </div>
+        )}
         <PromptsDropdown
           isOpen={promptsDropdownOpen}
           prompts={prompts}
@@ -84,6 +114,9 @@ export function ChatInputArea({
             "bg-zinc-50 z-10 focus:bg-zinc-100 dark:text-white dark:bg-black border-gray-200 dark:border-zinc-800",
             promptResults.length > 0 && "pt-16"
           )}
+          tools={tools}
+          disabledTools={disabledTools}
+          onDisabledToolsChange={onDisabledToolsChange}
           onInputChange={onInputChange}
           onKeyDown={onKeyDown}
           onKeyUp={onKeyUp}

@@ -5,11 +5,40 @@
  * while preserving server functionality.
  */
 
-import type { Hono as HonoType } from "hono";
+import type { Hono as HonoType, MiddlewareHandler } from "hono";
 import {
   adaptConnectMiddleware,
   isExpressMiddleware,
 } from "../connect-adapter.js";
+
+/**
+ * Express/Connect middleware signature
+ * (req, res, next) => void or (err, req, res, next) => void
+ */
+type ExpressMiddleware = (
+  req: any,
+  res: any,
+  next: () => void
+) => void | Promise<void>;
+
+/**
+ * Express error middleware signature
+ * (err, req, res, next) => void
+ */
+type ExpressErrorMiddleware = (
+  err: any,
+  req: any,
+  res: any,
+  next: () => void
+) => void | Promise<void>;
+
+/**
+ * Union type for all acceptable middleware types
+ */
+type AcceptableMiddleware =
+  | MiddlewareHandler
+  | ExpressMiddleware
+  | ExpressErrorMiddleware;
 
 /**
  * Create a proxy that allows direct access to Hono methods
@@ -64,20 +93,37 @@ export function installCustomRoutesMiddleware(
   });
 }
 
+/**
+ * Extended Hono type that accepts both Hono and Express middleware in use() method
+ */
+type ExtendedHonoUse = {
+  use(...handlers: AcceptableMiddleware[]): any;
+  use(path: string, ...handlers: AcceptableMiddleware[]): any;
+};
+
+/**
+ * Type that extends Hono with Express middleware support
+ */
+type HonoWithExpressMiddleware = Omit<HonoType, "use"> & ExtendedHonoUse;
+
 export function createHonoProxy<T extends object>(
   target: T,
   app: HonoType
-): T & HonoType {
+): T & HonoWithExpressMiddleware {
   return new Proxy(target, {
     get(target, prop) {
       // Special handling for 'use' method to auto-detect and adapt Express middleware
       if (prop === "use") {
-        return async (...args: any[]) => {
+        return async (
+          ...args: AcceptableMiddleware[] | [string, ...AcceptableMiddleware[]]
+        ) => {
           // Hono's use signature: use(path?, ...handlers)
           // Check if the first arg is a path (string) or a handler (function)
           const hasPath = typeof args[0] === "string";
-          const path = hasPath ? args[0] : "*";
-          const handlers = hasPath ? args.slice(1) : args;
+          const path: string = hasPath ? (args[0] as string) : "*";
+          const handlers: AcceptableMiddleware[] = hasPath
+            ? (args.slice(1) as AcceptableMiddleware[])
+            : (args as AcceptableMiddleware[]);
 
           // Adapt each handler if it's Express middleware
           const adaptedHandlers = handlers.map((handler: any) => {
@@ -106,16 +152,16 @@ export function createHonoProxy<T extends object>(
                   );
                   // Call app.use with the adapted middleware
                   if (hasPath) {
-                    (app as any).use(path, adapted);
+                    app.use(path, adapted);
                   } else {
-                    (app as any).use(adapted);
+                    app.use(adapted);
                   }
                 } else {
                   // Regular Hono middleware
                   if (hasPath) {
-                    (app as any).use(path, h);
+                    app.use(path, h as MiddlewareHandler);
                   } else {
-                    (app as any).use(h);
+                    app.use(h as MiddlewareHandler);
                   }
                 }
               })
@@ -125,7 +171,11 @@ export function createHonoProxy<T extends object>(
           }
 
           // No Express middleware, call normally
-          return (app as any).use(...args);
+          if (hasPath) {
+            return app.use(path, ...(handlers as MiddlewareHandler[]));
+          } else {
+            return app.use(...(handlers as MiddlewareHandler[]));
+          }
         };
       }
 
@@ -159,5 +209,5 @@ export function createHonoProxy<T extends object>(
       const value = (app as any)[prop];
       return typeof value === "function" ? value.bind(app) : value;
     },
-  }) as T & HonoType;
+  }) as T & HonoWithExpressMiddleware;
 }

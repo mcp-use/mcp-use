@@ -1,5 +1,797 @@
 # @mcp-use/inspector
 
+## 0.24.4
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [dd77c3c]
+- Updated dependencies [dd77c3c]
+  - mcp-use@1.21.4
+
+## 0.24.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4a5e680]
+  - mcp-use@1.21.4-canary.2
+
+## 0.24.4-canary.1
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [d4f479d]
+  - mcp-use@1.21.4-canary.1
+
+## 0.24.4-canary.0
+
+### Patch Changes
+
+- mcp-use@1.21.4-canary.0
+
+## 0.24.3
+
+### Patch Changes
+
+- d8d6d06: Fix sandbox host derivation for cloud-embedded inspector pages. Apex hosts (e.g. manufact.com) now correctly resolve to sandbox-inspector.{domain} instead of sandbox-{domain}.
+  - mcp-use@1.21.3
+
+## 0.24.3-canary.0
+
+### Patch Changes
+
+- c509930: Fix sandbox host derivation for cloud-embedded inspector pages. Apex hosts (e.g. manufact.com) now correctly resolve to sandbox-inspector.{domain} instead of sandbox-{domain}.
+  - mcp-use@1.21.3-canary.0
+
+## 0.24.2
+
+### Patch Changes
+
+- 8d55603: fix(inspector): disable proxy on python builtin server
+  - mcp-use@1.21.2
+
+## 0.24.2-canary.0
+
+### Patch Changes
+
+- 76320f0: fix(inspector): disable proxy on python builtin server
+  - mcp-use@1.21.2-canary.0
+
+## 0.24.1
+
+### Patch Changes
+
+- ed1b034: fix(inspector): strip infra headers from proxied requests
+- ed1b034: Fix tools selection and attachment button icons invisible in dark mode. Add explicit `text-muted-foreground` and `hover:text-foreground` to the paperclip and wrench buttons so they have proper contrast against the dark input background.
+- ed1b034: fix(inspector): allow set initial messages for exported chat components
+- ed1b034: Refactor clipboard operations across components to use a centralized `copyToClipboard` utility
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+  - mcp-use@1.21.1
+
+## 0.24.1-canary.6
+
+### Patch Changes
+
+- 3cae276: Refactor clipboard operations across components to use a centralized `copyToClipboard` utility
+  - mcp-use@1.21.1-canary.6
+
+## 0.24.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [fb91a61]
+  - mcp-use@1.21.1-canary.5
+
+## 0.24.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [bdeaadb]
+  - mcp-use@1.21.1-canary.4
+
+## 0.24.1-canary.3
+
+### Patch Changes
+
+- mcp-use@1.21.1-canary.3
+
+## 0.24.1-canary.2
+
+### Patch Changes
+
+- mcp-use@1.21.1-canary.2
+
+## 0.24.1-canary.1
+
+### Patch Changes
+
+- 3e3767e: fix(inspector): allow set initial messages for exported chat components
+  - mcp-use@1.21.1-canary.1
+
+## 0.24.1-canary.0
+
+### Patch Changes
+
+- f0a872a: fix(inspector): strip infra headers from proxied requests
+- ef8a0cf: Fix tools selection and attachment button icons invisible in dark mode. Add explicit `text-muted-foreground` and `hover:text-foreground` to the paperclip and wrench buttons so they have proper contrast against the dark input background.
+  - mcp-use@1.21.1-canary.0
+
+## 0.24.0
+
+### Minor Changes
+
+- 405fac7: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- 405fac7: feat(inspector): fix build to allow inspectro embedding
+- 405fac7: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- 405fac7: fix(inspector): sandbox url for dev inspector was incorrectly computed as -dev instead of .dev
+- 405fac7: Fix --no-open flag being ignored in inspector standalone dev mode
+- 405fac7: feat(auth): enhance OAuth flow and CORS handling
+- 405fac7: feat(inspector): enhance logger middleware to filter noisy API endpoints
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+  - mcp-use@1.21.0
+
+## 0.24.0-canary.14
+
+### Patch Changes
+
+- cb89d47: feat(auth): enhance OAuth flow and CORS handling
+- Updated dependencies [cb89d47]
+  - mcp-use@1.21.0-canary.14
+
+## 0.24.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [a903dd8]
+  - mcp-use@1.21.0-canary.13
+
+## 0.24.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [2f6a6a0]
+  - mcp-use@1.21.0-canary.12
+
+## 0.24.0-canary.11
+
+### Patch Changes
+
+- 71fd188: fix(inspector): sandbox url for dev inspector was incorrectly computed as -dev instead of .dev
+  - mcp-use@1.21.0-canary.11
+
+## 0.24.0-canary.10
+
+### Patch Changes
+
+- mcp-use@1.21.0-canary.10
+
+## 0.24.0-canary.9
+
+### Minor Changes
+
+- 3aa578a: feat(inspector): fix build to allow inspectro embedding
+
+### Patch Changes
+
+- mcp-use@1.21.0-canary.9
+
+## 0.24.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [0747144]
+  - mcp-use@1.21.0-canary.8
+
+## 0.24.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [6f66801]
+  - mcp-use@1.21.0-canary.7
+
+## 0.24.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [d9f946a]
+  - mcp-use@1.21.0-canary.6
+
+## 0.24.0-canary.5
+
+### Patch Changes
+
+- 2a8a9d1: feat(inspector): enhance logger middleware to filter noisy API endpoints
+  - mcp-use@1.21.0-canary.5
+
+## 0.24.0-canary.4
+
+### Minor Changes
+
+- 22a596e: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- 22a596e: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- Updated dependencies [22a596e]
+- Updated dependencies [22a596e]
+  - mcp-use@1.21.0-canary.4
+
+## 0.23.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [560a0ae]
+  - mcp-use@1.21.0-canary.3
+
+## 0.23.2-canary.2
+
+### Patch Changes
+
+- mcp-use@1.20.6-canary.2
+
+## 0.23.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [1c8d340]
+  - mcp-use@1.20.6-canary.1
+
+## 0.23.2-canary.0
+
+### Patch Changes
+
+- 85f4bff: Fix --no-open flag being ignored in inspector standalone dev mode
+  - mcp-use@1.20.6-canary.0
+
+## 0.23.1
+
+### Patch Changes
+
+- mcp-use@1.20.5
+
+## 0.23.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.20.5-canary.0
+
+## 0.23.0
+
+### Minor Changes
+
+- 9d8a73f: feat(inspector): improve emebedded chat
+
+### Patch Changes
+
+- mcp-use@1.20.4
+
+## 0.23.0-canary.0
+
+### Minor Changes
+
+- 452d274: feat(inspector): improve emebedded chat
+
+### Patch Changes
+
+- mcp-use@1.20.4-canary.0
+
+## 0.22.3
+
+### Patch Changes
+
+- 322ab53: fix(inspector): standalone deployment was importing the version from the wrong path
+  - mcp-use@1.20.3
+
+## 0.22.3-canary.0
+
+### Patch Changes
+
+- 0b9818c: fix(inspector): standalone deployment was importing the version from the wrong path
+  - mcp-use@1.20.3-canary.0
+
+## 0.22.2
+
+### Patch Changes
+
+- 455c18f: fix(inspector): update useAutoConnect to retain tile visibility on connection failure
+- 455c18f: fix(inspector): update MCPAppsRenderer and OpenAIComponentRenderer for improved border handling and status display
+  - Changed default state for `prefersBorder` in MCPAppsRenderer to false, aligning with updated UI specifications.
+  - Updated OpenAIComponentRenderer to conditionally display status labels above the widget in inline mode, enhancing user feedback.
+  - Adjusted CSS classes for better layout management based on display modes, improving overall user experience.
+  - Increased z-index for sticky elements in ToolResultDisplay to ensure proper layering in the UI.
+
+- 455c18f: Add `exposeResourcesAsTools` and `exposePromptsAsTools` options to `MCPAgentOptions` (both default to `true` for backward compatibility). The inspector chat tab now sets both to `false`, so the agent only exposes actual MCP tools to the LLM rather than fabricating tool wrappers for resources and prompts.
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+  - mcp-use@1.20.2
+
+## 0.22.2-canary.0
+
+### Patch Changes
+
+- 89cdd0b: fix(inspector): update useAutoConnect to retain tile visibility on connection failure
+- 89cdd0b: fix(inspector): update MCPAppsRenderer and OpenAIComponentRenderer for improved border handling and status display
+  - Changed default state for `prefersBorder` in MCPAppsRenderer to false, aligning with updated UI specifications.
+  - Updated OpenAIComponentRenderer to conditionally display status labels above the widget in inline mode, enhancing user feedback.
+  - Adjusted CSS classes for better layout management based on display modes, improving overall user experience.
+  - Increased z-index for sticky elements in ToolResultDisplay to ensure proper layering in the UI.
+
+- 89cdd0b: Add `exposeResourcesAsTools` and `exposePromptsAsTools` options to `MCPAgentOptions` (both default to `true` for backward compatibility). The inspector chat tab now sets both to `false`, so the agent only exposes actual MCP tools to the LLM rather than fabricating tool wrappers for resources and prompts.
+- Updated dependencies [89cdd0b]
+- Updated dependencies [89cdd0b]
+  - mcp-use@1.20.2-canary.0
+
+## 0.22.1
+
+### Patch Changes
+
+- 4546a8c: feat(widget): introduce invoking and invoked status texts for improved user feedback
+  - Added `invoking` and `invoked` properties to widget metadata, allowing for customizable status messages during tool execution.
+  - Updated relevant components to display these status texts, enhancing user experience by providing real-time feedback on tool operations.
+  - Adjusted default values for `invoking` and `invoked` to improve clarity and consistency across widgets.
+  - Refactored documentation to reflect changes in widget metadata and usage patterns, ensuring developers have clear guidance on implementing these features.
+
+- Updated dependencies [4546a8c]
+  - mcp-use@1.20.1
+
+## 0.22.1-canary.0
+
+### Patch Changes
+
+- fbd1dfe: feat(widget): introduce invoking and invoked status texts for improved user feedback
+  - Added `invoking` and `invoked` properties to widget metadata, allowing for customizable status messages during tool execution.
+  - Updated relevant components to display these status texts, enhancing user experience by providing real-time feedback on tool operations.
+  - Adjusted default values for `invoking` and `invoked` to improve clarity and consistency across widgets.
+  - Refactored documentation to reflect changes in widget metadata and usage patterns, ensuring developers have clear guidance on implementing these features.
+
+- Updated dependencies [fbd1dfe]
+  - mcp-use@1.20.1-canary.0
+
+## 0.22.0
+
+### Minor Changes
+
+- 5a73b41: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+- 5a73b41: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+### Patch Changes
+
+- 5a73b41: Fix OAuth auth flow: add proactive token refresh, remove static auth header override, always proxy WorkOS requests, and ensure OAuth fetch interceptor is installed on autoConnect
+- 5a73b41: Fix(docs): updated docs to remove outdated information
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+  - mcp-use@1.20.0
+
+## 0.22.0-canary.4
+
+### Patch Changes
+
+- 76f10ec: Fix(docs): updated docs to remove outdated information
+- Updated dependencies [76f10ec]
+  - mcp-use@1.20.0-canary.4
+
+## 0.22.0-canary.3
+
+### Minor Changes
+
+- f55c56e: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+### Patch Changes
+
+- Updated dependencies [f55c56e]
+  - mcp-use@1.20.0-canary.3
+
+## 0.22.0-canary.2
+
+### Minor Changes
+
+- ba0ea97: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+### Patch Changes
+
+- Updated dependencies [ba0ea97]
+  - mcp-use@1.20.0-canary.2
+
+## 0.21.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [8abb736]
+  - mcp-use@1.19.4-canary.1
+
+## 0.21.2-canary.0
+
+### Patch Changes
+
+- fbf1308: Fix OAuth auth flow: add proactive token refresh, remove static auth header override, always proxy WorkOS requests, and ensure OAuth fetch interceptor is installed on autoConnect
+  - mcp-use@1.19.4-canary.0
+
+## 0.21.1
+
+### Patch Changes
+
+- mcp-use@1.19.3
+
+## 0.21.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.19.3-canary.0
+
+## 0.21.0
+
+### Minor Changes
+
+- 179e800: feat(inspector): enhance ToolsTab with bulk paste functionality and auto-fill dialog
+  - Implemented a new bulk paste feature in the ToolsTab component, allowing users to paste JSON or JavaScript object syntax directly into input fields.
+  - Added an auto-fill dialog to confirm updates when pasted data would overwrite existing values, improving user experience and data integrity.
+  - Introduced utility functions for parsing pasted text and converting JavaScript object syntax to valid JSON.
+  - Updated ToolInputForm and ToolExecutionPanel components to support the new bulk paste functionality and visual feedback for auto-filled fields.
+
+### Patch Changes
+
+- 179e800: feat(inspector): update ToolExecutionPanel to copy full tool definition
+  fix(server): correctly convert nested inpout schema args for tools
+- 179e800: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+  - mcp-use@1.19.2
+
+## 0.21.0-canary.2
+
+### Patch Changes
+
+- 9ef0ba9: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+- Updated dependencies [9ef0ba9]
+  - mcp-use@1.19.2-canary.2
+
+## 0.21.0-canary.1
+
+### Minor Changes
+
+- 894d21a: feat(inspector): enhance ToolsTab with bulk paste functionality and auto-fill dialog
+  - Implemented a new bulk paste feature in the ToolsTab component, allowing users to paste JSON or JavaScript object syntax directly into input fields.
+  - Added an auto-fill dialog to confirm updates when pasted data would overwrite existing values, improving user experience and data integrity.
+  - Introduced utility functions for parsing pasted text and converting JavaScript object syntax to valid JSON.
+  - Updated ToolInputForm and ToolExecutionPanel components to support the new bulk paste functionality and visual feedback for auto-filled fields.
+
+### Patch Changes
+
+- 894d21a: feat(inspector): update ToolExecutionPanel to copy full tool definition
+  fix(server): correctly convert nested inpout schema args for tools
+- Updated dependencies [894d21a]
+- Updated dependencies [894d21a]
+  - mcp-use@1.19.2-canary.1
+
+## 0.20.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1921562]
+  - mcp-use@1.19.2-canary.0
+
+## 0.20.1
+
+### Patch Changes
+
+- 568901e: fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+- Updated dependencies [568901e]
+  - mcp-use@1.19.1
+
+## 0.20.1-canary.0
+
+### Patch Changes
+
+- 344dc29: fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+- Updated dependencies [344dc29]
+  - mcp-use@1.19.1-canary.0
+
+## 0.20.0
+
+### Minor Changes
+
+- f4e2a70: feat(inspector): add quick questions and followups support to ChatTab
+  - Added support for `chatQuickQuestions` and `chatFollowups` props in `ChatTab`, `ChatLandingForm`, and `ChatInputArea` components to improve user interaction
+  - Implemented functionality to handle quick question and followup selection, enhancing the chat experience
+  - Updated `InspectorContext` to include new configuration options for quick questions and followups
+  - Enhanced message handling and event posting for better integration with the chat system
+
+### Patch Changes
+
+- f4e2a70: feat(inspector): enhance error handling and logging for widget components
+  - Implemented error logging functionality in MCPAppsRenderer and OpenAIComponentRenderer to capture and post error messages and stack traces to the parent window
+  - Added global error and unhandled promise rejection listeners in shared-utils to emit runtime errors with detailed context
+  - Enhanced console error handling in mcp-apps route to serialize and send console errors to the parent window, improving debugging capabilities
+  - Refactored MCPAppsRenderer to replace `isReady` state with `initCount` for better tracking of initialization events
+
+- f4e2a70: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- f4e2a70: fix(inspector): enhance MCPAppsRenderer and OpenAIComponentRenderer with loading states and spinner
+  - Updated MCPAppsRenderer to include a loading spinner during widget initialization, improving user feedback.
+  - Introduced a new `isReady` state to manage the loading state effectively.
+  - Enhanced OpenAIComponentRenderer to adjust display properties based on the new configuration for better responsiveness.
+  - Added a maximum width for the Picture-in-Picture mode in MCP_APPS_CONFIG for improved layout control.
+  - Refactored iframe loading handling to ensure proper state management and user experience during loading phases.
+
+- f4e2a70: fix(csp): allow permissive frame ancestors by default
+- f4e2a70: feat(inspector): improve loading state and UI feedback in OpenAIComponentRenderer
+  - Replaced shimmer animation with a Spinner component for a more consistent loading experience
+  - Introduced a skeleton loading state that only displays on the initial load of the widget
+  - Updated ToolResultDisplay to adjust the order of view checks for better clarity
+  - Enhanced ToolsList to conditionally display parameter counts based on tool input schemas
+
+- f4e2a70: feat(inspector): enhance ToolsList with metadata display and tool type icons
+  - Updated ListItem component to conditionally render metadata
+  - Enhanced ToolsList to include tool metadata with icons for MCP and OpenAI, utilizing tool detection logic
+  - Introduced McpIcon and OpenAIIcon components for better visual representation of tool types
+
+- f4e2a70: feat(inspector): add log copying functionality and enhance theme handling
+  - Implemented a new feature in IframeConsole to copy all logs to the clipboard, providing users with an easy way to access console logs
+  - Enhanced OpenAIComponentRenderer to manage widget readiness state and apply theme changes dynamically, improving user experience and visual consistency
+  - Updated ThemeProvider to synchronize theme application with Tailwind dark mode and OpenAI Apps SDK design tokens, ensuring a seamless theme transition
+  - Added a message signaling to the parent window when the widget is ready, enhancing communication between components
+
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+  - mcp-use@1.19.0
+
+## 0.20.0-canary.6
+
+### Patch Changes
+
+- 8774ef6: fix(inspector): enhance MCPAppsRenderer and OpenAIComponentRenderer with loading states and spinner
+  - Updated MCPAppsRenderer to include a loading spinner during widget initialization, improving user feedback.
+  - Introduced a new `isReady` state to manage the loading state effectively.
+  - Enhanced OpenAIComponentRenderer to adjust display properties based on the new configuration for better responsiveness.
+  - Added a maximum width for the Picture-in-Picture mode in MCP_APPS_CONFIG for improved layout control.
+  - Refactored iframe loading handling to ensure proper state management and user experience during loading phases.
+
+- Updated dependencies [8774ef6]
+  - mcp-use@1.19.0-canary.6
+
+## 0.20.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [5823280]
+  - mcp-use@1.19.0-canary.5
+
+## 0.20.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [21b3c0b]
+  - mcp-use@1.19.0-canary.4
+
+## 0.20.0-canary.3
+
+### Minor Changes
+
+- aa81040: feat(inspector): add quick questions and followups support to ChatTab
+  - Added support for `chatQuickQuestions` and `chatFollowups` props in `ChatTab`, `ChatLandingForm`, and `ChatInputArea` components to improve user interaction
+  - Implemented functionality to handle quick question and followup selection, enhancing the chat experience
+  - Updated `InspectorContext` to include new configuration options for quick questions and followups
+  - Enhanced message handling and event posting for better integration with the chat system
+
+### Patch Changes
+
+- aa81040: feat(inspector): enhance error handling and logging for widget components
+  - Implemented error logging functionality in MCPAppsRenderer and OpenAIComponentRenderer to capture and post error messages and stack traces to the parent window
+  - Added global error and unhandled promise rejection listeners in shared-utils to emit runtime errors with detailed context
+  - Enhanced console error handling in mcp-apps route to serialize and send console errors to the parent window, improving debugging capabilities
+  - Refactored MCPAppsRenderer to replace `isReady` state with `initCount` for better tracking of initialization events
+
+- dea387a: fix(csp): allow permissive frame ancestors by default
+- aa81040: feat(inspector): improve loading state and UI feedback in OpenAIComponentRenderer
+  - Replaced shimmer animation with a Spinner component for a more consistent loading experience
+  - Introduced a skeleton loading state that only displays on the initial load of the widget
+  - Updated ToolResultDisplay to adjust the order of view checks for better clarity
+  - Enhanced ToolsList to conditionally display parameter counts based on tool input schemas
+
+- aa81040: feat(inspector): enhance ToolsList with metadata display and tool type icons
+  - Updated ListItem component to conditionally render metadata
+  - Enhanced ToolsList to include tool metadata with icons for MCP and OpenAI, utilizing tool detection logic
+  - Introduced McpIcon and OpenAIIcon components for better visual representation of tool types
+
+- aa81040: feat(inspector): add log copying functionality and enhance theme handling
+  - Implemented a new feature in IframeConsole to copy all logs to the clipboard, providing users with an easy way to access console logs
+  - Enhanced OpenAIComponentRenderer to manage widget readiness state and apply theme changes dynamically, improving user experience and visual consistency
+  - Updated ThemeProvider to synchronize theme application with Tailwind dark mode and OpenAI Apps SDK design tokens, ensuring a seamless theme transition
+  - Added a message signaling to the parent window when the widget is ready, enhancing communication between components
+
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+  - mcp-use@1.19.0-canary.3
+
+## 0.19.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e8383a7]
+- Updated dependencies [1a8a2a6]
+  - mcp-use@1.19.0-canary.2
+
+## 0.19.1-canary.1
+
+### Patch Changes
+
+- 8e3cfb8: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- Updated dependencies [8e3cfb8]
+  - mcp-use@1.19.0-canary.1
+
+## 0.19.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [df8d269]
+  - mcp-use@1.19.0-canary.0
+
+## 0.19.0
+
+### Minor Changes
+
+- 3334a67: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+
+### Patch Changes
+
+- 3334a67: fix(inspector): enhance tool argument handling with type coercion and schema resolution
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+  - mcp-use@1.18.0
+
+## 0.19.0-canary.3
+
+### Patch Changes
+
+- c93a061: fix(inspector): enhance tool argument handling with type coercion and schema resolution
+  - mcp-use@1.18.0-canary.3
+
+## 0.19.0-canary.2
+
+### Minor Changes
+
+- 4a2b65e: feat(inspector): enhance elicitation support with SEP-1330 enum schema variants
+
+### Patch Changes
+
+- Updated dependencies [4a2b65e]
+  - mcp-use@1.18.0-canary.2
+
+## 0.18.10-canary.1
+
+### Patch Changes
+
+- Updated dependencies [52cd2a8]
+  - mcp-use@1.18.0-canary.1
+
+## 0.18.10-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c3a452a]
+  - mcp-use@1.18.0-canary.0
+
 ## 0.18.9
 
 ### Patch Changes
@@ -1824,13 +2616,13 @@
 
   **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
 
-  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+  **Learn more:** [LangChain Integration](https://mcp-use.com/docs/typescript/agent/llm-integration)
 
   ### WebSocket Transport Removed
 
   WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
 
-  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+  **Learn more:** [Client Configuration](https://mcp-use.com/docs/typescript/client/client-configuration)
 
   ## Features
 
@@ -1887,7 +2679,7 @@
   **Deprecated:**
   - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
 
-  **Learn more:** [Session Management](/typescript/server/session-management)
+  **Learn more:** [Session Management](https://mcp-use.com/docs/typescript/server/session-management)
 
   ### Favicon Support for Widgets
 
@@ -1905,13 +2697,13 @@
   - CLI build process includes favicon in widget HTML pages
   - Long-term caching (1 year) for favicon assets
 
-  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://mcp-use.com/docs/typescript/server/configuration)
 
   ### CLI Client Support
 
   Added dedicated CLI client support for better command-line integration and testing.
 
-  **Learn more:** [CLI Client](/typescript/client/cli)
+  **Learn more:** [CLI Client](https://mcp-use.com/docs/typescript/client/cli)
 
   ### Enhanced Session Methods
   - `callTool()` method now defaults args to an empty object
@@ -1941,7 +2733,7 @@
 
   Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
 
-  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+  **Learn more:** [useMcp Hook](https://mcp-use.com/docs/typescript/client/usemcp)
 
   ### Session & Transport Fixes
   - Fixed transport cleanup when session becomes idle

@@ -6,6 +6,172 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.21.2" description="March 2026">
+  ## Inspector Proxy Fix for Embedded Servers
+  Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
+
+- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
+- **Update**: Updated @mcp-use/inspector to v0.24.2
+- **Update**: Updated @mcp-use/cli to v2.18.1
+</Update>
+
+<Update label="v1.21.3" description="March 2026">
+  ## Inspector Sandbox Host Fix
+  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+
+- **Fix** (@mcp-use/inspector): Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
+- **Update**: Updated @mcp-use/inspector to v0.24.3
+- **Update**: Updated @mcp-use/cli to v2.18.2
+</Update>
+
+<Update label="v1.21.4" description="March 2026">
+  ## Request Context, CLI Build & README Fixes
+  Patch release fixing request context propagation, CLI build hang, and stale monorepo references.
+
+- **Fix**: `ctx.auth` and other request context properties were `undefined` in tool callbacks; `mountMcp()` now wraps `transport.handleRequest()` with `runWithContext()` so `getRequestContext()` is populated
+- **Fix** (@mcp-use/cli): `mcp-use build` no longer hangs — add `process.exit(0)` on success (tsImport creates active handles)
+- **Fix**: Update stale mcp-use-ts references in README badges, image URLs, eslint config to mcp-use monorepo
+- **Update**: Updated @mcp-use/inspector to v0.24.4
+- **Update**: Updated @mcp-use/cli to v2.18.3
+</Update>
+
+<Update label="v1.21.1" description="March 2026">
+  ## Session Persistence & CLI Improvements
+  Patch release with session recovery fix, CLI enhancements, and create-mcp-use-app install improvements.
+
+- **Fix**: Session recovery after restart returns 400 fix; distributed SSE stream routing via Redis Pub/Sub
+- **Enhancement** (@mcp-use/cli): `mcp-use build` runs tool registry type generation before TypeScript compilation when server file exists
+- **Enhancement** (@mcp-use/cli): `--root-dir` option for deploy command for monorepo support
+- **Fix** (create-mcp-use-app): Remove flickering behaviour from `npm i`
+- **Update**: Updated @mcp-use/inspector to v0.24.1
+- **Update**: Updated @mcp-use/cli to v2.18.0
+- **Update**: Updated create-mcp-use-app to v0.14.4
+</Update>
+
+<Update label="v1.20.1" description="February 2026">
+  ## Widget Status Texts & CSP Handling
+  Patch release with widget metadata enhancements and CSP improvements.
+
+- **New**: `invoking` and `invoked` properties in widget metadata for customizable status messages during tool execution
+- **Breaking**: McpUseProvider no longer includes BrowserRouter; add it explicitly if your widget uses react-router
+- **Enhancement**: MCPAppsDebugControls CSP mode violation indicators; sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Fix** (create-mcp-use-app): Unify logo display across all CLI entry paths
+- **Update**: Updated @mcp-use/inspector to v0.22.1
+- **Update**: Updated @mcp-use/cli to v2.15.1
+</Update>
+
+<Update label="v1.21.0" description="March 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.21.0&title=Proxy%20Servers%20%26%20Client%20Completion&date=2026-03&lang=typescript" alt="Release 1.21.0" />
+  </Frame>
+  ## Proxy Servers & Client Completion
+  Minor release with server composition, client-side completion, user context, and Express middleware types.
+
+- **New**: `MCPServer.proxy()` for composing multiple MCP servers into a single aggregator — automatic orchestration, schema translation, namespacing, list-changed multiplexing
+- **New**: Client-side completion support — `complete()` on BaseConnector, MCPSession, and `useMcp`; `refreshResourceTemplates()`; prompt argument and resource template URI autocomplete
+- **New**: `ctx.client.user()` for per-invocation end-user metadata (`subject`, `conversationId`) from tools/call params
+- **Enhancement**: `ctx.client.supportsApps()` now correctly returns true for MCP Apps clients (fixed ClientCapabilitiesSchema `extensions` stripping)
+- **Enhancement**: `autoReconnect` options — configurable health check interval, reconnection delay, timeout via `reconnectionOptions`
+- **Enhancement**: `sendFollowUpMessage` accepts `MessageContentBlock` arrays (text, image, resource blocks) per SEP-1865
+- **Enhancement**: Host info and capabilities — `hostInfo`, `hostCapabilities` in `useWidget`; `getHostInfo`, `getHostCapabilities` on `McpAppsBridge`
+- **Fix**: Express middleware types — proper TypeScript types for `server.use()` with Express middleware (auto-detected and adapted)
+- **Fix**: Session isolation — `findSessionContext` no longer falls back to arbitrary session, preventing metadata leakage
+- **Fix**: Remove deprecated `@types/tar`; update tar to latest (cli, create-mcp-use-app)
+- **Update**: Updated @mcp-use/inspector to v0.24.0
+- **Update**: Updated @mcp-use/cli to v2.17.0
+- **Update**: Updated create-mcp-use-app to v0.14.3
+- **Documentation**: Per-server elicitation and sampling callbacks examples; proxy servers section
+</Update>
+
+<Update label="v1.20.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.20.0&title=Widget%20Debug%20%26%20CSP%20Improvements&date=2026-02&lang=typescript" alt="Release 1.20.0" />
+  </Frame>
+  ## Widget Debug & CSP Improvements
+  Minor release with Iframe Console enhancements, MCP Apps debug controls, and CSP handling.
+
+- **New**: CLI update check notifies when a newer mcp-use release is available
+- **Fix**: CLI TSC build uses node with increased heap; avoid npx installing wrong package
+- **Fix**: CLI fallback MCP_URL when tunnel is unavailable
+- **New** (create-mcp-use-app): @types/react and @types/react-dom in template devDependencies
+- **Enhancement**: Slim down generated READMEs; improve mcp-apps template (Carousel, product-search-result widget); include .mcp-use in tsconfig; fix postinstall script
+- **Fix**: create-mcp-use-app product-search-result template styling and CSP metadata
+- **Enhancement**: Iframe Console with expandable logs, level filter, search, resizable height
+- **New**: Widget debug context for chat; MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics)
+- **New**: CDN build for inspector; CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+- **Fix**: useSyncExternalStore first-render handling; reconnect logic; Tools tab only sends explicitly set fields; resource annotations include `_meta`
+- **Fix**: mcp-use widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+- **Enhancement**: useWidget merges props from toolInput and structuredContent per SEP-1865
+- **New**: updateModelContext and useMcp clientOptions
+- **Fix**: WorkOS subdomain config to accept full AuthKit domain (e.g., `name.authkit.app`)
+- **Update**: Updated @mcp-use/inspector to v0.22.0
+- **Update**: Updated @mcp-use/cli to v2.15.0
+</Update>
+
+<Update label="v1.19.2" description="February 2026">
+  ## Tool Schema & Type Testing Improvements
+  Patch release with nested input schema fixes and compile-time type regression testing.
+
+- **Fix**: Correctly convert nested input schema args for tools
+- **New**: Added everything-server example for compile-time type regression testing
+- **Update**: Updated @mcp-use/inspector to v0.21.0
+- **Update**: Updated @mcp-use/cli to v2.13.10
+</Update>
+
+<Update label="v1.19.1" description="February 2026">
+  ## MCPApps & Widget Loading Enhancements
+  Patch release improving widget loading logic and iframe handling.
+
+- **Enhancement**: Improved MCPAppsRenderer loading logic with better state management
+- **Enhancement**: Enhanced useWidget for iframe handling
+- **Update**: Updated @mcp-use/inspector to v0.20.1
+- **Update**: Updated @mcp-use/cli to v2.13.9
+</Update>
+
+<Update label="v1.19.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.19.0&title=Client%20Conformance%20%26%20Type%20Safety%20Improvements&date=2026-02&lang=typescript" alt="Release 1.19.0" />
+  </Frame>
+  ## Client Conformance & Type Safety Improvements
+  Minor release with full MCP client conformance, direct stdio connector support, and type inference fixes.
+
+- **New**: Client implementation is now 100% conformant with the MCP spec
+- **Enhancement**: Node.js client handles stdio connector directly with command/argument configuration
+- **Fix**: `error()` return type now compatible with tool callbacks using `outputSchema`
+- **Fix**: Fixed `TypedCallToolResult` type inference with explicit properties instead of Omit
+- **Fix**: Enhanced `prompt()` method generic type inference to match `tool()` pattern
+- **Enhancement**: Console output routes through Logger class with improved consistency; added tests for logLevel
+- **Enhancement**: Added support for additional Vitest file extensions in config
+- **Fix**: Correct MIME type for mcp_apps resource counting; disabled telemetry in local tests
+- **Update**: Updated @mcp-use/inspector to v0.20.0
+- **Update**: Updated @mcp-use/cli to v2.13.8
+
+### @mcp-use/cli v2.13.8
+
+- **Enhancement**: Improved loading states with spinner component
+- **Fix**: Correct MIME type for mcp_apps resource counting
+
+### create-mcp-use-app v0.13.0
+
+- **New**: Interactive prompts for optional skills installation (claude-code, cursor, codex)
+- **New**: `--install` and `--no-install` CLI flags for non-interactive mode
+- **Fix**: Corrected template reference in test-cli.sh
+</Update>
+
+<Update label="v1.18.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.18.0&title=DNS%20Rebinding%20%26%20Deferred%20Callbacks&date=2026-02&lang=typescript" alt="Release 1.18.0" />
+  </Frame>
+  ## DNS Rebinding Protection & Deferred Client Callbacks
+  Minor release adding DNS rebinding protection and deferred React client callbacks.
+
+- **New**: `allowedOrigins` configuration on `MCPServer` for DNS rebinding protection and host validation; docs and example (curl tests) added
+- **Enhancement**: `McpClientProvider` defers `onServerAdded` and `onServerStateChange` callbacks via `queueMicrotask` to avoid render-phase updates and improve stability
+- **Update**: Updated @mcp-use/inspector to v0.19.0
+- **Update**: Updated @mcp-use/cli to v2.13.7
+</Update>
+
 <Update label="v1.17.4" description="February 2026">
   ## Widget Resource Propagation & Log Noise Reduction
   Patch release improving HMR reliability for widget resources and reducing dev server log noise.

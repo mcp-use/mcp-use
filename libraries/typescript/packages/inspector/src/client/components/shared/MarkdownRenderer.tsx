@@ -1,5 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import Markdown from "markdown-to-jsx";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { usePrismTheme } from "@/client/hooks/usePrismTheme";
@@ -49,7 +50,7 @@ function CodeBlock({
   const codeContent = String(children).trim();
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(codeContent);
+    await copyToClipboard(codeContent);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -233,10 +234,12 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             <p className="text-foreground mb-2 leading-relaxed">{children}</p>
           ),
           ul: ({ children }: { children: React.ReactNode }) => (
-            <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>
+            <ul className="list-disc list-outside pl-6 mb-3 space-y-1">
+              {children}
+            </ul>
           ),
           ol: ({ children }: { children: React.ReactNode }) => (
-            <ol className="list-decimal list-inside mb-3 space-y-1">
+            <ol className="list-decimal list-outside pl-6 mb-3 space-y-1">
               {children}
             </ol>
           ),

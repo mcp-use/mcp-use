@@ -222,7 +222,7 @@ For the simplified `metadata` format with camelCase, use `type: "mcpApps"` inste
 
 </Warning>
 
-See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation and migration guide.
+See [MCP Apps](/typescript/server/mcp-apps) for complete dual-protocol documentation and [Content Security Policy](./content-security-policy) for CSP configuration.
 
 ## Widget Metadata
 
@@ -235,29 +235,31 @@ export const widgetMetadata: WidgetMetadata = {
   // Required: Human-readable description
   description: string,
 
-  // Required: Zod schema defining the widget's input parameters
+  // Required: Zod schema defining the widget's props shape
   props: z.ZodObject<...>,
 
-  // Optional: Control automatic tool registration (defaults to true)
+  // Optional: Control automatic tool registration (defaults to false)
   exposeAsTool?: boolean,
 
-  // Optional: Apps SDK metadata (CSP, widget description, etc.)
+  // Recommended: Unified metadata (works with both MCP Apps and ChatGPT)
+  metadata?: {
+    csp?: { connectDomains?: string[], resourceDomains?: string[] },
+    prefersBorder?: boolean,
+    invoking?: string,  // Status text while tool runs — auto-default: "Loading {name}..."
+    invoked?: string,   // Status text after tool completes — auto-default: "{name} ready"
+  },
+
+  // Alternative: Apps SDK metadata (ChatGPT-only, legacy format)
   appsSdkMetadata?: {
+    'openai/widgetCSP'?: { connect_domains?: string[], resource_domains?: string[] },
     'openai/widgetDescription'?: string,
-    'openai/widgetCSP'?: {
-      connect_domains?: string[],
-      resource_domains?: string[],
-    },
-    'openai/toolInvocation/invoking'?: string,
-    'openai/toolInvocation/invoked'?: string,
     'openai/widgetAccessible'?: boolean,
-    'openai/resultCanProduceWidget'?: boolean,
   },
 }
 ```
 
 <Note>
-The `inputs` field expects a Zod schema that defines the shape of the parameters passed to your widget. This schema is used to generate the tool's input validation and to type-check the props in your widget component via `useWidget<T>()`.
+The `props` field expects a Zod schema that defines the shape of `structuredContent` returned by the tool. This schema is used to generate the tool's input validation and to type-check the data in your widget via `useWidget<T>()`.
 </Note>
 
 **Apps SDK Metadata Defaults:**
@@ -267,9 +269,11 @@ Widget templates automatically receive default Apps SDK metadata values:
 - `openai/widgetDescription`: Generated from your widget's description
 - `openai/widgetDomain`: Defaults to `"https://chatgpt.com"` (required for app submission)
 - `openai/widgetAccessible`: Allows component-initiated tool calls
-- `openai/widgetCSP`: Content Security Policy with default trusted domains
-- `openai/toolInvocation/invoking`: Loading state text (e.g., "Loading MyWidget...")
-- `openai/toolInvocation/invoked`: Ready state text (e.g., "MyWidget ready")
+- `openai/widgetCSP`: [Content Security Policy](./content-security-policy) with default trusted domains
+- `openai/toolInvocation/invoking`: Loading state text — set via `metadata.invoking` (default: `"Loading MyWidget..."`)
+- `openai/toolInvocation/invoked`: Ready state text — set via `metadata.invoked` (default: `"MyWidget ready"`)
+
+These status texts are displayed as animated shimmer text (pending) and static text (complete) in the MCP Inspector. You can override them via `metadata.invoking`/`metadata.invoked` in your widget registration, or use `appsSdkMetadata` for raw key access:
 
 You can customize any of these in your widget's `appsSdkMetadata` export:
 
@@ -286,28 +290,44 @@ export const appsSdkMetadata = {
 
 **Widget Exposure Modes:**
 
-By default, widgets are automatically registered as both MCP tools and resources (`exposeAsTool: true`). You can control this behavior:
+<Warning>
+**Breaking change**: `exposeAsTool` now defaults to `false`. Widgets are registered as MCP resources only. To make a widget callable directly by a model, either set `exposeAsTool: true` in your widget metadata, or define a custom tool that returns the widget using the `widget()` helper (recommended).
+</Warning>
 
-- **Auto-registered (default)**: Widget is callable as a tool directly by the model
+By default, widgets are registered as MCP resources only — they are not auto-registered as tools. The recommended pattern is to expose widgets through a custom tool:
+
+- **Via custom tool (recommended)**: Define a tool that calls `widget()` in its handler. This gives you full control over tool naming, description, parameters, and business logic:
+
+  ```typescript
+  // resources/weather-display/widget.tsx — no exposeAsTool needed
+  export const widgetMetadata: WidgetMetadata = {
+    description: "Display weather",
+    props: propSchema,
+  };
+
+  // index.ts — expose via a custom tool
+  server.tool({
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({ city: z.string() }),
+    widget: { name: "weather-display", invoking: "Fetching weather...", invoked: "Weather loaded" },
+  }, async ({ city }) => {
+    const data = await fetchWeather(city);
+    return widget({ props: data, output: text(`Weather in ${city}: ${data.temp}°C`) });
+  });
+  ```
+
+- **Auto-registered**: Widget is auto-registered as a tool using its metadata description and props schema as the tool's parameters. Simpler, but less control:
 
   ```typescript
   export const widgetMetadata: WidgetMetadata = {
     description: "Display weather",
     props: propSchema,
-    // exposeAsTool: true (default, can be omitted)
+    exposeAsTool: true, // Opt in to auto-registration
   };
   ```
 
-- **Custom tool only**: Widget is only accessible through custom tools you define
-  ```typescript
-  export const widgetMetadata: WidgetMetadata = {
-    description: "Display weather",
-    props: propSchema,
-    exposeAsTool: false, // Don't auto-register as tool
-  };
-  ```
-
-**Note**: The CSP domains you specify will be merged with default trusted domains (like `*.oaistatic.com`, `*.oaiusercontent.com`, `*.openai.com`, and your server's base URL). This ensures your widget can access both your custom resources and OpenAI's required domains.
+**Note**: Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used. See [Content Security Policy](./content-security-policy) for full CSP documentation.
 
 ## Components & Hooks
 
@@ -317,7 +337,7 @@ mcp-use provides a comprehensive set of React components and hooks for building 
 
 | Component          | Description                                                                                                                     | Link                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| **McpUseProvider** | Unified provider that combines all common React setup (StrictMode, ThemeProvider, BrowserRouter, WidgetControls, ErrorBoundary) | [McpUseProvider →](./widget-components/mcpuseprovider) |
+| **McpUseProvider** | Unified provider that combines all common React setup (StrictMode, ThemeProvider, WidgetControls, ErrorBoundary) | [McpUseProvider →](./widget-components/mcpuseprovider) |
 | **WidgetControls** | Debug button and view controls (fullscreen/pip) with customizable positioning                                                   | [WidgetControls →](./widget-components/widgetcontrols) |
 | **ErrorBoundary**  | Error boundary component for graceful error handling in widgets                                                                 | [ErrorBoundary →](./widget-components/errorboundary)   |
 | **Image**          | Image component that handles both data URLs and public file paths                                                               | [Image →](./widget-components/image)                   |
@@ -386,13 +406,16 @@ const imageUrl = window.__getFile?.("fruits/apple.png");
 
 ## Patterns
 
-### Accessing Tool Input
+### Accessing Widget Data
 
-Widgets are called by the model in the same way as tools. The `useWidget` hook provides access to the tool input, typed based on widget metadata schmea you defined.
+The `useWidget` hook provides access to both the server-computed props and the original tool arguments:
 
 ```typescript
-const { props } = useWidget();
+const { props, toolInput, isPending } = useWidget();
 ```
+
+- **`props`** — Data computed by the server, sent via `structuredContent` (the LLM does **not** see this)
+- **`toolInput`** — The original tool call arguments from the model (e.g. `{ query: "mango" }`)
 
 **Example:**
 
@@ -401,12 +424,21 @@ export const widgetMetadata: WidgetMetadata = {
   description: 'Display product search results with filtering',
   props: z.object({
     query: z.string(),
+    results: z.array(z.object({ name: z.string() })),
   }),
 };
 
 const ProductSearchResult: React.FC = () => {
-  const { props } = useWidget();
-  return <div>Query: {props.query}</div>;
+  const { props, toolInput, isPending } = useWidget();
+
+  if (isPending) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <p>You searched for: {toolInput.query}</p>
+      <p>Found {props.results.length} results</p>
+    </div>
+  );
 };
 ```
 
@@ -418,6 +450,8 @@ Widgets render **before** the tool execution completes. This allows you to show 
 
 - `isPending = true`: Widget just mounted, `props` is empty `{}`
 - `isPending = false`: Tool completed, `props` contains actual data
+
+When the host supports it (MCP Apps, MCP Inspector), you can also show **streaming** tool arguments in real time via `partialToolInput` and `isStreaming` from `useWidget` for live previews while the LLM generates the tool call. See [Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) in the useWidget docs.
 
 **Pattern 1: Early return with loading state**
 
@@ -501,7 +535,71 @@ await setState((prev) => ({
 
 ### Calling Other Tools
 
-Widgets can call other MCP tools directly using `callTool`:
+Widgets can call MCP tools to perform actions and fetch data. Use the dedicated `useCallTool` hook for the best developer experience with automatic type inference and state management.
+
+<Info>
+**Automatic Type Inference**: When you run `mcp-use dev`, types are automatically generated from your tool definitions. This gives you autocomplete for tool names, inputs, and outputs.
+</Info>
+
+#### Using useCallTool (Recommended)
+
+The `useCallTool` hook provides TanStack Query-like state management with full TypeScript support:
+
+```tsx
+import { useWidget, useCallTool } from "mcp-use/react";
+
+const InteractiveWidget = () => {
+  const { props } = useWidget();
+  const { callTool, data, isPending, isSuccess, isError, error } = 
+    useCallTool("search-flights");
+
+  const handleSearch = () => {
+    callTool({ destination: "NYC", date: "2024-12-01" });
+  };
+
+  return (
+    <div>
+      <button onClick={handleSearch} disabled={isPending}>
+        {isPending ? "Searching..." : "Search Flights"}
+      </button>
+      {isSuccess && (
+        <ul>
+          {data.structuredContent.flights.map(flight => (
+            <li key={flight.id}>{flight.price}</li>
+          ))}
+        </ul>
+      )}
+      {isError && <p>Error: {error.message}</p>}
+    </div>
+  );
+};
+```
+
+**Benefits:**
+- ✅ **Type-safe**: Autocomplete for tool names, inputs, and outputs
+- ✅ **State management**: Built-in loading, success, and error states
+- ✅ **Callbacks**: Optional `onSuccess`, `onError`, and `onSettled` handlers
+- ✅ **Async/await**: Use `callToolAsync` for promise-based flows
+
+See [useCallTool()](/typescript/server/widget-components/usecalltool) for complete documentation.
+
+#### Type Generation
+
+Types are automatically generated during development:
+
+```bash
+# Types are generated automatically
+mcp-use dev
+
+# Or generate manually
+mcp-use generate-types
+```
+
+This creates `.mcp-use/tool-registry.d.ts` with type definitions for all your tools, enabling full IntelliSense in your widgets.
+
+#### Using useWidget.callTool (Alternative)
+
+You can also call tools directly from `useWidget()`:
 
 ```typescript
 const { callTool } = useWidget();
@@ -519,17 +617,9 @@ const handleSearch = async () => {
 };
 ```
 
-**Return Format:**
-
-```typescript
-const result: CallToolResponse = {
-  content: [
-    { type: 'text', text: '...' },
-    // ... other content items
-  ],
-  isError?: boolean
-};
-```
+<Note>
+While `useWidget().callTool` works, `useCallTool` is recommended for better type safety and state management.
+</Note>
 
 ### Display Mode Control
 
@@ -580,6 +670,49 @@ function MyWidget() {
     </WidgetControls>
   );
 }
+```
+
+### Downloads & External Links
+
+Widgets run inside sandboxed iframes, which block two common patterns:
+
+- **`Blob` + `URL.createObjectURL()`** — object URLs cannot cross the iframe boundary
+- **`element.requestFullscreen()`** — the browser Fullscreen API is blocked in sandboxed iframes (use `requestDisplayMode("fullscreen")` instead)
+
+Use `openExternal` from `useWidget()` for all outbound navigation. For file downloads, serve the file from the MCP server and open the URL externally:
+
+<Warning>
+Never use `new Blob(...)` + `URL.createObjectURL()` or `window.open()` inside a widget. Both are blocked by the iframe sandbox.
+</Warning>
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+function DownloadButton({ svgData }: { svgData: string }) {
+  const { mcp_url, openExternal } = useWidget();
+
+  const handleDownload = async () => {
+    // POST the content to a server-side endpoint
+    const res = await fetch(`${mcp_url}/api/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: svgData, filename: "export.svg" }),
+    });
+    const { id } = await res.json();
+
+    // Open the resulting URL — host handles the actual download
+    openExternal(`${mcp_url}/api/download/${id}`);
+  };
+
+  return <button onClick={handleDownload}>Download SVG</button>;
+}
+```
+
+Your MCP server needs to expose matching endpoints:
+
+```typescript
+// POST /api/download — store content, return an ID
+// GET  /api/download/:id — serve with Content-Disposition: attachment
 ```
 
 ## Custom Tools with Widgets
@@ -643,19 +776,20 @@ server.tool(
 **Key Points:**
 
 - **`widget: { name, invoking, invoked, ... }`** on tool definition - Configures all widget metadata at registration time
-- **`widget({ props, output, message })`** helper - Returns runtime data only:
-  - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
-  - `output` - Optional response helper result (text(), object(), etc.) that the model sees
-  - `message` - Optional text message override
+- **`widget({ props, output, metadata, message })`** helper - Returns runtime data only:
+  - `props` - Widget rendering data sent as `structuredContent` (LLM does **not** see). Widget reads via `useWidget().props`.
+  - `output` - Optional response helper (text(), object(), etc.) that the model sees in `content`
+  - `metadata` - Optional extra data in `_meta`. Widget reads via `useWidget().metadata`.
+  - `message` - Optional text message override for `content`
 - **Widget must exist** - The widget name must match a `.tsx` file or folder in `resources/`
-- **Disable auto-registration** - Set `exposeAsTool: false` in the widget's metadata if you only want it accessible through custom tools:
+- **`exposeAsTool` defaults to `false`** - Widgets are resources by default. This is the expected setup when returning widgets from custom tools. To opt into auto-registration instead, set `exposeAsTool: true` in the widget metadata:
 
 ```tsx
 // resources/weather-display/widget.tsx
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather information",
   props: propSchema,
-  exposeAsTool: false, // Only accessible via custom tools
+  exposeAsTool: true, // Opt in to auto-register as a tool
 };
 ```
 
@@ -698,12 +832,12 @@ CSP_URLS=https://myserver.com,...other domains
 
 - `MCP_URL`: Base URL for widget assets and public files. Used by Vite's `base` option during build. Also used by the server to configure CSP.
 - `MCP_SERVER_URL`: (Optional) MCP server URL for API calls. When set, URLs are injected at build time for static deployments where widgets are served from storage rather than the MCP server.
-- `CSP_URLS`: (Optional) Additional domains to whitelist in widget Content Security Policy. Supports comma-separated list. For Supabase, use the base project URL without path (e.g., `https://nnpumlykjksvxivhywwo.supabase.co`). Required for static deployments where widget assets are served from different domains.
+- `CSP_URLS`: (Optional) Additional domains to whitelist in widget Content Security Policy. Supports comma-separated list. For Supabase, use the base project URL without path (e.g., `https://nnpumlykjksvxivhywwo.supabase.co`). Required for static deployments where widget assets are served from different domains. See [Content Security Policy](./content-security-policy) for full CSP documentation.
 
 <Note>
 **Static Deployments**: Set `MCP_URL` (for assets), `MCP_SERVER_URL` (for API calls), and `CSP_URLS` (for CSP whitelisting) when deploying to platforms like Supabase where widgets are served from static storage.
 
-**Alternative CSP Configuration**: Instead of using the global `CSP_URLS` environment variable, you can configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` (see [Apps SDK Metadata](#apps-sdk-metadata) section above).
+**Alternative CSP Configuration**: Instead of using the global `CSP_URLS` environment variable, you can configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` (see [Apps SDK Metadata](#apps-sdk-metadata) or [Content Security Policy](./content-security-policy)).
 
 </Note>
 
@@ -743,6 +877,7 @@ You need to enable the Developer Mode in ChatGPT to test widgets.
 ## Next Steps
 
 - [MCP Apps](/typescript/server/mcp-apps) - Use the standard MCP protocol with dual-protocol support
+- [Content Security Policy](./content-security-policy) - CSP configuration for widgets
 - [Creating MCP Apps Server](./creating-mcp-apps-server) - Complete server setup guide
 - [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test widgets with the Inspector
 - [Widget Components](/typescript/server/widget-components/usewidget) - React components and hooks

@@ -1,0 +1,19 @@
+from mcp_use.server import MCPServer
+
+from routes.tools import router as tools_router
+from routes.resources import router as resources_router
+from routes.prompts import router as prompts_router
+
+server = MCPServer(
+    name="{{PROJECT_NAME}}",
+    version="0.1.0",
+    instructions="An MCP server built with mcp-use.",
+    debug=True,
+)
+
+server.include_router(tools_router, prefix="tools")
+server.include_router(resources_router)
+server.include_router(prompts_router)
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", port=8000, debug=True)

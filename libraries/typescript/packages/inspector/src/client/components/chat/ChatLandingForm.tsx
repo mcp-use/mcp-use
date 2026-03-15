@@ -15,6 +15,7 @@ import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
+import type { ToolInfo } from "./ToolSelector";
 import type { LLMConfig, MessageAttachment } from "./types";
 
 interface ChatLandingFormProps {
@@ -30,6 +31,9 @@ interface ChatLandingFormProps {
   selectedPrompt: Prompt | null;
   promptResults: PromptResult[];
   attachments: MessageAttachment[];
+  tools?: ToolInfo[];
+  disabledTools?: Set<string>;
+  onDisabledToolsChange?: (disabledTools: Set<string>) => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onKeyUp: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -44,6 +48,10 @@ interface ChatLandingFormProps {
   hideModelBadge?: boolean;
   /** When true, hides the MCP server URL below the title. */
   hideServerUrl?: boolean;
+  /** Optional quick question suggestions displayed below the landing input. */
+  quickQuestions?: string[];
+  /** Called when a quick question is selected. */
+  onQuickQuestionSelect?: (question: string) => void;
 }
 
 export function ChatLandingForm({
@@ -59,6 +67,9 @@ export function ChatLandingForm({
   selectedPrompt,
   promptResults,
   attachments,
+  tools,
+  disabledTools,
+  onDisabledToolsChange,
   onInputChange,
   onKeyDown,
   onKeyUp,
@@ -71,6 +82,8 @@ export function ChatLandingForm({
   onAttachmentRemove,
   hideModelBadge,
   hideServerUrl,
+  quickQuestions = [],
+  onQuickQuestionSelect,
 }: ChatLandingFormProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -119,6 +132,9 @@ export function ChatLandingForm({
                   "bg-white/80 dark:text-white dark:bg-black backdrop-blur-sm border-gray-200 dark:border-zinc-800",
                   promptResults.length > 0 && "pt-16"
                 )}
+                tools={tools}
+                disabledTools={disabledTools}
+                onDisabledToolsChange={onDisabledToolsChange}
                 onInputChange={onInputChange}
                 onKeyDown={onKeyDown}
                 onKeyUp={onKeyUp}
@@ -148,6 +164,23 @@ export function ChatLandingForm({
               </div>
             </div>
           </div>
+          {quickQuestions.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 px-2">
+              {quickQuestions.map((question) => (
+                <Button
+                  key={question}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full bg-white/70 dark:bg-black/50 text-gray-900 dark:text-white"
+                  onClick={() => onQuickQuestionSelect?.(question)}
+                  disabled={isLoading || !isConnected}
+                >
+                  {question}
+                </Button>
+              ))}
+            </div>
+          )}
           {llmConfig && !hideModelBadge && (
             <div className="flex justify-center mt-4">
               <Tooltip>

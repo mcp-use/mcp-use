@@ -63,9 +63,7 @@ export interface ToolServerContext<_HasOAuth extends boolean = false> {
   /** Registered tools list */
   registeredTools: string[];
   /** Convert Zod schema to params */
-  convertZodSchemaToParams(
-    schema: z.ZodObject<any>
-  ): Record<string, z.ZodSchema>;
+  convertZodSchemaToParams(schema: z.ZodTypeAny): Record<string, z.ZodSchema>;
   /** Create params schema from inputs */
   createParamsSchema(inputs: InputDefinition[]): Record<string, z.ZodSchema>;
   /** Create message for sampling */
@@ -143,7 +141,7 @@ export function toolRegistration<
   }
 
   // Determine input schema - prefer schema over inputs
-  let inputSchema: z.ZodObject<any> | Record<string, z.ZodSchema>;
+  let inputSchema: z.ZodTypeAny | Record<string, z.ZodSchema>;
 
   if (toolDefinition.schema) {
     // Pass the full Zod schema directly to the SDK
@@ -192,6 +190,26 @@ export function toolRegistration<
           extraSendNotification
         );
 
+      // Extract sessionId from sessions Map
+      let sessionId: string | undefined;
+      if (session) {
+        for (const [sid, s] of this.sessions.entries()) {
+          if (s === session) {
+            sessionId = sid;
+            break;
+          }
+        }
+      }
+
+      // Build request-level user meta from extra._meta (strip SDK-internal progressToken).
+      const requestMeta =
+        extra?._meta &&
+        Object.keys(extra._meta).some((k) => k !== "progressToken")
+          ? (Object.fromEntries(
+              Object.entries(extra._meta).filter(([k]) => k !== "progressToken")
+            ) as Record<string, unknown>)
+          : undefined;
+
       // Create enhanced context with sample, elicit, and reportProgress methods
       const enhancedContext = createEnhancedContext(
         requestContext,
@@ -200,7 +218,11 @@ export function toolRegistration<
         progressToken,
         sendNotification,
         session?.logLevel,
-        session?.clientCapabilities
+        session?.clientCapabilities,
+        sessionId,
+        this.sessions,
+        session?.clientInfo,
+        requestMeta
       );
 
       // Execute callback

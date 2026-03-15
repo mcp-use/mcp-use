@@ -41,9 +41,8 @@ Here's a simple example of creating a custom agent using the LangChain adapter:
 <CodeGroup>
 ```python Python
 import asyncio
-from langchain_openai import ChatOpenAI
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents import create_agent
+from langchain.chat_models import init_chat_model
 
 from mcp_use.client import MCPClient
 from mcp_use.adapters import LangChainAdapter
@@ -59,25 +58,20 @@ async def main():
     tools = await adapter.create_tools(client)
 
     # Initialize your language model
-    llm = ChatOpenAI(model="gpt-4o")
-
-    # Create a prompt template
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a helpful assistant with access to powerful tools."),
-        MessagesPlaceholder(variable_name="chat_history"),
-        ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
-    ])
+    model = init_chat_model("gpt-4o", temperature=0.5)
 
     # Create the agent
-    agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
-
-    # Create the agent executor
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = create_agent(
+        model=model,
+        tools=tools,
+        system_prompt="You are a helpful assistant with access to powerful tools.",
+    )
 
     # Run the agent
-    result = await agent_executor.ainvoke({"input": "What can you do?"})
-    print(result["output"])
+    result = await agent.ainvoke(
+        {"messages": [{"role": "user", "content": "What can you do?"}]}
+    )
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())

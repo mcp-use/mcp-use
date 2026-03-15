@@ -95,7 +95,7 @@ export class StdioConnector extends BaseConnector {
             ? { sampling: {} }
             : {}),
           // Add elicitation capability if callback is provided
-          ...(this.opts.elicitationCallback
+          ...((this.opts.onElicitation ?? this.opts.elicitationCallback)
             ? { elicitation: { form: {}, url: {} } }
             : {}),
         },

@@ -8,8 +8,6 @@ export const MCP_APPS_CONFIG = {
    */
   API_ENDPOINTS: {
     WIDGET_STORE: "/inspector/api/mcp-apps/widget/store",
-    DEV_WIDGET_CONTENT: (toolCallId: string) =>
-      `/inspector/api/mcp-apps/dev-widget-content/${toolCallId}`,
     WIDGET_CONTENT: (toolCallId: string) =>
       `/inspector/api/mcp-apps/widget-content/${toolCallId}`,
   },
@@ -35,6 +33,8 @@ export const MCP_APPS_CONFIG = {
   DIMENSIONS: {
     /** Picture-in-picture width */
     PIP_WIDTH: 768,
+    /** Picture-in-picture max width (cap so widget can expand up to this) */
+    PIP_MAX_WIDTH: 700,
     /** Picture-in-picture height */
     PIP_HEIGHT: 400,
     /** Default iframe height for inline mode */

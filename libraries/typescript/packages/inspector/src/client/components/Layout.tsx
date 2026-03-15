@@ -58,6 +58,15 @@ export function Layout({ children }: LayoutProps) {
         proxyConfig,
         transportType,
         preventAutoAuth: true,
+        clientOptions: {
+          capabilities: {
+            extensions: {
+              "io.modelcontextprotocol/ui": {
+                mimeTypes: ["text/html;profile=mcp-app"],
+              },
+            },
+          },
+        },
       });
     },
     [addServer]
@@ -137,7 +146,6 @@ export function Layout({ children }: LayoutProps) {
         "sampling",
         "elicitation",
         "notifications",
-        "playground",
       ];
       if (validTabs.includes(tab as TabType)) {
         setActiveTab(tab as TabType);
@@ -486,6 +494,100 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [location.search, navigate, connections]);
 
+  // Handle mcp-inspector:connect_servers postMessage from parent frame.
+  // Allows a host page to securely pass server configs (incl. auth) without
+  // putting tokens in the URL.
+  useEffect(() => {
+    if (!isEmbedded) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== "object") return;
+      if (event.data.type !== "mcp-inspector:connect_servers") return;
+
+      const serverList = event.data.servers;
+      if (!Array.isArray(serverList) || serverList.length === 0) return;
+
+      let firstServerId: string | null = null;
+      for (const srv of serverList) {
+        if (!srv.url || typeof srv.url !== "string") continue;
+
+        const url: string = srv.url;
+        const name: string = srv.name ?? "Server";
+        const transportType: "http" | "sse" = srv.transportType ?? "http";
+
+        // Build custom headers from auth config (same logic as useAutoConnect)
+        const customHeaders: Record<string, string> = {
+          ...(srv.headers ?? {}),
+        };
+        if (srv.auth?.access_token) {
+          const tokenType = srv.auth.token_type || "bearer";
+          const formatted =
+            tokenType.charAt(0).toUpperCase() + tokenType.slice(1);
+          customHeaders.Authorization = `${formatted} ${srv.auth.access_token}`;
+        }
+
+        const proxyConfig: {
+          proxyAddress: string;
+          headers?: Record<string, string>;
+        } = {
+          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+          ...(Object.keys(customHeaders).length > 0 && {
+            headers: customHeaders,
+          }),
+        };
+
+        // Avoid duplicates
+        const existing = connections.find((c) => c.url === url);
+        if (!existing) {
+          addConnection(url, name, proxyConfig, transportType);
+        }
+
+        if (!firstServerId) {
+          firstServerId = url;
+        }
+      }
+
+      // Confirm back to parent
+      if (window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: "mcp-inspector:servers_connected",
+            count: serverList.length,
+          },
+          "*"
+        );
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [isEmbedded, connections, addConnection]);
+
+  // Auto-select the first ready server when new servers connect via postMessage.
+  // This handles the case where connect_servers adds servers and we need to
+  // navigate to one of them once it's ready.
+  const postMessageAutoSelectRef = useRef(false);
+  useEffect(() => {
+    if (!isEmbedded || postMessageAutoSelectRef.current) return;
+    if (selectedServerId) return;
+
+    const readyServer = connections.find((c) => c.state === "ready");
+    if (readyServer) {
+      postMessageAutoSelectRef.current = true;
+      setSelectedServerId(readyServer.id);
+      const params = new URLSearchParams(location.search);
+      params.set("server", readyServer.id);
+      navigate(`/?${params.toString()}`, { replace: true });
+    }
+  }, [
+    isEmbedded,
+    connections,
+    selectedServerId,
+    setSelectedServerId,
+    navigate,
+    location.search,
+  ]);
+
   // Centralized keyboard shortcuts
   useKeyboardShortcuts({
     onCommandPalette: () => handleCommandPaletteOpen("keyboard"),
@@ -597,44 +699,6 @@ export function Layout({ children }: LayoutProps) {
             {children}
           </LayoutContent>
         </main>
-
-        {/* Footer Helper */}
-        {!isEmbedded && (
-          <div className="text-xs text-zinc-500 dark:text-zinc-400 px-2">
-            Having trouble connecting?{" "}
-            <button
-              onClick={() => {
-                // Clear all mcp-related localStorage keys
-                const keysToRemove: string[] = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                  const key = localStorage.key(i);
-                  if (
-                    key &&
-                    (key.startsWith("mcp:auth") ||
-                      key.startsWith("mcp-inspector"))
-                  ) {
-                    keysToRemove.push(key);
-                  }
-                }
-
-                keysToRemove.forEach((key) => localStorage.removeItem(key));
-
-                toast.success(
-                  `Cleared ${keysToRemove.length} localStorage item(s). Refreshing page...`,
-                  { duration: 2000 }
-                );
-
-                // Refresh the page after a brief delay to show the toast
-                setTimeout(() => {
-                  window.location.reload();
-                }, 500);
-              }}
-              className="text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:underline"
-            >
-              Clear localStorage
-            </button>
-          </div>
-        )}
 
         {/* Command Palette */}
         <CommandPalette

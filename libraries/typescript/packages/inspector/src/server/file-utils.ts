@@ -6,9 +6,6 @@ import { fileURLToPath } from "node:url";
  * Node.js-specific file system utilities for the MCP Inspector server
  */
 
-/**
- * Get content type for static assets
- */
 export function getContentType(filePath: string): string {
   if (filePath.endsWith(".js")) {
     return "application/javascript";
@@ -31,29 +28,23 @@ export function getContentType(filePath: string): string {
   }
 }
 
-/**
- * Check if client files exist
- */
 export function checkClientFiles(clientDistPath: string): boolean {
   return existsSync(clientDistPath);
 }
 
 /**
- * Get client dist path
- * Returns different paths depending on whether running from CLI or server
+ * Get client dist path.
+ * Returns different paths depending on whether running from CLI or server.
  */
 export function getClientDistPath(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
 
-  // Check if we're running from dist/cli.js or dist/server/*.js
   // CLI: dist/cli.js -> path is './web'
   // Server: dist/server/*.js -> path is '../web'
   if (__dirname.endsWith("dist") || __dirname.endsWith("dist/")) {
-    // Running from CLI (dist/cli.js)
     return join(__dirname, "web");
   }
 
-  // Running from server (dist/server/*.js)
   return join(__dirname, "../web");
 }

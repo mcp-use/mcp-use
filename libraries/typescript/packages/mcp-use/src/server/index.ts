@@ -25,6 +25,12 @@ export {
   runWithContext,
 } from "./context-storage.js";
 
+// Client capability utilities
+export {
+  supportsApps,
+  type UserContext,
+} from "./tools/tool-execution-helpers.js";
+
 // Response helper utilities for tools and resources
 export {
   array,
@@ -53,6 +59,23 @@ export {
   type Completable,
   type CompletionContext,
 } from "./utils/completion-helpers.js";
+export {
+  enumSchema,
+  legacyEnum,
+  titledEnum,
+  titledMultiEnum,
+  untitledEnum,
+  untitledMultiEnum,
+  type ElicitationEnumFieldSchema,
+  type ElicitationEnumObjectSchema,
+  type EnumOption,
+  type LegacyEnumOption,
+  type LegacyEnumSchema,
+  type TitledEnumSchema,
+  type TitledMultiEnumSchema,
+  type UntitledEnumSchema,
+  type UntitledMultiEnumSchema,
+} from "./utils/elicitation-helpers.js";
 
 // OAuth utilities for authentication and authorization
 export {
@@ -137,10 +160,19 @@ export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 
 // Landing page generator for browser requests
-export { generateLandingPage } from "./landing.js";
+export {
+  generateLandingPage,
+  type LandingPageTool,
+  type LandingPagePrompt,
+  type LandingPageResource,
+} from "./landing.js";
+
+// Tool registry type generator (for CLI generate-types command)
+export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
 
 export type {
   AppsSdkUIResource,
+  ClientCapabilityChecker,
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
   GetPromptResult,

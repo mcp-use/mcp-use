@@ -69,7 +69,7 @@ function extractErrorMessage(
 
   // Handle error property directly
   if ("error" in result && result.error) {
-    return result.error;
+    return String(result.error);
   }
 
   // GetPromptResult has messages, not content
@@ -302,15 +302,16 @@ export function PromptResultDisplay({
               </div>
             ) : formattedMode && hasMessages ? (
               <div className="space-y-3">
-                {result.result.messages.map(
-                  (message: any, msgIndex: number) => (
-                    <PromptMessageCard
-                      key={msgIndex}
-                      message={message}
-                      index={msgIndex}
-                    />
-                  )
-                )}
+                {("messages" in result.result
+                  ? result.result.messages
+                  : []
+                ).map((message: any, msgIndex: number) => (
+                  <PromptMessageCard
+                    key={msgIndex}
+                    message={message}
+                    index={msgIndex}
+                  />
+                ))}
               </div>
             ) : (
               <JSONDisplay

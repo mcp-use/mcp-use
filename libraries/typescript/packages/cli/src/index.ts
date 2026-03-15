@@ -14,6 +14,8 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
+import { createSkillsCommand } from "./commands/skills.js";
+import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 
 const program = new Command();
 
@@ -318,6 +320,54 @@ async function findServerFile(projectPath: string): Promise<string> {
     }
   }
   throw new Error("No server file found");
+}
+
+async function generateToolRegistryTypesForServer(
+  projectPath: string,
+  serverFileRelative: string
+): Promise<void> {
+  const serverFile = path.join(projectPath, serverFileRelative);
+  const serverFileExists = await access(serverFile)
+    .then(() => true)
+    .catch(() => false);
+
+  if (!serverFileExists) {
+    throw new Error(`Server file not found: ${serverFile}`);
+  }
+
+  const previousHmrMode = (globalThis as any).__mcpUseHmrMode;
+
+  try {
+    // Prevent server startup side effects while importing registrations.
+    (globalThis as any).__mcpUseHmrMode = true;
+    (globalThis as any).__mcpUseLastServer = undefined;
+
+    const { tsImport } = await import("tsx/esm/api");
+    await tsImport(serverFile, {
+      parentURL: import.meta.url,
+      tsconfig: path.join(projectPath, "tsconfig.json"),
+    });
+
+    const server = (globalThis as any).__mcpUseLastServer;
+    if (!server) {
+      throw new Error(
+        "No MCPServer instance found. Make sure your server file creates an MCPServer instance."
+      );
+    }
+
+    const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+    const { generateToolRegistryTypes } = await import(
+      path.join(mcpUsePath, "dist", "src", "server", "index.js")
+    ).then((mod) => mod);
+
+    if (!generateToolRegistryTypes) {
+      throw new Error("generateToolRegistryTypes not found in mcp-use package");
+    }
+
+    await generateToolRegistryTypes(server.registrations.tools, projectPath);
+  } finally {
+    (globalThis as any).__mcpUseHmrMode = previousHmrMode ?? false;
+  }
 }
 
 async function buildWidgets(
@@ -940,9 +990,27 @@ program
         // No server file found, that's okay for widget-only projects
       }
 
+      if (sourceServerFile) {
+        console.log(chalk.gray("Generating tool registry types..."));
+        await generateToolRegistryTypesForServer(projectPath, sourceServerFile);
+        console.log(chalk.green("✓ Tool registry types generated"));
+      }
+
       // Then run tsc (now schemas are available for import)
+      // Use the locally installed typescript binary directly rather than npx to
+      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package when
+      // typescript is not found in node_modules.
+      // Raise the Node.js heap limit for tsc to avoid OOM on projects with
+      // heavy transitive types (React, Zod v4, etc.).
       console.log(chalk.gray("Building TypeScript..."));
-      await runCommand("npx", ["tsc"], projectPath);
+      await runCommand(
+        "node",
+        [
+          "--max-old-space-size=4096",
+          path.join(projectPath, "node_modules", "typescript", "bin", "tsc"),
+        ],
+        projectPath
+      ).promise;
       console.log(chalk.green("✓ TypeScript build complete!"));
 
       // Determine where the entry point was compiled to
@@ -1035,6 +1103,7 @@ program
       if (options.withInspector) {
         console.log(chalk.gray("  Inspector included"));
       }
+      process.exit(0);
     } catch (error) {
       console.error(chalk.red("Build failed:"), error);
       process.exit(1);
@@ -1053,7 +1122,7 @@ program
   )
   .option("--no-open", "Do not auto-open inspector")
   .option("--no-hmr", "Disable hot module reloading (use tsx watch instead)")
-  // .option('--tunnel', 'Expose server through a tunnel')
+  .option("--tunnel", "Expose server through a tunnel")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -1074,15 +1143,77 @@ program
       // Find the main source file
       const serverFile = await findServerFile(projectPath);
 
+      // Start tunnel if requested
+      let tunnelProcess: any = undefined;
+      let tunnelSubdomain: string | undefined = undefined;
+      let tunnelUrl: string | undefined = undefined;
+
+      if (options.tunnel) {
+        try {
+          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          let existingSubdomain: string | undefined;
+
+          try {
+            const manifestContent = await readFile(manifestPath, "utf-8");
+            const manifest = JSON.parse(manifestContent);
+            existingSubdomain = manifest.tunnel?.subdomain;
+            if (existingSubdomain) {
+              console.log(
+                chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
+              );
+            }
+          } catch {
+            // Manifest doesn't exist or is invalid, that's okay
+          }
+
+          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          tunnelUrl = tunnelInfo.url;
+          tunnelProcess = tunnelInfo.process;
+          tunnelSubdomain = tunnelInfo.subdomain;
+
+          // Persist subdomain for reuse across restarts
+          try {
+            let manifest: any = {};
+            try {
+              const manifestContent = await readFile(manifestPath, "utf-8");
+              manifest = JSON.parse(manifestContent);
+            } catch {
+              // File doesn't exist, create new manifest
+            }
+
+            if (!manifest.tunnel) {
+              manifest.tunnel = {};
+            }
+            manifest.tunnel.subdomain = tunnelSubdomain;
+
+            await mkdir(path.dirname(manifestPath), { recursive: true });
+            await writeFile(
+              manifestPath,
+              JSON.stringify(manifest, null, 2),
+              "utf-8"
+            );
+          } catch (error) {
+            console.warn(
+              chalk.yellow(
+                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+              )
+            );
+          }
+        } catch (error) {
+          console.error(chalk.red("Failed to start tunnel:"), error);
+          process.exit(1);
+        }
+      }
+
       // Set environment variables for the server
       const mcpUrl = `http://${host}:${port}`;
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
-      // Only set MCP_URL if not already provided by the user.
-      // Users may set MCP_URL to an external proxy URL (ngrok, E2B, etc.)
-      // for correct widget URLs and HMR WebSocket connections through proxies.
-      if (!process.env.MCP_URL) {
+      // Tunnel URL takes priority; otherwise preserve user-provided MCP_URL (e.g., for reverse proxy setups)
+      if (tunnelUrl) {
+        process.env.MCP_URL = tunnelUrl;
+      } else if (!process.env.MCP_URL) {
         process.env.MCP_URL = mcpUrl;
       }
 
@@ -1140,11 +1271,14 @@ program
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const startTime = Date.now();
-          const ready = await waitForServer(port, host);
+          const browserHost = normalizeBrowserHost(host);
+          const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const browserHost = normalizeBrowserHost(host);
             const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const autoConnectEndpoint = tunnelUrl
+              ? `${tunnelUrl}/mcp`
+              : mcpEndpoint;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1153,20 +1287,52 @@ program
             );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+            if (tunnelUrl) {
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+            }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
           }
         }
 
         // Handle cleanup
-        const cleanup = () => {
+        let noHmrCleanupInProgress = false;
+        const cleanup = async () => {
+          if (noHmrCleanupInProgress) return;
+          noHmrCleanupInProgress = true;
+
           console.log(chalk.gray("\n\nShutting down..."));
+
+          if (
+            tunnelProcess &&
+            typeof (tunnelProcess as any).markShutdown === "function"
+          ) {
+            (tunnelProcess as any).markShutdown();
+          }
+
+          if (tunnelSubdomain) {
+            try {
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+                method: "DELETE",
+              });
+            } catch {
+              // Ignore cleanup errors
+            }
+          }
+
           processes.forEach((proc) => {
             if (proc && typeof proc.kill === "function") {
               proc.kill("SIGINT");
             }
           });
-          setTimeout(() => process.exit(0), 1000);
+
+          if (tunnelProcess && typeof tunnelProcess.kill === "function") {
+            tunnelProcess.kill("SIGINT");
+          }
+
+          setTimeout(() => process.exit(0), 2000);
         };
 
         process.on("SIGINT", cleanup);
@@ -1326,11 +1492,14 @@ program
 
         // Auto-open inspector if enabled
         if (options.open !== false) {
-          const ready = await waitForServer(port, host);
+          const browserHost = normalizeBrowserHost(host);
+          const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const browserHost = normalizeBrowserHost(host);
             const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(mcpEndpoint)}`;
+            const autoConnectEndpoint = tunnelUrl
+              ? `${tunnelUrl}/mcp`
+              : mcpEndpoint;
+            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1339,6 +1508,9 @@ program
             );
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+            if (tunnelUrl) {
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+            }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
             console.log(chalk.gray(`Watching for changes...\n`));
             await open(inspectorUrl);
@@ -1361,6 +1533,9 @@ program
         console.log(chalk.green.bold(`✓ Server ready`));
         console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+        if (tunnelUrl) {
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+        }
         console.log(chalk.gray(`Watching for changes...\n`));
       }
 
@@ -1544,10 +1719,39 @@ program
       });
 
       // Handle cleanup
-      const cleanup = () => {
+      let hmrCleanupInProgress = false;
+      const cleanup = async () => {
+        if (hmrCleanupInProgress) return;
+        hmrCleanupInProgress = true;
+
         console.log(chalk.gray("\n\nShutting down..."));
         watcher.close();
-        process.exit(0);
+
+        if (
+          tunnelProcess &&
+          typeof (tunnelProcess as any).markShutdown === "function"
+        ) {
+          (tunnelProcess as any).markShutdown();
+        }
+
+        if (tunnelSubdomain) {
+          try {
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+
+        if (tunnelProcess && typeof tunnelProcess.kill === "function") {
+          tunnelProcess.kill("SIGINT");
+          setTimeout(() => process.exit(0), 2000);
+        } else {
+          process.exit(0);
+        }
       };
 
       process.on("SIGINT", cleanup);
@@ -1715,6 +1919,8 @@ program
       if (mcpUrl) {
         env.MCP_URL = mcpUrl;
         console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
+      } else if (!env.MCP_URL) {
+        env.MCP_URL = `http://localhost:${port}`;
       }
 
       const serverProc = spawn("node", [serverFile], {
@@ -1853,6 +2059,10 @@ program
     "Environment variables (can be used multiple times)"
   )
   .option("--env-file <path>", "Path to .env file with environment variables")
+  .option(
+    "--root-dir <path>",
+    "Root directory within repo to deploy from (for monorepos)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -1862,6 +2072,7 @@ program
       new: options.new,
       env: options.env,
       envFile: options.envFile,
+      rootDir: options.rootDir,
     });
   });
 
@@ -1870,5 +2081,41 @@ program.addCommand(createClientCommand());
 
 // Deployments command
 program.addCommand(createDeploymentsCommand());
+
+// Skills command
+program.addCommand(createSkillsCommand());
+
+// Generate types command
+program
+  .command("generate-types")
+  .description(
+    "Generate TypeScript type definitions for tools (writes .mcp-use/tool-registry.d.ts)"
+  )
+  .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option("--server <file>", "Server entry file", "index.ts")
+  .action(async (options) => {
+    const projectPath = path.resolve(options.path);
+
+    try {
+      console.log(chalk.blue("Generating tool registry types..."));
+      await generateToolRegistryTypesForServer(projectPath, options.server);
+      console.log(chalk.green("✓ Tool registry types generated successfully"));
+      process.exit(0);
+    } catch (error) {
+      console.error(
+        chalk.red("Failed to generate types:"),
+        error instanceof Error ? error.message : String(error)
+      );
+      if (error instanceof Error && error.stack) {
+        console.error(chalk.gray(error.stack));
+      }
+      process.exit(1);
+    }
+  });
+
+program.hook("preAction", async (_thisCommand, actionCommand) => {
+  const projectPath = actionCommand.opts().path as string | undefined;
+  await notifyIfUpdateAvailable(projectPath);
+});
 
 program.parse();

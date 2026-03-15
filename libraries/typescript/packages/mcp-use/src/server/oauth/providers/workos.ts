@@ -26,7 +26,7 @@ export class WorkOSOAuthProvider implements OAuthProvider {
 
   constructor(config: WorkOSOAuthConfig) {
     this.config = config;
-    this.issuer = `https://${config.subdomain}.authkit.app`;
+    this.issuer = `https://${config.subdomain}`;
   }
 
   private getJWKS(): ReturnType<typeof createRemoteJWKSet> {
@@ -101,16 +101,9 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   }
 
   getMode(): OAuthMode {
-    // If a client_id is configured, use proxy mode so we can inject it
-    // Otherwise use direct mode with Dynamic Client Registration
-    if (this.config.clientId) {
-      console.log("[WorkOS OAuth] Using proxy mode (pre-registered client)");
-      return "proxy";
-    }
-    console.log(
-      "[WorkOS OAuth] Using direct mode (Dynamic Client Registration)"
-    );
-    return "direct";
+    // Always proxy — WorkOS is an external provider, so the MCP server must
+    // proxy OAuth metadata and endpoints to avoid browser CORS issues.
+    return "proxy";
   }
 
   getRegistrationEndpoint(): string | undefined {

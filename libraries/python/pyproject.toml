@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mcp>=1.23.0",
+    "mcp>=1.24.0",
     "langchain>=1.0.0",
     "websockets>=15.0",
     "httpx>=0.27.1",
@@ -98,3 +98,6 @@ exclude = ["tests/**"]
 
 [tool.ty.rules]
 possibly-missing-attribute = "ignore"
+
+[project.scripts]
+create-mcp-use = "mcp_use.server.templates.cli:main"

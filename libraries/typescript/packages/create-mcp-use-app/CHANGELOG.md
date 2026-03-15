@@ -1,5 +1,171 @@
 # create-mcp-use-app
 
+## 0.14.5
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+
+## 0.14.5-canary.0
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+
+## 0.14.4
+
+### Patch Changes
+
+- ed1b034: fix(create-mcp-use-app): remove flickering behaviour from npm i
+
+## 0.14.4-canary.0
+
+### Patch Changes
+
+- 34eb6d2: fix(create-mcp-use-app): remove flickering behaviour from npm i
+
+## 0.14.3
+
+### Patch Changes
+
+- 405fac7: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+
+## 0.14.3-canary.0
+
+### Patch Changes
+
+- 869eafa: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+
+## 0.14.2
+
+### Patch Changes
+
+- 9d8a73f: fix(templates): remove unused dependencies
+- 9d8a73f: fix(templates): update gitignore
+
+## 0.14.2-canary.1
+
+### Patch Changes
+
+- 26b5a5d: fix(templates): remove unused dependencies
+
+## 0.14.2-canary.0
+
+### Patch Changes
+
+- 608a95f: fix(templates): update gitignore
+
+## 0.14.1
+
+### Patch Changes
+
+- 4546a8c: Unify logo display across all CLI entry paths
+
+## 0.14.1-canary.0
+
+### Patch Changes
+
+- 4e0f531: Unify logo display across all CLI entry paths
+
+## 0.14.0
+
+### Minor Changes
+
+- 5a73b41: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+- 5a73b41: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+### Patch Changes
+
+- 5a73b41: Improve CLI prompts, install order, branding, and project structure output
+- 5a73b41: Fix(docs): updated docs to remove outdated information
+
+## 0.14.0-canary.3
+
+### Patch Changes
+
+- 04cae62: Improve CLI prompts, install order, branding, and project structure output
+
+## 0.14.0-canary.2
+
+### Patch Changes
+
+- 76f10ec: Fix(docs): updated docs to remove outdated information
+
+## 0.14.0-canary.1
+
+### Minor Changes
+
+- f55c56e: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+## 0.14.0-canary.0
+
+### Minor Changes
+
+- ba0ea97: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+## 0.13.2
+
+### Patch Changes
+
+- 7ebe19a: Add missing @types/react and @types/react-dom to template devDependencies
+
+## 0.13.2-canary.0
+
+### Patch Changes
+
+- 0b40a3b: Add missing @types/react and @types/react-dom to template devDependencies
+
+## 0.13.1
+
+### Patch Changes
+
+- 179e800: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+
+## 0.13.1-canary.0
+
+### Patch Changes
+
+- 9ef0ba9: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+
+## 0.13.0
+
+### Minor Changes
+
+- f4e2a70: Add optional skills and dependencies installation for claude-code, cursor, and codex with interactive prompts. Users can control `--install`/`--no-install` flags. Fix test-cli.sh to point to a valid template (starter).
+
+## 0.13.0-canary.0
+
+### Minor Changes
+
+- 64fcbbc: Add optional skills and dependencies installation for claude-code, cursor, and codex with interactive prompts. Users can control `--install`/`--no-install` flags. Fix test-cli.sh to point to a valid template (starter).
+
 ## 0.12.3
 
 ### Patch Changes
@@ -456,13 +622,13 @@
 
   **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
 
-  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+  **Learn more:** [LangChain Integration](https://mcp-use.com/docs/typescript/agent/llm-integration)
 
   ### WebSocket Transport Removed
 
   WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
 
-  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+  **Learn more:** [Client Configuration](https://mcp-use.com/docs/typescript/client/client-configuration)
 
   ## Features
 
@@ -519,7 +685,7 @@
   **Deprecated:**
   - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
 
-  **Learn more:** [Session Management](/typescript/server/session-management)
+  **Learn more:** [Session Management](https://mcp-use.com/docs/typescript/server/session-management)
 
   ### Favicon Support for Widgets
 
@@ -537,13 +703,13 @@
   - CLI build process includes favicon in widget HTML pages
   - Long-term caching (1 year) for favicon assets
 
-  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://mcp-use.com/docs/typescript/server/configuration)
 
   ### CLI Client Support
 
   Added dedicated CLI client support for better command-line integration and testing.
 
-  **Learn more:** [CLI Client](/typescript/client/cli)
+  **Learn more:** [CLI Client](https://mcp-use.com/docs/typescript/client/cli)
 
   ### Enhanced Session Methods
   - `callTool()` method now defaults args to an empty object
@@ -573,7 +739,7 @@
 
   Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
 
-  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+  **Learn more:** [useMcp Hook](https://mcp-use.com/docs/typescript/client/usemcp)
 
   ### Session & Transport Fixes
   - Fixed transport cleanup when session becomes idle

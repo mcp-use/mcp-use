@@ -113,22 +113,35 @@ export function registerPrompt(
     // Get the HTTP request context from AsyncLocalStorage
     const { getRequestContext, runWithContext } =
       await import("../context-storage.js");
-    const { findSessionContext } =
+    const { findSessionContext, createClientCapabilityChecker } =
       await import("../tools/tool-execution-helpers.js");
 
     const initialRequestContext = getRequestContext();
 
     // Find session context
     const sessions = (this as any).sessions || new Map();
-    const { requestContext } = findSessionContext(
+    const { requestContext, session } = findSessionContext(
       sessions,
       initialRequestContext,
       undefined,
       undefined
     );
 
-    // Create enhanced context (without tool-specific features like sample/elicit/reportProgress)
-    const enhancedContext = requestContext || {};
+    // Create enhanced context with client capability checker.
+    // Use Object.defineProperty to ensure the own property is created even
+    // when the Hono Context prototype has a non-writable or accessor property.
+    const enhancedContext: any = requestContext
+      ? Object.create(requestContext)
+      : {};
+    Object.defineProperty(enhancedContext, "client", {
+      value: createClientCapabilityChecker(
+        session?.clientCapabilities,
+        session?.clientInfo
+      ),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
 
     // Execute callback with context
     const executeCallback = async () => {

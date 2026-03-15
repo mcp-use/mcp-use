@@ -72,11 +72,9 @@ export class InMemoryStreamManager implements StreamManager {
       for (const [_id, controller] of this.streams.entries()) {
         try {
           controller.enqueue(encoded);
-        } catch (error) {
-          console.warn(
-            `[InMemoryStreamManager] Failed to send to session ${_id}:`,
-            error
-          );
+        } catch {
+          // Client disconnected or stream closed - remove stale entry
+          this.streams.delete(_id);
         }
       }
     } else {
@@ -86,11 +84,9 @@ export class InMemoryStreamManager implements StreamManager {
         if (controller) {
           try {
             controller.enqueue(encoded);
-          } catch (error) {
-            console.warn(
-              `[InMemoryStreamManager] Failed to send to session ${sessionId}:`,
-              error
-            );
+          } catch {
+            // Client disconnected or stream closed - remove stale entry
+            this.streams.delete(sessionId);
           }
         }
       }

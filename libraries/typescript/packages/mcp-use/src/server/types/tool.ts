@@ -165,19 +165,45 @@ export interface ToolDefinition<
   TOutput extends Record<string, unknown> = Record<string, unknown>,
   HasOAuth extends boolean = false,
 > {
-  /** Unique identifier for the tool */
+  /**
+   * Unique identifier for the tool .
+   * Must match the name passed to useCallTool("name") in widget components.
+   *
+   * @example "search-products"
+   * @example "get-weather"
+   */
   name: string;
-  /** Human-readable title for the tool (displayed in UI) */
+  /**
+   * Human-readable title displayed in UI (clients, inspector).
+   * If omitted, `name` is used.
+   *
+   * @example "Search Products"
+   */
   title?: string;
-  /** Description of what the tool does (optional) */
+  /**
+   * LLM-facing description of what the tool does.
+   * Helps the model decide when to invoke this tool.
+   *
+   * @example "Search products by query and display results in a visual widget"
+   */
   description?: string;
   /** Input parameter definitions (legacy, use schema instead) */
   /** @deprecated Use schema instead */
   inputs?: InputDefinition[];
-  /** Zod schema for input validation (alias for inputs, preferred) */
-  schema?: z.ZodObject<any>;
-  /** Zod schema for structured output validation */
-  outputSchema?: z.ZodObject<any>;
+  /**
+   * Zod schema for input validation. Use .describe() on each field for LLM hints.
+   * Preferred over inputs for type safety and better model guidance.
+   *
+   * @example z.object({ query: z.string().describe("Search term"), limit: z.number().optional().describe("Max results") })
+   */
+  schema?: z.ZodTypeAny;
+  /**
+   * Zod schema for structured output. Enables type inference in useCallTool().
+   * Types are generated to .mcp-use/tool-registry.d.ts when using mcp-use dev.
+   *
+   * @example z.object({ fruit: z.string(), color: z.string(), facts: z.array(z.string()) })
+   */
+  outputSchema?: z.ZodTypeAny;
   /**
    * Async callback function that executes the tool.
    * Receives tool parameters and an enhanced context with sampling, auth, and request info.
@@ -235,18 +261,40 @@ export interface ToolDefinition<
 
 /**
  * Configuration for a tool that returns a widget.
- * This is set at registration time and configures all the metadata
- * needed for proper widget rendering in Inspector and ChatGPT.
+ * Set at registration time; configures metadata for widget rendering in Inspector and ChatGPT.
  */
 export interface ToolWidgetConfig {
-  /** Widget name from resources folder */
+  /**
+   * Widget name; must match a file in resources/ (e.g., resources/weather-display.tsx).
+   *
+   * @example "weather-display"
+   * @example "product-search-result"
+   */
   name: string;
-  /** Status text while tool is invoking (defaults to "Loading {name}...") */
+  /**
+   * Status text shown while the tool is running.
+   * Defaults to "Loading {name}..." if omitted.
+   *
+   * @example "Fetching weather data..."
+   * @example "Searching fruits..."
+   */
   invoking?: string;
-  /** Status text after tool has invoked (defaults to "{name} ready") */
+  /**
+   * Status text shown after the tool completes.
+   * Defaults to "{name} ready" if omitted.
+   *
+   * @example "Weather loaded"
+   * @example "Fruits loaded"
+   */
   invoked?: string;
-  /** Whether the widget can initiate tool calls (defaults to true) */
+  /**
+   * Whether the widget can initiate tool calls (e.g., useCallTool).
+   * Defaults to true.
+   */
   widgetAccessible?: boolean;
-  /** Whether this tool result can produce a widget (defaults to true) */
+  /**
+   * Whether this tool result can produce a widget.
+   * Defaults to true.
+   */
   resultCanProduceWidget?: boolean;
 }

@@ -4,11 +4,11 @@ description: "Test and debug MCP Apps and ChatGPT Apps SDK widgets with dual-pro
 icon: "bug"
 ---
 
-The mcp-use Inspector provides comprehensive support for debugging widgets built with **both** MCP Apps (SEP-1865) and ChatGPT Apps SDK protocols. Test your tools, render widgets, switch protocols, and verify interactions all within the inspector interface.
+The mcp-use Inspector provides comprehensive support for debugging widgets built with **both** MCP Apps and ChatGPT Apps SDK protocols. Test your tools, render widgets, switch protocols, and verify interactions all within the inspector interface.
 
 <Info>
 **Dual-Protocol Support**: The inspector supports both widget protocols:
-- **MCP Apps** - Standard MCP protocol (SEP-1865) with JSON-RPC communication
+- **MCP Apps** - Standard MCP protocol with JSON-RPC communication
 - **ChatGPT Apps SDK** - OpenAI's protocol with `window.openai` API emulation
 
 Use the **Protocol Toggle** to switch between protocols and test cross-compatibility.
@@ -23,7 +23,7 @@ MCP servers can provide interactive widgets using two protocols:
 
 | Protocol             | Standard                | Clients                    | Communication             |
 | -------------------- | ----------------------- | -------------------------- | ------------------------- |
-| **MCP Apps**         | SEP-1865 (MCP standard) | Claude, Goose, MCP clients | JSON-RPC over postMessage |
+| **MCP Apps**         | MCP standard             | Claude, Goose, MCP clients | JSON-RPC over postMessage |
 | **ChatGPT Apps SDK** | OpenAI proprietary      | ChatGPT                    | window.openai API         |
 
 With mcp-use, you can build widgets that support **both protocols simultaneously** using `type: "mcpApps"`.
@@ -44,7 +44,7 @@ The inspector provides:
 
 For widgets that support both protocols (using `type: "mcpApps"`), the inspector shows a **Protocol Toggle** that lets you switch between:
 
-- **MCP Apps** - Tests the SEP-1865 protocol with JSON-RPC communication
+- **MCP Apps** - Tests the MCP Apps protocol with JSON-RPC communication
 - **ChatGPT Apps** - Tests the Apps SDK protocol with window.openai emulation
 
 The toggle only appears for dual-protocol widgets. Single-protocol widgets (`type: "appsSdk"`) only render using ChatGPT protocol.
@@ -79,6 +79,8 @@ Test Content Security Policy enforcement:
   CSP violations are logged in the console. Use Widget-Declared mode to catch
   CSP issues before production deployment.
 </Warning>
+
+See [Content Security Policy](/typescript/server/content-security-policy) for widget CSP configuration.
 
 ### Capabilities Testing
 
@@ -155,7 +157,7 @@ const output = window.openai.toolOutput;
 
 #### `toolResponseMetadata`
 
-Additional metadata from the tool response (currently `null` in inspector).
+Additional metadata from the tool response. Contains the `_meta` field from the tool result, which may include custom metadata passed via `widget({ metadata: ... })` on the server.
 
 #### `widgetState`
 
@@ -399,9 +401,10 @@ The inspector provides built-in widget state inspection capabilities through the
 
 When a widget is rendered in the inspector, you can inspect:
 
-- **Props**: Current widget props from `toolInput`
-- **Output**: Tool output data (`toolOutput`)
-- **Metadata**: Response metadata (`toolResponseMetadata`)
+- **Props**: Widget rendering data from `structuredContent` (what the server computed)
+- **Tool Input**: Original tool call arguments from the model
+- **Output**: Tool output data (`toolOutput` / `structuredContent`)
+- **Metadata**: Response metadata from `_meta` (`toolResponseMetadata`)
 - **State**: Persistent widget state (`widgetState`)
 - **Theme**: Current theme (light/dark)
 - **Display Mode**: Current display mode (inline/pip/fullscreen)
@@ -767,20 +770,11 @@ See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lif
 
 ### Dev Mode for Widgets
 
-Enable hot reload for widget development:
+Dev mode is enabled automatically when running `mcp-use dev`. The framework detects dev mode from the resource metadata and uses Vite's dev server for hot module replacement:
 
-1. Set widget metadata with dev flag:
-   ```typescript
-   _meta: {
-     'mcp-use/widget': {
-       name: 'my-widget',
-       html: 'widget.html',
-       dev: true  // Enable dev mode
-     }
-   }
-   ```
-2. Inspector uses dev server URL
-3. Changes reload automatically
+1. Run `mcp-use dev` (or `npm run dev`)
+2. Inspector detects dev mode automatically
+3. Widget changes reload instantly via Vite HMR
 4. Console logs visible in inspector
 
 ### Widget Display Modes
@@ -923,8 +917,8 @@ View widget console output:
 
 **Widget Not Rendering:**
 
-- **MCP Apps**: Check `_meta.ui.resourceUri` or `_meta["ui/resourceUri"]` in metadata
-- **ChatGPT**: Check `openai/outputTemplate` in metadata
+- **MCP Apps**: Check `_meta.ui.resourceUri` in tool metadata (the `ui/resourceUri` flat format is deprecated)
+- **ChatGPT**: Check `_meta["openai/outputTemplate"]` in tool metadata
 - Verify widget resource exists at the specified path
 - Check CSP settings match widget's network requirements
 - Use Protocol Toggle to test if it works in the other protocol

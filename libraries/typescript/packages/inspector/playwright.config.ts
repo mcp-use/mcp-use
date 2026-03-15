@@ -13,6 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
  * - TEST_SERVER_URL: Custom MCP endpoint URL (optional)
  */
 
+// Disable telemetry during test runs
+process.env.MCP_USE_ANONYMIZED_TELEMETRY = "false";
+
 const testMode = process.env.TEST_MODE || "dev";
 const serverMode = process.env.TEST_SERVER_MODE || "external-built";
 
@@ -47,17 +50,24 @@ const { baseURL, webServer } = (() => {
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  // Tests share a single MCP server, so they must run serially to avoid interference
-  // (e.g., HMR tests modify server files, tool calls can change server state)
-  fullyParallel: false,
+  // In production mode, we skip HMR tests and can run tests in parallel
+  // HMR tests modify server files and must run serially
+  // Other modes use dev server where file changes can cause interference
+  // Note: Tests within a file run sequentially, different files run in parallel
+  // The conformance server is stateless for most operations, and browser contexts
+  // are isolated per test (localStorage/cookies cleared in beforeEach)
+  fullyParallel: testMode !== "builtin",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 1,
+  // Production mode: 3 workers for parallelization (skips HMR tests)
+  // Other modes: 1 worker for serial execution (includes HMR tests)
+  workers: testMode === "builtin" ? 1 : undefined,
   reporter: "html",
   timeout: 90_000, // 90 seconds per test (chat tests with LLM can be slow)
   // CI environments (Docker/xvfb) need longer timeouts due to slower rendering
+  // 15s: connection flow (init + lists) can be slow under parallel workers
   expect: {
-    timeout: process.env.CI ? 15_000 : 5_000, // Default expect timeout (3x for CI)
+    timeout: 15_000,
   },
   use: {
     baseURL,

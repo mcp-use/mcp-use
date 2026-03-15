@@ -19,7 +19,8 @@ import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
 import { ObservabilityManager } from "../observability/index.js";
 import type { MCPSession } from "../session.js";
-import { extractModelInfo, Telemetry } from "../telemetry/index.js";
+import { extractModelInfo } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 import { createSystemMessage } from "./prompts/system_prompt_builder.js";
 import {
@@ -129,6 +130,8 @@ export class MCPAgent {
   private disallowedTools: string[];
   private additionalTools: StructuredToolInterface[];
   public toolsUsedNames: string[] = [];
+  private exposeResourcesAsTools: boolean = true;
+  private exposePromptsAsTools: boolean = true;
   private useServerManager: boolean;
   private verbose: boolean;
   private observe: boolean;
@@ -258,6 +261,8 @@ export class MCPAgent {
     this.disallowedTools = options.disallowedTools ?? [];
     this.additionalTools = options.additionalTools ?? [];
     this.toolsUsedNames = options.toolsUsedNames ?? [];
+    this.exposeResourcesAsTools = options.exposeResourcesAsTools ?? true;
+    this.exposePromptsAsTools = options.exposePromptsAsTools ?? true;
     this.useServerManager = options.useServerManager ?? false;
     this.verbose = options.verbose ?? false;
     this.observe = options.observe ?? true;
@@ -440,16 +445,18 @@ export class MCPAgent {
             );
           }
         } else {
-          // Create tools, resources, and prompts from the client
-          const tools = await this.adapter.createToolsFromConnectors(
-            Object.values(this.sessions).map((session) => session.connector)
+          // Create tools from the client; resources and prompts are optional
+          const connectors = Object.values(this.sessions).map(
+            (session) => session.connector
           );
-          const resources = await this.adapter.createResourcesFromConnectors(
-            Object.values(this.sessions).map((session) => session.connector)
-          );
-          const prompts = await this.adapter.createPromptsFromConnectors(
-            Object.values(this.sessions).map((session) => session.connector)
-          );
+          const tools =
+            await this.adapter.createToolsFromConnectors(connectors);
+          const resources = this.exposeResourcesAsTools
+            ? await this.adapter.createResourcesFromConnectors(connectors)
+            : [];
+          const prompts = this.exposePromptsAsTools
+            ? await this.adapter.createPromptsFromConnectors(connectors)
+            : [];
           this._tools = [...tools, ...resources, ...prompts];
           logger.info(
             `🛠️ Created ${this._tools.length} LangChain items from client: ` +

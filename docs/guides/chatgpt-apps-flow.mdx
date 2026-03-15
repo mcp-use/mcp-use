@@ -4,6 +4,10 @@ description: "Understanding ChatGPT widget flows and how mcp-use simplifies widg
 icon: "openai"
 ---
 
+<Warning>
+**Apps SDK is deprecated**: ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Server](/typescript/server/creating-mcp-apps-server) to build widgets that work with both ChatGPT and MCP Apps clients.
+</Warning>
+
 # Building ChatGPT Apps with Widgets
 
 <Info>
@@ -59,19 +63,13 @@ When building widgets with the official SDK, you need to:
 ```mermaid
 flowchart LR
     Developer[Developer] --> Setup[Manual Setup]
-    Setup --> Structure[Create server/ & web/]
+    Setup --> Structure["Create server/ & web/"]
     Structure --> Config[Configure Build Tools]
     Config --> Hooks[Implement Custom Hooks]
     Hooks --> Bundle[Manual Bundling]
     Bundle --> CSP[Configure CSP]
     CSP --> Deploy[Deploy]
     Deploy --> ChatGPT[ChatGPT]
-
-    style Setup fill:#ff6b6b
-    style Config fill:#ff6b6b
-    style Hooks fill:#ff6b6b
-    style Bundle fill:#ff6b6b
-    style CSP fill:#ff6b6b
 ```
 
 ### Code Example: Official SDK Setup
@@ -257,7 +255,7 @@ With mcp-use, you get:
 1. **Single Command Setup**: `npx create-mcp-use-app my-app --template mcp-apps`
 2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder—they're automatically registered
 3. **Built-in Bundling**: Hot reload and production builds work out of the box
-4. **Pre-built React Hooks**: Use `useWidget()` for props, state, tool calls, and display modes
+4. **Pre-built React Hooks**: Use `useWidget()` for props, state, tool calls, and display modes; [streaming tool input](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for live previews when the host supports it (MCP Apps / Inspector)
 5. **Automatic CSP Configuration**: Content Security Policy is configured automatically
 6. **Automatic Tool Registration**: Widgets become tools automatically based on metadata
 7. **Automatic Asset Handling**: `public/` folder serves static assets automatically
@@ -272,10 +270,6 @@ flowchart LR
     Auto --> Bundle[Auto-Bundle]
     Bundle --> Deploy[Deploy]
     Deploy --> ChatGPT[ChatGPT]
-
-    style Create fill:#51cf66
-    style Auto fill:#51cf66
-    style Bundle fill:#51cf66
 ```
 
 ### Code Example: mcp-use Setup

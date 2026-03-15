@@ -1,4 +1,7 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import {
+  Client,
+  type ClientOptions,
+} from "@modelcontextprotocol/sdk/client/index.js";
 import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
@@ -23,6 +26,7 @@ export type ClientInfo = {
 
 export interface HttpConnectorOptions extends ConnectorInitOptions {
   authToken?: string;
+  fetch?: typeof fetch;
   headers?: Record<string, string>;
   timeout?: number; // HTTP request timeout (ms)
   sseReadTimeout?: number; // SSE read timeout (ms)
@@ -31,18 +35,32 @@ export interface HttpConnectorOptions extends ConnectorInitOptions {
   disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
   gatewayUrl?: string; // Optional gateway URL to route requests through
   serverId?: string; // Optional server ID for gateway observability
+  reconnectionOptions?: {
+    maxReconnectionDelay?: number;
+    initialReconnectionDelay?: number;
+    reconnectionDelayGrowFactor?: number;
+    maxRetries?: number;
+  };
 }
+
+type StreamableHttpFailure = {
+  fallbackReason: string;
+  is401Error: boolean;
+  httpStatusCode?: number;
+};
 
 export class HttpConnector extends BaseConnector {
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
   private readonly timeout: number;
   private readonly sseReadTimeout: number;
+  private readonly customFetch?: typeof fetch;
   private readonly clientInfo: ClientInfo;
   private readonly preferSse: boolean;
   private readonly disableSseFallback: boolean;
   private readonly gatewayUrl?: string;
   private readonly serverId?: string;
+  private readonly reconnectionOptions?: HttpConnectorOptions["reconnectionOptions"];
   private transportType: "streamable-http" | "sse" | null = null;
   private streamableTransport: StreamableHTTPClientTransport | null = null;
 
@@ -80,12 +98,95 @@ export class HttpConnector extends BaseConnector {
 
     this.timeout = opts.timeout ?? 10000; // Default 10 seconds
     this.sseReadTimeout = opts.sseReadTimeout ?? 300000; // Default 5 minutes
+    this.customFetch = opts.fetch;
     this.clientInfo = opts.clientInfo ?? {
       name: "http-connector",
       version: "1.0.0",
     };
     this.preferSse = opts.preferSse ?? false;
     this.disableSseFallback = opts.disableSseFallback ?? false;
+    this.reconnectionOptions = opts.reconnectionOptions;
+  }
+
+  private buildClientOptions(): ClientOptions {
+    return {
+      ...(this.opts.clientOptions || {}),
+      capabilities: {
+        ...(this.opts.clientOptions?.capabilities || {}),
+        roots: { listChanged: true },
+        ...(this.opts.onSampling ? { sampling: {} } : {}),
+        ...((this.opts.onElicitation ?? this.opts.elicitationCallback)
+          ? { elicitation: { form: {}, url: {} } }
+          : {}),
+      },
+    };
+  }
+
+  private unwrapStreamableError(err: unknown): StreamableHTTPError | null {
+    if (err instanceof StreamableHTTPError) {
+      return err;
+    }
+    if (err instanceof Error && err.cause instanceof StreamableHTTPError) {
+      return err.cause;
+    }
+    return null;
+  }
+
+  private classifyStreamableHttpFailure(err: unknown): StreamableHttpFailure {
+    let fallbackReason = "Unknown error";
+    let is401Error = false;
+    let httpStatusCode: number | undefined;
+
+    const streamableErr = this.unwrapStreamableError(err);
+    if (streamableErr) {
+      is401Error = streamableErr.code === 401;
+      httpStatusCode = streamableErr.code;
+
+      if (
+        streamableErr.code === 400 &&
+        streamableErr.message.includes("Missing session ID")
+      ) {
+        fallbackReason =
+          "Server requires session ID (FastMCP compatibility) - using SSE transport";
+        logger.warn(`⚠️  ${fallbackReason}`);
+      } else if (streamableErr.code === 404 || streamableErr.code === 405) {
+        fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
+        logger.debug(fallbackReason);
+      } else {
+        fallbackReason = `Server returned ${streamableErr.code}: ${streamableErr.message}`;
+        logger.debug(fallbackReason);
+      }
+
+      return { fallbackReason, is401Error, httpStatusCode };
+    }
+
+    if (err instanceof Error) {
+      const errorStr = err.toString();
+      const errorMsg = err.message || "";
+      is401Error =
+        errorStr.includes("401") || errorMsg.includes("Unauthorized");
+
+      if (
+        errorStr.includes("Missing session ID") ||
+        errorStr.includes("Bad Request: Missing session ID") ||
+        errorMsg.includes("FastMCP session ID error")
+      ) {
+        fallbackReason =
+          "Server requires session ID (FastMCP compatibility) - using SSE transport";
+        logger.warn(`⚠️  ${fallbackReason}`);
+      } else if (
+        errorStr.includes("405 Method Not Allowed") ||
+        errorStr.includes("404 Not Found")
+      ) {
+        fallbackReason = "Server doesn't support streamable HTTP (405/404)";
+        logger.debug(fallbackReason);
+      } else {
+        fallbackReason = `Streamable HTTP failed: ${err.message}`;
+        logger.debug(fallbackReason);
+      }
+    }
+
+    return { fallbackReason, is401Error, httpStatusCode };
   }
 
   /** Establish connection to the MCP implementation via HTTP (streamable or SSE). */
@@ -116,71 +217,9 @@ export class HttpConnector extends BaseConnector {
       await this.connectWithStreamableHttp(baseUrl);
       logger.info("✅ Successfully connected via streamable HTTP");
     } catch (err: unknown) {
-      console.log("error in http connector connect", err);
-      // Check if this is a 4xx error that indicates we should try SSE fallback
-      let fallbackReason = "Unknown error";
-      let is401Error = false;
-      let httpStatusCode: number | undefined;
-
-      // Check if error has a cause property with StreamableHTTPError
-      let streamableErr: any = null;
-      if (err instanceof StreamableHTTPError) {
-        streamableErr = err;
-      } else if (
-        err instanceof Error &&
-        err.cause instanceof StreamableHTTPError
-      ) {
-        streamableErr = err.cause;
-      }
-
-      if (streamableErr) {
-        is401Error = streamableErr.code === 401;
-        httpStatusCode = streamableErr.code; // Capture the status code for later use
-        console.log("Captured HTTP status code:", httpStatusCode);
-
-        // Check for "Missing session ID" error (HTTP 400 from FastMCP)
-        if (
-          streamableErr.code === 400 &&
-          streamableErr.message.includes("Missing session ID")
-        ) {
-          fallbackReason =
-            "Server requires session ID (FastMCP compatibility) - using SSE transport";
-          logger.warn(`⚠️  ${fallbackReason}`);
-        } else if (streamableErr.code === 404 || streamableErr.code === 405) {
-          fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
-          logger.debug(fallbackReason);
-        } else {
-          fallbackReason = `Server returned ${streamableErr.code}: ${streamableErr.message}`;
-          logger.debug(fallbackReason);
-        }
-      } else if (err instanceof Error) {
-        // Check for 404/405 in error message as fallback detection
-        const errorStr = err.toString();
-        const errorMsg = err.message || "";
-
-        is401Error =
-          errorStr.includes("401") || errorMsg.includes("Unauthorized");
-
-        // Check for "Missing session ID" error in the message (from both direct errors and wrapped errors)
-        if (
-          errorStr.includes("Missing session ID") ||
-          errorStr.includes("Bad Request: Missing session ID") ||
-          errorMsg.includes("FastMCP session ID error")
-        ) {
-          fallbackReason =
-            "Server requires session ID (FastMCP compatibility) - using SSE transport";
-          logger.warn(`⚠️  ${fallbackReason}`);
-        } else if (
-          errorStr.includes("405 Method Not Allowed") ||
-          errorStr.includes("404 Not Found")
-        ) {
-          fallbackReason = "Server doesn't support streamable HTTP (405/404)";
-          logger.debug(fallbackReason);
-        } else {
-          fallbackReason = `Streamable HTTP failed: ${err.message}`;
-          logger.debug(fallbackReason);
-        }
-      }
+      logger.debug("Streamable HTTP connect failed", err);
+      const { fallbackReason, is401Error, httpStatusCode } =
+        this.classifyStreamableHttpFailure(err);
 
       // Don't fallback on 401 - SSE will fail too
       if (is401Error) {
@@ -191,12 +230,11 @@ export class HttpConnector extends BaseConnector {
         throw authError;
       }
 
-      // Check if SSE fallback is disabled
-      // if (this.disableSseFallback) {
-      //   logger.info("SSE fallback disabled - failing connection");
-      //   await this.cleanupResources();
-      //   throw new Error(`Streamable HTTP connection failed: ${fallbackReason}`);
-      // }
+      if (this.disableSseFallback) {
+        logger.info("SSE fallback disabled - failing connection");
+        await this.cleanupResources();
+        throw new Error(`Streamable HTTP connection failed: ${fallbackReason}`);
+      }
 
       // Always try SSE fallback for maximum compatibility
       logger.info("🔄 Falling back to SSE transport...");
@@ -204,9 +242,9 @@ export class HttpConnector extends BaseConnector {
       try {
         await this.connectWithSse(baseUrl);
       } catch (sseErr: any) {
-        console.error(`Failed to connect with both transports:`);
-        console.error(`  Streamable HTTP: ${fallbackReason}`);
-        console.error(`  SSE: ${sseErr}`);
+        logger.error("Failed to connect with both transports:");
+        logger.error(`  Streamable HTTP: ${fallbackReason}`);
+        logger.error(`  SSE: ${sseErr}`);
         await this.cleanupResources();
 
         // Preserve 401 error code if SSE also failed with 401
@@ -245,15 +283,13 @@ export class HttpConnector extends BaseConnector {
 
   private async connectWithStreamableHttp(baseUrl: string): Promise<void> {
     try {
-      // Log configuration for debugging
-      console.log(`[HttpConnector] Connecting with Streamable HTTP:`);
-      console.log(`  Base URL: ${baseUrl}`);
-      console.log(`  Original URL: ${this.baseUrl}`);
-      console.log(`  Gateway URL: ${this.gatewayUrl || "none"}`);
-      console.log(
-        `  Auth Provider URL: ${this.opts.authProvider?.serverUrl || "none"}`
-      );
-      console.log(`  Headers: ${JSON.stringify(this.headers)}`);
+      logger.debug("[HttpConnector] Connecting with Streamable HTTP", {
+        baseUrl,
+        originalUrl: this.baseUrl,
+        gatewayUrl: this.gatewayUrl || "none",
+        authProviderUrl: this.opts.authProvider?.serverUrl || "none",
+        headers: this.headers,
+      });
 
       // Create StreamableHTTPClientTransport directly
       // The official SDK's StreamableHTTPClientTransport automatically handles session IDs
@@ -263,15 +299,16 @@ export class HttpConnector extends BaseConnector {
         new URL(baseUrl),
         {
           authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK
+          fetch: this.customFetch,
           requestInit: {
             headers: this.headers,
           },
-          // Pass through reconnection options
           reconnectionOptions: {
             maxReconnectionDelay: 30000,
             initialReconnectionDelay: 1000,
             reconnectionDelayGrowFactor: 1.5,
-            maxRetries: 2, // Disable automatic reconnection - let higher-level logic handle it
+            maxRetries: 2,
+            ...this.reconnectionOptions,
           },
           // Don't pass sessionId - let the SDK generate it automatically during connect()
         }
@@ -292,19 +329,7 @@ export class HttpConnector extends BaseConnector {
       // Create and connect the client
       // This performs both initialize AND initialized notification
       // Always advertise roots capability - server may query roots/list even if client has no roots
-      const clientOptions = {
-        ...(this.opts.clientOptions || {}),
-        capabilities: {
-          ...(this.opts.clientOptions?.capabilities || {}),
-          roots: { listChanged: true }, // Always advertise roots capability
-          // Add sampling capability if callback is provided
-          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
-          // Add elicitation capability if callback is provided
-          ...(this.opts.elicitationCallback
-            ? { elicitation: { form: {}, url: {} } }
-            : {}),
-        },
-      };
+      const clientOptions = this.buildClientOptions();
       logger.debug(
         `Creating Client with capabilities:`,
         JSON.stringify(clientOptions.capabilities, null, 2)
@@ -419,19 +444,7 @@ export class HttpConnector extends BaseConnector {
 
       // Create and connect the client
       // Always advertise roots capability - server may query roots/list even if client has no roots
-      const clientOptions = {
-        ...(this.opts.clientOptions || {}),
-        capabilities: {
-          ...(this.opts.clientOptions?.capabilities || {}),
-          roots: { listChanged: true }, // Always advertise roots capability
-          // Add sampling capability if callback is provided
-          ...(this.opts.samplingCallback ? { sampling: {} } : {}),
-          // Add elicitation capability if callback is provided
-          ...(this.opts.elicitationCallback
-            ? { elicitation: { form: {}, url: {} } }
-            : {}),
-        },
-      };
+      const clientOptions = this.buildClientOptions();
       logger.debug(
         `Creating Client with capabilities (SSE):`,
         JSON.stringify(clientOptions.capabilities, null, 2)

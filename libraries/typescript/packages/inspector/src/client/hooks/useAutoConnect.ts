@@ -287,22 +287,33 @@ export function useAutoConnect({
 
       console.log("[useAutoConnect] Final custom headers:", finalCustomHeaders);
 
-      // Prepare proxy configuration
-      // Note: Use "headers" instead of deprecated "customHeaders"
-      // Always provide proxyAddress when we have headers so autoProxyFallback can use them
-      const proxyConfig =
-        connectionType === "Via Proxy"
-          ? {
-              proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-              headers: finalCustomHeaders,
-            }
-          : Object.keys(finalCustomHeaders).length > 0
-            ? {
-                // Provide proxyAddress for autoProxyFallback to use with headers
-                proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-                headers: finalCustomHeaders,
-              }
-            : undefined;
+      // Provide proxyAddress so the OAuth fetch interceptor gets installed.
+      // Without it, OAuth metadata/registration requests go directly to the
+      // external provider and get CORS-blocked in the browser.
+      //
+      // However, skip the proxy when the inspector is served by the MCP server
+      // itself (same origin as the target URL): in that case /inspector/api/proxy
+      // doesn't exist on the host and routing through it breaks direct connections.
+      let proxyAddress: string | undefined;
+      try {
+        const targetOrigin = new URL(url).origin;
+        const inspectorOrigin = window.location.origin;
+        if (inspectorOrigin !== targetOrigin) {
+          proxyAddress = `${inspectorOrigin}/inspector/api/proxy`;
+        }
+      } catch {
+        proxyAddress = `${window.location.origin}/inspector/api/proxy`;
+      }
+
+      const proxyConfig: {
+        proxyAddress?: string;
+        headers?: Record<string, string>;
+      } = {
+        ...(proxyAddress ? { proxyAddress } : {}),
+        ...(Object.keys(finalCustomHeaders).length > 0 && {
+          headers: finalCustomHeaders,
+        }),
+      };
 
       console.warn(
         `[useAutoConnect] Attempting connection (${connectionType}):`,
@@ -494,7 +505,7 @@ export function useAutoConnect({
       return;
     }
 
-    // Handle failed connection - show error and navigate home
+    // Handle failed connection - show error but keep the tile visible in failed state
     // Note: useMcp's autoProxyFallback will have already tried proxy fallback internally
     if (connection?.state === "failed") {
       console.warn("[useAutoConnect] Connection failed after all retries");
@@ -504,16 +515,13 @@ export function useAutoConnect({
       );
 
       // Defer state updates to avoid updating during render
+      // Do NOT remove the connection or navigate away - leave the tile in failed state
       queueMicrotask(() => {
-        removeConnection(connection.id);
         setIsAutoConnecting(false);
         setAutoConnectConfig(null);
-
-        // Navigate to home page after connection failure
-        navigate("/");
       });
     }
-  }, [connections, autoConnectConfig, removeConnection, navigate]);
+  }, [connections, autoConnectConfig, navigate]);
 
   // Clear loading state for connections that complete without retry
   useEffect(() => {

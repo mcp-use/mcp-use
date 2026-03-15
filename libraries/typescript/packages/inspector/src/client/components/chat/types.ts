@@ -19,7 +19,9 @@ export interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "result" | "error";
+      state?: "pending" | "streaming" | "result" | "error";
+      /** Best-effort parsed partial arguments while the LLM is still generating */
+      partialArgs?: Record<string, unknown>;
     };
   }>;
   toolCalls?: Array<{

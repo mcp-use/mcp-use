@@ -23,6 +23,7 @@ import {
   generateVSCodeInsidersDeepLink,
   getEnvVarInstructions,
 } from "@/client/utils/mcpClientUtils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { Check, ChevronDown, Copy, Plus } from "lucide-react";
 import { useState } from "react";
 import { VSCodeIcon } from "./ui/client-icons";
@@ -161,7 +162,7 @@ export function AddToClientDropdown({
 
   const handleCopy = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {

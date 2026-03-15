@@ -134,16 +134,16 @@ server.tool({
 });
 ```
 
-## `exposeAsTool: false` Pattern
+## `exposeAsTool` Defaults to `false`
 
-When you define a custom tool with `widget: { name }`, the widget file should disable auto-registration:
+Widgets are not auto-registered as tools by default. When you define a custom tool with `widget: { name }`, omitting `exposeAsTool` in the widget file is the correct setup:
 
 ```typescript
 // resources/flight-search.tsx
 export const widgetMetadata: WidgetMetadata = {
   description: "Flight search results",
   props: z.object({ flights: z.array(...), destination: z.string() }),
-  exposeAsTool: false,  // Custom tool in index.ts handles registration
+  // exposeAsTool defaults to false — custom tool in index.ts handles registration
 };
 ```
 

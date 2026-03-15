@@ -109,11 +109,25 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
+  // NOTE: Authorization must be listed explicitly — the wildcard * does NOT cover it per the Fetch spec.
   app.use(
     `${basePath}/*`,
     cors({
       origin: "*",
-      exposeHeaders: ["*"], // Expose all headers including Mcp-Session-Id for FastMCP
+      allowHeaders: [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Target-URL",
+        "X-MCP-Target",
+        "Mcp-Session-Id",
+        "mcp-session-id",
+        "mcp-protocol-version",
+        "X-Server-Id",
+        "X-Requested-With",
+        "X-Connection-URL",
+      ],
+      exposeHeaders: ["*"],
     })
   );
 
@@ -193,17 +207,23 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       const method = c.req.method;
       const headers: Record<string, string> = {};
 
-      // Copy relevant headers, excluding proxy-specific ones and encoding preferences
+      // Copy relevant headers, stripping proxy/infrastructure headers that would
+      // confuse the target (e.g. X-Forwarded-Host from our own chain causes the
+      // gateway to resolve the wrong hostname and return 404).
       const requestHeaders = c.req.header();
       for (const [key, value] of Object.entries(requestHeaders)) {
         const lowerKey = key.toLowerCase();
         if (
           !lowerKey.startsWith("x-proxy-") &&
           !lowerKey.startsWith("x-target-") &&
+          !lowerKey.startsWith("x-mcp-") &&
+          !lowerKey.startsWith("x-forwarded-") &&
+          !lowerKey.startsWith("cf-") &&
+          lowerKey !== "x-original-host" &&
           lowerKey !== "host" &&
-          lowerKey !== "accept-encoding"
+          lowerKey !== "accept-encoding" &&
+          lowerKey !== "cdn-loop"
         ) {
-          // Don't forward accept-encoding to prevent compression issues
           headers[key] = value;
         }
       }
@@ -334,8 +354,25 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       }
 
-      // Return the proxied response unchanged for non-OAuth discovery responses
-      return new Response(response.body, {
+      // For streaming SSE responses (GET without content-length), pass through the body stream.
+      // For all other responses, buffer the body and set Content-Length so browsers
+      // don't hang waiting for a ReadableStream that may not signal EOF promptly.
+      const isSSE = contentType.includes("text/event-stream");
+      const isGetRequest = c.req.method === "GET";
+      const upstreamContentLength = response.headers.get("content-length");
+      const isTrueStream = isSSE && isGetRequest && !upstreamContentLength;
+
+      if (isTrueStream) {
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+        });
+      }
+
+      const bodyBuffer = await response.arrayBuffer();
+      responseHeaders["Content-Length"] = String(bodyBuffer.byteLength);
+      return new Response(bodyBuffer, {
         status: response.status,
         statusText: response.statusText,
         headers: responseHeaders,

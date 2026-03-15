@@ -12,9 +12,11 @@ import {
 } from "react";
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { WIDGET_DEFAULTS } from "./constants.js";
+import { normalizeCallToolResponse } from "./widget-utils.js";
 import type {
   CallToolResponse,
   DisplayMode,
+  MessageContentBlock,
   OpenAiGlobals,
   SafeArea,
   SetGlobalsEvent,
@@ -26,19 +28,28 @@ import type {
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
 
 /**
- * Hook to subscribe to a single value from window.openai globals
+ * Hook to subscribe to a single value from window.openai globals.
+ * Only triggers onChange when the value actually changes, to avoid redundant
+ * re-renders from duplicate events (e.g. theme sync that re-sends same toolOutput).
  */
 function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
   key: K
 ): OpenAiGlobals[K] | undefined {
   return useSyncExternalStore(
     (onChange) => {
+      // Initialize from current snapshot so redundant events with same values are ignored
+      let lastValue: unknown =
+        typeof window !== "undefined" && window.openai
+          ? (window.openai as OpenAiGlobals)[key]
+          : undefined;
       const handleSetGlobal = (event: any) => {
         const customEvent = event as SetGlobalsEvent;
         const value = customEvent.detail.globals[key];
         if (value === undefined) {
           return;
         }
+        if (value === lastValue) return;
+        lastValue = value;
         onChange();
       };
 
@@ -60,21 +71,62 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
 }
 
 /**
- * React hook for building OpenAI Apps SDK widgets with MCP-use
+ * React hook for building MCP Apps and ChatGPT Apps SDK widgets.
  *
- * Provides type-safe access to the window.openai API. Widget props come from
- * _meta["mcp-use/props"] (widget-only data), while toolInput contains the original tool arguments.
+ * Abstracts over three runtime providers, selected automatically:
+ *
+ * 1. **ChatGPT Apps SDK** (`window.openai`) — active when the widget is loaded
+ *    inside ChatGPT. Data arrives via `window.openai.toolInput`,
+ *    `window.openai.toolOutput`, etc. and through the `openai:set_globals`
+ *    custom event.
+ *
+ * 2. **MCP Apps bridge** (SEP-1865 `postMessage`) — active when the widget is
+ *    loaded in any SEP-1865-compliant host (e.g. Claude, Cursor) that is not
+ *    ChatGPT. The hook connects via `ui/initialize` and listens for
+ *    `ui/notifications/tool-input`, `ui/notifications/tool-input-partial`,
+ *    `ui/notifications/tool-result`, and `ui/notifications/host-context-changed`.
+ *
+ * 3. **URL params fallback** (`mcpUseParams`) — used during local development
+ *    (`mcp-use dev` inspector) where `toolInput` and `toolOutput` are injected
+ *    via the query string. No live streaming in this mode.
+ *
+ * ### Data flow (per SEP-1865)
+ *
+ * ```
+ * LLM calls tool → host sends tool-input → widget receives toolInput
+ *                → host executes tool  → host sends tool-result
+ *                                       → widget receives props (structuredContent)
+ * ```
+ *
+ * The server controls what the **LLM** sees (`content` text array) separately
+ * from what the **widget** sees (`structuredContent` / `props`). This lets the
+ * tool return rich structured data for rendering without polluting the model's
+ * context.
+ *
+ * ### Key fields
+ *
+ * - `isPending` — `true` until the tool result arrives; `props` is `Partial<TProps>` while pending.
+ * - `props` — merged from toolInput (base) and structuredContent (overlay). When the widget is
+ *   exposed as a tool, props = toolInput during pending and structuredContent when done. When
+ *   the widget is returned by another tool, props = structuredContent (toolInput = parent's args).
+ * - `toolInput` — the arguments the model passed to the tool.
+ * - `partialToolInput` / `isStreaming` — real-time argument streaming (MCP Apps only).
+ * - `theme`, `displayMode`, `locale`, `timeZone`, `safeArea`, `maxHeight` — host context.
+ * - `callTool`, `sendFollowUpMessage`, `openExternal`, `requestDisplayMode` — host actions.
+ * - `state` / `setState` — persisted state visible to the model on future turns.
  *
  * @example
  * ```tsx
  * const MyWidget: React.FC = () => {
- *   const { props, toolInput, output, theme } = useWidget<
- *     { city: string; temperature: number },  // Props (widget-only)
- *     string,                                  // Output (model sees)
- *     {},                                      // Metadata
+ *   const { props, isPending, toolInput, theme } = useWidget<
+ *     { city: string; temperature: number },  // Props (from structuredContent)
  *     {},                                      // State
- *     { city: string }                         // ToolInput (tool args)
+ *     { city: string; temperature: number },  // Output type
+ *     {},                                      // Metadata
+ *     { city: string }                         // ToolInput (tool call args)
  *   >();
+ *
+ *   if (isPending) return <p>Loading…</p>;
  *
  *   return (
  *     <div data-theme={theme}>
@@ -87,14 +139,14 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  * ```
  */
 export function useWidget<
-  TProps extends UnknownObject = UnknownObject,
-  TOutput extends UnknownObject = UnknownObject,
-  TMetadata extends UnknownObject = UnknownObject,
-  TState extends UnknownObject = UnknownObject,
-  TToolInput extends UnknownObject = UnknownObject,
+  TProps = UnknownObject,
+  TState = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TToolInput = UnknownObject,
 >(
   defaultProps?: TProps
-): UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput> {
+): UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput> {
   // Check if window.openai is available - use state to allow re-checking after async injection
   const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
     () => typeof window !== "undefined" && !!window.openai
@@ -110,7 +162,23 @@ export function useWidget<
     string,
     unknown
   > | null>(null);
+  const [mcpAppsResponseMetadata, setMcpAppsResponseMetadata] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [mcpAppsPartialToolInput, setMcpAppsPartialToolInput] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [mcpAppsHostContext, setMcpAppsHostContext] = useState<any>(null);
+  const [mcpAppsHostInfo, setMcpAppsHostInfo] = useState<{
+    name: string;
+    version: string;
+  } | null>(null);
+  const [mcpAppsHostCapabilities, setMcpAppsHostCapabilities] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   // Re-check for window.openai availability after mount (in case it's injected asynchronously)
   useEffect(() => {
@@ -179,11 +247,20 @@ export function useWidget<
         // Get initial state
         const toolInput = bridge.getToolInput();
         const toolOutput = bridge.getToolOutput();
+        const responseMeta = bridge.getToolResponseMetadata();
         const hostContext = bridge.getHostContext();
+        const partialToolInput = bridge.getPartialToolInput();
 
         if (toolInput) setMcpAppsToolInput(toolInput);
         if (toolOutput) setMcpAppsToolOutput(toolOutput);
+        if (responseMeta) setMcpAppsResponseMetadata(responseMeta);
+        if (partialToolInput) setMcpAppsPartialToolInput(partialToolInput);
         if (hostContext) setMcpAppsHostContext(hostContext);
+
+        const hostInfo = bridge.getHostInfo();
+        const hostCapabilities = bridge.getHostCapabilities();
+        if (hostInfo) setMcpAppsHostInfo(hostInfo);
+        if (hostCapabilities) setMcpAppsHostCapabilities(hostCapabilities);
       })
       .catch((error) => {
         console.warn("[useWidget] Failed to connect to MCP Apps host:", error);
@@ -194,8 +271,14 @@ export function useWidget<
       setMcpAppsToolInput(input);
     });
 
+    const unsubToolInputPartial = bridge.onToolInputPartial((input) => {
+      setMcpAppsPartialToolInput(input);
+    });
+
     const unsubToolResult = bridge.onToolResult((result) => {
       setMcpAppsToolOutput(result);
+      setMcpAppsResponseMetadata(bridge.getToolResponseMetadata());
+      setMcpAppsPartialToolInput(null);
     });
 
     const unsubHostContext = bridge.onHostContextChange((context) => {
@@ -205,6 +288,7 @@ export function useWidget<
 
     return () => {
       unsubToolInput();
+      unsubToolInputPartial();
       unsubToolResult();
       unsubHostContext();
     };
@@ -271,33 +355,63 @@ export function useWidget<
   }, [provider, openaiToolInput, mcpAppsToolInput, urlParams.toolInput]);
 
   const toolOutput = useMemo(() => {
-    if (provider === "openai") return openaiToolOutput;
+    if (provider === "openai") {
+      // Unwrap CallToolResult envelope if the host passed the full tool-result params
+      const raw = openaiToolOutput as
+        | Record<string, unknown>
+        | null
+        | undefined;
+      if (
+        raw &&
+        raw.structuredContent &&
+        typeof raw.structuredContent === "object"
+      ) {
+        return raw.structuredContent as TOutput | null | undefined;
+      }
+      return openaiToolOutput;
+    }
     if (provider === "mcp-apps")
       return mcpAppsToolOutput as TOutput | null | undefined;
     return urlParams.toolOutput as TOutput | null | undefined;
   }, [provider, openaiToolOutput, mcpAppsToolOutput, urlParams.toolOutput]);
 
-  // Extract widget props based on provider
+  // Props semantics:
+  // - Widget exposed as tool: props = toolInput (args to the tool); when result arrives, props = structuredContent (tool can echo/override).
+  // - Widget returned by another tool: props = structuredContent from that tool's result; toolInput = args to the parent tool.
+  // Merge: use toolInput as base, structuredContent overrides. This handles both cases: during pending we show toolInput; when done, structuredContent wins.
   const widgetProps = useMemo(() => {
-    // Apps SDK: Props from toolResponseMetadata["mcp-use/props"]
-    if (
-      provider === "openai" &&
-      toolResponseMetadata &&
-      typeof toolResponseMetadata === "object"
-    ) {
-      const metaProps = (toolResponseMetadata as any)["mcp-use/props"];
-      if (metaProps) {
-        return metaProps as TProps;
+    const ti = (toolInput || {}) as Record<string, unknown>;
+    const base = (defaultProps || {}) as Record<string, unknown> as TProps;
+
+    // Extract structuredContent from provider-specific toolOutput.
+    // Some hosts (e.g. compat runtimes bridging MCP Apps → window.openai) pass the
+    // full CallToolResult envelope { content, structuredContent, _meta } as toolOutput
+    // instead of pre-extracting structuredContent. Detect and unwrap when needed.
+    let structuredContent: Record<string, unknown> | undefined;
+    if (provider === "openai" && openaiToolOutput) {
+      const raw = openaiToolOutput as Record<string, unknown>;
+      if (raw.structuredContent && typeof raw.structuredContent === "object") {
+        structuredContent = raw.structuredContent as Record<string, unknown>;
+      } else {
+        structuredContent = raw;
       }
+    } else if (provider === "mcp-apps" && mcpAppsToolOutput) {
+      structuredContent = mcpAppsToolOutput as Record<string, unknown>;
+    } else if (provider === "mcp-ui" && urlParams.toolOutput) {
+      structuredContent = urlParams.toolOutput as Record<string, unknown>;
     }
 
-    // MCP Apps: Props come from tool input (arguments)
-    if (provider === "mcp-apps" && mcpAppsToolInput) {
-      return mcpAppsToolInput as TProps;
-    }
-
-    return defaultProps || ({} as TProps);
-  }, [provider, toolResponseMetadata, mcpAppsToolInput, defaultProps]);
+    // Base: toolInput (for exposed-as-tool) or defaultProps; overlay: structuredContent
+    const merged = { ...base, ...ti, ...(structuredContent || {}) } as TProps;
+    return merged;
+  }, [
+    provider,
+    toolInput,
+    openaiToolOutput,
+    mcpAppsToolOutput,
+    urlParams.toolOutput,
+    defaultProps,
+  ]);
 
   // Theme, displayMode, and other host context from provider
   const theme = useMemo(() => {
@@ -416,32 +530,46 @@ export function useWidget<
     ): Promise<CallToolResponse> => {
       if (provider === "mcp-apps") {
         const bridge = getMcpAppsBridge();
-        const result = await bridge.callTool(name, args);
-        // Convert to CallToolResponse format
-        return {
-          content: [{ type: "text", text: JSON.stringify(result) }],
-        };
+        const raw = await bridge.callTool(name, args);
+        return normalizeCallToolResponse(raw);
       }
 
       if (!window.openai?.callTool) {
         throw new Error("window.openai.callTool is not available");
       }
-      return window.openai.callTool(name, args);
+      const raw = await window.openai.callTool(name, args);
+      return normalizeCallToolResponse(raw);
     },
     [provider]
   );
 
   const sendFollowUpMessage = useCallback(
-    async (prompt: string): Promise<void> => {
+    async (content: string | MessageContentBlock[]): Promise<void> => {
+      const contentArray: MessageContentBlock[] =
+        typeof content === "string"
+          ? [{ type: "text", text: content }]
+          : content;
+
       if (provider === "mcp-apps") {
         const bridge = getMcpAppsBridge();
-        await bridge.sendMessage({ type: "text", text: prompt });
+        await bridge.sendMessage(contentArray);
         return;
       }
 
       if (!window.openai?.sendFollowUpMessage) {
         throw new Error("window.openai.sendFollowUpMessage is not available");
       }
+      // window.openai only supports plain text; extract and join text blocks
+      const prompt =
+        typeof content === "string"
+          ? content
+          : contentArray
+              .filter(
+                (c): c is { type: "text"; text: string } =>
+                  c.type === "text" && "text" in c
+              )
+              .map((c) => c.text)
+              .join("\n");
       return window.openai.sendFollowUpMessage({ prompt });
     },
     [provider]
@@ -484,12 +612,25 @@ export function useWidget<
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      // MCP Apps doesn't support widget state persistence
+      // MCP Apps: update local state + send ui/update-model-context to host
+      // so the model can reason about UI state on future turns (per SEP-1865)
       if (provider === "mcp-apps") {
         const currentState = localWidgetState;
         const newState =
-          typeof state === "function" ? state(currentState) : state;
+          typeof state === "function"
+            ? (state as (prevState: TState | null) => TState)(currentState)
+            : state;
         setLocalWidgetState(newState);
+
+        const bridge = getMcpAppsBridge();
+        bridge
+          .updateModelContext({
+            structuredContent: newState as Record<string, unknown>,
+            content: [{ type: "text", text: JSON.stringify(newState) }],
+          })
+          .catch((err) => {
+            console.warn("[useWidget] Failed to update model context:", err);
+          });
         return;
       }
 
@@ -502,7 +643,9 @@ export function useWidget<
       const currentState =
         widgetState !== undefined ? widgetState : localWidgetState;
       const newState =
-        typeof state === "function" ? state(currentState) : state;
+        typeof state === "function"
+          ? (state as (prevState: TState | null) => TState)(currentState)
+          : state;
 
       setLocalWidgetState(newState);
       return window.openai.setWidgetState(newState);
@@ -513,8 +656,10 @@ export function useWidget<
   // Determine if tool is still executing
   const isPending = useMemo(() => {
     if (provider === "openai") {
-      // When widget first loads before tool completes, toolResponseMetadata is null
-      return toolResponseMetadata === null;
+      // Tool is pending until the host delivers either toolOutput (structuredContent)
+      // or toolResponseMetadata (_meta). Checking both mirrors how MCP Apps works and
+      // avoids staying stuck when the server omits _meta from the tool result.
+      return openaiToolOutput === null && toolResponseMetadata === null;
     }
     if (provider === "mcp-apps") {
       // In MCP Apps, widget is pending until we receive tool-result notification
@@ -523,17 +668,58 @@ export function useWidget<
     }
     // For mcp-ui (URL params), check if toolOutput is null (tool hasn't completed)
     if (provider === "mcp-ui") {
+      // If we're in an iframe without actual URL params, we're in a transitional
+      // state before the MCP Apps bridge connects. Stay pending to avoid rendering
+      // with empty props.
+      if (
+        typeof window !== "undefined" &&
+        window !== window.parent &&
+        !urlParams.toolId
+      ) {
+        return true;
+      }
       return toolOutput === null || toolOutput === undefined;
     }
     return false;
-  }, [provider, toolResponseMetadata, mcpAppsToolOutput, toolOutput]);
+  }, [
+    provider,
+    openaiToolOutput,
+    toolResponseMetadata,
+    mcpAppsToolOutput,
+    toolOutput,
+    urlParams.toolId,
+  ]);
+
+  // Partial/streaming tool input (available during LLM argument generation)
+  const partialToolInput = useMemo(() => {
+    if (provider === "mcp-apps" && mcpAppsPartialToolInput) {
+      return mcpAppsPartialToolInput as Partial<TToolInput>;
+    }
+    // OpenAI Apps SDK and URL params don't support streaming tool input
+    return null;
+  }, [provider, mcpAppsPartialToolInput]);
+
+  // Whether tool arguments are currently being streamed
+  const isStreaming = useMemo(() => {
+    if (provider === "mcp-apps") {
+      // Streaming when we have partial input data available.
+      // Don't gate on mcpAppsToolInput === null — React batches state updates
+      // from tool-input-partial and tool-input together, so toolInput is often
+      // already set by the time React renders. partialToolInput being non-null
+      // is the authoritative signal that streaming data exists.
+      return mcpAppsPartialToolInput !== null;
+    }
+    return false;
+  }, [provider, mcpAppsPartialToolInput]);
 
   return {
     // Props and state (with defaults)
     props: widgetProps,
     toolInput: (toolInput || {}) as TToolInput,
     output: (toolOutput ?? null) as TOutput | null,
-    metadata: (toolResponseMetadata ?? null) as TMetadata | null,
+    metadata: (provider === "mcp-apps"
+      ? (mcpAppsResponseMetadata ?? null)
+      : (toolResponseMetadata ?? null)) as TMetadata | null,
     state: localWidgetState,
     setState,
 
@@ -564,7 +750,15 @@ export function useWidget<
     // Availability
     isAvailable: isOpenAiAvailable || isMcpAppsConnected,
     isPending,
-  } as UseWidgetResult<TProps, TOutput, TMetadata, TState, TToolInput>;
+
+    // Streaming
+    partialToolInput,
+    isStreaming,
+
+    // Host identity (MCP Apps only)
+    hostInfo: mcpAppsHostInfo ?? undefined,
+    hostCapabilities: mcpAppsHostCapabilities ?? undefined,
+  } as UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>;
 }
 
 /**
@@ -574,7 +768,7 @@ export function useWidget<
  * const props = useWidgetProps<{ city: string; temperature: number }>();
  * ```
  */
-export function useWidgetProps<TProps extends UnknownObject = UnknownObject>(
+export function useWidgetProps<TProps = UnknownObject>(
   defaultProps?: TProps
 ): Partial<TProps> {
   const { props } = useWidget<TProps>(defaultProps);
@@ -600,18 +794,13 @@ export function useWidgetTheme(): Theme {
  * const [favorites, setFavorites] = useWidgetState<string[]>([]);
  * ```
  */
-export function useWidgetState<TState extends UnknownObject>(
+export function useWidgetState<TState>(
   defaultState?: TState
 ): readonly [
   TState | null,
   (state: TState | ((prev: TState | null) => TState)) => Promise<void>,
 ] {
-  const { state, setState } = useWidget<
-    UnknownObject,
-    UnknownObject,
-    UnknownObject,
-    TState
-  >();
+  const { state, setState } = useWidget<UnknownObject, TState>();
 
   // Initialize with default if provided and state is null
   useEffect(() => {

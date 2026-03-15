@@ -9,6 +9,11 @@ import type {
 } from "./types";
 import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
 
+interface WidgetModelContext {
+  content?: Array<{ type: string; text: string }>;
+  structuredContent?: Record<string, unknown>;
+}
+
 interface UseChatMessagesProps {
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
@@ -16,6 +21,12 @@ interface UseChatMessagesProps {
   isConnected: boolean;
   /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
   chatApiUrl?: string;
+  /** When chatApiUrl is not yet available, called before sending to resolve the URL. Useful for background initialization. */
+  waitForChatApiUrl?: () => Promise<string | undefined>;
+  /** Active widget model contexts to inject into the LLM conversation */
+  widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
+  /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
+  initialMessages?: Message[];
 }
 
 export function useChatMessages({
@@ -24,17 +35,27 @@ export function useChatMessages({
   authConfig,
   isConnected,
   chatApiUrl,
+  waitForChatApiUrl,
+  widgetModelContexts,
+  initialMessages,
 }: UseChatMessagesProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string, promptResults: PromptResult[]) => {
+    async (
+      userInput: string,
+      promptResults: PromptResult[],
+      extraAttachments?: MessageAttachment[]
+    ) => {
+      const allAttachments = [...attachments, ...(extraAttachments ?? [])];
       // Can send if there's text, prompt results, or attachments
       const hasContent =
-        userInput.trim() || promptResults.length > 0 || attachments.length > 0;
+        userInput.trim() ||
+        promptResults.length > 0 ||
+        allAttachments.length > 0;
       if (!hasContent || !llmConfig || !isConnected) {
         return;
       }
@@ -46,13 +67,13 @@ export function useChatMessages({
       // Don't create one when only using prompt results (they create their own messages)
       const userMessages: Message[] = [...promptResultsMessages];
 
-      if (userInput.trim() || attachments.length > 0) {
+      if (userInput.trim() || allAttachments.length > 0) {
         const userMessage: Message = {
           id: `user-${Date.now()}`,
           role: "user",
           content: userInput.trim(),
           timestamp: Date.now(),
-          attachments: attachments.length > 0 ? [...attachments] : undefined,
+          attachments: allAttachments.length > 0 ? allAttachments : undefined,
         };
         userMessages.push(userMessage);
       }
@@ -94,20 +115,45 @@ export function useChatMessages({
           }
         }
 
-        // Call the streaming chat API endpoint
-        const response = await fetch(
-          chatApiUrl ?? "/inspector/api/chat/stream",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            signal: abortControllerRef.current.signal,
-            body: JSON.stringify({
-              mcpServerUrl,
-              llmConfig,
-              authConfig: authConfigWithTokens,
-              messages: [...messages, ...userMessages].map((m) => ({
+        // Build widget state context messages (per SEP-1865 ui/update-model-context)
+        // These inform the LLM about current widget UI state so it can reason about what the user sees.
+        const widgetContextMessages: Array<{ role: string; content: string }> =
+          [];
+        if (widgetModelContexts && widgetModelContexts.size > 0) {
+          const parts: string[] = [];
+          for (const [, ctx] of widgetModelContexts) {
+            if (!ctx) continue;
+            if (ctx.content?.length) {
+              parts.push(ctx.content.map((c) => c.text).join("\n"));
+            } else if (ctx.structuredContent) {
+              parts.push(JSON.stringify(ctx.structuredContent));
+            }
+          }
+          if (parts.length > 0) {
+            widgetContextMessages.push({
+              role: "user",
+              content: `[Current Widget State]\n${parts.join("\n")}`,
+            });
+          }
+        }
+
+        const resolvedUrl =
+          chatApiUrl ??
+          (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
+          "/inspector/api/chat/stream";
+
+        const response = await fetch(resolvedUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: abortControllerRef.current.signal,
+          body: JSON.stringify({
+            mcpServerUrl,
+            llmConfig,
+            authConfig: authConfigWithTokens,
+            messages: [
+              ...[...messages, ...userMessages].map((m) => ({
                 role: m.role,
                 content:
                   m.content ||
@@ -118,9 +164,10 @@ export function useChatMessages({
                     ""),
                 attachments: m.attachments,
               })),
-            }),
-          }
-        );
+              ...widgetContextMessages,
+            ],
+          }),
+        });
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -384,6 +431,7 @@ export function useChatMessages({
       authConfig,
       attachments,
       chatApiUrl,
+      waitForChatApiUrl,
     ]
   );
 
@@ -435,6 +483,7 @@ export function useChatMessages({
     attachments,
     sendMessage,
     clearMessages,
+    setMessages,
     stop,
     addAttachment,
     removeAttachment,

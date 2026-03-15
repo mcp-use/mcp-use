@@ -1,10 +1,11 @@
-import { MCPServer, object } from "mcp-use/server";
+import { MCPServer, object, text, widget } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
   name: "{{PROJECT_NAME}}",
   title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
-  description: "MCP server with OpenAI Apps SDK integration",
+  description: "MCP server with MCP Apps integration",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com", // Can be customized later
@@ -18,22 +19,13 @@ const server = new MCPServer({
 });
 
 /**
- * AUTOMATIC UI WIDGET REGISTRATION
- * All React components in the `resources/` folder are automatically registered as MCP tools and resources.
- * Just export widgetMetadata with description and Zod schema, and mcp-use handles the rest!
- *
- * It will automatically add to your MCP server:
- * - server.tool('get-brand-info')
- * - server.resource('ui://widget/get-brand-info')
- *
- * See docs: https://mcp-use.com/docs/typescript/server/ui-widgets
+ * TOOL THAT RETURNS A WIDGET
+ * The `widget` config tells mcp-use which widget component to render.
+ * The `widget()` helper in the handler passes props to that component.
+ * Docs: https://mcp-use.com/docs/typescript/server/mcp-apps
  */
 
-/**
- * Add here your standard MCP tools, resources and prompts
- */
-
-// Fruits data for the API
+// Fruits data — color values are Tailwind bg-[] classes used by the carousel UI
 const fruits = [
   { fruit: "mango", color: "bg-[#FBF1E1] dark:bg-[#FBF1E1]/10" },
   { fruit: "pineapple", color: "bg-[#f8f0d9] dark:bg-[#f8f0d9]/10" },
@@ -53,45 +45,59 @@ const fruits = [
   { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/10" },
 ];
 
-// API endpoint for fruits data
-server.get("/api/fruits", (c) => {
-  return c.json(fruits);
-});
-
-// Brand Info Tool - Returns brand information
 server.tool(
   {
-    name: "get-brand-info",
-    description:
-      "Get information about the brand, including company details, mission, and values",
+    name: "search-tools",
+    description: "Search for fruits and display the results in a visual widget",
+    schema: z.object({
+      query: z.string().optional().describe("Search query to filter fruits"),
+    }),
+    widget: {
+      name: "product-search-result",
+      invoking: "Searching...",
+      invoked: "Results loaded",
+    },
   },
-  async () => {
+  async ({ query }) => {
+    const results = fruits.filter(
+      (f) => !query || f.fruit.toLowerCase().includes(query.toLowerCase())
+    );
+
+    // let's emulate a delay to show the loading state
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    return widget({
+      props: { query: query ?? "", results },
+      output: text(
+        `Found ${results.length} fruits matching "${query ?? "all"}"`
+      ),
+    });
+  }
+);
+
+server.tool(
+  {
+    name: "get-fruit-details",
+    description: "Get detailed information about a specific fruit",
+    schema: z.object({
+      fruit: z.string().describe("The fruit name"),
+    }),
+    outputSchema: z.object({
+      fruit: z.string(),
+      color: z.string(),
+      facts: z.array(z.string()),
+    }),
+  },
+  async ({ fruit }) => {
+    const found = fruits.find(
+      (f) => f.fruit?.toLowerCase() === fruit?.toLowerCase()
+    );
     return object({
-      name: "mcp-use",
-      tagline: "Build MCP servers with UI widgets in minutes",
-      description:
-        "mcp-use is a modern framework for building Model Context Protocol (MCP) servers with automatic UI widget registration, making it easy to create interactive AI tools and resources.",
-      founded: "2025",
-      mission:
-        "To simplify the development of MCP servers and make AI integration accessible for developers",
-      values: [
-        "Developer Experience",
-        "Simplicity",
-        "Performance",
-        "Open Source",
-        "Innovation",
-      ],
-      contact: {
-        website: "https://mcp-use.com",
-        docs: "https://mcp-use.com/docs",
-        github: "https://github.com/mcp-use/mcp-use",
-      },
-      features: [
-        "Automatic UI widget registration",
-        "React component support",
-        "Full TypeScript support",
-        "Built-in HTTP server",
-        "MCP protocol compliance",
+      fruit: found?.fruit ?? fruit,
+      color: found?.color ?? "unknown",
+      facts: [
+        `${fruit} is a delicious fruit`,
+        `Color: ${found?.color ?? "unknown"}`,
       ],
     });
   }

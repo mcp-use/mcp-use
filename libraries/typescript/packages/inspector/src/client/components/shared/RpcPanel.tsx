@@ -2,7 +2,7 @@ import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { ResizablePanel, usePanelRef } from "@/client/components/ui/resizable";
 import { ChevronDown, Copy, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { JsonRpcLoggerView } from "../logging/JsonRpcLoggerView";
 
 interface RpcPanelProps {
@@ -28,13 +28,16 @@ export function RpcPanel({ serverId, className }: RpcPanelProps) {
   const clearRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
   const exportRpcMessagesRef = useRef<(() => Promise<void>) | null>(null);
 
+  useEffect(() => {
+    rpcPanelRef.current?.collapse();
+  }, []);
+
   const handleResize = (size: { asPercentage: number; inPixels: number }) => {
-    console.log("[handleResize] size:", size);
     // Auto-expand when manually resized above collapsed size
     if (rpcPanelCollapsed && size.inPixels > 46) {
       setRpcPanelCollapsed(false);
     }
-    // Auto-collapse when resized close to collapsed size
+    // Auto-collapse when dragged back to collapsed size
     else if (!rpcPanelCollapsed && size.inPixels <= 46) {
       setRpcPanelCollapsed(true);
     }
@@ -43,9 +46,9 @@ export function RpcPanel({ serverId, className }: RpcPanelProps) {
   return (
     <ResizablePanel
       panelRef={rpcPanelRef}
-      defaultSize={38}
+      defaultSize={46}
       collapsible
-      minSize={46}
+      minSize={150}
       collapsedSize={46}
       onResize={handleResize}
       className={`flex flex-col border-t dark:border-zinc-700 ${className || ""}`}
@@ -59,11 +62,10 @@ export function RpcPanel({ serverId, className }: RpcPanelProps) {
           if (rpcPanelCollapsed) {
             setRpcPanelCollapsed(false);
             setTimeout(() => {
-              rpcPanelRef.current?.resize("50%");
+              rpcPanelRef.current?.expand();
             }, 100);
           } else {
-            rpcPanelRef.current?.resize(38);
-
+            rpcPanelRef.current?.collapse();
             setTimeout(() => {
               setRpcPanelCollapsed(true);
             }, 100);

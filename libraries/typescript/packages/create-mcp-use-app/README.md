@@ -1,8 +1,8 @@
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_black.svg">
-    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_black.svg">
+    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
@@ -14,9 +14,9 @@
     <a href="https://www.npmjs.com/package/create-mcp-use-app" alt="NPM Version">
         <img src="https://img.shields.io/npm/v/create-mcp-use-app.svg"/></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
+        <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
     <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
-        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
+        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
@@ -40,7 +40,6 @@ Create a new MCP application in seconds:
 ```bash
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
-npm run dev
 ```
 
 That's it! Your MCP server is running at `http://localhost:3000` with the inspector automatically opened in your browser.
@@ -96,6 +95,8 @@ You'll be prompted for:
 - Project name
 - Project template
 - Package manager preference
+- Install dependencies (Y/n)
+- Skills installation (Claude Code, Cursor, Both, or None)
 
 ### Direct Mode
 
@@ -122,8 +123,16 @@ npx create-mcp-use-app my-project --npm
 npx create-mcp-use-app my-project --yarn
 npx create-mcp-use-app my-project --pnpm
 
-# Install deps automatically
+# Install deps automatically (or --no-install to skip and skip prompt)
 npx create-mcp-use-app my-project --install
+npx create-mcp-use-app my-project --no-install
+
+# Skills presets for Claude Code / Cursor (omit to prompt)
+npx create-mcp-use-app my-project --skills
+npx create-mcp-use-app my-project --no-skills
+
+# List all available templates
+npx create-mcp-use-app --list-templates
 ```
 
 ---

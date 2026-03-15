@@ -14,7 +14,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { theme, isAvailable } = useWidget();
-  console.log("theme", theme);
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
       if (typeof window === "undefined") return "light";
@@ -40,17 +39,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   // Calculate effective theme
   const effectiveTheme = isAvailable ? theme : systemPreference;
 
-  // Apply dark class synchronously before browser paint to prevent flash
+  // Apply theme synchronously before browser paint to prevent flash
+  // Sets both CSS class (for Tailwind dark mode) and data-theme attribute
+  // (for OpenAI Apps SDK UI design tokens)
   useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
-    // Priority 1: If widget API is available, use widget theme
-    // Apply or remove dark class
-    if (effectiveTheme === "dark") {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    const root = document.documentElement;
+
+    // Apply or remove dark class (Tailwind dark mode)
+    root.classList.remove("light", "dark");
+    root.classList.add(effectiveTheme === "dark" ? "dark" : "light");
+
+    // Set data-theme attribute (OpenAI Apps SDK UI design tokens)
+    root.setAttribute(
+      "data-theme",
+      effectiveTheme === "dark" ? "dark" : "light"
+    );
+
+    // Set color-scheme for CSS light-dark() function
+    root.style.colorScheme = effectiveTheme === "dark" ? "dark" : "light";
   }, [effectiveTheme]);
 
   return <>{children}</>;

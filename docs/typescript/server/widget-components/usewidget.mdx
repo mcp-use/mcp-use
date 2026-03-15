@@ -4,7 +4,7 @@ description: "Universal React hook for MCP Apps and ChatGPT Apps SDK widgets"
 icon: "webhook"
 ---
 
-The `useWidget` hook provides a **universal, protocol-agnostic** interface for building widgets that work with **both** MCP Apps (SEP-1865) and ChatGPT Apps SDK protocols. It automatically detects the environment and provides a consistent API regardless of which protocol is being used.
+The `useWidget` hook provides a **universal, protocol-agnostic** interface for building widgets that work with **both** MCP Apps and ChatGPT Apps SDK protocols. It automatically detects the environment and provides a consistent API regardless of which protocol is being used.
 
 <Info>
 **Protocol Detection**: The hook automatically detects whether it's running in:
@@ -96,17 +96,43 @@ useWidget<
 | Method                  | Signature                                                                    | Description                                                  |
 | ----------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `callTool`              | `(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>` | Call a tool on the MCP server                                |
-| `sendFollowUpMessage`   | `(prompt: string) => Promise<void>`                                          | Send a follow-up message to the ChatGPT conversation         |
+| `sendFollowUpMessage`   | `(content: string \| MessageContentBlock[]) => Promise<void>`                | Send a follow-up message; string shorthand or full content block array (SEP-1865) |
 | `openExternal`          | `(href: string) => void`                                                     | Open an external URL in a new tab                            |
 | `requestDisplayMode`    | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>`                      | Request a different display mode                             |
 | `notifyIntrinsicHeight` | `(height: number) => Promise<void>`                                          | Notify OpenAI about intrinsic height changes for auto-sizing |
 
 ### Availability
 
-| Property      | Type      | Description                                                                    |
-| ------------- | --------- | ------------------------------------------------------------------------------ |
-| `isAvailable` | `boolean` | Whether the `window.openai` API is available                                   |
-| `isPending`   | `boolean` | Whether the tool is currently executing. When `true`, props will be empty `{}` |
+| Property            | Type                 | Description                                                                                                                                 |
+| ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isAvailable`       | `boolean`            | Whether the `window.openai` API is available                                                                                                |
+| `isPending`         | `boolean`            | Whether the tool is currently executing. When `true`, props will be empty `{}`                                                             |
+| `partialToolInput`  | `Partial<TProps> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
+| `isStreaming`       | `boolean`            | Whether tool arguments are currently being streamed (partial input received but complete input not yet available). `false` in ChatGPT Apps SDK or when the host does not stream. |
+
+### Host Identity (MCP Apps only)
+
+| Property           | Type                                          | Description                                                                                                     |
+| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `hostInfo`         | `{ name: string; version: string } \| undefined` | Name and version of the MCP Apps host, from the `ui/initialize` handshake. `undefined` in ChatGPT Apps SDK.  |
+| `hostCapabilities` | `Record<string, unknown> \| undefined`        | Capabilities advertised by the MCP Apps host (SEP-1865 `HostCapabilities`). `undefined` in ChatGPT Apps SDK.   |
+
+These fields are only populated when the widget is running inside an MCP Apps host (Claude, Goose, or any client implementing SEP-1865). They are `undefined` in the ChatGPT Apps SDK environment.
+
+```tsx
+const { hostInfo, hostCapabilities } = useWidget();
+
+// Identify the host
+if (hostInfo) {
+  console.log(`Running inside ${hostInfo.name} ${hostInfo.version}`);
+  // e.g. "claude-desktop 1.2.0"
+}
+
+// Check for optional host features
+if (hostCapabilities?.openLinks) {
+  // Host supports opening external URLs via ui/open-link
+}
+```
 
 ## Complete Example
 
@@ -189,6 +215,8 @@ Widgets render **before** the tool execution completes. This means:
    - `output` and `metadata` are available
    - Widget re-renders with full data
 
+When the host supports **streaming tool arguments** (e.g. MCP Inspector, MCP Apps clients that send `tool-input-partial`), an optional phase occurs between (1) and (2): the widget receives partial tool input in real time via `partialToolInput` while `isStreaming` is `true`, then transitions to full `props` when the tool input is complete. See [Streaming tool arguments](#streaming-tool-arguments) below.
+
 **Example:**
 
 ```tsx
@@ -224,6 +252,40 @@ const MyWidget: React.FC = () => {
         </div>
       )}
     </div>
+  );
+};
+```
+
+### Streaming tool arguments
+
+When the host streams tool arguments (e.g. MCP Inspector or MCP Apps clients that send `ui/notifications/tool-input-partial`), the widget can show a **live preview** of the incoming data. Use `partialToolInput` and `isStreaming` from `useWidget`:
+
+- **`isStreaming`** is `true` while the LLM is still generating the tool call arguments.
+- **`partialToolInput`** contains the partial arguments parsed so far (may be incomplete or invalid JSON until streaming finishes).
+- When streaming ends, the host sends the final tool input and `props` is populated; `isStreaming` becomes `false` and `partialToolInput` is cleared.
+
+This is only available when the host supports it; in ChatGPT Apps SDK or when using URL params, `partialToolInput` stays `null` and `isStreaming` stays `false`.
+
+**Example: live preview while streaming**
+
+```tsx
+const CodePreviewWidget: React.FC = () => {
+  const { props, isPending, isStreaming, partialToolInput } = useWidget<{ code: string; language: string }>();
+
+  if (isPending && !partialToolInput) {
+    return <LoadingSpinner />;
+  }
+
+  // Show live preview during streaming, then final props when complete
+  const displayCode = isStreaming && partialToolInput?.code != null
+    ? partialToolInput.code
+    : props.code ?? "";
+  const displayLang = (isStreaming ? partialToolInput?.language : props.language) ?? "text";
+
+  return (
+    <pre data-language={displayLang}>
+      {displayCode || "Waiting for input..."}
+    </pre>
   );
 };
 ```
@@ -356,13 +418,21 @@ const handleSearch = async () => {
 
 ### 7. Follow-up Messages
 
-Send messages to the ChatGPT conversation:
+Send messages to the conversation. Accepts a plain string shorthand or a full content block array per the SEP-1865 `ui/message` spec:
 
 ```tsx
 const { sendFollowUpMessage } = useWidget();
 
+// String shorthand (most common)
 const handleRequestInfo = async () => {
   await sendFollowUpMessage("Show me more details about this product");
+};
+
+// Full content array (MCP Apps — supports text, image, resource blocks)
+const handleRichMessage = async () => {
+  await sendFollowUpMessage([
+    { type: "text", text: "Show me more details about this product" },
+  ]);
 };
 ```
 

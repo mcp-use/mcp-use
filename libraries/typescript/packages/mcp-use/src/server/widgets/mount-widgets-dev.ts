@@ -254,6 +254,11 @@ const container = document.getElementById('widget-root')
 if (container && Component) {
   const root = createRoot(container)
   root.render(<Component />)
+  
+  // Signal to parent that widget has mounted (after a brief delay for initial render)
+  setTimeout(() => {
+    window.parent.postMessage({ type: 'mcp-inspector:widget:ready' }, '*')
+  }, 100)
 }
 `;
 
@@ -270,7 +275,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -503,7 +508,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -581,6 +586,42 @@ if (container && Component) {
           }
         }
 
+        // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for all widget registrations.
+        const serverOrigin = serverConfig.serverBaseUrl
+          ? new URL(serverConfig.serverBaseUrl).origin
+          : null;
+        let enrichedCspMetadata = metadata.metadata as
+          | Record<string, any>
+          | undefined;
+        if (serverOrigin) {
+          const csp = enrichedCspMetadata?.csp
+            ? { ...enrichedCspMetadata.csp }
+            : {};
+          for (const field of [
+            "connectDomains",
+            "resourceDomains",
+            "baseUriDomains",
+          ] as const) {
+            if (csp[field] && !csp[field].includes(serverOrigin)) {
+              csp[field] = [...csp[field], serverOrigin];
+            } else if (!csp[field]) {
+              csp[field] = [serverOrigin];
+            }
+          }
+          const wsOrigin = serverOrigin.replace(/^http/, "ws");
+          if (!csp.connectDomains?.includes(wsOrigin)) {
+            csp.connectDomains = [...(csp.connectDomains || []), wsOrigin];
+          }
+          const unsafeEval = "'unsafe-eval'";
+          if (!csp.scriptDirectives?.includes(unsafeEval)) {
+            csp.scriptDirectives = [
+              ...(csp.scriptDirectives || []),
+              unsafeEval,
+            ];
+          }
+          enrichedCspMetadata = { ...enrichedCspMetadata, csp };
+        }
+
         // For HMR updates, use the direct update path to avoid re-registration issues
         if (isHmrUpdate) {
           const schemaField = metadata.props || metadata.inputs;
@@ -588,6 +629,8 @@ if (container && Component) {
           // Import helpers for widget registration
           const { slugifyWidgetName, processWidgetHtml } =
             await import("./widget-helpers.js");
+          const { buildDualProtocolMetadata, getBuildIdPart } =
+            await import("./protocol-helpers.js");
 
           // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
           const widgetType =
@@ -595,11 +638,7 @@ if (container && Component) {
               ? "appsSdk"
               : "mcpApps";
           const slugifiedName = slugifyWidgetName(widgetName);
-
-          // Debug logging
-          console.log(
-            `[WIDGET-HMR] ${widgetName} - Type: ${widgetType}, Has metadata: ${!!metadata.metadata}`
-          );
+          const description = metadata.description || `Widget: ${widgetName}`;
 
           // Re-read and process HTML for the update
           const htmlPath = pathHelpers.join(
@@ -622,26 +661,49 @@ if (container && Component) {
             );
           }
 
-          // Use the update callback to update tool in place with complete metadata
-          // Pass the raw Zod schema - the server will convert it internally
-          const updated = updateWidgetTool(widgetName, {
-            description: metadata.description || `Widget: ${widgetName}`,
-            schema: schemaField,
-            _meta: {
-              "mcp-use/widget": {
-                name: widgetName,
-                slugifiedName: slugifiedName,
-                title: metadata.title || widgetName,
-                description: metadata.description,
-                type: widgetType,
-                props: schemaField,
-                html: html,
-                dev: true,
-                exposeAsTool: metadata.exposeAsTool ?? true,
-              },
-              // Include unified metadata for dual-protocol support (MCP Apps)
-              ...(metadata.metadata ? { ui: metadata.metadata } : { ui: {} }),
+          // Build the resource URI (same as initial registration)
+          const buildIdPart = getBuildIdPart(undefined); // dev mode has no buildId
+          const resourceUri = `ui://widget/${widgetName}${buildIdPart}.html`;
+
+          const hmrDefinition = {
+            name: widgetName,
+            type: widgetType,
+            description: description as string,
+            metadata: metadata.metadata ? enrichedCspMetadata : undefined,
+          };
+
+          // Build dual-protocol _meta for the tool definition:
+          // - MCP Apps: ui.resourceUri, ui/resourceUri (deprecated)
+          // - Apps SDK: openai/outputTemplate, openai/widgetCSP, openai/description
+          const dualProtocolMeta = buildDualProtocolMetadata(
+            hmrDefinition as any,
+            resourceUri
+          );
+
+          // Assemble full _meta: mcp-use/widget + dual-protocol fields
+          const fullMeta: Record<string, unknown> = {
+            "mcp-use/widget": {
+              name: widgetName,
+              slugifiedName: slugifiedName,
+              title: metadata.title || widgetName,
+              description: description,
+              type: widgetType,
+              props: schemaField,
+              html: html,
+              dev: true,
+              exposeAsTool: metadata.exposeAsTool ?? false,
             },
+            ui: {},
+            // mcp-use private extension: props schema for inspector PropsConfigDialog.
+            // Not part of SEP-1865; other hosts will ignore this key.
+            ...(schemaField ? { "mcp-use/propsSchema": schemaField } : {}),
+            ...dualProtocolMeta,
+          };
+
+          const updated = updateWidgetTool(widgetName, {
+            description: description,
+            schema: schemaField,
+            _meta: fullMeta,
           });
 
           if (updated) {
@@ -655,19 +717,22 @@ if (container && Component) {
           );
         }
 
-        // Full registration for new widgets
-        // Use slugified name for temp directory path
+        // Full registration for new widgets (use enriched CSP with ws, unsafe-eval for dev)
         const { slugifyWidgetName } = await import("./widget-helpers.js");
         const slugifiedName = slugifyWidgetName(widgetName);
+        const metadataToRegister = {
+          ...metadata,
+          metadata: metadata.metadata
+            ? (enrichedCspMetadata ?? metadata.metadata)
+            : undefined,
+          ...(metadata.description
+            ? {}
+            : { description: `Widget: ${widgetName}` }),
+        } as Record<string, unknown>;
         await registerWidgetFromTemplate(
           widgetName,
           pathHelpers.join(tempDir, slugifiedName, "index.html"),
-          (metadata.description
-            ? metadata
-            : { ...metadata, description: `Widget: ${widgetName}` }) as Record<
-            string,
-            unknown
-          >,
+          metadataToRegister,
           serverConfig,
           registerWidget,
           true // isDev
@@ -714,6 +779,15 @@ if (container && Component) {
                 true // isHmrUpdate
               );
               console.log(`[WIDGETS] Reloaded metadata for ${widget.name}`);
+
+              // Regenerate tool registry types
+              import("../utils/tool-registry-generator.js")
+                .then(({ generateToolRegistryTypes }) =>
+                  generateToolRegistryTypes(server.registrations.tools)
+                )
+                .catch(() => {
+                  /* Ignore errors */
+                });
             } catch (error) {
               console.warn(
                 `[WIDGET] Failed to reload metadata for ${widget.name}:`,
@@ -750,6 +824,15 @@ if (container && Component) {
               await extractAndRegisterWidget(widgetName, filePath);
 
               console.log(`[WIDGETS] New widget added: ${widgetName}`);
+
+              // Regenerate tool registry types
+              import("../utils/tool-registry-generator.js")
+                .then(({ generateToolRegistryTypes }) =>
+                  generateToolRegistryTypes(server.registrations.tools)
+                )
+                .catch(() => {
+                  /* Ignore errors */
+                });
             } catch (error) {
               console.warn(
                 `[WIDGET] Failed to add new widget ${widgetName}:`,
@@ -782,6 +865,15 @@ if (container && Component) {
                 await extractAndRegisterWidget(widgetName, filePath);
 
                 console.log(`[WIDGETS] New widget added: ${widgetName}`);
+
+                // Regenerate tool registry types
+                import("../utils/tool-registry-generator.js")
+                  .then(({ generateToolRegistryTypes }) =>
+                    generateToolRegistryTypes(server.registrations.tools)
+                  )
+                  .catch(() => {
+                    /* Ignore errors */
+                  });
               } catch (error) {
                 console.warn(
                   `[WIDGET] Failed to add new widget ${widgetName}:`,
@@ -869,6 +961,106 @@ export default PostHog;
     },
   };
 
+  // Strip `widgetMetadata` export from browser builds so React Fast Refresh
+  // works. Widget files export both a React component (default) and
+  // `widgetMetadata` (named). The React plugin can't hot-update files with
+  // non-component exports and falls back to full-reload. By removing the
+  // export for the browser, Fast Refresh sees only the component and can
+  // do proper HMR. The SSR build keeps the export for metadata extraction.
+  // Make widget files compatible with React Fast Refresh by stripping the
+  // `widgetMetadata` named export for browser builds. SSR keeps it for
+  // metadata extraction. Also injects `import.meta.hot.accept()` as a
+  // safety net so even unusual export patterns never cascade to full-reload.
+  const widgetHmrPlugin = {
+    name: "widget-hmr-compat",
+    enforce: "pre" as const,
+    transform(code: string, id: string, options?: { ssr?: boolean }) {
+      if (options?.ssr) return null;
+      const cleanId = id.replace(/[?#].*$/, "");
+      if (!cleanId.endsWith(".tsx") && !cleanId.endsWith(".ts")) return null;
+      if (!code.includes("widgetMetadata")) return null;
+
+      let result = code;
+      // Strip all forms of widgetMetadata export
+      result = result.replace(
+        /export\s+(const|let|var)\s+widgetMetadata\b/g,
+        "const _widgetMetadata"
+      );
+      result = result.replace(
+        /export\s*\{[^}]*\bwidgetMetadata\b[^}]*\}/g,
+        (match) => {
+          // Remove widgetMetadata from export list, keep others
+          const cleaned = match
+            .replace(/\bwidgetMetadata\b\s*(as\s+\w+)?\s*,?\s*/g, "")
+            .replace(/,\s*\}/, " }")
+            .replace(/\{\s*\}/, "{ /* stripped */ }");
+          return cleaned.includes("{ /* stripped */ }") ? "" : cleaned;
+        }
+      );
+
+      // Safety net: ensure the module self-accepts HMR even if we missed
+      // an export pattern, preventing cascade to full-reload
+      if (!result.includes("import.meta.hot")) {
+        result += "\nif (import.meta.hot) { import.meta.hot.accept(); }\n";
+      }
+
+      return result;
+    },
+  };
+
+  // Suppress all full-page reloads for widgets. The widgetHmrPlugin makes
+  // widget files self-accepting (import.meta.hot.accept()), so React Fast
+  // Refresh handles component updates at the module level. Full-page reloads
+  // must be suppressed because widgets run inside iframes that receive host
+  // context (window.openai props) via postMessage — a reload would wipe that
+  // state. Dep re-optimization reloads are also suppressed; instead we rely
+  // on optimizeDeps.include + resolve.dedupe to pre-bundle all React deps
+  // in a single pass, preventing duplicate React instances.
+  const suppressFullReloadPlugin = {
+    name: "suppress-widget-full-reload",
+    configureServer(srv: any) {
+      const channels: any[] = [];
+      if (srv.ws) channels.push(srv.ws);
+      if (srv.hot) channels.push(srv.hot);
+      if (srv.environments?.client?.hot)
+        channels.push(srv.environments.client.hot);
+
+      for (const channel of channels) {
+        if (!channel?.send) continue;
+        const origSend = channel.send.bind(channel);
+        channel.send = (...args: any[]) => {
+          const msg = args[0];
+          if (
+            (msg && typeof msg === "object" && msg.type === "full-reload") ||
+            (typeof msg === "string" && msg.includes('"type":"full-reload"'))
+          ) {
+            return;
+          }
+          return origSend(...args);
+        };
+      }
+    },
+    handleHotUpdate({ file }: { file: string }) {
+      if (file.endsWith(".html")) return [];
+      return undefined;
+    },
+  };
+
+  // Build the optimizeDeps config. We point `entries` directly at widget
+  // source files so esbuild scans their imports and pre-bundles ALL deps
+  // at startup. The temp entry files use absolute import paths that esbuild
+  // can't follow, so we scan widget sources instead. We also include the
+  // core deps from the generated entry template (react, react-dom/client).
+  const widgetSourceEntries = widgets.map((w) => w.entry);
+  const coreDeps = [
+    "react",
+    "react/jsx-runtime",
+    "react/jsx-dev-runtime",
+    "react-dom",
+    "react-dom/client",
+    "mcp-use/react",
+  ];
+
   const hmrPort = await findAvailablePort(DEFAULT_HMR_PORT);
 
   const viteServer = await createServer({
@@ -878,11 +1070,14 @@ export default PostHog;
       zodJitlessPlugin,
       nodeStubsPlugin,
       ssrCssPlugin,
+      widgetHmrPlugin,
+      suppressFullReloadPlugin,
       watchResourcesPlugin,
       tailwindcss(),
       react(),
     ],
     resolve: {
+      dedupe: ["react", "react-dom"],
       alias: {
         "@": pathHelpers.join(getCwd(), resourcesDir),
       },
@@ -938,8 +1133,12 @@ export default PostHog;
     // Explicitly tell Vite to watch files outside root
     // This is needed because widget entry files import from resources directory
     optimizeDeps: {
+      // Scan widget source files at startup so all deps are pre-bundled
+      // before any browser connects. Avoids mid-session "optimized
+      // dependencies changed" reloads that create duplicate React instances.
+      entries: widgetSourceEntries,
+      include: coreDeps,
       // Exclude Node.js-only packages from browser bundling
-      // posthog-node is for server-side telemetry and doesn't work in browser
       exclude: ["posthog-node"],
     },
     ssr: {
@@ -1083,13 +1282,12 @@ export default PostHog;
     return c.text(message, 404);
   });
 
-  widgets.forEach((widget) => {
-    // Use slugified name for URL display
+  for (const widget of widgets) {
     const slugifiedName = slugifyWidgetName(widget.name);
     console.log(
       `[WIDGET] ${widget.name} mounted at ${baseRoute}/${slugifiedName}`
     );
-  });
+  }
 
   // register a tool and resource for each widget
   for (const widget of widgets) {
@@ -1128,16 +1326,54 @@ export default PostHog;
       );
     }
 
+    // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for initial registration.
+    // Same logic as extractAndRegisterWidget - the initial loop bypassed this before.
+    let enrichedCspMetadata = metadata.metadata as
+      | Record<string, any>
+      | undefined;
+    const serverOrigin = serverConfig.serverBaseUrl
+      ? new URL(serverConfig.serverBaseUrl).origin
+      : null;
+    if (serverOrigin) {
+      const csp = enrichedCspMetadata?.csp
+        ? { ...enrichedCspMetadata.csp }
+        : {};
+      for (const field of [
+        "connectDomains",
+        "resourceDomains",
+        "baseUriDomains",
+      ] as const) {
+        if (csp[field] && !csp[field].includes(serverOrigin)) {
+          csp[field] = [...csp[field], serverOrigin];
+        } else if (!csp[field]) {
+          csp[field] = [serverOrigin];
+        }
+      }
+      const wsOrigin = serverOrigin.replace(/^http/, "ws");
+      if (!csp.connectDomains?.includes(wsOrigin)) {
+        csp.connectDomains = [...(csp.connectDomains || []), wsOrigin];
+      }
+      const unsafeEval = "'unsafe-eval'";
+      if (!csp.scriptDirectives?.includes(unsafeEval)) {
+        csp.scriptDirectives = [...(csp.scriptDirectives || []), unsafeEval];
+      }
+      enrichedCspMetadata = { ...enrichedCspMetadata, csp };
+    }
+
+    const metadataToRegister = {
+      ...metadata,
+      metadata: metadata.metadata
+        ? (enrichedCspMetadata ?? metadata.metadata)
+        : undefined,
+      ...(metadata.description ? {} : { description: widget.description }),
+    } as Record<string, unknown>;
+
     // Use the extracted helper to register the widget
+    const slugifiedName = slugifyWidgetName(widget.name);
     await registerWidgetFromTemplate(
       widget.name,
-      pathHelpers.join(tempDir, widget.name, "index.html"),
-      (metadata.description
-        ? metadata
-        : { ...metadata, description: widget.description }) as Record<
-        string,
-        unknown
-      >,
+      pathHelpers.join(tempDir, slugifiedName, "index.html"),
+      metadataToRegister,
       serverConfig,
       registerWidget,
       true // isDev

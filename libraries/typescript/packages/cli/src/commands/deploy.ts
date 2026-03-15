@@ -4,7 +4,7 @@ import path from "node:path";
 import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
-import { isLoggedIn } from "../utils/config.js";
+import { getWebUrl, isLoggedIn } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { loginCommand } from "./auth.js";
@@ -179,6 +179,7 @@ interface DeployOptions {
   new?: boolean;
   env?: string[];
   envFile?: string;
+  rootDir?: string;
 }
 
 /**
@@ -487,11 +488,13 @@ async function displayDeploymentProgress(
       const mcpServerUrl = getMcpServerUrl(finalDeployment);
 
       // Determine dashboard URL if server exists
+      // Uses /cloud/servers/[id] - frontend redirects to /cloud/[org-slug]/servers/[id]
       let dashboardUrl: string | null = null;
+      const webUrl = (await getWebUrl()).replace(/\/$/, "");
       if (finalDeployment.serverSlug) {
-        dashboardUrl = `https://manufact.com/cloud/servers/${finalDeployment.serverSlug}`;
+        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverSlug}`;
       } else if (finalDeployment.serverId) {
-        dashboardUrl = `https://manufact.com/cloud/servers/${finalDeployment.serverId}`;
+        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverId}`;
       }
 
       const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(
@@ -777,7 +780,7 @@ async function promptGitHubInstallation(
 }
 
 /**
- * Deploy command - deploys MCP server to mcp-use cloud
+ * Deploy command - deploys MCP server to Manufact cloud
  */
 export async function deployCommand(options: DeployOptions): Promise<void> {
   try {
@@ -824,8 +827,25 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     console.log(chalk.cyan.bold("🚀 Deploying to Manufact cloud...\n"));
 
+    // Resolve project directory (subfolder support for monorepos)
+    const projectDir = options.rootDir
+      ? path.resolve(cwd, options.rootDir)
+      : cwd;
+
+    if (options.rootDir) {
+      try {
+        await fs.access(projectDir);
+      } catch {
+        console.log(
+          chalk.red(`✗ Root directory not found: ${options.rootDir}`)
+        );
+        process.exit(1);
+      }
+      console.log(chalk.gray(`  Root dir:   `) + chalk.cyan(options.rootDir));
+    }
+
     // Check if this is an MCP project
-    const isMcp = await isMcpProject(cwd);
+    const isMcp = await isMcpProject(projectDir);
     if (!isMcp) {
       console.log(
         chalk.yellow(
@@ -936,12 +956,12 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       process.exit(0);
     }
 
-    // Detect project settings
-    const projectName = options.name || (await getProjectName(cwd));
-    const runtime = options.runtime || (await detectRuntime(cwd));
+    // Detect project settings (use projectDir for subfolder-aware detection)
+    const projectName = options.name || (await getProjectName(projectDir));
+    const runtime = options.runtime || (await detectRuntime(projectDir));
     const port = options.port || 3000;
-    const buildCommand = await detectBuildCommand(cwd);
-    const startCommand = await detectStartCommand(cwd);
+    const buildCommand = await detectBuildCommand(projectDir);
+    const startCommand = await detectStartCommand(projectDir);
 
     // Build environment variables
     const envVars = await buildEnvVars(options);
@@ -951,6 +971,11 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
     console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
     console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
+    if (options.rootDir) {
+      console.log(
+        chalk.gray(`  Root dir:      `) + chalk.cyan(options.rootDir)
+      );
+    }
     if (buildCommand) {
       console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
     }
@@ -1110,6 +1135,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
             startCommand,
             ...(options.port !== undefined ? { port: options.port } : {}),
             env: Object.keys(envVars).length > 0 ? envVars : undefined,
+            rootDir: options.rootDir || undefined,
           };
 
           // Redeploy
@@ -1165,6 +1191,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         type: "github",
         repo: `${gitInfo.owner}/${gitInfo.repo}`,
         branch: gitInfo.branch || "main",
+        rootDir: options.rootDir || undefined,
         runtime,
         port,
         buildCommand,

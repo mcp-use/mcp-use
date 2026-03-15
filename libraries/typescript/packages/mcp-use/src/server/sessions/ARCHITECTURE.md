@@ -182,6 +182,12 @@ const server = new MCPServer({
 });
 ```
 
+## Example
+
+A runnable example with `RedisSessionStore`, session recovery after restart, and
+notifications is in
+[`examples/server/features/session-management/`](../../../examples/server/features/session-management/).
+
 ## Future Enhancements
 
 Planned implementations:

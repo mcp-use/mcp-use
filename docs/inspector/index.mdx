@@ -165,6 +165,27 @@ The Prompts tab shows pre-configured prompts from the MCP server. You can select
 
 Note: Linear MCP server doesn't provide any prompts, so this tab shows "No prompts available".
 
+### Elicitation Tab
+
+The Elicitation tab appears when a tool requests user input during execution.
+
+What you can do:
+
+- Review pending elicitation requests
+- Fill form fields generated from the server's schema
+- Accept, decline, or cancel requests
+- Jump back to tool results after response submission
+
+Supported schema patterns include all SEP-1330 enum variants:
+
+- Untitled single-select: `type: "string"` + `enum`
+- Titled single-select: `type: "string"` + `oneOf[{ const, title }]`
+- Legacy titled enum: `type: "string"` + `enum` + `enumNames`
+- Untitled multi-select: `type: "array"` + `items.enum`
+- Titled multi-select: `type: "array"` + `items.anyOf[{ const, title }]`
+
+These schemas render as dropdowns (single-select) or checkbox groups (multi-select), while submitted values always use the underlying enum/const values.
+
 # Chat Tab
 
 <Note>

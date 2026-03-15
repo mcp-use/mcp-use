@@ -128,16 +128,21 @@ export async function createRemoteDomResource(
   script: string,
   framework: "react" | "webcomponents" = "react",
   encoding: UIEncoding = "text",
-  adapters?: AdaptersConfig,
-  metadata?: AppsSdkMetadata
+  _adapters?: AdaptersConfig,
+  _metadata?: AppsSdkMetadata
 ): Promise<UIResourceContent> {
-  return await createUIResource({
-    uri: uri as `ui://${string}`,
-    content: { type: "remoteDom", script, framework },
-    encoding,
-    adapters: adapters,
-    metadata: metadata,
-  });
+  // remoteDom was removed from createUIResource in @mcp-ui/server v6.
+  // The MIME type is still rendered by @mcp-ui/client, so construct manually.
+  const resource: Record<string, unknown> = {
+    uri,
+    mimeType: `application/vnd.mcp-ui.remote-dom+${framework}`,
+  };
+  if (encoding === "blob") {
+    resource.blob = Buffer.from(script).toString("base64");
+  } else {
+    resource.text = script;
+  }
+  return { type: "resource", resource } as UIResourceContent;
 }
 
 /**
@@ -254,21 +259,22 @@ export function createMcpAppsResource(
       connectDomains?: string[];
       resourceDomains?: string[];
       frameDomains?: string[];
+      baseUriDomains?: string[];
     };
     prefersBorder?: boolean;
-    autoResize?: boolean;
     domain?: string;
   }
 ): UIResourceContent {
   // For MCP Apps, we create the resource structure following the official pattern
-  // from https://github.com/modelcontextprotocol/ext-apps
+  // from https://github.com/modelcontextprotocol/ext-apps (SEP-1865)
   const resource: any = {
     uri,
     mimeType: "text/html;profile=mcp-app",
     text: htmlTemplate,
   };
 
-  // Build _meta.ui metadata if provided
+  // Build _meta.ui metadata per MCP Apps spec (SEP-1865):
+  // UIResourceMeta = { csp?, permissions?, domain?, prefersBorder? }
   if (metadata && Object.keys(metadata).length > 0) {
     const uiMeta: Record<string, unknown> = {};
 
@@ -278,10 +284,6 @@ export function createMcpAppsResource(
 
     if (metadata.prefersBorder !== undefined) {
       uiMeta.prefersBorder = metadata.prefersBorder;
-    }
-
-    if (metadata.autoResize !== undefined) {
-      uiMeta.autoResize = metadata.autoResize;
     }
 
     if (metadata.domain) {
