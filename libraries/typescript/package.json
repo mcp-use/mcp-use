@@ -102,7 +102,6 @@
       "rollup": ">=4.59.0",
       "@modelcontextprotocol/sdk": ">=1.25.2",
       "ai": ">=5.0.52",
-      "ajv": ">=8.18.0",
       "axios": ">=1.13.5",
       "body-parser": ">=2.2.1",
       "brace-expansion": ">=2.0.2",
