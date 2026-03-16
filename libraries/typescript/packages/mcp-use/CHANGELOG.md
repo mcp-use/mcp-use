@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.21.5-canary.0
+
+### Patch Changes
+
+- cfff626: fix: move zod from dependencies to peerDependencies to prevent duplicate type trees
+
+  When users had a different Zod v4 version than the bundled 4.3.5, npm/pnpm installed two copies. TypeScript then performed expensive structural comparisons of deeply recursive Zod types at every `server.tool()` and `ctx.elicit()` boundary, causing type errors or OOM during `mcp-use build`. Making Zod a peerDependency (`^4.0.0`) ensures a single shared instance.
+
+- Updated dependencies [cfff626]
+  - @mcp-use/cli@2.19.0-canary.0
+  - @mcp-use/inspector@0.24.5-canary.0
+
 ## 1.21.4
 
 ### Patch Changes

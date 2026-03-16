@@ -1,5 +1,19 @@
 # @mcp-use/cli
 
+## 2.19.0-canary.0
+
+### Minor Changes
+
+- cfff626: feat: use esbuild for transpilation, separate type checking from build
+
+  `mcp-use build` now uses esbuild for TypeScript transpilation instead of tsc. esbuild strips types without analyzing them, so it cannot OOM on complex type graphs (Zod v4, Prisma, etc.). Type checking runs separately via `tsc --noEmit` after transpilation — if it fails or OOMs, the build output is still produced. Use `--no-typecheck` to skip type checking entirely for faster builds.
+
+### Patch Changes
+
+- Updated dependencies [cfff626]
+  - mcp-use@1.21.5-canary.0
+  - @mcp-use/inspector@0.24.5-canary.0
+
 ## 2.18.3
 
 ### Patch Changes
