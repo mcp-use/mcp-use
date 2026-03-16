@@ -959,6 +959,139 @@ export default {
   return builtWidgets;
 }
 
+/**
+ * Collect TypeScript files from tsconfig include/exclude patterns using only
+ * Node.js built-ins (no globby/fast-glob, which break in ESM bundles).
+ */
+async function collectTsFiles(
+  projectPath: string,
+  includePatterns: string[],
+  excludePatterns: string[]
+): Promise<string[]> {
+  const { promises: fs } = await import("node:fs");
+
+  // Separate literal files from directory globs
+  const literalFiles: string[] = [];
+  const dirPrefixes: string[] = [];
+
+  for (const pattern of includePatterns) {
+    if (pattern.includes("*")) {
+      // Extract directory prefix before the first wildcard
+      const prefix = pattern.split("*")[0].replace(/\/+$/, "") || ".";
+      dirPrefixes.push(prefix);
+    } else {
+      literalFiles.push(pattern);
+    }
+  }
+
+  const files: string[] = [];
+
+  // Add literal files that exist and are .ts/.tsx (not .d.ts)
+  for (const file of literalFiles) {
+    if (/\.tsx?$/.test(file) && !file.endsWith(".d.ts")) {
+      try {
+        await access(path.join(projectPath, file));
+        files.push(file);
+      } catch {
+        // File doesn't exist, skip
+      }
+    }
+  }
+
+  // Recursively scan directories
+  const excludeSet = new Set(excludePatterns.map((e) => e.replace(/\*+/g, "")));
+  for (const prefix of dirPrefixes) {
+    const dirPath = path.join(projectPath, prefix);
+    try {
+      const entries = await fs.readdir(dirPath, { recursive: true });
+      for (const entry of entries) {
+        const entryStr = String(entry);
+        const rel = path.join(prefix, entryStr);
+        if (
+          /\.tsx?$/.test(entryStr) &&
+          !entryStr.endsWith(".d.ts") &&
+          !excludeSet.has(rel.split(path.sep)[0])
+        ) {
+          files.push(rel);
+        }
+      }
+    } catch {
+      // Directory doesn't exist, skip
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Transpile TypeScript files using esbuild instead of tsc.
+ * esbuild strips types without analyzing them, so it cannot OOM on complex types.
+ * Reads the project's tsconfig.json to determine source files, outDir, and compiler options.
+ */
+async function transpileWithEsbuild(projectPath: string): Promise<void> {
+  const esbuild = await import("esbuild");
+  const { promises: fs } = await import("node:fs");
+
+  const tsconfigPath = path.join(projectPath, "tsconfig.json");
+  let tsconfig: any = {};
+  try {
+    const raw = await fs.readFile(tsconfigPath, "utf-8");
+    tsconfig = JSON.parse(raw);
+  } catch {
+    // No tsconfig — use defaults
+  }
+
+  const compilerOptions = tsconfig.compilerOptions || {};
+  const outDir = compilerOptions.outDir || "./dist";
+  const includePatterns = tsconfig.include || ["**/*.ts", "**/*.tsx"];
+  const excludePatterns = tsconfig.exclude || ["node_modules", "dist"];
+
+  const files = await collectTsFiles(
+    projectPath,
+    includePatterns,
+    excludePatterns
+  );
+
+  if (files.length === 0) {
+    console.log(chalk.yellow("  No TypeScript files found to transpile."));
+    return;
+  }
+
+  // Map tsconfig jsx setting to esbuild equivalent
+  const jsxMap: Record<string, "automatic" | "transform" | "preserve"> = {
+    "react-jsx": "automatic",
+    "react-jsxdev": "automatic",
+    react: "transform",
+    preserve: "preserve",
+  };
+  const jsx = jsxMap[compilerOptions.jsx] || undefined;
+
+  const target = (compilerOptions.target || "ES2022").toLowerCase();
+
+  const moduleStr = (compilerOptions.module || "ESNext").toLowerCase();
+  const format: "esm" | "cjs" = moduleStr.includes("commonjs") ? "cjs" : "esm";
+
+  // Match tsc's rootDir behavior: when set, esbuild's outbase should map to it
+  // so that `src/index.ts` → `dist/index.js` (not `dist/src/index.js`).
+  const outbase = compilerOptions.rootDir
+    ? path.resolve(projectPath, compilerOptions.rootDir)
+    : projectPath;
+
+  await esbuild.build({
+    entryPoints: files.map((f) => path.join(projectPath, f)),
+    outdir: path.join(projectPath, outDir),
+    outbase,
+    bundle: false,
+    format,
+    target,
+    jsx,
+    sourcemap: compilerOptions.sourceMap ?? true,
+    tsconfig: tsconfigPath,
+    platform: "node",
+    logLevel: "warning",
+  });
+}
+
 program
   .command("build")
   .description("Build TypeScript and MCP UI widgets")
@@ -969,6 +1102,7 @@ program
     "Inline all JS/CSS into HTML (required for VS Code MCP Apps)"
   )
   .option("--no-inline", "Keep JS/CSS as separate files (default)")
+  .option("--no-typecheck", "Skip TypeScript type checking (faster builds)")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -996,22 +1130,42 @@ program
         console.log(chalk.green("✓ Tool registry types generated"));
       }
 
-      // Then run tsc (now schemas are available for import)
-      // Use the locally installed typescript binary directly rather than npx to
-      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package when
-      // typescript is not found in node_modules.
-      // Raise the Node.js heap limit for tsc to avoid OOM on projects with
-      // heavy transitive types (React, Zod v4, etc.).
+      // Transpile TypeScript with esbuild (fast, no OOM on complex types).
+      // Type checking is a separate step via tsc --noEmit (skippable with --no-typecheck).
       console.log(chalk.gray("Building TypeScript..."));
-      await runCommand(
-        "node",
-        [
-          "--max-old-space-size=4096",
-          path.join(projectPath, "node_modules", "typescript", "bin", "tsc"),
-        ],
-        projectPath
-      ).promise;
+      await transpileWithEsbuild(projectPath);
       console.log(chalk.green("✓ TypeScript build complete!"));
+
+      // Type-check with tsc --noEmit (separate from transpilation).
+      // Uses the locally installed typescript binary directly rather than npx to
+      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package.
+      if (options.typecheck !== false) {
+        console.log(chalk.gray("Type checking..."));
+        try {
+          await runCommand(
+            "node",
+            [
+              "--max-old-space-size=4096",
+              path.join(
+                projectPath,
+                "node_modules",
+                "typescript",
+                "bin",
+                "tsc"
+              ),
+              "--noEmit",
+            ],
+            projectPath
+          ).promise;
+          console.log(chalk.green("✓ Type check passed!"));
+        } catch {
+          console.error(
+            chalk.red("✗ Type check failed.") +
+              chalk.gray(" Use --no-typecheck to skip.")
+          );
+          process.exit(1);
+        }
+      }
 
       // Determine where the entry point was compiled to
       let entryPoint: string | undefined;
