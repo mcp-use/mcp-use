@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.6-canary.0
+
+### Patch Changes
+
+- 98e09ce: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+
 ## 0.14.5
 
 ### Patch Changes

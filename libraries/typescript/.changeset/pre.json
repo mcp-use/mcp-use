@@ -9,6 +9,7 @@
   },
   "changesets": [
     "esbuild-transpilation",
+    "fix-dependabot-alerts",
     "zod-peer-dependency"
   ]
 }
