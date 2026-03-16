@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 2.19.0-canary.2
+
+### Patch Changes
+
+- 3b0a426: Fix Windows crash in `mcp-use dev` and `mcp-use generate-types` where raw OS paths (e.g. `C:\project\index.ts`) were passed to `tsImport` instead of `file://` URLs, causing `ERR_UNSUPPORTED_ESM_URL_SCHEME`.
+  - mcp-use@1.21.5-canary.2
+  - @mcp-use/inspector@0.24.5-canary.2
+
 ## 2.19.0-canary.1
 
 ### Patch Changes
