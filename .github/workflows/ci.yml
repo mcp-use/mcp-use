@@ -721,10 +721,11 @@ jobs:
 
   typescript-test-cli:
     needs: typescript-lint
-    name: "typescript/cli (node-${{ matrix.node-version }})"
-    runs-on: ubuntu-latest
+    name: "typescript/cli (${{ matrix.os }}, node-${{ matrix.node-version }})"
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20, 22]
     defaults:
       run:

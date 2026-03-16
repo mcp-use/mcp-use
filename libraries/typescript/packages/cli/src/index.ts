@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
@@ -343,7 +344,7 @@ async function generateToolRegistryTypesForServer(
     (globalThis as any).__mcpUseLastServer = undefined;
 
     const { tsImport } = await import("tsx/esm/api");
-    await tsImport(serverFile, {
+    await tsImport(pathToFileURL(serverFile).href, {
       parentURL: import.meta.url,
       tsconfig: path.join(projectPath, "tsconfig.json"),
     });
@@ -1351,7 +1352,7 @@ program
 
       const chokidarModule = await import("chokidar");
       const chokidar = (chokidarModule as any).default || chokidarModule;
-      const { pathToFileURL, fileURLToPath } = await import("node:url");
+      const { fileURLToPath } = await import("node:url");
       const { createRequire } = await import("node:module");
 
       // Try to get tsx's tsImport function for TypeScript support
