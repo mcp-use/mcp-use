@@ -746,6 +746,9 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build Packages
         run: pnpm build
+      - name: Verify CLI build artifact
+        shell: bash
+        run: test -f packages/cli/dist/index.cjs || { echo "::warning::dist/index.cjs missing after pnpm build, rebuilding CLI explicitly"; pnpm --filter @mcp-use/cli build; }
       - name: Run CLI Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
