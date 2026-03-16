@@ -1,5 +1,57 @@
 # @mcp-use/cli
 
+## 2.18.3
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- dd77c3c: Fix `mcp-use build` hanging after completion by adding `process.exit(0)` to the build command's success path
+- Updated dependencies [dd77c3c]
+- Updated dependencies [dd77c3c]
+  - mcp-use@1.21.4
+  - @mcp-use/inspector@0.24.4
+
+## 2.18.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4a5e680]
+  - mcp-use@1.21.4-canary.2
+  - @mcp-use/inspector@0.24.4-canary.2
+
+## 2.18.3-canary.1
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [d4f479d]
+  - mcp-use@1.21.4-canary.1
+  - @mcp-use/inspector@0.24.4-canary.1
+
+## 2.18.3-canary.0
+
+### Patch Changes
+
+- 98f6521: Fix `mcp-use build` hanging after completion by adding `process.exit(0)` to the build command's success path
+  - mcp-use@1.21.4-canary.0
+  - @mcp-use/inspector@0.24.4-canary.0
+
+## 2.18.2
+
+### Patch Changes
+
+- Updated dependencies [d8d6d06]
+  - @mcp-use/inspector@0.24.3
+  - mcp-use@1.21.3
+
+## 2.18.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c509930]
+  - @mcp-use/inspector@0.24.3-canary.0
+  - mcp-use@1.21.3-canary.0
+
 ## 2.18.1
 
 ### Patch Changes

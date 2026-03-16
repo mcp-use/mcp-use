@@ -97,7 +97,7 @@ from mcp_use.server.logging.config import setup_logging
 ><ParamField body="debug_level" type="int" default="0" >   Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc) </ParamField>
 ><ParamField body="log_level" type="str" default='INFO' >   Logging level (DEBUG, INFO, WARNING, ERROR) </ParamField>
 ><ParamField body="show_inspector_logs" type="bool" default="False" >   Whether to show inspector-related access logs (default: False) </ParamField>
-><ParamField body="inspector_path" type="str" default='/inspector' >   Path prefix for inspector routes </ParamField>
+><ParamField body="inspector_path" type="str" default='/inspector' >   Effective inspector route prefix, typically `/inspector` </ParamField>
 ><ParamField body="mcp_logs_only" type="bool" default="False" >   When True, suppress all uvicorn access logs (MCP logs are printed </ParamField>
 
 **Returns**

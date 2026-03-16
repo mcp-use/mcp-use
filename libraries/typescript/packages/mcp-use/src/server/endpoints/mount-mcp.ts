@@ -21,6 +21,7 @@ import {
   isJsonRpcRequest,
   isJsonRpcResponse,
 } from "../utils/jsonrpc-helpers.js";
+import { runWithContext } from "../context-storage.js";
 import { generateUUID } from "../utils/runtime.js";
 
 // ---------------------------------------------------------------------------
@@ -347,10 +348,14 @@ export async function mountMcp(
             body: request.body,
             ...(request.body && ({ duplex: "half" } as any)),
           });
-          return await transport.handleRequest(modifiedRequest);
+          return await runWithContext(c, async () =>
+            transport.handleRequest(modifiedRequest)
+          );
         }
 
-        return await transport.handleRequest(request);
+        return await runWithContext(c, async () =>
+          transport.handleRequest(request)
+        );
       } catch (error) {
         console.error("[MCP] Stateless request error:", error);
         transport.close();
@@ -438,7 +443,11 @@ export async function mountMcp(
         if (c.req.method === "POST") {
           await maybeForwardResponses(c.req.raw, sessionId, streamManager);
         }
-        const recoveryResponse = await transport.handleRequest(c.req.raw);
+        const recoveryResponse = await runWithContext(
+          c,
+          async () => transport.handleRequest(c.req.raw),
+          sessionId
+        );
         if (c.req.method === "GET") {
           await registerSseStream(transport, sessionId, streamManager);
         }
@@ -485,7 +494,11 @@ export async function mountMcp(
         if (c.req.method === "POST") {
           await maybeForwardResponses(c.req.raw, sessionId, streamManager);
         }
-        const existingResponse = await transport.handleRequest(c.req.raw);
+        const existingResponse = await runWithContext(
+          c,
+          async () => transport.handleRequest(c.req.raw),
+          sessionId
+        );
         if (c.req.method === "GET") {
           await registerSseStream(transport, sessionId, streamManager);
         }
@@ -596,7 +609,11 @@ export async function mountMcp(
       // Connect server to transport
       await server.connect(transport);
 
-      const newSessionResponse = await transport.handleRequest(c.req.raw);
+      const newSessionResponse = await runWithContext(
+        c,
+        async () => transport.handleRequest(c.req.raw),
+        newSessionId
+      );
       if (c.req.method === "GET") {
         await registerSseStream(transport, newSessionId, streamManager);
       }

@@ -50,7 +50,8 @@ def setup_logging(
         debug_level: Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc)
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
         show_inspector_logs: Whether to show inspector-related access logs (default: False)
-        inspector_path: Path prefix for inspector routes
+        inspector_path: Effective inspector route prefix, typically `/inspector`
+            or a prefixed route like `/mcp/inspector`
         mcp_logs_only: When True, suppress all uvicorn access logs (MCP logs are printed
             directly by the middleware). Default: False.
 

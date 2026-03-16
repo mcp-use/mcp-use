@@ -1,5 +1,57 @@
 # mcp-use
 
+## 1.21.4
+
+### Patch Changes
+
+- dd77c3c: Fix regression where `ctx.auth` and other request context properties were `undefined` in tool callbacks. `mountMcp()` now wraps all `transport.handleRequest()` calls with `runWithContext()` so that `getRequestContext()` (AsyncLocalStorage) is properly populated during the MCP request lifecycle.
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [dd77c3c]
+- Updated dependencies [dd77c3c]
+  - @mcp-use/cli@2.18.3
+  - @mcp-use/inspector@0.24.4
+
+## 1.21.4-canary.2
+
+### Patch Changes
+
+- 4a5e680: Fix regression where `ctx.auth` and other request context properties were `undefined` in tool callbacks. `mountMcp()` now wraps all `transport.handleRequest()` calls with `runWithContext()` so that `getRequestContext()` (AsyncLocalStorage) is properly populated during the MCP request lifecycle.
+  - @mcp-use/cli@2.18.3-canary.2
+  - @mcp-use/inspector@0.24.4-canary.2
+
+## 1.21.4-canary.1
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [d4f479d]
+  - @mcp-use/cli@2.18.3-canary.1
+  - @mcp-use/inspector@0.24.4-canary.1
+
+## 1.21.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [98f6521]
+  - @mcp-use/cli@2.18.3-canary.0
+  - @mcp-use/inspector@0.24.4-canary.0
+
+## 1.21.3
+
+### Patch Changes
+
+- Updated dependencies [d8d6d06]
+  - @mcp-use/inspector@0.24.3
+  - @mcp-use/cli@2.18.2
+
+## 1.21.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c509930]
+  - @mcp-use/inspector@0.24.3-canary.0
+  - @mcp-use/cli@2.18.2-canary.0
+
 ## 1.21.2
 
 ### Patch Changes

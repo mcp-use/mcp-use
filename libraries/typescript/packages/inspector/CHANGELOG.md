@@ -1,5 +1,49 @@
 # @mcp-use/inspector
 
+## 0.24.4
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [dd77c3c]
+- Updated dependencies [dd77c3c]
+  - mcp-use@1.21.4
+
+## 0.24.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4a5e680]
+  - mcp-use@1.21.4-canary.2
+
+## 0.24.4-canary.1
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [d4f479d]
+  - mcp-use@1.21.4-canary.1
+
+## 0.24.4-canary.0
+
+### Patch Changes
+
+- mcp-use@1.21.4-canary.0
+
+## 0.24.3
+
+### Patch Changes
+
+- d8d6d06: Fix sandbox host derivation for cloud-embedded inspector pages. Apex hosts (e.g. manufact.com) now correctly resolve to sandbox-inspector.{domain} instead of sandbox-{domain}.
+  - mcp-use@1.21.3
+
+## 0.24.3-canary.0
+
+### Patch Changes
+
+- c509930: Fix sandbox host derivation for cloud-embedded inspector pages. Apex hosts (e.g. manufact.com) now correctly resolve to sandbox-inspector.{domain} instead of sandbox-{domain}.
+  - mcp-use@1.21.3-canary.0
+
 ## 0.24.2
 
 ### Patch Changes
