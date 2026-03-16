@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import os
+import re
 import time
 import weakref
 from datetime import UTC, datetime
@@ -74,6 +76,11 @@ def _normalize_inspector_path(path: str) -> str:
     if normalized.endswith("/inspector"):
         return normalized
     return f"{normalized}/inspector"
+
+
+def _sanitize_for_tool_name_component(name: str) -> str:
+    """Sanitize a mounted tool name component to a provider-compatible shape."""
+    return re.sub(r"[^a-zA-Z0-9_]+", "_", name).strip("_")[:64]
 
 
 class MCPServer(FastMCP):
@@ -168,6 +175,7 @@ class MCPServer(FastMCP):
         self._mounted_tool_map: dict[str, tuple[BaseConnector, str]] = {}
         self._mounted_tools_cache: list[Tool] = []
         self._mounted_tool_cache_built = False
+        self._mounted_tool_cache_lock = asyncio.Lock()
         self._middleware_handlers_wrapped = False
         self._mount_handlers_wrapped = False
 
@@ -350,11 +358,16 @@ class MCPServer(FastMCP):
         normalized_prefix = prefix.strip()
         if not normalized_prefix:
             raise ValueError("Mounted connector prefix must be non-empty")
+        normalized_prefix = _sanitize_for_tool_name_component(normalized_prefix)
+        if not normalized_prefix:
+            raise ValueError("Mounted connector prefix must contain at least one letter or number")
 
         if any(existing_prefix == normalized_prefix for existing_prefix, _ in self._mounted_connectors):
             raise ValueError(f"Mounted connector prefix '{normalized_prefix}' is already registered")
 
         self._mounted_connectors.append((normalized_prefix, connector))
+        self._mounted_tool_map.clear()
+        self._mounted_tools_cache = []
         self._mounted_tool_cache_built = False
 
     async def _connect_mounted_connectors(self) -> None:
@@ -398,8 +411,12 @@ class MCPServer(FastMCP):
 
     async def _ensure_mounted_tool_cache(self) -> None:
         """Build mounted tool metadata once before serving lookups."""
-        if self._mounted_connectors and not self._mounted_tool_cache_built:
-            await self._build_mounted_tool_cache()
+        if not self._mounted_connectors or self._mounted_tool_cache_built:
+            return
+
+        async with self._mounted_tool_cache_lock:
+            if self._mounted_connectors and not self._mounted_tool_cache_built:
+                await self._build_mounted_tool_cache()
 
     async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> CallToolResult:
         """Call a mounted tool by its prefixed name."""
@@ -617,6 +634,7 @@ class MCPServer(FastMCP):
 
             async def wrapped_list_tools(request: Any) -> ServerResult:
                 result = await original_list_tools(request)
+                await self._ensure_mounted_tool_cache()
 
                 if not self._mounted_tools_cache:
                     return result
