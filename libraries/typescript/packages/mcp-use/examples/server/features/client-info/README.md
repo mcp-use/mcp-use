@@ -71,5 +71,5 @@ server.tool(
 
 ## Related Documentation
 
-- [Client Capabilities — sampling.mdx](https://mcp-use.io/typescript/server/sampling)
+- [Client Capabilities — sampling.mdx](https://manufact.com/docs/typescript/client/sampling)
 - [SEP-1865: MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps)
