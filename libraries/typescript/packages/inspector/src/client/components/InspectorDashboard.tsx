@@ -30,6 +30,7 @@ import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
+import { OpenApiConnectionForm } from "./OpenApiConnectionForm";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
@@ -212,6 +213,64 @@ export function InspectorDashboard() {
       : "/inspector/oauth/callback"
   );
   const [scope, setScope] = useState("");
+
+  // OpenAPI bridge
+  const [connectMode, setConnectMode] = useState<"url" | "openapi">("url");
+  const [isOpenApiLoading, setIsOpenApiLoading] = useState(false);
+
+  // Start an OpenAPI bridge server and auto-connect to it.
+  const startOpenApiBridge = useCallback(
+    async (spec: string) => {
+      setIsOpenApiLoading(true);
+      const toastId = toast.loading("Starting MCP server from OpenAPI spec...");
+      try {
+        const response = await fetch(
+          `${window.location.origin}/inspector/api/openapi/start`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ spec }),
+          }
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          toast.error(data.error || "Failed to start OpenAPI bridge", {
+            id: toastId,
+          });
+          return;
+        }
+        addServer(data.mcpUrl, {
+          url: data.mcpUrl,
+          name: `OpenAPI: ${data.serverName}`,
+          transportType: "http",
+          preventAutoAuth: true,
+          clientOptions: {
+            capabilities: {
+              extensions: {
+                "io.modelcontextprotocol/ui": {
+                  mimeTypes: ["text/html;profile=mcp-app"],
+                },
+              },
+            },
+          },
+        });
+        toast.success(
+          `Started "${data.serverName}" with ${data.toolCount} tools`,
+          { id: toastId }
+        );
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to start OpenAPI bridge",
+          { id: toastId }
+        );
+      } finally {
+        setIsOpenApiLoading(false);
+      }
+    },
+    [addServer]
+  );
 
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
@@ -927,34 +986,71 @@ export function InspectorDashboard() {
 
       <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
-          <ConnectionSettingsForm
-            transportType="SSE"
-            setTransportType={() => {}}
-            url={url}
-            setUrl={setUrl}
-            connectionType={connectionType}
-            setConnectionType={setConnectionType}
-            customHeaders={customHeaders}
-            setCustomHeaders={setCustomHeaders}
-            requestTimeout={requestTimeout}
-            setRequestTimeout={setRequestTimeout}
-            resetTimeoutOnProgress={resetTimeoutOnProgress}
-            setResetTimeoutOnProgress={setResetTimeoutOnProgress}
-            maxTotalTimeout={maxTotalTimeout}
-            setMaxTotalTimeout={setMaxTotalTimeout}
-            proxyAddress={proxyAddress}
-            setProxyAddress={setProxyAddress}
-            clientId={clientId}
-            setClientId={setClientId}
-            redirectUrl={redirectUrl}
-            setRedirectUrl={setRedirectUrl}
-            scope={scope}
-            setScope={setScope}
-            onConnect={handleAddConnection}
-            variant="styled"
-            showConnectButton={true}
-            showExportButton={true}
-          />
+          {/* Tab selector */}
+          <div className="flex rounded-lg overflow-hidden border border-white/20">
+            <button
+              type="button"
+              onClick={() => setConnectMode("url")}
+              className={`flex-1 py-2 px-3 text-sm font-medium transition-colors cursor-pointer ${
+                connectMode === "url"
+                  ? "bg-white/20 text-white"
+                  : "bg-transparent text-white/60 hover:text-white/80"
+              }`}
+            >
+              MCP Server
+            </button>
+            <button
+              type="button"
+              onClick={() => setConnectMode("openapi")}
+              className={`flex-1 py-2 px-3 text-sm font-medium transition-colors cursor-pointer ${
+                connectMode === "openapi"
+                  ? "bg-white/20 text-white"
+                  : "bg-transparent text-white/60 hover:text-white/80"
+              }`}
+            >
+              OpenAPI Spec
+            </button>
+          </div>
+
+          {/* Both panels rendered, stacked in same grid cell — tallest sets height */}
+          <div className="grid [&>*]:col-start-1 [&>*]:row-start-1">
+            <div className={connectMode !== "url" ? "invisible pointer-events-none" : undefined}>
+              <ConnectionSettingsForm
+                transportType="SSE"
+                setTransportType={() => {}}
+                url={url}
+                setUrl={setUrl}
+                connectionType={connectionType}
+                setConnectionType={setConnectionType}
+                customHeaders={customHeaders}
+                setCustomHeaders={setCustomHeaders}
+                requestTimeout={requestTimeout}
+                setRequestTimeout={setRequestTimeout}
+                resetTimeoutOnProgress={resetTimeoutOnProgress}
+                setResetTimeoutOnProgress={setResetTimeoutOnProgress}
+                maxTotalTimeout={maxTotalTimeout}
+                setMaxTotalTimeout={setMaxTotalTimeout}
+                proxyAddress={proxyAddress}
+                setProxyAddress={setProxyAddress}
+                clientId={clientId}
+                setClientId={setClientId}
+                redirectUrl={redirectUrl}
+                setRedirectUrl={setRedirectUrl}
+                scope={scope}
+                setScope={setScope}
+                onConnect={handleAddConnection}
+                variant="styled"
+                showConnectButton={true}
+                showExportButton={true}
+              />
+            </div>
+            <div className={connectMode !== "openapi" ? "invisible pointer-events-none" : undefined}>
+              <OpenApiConnectionForm
+                onConnect={startOpenApiBridge}
+                isLoading={isOpenApiLoading}
+              />
+            </div>
+          </div>
         </div>
         <RandomGradientBackground className="absolute inset-0" />
       </div>

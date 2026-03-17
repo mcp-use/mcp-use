@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
 import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
+import { registerOpenApiRoutes } from "./routes/openapi.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
@@ -55,6 +56,9 @@ export function registerInspectorRoutes(
   // Mount MCP Apps routes at /inspector/api/mcp-apps
   // Note: registerMcpAppsRoutes handles the /inspector/api/mcp-apps prefix internally
   registerMcpAppsRoutes(app);
+
+  // Mount OpenAPI-to-MCP bridge routes
+  registerOpenApiRoutes(app);
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)
   app.post("/inspector/api/chat/stream", async (c) => {
