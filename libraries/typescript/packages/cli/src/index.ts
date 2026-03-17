@@ -326,7 +326,7 @@ async function findServerFile(projectPath: string): Promise<string> {
 async function generateToolRegistryTypesForServer(
   projectPath: string,
   serverFileRelative: string
-): Promise<void> {
+): Promise<boolean> {
   const serverFile = path.join(projectPath, serverFileRelative);
   const serverFileExists = await access(serverFile)
     .then(() => true)
@@ -365,7 +365,11 @@ async function generateToolRegistryTypesForServer(
       throw new Error("generateToolRegistryTypes not found in mcp-use package");
     }
 
-    await generateToolRegistryTypes(server.registrations.tools, projectPath);
+    const success = await generateToolRegistryTypes(
+      server.registrations.tools,
+      projectPath
+    );
+    return success;
   } finally {
     (globalThis as any).__mcpUseHmrMode = previousHmrMode ?? false;
   }
@@ -1127,8 +1131,19 @@ program
 
       if (sourceServerFile) {
         console.log(chalk.gray("Generating tool registry types..."));
-        await generateToolRegistryTypesForServer(projectPath, sourceServerFile);
-        console.log(chalk.green("✓ Tool registry types generated"));
+        const typeGenOk = await generateToolRegistryTypesForServer(
+          projectPath,
+          sourceServerFile
+        );
+        if (typeGenOk) {
+          console.log(chalk.green("✓ Tool registry types generated"));
+        } else {
+          console.log(
+            chalk.yellow(
+              "⚠ Tool registry type generation had errors (non-blocking)"
+            )
+          );
+        }
       }
 
       // Transpile TypeScript with esbuild (fast, no OOM on complex types).
@@ -2253,8 +2268,17 @@ program
 
     try {
       console.log(chalk.blue("Generating tool registry types..."));
-      await generateToolRegistryTypesForServer(projectPath, options.server);
-      console.log(chalk.green("✓ Tool registry types generated successfully"));
+      const success = await generateToolRegistryTypesForServer(
+        projectPath,
+        options.server
+      );
+      if (success) {
+        console.log(
+          chalk.green("✓ Tool registry types generated successfully")
+        );
+      } else {
+        console.log(chalk.yellow("⚠ Tool registry type generation had errors"));
+      }
       process.exit(0);
     } catch (error) {
       console.error(
