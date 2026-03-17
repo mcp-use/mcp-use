@@ -1,5 +1,17 @@
 # @mcp-use/cli
 
+## 2.19.0-canary.3
+
+### Patch Changes
+
+- b4ad0e8: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- Updated dependencies [b4ad0e8]
+  - mcp-use@1.21.5-canary.3
+  - @mcp-use/inspector@0.24.5-canary.3
+
 ## 2.19.0-canary.2
 
 ### Patch Changes

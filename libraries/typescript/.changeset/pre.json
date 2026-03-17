@@ -10,6 +10,7 @@
   "changesets": [
     "esbuild-transpilation",
     "fix-dependabot-alerts",
+    "fix-typegen-zod-v4",
     "fix-windows-file-url-crash",
     "zod-peer-dependency"
   ]
