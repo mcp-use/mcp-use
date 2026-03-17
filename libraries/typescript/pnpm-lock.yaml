@@ -637,7 +637,7 @@ importers:
         specifier: ^8.18.1
         version: 8.18.1
       ai:
-        specifier: ^6.0.116
+        specifier: '>=5.0.52'
         version: 6.0.116(zod@4.3.5)
       esbuild:
         specifier: 0.27.1
@@ -649,8 +649,8 @@ importers:
         specifier: ^1.4.0
         version: 1.4.0(eslint@9.39.2(jiti@2.6.1))
       express-rate-limit:
-        specifier: ^7.5.1
-        version: 7.5.1(express@5.2.1)
+        specifier: '>=8.2.2'
+        version: 8.3.1(express@5.2.1)
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -1231,54 +1231,6 @@ importers:
         specifier: ^8.0.0
         version: 8.0.0(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  test_app:
-    dependencies:
-      '@openai/apps-sdk-ui':
-        specifier: ^0.2.1
-        version: 0.2.1(@types/react-dom@19.2.3(@types/react@19.2.10))(@types/react@19.2.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(tailwindcss@4.2.0)
-      mcp-use:
-        specifier: workspace:*
-        version: link:../packages/mcp-use
-      react:
-        specifier: ^19.2.0
-        version: 19.2.4
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.4(react@19.2.4)
-      react-router:
-        specifier: ^7.12.0
-        version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      tailwindcss:
-        specifier: ^4.2.0
-        version: 4.2.0
-      zod:
-        specifier: 4.3.5
-        version: 4.3.5
-    devDependencies:
-      '@tailwindcss/vite':
-        specifier: ^4.2.0
-        version: 4.2.0(vite@8.0.0(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-      '@types/node':
-        specifier: ^25.3.0
-        version: 25.3.0
-      '@types/react':
-        specifier: ^19.2.7
-        version: 19.2.10
-      '@types/react-dom':
-        specifier: ^19.2.3
-        version: 19.2.3(@types/react@19.2.10)
-      '@vitejs/plugin-react':
-        specifier: ^5.1.4
-        version: 5.1.4(vite@8.0.0(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-      tsx:
-        specifier: ^4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vite:
-        specifier: ^8.0.0
-        version: 8.0.0(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
 packages:
 
@@ -5049,12 +5001,6 @@ packages:
   expect-type@1.3.0:
     resolution: {integrity: sha512-knvyeauYhqjOYvQ66MznSMs83wmHrCycNEN6Ao+2AeYEfxUIkuiVxdEa1qlGEPK+We3n0THiDciYSsCcgW/DoA==}
     engines: {node: '>=12.0.0'}
-
-  express-rate-limit@7.5.1:
-    resolution: {integrity: sha512-7iN8iPMDzOMHPUYllBEsQdWVB6fPDMPqwjBaFrgr4Jgr/+okjvzAy+UHlYYL/Vs0OsOrMkwS6PJDkFlJwoxUnw==}
-    engines: {node: '>= 16'}
-    peerDependencies:
-      express: '>= 4.11'
 
   express-rate-limit@8.3.1:
     resolution: {integrity: sha512-D1dKN+cmyPWuvB+G2SREQDzPY1agpBIcTa9sJxOPMCNeH3gwzhqJRDWCXW3gg0y//+LQ/8j52JbMROWyrKdMdw==}
@@ -11908,10 +11854,6 @@ snapshots:
       eventsource-parser: 3.0.6
 
   expect-type@1.3.0: {}
-
-  express-rate-limit@7.5.1(express@5.2.1):
-    dependencies:
-      express: 5.2.1
 
   express-rate-limit@8.3.1(express@5.2.1):
     dependencies:
