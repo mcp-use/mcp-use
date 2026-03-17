@@ -14,13 +14,11 @@ tag: "New"
 - **Update**: Updated mcp-use to v1.21.5
 </Update>
 
-<Update label="v0.24.2" description="March 2026">
-  ## Embedded Inspector Proxy Fix
-  Patch release fixing auto-connect when inspector is served from MCP server (Python, custom servers).
+<Update label="v0.24.4" description="March 2026">
+  ## Dependency Update
+  Patch release with dependency update.
 
-- **Fix**: Skip proxy when inspector origin matches MCP server origin — no longer routes through missing `/inspector/api/proxy` on embedded servers
-- **Fix**: Detect proxy availability via runtime config injection (`__MCP_PROXY_URL__`); disable autoProxyFallback when no proxy is available
-- **Update**: Updated mcp-use to v1.21.2
+- **Update**: Updated mcp-use to v1.21.4
 </Update>
 
 <Update label="v0.24.3" description="March 2026">
@@ -31,11 +29,13 @@ tag: "New"
 - **Update**: Updated mcp-use to v1.21.3
 </Update>
 
-<Update label="v0.24.4" description="March 2026">
-  ## Dependency Update
-  Patch release with dependency update.
+<Update label="v0.24.2" description="March 2026">
+  ## Embedded Inspector Proxy Fix
+  Patch release fixing auto-connect when inspector is served from MCP server (Python, custom servers).
 
-- **Update**: Updated mcp-use to v1.21.4
+- **Fix**: Skip proxy when inspector origin matches MCP server origin — no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix**: Detect proxy availability via runtime config injection (`__MCP_PROXY_URL__`); disable autoProxyFallback when no proxy is available
+- **Update**: Updated mcp-use to v1.21.2
 </Update>
 
 <Update label="v0.24.1" description="March 2026">
@@ -48,16 +48,6 @@ tag: "New"
 - **Update**: Updated mcp-use to v1.21.1
 </Update>
 
-<Update label="v0.22.1" description="February 2026">
-  ## Widget Status Texts & CSP Fixes
-  Patch release with invoking/invoked status display and CSP handling improvements.
-
-- **New**: Display of `invoking` and `invoked` status texts in MCPAppsRenderer, OpenAIComponentRenderer, ToolResultDisplay, ToolResultRenderer
-- **Enhancement**: MCPAppsDebugControls adjusts violation indicators based on CSP mode
-- **Fix**: sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
-- **Update**: Updated mcp-use to v1.20.1
-</Update>
-
 <Update label="v0.24.0" description="March 2026">
   ## Inspector Embedding & MCP Apps
   Minor release with embedding support and logger improvements.
@@ -67,6 +57,16 @@ tag: "New"
 - **Enhancement**: Logger middleware filters noisy API endpoints (telemetry, RPC stream/log)
 - **Fix**: `--no-open` flag respected in standalone dev mode (was always opening browser)
 - **Update**: Updated mcp-use to v1.21.0
+</Update>
+
+<Update label="v0.22.1" description="February 2026">
+  ## Widget Status Texts & CSP Fixes
+  Patch release with invoking/invoked status display and CSP handling improvements.
+
+- **New**: Display of `invoking` and `invoked` status texts in MCPAppsRenderer, OpenAIComponentRenderer, ToolResultDisplay, ToolResultRenderer
+- **Enhancement**: MCPAppsDebugControls adjusts violation indicators based on CSP mode
+- **Fix**: sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Update**: Updated mcp-use to v1.20.1
 </Update>
 
 <Update label="v0.22.0" description="February 2026">

@@ -20,14 +20,15 @@ tag: "New"
 - **Update**: Updated create-mcp-use-app to v0.14.6
 </Update>
 
-<Update label="v1.21.2" description="March 2026">
-  ## Inspector Proxy Fix for Embedded Servers
-  Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
+<Update label="v1.21.4" description="March 2026">
+  ## Request Context, CLI Build & README Fixes
+  Patch release fixing request context propagation, CLI build hang, and stale monorepo references.
 
-- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
-- **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
-- **Update**: Updated @mcp-use/inspector to v0.24.2
-- **Update**: Updated @mcp-use/cli to v2.18.1
+- **Fix**: `ctx.auth` and other request context properties were `undefined` in tool callbacks; `mountMcp()` now wraps `transport.handleRequest()` with `runWithContext()` so `getRequestContext()` is populated
+- **Fix** (@mcp-use/cli): `mcp-use build` no longer hangs — add `process.exit(0)` on success (tsImport creates active handles)
+- **Fix**: Update stale mcp-use-ts references in README badges, image URLs, eslint config to mcp-use monorepo
+- **Update**: Updated @mcp-use/inspector to v0.24.4
+- **Update**: Updated @mcp-use/cli to v2.18.3
 </Update>
 
 <Update label="v1.21.3" description="March 2026">
@@ -39,15 +40,14 @@ tag: "New"
 - **Update**: Updated @mcp-use/cli to v2.18.2
 </Update>
 
-<Update label="v1.21.4" description="March 2026">
-  ## Request Context, CLI Build & README Fixes
-  Patch release fixing request context propagation, CLI build hang, and stale monorepo references.
+<Update label="v1.21.2" description="March 2026">
+  ## Inspector Proxy Fix for Embedded Servers
+  Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
 
-- **Fix**: `ctx.auth` and other request context properties were `undefined` in tool callbacks; `mountMcp()` now wraps `transport.handleRequest()` with `runWithContext()` so `getRequestContext()` is populated
-- **Fix** (@mcp-use/cli): `mcp-use build` no longer hangs — add `process.exit(0)` on success (tsImport creates active handles)
-- **Fix**: Update stale mcp-use-ts references in README badges, image URLs, eslint config to mcp-use monorepo
-- **Update**: Updated @mcp-use/inspector to v0.24.4
-- **Update**: Updated @mcp-use/cli to v2.18.3
+- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
+- **Update**: Updated @mcp-use/inspector to v0.24.2
+- **Update**: Updated @mcp-use/cli to v2.18.1
 </Update>
 
 <Update label="v1.21.1" description="March 2026">
@@ -61,18 +61,6 @@ tag: "New"
 - **Update**: Updated @mcp-use/inspector to v0.24.1
 - **Update**: Updated @mcp-use/cli to v2.18.0
 - **Update**: Updated create-mcp-use-app to v0.14.4
-</Update>
-
-<Update label="v1.20.1" description="February 2026">
-  ## Widget Status Texts & CSP Handling
-  Patch release with widget metadata enhancements and CSP improvements.
-
-- **New**: `invoking` and `invoked` properties in widget metadata for customizable status messages during tool execution
-- **Breaking**: McpUseProvider no longer includes BrowserRouter; add it explicitly if your widget uses react-router
-- **Enhancement**: MCPAppsDebugControls CSP mode violation indicators; sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
-- **Fix** (create-mcp-use-app): Unify logo display across all CLI entry paths
-- **Update**: Updated @mcp-use/inspector to v0.22.1
-- **Update**: Updated @mcp-use/cli to v2.15.1
 </Update>
 
 <Update label="v1.21.0" description="March 2026">
@@ -96,6 +84,18 @@ tag: "New"
 - **Update**: Updated @mcp-use/cli to v2.17.0
 - **Update**: Updated create-mcp-use-app to v0.14.3
 - **Documentation**: Per-server elicitation and sampling callbacks examples; proxy servers section
+</Update>
+
+<Update label="v1.20.1" description="February 2026">
+  ## Widget Status Texts & CSP Handling
+  Patch release with widget metadata enhancements and CSP improvements.
+
+- **New**: `invoking` and `invoked` properties in widget metadata for customizable status messages during tool execution
+- **Breaking**: McpUseProvider no longer includes BrowserRouter; add it explicitly if your widget uses react-router
+- **Enhancement**: MCPAppsDebugControls CSP mode violation indicators; sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Fix** (create-mcp-use-app): Unify logo display across all CLI entry paths
+- **Update**: Updated @mcp-use/inspector to v0.22.1
+- **Update**: Updated @mcp-use/cli to v2.15.1
 </Update>
 
 <Update label="v1.20.0" description="February 2026">
