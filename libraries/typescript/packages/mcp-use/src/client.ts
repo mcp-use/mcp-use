@@ -17,13 +17,13 @@ import {
 import { CodeModeConnector } from "./client/connectors/codeMode.js";
 import {
   createConnectorFromConfig,
-  loadConfigFile,
   normalizeClientInfo,
   resolveCallbacks,
   type CallbackConfig,
   type MCPClientConfigShape,
   type ServerConfig,
 } from "./config.js";
+import { loadConfigFile } from "./config-file.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";

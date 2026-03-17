@@ -69,6 +69,7 @@ describe("MCPServer Telemetry Integration", () => {
     // Save original environment
     originalEnv = { ...process.env };
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
+    vi.resetModules();
     vi.clearAllMocks();
     mockCapture.mockClear();
   });
@@ -100,6 +101,7 @@ describe("MCPServer Telemetry Integration", () => {
 
       // Call listen (mocked)
       await server.listen(3000);
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify telemetry was tracked via PostHog capture
       const captureCall = mockCapture.mock.calls.find(
@@ -123,6 +125,7 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       await server.getHandler({ provider: "supabase" });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
@@ -140,6 +143,7 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       await server.getHandler({ provider: "cloudflare" });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
@@ -157,6 +161,7 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       await server.getHandler();
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
@@ -195,6 +200,7 @@ describe("MCPServer Telemetry Integration", () => {
       );
 
       await server.listen(3000);
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"

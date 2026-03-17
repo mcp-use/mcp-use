@@ -1087,7 +1087,7 @@ export default PostHog;
       // Source maps can use eval-based mappings which violate strict CSP
       sourcemap: false,
       // Minify for production builds
-      minify: "esbuild",
+      minify: true,
     },
     server: {
       middlewareMode: true,
