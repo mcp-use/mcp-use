@@ -7,7 +7,7 @@ This module provides the abstract base class that all MCP tool adapters should i
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
-from mcp.types import Prompt, Resource, Tool
+from mcp.types import Prompt, Resource, TextContent, Tool
 
 from mcp_use.client.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
@@ -57,15 +57,18 @@ class BaseAdapter(Generic[T], ABC):
             A string representation of the result content.
         """
         if getattr(tool_result, "isError", False):
-            # Handle errors first
-            error_content = tool_result.content or "Unknown error"
-            return f"Error: {error_content}"
+            # Handle errors: extract text from content blocks
+            content = getattr(tool_result, "content", None)
+            if content:
+                error_text = self._format_content_list(content)
+                return f"Error: {error_text}" if error_text else "Error: Unknown error"
+            return "Error: Unknown error"
         elif hasattr(tool_result, "contents"):  # For Resources (ReadResourceResult)
             return "\n".join(c.decode() if isinstance(c, bytes) else str(c) for c in tool_result.contents)
         elif hasattr(tool_result, "messages"):  # For Prompts (GetPromptResult)
             return "\n".join(str(s) for s in tool_result.messages)
         elif hasattr(tool_result, "content"):  # For Tools (CallToolResult)
-            return str(tool_result.content)
+            return self._format_content_list(tool_result.content)
         else:
             # Fallback for unexpected types
             return str(tool_result)
@@ -341,3 +344,31 @@ class BaseAdapter(Generic[T], ABC):
                 logger.error(f"Error initializing connector: {e}")
                 return False
         return True
+
+    def _format_content_item(self, item: Any) -> str:
+        """Format a single MCP content item as a readable string."""
+        if isinstance(item, TextContent):
+            return item.text
+
+        mime_type = getattr(item, "mimeType", None)
+        if mime_type:
+            return f"[{mime_type} content]"
+
+        text = getattr(item, "text", None)
+        if text:
+            return text
+
+        return str(item)
+
+    def _format_content_list(self, content: list[Any]) -> str:
+        """Format a list of MCP content items as a readable string.
+
+        Args:
+            content: A list of MCP content items.
+
+        Returns:
+            A newline-joined string of formatted content.
+        """
+        if not content:
+            return ""
+        return "\n".join(self._format_content_item(item) for item in content)
