@@ -32,8 +32,9 @@ jobs:
 
       - name: Checkout PR branch (if PR comment)
         if: github.event.issue.pull_request
+        env:
+          PR_NUMBER: ${{ github.event.issue.number }}
         run: |
-          PR_NUMBER=${{ github.event.issue.number }}
           echo "Fetching PR #$PR_NUMBER..."
           git fetch origin pull/$PR_NUMBER/head:pr-$PR_NUMBER
           git checkout pr-$PR_NUMBER

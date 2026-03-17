@@ -67,23 +67,29 @@ jobs:
               - '.github/workflows/conformance.yml'
       - name: Compute outputs
         id: compute
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TYPESCRIPT_ONLY: ${{ github.event.inputs.typescript_only }}
+          INPUT_PYTHON_ONLY: ${{ github.event.inputs.python_only }}
+          FILTER_PYTHON: ${{ steps.filter.outputs.python }}
+          FILTER_TYPESCRIPT: ${{ steps.filter.outputs.typescript }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             # Manual dispatch: use the explicit inputs
-            if [ "${{ inputs.typescript_only }}" = "true" ]; then
+            if [ "$INPUT_TYPESCRIPT_ONLY" = "true" ]; then
               echo "python=false" >> $GITHUB_OUTPUT
             else
               echo "python=true" >> $GITHUB_OUTPUT
             fi
-            if [ "${{ inputs.python_only }}" = "true" ]; then
+            if [ "$INPUT_PYTHON_ONLY" = "true" ]; then
               echo "typescript=false" >> $GITHUB_OUTPUT
             else
               echo "typescript=true" >> $GITHUB_OUTPUT
             fi
           else
             # Push / PR: use path detection
-            echo "python=${{ steps.filter.outputs.python }}" >> $GITHUB_OUTPUT
-            echo "typescript=${{ steps.filter.outputs.typescript }}" >> $GITHUB_OUTPUT
+            echo "python=$FILTER_PYTHON" >> $GITHUB_OUTPUT
+            echo "typescript=$FILTER_TYPESCRIPT" >> $GITHUB_OUTPUT
           fi
 
   conformance-test:
@@ -147,12 +153,15 @@ jobs:
 
       - name: Build server list
         id: build-servers
+        env:
+          NEEDS_PYTHON: ${{ needs.detect-changes.outputs.python }}
+          NEEDS_TYPESCRIPT: ${{ needs.detect-changes.outputs.typescript }}
         run: |
           SERVERS='['
-          if [ "${{ needs.detect-changes.outputs.python }}" = "true" ]; then
+          if [ "$NEEDS_PYTHON" = "true" ]; then
             SERVERS+='{"name":"python","start-command":"source .venv/bin/activate && python tests/integration/servers_for_testing/conformance_server.py --transport streamable-http --port 8000","url":"http://127.0.0.1:8000/mcp","working-directory":"libraries/python"}'
           fi
-          if [ "${{ needs.detect-changes.outputs.typescript }}" = "true" ]; then
+          if [ "$NEEDS_TYPESCRIPT" = "true" ]; then
             if [[ $SERVERS != '[' ]]; then
               SERVERS+=','
             fi
@@ -163,12 +172,15 @@ jobs:
 
       - name: Build client list
         id: build-clients
+        env:
+          NEEDS_PYTHON: ${{ needs.detect-changes.outputs.python }}
+          NEEDS_TYPESCRIPT: ${{ needs.detect-changes.outputs.typescript }}
         run: |
           CLIENTS='['
-          if [ "${{ needs.detect-changes.outputs.python }}" = "true" ]; then
+          if [ "$NEEDS_PYTHON" = "true" ]; then
             CLIENTS+='{"name":"python-client","command":".venv/bin/python tests/integration/clients_for_testing/conformance_client.py","working-directory":"libraries/python"}'
           fi
-          if [ "${{ needs.detect-changes.outputs.typescript }}" = "true" ]; then
+          if [ "$NEEDS_TYPESCRIPT" = "true" ]; then
             if [[ $CLIENTS != '[' ]]; then
               CLIENTS+=','
             fi

@@ -32,8 +32,10 @@ jobs:
       
       - name: Check if packages were published
         id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" == "workflow_dispatch" ]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
             echo "Manual trigger, will run e2e tests"
           elif [ -f .railway-deploy-marker ] && grep -q "packages_published=true" .railway-deploy-marker; then
