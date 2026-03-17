@@ -170,12 +170,7 @@ async function waitForTunnelUrl(logPath, phase) {
 }
 
 async function runTunnelPhase(phase, command, args, logPath) {
-  const proc = await startTunnelProcess(
-    command,
-    args,
-    typescriptRoot,
-    logPath
-  );
+  const proc = await startTunnelProcess(command, args, typescriptRoot, logPath);
   const url = await waitForTunnelUrl(logPath, phase);
 
   try {
