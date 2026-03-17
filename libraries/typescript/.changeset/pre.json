@@ -1,0 +1,11 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.19.0",
+    "create-mcp-use-app": "0.14.6",
+    "@mcp-use/inspector": "0.24.5",
+    "mcp-use": "1.21.5"
+  },
+  "changesets": []
+}
