@@ -1,5 +1,27 @@
 # @mcp-use/cli
 
+## 2.19.0
+
+### Minor Changes
+
+- ed0fadb: feat: use esbuild for transpilation, separate type checking from build
+
+  `mcp-use build` now uses esbuild for TypeScript transpilation instead of tsc. esbuild strips types without analyzing them, so it cannot OOM on complex type graphs (Zod v4, Prisma, etc.). Type checking runs separately via `tsc --noEmit` after transpilation — if it fails or OOMs, the build output is still produced. Use `--no-typecheck` to skip type checking entirely for faster builds.
+
+### Patch Changes
+
+- ed0fadb: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+- ed0fadb: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- ed0fadb: Fix Windows crash in `mcp-use dev` and `mcp-use generate-types` where raw OS paths (e.g. `C:\project\index.ts`) were passed to `tsImport` instead of `file://` URLs, causing `ERR_UNSUPPORTED_ESM_URL_SCHEME`.
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+  - mcp-use@1.21.5
+  - @mcp-use/inspector@0.24.5
+
 ## 2.19.0-canary.3
 
 ### Patch Changes

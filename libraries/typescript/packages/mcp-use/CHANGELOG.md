@@ -1,5 +1,25 @@
 # mcp-use
 
+## 1.21.5
+
+### Patch Changes
+
+- ed0fadb: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+- ed0fadb: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- ed0fadb: fix: move zod from dependencies to peerDependencies to prevent duplicate type trees
+
+  When users had a different Zod v4 version than the bundled 4.3.5, npm/pnpm installed two copies. TypeScript then performed expensive structural comparisons of deeply recursive Zod types at every `server.tool()` and `ctx.elicit()` boundary, causing type errors or OOM during `mcp-use build`. Making Zod a peerDependency (`^4.0.0`) ensures a single shared instance.
+
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+  - @mcp-use/cli@2.19.0
+  - @mcp-use/inspector@0.24.5
+
 ## 1.21.5-canary.3
 
 ### Patch Changes
