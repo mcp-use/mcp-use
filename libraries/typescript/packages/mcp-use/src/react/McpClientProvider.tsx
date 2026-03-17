@@ -111,6 +111,7 @@ export interface McpClientContextType {
   /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
+  updateServerMetadata: (id: string, metadata: { name: string }) => Promise<void>;
   updateServer: (
     id: string,
     options: Partial<McpServerOptions>
@@ -1087,6 +1088,8 @@ export function McpClientProvider({
         );
 
         if (
+          current.name === updatedServer.name &&
+          current.url === updatedServer.url &&
           current.state === updatedServer.state &&
           current.tools === updatedServer.tools &&
           current.resources === updatedServer.resources &&
@@ -1244,6 +1247,41 @@ export function McpClientProvider({
     [serverConfigs]
   );
 
+  const updateServerMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      return new Promise<void>((resolve) => {
+        const currentConfig = serverConfigs.find((s) => s.id === id);
+        if (!currentConfig) {
+          providerLogger.warn(
+            `[McpClientProvider] Cannot update server metadata for "${id}" - not found`
+          );
+          resolve();
+          return;
+        }
+
+        const updatedOptions: McpServerOptions = {
+          ...currentConfig.options,
+          ...metadata,
+        };
+
+        setServers((prev) =>
+          prev.map((server) =>
+            server.id === id ? { ...server, name: metadata.name } : server
+          )
+        );
+
+        setServerConfigs((prev) => {
+          const updated = prev.map((s) =>
+            s.id === id ? { id, options: updatedOptions } : s
+          );
+          setTimeout(() => resolve(), 0);
+          return updated;
+        });
+      });
+    },
+    [serverConfigs]
+  );
+
   const getServer = useCallback(
     (id: string) => {
       return servers.find((s) => s.id === id);
@@ -1256,11 +1294,20 @@ export function McpClientProvider({
       servers,
       addServer,
       removeServer,
+      updateServerMetadata,
       updateServer,
       getServer,
       storageLoaded,
     }),
-    [servers, addServer, removeServer, updateServer, getServer, storageLoaded]
+    [
+      servers,
+      addServer,
+      removeServer,
+      updateServerMetadata,
+      updateServer,
+      getServer,
+      storageLoaded,
+    ]
   );
 
   // Strip `capabilities` from clientInfo — it is a provider-level default for
@@ -1330,13 +1377,22 @@ export function McpClientProvider({
  *
  * @example
  * ```tsx
- * const { servers, addServer, removeServer, updateServer } = useMcpClient();
+ * const {
+ *   servers,
+ *   addServer,
+ *   removeServer,
+ *   updateServer,
+ *   updateServerMetadata,
+ * } = useMcpClient();
  *
  * // Add a server
  * addServer("linear", { url: "https://mcp.linear.app/sse" });
  *
- * // Update a server's configuration
- * await updateServer("linear", { name: "Linear Production" });
+ * // Update a server's configured display name without reconnecting
+ * await updateServerMetadata("linear", { name: "Linear Production" });
+ *
+ * // Update connection-affecting configuration and reconnect
+ * await updateServer("linear", { headers: { Authorization: "Bearer ..." } });
  *
  * // Access servers
  * servers.forEach(server => {

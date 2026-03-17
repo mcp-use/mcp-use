@@ -138,7 +138,7 @@ test.describe("Inspector MCP Server Connections", () => {
     });
   });
 
-  test("should save and show a server alias from edit connection settings", async ({
+  test("should save and use a server alias from edit connection settings without interrupting the connection", async ({
     page,
   }) => {
     await page.goto("http://localhost:3000/inspector");
@@ -163,6 +163,19 @@ test.describe("Inspector MCP Server Connections", () => {
       page.getByRole("heading", { name: "QA Conformance" })
     ).toBeVisible();
 
+    await page.getByTestId("server-tile-http://localhost:3002/mcp").click();
+    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await page.getByTestId("tool-item-test_simple_text").click();
+    await expect(
+      page.getByTestId("tool-execution-execute-button")
+    ).toBeVisible();
+    await page.getByTestId("tool-param-message").fill("Alias check");
+    await page.getByTestId("tool-execution-execute-button").click();
+    await expect(
+      page.getByTestId("tool-execution-results-text-content")
+    ).toContainText("Echo: Alias check");
+
+    await page.goto("http://localhost:3000/inspector");
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "QA Conformance" })

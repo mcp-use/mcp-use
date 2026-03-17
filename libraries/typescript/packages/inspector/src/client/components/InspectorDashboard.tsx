@@ -23,9 +23,18 @@ import {
   RotateCcw,
   Settings,
 } from "lucide-react";
-import { useMcpClient, type McpServerOptions } from "mcp-use/react";
+import {
+  useMcpClient,
+  type McpServer,
+  type McpServerOptions,
+} from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import {
+  getStoredConnectionConfig,
+  isAliasOnlyConnectionUpdate,
+  type EditableConnectionConfig,
+} from "@/client/utils/connectionUpdates";
 import {
   getConfiguredServerAlias,
   getServerDisplayName,
@@ -56,6 +65,7 @@ export function InspectorDashboard() {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServerMetadata,
     updateServer,
   } = useMcpClient();
 
@@ -129,6 +139,20 @@ export function InspectorDashboard() {
       }
     },
     [updateServer]
+  );
+
+  const updateConnectionMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      try {
+        await updateServerMetadata(id, metadata);
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to update connection metadata for ${id}:`,
+          error
+        );
+      }
+    },
+    [updateServerMetadata]
   );
 
   const connectServer = useCallback(
@@ -413,16 +437,14 @@ export function InspectorDashboard() {
   };
 
   const handleUpdateConnection = useCallback(
-    (config: {
-      url: string;
-      name?: string;
-      transportType: "http" | "sse";
-      proxyConfig?: {
-        proxyAddress?: string;
-        headers?: Record<string, string>;
-      };
-    }) => {
+    (config: EditableConnectionConfig) => {
       if (!editingConnectionId) return;
+
+      const currentConnection =
+        getStoredConnectionConfig<EditableConnectionConfig>(editingConnectionId) ||
+        connections.find(
+          (connection: McpServer) => connection.id === editingConnectionId
+        );
 
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
@@ -433,6 +455,13 @@ export function InspectorDashboard() {
           config.proxyConfig,
           config.transportType
         );
+      } else if (
+        currentConnection &&
+        isAliasOnlyConnectionUpdate(currentConnection, config)
+      ) {
+        updateConnectionMetadata(editingConnectionId, {
+          name: config.name || config.url,
+        });
       } else {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
@@ -449,8 +478,10 @@ export function InspectorDashboard() {
     },
     [
       editingConnectionId,
+      connections,
       removeConnection,
       addConnection,
+      updateConnectionMetadata,
       updateConnectionConfig,
     ]
   );
