@@ -6,6 +6,20 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.21.5" description="March 2026">
+  ## Zod Peer Dep, Esbuild Build & Windows Fix
+  Patch release with Zod peer dependency, esbuild transpilation, TypeGen Zod v4 fixes, and Windows path handling.
+
+- **Fix**: Move zod from dependencies to peerDependencies — prevents duplicate type trees when users have a different Zod v4 version; avoids type errors or OOM during `mcp-use build`
+- **Fix**: TypeGen crash with Zod v4 enum schemas — `zod-to-ts` now handles Zod v4 `ZodEnum` (`_def.entries`), `ZodDiscriminatedUnion`; CLI reports success/failure of type generation instead of silently failing
+- **Fix** (@mcp-use/cli): Windows crash in `mcp-use dev` and `mcp-use generate-types` — use `file://` URL in tsImport instead of raw OS paths (fixes `ERR_UNSUPPORTED_ESM_URL_SCHEME`)
+- **Fix**: Dependabot security alerts — updated flatted, tar, hono, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps
+- **Enhancement** (@mcp-use/cli): `mcp-use build` uses esbuild for transpilation instead of tsc — avoids OOM on complex type graphs (Zod v4, Prisma); type checking runs separately via `tsc --noEmit`; add `--no-typecheck` to skip type checking for faster builds
+- **Update**: Updated @mcp-use/inspector to v0.24.5
+- **Update**: Updated @mcp-use/cli to v2.19.0
+- **Update**: Updated create-mcp-use-app to v0.14.6
+</Update>
+
 <Update label="v1.21.2" description="March 2026">
   ## Inspector Proxy Fix for Embedded Servers
   Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
