@@ -49,6 +49,11 @@ const conformanceServerDir = resolve(
   inspectorDir,
   "../mcp-use/examples/server/features/conformance"
 );
+const workspaceRoot = resolve(inspectorDir, "../..");
+const mcpUseBin = resolve(
+  conformanceServerDir,
+  "../../../../dist/src/bin.js"
+);
 
 // Track child processes and servers for cleanup
 const childProcesses = [];
@@ -233,10 +238,18 @@ async function waitForUrl(url, description) {
 // Main execution
 async function main() {
   try {
-    // Step 1: Build conformance server (needed for all modes)
+    // Step 1: Build mcp-use (conformance server depends on its bin)
     await runCommand(
       "pnpm",
-      ["--filter", "conformance-server", "build"],
+      ["--filter", "mcp-use", "build"],
+      workspaceRoot,
+      "Building mcp-use"
+    );
+
+    // Step 2: Build conformance server (use node directly - mcp-use bin may not be in PATH)
+    await runCommand(
+      "node",
+      [mcpUseBin, "build"],
       conformanceServerDir,
       "Building conformance server"
     );
@@ -271,8 +284,8 @@ async function main() {
 
       // Start conformance server in dev mode (includes built-in inspector)
       await startBackgroundProcess(
-        "pnpm",
-        ["--filter", "conformance-server", "dev", "--no-open"],
+        "node",
+        [mcpUseBin, "dev", "--no-open"],
         conformanceServerDir,
         "Starting conformance server with built-in inspector",
         playwrightEnv
@@ -293,8 +306,8 @@ async function main() {
 
       // Start conformance server on port 3002
       await startBackgroundProcess(
-        "pnpm",
-        ["--filter", "conformance-server", "start", "--port", "3002"],
+        "node",
+        [mcpUseBin, "start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -312,8 +325,8 @@ async function main() {
 
       // Start conformance server on port 3002
       await startBackgroundProcess(
-        "pnpm",
-        ["--filter", "conformance-server", "start", "--port", "3002"],
+        "node",
+        [mcpUseBin, "start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
