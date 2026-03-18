@@ -63,7 +63,7 @@ export { McpUseProvider } from "./McpUseProvider.js";
 
 // Export useFiles hook
 export { useFiles } from "./useFiles.js";
-export type { UseFilesResult } from "./useFiles.js";
+export type { UseFilesResult, UploadOptions } from "./useFiles.js";
 
 // Export useCallTool hook and related types
 export { useCallTool } from "./useCallTool.js";

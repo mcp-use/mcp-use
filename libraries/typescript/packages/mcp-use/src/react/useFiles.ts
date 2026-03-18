@@ -6,10 +6,34 @@
  * https://github.com/modelcontextprotocol/ext-apps/issues/201
  *
  * Always check `isSupported` before calling `upload` or `getDownloadUrl`.
+ *
+ * ## Model visibility
+ *
+ * By default, uploaded files are tracked in widget state under `imageIds` so
+ * ChatGPT includes them in the model's conversation context. Pass
+ * `{ modelVisible: false }` to `upload()` to suppress this — the file is
+ * still uploaded but the model won't see it.
  */
 
 import { useMemo } from "react";
 import type { FileMetadata } from "./widget-types.js";
+
+export interface UploadOptions {
+  /**
+   * Whether the uploaded file should be visible to the model.
+   *
+   * When `true` (default), the `fileId` is appended to `imageIds` in widget
+   * state so the ChatGPT host includes the file in the model's conversation
+   * context on future turns.
+   *
+   * When `false`, the file is uploaded but not tracked in `imageIds` — the
+   * model will not see it. Useful for files used only by the widget (e.g.
+   * a user-provided config file or a privately-processed image).
+   *
+   * @default true
+   */
+  modelVisible?: boolean;
+}
 
 export interface UseFilesResult {
   /**
@@ -17,9 +41,8 @@ export interface UseFilesResult {
    *
    * `true` only in the ChatGPT Apps SDK environment where
    * `window.openai.uploadFile` and `window.openai.getFileDownloadUrl`
-   * are available.
-   *
-   * Always check this flag before calling `upload` or `getDownloadUrl`.
+   * are available. Always check this flag before calling `upload` or
+   * `getDownloadUrl`.
    */
   isSupported: boolean;
 
@@ -29,16 +52,19 @@ export interface UseFilesResult {
    * Returns a `{ fileId }` reference that can be passed to `getDownloadUrl`
    * or stored in widget state for later retrieval.
    *
+   * By default the file is tracked in widget state (`imageIds`) so the model
+   * can see it. Pass `{ modelVisible: false }` to upload privately.
+   *
    * @throws If called when `isSupported` is `false`.
    */
-  upload: (file: File) => Promise<FileMetadata>;
+  upload: (file: File, options?: UploadOptions) => Promise<FileMetadata>;
 
   /**
    * Get a temporary download URL for a previously uploaded file.
    *
    * The returned URL is valid for a limited time (typically 5 minutes).
-   * Do not store the URL — call `getDownloadUrl` again when you need
-   * to display or fetch the file.
+   * Do not store the URL — call `getDownloadUrl` again when you need to
+   * display or fetch the file.
    *
    * @throws If called when `isSupported` is `false`.
    */
@@ -58,7 +84,12 @@ export interface UseFilesResult {
  *   return <p>File operations are not available in this host.</p>;
  * }
  *
+ * // Upload (model-visible by default)
  * const { fileId } = await upload(file);
+ *
+ * // Upload privately (model won't see it)
+ * const { fileId } = await upload(file, { modelVisible: false });
+ *
  * const { downloadUrl } = await getDownloadUrl({ fileId });
  * ```
  */
@@ -73,7 +104,10 @@ export function useFiles(): UseFilesResult {
 
   const upload = useMemo(
     () =>
-      async (file: File): Promise<FileMetadata> => {
+      async (
+        file: File,
+        options: UploadOptions = {}
+      ): Promise<FileMetadata> => {
         if (!isSupported) {
           throw new Error(
             "[useFiles] File upload is not supported in this host. " +
@@ -81,7 +115,31 @@ export function useFiles(): UseFilesResult {
               "File operations are only available in the ChatGPT Apps SDK environment."
           );
         }
-        return (window.openai as any).uploadFile(file) as Promise<FileMetadata>;
+
+        const metadata = await ((window.openai as any).uploadFile(
+          file
+        ) as Promise<FileMetadata>);
+
+        // Track in imageIds so the model can see the file, unless opted out.
+        // Preserves existing privateContent to avoid wiping non-file widget state.
+        const { modelVisible = true } = options;
+        if (modelVisible && window.openai?.setWidgetState) {
+          const prev = (window.openai.widgetState ?? {}) as Record<
+            string,
+            unknown
+          >;
+          const imageIds = [
+            ...((prev.imageIds as string[] | undefined) ?? []),
+            metadata.fileId,
+          ];
+          window.openai
+            .setWidgetState({ ...prev, imageIds } as any)
+            .catch((err: unknown) => {
+              console.warn("[useFiles] Failed to track imageId:", err);
+            });
+        }
+
+        return metadata;
       },
     [isSupported]
   );
