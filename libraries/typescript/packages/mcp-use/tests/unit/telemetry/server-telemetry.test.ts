@@ -65,11 +65,13 @@ vi.mock("../../../src/server/widgets/index.js", () => ({
 describe("MCPServer Telemetry Integration", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Save original environment
     originalEnv = { ...process.env };
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
     vi.resetModules();
+    // Let any lingering fire-and-forget telemetry from previous tests settle
+    await new Promise((resolve) => setTimeout(resolve, 300));
     vi.clearAllMocks();
     mockCapture.mockClear();
   });
@@ -101,7 +103,7 @@ describe("MCPServer Telemetry Integration", () => {
 
       // Call listen (mocked)
       await server.listen(3000);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Verify telemetry was tracked via PostHog capture
       const captureCall = mockCapture.mock.calls.find(
@@ -125,7 +127,7 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       await server.getHandler({ provider: "supabase" });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
@@ -143,7 +145,7 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       await server.getHandler({ provider: "cloudflare" });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
@@ -161,7 +163,7 @@ describe("MCPServer Telemetry Integration", () => {
       });
 
       await server.getHandler();
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
@@ -200,7 +202,7 @@ describe("MCPServer Telemetry Integration", () => {
       );
 
       await server.listen(3000);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "server_run"
