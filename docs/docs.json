@@ -574,6 +574,7 @@
                       "typescript/server/widget-components/errorboundary",
                       "typescript/server/widget-components/image",
                       "typescript/server/widget-components/themeprovider",
+                      "typescript/server/widget-components/modelcontext",
                       {
                         "group": "Deprecated",
                         "icon": "archive",
