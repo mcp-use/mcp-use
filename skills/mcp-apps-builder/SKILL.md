@@ -151,6 +151,10 @@ Load these before diving into tools/resources/widgets sections.
   - When: Building complex widgets with async data, error boundaries, or performance optimizations
   - Covers: Loading states, error handling, memoization, code splitting
 
+- **[model-context.md](references/widgets/model-context.md)**
+  - When: Keeping the AI model aware of what the user is currently seeing (active tab, hovered item, selected product) without requiring tool calls
+  - Covers: `<ModelContext>` component, `modelContext.set/remove` imperative API, nesting, tree serialization, lifecycle rules
+
 ---
 
 ### 📚 Need Complete Examples?
@@ -184,6 +188,9 @@ What do you need?
 │
 ├─ Visual/interactive UI
 │  └─> Use Widget: widgets/basics.md
+│
+├─ Keep model aware of what user is seeing in widget
+│  └─> widgets/model-context.md
 │
 └─ Deploy to production
    └─> deployment.md (cloud deploy, self-hosting, Docker)
