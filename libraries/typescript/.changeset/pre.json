@@ -8,6 +8,7 @@
     "mcp-use": "1.21.5"
   },
   "changesets": [
-    "fix-react-sse-retry-conformance"
+    "fix-react-sse-retry-conformance",
+    "vite8-upgrade-and-test-fixes"
   ]
 }
