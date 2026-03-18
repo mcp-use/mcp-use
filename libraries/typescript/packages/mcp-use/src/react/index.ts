@@ -45,6 +45,7 @@ export {
 export type {
   API,
   CallToolResponse,
+  FileMetadata,
   MessageContentBlock,
   DeviceType,
   DisplayMode,
@@ -59,6 +60,10 @@ export type {
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
+
+// Export useFiles hook
+export { useFiles } from "./useFiles.js";
+export type { UseFilesResult } from "./useFiles.js";
 
 // Export useCallTool hook and related types
 export { useCallTool } from "./useCallTool.js";
