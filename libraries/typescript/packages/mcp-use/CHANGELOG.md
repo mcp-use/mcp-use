@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.21.6-canary.0
+
+### Patch Changes
+
+- aafea7b: Fix sse-retry conformance test for React client by passing explicit reconnectionOptions to preserve SDK-level SSE reconnection when autoReconnect is disabled
+  - @mcp-use/cli@2.19.1-canary.0
+  - @mcp-use/inspector@0.24.6-canary.0
+
 ## 1.21.5
 
 ### Patch Changes

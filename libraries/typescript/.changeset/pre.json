@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.24.5",
     "mcp-use": "1.21.5"
   },
-  "changesets": []
+  "changesets": [
+    "fix-react-sse-retry-conformance"
+  ]
 }
