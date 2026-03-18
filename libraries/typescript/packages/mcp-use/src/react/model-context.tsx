@@ -105,6 +105,14 @@ function buildDescriptionString(): string {
   return lines.join("\n");
 }
 
+/**
+ * Get the current serialized model-context string. For use in tests only.
+ * @internal
+ */
+export function _getDescriptionForTesting(): string {
+  return buildDescriptionString();
+}
+
 // ---------------------------------------------------------------------------
 // Host notification
 //
@@ -234,6 +242,16 @@ export function ModelContext({ content, children }: ModelContextProps) {
  * }
  * ```
  */
+/**
+ * Reset all internal state. For use in tests only.
+ * @internal
+ */
+export function _resetModelContextForTesting(): void {
+  nodes.clear();
+  flushHandler = null;
+  flushScheduled = false;
+}
+
 export const modelContext = {
   /**
    * Register or update a named context entry.
