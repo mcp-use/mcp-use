@@ -31,10 +31,10 @@
     "@types/node": "^25.0.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-react": "^6.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.0"
+    "vite": "^8.0.0"
   },
   "packageManager": "pnpm@9.1.4+sha1.2432063d815cfa88fd9fef1d85a445e3f609851d"
 }

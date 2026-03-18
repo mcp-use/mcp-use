@@ -825,7 +825,7 @@ export default {
           // Source maps can use eval-based mappings which break strict CSP policies
           sourcemap: false,
           // Minify for smaller bundle size
-          minify: "esbuild",
+          minify: true,
           // Widgets bundle React+Zod; suppress expected chunk size warning
           chunkSizeWarningLimit: 1024,
           // For inline builds, disable CSS code splitting and inline all assets
@@ -835,10 +835,9 @@ export default {
                 assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
               }
             : {}),
-          rollupOptions: {
+          rolldownOptions: {
             input: path.join(tempDir, "index.html"),
             external: (id) => {
-              // Don't externalize posthog-node or path - we're stubbing them
               return false;
             },
           },

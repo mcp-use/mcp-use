@@ -6,7 +6,7 @@
  * Vercel AI SDK hooks like useCompletion and useChat.
  */
 
-import type { StreamEvent } from "../index.js";
+import type { StreamEvent } from "@langchain/core/tracers/log_stream";
 import { createTextStreamResponse } from "ai";
 import { describe, expect, it } from "vitest";
 

@@ -12,12 +12,12 @@
 import { MCPAgent } from "./src/agents/mcp_agent.js";
 import { RemoteAgent } from "./src/agents/remote.js";
 import { MCPClient } from "./src/client.js";
-import {
-  loadConfigFile,
-  type OnElicitationCallback,
-  type OnNotificationCallback,
-  type OnSamplingCallback,
+import type {
+  OnElicitationCallback,
+  OnNotificationCallback,
+  OnSamplingCallback,
 } from "./src/config.js";
+import { loadConfigFile } from "./src/config-file.js";
 import type { NotificationHandler } from "./src/connectors/base.js";
 import { BaseConnector } from "./src/connectors/base.js";
 import { HttpConnector } from "./src/connectors/http.js";
