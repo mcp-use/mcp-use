@@ -169,6 +169,7 @@ async function main(): Promise<void> {
       // some scenarios keep long-lived requests open and do not handle HEAD probes.
       autoReconnect: false,
       autoRetry: false,
+      reconnectionOptions: { maxRetries: 2 },
       // Allow automatic OAuth flow in conformance tests (headless provider)
       preventAutoAuth: false,
     },
