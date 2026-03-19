@@ -38,14 +38,30 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     super(disallowedTools);
   }
 
-  private reserveName(
-    name: string,
-    kind?: "resource" | "prompt"
-  ): string {
-    const resolvedName =
-      kind && this.usedToolNames.has(name) ? `${kind}_${name}` : name;
-    this.usedToolNames.add(resolvedName);
-    return resolvedName;
+  private reserveName(name: string, kind?: "resource" | "prompt"): string {
+    if (!this.usedToolNames.has(name)) {
+      this.usedToolNames.add(name);
+      return name;
+    }
+    if (kind) {
+      const prefixed = `${kind}_${name}`;
+      if (!this.usedToolNames.has(prefixed)) {
+        this.usedToolNames.add(prefixed);
+        return prefixed;
+      }
+      // Both base name and prefixed name are taken; fall back to a numeric suffix.
+      let i = 2;
+      while (this.usedToolNames.has(`${prefixed}_${i}`)) i++;
+      const fallback = `${prefixed}_${i}`;
+      this.usedToolNames.add(fallback);
+      return fallback;
+    }
+    // No kind: use a numeric suffix to avoid collision.
+    let i = 2;
+    while (this.usedToolNames.has(`${name}_${i}`)) i++;
+    const fallback = `${name}_${i}`;
+    this.usedToolNames.add(fallback);
+    return fallback;
   }
 
   public override async createToolsFromConnectors(
@@ -179,7 +195,8 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
           : z.object({}).optional();
     }
 
-    const promptBaseName = mcpPrompt.name || "prompt";
+    const promptBaseName =
+      sanitizeToolName(mcpPrompt.name || "prompt") || "prompt";
     const promptName = this.reserveName(promptBaseName, "prompt");
     const tool = new DynamicStructuredTool({
       name: promptName,
