@@ -151,6 +151,10 @@ Load these before diving into tools/resources/widgets sections.
   - When: Building complex widgets with async data, error boundaries, or performance optimizations
   - Covers: Loading states, error handling, memoization, code splitting
 
+- **[files.md](references/widgets/files.md)**
+  - When: Uploading or downloading files from within a widget (ChatGPT Apps SDK only)
+  - Covers: `useFiles()` hook, `isSupported` guard, model visibility (`modelVisible`), storing `fileId`, temporary download URLs
+
 ---
 
 ### 📚 Need Complete Examples?
@@ -184,6 +188,9 @@ What do you need?
 │
 ├─ Visual/interactive UI
 │  └─> Use Widget: widgets/basics.md
+│
+├─ Upload/download files in a widget
+│  └─> widgets/files.md (ChatGPT Apps SDK only)
 │
 └─ Deploy to production
    └─> deployment.md (cloud deploy, self-hosting, Docker)

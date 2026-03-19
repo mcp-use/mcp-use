@@ -8,6 +8,12 @@
 export type UnknownObject = Record<string, unknown>;
 
 /**
+ * Opaque file reference returned by `useFiles().upload()`.
+ * Pass to `getDownloadUrl()` to retrieve a temporary download URL.
+ */
+export type FileMetadata = { fileId: string };
+
+/**
  * Registry for tool type definitions. This interface is automatically augmented
  * by the dev server when you use `mcp-use dev`. Type definitions are generated
  * from your tool schemas and written to `.mcp-use/tool-registry.d.ts`.
@@ -131,6 +137,20 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
 
   /** Notify OpenAI about intrinsic height changes for auto-sizing */
   notifyIntrinsicHeight: (height: number) => Promise<void>;
+
+  /**
+   * Upload a file to the host.
+   * Only available in ChatGPT Apps SDK environments.
+   * Use `useFiles().isSupported` to detect availability before calling.
+   */
+  uploadFile?: (file: File) => Promise<FileMetadata>;
+
+  /**
+   * Get a temporary download URL for a previously uploaded file.
+   * Only available in ChatGPT Apps SDK environments.
+   * Use `useFiles().isSupported` to detect availability before calling.
+   */
+  getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
 }
 
 // Event types
