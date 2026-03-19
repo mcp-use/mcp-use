@@ -9,6 +9,7 @@
   },
   "changesets": [
     "add-mcp-middleware",
+    "fix-elicit-content-mapping",
     "fix-react-sse-retry-conformance",
     "fix-tool-name-collision-reserve",
     "use-files-and-model-context",
