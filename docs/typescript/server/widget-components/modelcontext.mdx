@@ -1,0 +1,237 @@
+---
+title: "<ModelContext />"
+description: "Keep the AI model aware of what the user is currently viewing in your widget"
+icon: "brain"
+---
+
+`ModelContext` and `modelContext` let your widget push contextual descriptions to the AI model so it can reason about what the user is currently seeing — without requiring an explicit tool call or storing it in developer-managed state.
+
+<Info>
+Both APIs feed into a single hierarchical context string that is sent to the host via `ui/update-model-context` (MCP Apps) or `setWidgetState` (ChatGPT Apps SDK) whenever the node tree changes. Updates are batched automatically.
+</Info>
+
+## Import
+
+```typescript
+import { ModelContext, modelContext } from "mcp-use/react";
+```
+
+---
+
+## `<ModelContext>` component
+
+Declarative React component that registers a context annotation for as long as it is mounted. Participates in a parent-child tree based on nesting in JSX.
+
+### Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `content` | `string` | Yes | The description the model should see. |
+| `children` | `ReactNode` | No | Optional. If provided, this component becomes a scope boundary — any nested `<ModelContext>` components become children in the tree. |
+
+### Basic usage
+
+```tsx
+import { ModelContext } from "mcp-use/react";
+
+function WeatherCard({ city, temp }: Props) {
+  return (
+    <>
+      {/* Leaf annotation — no children needed */}
+      <ModelContext content={`Showing weather for ${city}: ${temp}°C`} />
+      <div className="card">
+        {city}: {temp}°C
+      </div>
+    </>
+  );
+}
+```
+
+### Nesting
+
+`<ModelContext>` components nest hierarchically. A component wrapped in another's `children` becomes a child node in the serialized tree:
+
+```tsx
+<ModelContext content="User is on the Dashboard">
+  <ModelContext content="Revenue chart is visible" />
+  <ModelContext content="5 notifications pending" />
+</ModelContext>
+```
+
+The model receives:
+
+```
+- User is on the Dashboard
+  - Revenue chart is visible
+  - 5 notifications pending
+```
+
+### Siblings
+
+Multiple `<ModelContext>` at the same level in the component tree are siblings — they produce a flat list at that depth:
+
+```tsx
+function Dashboard() {
+  return (
+    <>
+      <ModelContext content="Revenue section" />
+      <ModelContext content="Users section" />
+    </>
+  );
+}
+// - Revenue section
+// - Users section
+```
+
+### Dynamic content
+
+The component re-registers automatically when `content` changes. Use this to reflect interactive state:
+
+```tsx
+const [tab, setTab] = useState("overview");
+
+<ModelContext content={`Active tab: ${tab}`}>
+  <TabPanel tab={tab} />
+</ModelContext>
+```
+
+### Empty children
+
+Children are optional. A self-closing tag registers a leaf annotation:
+
+```tsx
+<ModelContext content={`Selected: ${item.name}`} />
+```
+
+---
+
+## `modelContext` API
+
+Module-level imperative API. Works anywhere — event handlers, plain functions, outside React. Entries registered via this API are always root-level nodes (no parent in the tree).
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `modelContext.set(key, content)` | Register or update a named context entry. The `key` is a stable identifier — calling `set` with the same key overwrites the previous value. |
+| `modelContext.remove(key)` | Remove a previously registered entry by key. |
+| `modelContext.clear()` | Remove all entries (both component-based and imperative). |
+
+### Usage
+
+```ts
+import { modelContext } from "mcp-use/react";
+
+function onItemSelect(item: Item) {
+  // The model now knows which item the user selected
+  modelContext.set("selected-item", `User selected: ${item.name} ($${item.price})`);
+}
+
+function onDrawerClose() {
+  modelContext.remove("selected-item");
+}
+```
+
+Use `modelContext.set` from a `useEffect` when you want lifecycle-aware imperative updates:
+
+```tsx
+useEffect(() => {
+  modelContext.set("scroll-position", `User scrolled to item ${visibleIndex}`);
+  return () => modelContext.remove("scroll-position");
+}, [visibleIndex]);
+```
+
+<Note>
+Unlike `<ModelContext>`, entries set via `modelContext.set()` are not automatically cleaned up when a component unmounts. Always call `modelContext.remove(key)` in cleanup logic, or use `<ModelContext>` when you need automatic lifecycle management.
+</Note>
+
+---
+
+## How the tree is serialized
+
+All mounted `<ModelContext>` nodes and `modelContext.set()` entries are collected in a global registry. On every change, the tree is serialized into an indented markdown-like string:
+
+```
+- Root description
+  - Child description
+    - Grandchild description
+  - Another child
+- Standalone imperative entry
+```
+
+This string is sent to the host as:
+- **MCP Apps**: `ui/update-model-context` with `structuredContent.__model_context`
+- **ChatGPT Apps SDK**: `setWidgetState` with `__model_context` merged into the state object
+
+Updates are **batched via `queueMicrotask`**, so rapid mount/unmount cycles within a single render produce a single host notification.
+
+---
+
+## Integration with `useWidget` state
+
+`<ModelContext>` and `setState` from `useWidget` are **independent**. Use them for different purposes:
+
+| API | Purpose |
+|-----|---------|
+| `setState` | Explicit developer-managed state (cart items, form values, filters). The developer decides what to include. |
+| `<ModelContext>` / `modelContext.set()` | Declarative annotations about what the user is *currently seeing*. Set it and forget it — the framework handles the rest. |
+
+The `__model_context` key is automatically filtered from the `state` value returned by `useWidget`, so it never appears in your code.
+
+<Tip>
+Use `<ModelContext>` for UI annotations that mirror your JSX structure (which tab is active, which section is visible). Use `modelContext.set()` for annotations triggered by user actions (item selected, modal opened) that don't map cleanly to a rendered component.
+</Tip>
+
+---
+
+## Full example
+
+```tsx
+import { McpUseProvider, ModelContext, modelContext, useWidget } from "mcp-use/react";
+import { useState } from "react";
+
+const TABS = ["Overview", "Reviews", "Specs"];
+
+export default function ProductWidget() {
+  const { props, isPending } = useWidget<{ name: string; price: number }>();
+  const [tab, setTab] = useState("Overview");
+
+  function onAddToCart() {
+    modelContext.set("cart-action", `User added ${props.name} to cart`);
+    // Clear after a short delay so it doesn't linger
+    setTimeout(() => modelContext.remove("cart-action"), 3000);
+  }
+
+  if (isPending) return <div>Loading...</div>;
+
+  return (
+    <McpUseProvider autoSize>
+      {/* Root annotation */}
+      <ModelContext content={`Viewing product: ${props.name} ($${props.price})`}>
+        {/* Updates when tab changes */}
+        <ModelContext content={`Active tab: ${tab}`} />
+
+        <div>
+          <h1>{props.name}</h1>
+          <p>${props.price}</p>
+
+          <div>
+            {TABS.map((t) => (
+              <button key={t} onClick={() => setTab(t)}>{t}</button>
+            ))}
+          </div>
+
+          <button onClick={onAddToCart}>Add to cart</button>
+        </div>
+      </ModelContext>
+    </McpUseProvider>
+  );
+}
+```
+
+---
+
+## Related
+
+- [`useWidget()`](./usewidget) — Access widget props and state
+- [`<McpUseProvider />`](./mcpuseprovider) — Widget root provider

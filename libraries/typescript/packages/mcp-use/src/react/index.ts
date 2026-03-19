@@ -32,6 +32,9 @@ export type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
+// Export ModelContext component and module-level API
+export { ModelContext, modelContext } from "./model-context.js";
+
 // Export OpenAI Apps SDK widget hooks and types
 export { ErrorBoundary } from "./ErrorBoundary.js";
 export { Image } from "./Image.js";

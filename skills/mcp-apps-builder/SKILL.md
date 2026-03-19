@@ -155,6 +155,9 @@ Load these before diving into tools/resources/widgets sections.
   - When: Building complex widgets with async data, error boundaries, or performance optimizations
   - Covers: Loading states, error handling, memoization, code splitting
 
+- **[model-context.md](references/widgets/model-context.md)**
+  - When: Keeping the AI model aware of what the user is currently seeing (active tab, hovered item, selected product) without requiring tool calls
+  - Covers: `<ModelContext>` component, `modelContext.set/remove` imperative API, nesting, tree serialization, lifecycle rules
 - **[files.md](references/widgets/files.md)**
   - When: Uploading or downloading files from within a widget (ChatGPT Apps SDK only)
   - Covers: `useFiles()` hook, `isSupported` guard, model visibility (`modelVisible`), storing `fileId`, temporary download URLs
@@ -196,6 +199,8 @@ What do you need?
 ├─ Visual/interactive UI
 │  └─> Use Widget: widgets/basics.md
 │
+├─ Keep model aware of what user is seeing in widget
+│  └─> widgets/model-context.md
 ├─ Upload/download files in a widget
 │  └─> widgets/files.md (ChatGPT Apps SDK only)
 │
