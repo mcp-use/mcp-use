@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.22.0-canary.3
+
+### Minor Changes
+
+- 42c93aa: Add `useFiles` React hook with `isSupported` detection and `modelVisible` option for file attachment widgets; add `ModelContext` component and `modelContext` imperative API for injecting model context from the server side.
+
+### Patch Changes
+
+- @mcp-use/cli@2.20.0-canary.3
+- @mcp-use/inspector@0.25.0-canary.3
+
 ## 1.22.0-canary.2
 
 ### Minor Changes
