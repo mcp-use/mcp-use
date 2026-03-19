@@ -501,9 +501,9 @@ export function createElicitMethod(
       .catch((e) => console.debug(`Failed to track elicit context: ${e}`));
 
     // The MCP SDK returns form data in `result.content` (per spec), not `result.data`.
-    // We also check `result.data` for backward compatibility with custom handlers
-    // that may return data in either field.
+    // Fall back to `result.data` for backward compatibility with custom handlers.
     const inputData = result.data ?? result.content;
+
     if (zodSchema && result.action === "accept" && inputData) {
       try {
         const validatedData = zodSchema.parse(inputData);
@@ -518,6 +518,13 @@ export function createElicitMethod(
           err
         );
       }
+    }
+
+    if (!zodSchema && result.action === "accept" && inputData) {
+      return {
+        ...result,
+        data: inputData,
+      };
     }
 
     return result;
