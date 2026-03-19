@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.22.0-canary.4
+
+### Patch Changes
+
+- f2034db: Fix tool name collisions between resources, prompts, and regular tools in LangChainAdapter. The `reserveName` method now checks whether the prefixed fallback name (`resource_<name>` / `prompt_<name>`) is itself already taken, falling back to a numeric suffix when needed. Prompt names are also now sanitized consistently with resource names.
+  - @mcp-use/cli@2.20.0-canary.4
+  - @mcp-use/inspector@0.25.0-canary.4
+
 ## 1.22.0-canary.3
 
 ### Minor Changes

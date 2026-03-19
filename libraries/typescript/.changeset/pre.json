@@ -10,6 +10,7 @@
   "changesets": [
     "add-mcp-middleware",
     "fix-react-sse-retry-conformance",
+    "fix-tool-name-collision-reserve",
     "use-files-and-model-context",
     "vite8-upgrade-and-test-fixes"
   ]
