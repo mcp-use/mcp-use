@@ -1,0 +1,28 @@
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.prompt(
+    name="code-review",
+    description="Review code for best practices and potential issues",
+)
+async def code_review(language: str, code: str) -> str:
+    """Generate a code review prompt."""
+    return (
+        f"Please review the following {language} code for:\n"
+        f"- Bugs and potential issues\n"
+        f"- Best practices and conventions\n"
+        f"- Performance improvements\n\n"
+        f"{code}"
+    )
+
+@router.prompt(
+    name="summarize",
+    description="Summarize content concisely",
+)
+async def summarize(text: str) -> str:
+    """Generate a summarization prompt."""
+    return (
+        f"Please provide a concise summary of the following text:\n\n"
+        f"{text}"
+    )

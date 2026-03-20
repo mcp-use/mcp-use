@@ -64,6 +64,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=8080
+      # Optional: Allow embedding from specific origins
+      - MCP_INSPECTOR_FRAME_ANCESTORS=https://app.example.com https://dev.example.com
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
@@ -83,6 +85,7 @@ All configuration is optional. The inspector works out of the box with sensible 
 | `NODE_ENV` | `production` | Node.js environment |
 | `PORT` | `8080` | Port to run the inspector on |
 | `HOST` | `0.0.0.0` | Host to bind to |
+| `MCP_INSPECTOR_FRAME_ANCESTORS` | `'self'` in production, `*` in dev | Configure which origins can embed inspector widgets in iframes. Use space-separated origins (e.g., `"https://app.example.com https://dev.example.com"`) or `*` for all. |
 
 ## Support
 

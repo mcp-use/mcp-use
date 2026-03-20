@@ -1,16 +1,18 @@
-import { X } from "lucide-react";
 import { cn } from "@/client/lib/utils";
+import { X } from "lucide-react";
 
 interface FullscreenNavbarProps {
   title: string;
   onClose: () => void;
   className?: string;
+  testId?: string;
 }
 
 export function FullscreenNavbar({
   title,
   onClose,
   className,
+  testId,
 }: FullscreenNavbarProps) {
   return (
     <div
@@ -38,6 +40,7 @@ export function FullscreenNavbar({
       {/* Right: Close Button */}
       <div className="flex items-center">
         <button
+          data-testid={testId}
           onClick={onClose}
           className={cn(
             "flex items-center gap-2 px-3 py-1.5 rounded-md",

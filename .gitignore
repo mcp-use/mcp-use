@@ -105,6 +105,7 @@ dmypy.json
 # AI
 .cursor
 .claude
+.agents
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 

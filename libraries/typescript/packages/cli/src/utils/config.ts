@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
 
 export interface McpConfig {
   apiKey?: string;
@@ -18,7 +18,7 @@ const DEFAULT_API_URL = process.env.MCP_API_URL
 // Frontend/Web URL (where /auth/cli page is)
 const DEFAULT_WEB_URL = process.env.MCP_WEB_URL
   ? process.env.MCP_WEB_URL
-  : "https://mcp-use.com";
+  : "https://manufact.com";
 
 /**
  * Ensure config directory exists

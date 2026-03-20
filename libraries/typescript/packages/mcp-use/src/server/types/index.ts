@@ -12,7 +12,7 @@ export {
 } from "./common.js";
 
 // Context types
-export { McpContext } from "./context.js";
+export { ClientCapabilityChecker, McpContext } from "./context.js";
 
 // Tool context types
 export {
@@ -45,6 +45,7 @@ export {
   RawHtmlUIResource,
   RemoteDomUIResource,
   AppsSdkUIResource,
+  McpAppsUIResource,
   WidgetConfig,
   WidgetManifest,
   DiscoverWidgetsOptions,

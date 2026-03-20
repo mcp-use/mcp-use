@@ -1,8 +1,8 @@
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_black.svg">
-    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_black.svg">
+    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
@@ -14,9 +14,9 @@
     <a href="https://www.npmjs.com/package/@mcp-use/cli" alt="NPM Version">
         <img src="https://img.shields.io/npm/v/@mcp-use/cli.svg"/></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
+        <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
     <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
-        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
+        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
@@ -25,11 +25,11 @@
 
 ## 📦 Related Packages
 
-| Package                                                                                           | Description             | Version                                                                                                         |
-| ------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)          | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                                                                                             | Description             | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)          | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
@@ -119,10 +119,10 @@ mcp-use start [options]
 
 ### Cloud Deployment
 
-Deploy your MCP server to mcp-use cloud:
+Deploy your MCP server to production via [manufact.com](https://manufact.com):
 
 ```bash
-# Login to mcp-use cloud
+# Login to Manufact cloud
 mcp-use login
 
 # Check authentication status
@@ -151,8 +151,6 @@ mcp-use deploy
 # Deploy with custom options
 mcp-use deploy --name my-server --port 8000 --open
 ```
-
-See [ENVIRONMENT.md](./ENVIRONMENT.md) for configuration options.
 
 ---
 
@@ -247,37 +245,37 @@ UI widgets are React components that get compiled into standalone HTML pages. Th
 
 ```tsx
 // resources/task-manager.tsx
-import React, { useState, useEffect } from 'react'
-import { useMcp } from 'mcp-use/react'
+import React, { useState, useEffect } from "react";
+import { useMcp } from "mcp-use/react";
 
 export default function TaskManager() {
-  const { callTool, status, error } = useMcp()
-  const [tasks, setTasks] = useState([])
-  const [newTask, setNewTask] = useState('')
+  const { callTool, status, error } = useMcp();
+  const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState("");
 
   useEffect(() => {
-    loadTasks()
-  }, [])
+    loadTasks();
+  }, []);
 
   const loadTasks = async () => {
-    const result = await callTool('list_tasks')
-    setTasks(result.tasks)
-  }
+    const result = await callTool("list_tasks");
+    setTasks(result.tasks);
+  };
 
   const addTask = async () => {
-    if (!newTask.trim()) return
+    if (!newTask.trim()) return;
 
-    await callTool('create_task', {
+    await callTool("create_task", {
       title: newTask,
-      status: 'pending',
-    })
+      status: "pending",
+    });
 
-    setNewTask('')
-    await loadTasks()
-  }
+    setNewTask("");
+    await loadTasks();
+  };
 
-  if (status === 'connecting') return <div>Connecting...</div>
-  if (error) return <div>Error: {error.message}</div>
+  if (status === "connecting") return <div>Connecting...</div>;
+  if (error) return <div>Error: {error.message}</div>;
 
   return (
     <div className="p-4">
@@ -307,7 +305,7 @@ export default function TaskManager() {
         ))}
       </ul>
     </div>
-  )
+  );
 }
 ```
 
@@ -373,7 +371,7 @@ MCP_URL=https://myserver.com mcp-use build
 
 #### Deployment & Cloud
 
-For deploying to mcp-use cloud, see [ENVIRONMENT.md](./ENVIRONMENT.md) for detailed configuration:
+For deploying to Manufact cloud, see the environment variables in this section for detailed configuration:
 
 ```bash
 # Frontend URL (where /auth/cli page is)
@@ -389,7 +387,7 @@ mcp-use login
 mcp-use deploy
 ```
 
-See [ENVIRONMENT.md](./ENVIRONMENT.md) for more examples and configuration options.
+See the [CLI reference docs](https://docs.mcp-use.com/typescript/server/cli-reference#environment-variables) for more examples and configuration options.
 
 ### Docker Deployment
 
@@ -405,21 +403,21 @@ EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
-### Integration with Existing Express Apps
+### Serving Built Widgets
 
-If you have an existing Express app, you can mount the built widgets:
+You can serve the built widgets from any Hono app using `serveStatic`:
 
 ```ts
-import express from 'express'
-import path from 'path'
+import { Hono } from "hono";
+import { serveStatic } from "hono/node-server/serve-static";
 
-const app = express()
+const app = new Hono();
 
 // Serve MCP widgets
 app.use(
-  '/widgets',
-  express.static(path.join(__dirname, '../dist/resources/mcp-use/widgets'))
-)
+  "/widgets/*",
+  serveStatic({ root: "./dist/resources/mcp-use/widgets" })
+);
 
 // Your other routes...
 ```
@@ -465,8 +463,8 @@ mcp-use dev --no-open
 
 - [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
 - [Model Context Protocol](https://modelcontextprotocol.io)
-- [Creating MCP Servers](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use#-mcp-server-framework)
-- [MCP Inspector Guide](https://github.com/mcp-use/mcp-use/tree/main/packages/inspector)
+- [Creating MCP Servers](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use#-mcp-server-framework)
+- [MCP Inspector Guide](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)
 
 ---
 

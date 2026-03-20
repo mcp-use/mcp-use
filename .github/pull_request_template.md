@@ -1,5 +1,13 @@
 # Pull Request Description
 
+## Language / Project Scope
+
+Check all that apply:
+- [ ] TypeScript
+- [ ] Python
+- [ ] Documentation only
+- [ ] CI/CD or tooling
+
 ## Changes
 
 Describe the changes introduced by this PR in a concise manner.
@@ -10,16 +18,61 @@ Describe the changes introduced by this PR in a concise manner.
 2. Include code organization, architectural decisions
 3. Note any dependencies that were added or modified
 
+---
+
+## TypeScript Checklist
+
+> Complete this section if your PR includes TypeScript changes
+
+### Packages Modified
+
+Check all packages that were modified:
+- [ ] `docs`
+- [ ] `tests`
+- [ ] `cli`
+- [ ] `create-mcp-use-app`
+- [ ] `mcp-use` (server)
+- [ ] `mcp-use` (client)
+- [ ] `inspector`
+
+### Pre-commit Checklist
+
+Ensure all of the following have been completed:
+- [ ] Ran `pnpm lint:fix` to auto-fix linting issues
+- [ ] Ran `pnpm format` to format code with Prettier
+- [ ] Ran `pnpm build` and build succeeds without errors
+- [ ] Ran `pnpm changeset` to create a changeset (if this PR includes user-facing changes)
+- [ ] Added or updated tests if needed
+- [ ] Updated documentation in `docs/` folder if needed
+
+---
+
+## Python Checklist
+
+> Complete this section if your PR includes Python changes
+
+### Pre-commit Checklist
+
+Ensure all of the following have been completed:
+- [ ] Code formatted with `ruff format`
+- [ ] Linting passes with `ruff check`
+- [ ] Added or updated tests if needed
+- [ ] Updated documentation if needed
+
+---
+
 ## Example Usage (Before)
 
-```python
+```
 # Include example code showing how things worked before (if applicable)
+# Use the appropriate language syntax (python, typescript, bash, etc.)
 ```
 
 ## Example Usage (After)
 
-```python
+```
 # Include example code showing how things work after your changes
+# Use the appropriate language syntax (python, typescript, bash, etc.)
 ```
 
 ## Documentation Updates
@@ -31,6 +84,7 @@ Describe the changes introduced by this PR in a concise manner.
 
 Describe how you tested these changes:
 - Unit tests added/modified
+- Integration tests added/modified
 - Manual testing performed
 - Edge cases considered
 

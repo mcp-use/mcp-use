@@ -1,15 +1,19 @@
-import { memo, useEffect, useRef } from "react";
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
+import { memo, useCallback, useEffect, useRef } from "react";
+import type { MessageContentBlock } from "mcp-use/react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
+import type { MessageAttachment } from "./types";
+import { detectWidgetProtocol } from "@/client/utils/widget-detection";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string | Array<{ index: number; type: string; text: string }>;
   timestamp: number;
+  attachments?: MessageAttachment[];
   parts?: Array<{
     type: "text" | "tool-invocation";
     text?: string;
@@ -17,7 +21,8 @@ interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "result" | "error";
+      state?: "pending" | "streaming" | "result" | "error";
+      partialArgs?: Record<string, unknown>;
     };
   }>;
   toolCalls?: Array<{
@@ -33,6 +38,12 @@ interface MessageListProps {
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   tools?: any[];
+  sendMessage?: (
+    message: string,
+    attachments?: MessageAttachment[]
+  ) => Promise<void>;
+  /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
+  serverBaseUrl?: string;
 }
 
 export const MessageList = memo(
@@ -42,14 +53,55 @@ export const MessageList = memo(
     serverId,
     readResource,
     tools,
+    sendMessage,
+    serverBaseUrl,
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Helper function to get tool metadata by name
+    // Helper function to get tool metadata by name.
+    // Normalizes hyphens/underscores because the Anthropic API converts
+    // hyphenated tool names to underscores in tool_use responses while
+    // MCP servers register tools with the original (often hyphenated) names.
     const getToolMeta = (toolName: string): Record<string, any> | undefined => {
-      const tool = tools?.find((t) => t.name === toolName);
+      const normalize = (n: string) => n.replace(/-/g, "_");
+      const key = normalize(toolName);
+      const tool = tools?.find((t) => normalize(t.name) === key);
       return tool?._meta;
     };
+
+    // Helper function to check if a tool has widget support
+    const isWidgetTool = (toolName: string): boolean => {
+      const toolMeta = getToolMeta(toolName);
+      const protocol = detectWidgetProtocol(toolMeta, undefined);
+      // mcp-ui requires result to detect, so don't pre-render for those
+      return protocol !== null && protocol !== "mcp-ui";
+    };
+
+    // Convert a ui/message content array to a text string + image attachments,
+    // then forward to sendMessage so the full message reaches the LLM.
+    const handleFollowUp = useCallback(
+      (content: MessageContentBlock[]) => {
+        const text = content
+          .filter(
+            (c): c is { type: "text"; text: string } =>
+              c.type === "text" && "text" in c
+          )
+          .map((c) => c.text)
+          .join("\n");
+        const images: MessageAttachment[] = content
+          .filter(
+            (c): c is { type: "image"; data: string; mimeType: string } =>
+              c.type === "image" && "data" in c && "mimeType" in c
+          )
+          .map((c) => ({
+            type: "image" as const,
+            data: c.data,
+            mimeType: c.mimeType,
+          }));
+        sendMessage?.(text, images.length > 0 ? images : undefined);
+      },
+      [sendMessage]
+    );
 
     // Scroll to bottom when messages change or streaming status changes
     useEffect(() => {
@@ -124,6 +176,7 @@ export const MessageList = memo(
                 key={message.id}
                 content={contentStr}
                 timestamp={message.timestamp}
+                attachments={message.attachments}
               />
             );
           }
@@ -163,20 +216,38 @@ export const MessageList = memo(
                             args={part.toolInvocation.args}
                             result={part.toolInvocation.result}
                             state={
-                              part.toolInvocation.result ? "result" : "call"
+                              part.toolInvocation.state === "error"
+                                ? "error"
+                                : part.toolInvocation.state === "streaming"
+                                  ? "call"
+                                  : part.toolInvocation.state === "pending"
+                                    ? "call"
+                                    : "result"
                             }
+                            partialArgs={part.toolInvocation.partialArgs}
                           />
-                          {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                          {part.toolInvocation.result && (
+                          {/* Render tool result / widget */}
+                          {/* Render immediately for widget tools or streaming tools, even if result is null */}
+                          {(part.toolInvocation.result ||
+                            part.toolInvocation.state === "streaming" ||
+                            isWidgetTool(part.toolInvocation.toolName)) && (
                             <ToolResultRenderer
                               toolName={part.toolInvocation.toolName}
                               toolArgs={part.toolInvocation.args}
-                              result={part.toolInvocation.result}
+                              result={part.toolInvocation.result || null}
                               serverId={serverId}
                               readResource={readResource}
+                              serverBaseUrl={serverBaseUrl}
                               toolMeta={getToolMeta(
                                 part.toolInvocation.toolName
                               )}
+                              onSendFollowUp={handleFollowUp}
+                              partialToolArgs={part.toolInvocation.partialArgs}
+                              cancelled={
+                                part.toolInvocation.state === "error" &&
+                                part.toolInvocation.result ===
+                                  "Cancelled by user"
+                              }
                             />
                           )}
                         </div>
@@ -207,14 +278,18 @@ export const MessageList = memo(
                                 state={toolCall.result ? "result" : "call"}
                               />
                               {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                              {toolCall.result && (
+                              {/* Render immediately for widget tools, even if result is null */}
+                              {(toolCall.result ||
+                                isWidgetTool(toolCall.toolName)) && (
                                 <ToolResultRenderer
                                   toolName={toolCall.toolName}
                                   toolArgs={toolCall.args}
-                                  result={toolCall.result}
+                                  result={toolCall.result || null}
                                   serverId={serverId}
                                   readResource={readResource}
+                                  serverBaseUrl={serverBaseUrl}
                                   toolMeta={getToolMeta(toolCall.toolName)}
+                                  onSendFollowUp={handleFollowUp}
                                 />
                               )}
                             </div>

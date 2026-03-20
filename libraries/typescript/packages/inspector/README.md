@@ -1,8 +1,8 @@
 <div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_white.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_black.svg">
-    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use-ts/main/packages/mcp-use/static/logo_white.svg" width="80%" style="margin: 20px auto;">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_black.svg">
+    <img alt="mcp use logo" src="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg" width="80%" style="margin: 20px auto;">
   </picture>
 </div>
 
@@ -14,9 +14,9 @@
     <a href="https://www.npmjs.com/package/@mcp-use/inspector" alt="NPM Version">
         <img src="https://img.shields.io/npm/v/@mcp-use/inspector.svg"/></a>
     <a href="https://github.com/mcp-use/mcp-use/blob/main/LICENSE" alt="License">
-        <img src="https://img.shields.io/github/license/mcp-use/mcp-use-ts" /></a>
+        <img src="https://img.shields.io/github/license/mcp-use/mcp-use" /></a>
     <a href="https://github.com/mcp-use/mcp-use/stargazers" alt="GitHub stars">
-        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use-ts?style=social" /></a>
+        <img src="https://img.shields.io/github/stars/mcp-use/mcp-use?style=social" /></a>
     <a href="https://discord.gg/XkNkSkMz3V" alt="Discord">
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
@@ -33,7 +33,6 @@
 
 [![mcp-use inspector demo video](https://github.com/user-attachments/assets/4ef1643b-6f28-473e-8e7b-40c0c454d69d)](https://www.youtube.com/watch?v=DvsNSABz1GM)
 
-
 ### 📖 Documentation
 
 For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](https://mcp-use.com/docs/inspector)
@@ -42,34 +41,34 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 
 ## 📦 Related Packages
 
-| Package                                                                                        | Description             | Version                                                                                                         |
-| ---------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/packages/cli)                      | Build tool for MCP apps | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| Package                                                                                                             | Description             | Version                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use)                       | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
+| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli)                      | Build tool for MCP apps | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
+| [create-mcp-use-app](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/create-mcp-use-app) | Create MCP apps         | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
 ## ✨ Key Features
 
-| Feature                    | Description                                                     |
-| -------------------------- | --------------------------------------------------------------- |
-| **🚀 Auto-Mount**          | Automatically available at `/inspector` for all mcp-use servers |
-| **🔌 Multi-Connection**    | Connect to and manage multiple MCP servers simultaneously       |
-| **🎯 Interactive Testing** | Test tools with live execution and real-time results            |
-| **📊 Real-time Status**    | Monitor connection states, errors, and server health            |
-| **🔐 OAuth Support**       | Built-in OAuth flow handling with popup authentication          |
-| **💾 Persistent Sessions** | Connections saved to localStorage and auto-reconnect            |
-| **🎨 Beautiful UI**        | Modern, responsive interface built with React and Tailwind      |
-| **🔍 Tool Explorer**       | Browse and execute all available tools with schema validation   |
-| **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting            |
-| **💬 Prompt Manager**      | Test and manage prompts with argument templates                 |
-| **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                   |
-| **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets             |
+| Feature                    | Description                                                        |
+| -------------------------- | ------------------------------------------------------------------ |
+| **🚀 Auto-Mount**          | Automatically available at `/inspector` for all mcp-use servers    |
+| **🔌 Multi-Connection**    | Connect to and manage multiple MCP servers simultaneously          |
+| **🎯 Interactive Testing** | Test tools with live execution and real-time results               |
+| **📊 Real-time Status**    | Monitor connection states, errors, and server health               |
+| **🔐 OAuth Support**       | Built-in OAuth flow handling with popup authentication             |
+| **💾 Persistent Sessions** | Connections saved to localStorage and auto-reconnect               |
+| **🎨 Beautiful UI**        | Modern, responsive interface built with React and Tailwind         |
+| **🔍 Tool Explorer**       | Browse and execute all available tools with schema validation      |
+| **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting               |
+| **💬 Prompt Manager**      | Test and manage prompts with argument templates                    |
+| **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                      |
+| **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                |
 | **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows |
-| **💾 Saved Tool Calls**    | Save and replay tool executions for repeated testing            |
-| **⌨️ Quick Actions**       | Cmd + K keyboard shortcuts for rapid navigation                 |
-| **🐳 Docker Ready**        | Self-host with a single Docker container for production use     |
+| **💾 Saved Tool Calls**    | Save and replay tool executions for repeated testing               |
+| **⌨️ Quick Actions**       | Cmd + K keyboard shortcuts for rapid navigation                    |
+| **🐳 Docker Ready**        | Self-host with a single Docker container for production use        |
 
 ---
 
@@ -96,16 +95,16 @@ Opens the inspector in your browser at `http://localhost:8080`
 When you create an MCP server with `mcp-use`, the inspector is automatically available at `/inspector`:
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer } from "mcp-use/server";
 
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-})
+  name: "my-server",
+  version: "1.0.0",
+});
 
 // Add your tools, resources, prompts...
 
-server.listen(3000)
+server.listen(3000);
 // 🎉 Inspector automatically available at http://localhost:3000/inspector
 ```
 
@@ -126,7 +125,7 @@ The main dashboard is your central hub for managing MCP server connections:
 To connect to an MCP server:
 
 1. **Open Connect Panel**: Click the Connect panel on the right side of the dashboard
-2. **Configure Transport**: 
+2. **Configure Transport**:
    - Select "Streamable HTTP" for SSE connections
    - Select "WebSocket" for WS connections
    - Configure "stdin/stdio" for local process connections
@@ -135,6 +134,7 @@ To connect to an MCP server:
 5. **Click Connect**: Establish the connection
 
 Example URLs:
+
 - Linear: `https://mcp.linear.app/mcp`
 - Local: `http://localhost:3000/mcp`
 
@@ -152,6 +152,7 @@ For servers requiring OAuth (like Linear):
 ### Connected Servers
 
 Once connected, each server shows:
+
 - Connection status indicator (green = connected)
 - Server name and URL
 - Available tools count
@@ -170,6 +171,7 @@ After clicking **"Inspect"** on a connected server, you'll see four main tabs:
 The Tools tab displays all available tools from the MCP server.
 
 **Features:**
+
 - Browse all available tools with their names and descriptions
 - Select a tool to view its detailed schema
 - Click **"Execute"** to test the tool
@@ -202,6 +204,30 @@ Test and manage pre-configured prompts:
 
 > **Note**: Not all servers provide prompts. If none are available, you'll see "No prompts available".
 
+### Elicitation Tab
+
+The Elicitation tab handles tool requests that require user input during execution.
+
+**Features:**
+
+- View pending elicitation requests in a dedicated queue
+- Fill and submit form-mode responses directly in the inspector
+- Accept, decline, or cancel requests
+- Jump back to tool results after responding
+
+**Supported field types:**
+
+- Text, number/integer, and boolean fields
+- Single-select enum dropdowns:
+  - `type: "string" + enum`
+  - `type: "string" + oneOf[{ const, title }]`
+  - `type: "string" + enum + enumNames` (legacy)
+- Multi-select enum groups:
+  - `type: "array" + items.enum`
+  - `type: "array" + items.anyOf[{ const, title }]`
+
+This aligns with SEP-1330 enum schema variants used by MCP conformance scenarios.
+
 ### Chat Tab
 
 The Chat tab provides an interactive interface to test the MCP server with an LLM using **BYOK (Bring Your Own Key)**.
@@ -228,12 +254,13 @@ The Chat tab provides an interactive interface to test the MCP server with an LL
 
 ## ⌨️ Keyboard Shortcuts
 
-| Shortcut       | Action                     |
-| -------------- | -------------------------- |
+| Shortcut       | Action                      |
+| -------------- | --------------------------- |
 | `Cmd/Ctrl + K` | Quick search and navigation |
-| `Esc`          | Close modals and overlays  |
+| `Esc`          | Close modals and overlays   |
 
 **Quick Search (Cmd/Ctrl + K)** allows you to:
+
 - Quickly connect to a new server
 - Access documentation and tutorials
 - Jump to recently used servers
@@ -286,7 +313,7 @@ docker run -d \
 **Using Docker Compose:**
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   mcp-inspector:
     image: mcpuse/inspector:latest
@@ -307,19 +334,11 @@ services:
 
 All configuration is optional. The inspector works out of the box with sensible defaults.
 
-| Variable    | Default    | Description                  |
-| ----------- | ---------- | ---------------------------- |
-| `NODE_ENV`  | production | Node.js environment          |
-| `PORT`      | 8080       | Port to run the inspector on |
-| `HOST`      | 0.0.0.0    | Host to bind to              |
-
-### Deploy to Railway
-
-Deploy instantly to Railway with automatic HTTPS and custom domains:
-
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template)
-
-For more deployment options and support, visit the [self-hosting documentation](https://mcp-use.com/docs/inspector/self-hosting).
+| Variable   | Default    | Description                  |
+| ---------- | ---------- | ---------------------------- |
+| `NODE_ENV` | production | Node.js environment          |
+| `PORT`     | 8080       | Port to run the inspector on |
+| `HOST`     | 0.0.0.0    | Host to bind to              |
 
 ---
 
@@ -358,7 +377,7 @@ export MCP_USE_ANONYMIZED_TELEMETRY=false
 
 ```javascript
 // In browser console
-localStorage.setItem('mcp_inspector_telemetry_disabled', 'true')
+localStorage.setItem("mcp_inspector_telemetry_disabled", "true");
 ```
 
 **Option 3: Package-level**
@@ -379,12 +398,11 @@ We use:
 - **PostHog**: For product analytics and feature usage tracking
 - **Scarf**: For package download analytics and company insights
 
-Both providers respect your privacy and follow GDPR compliance.
----
+## Both providers respect your privacy and follow GDPR compliance.
 
 ## 🤝 Contributing
 
-We welcome contributions! 
+We welcome contributions!
 
 See our [contributing guide](https://github.com/mcp-use/mcp-use/blob/main/CONTRIBUTING.md) for details.
 

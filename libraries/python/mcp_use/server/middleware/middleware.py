@@ -8,9 +8,14 @@ from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
 
 from mcp.types import (
     CallToolRequestParams,
+    CompleteRequestParams,
     GetPromptRequestParams,
+    InitializeRequestParams,
     PaginatedRequestParams,
     ReadResourceRequestParams,
+    SetLevelRequestParams,
+    SubscribeRequestParams,
+    UnsubscribeRequestParams,
 )
 
 T = TypeVar("T")
@@ -58,9 +63,9 @@ class Middleware:
     ) -> CallNext[Any, Any]:
         handler: CallNext[Any, Any] = call_next
 
-        # Note: "initialize" is not handled here - it occurs at the protocol layer
-        # before middleware is invoked. See ServerSession._received_request in the MCP SDK.
         match context.method:
+            case "initialize":
+                handler = partial(self.on_initialize, call_next=handler)
             case "tools/call":
                 handler = partial(self.on_call_tool, call_next=handler)
             case "resources/read":
@@ -73,11 +78,26 @@ class Middleware:
                 handler = partial(self.on_list_resources, call_next=handler)
             case "prompts/list":
                 handler = partial(self.on_list_prompts, call_next=handler)
+            case "logging/setLevel":
+                handler = partial(self.on_set_logging_level, call_next=handler)
+            case "resources/subscribe":
+                handler = partial(self.on_subscribe_resource, call_next=handler)
+            case "resources/unsubscribe":
+                handler = partial(self.on_unsubscribe_resource, call_next=handler)
+            case "completion/complete":
+                handler = partial(self.on_complete, call_next=handler)
 
         handler = partial(self.on_request, call_next=handler)
         return handler
 
     async def on_request(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
+        return await call_next(context)
+
+    async def on_initialize(
+        self,
+        context: ServerMiddlewareContext[InitializeRequestParams],
+        call_next: CallNext[InitializeRequestParams, Any],
+    ) -> Any:
         return await call_next(context)
 
     async def on_call_tool(
@@ -119,6 +139,34 @@ class Middleware:
         self,
         context: ServerMiddlewareContext[PaginatedRequestParams | None],
         call_next: CallNext[PaginatedRequestParams | None, Any],
+    ) -> Any:
+        return await call_next(context)
+
+    async def on_set_logging_level(
+        self,
+        context: ServerMiddlewareContext[SetLevelRequestParams],
+        call_next: CallNext[SetLevelRequestParams, Any],
+    ) -> Any:
+        return await call_next(context)
+
+    async def on_subscribe_resource(
+        self,
+        context: ServerMiddlewareContext[SubscribeRequestParams],
+        call_next: CallNext[SubscribeRequestParams, Any],
+    ) -> Any:
+        return await call_next(context)
+
+    async def on_unsubscribe_resource(
+        self,
+        context: ServerMiddlewareContext[UnsubscribeRequestParams],
+        call_next: CallNext[UnsubscribeRequestParams, Any],
+    ) -> Any:
+        return await call_next(context)
+
+    async def on_complete(
+        self,
+        context: ServerMiddlewareContext[CompleteRequestParams],
+        call_next: CallNext[CompleteRequestParams, Any],
     ) -> Any:
         return await call_next(context)
 

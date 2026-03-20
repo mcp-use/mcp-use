@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
   generateWidgetContainerHtml,
@@ -9,11 +10,25 @@ import {
   handleChatRequest,
   handleChatRequestStream,
   storeWidgetData,
-} from "./shared-utils-browser.js";
+} from "./shared-utils.js";
 import { formatErrorResponse } from "./utils.js";
 
-// WebSocket proxy for Vite HMR - note: requires WebSocket library
-// For now, this is a placeholder that will be implemented when WebSocket support is added
+/**
+ * Get frame-ancestors policy from environment variable
+ * Format: Space-separated list of origins or '*'
+ * Example: MCP_INSPECTOR_FRAME_ANCESTORS="https://app.example.com http://localhost:3000"
+ */
+function getFrameAncestorsFromEnv(): string | undefined {
+  const envValue = process.env.MCP_INSPECTOR_FRAME_ANCESTORS;
+  if (!envValue) return undefined;
+
+  // Validate format (either '*' or space-separated origins)
+  const trimmed = envValue.trim();
+  if (trimmed === "*") return "*";
+
+  // For origin list, keep as-is (CSP expects space-separated)
+  return trimmed;
+}
 
 /**
  * Register inspector-specific routes (proxy, chat, config, widget rendering)
@@ -34,7 +49,12 @@ export function registerInspectorRoutes(
   // Mount OAuth proxy middleware at the inspector's OAuth path
   mountOAuthProxy(app, {
     basePath: "/inspector/api/oauth",
+    enableLogging: true,
   });
+
+  // Mount MCP Apps routes at /inspector/api/mcp-apps
+  // Note: registerMcpAppsRoutes handles the /inspector/api/mcp-apps prefix internally
+  registerMcpAppsRoutes(app);
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)
   app.post("/inspector/api/chat/stream", async (c) => {
@@ -151,8 +171,24 @@ export function registerInspectorRoutes(
         return c.html(`<html><body>Error: ${result.error}</body></html>`, 404);
       }
 
-      // Set security headers with widget-specific CSP
-      const headers = getWidgetSecurityHeaders(widgetData.widgetCSP);
+      // Derive the MCP server origin from serverId so widget resources
+      // (scripts, images, styles) hosted on the MCP server are allowed by CSP.
+      let serverOrigin: string | undefined;
+      if (widgetData.serverId && /^https?:\/\//.test(widgetData.serverId)) {
+        try {
+          serverOrigin = new URL(
+            widgetData.serverId.replace(/\/mcp$/, "")
+          ).origin.replace("0.0.0.0", "localhost");
+        } catch {
+          /* ignore invalid URLs */
+        }
+      }
+
+      const headers = getWidgetSecurityHeaders(
+        widgetData.widgetCSP,
+        serverOrigin,
+        getFrameAncestorsFromEnv()
+      );
       Object.entries(headers).forEach(([key, value]) => {
         c.header(key, value);
       });
@@ -168,218 +204,6 @@ export function registerInspectorRoutes(
     }
   });
 
-  // Dev widget HTML proxy - fetches from dev server and injects OpenAI wrapper
-  app.get("/inspector/api/dev-widget/:toolId", async (c) => {
-    try {
-      const toolId = c.req.param("toolId");
-      const widgetData = getWidgetData(toolId);
-
-      if (!widgetData?.devWidgetUrl || !widgetData?.devServerBaseUrl) {
-        return c.html(
-          "<html><body>Error: Dev widget data not found or expired</body></html>",
-          404
-        );
-      }
-
-      // Fetch HTML from dev server
-      const response = await fetch(widgetData.devWidgetUrl);
-      if (!response.ok) {
-        const status = response.status as 400 | 404 | 500 | 502 | 503;
-        return c.html(
-          `<html><body>Error: Failed to fetch widget from dev server (${response.status})</body></html>`,
-          status
-        );
-      }
-
-      let html = await response.text();
-
-      // Create a modified widgetData with the fetched HTML as resourceData
-      const modifiedWidgetData = {
-        ...widgetData,
-        resourceData: {
-          contents: [{ text: html }],
-        },
-      };
-
-      // Inject OpenAI wrapper using existing logic
-      const result = generateWidgetContentHtml(modifiedWidgetData);
-
-      if (result.error) {
-        return c.html(`<html><body>Error: ${result.error}</body></html>`, 500);
-      }
-
-      // Use the HTML with injected wrapper for path rewriting
-      html = result.html;
-
-      // Rewrite asset paths to go through proxy
-      const proxyBase = `/inspector/api/dev-widget/${toolId}/assets`;
-
-      // Extract widget name from devWidgetUrl if available
-      const widgetNameMatch = widgetData.devWidgetUrl?.match(
-        /\/mcp-use\/widgets\/([^/?]+)/
-      );
-      const widgetName = widgetNameMatch ? widgetNameMatch[1] : "widget";
-
-      // Replace absolute paths to dev server with proxy paths
-      const escapedBaseUrl = widgetData.devServerBaseUrl.replace(
-        /[.*+?^${}()|[\]\\]/g,
-        "\\$&"
-      );
-      html = html.replace(
-        new RegExp(
-          `(src|href)="(${escapedBaseUrl}/mcp-use/widgets/[^"]+)"`,
-          "g"
-        ),
-        (_match, attr, url) => {
-          // Extract the path after the base URL
-          const path = url.replace(widgetData.devServerBaseUrl, "");
-          return `${attr}="${proxyBase}${path}"`;
-        }
-      );
-
-      // Also handle relative paths that start with /mcp-use/widgets/
-      // In dev mode, load all assets directly from dev server for simplicity
-      // This avoids issues with dynamically loaded assets that bypass HTML rewriting
-      html = html.replace(
-        /(src|href)="(\/mcp-use\/widgets\/[^"]+)"/g,
-        (_match, attr, path) => {
-          // Rewrite to absolute URL pointing to dev server
-          return `${attr}="${widgetData.devServerBaseUrl}${path}"`;
-        }
-      );
-
-      // Handle Vite's asset imports (e.g., import.meta.url, __VITE_ASSET__)
-      // These are typically handled by Vite's dev server, but we rewrite base paths
-      html = html.replace(/(src|href)="\.\/([^"]+)"/g, (match, attr, path) => {
-        // Only rewrite if it's in a script context or if it looks like an asset
-        if (
-          path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i)
-        ) {
-          return `${attr}="${proxyBase}/mcp-use/widgets/${widgetName}/${path}"`;
-        }
-        return match;
-      });
-
-      // Inject base tag and Vite HMR WebSocket configuration
-      if (widgetData.devServerBaseUrl) {
-        const devServerUrl = new URL(widgetData.devServerBaseUrl);
-        const wsProtocol = devServerUrl.protocol === "https:" ? "wss" : "ws";
-        const wsHost = devServerUrl.host; // e.g., "localhost:3004"
-
-        // Point directly to Vite HMR endpoint on the dev server
-        const directWsUrl = `${wsProtocol}://${wsHost}/mcp-use/widgets/`;
-
-        // Inject base tag to make all relative URLs resolve against dev server
-        // This is critical for Vite's dynamic module loading
-        // MUST be injected right after <head> tag, before any scripts
-        const baseTag = `<base href="${widgetData.devServerBaseUrl}/mcp-use/widgets/${widgetName}/">`;
-
-        // Inject CSP violation listener to warn about non-whitelisted resources
-        const cspWarningScript = `
-    <script>
-      // Listen for CSP violations (from Report-Only policy)
-      document.addEventListener('securitypolicyviolation', (e) => {
-        // Only warn about report-only violations (not enforced ones)
-        if (e.disposition === 'report') {
-          console.warn(
-            '%c⚠️ CSP Warning: Resource would be blocked in production',
-            'color: orange; font-weight: bold',
-            '\\n  Blocked URL:', e.blockedURI,
-            '\\n  Directive:', e.violatedDirective,
-            '\\n  Policy:', e.originalPolicy,
-            '\\n\\nℹ️ To fix: Add this domain to your widget\\'s CSP configuration in appsSdkMetadata[\\'openai/widgetCSP\\']'
-          );
-        }
-      });
-    </script>`;
-
-        // Inject configuration script before Vite client loads
-        // This tells Vite where to connect for HMR
-        const viteConfigScript = `
-    <script>
-      // Configure Vite HMR to connect directly to dev server
-      window.__vite_ws_url__ = "${directWsUrl}";
-    </script>`;
-
-        // Insert base tag immediately after <head> (before any scripts)
-        html = html.replace(/<head>/i, `<head>\n    ${baseTag}`);
-
-        // Insert CSP warning and config scripts before the first script tag
-        html = html.replace(
-          /<script/,
-          cspWarningScript + viteConfigScript + "\n    <script"
-        );
-      }
-
-      // Set security headers
-      const headers = getWidgetSecurityHeaders(
-        widgetData.widgetCSP,
-        widgetData.devServerBaseUrl
-      );
-      Object.entries(headers).forEach(([key, value]) => {
-        c.header(key, value);
-      });
-
-      return c.html(html);
-    } catch (error) {
-      console.error("[Dev Widget Proxy] Error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
-    }
-  });
-
-  // Dev widget asset proxy - forwards asset requests to dev server
-  app.get("/inspector/api/dev-widget/:toolId/assets/*", async (c) => {
-    try {
-      const toolId = c.req.param("toolId");
-      const assetPath = c.req.path.replace(
-        `/inspector/api/dev-widget/${toolId}/assets`,
-        ""
-      );
-      const widgetData = getWidgetData(toolId);
-
-      if (!widgetData?.devServerBaseUrl) {
-        return c.notFound();
-      }
-
-      // Construct full URL to dev server asset
-      const devAssetUrl = `${widgetData.devServerBaseUrl}${assetPath}`;
-
-      // Forward request to dev server
-      const response = await fetch(devAssetUrl, {
-        headers: {
-          Accept: c.req.header("Accept") || "*/*",
-        },
-      });
-
-      if (!response.ok) {
-        return c.notFound();
-      }
-
-      // Forward response with appropriate headers
-      const contentType =
-        response.headers.get("Content-Type") || "application/octet-stream";
-      const headers: Record<string, string> = {
-        "Content-Type": contentType,
-      };
-
-      // Forward cache headers if present
-      const cacheControl = response.headers.get("Cache-Control");
-      if (cacheControl) {
-        headers["Cache-Control"] = cacheControl;
-      }
-
-      return new Response(response.body, {
-        status: response.status,
-        headers,
-      });
-    } catch (error) {
-      console.error("[Dev Widget Asset Proxy] Error:", error);
-      return c.notFound();
-    }
-  });
-
   // Inspector config endpoint
   app.get("/inspector/config.json", (c) => {
     return c.json({
@@ -387,8 +211,18 @@ export function registerInspectorRoutes(
     });
   });
 
+  // Helper to check if telemetry is disabled via environment
+  const isTelemetryDisabled = () =>
+    process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false" ||
+    process.env.NODE_ENV === "test";
+
   // Telemetry proxy endpoint - forwards telemetry events to PostHog from server-side
   app.post("/inspector/api/tel/posthog", async (c) => {
+    // Skip telemetry in test environments
+    if (isTelemetryDisabled()) {
+      return c.json({ success: true });
+    }
+
     try {
       const body = await c.req.json();
       const { event, user_id, properties } = body;
@@ -429,6 +263,11 @@ export function registerInspectorRoutes(
 
   // Telemetry proxy endpoint - forwards telemetry events to Scarf from server-side
   app.post("/inspector/api/tel/scarf", async (c) => {
+    // Skip telemetry in test environments
+    if (isTelemetryDisabled()) {
+      return c.json({ success: true });
+    }
+
     try {
       const body = await c.req.json();
 

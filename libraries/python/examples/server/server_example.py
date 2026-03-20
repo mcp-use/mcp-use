@@ -1,43 +1,99 @@
-from datetime import datetime
+"""
+Example mcp-use server.
 
-from mcp.server.fastmcp import Context
-from mcp.types import ToolAnnotations
+Demonstrates the main building blocks of an MCP server:
+
+- **Tools**: Functions that LLMs can invoke. Parameters are typed with
+  ``Annotated[T, Field(description="...")]`` so the description is visible
+  to clients and models.  Supports required, optional (with default), and
+  nullable (``T | None``) parameters.  mcp-use automatically simplifies
+  Pydantic's ``anyOf``/null schema into a flat ``{"type": "T"}`` for
+  better compatibility with MCP clients.
+- **Resources**: Static or dynamic data endpoints identified by URI.
+- **Resource templates**: Parameterized URIs (e.g. ``template://{name}``).
+- **Prompts**: Reusable prompt templates.
+- **Annotations**: ``ToolAnnotations`` hints (readOnly, destructive, idempotent, …)
+  that help clients display and filter tools.
+
+Run with:
+    python server_example.py
+Then open http://localhost:8000/inspector to browse tools, resources, and prompts.
+"""
+
+from datetime import datetime
+from typing import Annotated, Literal
+
+from mcp.types import Icon, ToolAnnotations
+from pydantic import Field
 
 from mcp_use import MCPServer
 
-# 1. Create an mcp-use Server instance
 server = MCPServer(
     name="Example Server",
     version="0.1.0",
-    instructions="This is an example server with a simple echo tool.",
+    instructions="An example server showcasing tool parameter patterns.",
     debug=True,
     pretty_print_jsonrpc=True,
+    icons=[Icon(src="https://cdn.mcp-use.com/mcpuse_logo_circle_light.svg", mime_type="image/png")],
 )
 
 
-def lupo_tool(a: int, b: int) -> str:
-    return str(a) + str(b) + "lupo"
-
-
-# 2. Define a tool using the @server.tool() decorator
+# ---------------------------------------------------------------------------
+# Tool: create_event (demonstrates required, optional, and nullable params)
+# ---------------------------------------------------------------------------
 @server.tool(
-    name="echo",
-    title="Echo",
-    description="Echoes back the message you provide.",
-    annotations=ToolAnnotations(
-        title="Echo",
-        readOnlyHint=False,
-        destructiveHint=False,
-        openWorldHint=False,
-        idempotentHint=False,
-    ),
-    structured_output=True,
+    name="create_event",
+    description="Create a calendar event. Shows required, optional, and nullable parameter patterns.",
+    annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=False),
+    icons=[Icon(src="https://cdn.mcp-use.com/mcpuse_logo_circle_light.svg", mime_type="image/png")],
 )
-async def echo(message: str, context: Context) -> str:
-    """Echoes back the message you provide."""
-    return f"You said: {message}"
+async def create_event(
+    # Required — no default, will be in the "required" array
+    title: Annotated[str, Field(description="Event title")],
+    date: Annotated[str, Field(description="Event date in ISO format (YYYY-MM-DD)")],
+    # Enum via Literal — renders as a dropdown in the Inspector
+    visibility: Annotated[
+        Literal["public", "private", "team"],
+        Field(description="Who can see this event"),
+    ],
+    # Optional with non-None defaults — not required, default shown in schema
+    duration_minutes: Annotated[int, Field(description="Duration in minutes")] = 60,
+    all_day: Annotated[bool, Field(description="Whether this is an all-day event")] = False,
+    timezone: Annotated[str, Field(description="IANA timezone identifier")] = "UTC",
+    # Optional enum with default — dropdown with a pre-selected value
+    recurrence: Annotated[
+        Literal["none", "daily", "weekly", "monthly"],
+        Field(description="Recurrence pattern"),
+    ] = "none",
+    # Nullable — T | None with default None.
+    # mcp-use simplifies these to {"type": "string", "default": null} instead of
+    # Pydantic's {"anyOf": [{"type": "string"}, {"type": "null"}], "default": null}
+    location: Annotated[str | None, Field(description="Event location or meeting URL")] = None,
+    description: Annotated[str | None, Field(description="Detailed event description")] = None,
+    max_attendees: Annotated[int | None, Field(description="Maximum number of attendees")] = None,
+    priority: Annotated[float | None, Field(description="Priority score between 0 and 1")] = None,
+    tags: Annotated[list[str] | None, Field(description="List of tags for categorization")] = None,
+) -> dict:
+    """Create a calendar event and return its details."""
+    return {
+        "title": title,
+        "date": date,
+        "visibility": visibility,
+        "duration_minutes": duration_minutes,
+        "all_day": all_day,
+        "timezone": timezone,
+        "recurrence": recurrence,
+        "location": location,
+        "description": description,
+        "max_attendees": max_attendees,
+        "priority": priority,
+        "tags": tags,
+    }
 
 
+# ---------------------------------------------------------------------------
+# Resource: current time
+# ---------------------------------------------------------------------------
 @server.resource(
     uri="time://current",
     name="current_time",
@@ -49,11 +105,17 @@ async def current_time() -> str:
     return datetime.now().isoformat()
 
 
+# ---------------------------------------------------------------------------
+# Prompt: help
+# ---------------------------------------------------------------------------
 @server.prompt(name="help", title="Help", description="Returns a help message.")
-async def help_prompt(context: Context) -> str:
+async def help_prompt() -> str:
     return "This is a help message."
 
 
+# ---------------------------------------------------------------------------
+# Resource template
+# ---------------------------------------------------------------------------
 @server.resource(
     uri="template://{template_name}",
     name="template_message",
@@ -62,7 +124,6 @@ async def help_prompt(context: Context) -> str:
     mime_type="text/plain",
 )
 async def template_message(template_name: str) -> str:
-    """Returns a template message based on the template name parameter."""
     if template_name == "help":
         return "This is a help message."
     elif template_name == "time":
@@ -71,18 +132,15 @@ async def template_message(template_name: str) -> str:
         return "This is a template message."
 
 
-# 3. Run the server with TUI chat interface
-if __name__ == "__main__":
-    # Example with custom paths (optional)
-    # server = MCPServer(
-    #     name="Example Server",
-    #     version="0.1.0",
-    #     instructions="This is an example server with a simple echo tool.",
-    #     debug=True,  # Enable debug mode (adds dev routes)
-    #     mcp_path="/api/mcp",  # Custom MCP endpoint
-    #     docs_path="/custom-docs",
-    #     inspector_path="/custom-inspector",
-    #     openmcp_path="/custom-openmcp.json"
-    # )
+# ---------------------------------------------------------------------------
+# Tool: echo (used by E2E tests)
+# ---------------------------------------------------------------------------
+@server.tool(name="echo", description="Echoes the provided message back.")
+async def echo(
+    message: Annotated[str, Field(description="Message to echo")],
+) -> str:
+    return f"You said: {message}"
 
-    server.run(transport="streamable-http", port=8000, reload=True)
+
+if __name__ == "__main__":
+    server.run(transport="streamable-http", host="127.0.0.1", port=8000)

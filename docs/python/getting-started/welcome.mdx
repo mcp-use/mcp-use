@@ -1,0 +1,70 @@
+---
+title: "Welcome"
+description: "Full-stack MCP framework for **Python**"
+icon: "heart-handshake"
+---
+
+**mcp-use** is a full-stack MCP framework for Python that provides everything you need to build MCP servers, clients, and agents.
+
+![mcp-use](/images/py_welcome.png)
+
+
+<Callout color='#3178c6' icon={<svg xmlns="http://www.w3.org/2000/svg" className='min-w-[20px] mt-0 flex-shrink-0' viewBox="0 0 128 128"><path fill="#007acc" d="M2 63.91v62.5h125v-125H2zm100.73-5a15.56 15.56 0 017.82 4.5 20.58 20.58 0 013 4c0 .16-5.4 3.81-8.69 5.85-.12.08-.6-.44-1.13-1.23a7.09 7.09 0 00-5.87-3.53c-3.79-.26-6.23 1.73-6.21 5a4.58 4.58 0 00.54 2.34c.83 1.73 2.38 2.76 7.24 4.86 8.95 3.85 12.78 6.39 15.16 10 2.66 4 3.25 10.46 1.45 15.24-2 5.2-6.9 8.73-13.83 9.9a38.32 38.32 0 01-9.52-.1A23.82 23.82 0 0180.4 109a24.48 24.48 0 01-3.36-4.86c-.15-.34.39-.72 5.37-3.84l4.34-2.59.8 1.12a13.41 13.41 0 004.32 4.48 10.35 10.35 0 0011.3-.68 5.29 5.29 0 001.5-5.17c-.68-2-2.35-3.18-7.55-5.32A38.34 38.34 0 0186.57 87a20.3 20.3 0 01-4.43-5.78 22.32 22.32 0 01-1.8-8.24 20.51 20.51 0 012.56-10.43c2.32-3.8 6.39-6.63 11.63-8.1a31.4 31.4 0 0112.2.27zM73.39 67.41v5h-17.8v49.5h-11v-49.5H26.77v-4.85c0-2.69.06-5 .12-5.1s8.45-.1 18.64-.06l18.39.08z"/></svg>}>
+If you are looking for the **TypeScript** docs, they are [here](/typescript/getting-started/welcome).
+</Callout>
+
+## What is MCP?
+
+The Model Context Protocol (MCP) provides a standardized way to connect LLMs to tools and data sources. Think of it as an API specifically designed for LLM interactions.
+
+MCP servers can:
+- **Expose data** through Resources (similar to GET endpoints for loading information into LLM context)
+- **Provide functionality** through Tools (similar to POST endpoints for executing operations)
+- **Define interaction patterns** through Prompts (reusable templates for LLM interactions)
+
+And much more, you can read more about MCP [here](https://modelcontextprotocol.io/).
+
+## Why mcp-use?
+
+### Complete Vertical Stack
+Build everything from AI agents to MCP servers. Create the full MCP ecosystem without needing multiple libraries.
+
+### Production Ready
+Includes streaming, multi-server support, authentication, observability with Langfuse, and built-in security features.
+
+### Python Native
+Clean Pythonic API with full type hints, async/await support, and seamless integration with popular frameworks.
+
+### Developer Experience
+Built-in MCP Inspector for debugging, comprehensive documentation, and easy integration with LangChain, OpenAI, Anthropic, and Google.
+[![Use the online MCP Inspector](/images/UseLiveSmall.svg)](https://inspector.mcp-use.com)
+![MCP Inspector](/images/inspector/inspector-dashboard.jpg)
+
+
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Quickstart" icon="rocket" href="/python/getting-started/quickstart">
+    Get started with MCP servers, clients, and agents in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/python/getting-started/installation">
+    Install mcp-use and set up your development environment
+  </Card>
+  <Card title="MCP Server" icon="server" href="/python/server">
+    Build custom MCP servers with tools, resources, and prompts
+  </Card>
+  <Card title="MCP Client" icon="router" href="/python/client/connection-types">
+    Connect to any MCP server programmatically
+  </Card>
+  <Card title="MCP Agent" icon="brain" href="/python/agent/building-custom-agents">
+    Create AI agents with tool calling capabilities
+  </Card>
+  <Card title="Inspector" icon="bug-play" href="/inspector">
+    Debug and test MCP servers interactively
+  </Card>
+</CardGroup>
+
+<Tip>
+**Need Help?** Join our [Discord](https://discord.gg/XkNkSkMz3V) or check out [GitHub](https://github.com/mcp-use/mcp-use).
+</Tip>

@@ -693,6 +693,38 @@ const client = new MCPClient({
 });
 ```
 
+## Examples
+
+Client examples live in the package under `examples/client/`. Run them from the **package root** (e.g. `libraries/typescript/packages/mcp-use`):
+
+- **Node**: `examples/client/node/` — full-features (tool calls, sampling, elicitation, notifications) and communication examples (sampling, notification).
+- **Browser**: `examples/client/browser/` — full-features and CommonJS (`browser/commonjs/`).
+
+```bash
+# From package root (libraries/typescript/packages/mcp-use)
+pnpm run example:node:full      # Node client with onSampling, onElicitation, onNotification
+pnpm run example:browser:full   # Browser client (same features)
+pnpm run example:client:notification   # Notification client (start notification server first)
+pnpm run example:client:sampling       # Sampling client (start sampling server first)
+pnpm run example:commonjs             # Browser CommonJS build
+pnpm run example:with-conformance      # Starts conformance server, then node + browser full-features
+```
+
+Minimal client setup with root-level callbacks (as in [full-features-example.ts](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/client/node/full-features-example.ts)):
+
+```typescript
+import { acceptWithDefaults, MCPClient } from "mcp-use";
+
+const client = new MCPClient(
+  { mcpServers: { myServer: { url: "http://localhost:3000/mcp" } } },
+  {
+    onElicitation: async (params) => acceptWithDefaults(params),
+    onNotification: (n) => console.log(n.method),
+    // onSampling: see Sampling docs
+  }
+);
+```
+
 ## Next Steps
 
 <CardGroup cols={2}>

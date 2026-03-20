@@ -13,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
-import { Check, ChevronDown, Copy, Plus } from "lucide-react";
 import {
   downloadMcpbFile,
   generateClaudeCodeCommand,
@@ -21,8 +20,11 @@ import {
   generateCursorDeepLink,
   generateGeminiCLICommand,
   generateVSCodeDeepLink,
+  generateVSCodeInsidersDeepLink,
   getEnvVarInstructions,
 } from "@/client/utils/mcpClientUtils";
+import { copyToClipboard } from "@/client/utils/clipboard";
+import { Check, ChevronDown, Copy, Plus } from "lucide-react";
 import { useState } from "react";
 import { VSCodeIcon } from "./ui/client-icons";
 
@@ -42,6 +44,7 @@ interface AddToClientDropdownProps {
   showClients?: {
     cursor?: boolean;
     vsCode?: boolean;
+    vsCodeInsiders?: boolean;
     claudeDesktop?: boolean;
     claudeCode?: boolean;
     geminiCli?: boolean;
@@ -82,6 +85,7 @@ export function AddToClientDropdown({
   showClients = {
     cursor: true,
     vsCode: true,
+    vsCodeInsiders: true,
     claudeDesktop: true,
     claudeCode: true,
     geminiCli: true,
@@ -120,6 +124,17 @@ export function AddToClientDropdown({
     }
   };
 
+  const handleVSCodeInsidersClick = () => {
+    try {
+      const deepLink = generateVSCodeInsidersDeepLink(url, name, headers);
+      window.location.href = deepLink;
+      onSuccess?.("VS Code Insiders");
+    } catch (error) {
+      console.error("Failed to generate VS Code Insiders deep link:", error);
+      onError?.(error as Error);
+    }
+  };
+
   const handleClaudeDesktopClick = () => {
     try {
       downloadMcpbFile(url, name, headers);
@@ -147,7 +162,7 @@ export function AddToClientDropdown({
 
   const handleCopy = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -483,9 +498,21 @@ export function AddToClientDropdown({
               onClick={handleVSCodeClick}
               className="flex items-center gap-2"
             >
-              <VSCodeIcon className="h-4 w-4" />
+              <VSCodeIcon className="h-4 w-4 text-blue-500" />
               <span className="min-w-0 max-w-full whitespace-nowrap">
                 VS Code
+              </span>
+            </DropdownMenuItem>
+          )}
+
+          {showClients.vsCodeInsiders && (
+            <DropdownMenuItem
+              onClick={handleVSCodeInsidersClick}
+              className="flex items-center gap-2"
+            >
+              <VSCodeIcon className="h-4 w-4 text-teal-400" />
+              <span className="min-w-0 max-w-full whitespace-nowrap">
+                VS Code Insiders
               </span>
             </DropdownMenuItem>
           )}

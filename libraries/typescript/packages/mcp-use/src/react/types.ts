@@ -1,4 +1,6 @@
 import type {
+  CompleteRequestParams,
+  CompleteResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequestFormParams,
@@ -10,7 +12,23 @@ import type {
   ResourceTemplate,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { BrowserMCPClient } from "../client/browser.js";
+
+/**
+ * SDK-level reconnection options for streamable HTTP transports.
+ * Controls the retry behavior of the underlying `StreamableHTTPClientTransport`.
+ */
+export type ReconnectionOptions = {
+  /** Maximum delay between reconnection attempts in ms (default: 30000) */
+  maxReconnectionDelay?: number;
+  /** Initial delay before first reconnection attempt in ms (default: 1000) */
+  initialReconnectionDelay?: number;
+  /** Multiplier applied to delay after each failed attempt (default: 1.5) */
+  reconnectionDelayGrowFactor?: number;
+  /** Maximum number of reconnection retries (default: 2) */
+  maxRetries?: number;
+};
 
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
@@ -86,12 +104,60 @@ export type UseMcpOptions = {
    * Custom headers that can be used to bypass auth
    */
   customHeaders?: Record<string, string>;
-  /** Whether to enable verbose debug logging to the console and the log state */
+  /**
+   * @deprecated Use `logLevel` instead. This option will be removed in a future version.
+   * Whether to enable verbose debug logging to the console and the log state.
+   * When `logLevel` is also set, `logLevel` takes precedence.
+   */
   debug?: boolean;
+  /**
+   * Log level for console output. When set, takes precedence over the `debug` option.
+   * Set to 'silent' to suppress ALL console logging (the `mcp.log` state array is still populated).
+   * @default undefined (falls back to 'info' or 'debug' when `debug: true`)
+   */
+  logLevel?:
+    | "silent"
+    | "error"
+    | "warn"
+    | "info"
+    | "http"
+    | "verbose"
+    | "debug"
+    | "silly";
   /** Auto retry connection if initial connection fails, with delay in ms (default: false) */
   autoRetry?: boolean | number;
-  /** Auto reconnect if an established connection is lost, with delay in ms (default: 3000) */
-  autoReconnect?: boolean | number;
+  /**
+   * Auto reconnect if an established connection is lost.
+   *
+   * Can be:
+   * - `boolean`: Enable/disable with default 3000ms delay and 10s health check
+   * - `number`: Reconnect delay in ms (enables health checks with defaults)
+   * - `object`: Full configuration for reconnection and health checks
+   *
+   * @default 3000
+   */
+  autoReconnect?:
+    | boolean
+    | number
+    | {
+        /** Whether to enable automatic reconnection (default: true) */
+        enabled?: boolean;
+        /** Delay in ms before reconnection attempt (default: 3000) */
+        initialDelay?: number;
+        /**
+         * Interval in ms for health check polling via HEAD requests.
+         * Set to `false` to disable health checks entirely.
+         * @default 10000
+         */
+        healthCheckInterval?: number | false;
+        /**
+         * Time in ms without a successful health check before triggering reconnect.
+         * @default 30000
+         */
+        healthCheckTimeout?: number;
+      };
+  /** SDK-level reconnection options for the streamable HTTP transport */
+  reconnectionOptions?: ReconnectionOptions;
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
   /**
@@ -136,6 +202,29 @@ export type UseMcpOptions = {
     features: string,
     window: globalThis.Window | null
   ) => void;
+  /**
+   * Additional client options passed to the underlying MCP SDK Client.
+   * Use this to advertise custom capabilities (e.g., MCP Apps extension).
+   *
+   * @example
+   * ```typescript
+   * useMcp({
+   *   url: '...',
+   *   clientOptions: {
+   *     capabilities: {
+   *       extensions: {
+   *         "io.modelcontextprotocol/ui": {
+   *           mimeTypes: ["text/html;profile=mcp-app"],
+   *         },
+   *       },
+   *     },
+   *   },
+   * })
+   * ```
+   */
+  clientOptions?: {
+    capabilities?: Record<string, unknown>;
+  };
   /** Connection timeout in milliseconds for establishing initial connection (default: 30000 / 30 seconds) */
   timeout?: number;
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
@@ -174,6 +263,12 @@ export type UseMcpOptions = {
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
   /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
+  elicitationCallback?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+  /**
    * Client information sent to the MCP server in the initialize request.
    * If not provided, defaults to mcp-use client info.
    */
@@ -188,6 +283,46 @@ export type UseMcpOptions = {
       sizes?: string[];
     }>;
     websiteUrl?: string;
+  };
+  /**
+   * Optional custom fetch function to use for all MCP HTTP requests.
+   *
+   * When provided, this replaces the default global `fetch` for transport-level
+   * requests. Useful for adding custom auth retry logic, logging, or proxying.
+   *
+   * @example
+   * ```typescript
+   * useMcp({
+   *   url: 'http://localhost:3000/mcp',
+   *   fetch: myCustomFetch,
+   * })
+   * ```
+   */
+  fetch?: typeof globalThis.fetch;
+  /**
+   * Optional external OAuth client provider.
+   *
+   * When provided, useMcp will use this provider directly instead of creating
+   * BrowserOAuthClientProvider internally. This is useful for headless/testing
+   * runtimes where popup/redirect flows are not available.
+   */
+  authProvider?: OAuthClientProvider;
+  /**
+   * Initial server info to use from cache (internal use).
+   * This will be displayed immediately while the actual server info is being fetched.
+   * Once the real server info is available, it will replace this cached value.
+   * @internal
+   */
+  _initialServerInfo?: {
+    name?: string;
+    version?: string;
+    title?: string;
+    websiteUrl?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+    }>;
+    icon?: string;
   };
 };
 
@@ -327,6 +462,13 @@ export type UseMcpResult = {
     }>;
   }>;
   /**
+   * Request completion suggestions for a prompt or resource template argument.
+   * @param params Completion request parameters specifying the ref and argument to complete.
+   * @returns A promise that resolves with completion suggestions from the server.
+   * @throws If the client is not in the 'ready' state or the completion request fails.
+   */
+  complete: (params: CompleteRequestParams) => Promise<CompleteResult>;
+  /**
    * Refresh the tools list from the server.
    * Called automatically when notifications/tools/list_changed is received.
    * Can also be called manually for explicit refresh.
@@ -339,13 +481,18 @@ export type UseMcpResult = {
    */
   refreshResources: () => Promise<void>;
   /**
+   * Refresh the resource templates list from the server.
+   * Can be called manually for explicit refresh.
+   */
+  refreshResourceTemplates: () => Promise<void>;
+  /**
    * Refresh the prompts list from the server.
    * Called automatically when notifications/prompts/list_changed is received.
    * Can also be called manually for explicit refresh.
    */
   refreshPrompts: () => Promise<void>;
   /**
-   * Refresh all lists (tools, resources, prompts) from the server.
+   * Refresh all lists (tools, resources, resource templates, prompts) from the server.
    * Useful after reconnection or for manual refresh.
    */
   refreshAll: () => Promise<void>;

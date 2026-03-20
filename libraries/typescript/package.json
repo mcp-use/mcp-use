@@ -34,26 +34,27 @@
     "version:check": "changeset status",
     "test_app": "pnpm test_app:starter",
     "test_app:starter": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
-    "test_app:apps-sdk": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template apps-sdk && cd test_app && pnpm install && pnpm dev",
-    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev"
+    "test_app:mcp-apps": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-apps && cd test_app && pnpm install && pnpm dev",
+    "test_app:mcp-ui": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev",
+    "test_app:blank": "rm -rf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template blank && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
-    "@types/node": "^25.0.2",
-    "@types/react": "^19.2.7",
+    "@types/node": "^25.0.9",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^8.49.0",
-    "@typescript-eslint/parser": "^8.49.0",
+    "@typescript-eslint/eslint-plugin": "^8.53.1",
+    "@typescript-eslint/parser": "^8.53.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "prettier": "^3.7.4",
+    "prettier": "^3.8.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.49.0"
+    "typescript-eslint": "^8.53.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -61,9 +62,11 @@
       "eslint --fix"
     ]
   },
-  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
+  "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937",
   "pnpm": {
-    "patchedDependencies": {},
+    "patchedDependencies": {
+      "@modelcontextprotocol/sdk": "patches/@modelcontextprotocol__sdk.patch"
+    },
     "overrides": {
       "mcp-use": "workspace:*",
       "@mcp-use/inspector": "workspace:*",
@@ -75,18 +78,37 @@
       "langchain": "^1.2.3",
       "react": "^19.2.0",
       "react-dom": "^19.2.0",
+      "@types/react": "^19.2.7",
+      "@types/react-dom": "^19.2.3",
       "react-router": "^7.12.0",
       "react-router-dom": "^7.12.0",
-      "qs": ">=6.14.1",
+      "qs": ">=6.14.2",
       "preact": ">=10.28.2",
-      "zod": "^4.2.0",
+      "zod": "4.3.5",
       "jsondiffpatch": ">=0.7.2",
-      "esbuild": ">=0.25.0",
+      "esbuild": "0.27.1",
       "vite": "^7.3.0",
       "prismjs": ">=1.30.0",
       "glob": ">=10.5.0",
       "js-yaml": ">=3.14.2 || >=4.1.1",
-      "rollup-plugin-inject": "npm:@rollup/plugin-inject@^5.0.0"
+      "rollup-plugin-inject": "npm:@rollup/plugin-inject@^5.0.0",
+      "flatted": ">=3.4.0",
+      "tar": ">=7.5.11",
+      "hono": ">=4.12.7",
+      "@hono/node-server": ">=1.19.10",
+      "express-rate-limit": ">=8.2.2",
+      "dompurify": ">=3.3.2",
+      "minimatch": ">=10.2.1",
+      "rollup": ">=4.59.0",
+      "@modelcontextprotocol/sdk": ">=1.25.2",
+      "ai": ">=5.0.52",
+      "axios": ">=1.13.5",
+      "body-parser": ">=2.2.1",
+      "brace-expansion": ">=2.0.2",
+      "@isaacs/brace-expansion": ">=5.0.1",
+      "form-data": ">=4.0.4",
+      "lodash": ">=4.17.23",
+      "@eslint/plugin-kit": ">=0.3.4"
     }
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 """Server runner for different transport types."""
 
 import logging
+import socket
 import sys
 from functools import partial
 from typing import TYPE_CHECKING, get_args
@@ -17,9 +18,26 @@ if TYPE_CHECKING:
 
 from starlette.applications import Starlette
 
-from mcp_use.server.utils.signals import setup_signal_handlers
-
 logger = logging.getLogger(__name__)
+
+
+def _is_port_available(host: str, port: int) -> bool:
+    """Check if a port is available for binding."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _find_available_port(host: str, port: int, max_retries: int = 10) -> int:
+    """Find an available port starting from the given port."""
+    for i in range(max_retries):
+        candidate = port + i
+        if _is_port_available(host, candidate):
+            return candidate
+    raise RuntimeError(f"No available port found in range {port}-{port + max_retries - 1}")
 
 
 class ServerRunner:
@@ -36,6 +54,12 @@ class ServerRunner:
         transport: TransportType | None = None,
         reload: bool = False,
     ) -> None:
+        # Find an available port if the requested one is in use
+        original_port = port
+        port = _find_available_port(host, port)
+        if port != original_port:
+            logger.info(f"Port {original_port} is in use, using port {port} instead.")
+
         # Display startup information
         await display_startup_info(self.server, host, port, transport, self.server._start_time)
         config = uvicorn.Config(
@@ -48,12 +72,11 @@ class ServerRunner:
                 debug_level=self.server.debug_level,
                 show_inspector_logs=self.server.show_inspector_logs,
                 inspector_path=self.server.inspector_path or "/inspector",
+                mcp_logs_only=self.server.mcp_logs_only,
             ),
             timeout_graceful_shutdown=0,  # Disable graceful shutdown
         )
         server = uvicorn.Server(config)
-        # Set up signal handlers before starting server
-        setup_signal_handlers()
         await server.serve()
 
     async def run_streamable_http_async(self, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
@@ -72,7 +95,6 @@ class ServerRunner:
         host: str = "127.0.0.1",
         port: int = 8000,
         reload: bool = False,
-        debug: bool = False,
     ) -> None:
         """Run the MCP server.
 
@@ -81,7 +103,6 @@ class ServerRunner:
             host: Host to bind to
             port: Port to bind to
             reload: Whether to enable auto-reload
-            debug: Whether to enable debug mode
         """
 
         if transport not in get_args(TransportType):
@@ -92,9 +113,6 @@ class ServerRunner:
                 case "stdio":
                     anyio.run(self.server.run_stdio_async)
                 case "streamable-http":
-                    if debug and not self.server.debug:
-                        self.server._add_dev_routes()
-                        self.server.app = self.server.streamable_http_app()
                     anyio.run(partial(self.run_streamable_http_async, host=host, port=port, reload=reload))
                 case "sse":
                     logger.warning("SSE transport is not supported anymore. Use streamable-http instead.")

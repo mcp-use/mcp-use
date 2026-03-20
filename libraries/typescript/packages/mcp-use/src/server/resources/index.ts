@@ -16,6 +16,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import { convertToolResultToResourceResult } from "./conversion.js";
+import { toResourceTemplateCompleteCallbacks } from "../utils/completion-helpers.js";
 
 // Export subscription management
 export { ResourceSubscriptionManager } from "./subscriptions.js";
@@ -109,22 +110,36 @@ export function registerResource(
     // Get the HTTP request context from AsyncLocalStorage
     const { getRequestContext, runWithContext } =
       await import("../context-storage.js");
-    const { findSessionContext } =
+    const { findSessionContext, createClientCapabilityChecker } =
       await import("../tools/tool-execution-helpers.js");
 
     const initialRequestContext = getRequestContext();
 
     // Find session context
     const sessions = (this as any).sessions || new Map();
-    const { requestContext } = findSessionContext(
+    const { requestContext, session } = findSessionContext(
       sessions,
       initialRequestContext,
       undefined,
       undefined
     );
 
-    // Create enhanced context (without tool-specific features)
-    const enhancedContext = requestContext || {};
+    // Create enhanced context with client capability checker.
+    // Use direct property assignment (not Object.assign) to ensure the own
+    // property is created even when the Hono Context prototype has a
+    // non-writable or accessor property with the same name.
+    const enhancedContext: any = requestContext
+      ? Object.create(requestContext)
+      : {};
+    Object.defineProperty(enhancedContext, "client", {
+      value: createClientCapabilityChecker(
+        session?.clientCapabilities,
+        session?.clientInfo
+      ),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
 
     // Execute callback with context
     const executeCallback = async () => {
@@ -331,10 +346,24 @@ export function registerResourceTemplate(
           | ResourceTemplateDefinitionWithoutCallback
       ).resourceTemplate.description;
 
+  const resourceCallbacks = isFlatStructure
+    ? (
+        resourceTemplateDefinition as
+          | FlatResourceTemplateDefinition
+          | FlatResourceTemplateDefinitionWithoutCallback
+      ).callbacks
+    : (
+        resourceTemplateDefinition as
+          | ResourceTemplateDefinition
+          | ResourceTemplateDefinitionWithoutCallback
+      ).resourceTemplate.callbacks;
+
+  console.log("resourceCallbacks", resourceCallbacks);
+
   // Create ResourceTemplate instance from SDK
   const template = new ResourceTemplate(uriTemplate, {
+    complete: toResourceTemplateCompleteCallbacks(resourceCallbacks?.complete), // Optional: callback for auto-completion
     list: undefined, // Optional: callback to list all matching resources
-    complete: undefined, // Optional: callback for auto-completion
   });
 
   // Create metadata object with optional fields

@@ -1,5 +1,6 @@
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
+import { Switch } from "@/client/components/ui/switch";
 import { Textarea } from "@/client/components/ui/textarea";
 import {
   Select,
@@ -9,71 +10,55 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { extractEnumValues, resolveToolPropertySchema } from "./schema-utils";
 
 interface ToolInputFormProps {
   selectedTool: Tool;
   toolArgs: Record<string, unknown>;
   onArgChange: (key: string, value: string) => void;
-}
-
-// Helper function to resolve $ref references in JSON schema
-function resolveRef(schema: any, rootSchema: any): any {
-  if (!schema?.$ref) return schema;
-
-  const ref = schema.$ref;
-  if (ref.startsWith("#/")) {
-    const path = ref.substring(2).split("/"); // ["$defs", "Priority"]
-    let current = rootSchema;
-
-    for (const segment of path) {
-      if (current && typeof current === "object" && segment in current) {
-        current = current[segment];
-      } else {
-        console.warn(`Could not resolve $ref: ${ref}`);
-        return schema; // Can't resolve, return original
-      }
-    }
-    return current;
-  }
-  return schema;
-}
-
-// Helper function to normalize anyOf union types (FastMCP pattern)
-function normalizeUnionType(schema: any, rootSchema: any): any {
-  // Handle anyOf patterns (FastMCP uses this for optional fields)
-  if (schema.anyOf && Array.isArray(schema.anyOf)) {
-    // Find the non-null option
-    const nonNullOption = schema.anyOf.find((opt: any) => {
-      if (opt.type === "null") return false;
-      return true; // This could be { type: "string" } or { $ref: "..." }
-    });
-
-    if (nonNullOption) {
-      // If the non-null option is a $ref, resolve it first
-      const resolved = resolveRef(nonNullOption, rootSchema);
-      return { ...resolved, nullable: true };
-    }
-  }
-
-  return schema;
-}
-
-// Helper function to extract enum values from schema
-function extractEnum(schema: any): string[] | null {
-  if (Array.isArray(schema.enum)) {
-    return schema.enum as string[];
-  }
-  return null;
+  onBulkPaste?: (pastedText: string, fieldKey: string) => Promise<boolean>;
+  autoFilledFields?: Set<string>;
+  setFields?: Set<string>;
+  sendEmptyFields?: Set<string>;
+  onToggleEmpty?: (
+    key: string,
+    expectedType: "string" | "object" | "array",
+    pressed: boolean
+  ) => void;
 }
 
 export function ToolInputForm({
   selectedTool,
   toolArgs,
   onArgChange,
+  onBulkPaste,
+  autoFilledFields,
+  setFields,
+  sendEmptyFields,
+  onToggleEmpty,
 }: ToolInputFormProps) {
   const properties = selectedTool?.inputSchema?.properties || {};
   const requiredFields = (selectedTool?.inputSchema as any)?.required || [];
   const hasInputs = Object.keys(properties).length > 0;
+
+  // Handle paste events to detect and auto-fill from pasted objects
+  const handlePaste = async (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    fieldKey: string
+  ) => {
+    if (!onBulkPaste) return;
+
+    const pastedText = e.clipboardData.getData("text");
+
+    // Try to handle as bulk paste
+    const handled = await onBulkPaste(pastedText, fieldKey);
+
+    // If bulk paste was handled, prevent default paste behavior
+    if (handled) {
+      e.preventDefault();
+    }
+    // Otherwise, let the default paste behavior proceed
+  };
 
   if (!hasInputs) {
     return (
@@ -88,14 +73,11 @@ export function ToolInputForm({
       {Object.entries(properties).map(([key, prop]) => {
         const inputSchema = selectedTool?.inputSchema || {};
 
-        // Step 1: Normalize anyOf unions (handles FastMCP optional fields with $ref)
-        let resolvedProp = normalizeUnionType(prop, inputSchema);
-
-        // Step 2: Resolve any remaining $refs at top level
-        resolvedProp = resolveRef(resolvedProp, inputSchema);
-
-        // Step 3: Extract enum values
-        const enumValues = extractEnum(resolvedProp);
+        const resolvedProp = resolveToolPropertySchema(
+          prop,
+          inputSchema as any
+        );
+        const enumValues = extractEnumValues(resolvedProp);
         const isEnum = resolvedProp.type === "string" && enumValues !== null;
 
         // Type checking
@@ -130,21 +112,60 @@ export function ToolInputForm({
         // Use textarea for objects/arrays or complex types
         const isObjectOrArray =
           typedProp.type === "object" || typedProp.type === "array";
+        const effectiveType = isObjectOrArray
+          ? typedProp.type === "array"
+            ? ("array" as const)
+            : ("object" as const)
+          : ("string" as const);
+        const isSet = setFields?.has(key) ?? true;
+        const showSendEmptyToggle =
+          onToggleEmpty && (typedProp.type === "string" || isObjectOrArray);
+
         if (isObjectOrArray) {
           return (
             <div key={key} className="space-y-2">
-              <Label htmlFor={key} className="text-sm font-medium">
-                {key}
-                {typedProp?.required && (
-                  <span className="text-red-500 ml-1">*</span>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor={key} className="text-sm font-medium">
+                  {key}
+                  {typedProp?.required && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
+                </Label>
+                {showSendEmptyToggle && onToggleEmpty && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {effectiveType === "array"
+                        ? "Send empty array explicitly"
+                        : "Send empty object explicitly"}
+                    </span>
+                    <Switch
+                      checked={sendEmptyFields?.has(key) ?? false}
+                      onCheckedChange={(checked) =>
+                        onToggleEmpty(key, effectiveType, checked)
+                      }
+                      aria-label={
+                        effectiveType === "array"
+                          ? "Send empty array"
+                          : "Send empty object"
+                      }
+                      title={
+                        effectiveType === "array"
+                          ? "Send empty array []"
+                          : "Send empty object {}"
+                      }
+                    />
+                  </div>
                 )}
-              </Label>
+              </div>
               <Textarea
                 id={key}
+                data-testid={`tool-param-${key}`}
                 value={stringValue}
                 onChange={(e) => onArgChange(key, e.target.value)}
+                onPaste={(e) => handlePaste(e, key)}
                 placeholder={typedProp?.description || `Enter ${key}`}
-                className="min-h-[100px]"
+                disabled={sendEmptyFields?.has(key) ?? false}
+                className={`min-h-[100px] ${!isSet ? "opacity-70" : ""} ${autoFilledFields?.has(key) ? "animate-pulse ring-2 ring-green-500 dark:ring-green-400" : ""}`}
               />
               {typedProp?.description && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -169,7 +190,11 @@ export function ToolInputForm({
                 value={String(toolArgs[key] || "")}
                 onValueChange={(value) => onArgChange(key, value)}
               >
-                <SelectTrigger id={key} className="w-full">
+                <SelectTrigger
+                  id={key}
+                  className={`w-full ${!isSet ? "opacity-70" : ""}`}
+                  data-testid={`tool-param-${key}`}
+                >
                   <SelectValue
                     placeholder={typedProp.description || "Select an option"}
                   />
@@ -194,17 +219,42 @@ export function ToolInputForm({
 
         return (
           <div key={key} className="space-y-2">
-            <Label htmlFor={key} className="text-sm font-medium">
-              {key}
-              {typedProp?.required && (
-                <span className="text-red-500 ml-1">*</span>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor={key} className="text-sm font-medium">
+                {key}
+                {typedProp?.required && (
+                  <span className="text-red-500 ml-1">*</span>
+                )}
+              </Label>
+              {showSendEmptyToggle && onToggleEmpty && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    Send empty string
+                  </span>
+                  <Switch
+                    checked={sendEmptyFields?.has(key) ?? false}
+                    onCheckedChange={(checked) =>
+                      onToggleEmpty(key, "string", checked)
+                    }
+                    aria-label="Send empty string"
+                    title="Send empty string"
+                  />
+                </div>
               )}
-            </Label>
+            </div>
             <Input
               id={key}
+              data-testid={`tool-param-${key}`}
               value={stringValue}
               onChange={(e) => onArgChange(key, e.target.value)}
+              onPaste={(e) => handlePaste(e, key)}
               placeholder={typedProp?.description || `Enter ${key}`}
+              disabled={sendEmptyFields?.has(key) ?? false}
+              className={`${!isSet ? "opacity-70" : ""} ${
+                autoFilledFields?.has(key)
+                  ? "animate-pulse ring-2 ring-green-500 dark:ring-green-400"
+                  : ""
+              }`}
             />
             {typedProp?.description && (
               <p className="text-xs text-gray-500 dark:text-gray-400">

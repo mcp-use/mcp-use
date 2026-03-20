@@ -3,9 +3,9 @@ import type {
   Resource,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { SavedRequest } from "./tools";
 import { Command } from "cmdk";
 import {
+  BrushCleaning,
   ExternalLink,
   FileText,
   History,
@@ -17,10 +17,8 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import type { SavedRequest } from "./tools";
 
-import { McpUseLogo } from "./McpUseLogo";
-import { ServerIcon } from "./ServerIcon";
-import { VSCodeIcon } from "./ui/client-icons";
 import {
   downloadMcpbFile,
   generateClaudeCodeCommand,
@@ -28,8 +26,13 @@ import {
   generateCursorDeepLink,
   generateGeminiCLICommand,
   generateVSCodeDeepLink,
+  generateVSCodeInsidersDeepLink,
 } from "@/client/utils/mcpClientUtils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { toast } from "sonner";
+import { McpUseLogo } from "./McpUseLogo";
+import { ServerIcon } from "./ServerIcon";
+import { VSCodeIcon } from "./ui/client-icons";
 
 /**
  * Renders a Discord-style SVG icon.
@@ -159,7 +162,7 @@ export function CommandPalette({
               serverName,
               serverHeaders
             );
-            navigator.clipboard.writeText(command);
+            copyToClipboard(command);
             toast.success("Command copied to clipboard");
             onOpenChange(false);
           },
@@ -202,6 +205,27 @@ export function CommandPalette({
           },
         },
         {
+          id: "open-in-vscode-insiders",
+          name: "Open in VS Code Insiders",
+          description: "Add this server to VS Code Insiders",
+          type: "global",
+          category: "Open in Client",
+          action: () => {
+            try {
+              const deepLink = generateVSCodeInsidersDeepLink(
+                serverUrl!,
+                serverName,
+                serverHeaders
+              );
+              window.location.href = deepLink;
+              toast.success("Opening in VS Code Insiders...");
+              onOpenChange(false);
+            } catch (error) {
+              toast.error("Failed to open in VS Code Insiders");
+            }
+          },
+        },
+        {
           id: "open-in-gemini",
           name: "Open in Gemini CLI",
           description: "Add this server to Gemini CLI",
@@ -213,7 +237,7 @@ export function CommandPalette({
               serverName,
               serverHeaders
             );
-            navigator.clipboard.writeText(command);
+            copyToClipboard(command);
             toast.success("Command copied to clipboard");
             onOpenChange(false);
           },
@@ -230,7 +254,7 @@ export function CommandPalette({
               serverName,
               serverHeaders
             );
-            navigator.clipboard.writeText(config);
+            copyToClipboard(config);
             toast.success("Config copied to clipboard");
             onOpenChange(false);
           },
@@ -262,7 +286,7 @@ export function CommandPalette({
       description: "Step-by-step guide to building MCP servers",
       type: "global",
       category: "Documentation",
-      action: () => window.open("https://docs.mcp-use.com", "_blank"),
+      action: () => window.open("https://mcp-use.com/docs", "_blank"),
     },
     {
       id: "mcp-docs",
@@ -283,6 +307,35 @@ export function CommandPalette({
       type: "global",
       category: "Community",
       action: () => window.open("https://discord.gg/XkNkSkMz3V", "_blank"),
+    },
+    {
+      id: "clear-localstorage",
+      name: "Clear localStorage & Reload",
+      description:
+        "Having trouble connecting? Clear stored auth data and refresh",
+      type: "global",
+      category: "Troubleshooting",
+      action: () => {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            (key.startsWith("mcp:auth") || key.startsWith("mcp-inspector"))
+          ) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key));
+        toast.success(
+          `Cleared ${keysToRemove.length} localStorage item(s). Refreshing page...`,
+          { duration: 2000 }
+        );
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+        onOpenChange(false);
+      },
     },
   ];
 
@@ -528,6 +581,13 @@ export function CommandPalette({
             </div>
           );
         }
+        if (category === "Troubleshooting") {
+          return (
+            <div className="bg-yellow-500/20 rounded-full p-2 flex items-center justify-center shrink-0">
+              <BrushCleaning className="h-4 w-4 text-yellow-500" />
+            </div>
+          );
+        }
         if (category === "Connected Servers") {
           // For connected servers, we need to find the actual server object from metadata.serverId
           // Since we don't have access to it here, just show a generic server icon
@@ -572,16 +632,19 @@ export function CommandPalette({
       label="Command Palette"
       className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[51] max-w-[640px] w-[calc(100vw-2rem)] sm:w-full p-2 bg-white dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl overflow-hidden border border-border shadow-[var(--cmdk-shadow)] transition-transform duration-100 ease-out outline-none"
       overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+      data-testid="command-palette-dialog"
     >
       <Command.Input
         placeholder="What do you need?"
         value={search}
         onValueChange={setSearch}
         className="border-none w-full text-[17px] px-4 pt-2 pb-4 outline-none bg-transparent text-foreground border-b border-border mb-0 rounded-none placeholder:text-muted-foreground"
+        data-testid="command-palette-input"
       />
       <Command.List
         ref={listRef}
         className="min-h-[200px] sm:min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out"
+        data-testid="command-palette-list"
       >
         <Command.Empty className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
           No results found.
@@ -589,6 +652,7 @@ export function CommandPalette({
         {commandItems.map((item) => (
           <Command.Item
             key={item.id}
+            data-testid={`command-palette-item-${item.id}`}
             value={`${item.name} ${item.description || ""} ${item.category}`}
             onSelect={() => handleSelect(item)}
             className="[content-visibility:auto] cursor-pointer h-12 rounded-lg text-sm flex items-center gap-3 px-4 text-foreground select-none will-change-[background,color] transition-all duration-150 data-[selected=true]:bg-accent data-[selected=true]:text-foreground data-[disabled=true]:text-muted-foreground/50 data-[disabled=true]:cursor-not-allowed active:bg-accent/80 mt-1 first:mt-0"

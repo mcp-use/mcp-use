@@ -65,11 +65,13 @@ describe("Widget Data Flow", () => {
         {} as any
       );
 
-      // Verify it added widget metadata
-      expect((result as any)._meta).toBeDefined();
-      expect((result as any)._meta["openai/outputTemplate"]).toMatch(
-        /ui:\/\/widget\/test-widget/
-      );
+      // Per SEP-1865: outputTemplate is on tool definition, not on result
+      const toolReg = server.registrations.tools.get("get-weather");
+      const outputTemplate = (toolReg?.config as any)?._meta?.[
+        "openai/outputTemplate"
+      ];
+      expect(outputTemplate).toBeDefined();
+      expect(outputTemplate).toMatch(/ui:\/\/widget\/test-widget/);
     });
   });
 
@@ -135,14 +137,16 @@ describe("Widget Data Flow", () => {
       expect((result.content as any)[0]?.text).toBe(
         "Retrieved 100 rows from users table"
       );
-      // Widget data is available in _meta["mcp-use/props"]
-      expect((result as any)._meta).toBeDefined();
-      expect((result as any)._meta["mcp-use/props"]).toBeDefined();
-      expect((result as any)._meta["mcp-use/props"].rows).toHaveLength(100);
-      expect((result as any)._meta["mcp-use/props"].tableName).toBe("users");
-      expect((result as any)._meta["openai/outputTemplate"]).toMatch(
-        /ui:\/\/widget\/table-widget/
-      );
+      // Per SEP-1865: widget props go in structuredContent, outputTemplate on tool definition
+      expect((result as any).structuredContent).toBeDefined();
+      expect((result as any).structuredContent.rows).toHaveLength(100);
+      expect((result as any).structuredContent.tableName).toBe("users");
+
+      const toolReg = server.registrations.tools.get("get-table-data");
+      const outputTemplate = (toolReg?.config as any)?._meta?.[
+        "openai/outputTemplate"
+      ];
+      expect(outputTemplate).toMatch(/ui:\/\/widget\/table-widget/);
     });
   });
 
@@ -200,7 +204,8 @@ describe("Widget Data Flow", () => {
       expect((result.content as any)[0]?.text).toBe(
         "Found 100 items in electronics"
       );
-      expect((result as any)._meta["mcp-use/props"]).toEqual({
+      // Per SEP-1865: widget props go in structuredContent
+      expect((result as any).structuredContent).toEqual({
         items: [1, 2, 3],
         total: 100,
         category: "electronics",
@@ -268,11 +273,11 @@ describe("Widget Data Flow", () => {
       );
       expect(parsedOutput.count).toBe(50);
 
-      // Verify widget props in metadata
-      expect((result as any)._meta["mcp-use/props"].results).toEqual([
-        "result1",
-        "result2",
-      ]);
+      // When output has structuredContent, it takes precedence over props
+      expect((result as any).structuredContent).toEqual({
+        summary: 'Search for "test query" returned 50 results',
+        count: 50,
+      });
     });
   });
 
@@ -320,14 +325,8 @@ describe("Widget Data Flow", () => {
 
       // Verify response structure
       expect((result.content as any)[0]?.text).toBe("Legacy message format");
-      // structuredContent should contain the data when no output is provided
+      // Per SEP-1865: widget props go in structuredContent
       expect((result as any).structuredContent).toEqual({
-        id: "123",
-        value: "test",
-      });
-
-      // Verify widget props in metadata
-      expect((result as any)._meta["mcp-use/props"]).toEqual({
         id: "123",
         value: "test",
       });
@@ -416,7 +415,7 @@ describe("Widget Data Flow", () => {
       const result = await toolHandler!.handler({ count: 5 }, {} as any);
 
       expect((result.content as any)[0]?.text).toBe("Found 5 items");
-      expect((result as any)._meta["mcp-use/props"].count).toBe(5);
+      expect((result as any).structuredContent.count).toBe(5);
     });
 
     it("should support object() helper as output", async () => {
@@ -454,7 +453,11 @@ describe("Widget Data Flow", () => {
       const parsedOutput = JSON.parse((result.content as any)[0]?.text);
       expect(parsedOutput.summary).toBe("ID: abc123");
       expect(parsedOutput.status).toBe("success");
-      expect((result as any)._meta["mcp-use/props"].fullData.id).toBe("abc123");
+      // When output has structuredContent, it takes precedence over props
+      expect((result as any).structuredContent).toEqual({
+        summary: "ID: abc123",
+        status: "success",
+      });
     });
 
     it("should support function generating output dynamically", async () => {
@@ -492,7 +495,7 @@ describe("Widget Data Flow", () => {
       const result = await toolHandler!.handler({ type: "users" }, {} as any);
 
       expect((result.content as any)[0]?.text).toBe("users: 3 records");
-      expect((result as any)._meta["mcp-use/props"].type).toBe("users");
+      expect((result as any).structuredContent.type).toBe("users");
     });
   });
 });

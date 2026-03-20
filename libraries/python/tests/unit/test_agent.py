@@ -277,3 +277,109 @@ class TestMCPAgentStream:
         assert any(isinstance(m, ToolMessage) and m.content == "4" for m in history), "ToolMessage not persisted"
         assert isinstance(history[-1], AIMessage), "Last message should be AIMessage"
         assert outputs[-1] == "4"
+
+    @pytest.mark.asyncio
+    async def test_stream_handles_block_tool_results_without_losing_history(self):
+        """stream() should tolerate LangChain ToolMessage block content produced by richer tool outputs."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client, max_steps=5, memory_enabled=True)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        agent._agent_executor = executor
+        agent._initialized = True
+
+        tool_blocks = [
+            {"type": "text", "text": "Computed result: 4"},
+            {
+                "type": "file",
+                "source_type": "base64",
+                "data": "ZGF0YQ==",
+                "mime_type": "application/octet-stream",
+            },
+        ]
+
+        async def mock_astream(inputs, stream_mode=None, config=None):
+            yield {
+                "agent": {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[{"name": "add", "args": {"a": 2, "b": 2}, "id": "call_1"}],
+                        )
+                    ]
+                }
+            }
+            yield {"tools": {"messages": [ToolMessage(content=tool_blocks, tool_call_id="call_1")]}}
+            yield {"agent": {"messages": [AIMessage(content=[{"type": "text", "text": "The answer is 4"}])]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
+        outputs = []
+        async for item in agent.stream("Add 2 and 2 using the add tool", manage_connector=False):
+            outputs.append(item)
+
+        history = agent.get_conversation_history()
+
+        assert any(isinstance(item, tuple) and "Computed result: 4" in item[1] for item in outputs), (
+            "Expected streamed tool observation for block-based tool output"
+        )
+        assert outputs[-1] == "The answer is 4"
+        assert any(isinstance(message, ToolMessage) and message.content == tool_blocks for message in history), (
+            "Block-based ToolMessage should be preserved in history"
+        )
+
+
+class TestMCPAgentStreamEvents:
+    """Tests for MCPAgent.stream_events."""
+
+    def _mock_llm(self):
+        llm = MagicMock()
+        llm._llm_type = "test-provider"
+        llm._identifying_params = {"model": "test-model"}
+        llm.with_structured_output = MagicMock(return_value=llm)
+        return llm
+
+    @pytest.mark.asyncio
+    async def test_stream_events_persists_block_tool_results_in_history(self):
+        """stream_events() should preserve ToolMessages whose content is a list of LangChain blocks."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client, max_steps=5, memory_enabled=True)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        agent._agent_executor = executor
+        agent._initialized = True
+
+        tool_message = ToolMessage(
+            content=[
+                {"type": "text", "text": "tool failed, retrying"},
+                {"type": "text", "text": "fallback applied"},
+            ],
+            tool_call_id="call_1",
+        )
+        ai_message = AIMessage(content=[{"type": "text", "text": "Recovered successfully"}])
+
+        async def mock_astream_events(inputs, config=None):
+            yield {"event": "on_tool_end", "data": {"output": tool_message}}
+            yield {"event": "on_chat_model_end", "data": {"output": ai_message}}
+
+        executor.astream_events = MagicMock(side_effect=mock_astream_events)
+
+        events = []
+        async for event in agent.stream_events("Recover from the tool error", manage_connector=False):
+            events.append(event)
+
+        history = agent.get_conversation_history()
+
+        assert len(events) == 2
+        assert any(
+            isinstance(message, ToolMessage) and message.content == tool_message.content for message in history
+        ), "Block-based ToolMessage should be stored by stream_events()"
+        assert any(isinstance(message, AIMessage) and message.content == ai_message.content for message in history), (
+            "Final AI message should be stored by stream_events()"
+        )

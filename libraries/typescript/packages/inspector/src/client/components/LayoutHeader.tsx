@@ -34,6 +34,7 @@ import {
 import type { McpServer } from "mcp-use/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
@@ -153,7 +154,7 @@ export function LayoutHeader({
   onOpenConnectionOptions,
   embedded = false,
 }: LayoutHeaderProps) {
-  const { tunnelUrl } = useInspector();
+  const { tunnelUrl, embeddedConfig } = useInspector();
   const showTunnelBadge = selectedServer && tunnelUrl;
   const [copied, setCopied] = useState(false);
   const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
@@ -161,11 +162,21 @@ export function LayoutHeader({
 
   const [collapsed, setCollapsed] = useState(true);
 
+  // In single-tab mode, hide the entire header
+  if (embeddedConfig.singleTab) {
+    return null;
+  }
+
+  // Filter tabs based on visibleTabs config
+  const filteredTabs = embeddedConfig.visibleTabs
+    ? tabs.filter((t) => embeddedConfig.visibleTabs!.includes(t.id as TabType))
+    : tabs;
+
   const handleCopy = async () => {
     if (!tunnelUrl) return;
 
     try {
-      await navigator.clipboard.writeText(`${tunnelUrl}/mcp`);
+      await copyToClipboard(`${tunnelUrl}/mcp`);
       setCopied(true);
       toast.success("Tunnel URL copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
@@ -329,7 +340,7 @@ export function LayoutHeader({
               onCollapsedChange={setCollapsed}
             >
               <TabsList className="w-full justify-center">
-                {tabs.map((tab) => {
+                {filteredTabs.map((tab) => {
                   const count = getTabCount(tab.id, selectedServer);
                   const showDot = shouldShowDot(tab.id, count, collapsed);
 
@@ -337,6 +348,7 @@ export function LayoutHeader({
                     <TabsTrigger
                       key={tab.id}
                       value={tab.id}
+                      data-testid={`tab-${tab.id}`}
                       icon={tab.icon}
                       showDot={showDot}
                       className={cn(
@@ -390,7 +402,7 @@ export function LayoutHeader({
                 onCollapsedChange={setCollapsed}
               >
                 <TabsList className="overflow-x-auto" collapsible>
-                  {tabs.map((tab) => {
+                  {filteredTabs.map((tab) => {
                     const count = getTabCount(tab.id, selectedServer);
                     const tooltipText =
                       count > 0 ? `${tab.label} (${count})` : tab.label;
@@ -399,6 +411,7 @@ export function LayoutHeader({
                     return (
                       <TabsTrigger
                         value={tab.id}
+                        data-testid={`tab-${tab.id}`}
                         icon={tab.icon}
                         showDot={showDot}
                         className={cn(
@@ -623,6 +636,7 @@ export function LayoutHeader({
                   variant="ghost"
                   className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full px-1 -mx-3 flex gap-1"
                   onClick={onCommandPaletteOpen}
+                  data-testid="command-palette-trigger-button"
                 >
                   <Command className="size-4" />
                   <span className="text-base font-mono hidden sm:inline">

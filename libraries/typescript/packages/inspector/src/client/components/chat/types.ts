@@ -1,8 +1,17 @@
+export interface MessageAttachment {
+  type: "image" | "file";
+  data: string; // base64 encoded
+  mimeType: string;
+  name?: string;
+  size?: number;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string | Array<{ index: number; type: string; text: string }>;
   timestamp: number;
+  attachments?: MessageAttachment[];
   parts?: Array<{
     type: "text" | "tool-invocation";
     text?: string;
@@ -10,7 +19,9 @@ export interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
-      state?: "pending" | "result" | "error";
+      state?: "pending" | "streaming" | "result" | "error";
+      /** Best-effort parsed partial arguments while the LLM is still generating */
+      partialArgs?: Record<string, unknown>;
     };
   }>;
   toolCalls?: Array<{

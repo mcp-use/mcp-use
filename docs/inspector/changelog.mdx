@@ -6,9 +6,634 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.24.5" description="March 2026">
+  ## Dependency Updates
+  Patch release with dependency updates.
+
+- **Fix**: Dependabot security alerts — updated vulnerable dependencies (hono, dompurify, etc.)
+- **Update**: Updated mcp-use to v1.21.5
+</Update>
+
+<Update label="v0.24.4" description="March 2026">
+  ## Dependency Update
+  Patch release with dependency update.
+
+- **Update**: Updated mcp-use to v1.21.4
+</Update>
+
+<Update label="v0.24.3" description="March 2026">
+  ## Sandbox Host Fix
+  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+
+- **Fix**: Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
+- **Update**: Updated mcp-use to v1.21.3
+</Update>
+
+<Update label="v0.24.2" description="March 2026">
+  ## Embedded Inspector Proxy Fix
+  Patch release fixing auto-connect when inspector is served from MCP server (Python, custom servers).
+
+- **Fix**: Skip proxy when inspector origin matches MCP server origin — no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix**: Detect proxy availability via runtime config injection (`__MCP_PROXY_URL__`); disable autoProxyFallback when no proxy is available
+- **Update**: Updated mcp-use to v1.21.2
+</Update>
+
+<Update label="v0.24.1" description="March 2026">
+  ## Chat Components & Dark Mode Fixes
+  Patch release with exported chat component enhancements and proxy header handling.
+
+- **Fix**: Tools selection and attachment button icons invisible in dark mode
+- **Enhancement**: Strip infra headers from proxied requests
+- **New**: Initial messages support for exported chat components (`ChatTab`, `useChatMessages`)
+- **Update**: Updated mcp-use to v1.21.1
+</Update>
+
+<Update label="v0.24.0" description="March 2026">
+  ## Inspector Embedding & MCP Apps
+  Minor release with embedding support and logger improvements.
+
+- **New**: Inspector embedding support — build fix and `InspectorProvider` for embedded usage
+- **New**: MCP Apps support in `clientInfo.capabilities` — inspector advertises `io.modelcontextprotocol/ui`
+- **Enhancement**: Logger middleware filters noisy API endpoints (telemetry, RPC stream/log)
+- **Fix**: `--no-open` flag respected in standalone dev mode (was always opening browser)
+- **Update**: Updated mcp-use to v1.21.0
+</Update>
+
+<Update label="v0.23.1" description="February 2026">
+  ## Dependency Update
+  Patch release with dependency update.
+
+- **Update**: Updated mcp-use to v1.20.5
+</Update>
+
+<Update label="v0.23.0" description="February 2026">
+  ## Embedded Chat Improvements
+  Minor release improving embedded chat experience.
+
+- **Enhancement**: Improved embedded chat
+- **Update**: Updated mcp-use to v1.20.4
+</Update>
+
+<Update label="v0.22.3" description="February 2026">
+  ## Standalone Deployment Fix
+  Patch release fixing version import in standalone deployment.
+
+- **Fix**: Standalone deployment was importing the version from the wrong path
+- **Update**: Updated mcp-use to v1.20.3
+</Update>
+
+<Update label="v0.22.2" description="February 2026">
+  ## Connection & Widget Display Improvements
+  Patch release with useAutoConnect, MCPAppsRenderer, and chat agent fixes.
+
+- **Fix**: useAutoConnect now retains tile visibility on connection failure
+- **Enhancement**: MCPAppsRenderer and OpenAIComponentRenderer — improved border handling and status display; `prefersBorder` default set to false; status labels above widget in inline mode
+- **Enhancement**: ToolResultDisplay z-index for proper sticky layering
+- **Enhancement**: `exposeResourcesAsTools` and `exposePromptsAsTools` options in MCPAgentOptions; inspector chat tab sets both to `false` so agent only exposes actual MCP tools
+- **Update**: Updated mcp-use to v1.20.2
+</Update>
+
+<Update label="v0.22.1" description="February 2026">
+  ## Widget Status Texts & CSP Fixes
+  Patch release with invoking/invoked status display and CSP handling improvements.
+
+- **New**: Display of `invoking` and `invoked` status texts in MCPAppsRenderer, OpenAIComponentRenderer, ToolResultDisplay, ToolResultRenderer
+- **Enhancement**: MCPAppsDebugControls adjusts violation indicators based on CSP mode
+- **Fix**: sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Update**: Updated mcp-use to v1.20.1
+</Update>
+
+<Update label="v0.22.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.22.0&title=Iframe%20Console%20%26%20CSP%20Panel&date=2026-02&lang=inspector" alt="Release 0.22.0" />
+  </Frame>
+  ## Iframe Console & CSP Panel
+  Minor release with Iframe Console enhancements and CSP violation handling.
+
+- **New**: Iframe Console with expandable logs, level filter, search, resizable height
+- **New**: Widget debug context for chat
+- **Enhancement**: MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics)
+- **New**: CDN build
+- **Fix**: useSyncExternalStore first-render handling; reconnect logic; Tools tab sends only explicitly set fields; resource annotations include `_meta`
+- **New**: CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+- **Update**: Updated mcp-use to v1.20.0
+</Update>
+
+<Update label="v0.21.1" description="February 2026">
+  ## Dependency Update
+  Patch release with dependency update.
+
+- **Update**: Updated mcp-use to v1.19.3
+</Update>
+
+<Update label="v0.21.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.21.0&title=Bulk%20Paste%20%26%20Tool%20Definition%20Enhancements&date=2026-02&lang=inspector" alt="Release 0.21.0" />
+  </Frame>
+  ## Bulk Paste & Tool Definition Enhancements
+  Minor release adding bulk paste functionality and enhanced tool definition handling.
+
+- **New**: Bulk paste functionality in ToolsTab - paste JSON or JavaScript object syntax directly
+- **New**: Auto-fill dialog to confirm updates when pasted data would overwrite existing values
+- **Enhancement**: ToolExecutionPanel now copies full tool definition
+- **Enhancement**: Added utility functions for parsing and converting JavaScript object syntax to JSON
+- **Enhancement**: Visual feedback for auto-filled fields in ToolInputForm
+- **Update**: Updated mcp-use to v1.19.2
+</Update>
+
+<Update label="v0.20.1" description="February 2026">
+  ## MCPApps & Widget Improvements
+  Patch release improving widget loading and iframe handling.
+
+- **Enhancement**: Improved MCPAppsRenderer loading logic and widget handling
+- **Enhancement**: Enhanced useWidget for better iframe lifecycle management
+- **Update**: Updated mcp-use to v1.19.1
+</Update>
+
+<Update label="v0.20.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.20.0&title=Chat%20Quick%20Questions%20%26%20Enhanced%20UX&date=2026-02&lang=inspector" alt="Release 0.20.0" />
+  </Frame>
+  ## Chat Quick Questions & Enhanced UX
+  Minor release with chat quick questions and followups, improved loading states, and developer experience enhancements.
+
+### Chat Enhancements
+
+- **New**: Support for `chatQuickQuestions` and `chatFollowups` in ChatTab components
+
+### Loading & Error Handling
+
+- **Enhancement**: MCPAppsRenderer shows loading spinner with `isReady` state management
+- **Enhancement**: Replaced shimmer with Spinner component for better initial widget load UX
+- **Enhancement**: Added skeleton loading state for widgets
+- **Enhancement**: Global error listeners and improved error logging in widget components
+
+### Developer Experience
+
+- **New**: Copy all logs to clipboard feature
+- **Enhancement**: Enhanced theme handling in OpenAIComponentRenderer
+- **Enhancement**: ToolsList displays metadata and icons differentiating MCP/OpenAI tool types
+- **Fix**: Allow permissive CSP frame ancestors by default
+- **Fix**: Correct MIME type for mcp_apps resource counting
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.19.0
+</Update>
+
+<Update label="v0.19.0" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.19.0&title=Tool%20Arguments%20%26%20Streaming%20Input&date=2026-02&lang=inspector" alt="Release 0.19.0" />
+  </Frame>
+  ## Tool Arguments, Streaming Input & Elicitation Enum Support
+  Minor release with tool argument handling, streaming input support, and elicitation enum variants.
+
+- **New**: Tool argument type coercion and schema resolution (boolean, array, object); ToolsTab and ToolInputForm use new schema utilities; validation server tool and E2E tests for typed arguments
+- **New**: Partial tool input handling for streaming arguments in MCPAppsRenderer; MessageList and ToolResultRenderer support streaming states; useChatMessagesClientSide handles streaming tool call arguments; useWidget types for partial/streaming state
+- **New**: Elicitation support for SEP-1330 enum schema variants (single-select, multi-select); client and server handling; Elicitation tab docs and tests
+- **Fix**: Readiness state reset when widget URL changes in OpenAIComponentRenderer; improved tool output and response metadata handling for pending-to-ready transitions
+- **Update**: Updated mcp-use to v1.18.0
+</Update>
+
+<Update label="v0.18.9" description="February 2026">
+  ## Log Noise Reduction
+  Patch release reducing dev server log noise and aligning dependencies.
+
+- **Fix**: Reduced noisy logs in the dev server
+- **Update**: Updated mcp-use to v1.17.4
+</Update>
+
+<Update label="v0.18.8" description="February 2026">
+  ## Widget Readiness & Iframe Global Sync Fixes
+  Patch release focused on widget iframe lifecycle reliability and state update safety.
+
+- **Fix**: Reset widget readiness state when widget URL changes so new iframes re-initialize correctly
+- **Enhancement**: Improved tool output and response metadata transitions from pending to ready states
+- **Enhancement**: Queued iframe global updates until OpenAI globals are available for more reliable widget synchronization
+- **Fix**: Added animation frame cleanup logic to prevent memory leaks during component unmount
+- **Update**: Updated mcp-use to v1.17.3
+</Update>
+
+<Update label="v0.18.7" description="February 2026">
+  ## Chat Conversion & Error Copy Fixes
+  Patch release improving chat message conversion and copy behavior.
+
+- **Fix**: Copy button now copies actual error text instead of `null`
+- **Fix**: Chat message conversion now falls back to `parts` when `content` is empty, with improved attachment handling
+- **Enhancement**: Chat request streaming now uses external history for better context handling and to avoid duplicated messages
+- **Update**: Updated mcp-use to v1.17.2
+</Update>
+
+<Update label="v0.18.6" description="February 2026">
+  ## Dependency Update
+  Patch release aligned with mcp-use dependency updates.
+
+- **Update**: Updated mcp-use to v1.17.1
+</Update>
+
+<Update label="v0.18.5" description="February 2026">
+  ## Iframe Embedding & Reverse Proxy Support
+  Patch release with iframe embedding configuration, reverse proxy improvements, and widget rendering fixes.
+
+- **New**: `MCP_INSPECTOR_FRAME_ANCESTORS` environment variable to control which origins can embed the inspector in iframes via CSP `frame-ancestors`
+- **New**: `mountInspector` accepts `devMode` and `sandboxOrigin` options for deployment flexibility
+- **New**: Runtime config injection (`__MCP_DEV_MODE__`, `__MCP_SANDBOX_ORIGIN__` window globals) without rebuild
+- **Enhancement**: Server-side widget fetches convert external proxy URLs to localhost for correct content retrieval
+- **Enhancement**: Simplified widget asset URL rewriting for improved reverse proxy reliability
+- **Fix**: Infinite re-render loop in `MCPAppsRenderer` caused by excessive `useEffect` dependencies
+- **Update**: Updated mcp-use to v1.17.0
+</Update>
+
+<Update label="v0.18.4" description="February 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.18.4&title=E2E%20Testing%20%26%20Refresh%20Features&date=2026-02&lang=inspector" alt="Release 0.18.4" />
+  </Frame>
+  ## E2E Testing & Refresh Features
+  Patch release with comprehensive E2E testing infrastructure and enhanced UI functionality.
+
+### E2E Testing Infrastructure
+
+- **New**: Comprehensive Playwright-based E2E test suite with full coverage for chat, connections, HMR, widgets, and command palette
+- **New**: GitHub Actions workflow (`.github/workflows/inspector-e2e.yml`) for automated E2E testing across multiple modes
+- **New**: Test fixtures for authentication servers (OAuth mock, API key, custom headers)
+- **New**: Test helpers for connection, authentication, and debugger tools
+- **New**: Test matrix for parameterized test scenarios across multiple inspector modes (mix, prod, builtin)
+- **New**: Widget examples for conformance testing (weather-display, status-card, display-info, apps-sdk-only-card)
+- **Enhancement**: Comprehensive E2E testing documentation in `tests/e2e/README.md`
+
+### Testability Improvements
+
+- **Enhancement**: Added `data-testid` attributes across 40+ UI components for reliable element selection
+- **Enhancement**: Enhanced component accessibility for automated testing including connection forms, server list, command palette, chat interface, tool execution panels, resources/prompts/tools tabs, and elicitation/sampling displays
+
+### UI Enhancements
+
+- **New**: Refresh buttons with loading states for Tools, Resources, and Prompts tabs
+- **New**: `ListTabHeader` component with refresh functionality and spinning icon animation
+- **Enhancement**: Manual refresh capability for primitives without reconnecting to server
+- **Fix**: Inspector now detects when `server=` query parameter contains a URL that's not already connected and automatically redirects to use `autoConnect=` instead
+- **Enhancement**: Added comprehensive URL parameters documentation page to inspector reference
+
+### Widget Improvements
+
+- **Fix**: Widget pending state now correctly emulated to reflect ChatGPT behavior
+- **Enhancement**: MCPAppsRenderer and OpenAIComponentRenderer handle tool output and metadata more effectively
+- **Enhancement**: Immediate rendering of widgets even when results are pending
+- **Enhancement**: MessageList and ToolResultRenderer support immediate rendering of widget tools
+- **Enhancement**: Widget props support in ToolResultDisplay
+
+### Server Improvements
+
+- **Enhancement**: Changed default port from 3001 to 3000 for production builds (dev still uses 3001)
+- **Enhancement**: Skip telemetry (PostHog/Scarf) when `NODE_ENV=test` or `MCP_USE_ANONYMIZED_TELEMETRY=false`
+- **New**: `start-auth-servers.ts` utility for running authentication test servers
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.16.4
+</Update>
+
+<Update label="v0.18.3" description="February 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Update**: Updated mcp-use to v1.16.3
+</Update>
+
+<Update label="v0.18.2" description="January 2026">
+  ## Inspector Fixes
+  Patch release with widget behavior fix and improved URL handling.
+
+- **Fix**: Widget pending state now correctly emulated to reflect ChatGPT behavior
+- **Fix**: Inspector now detects when `server=` query parameter contains a URL that's not already connected and automatically redirects to use `autoConnect=` instead
+- **Update**: Updated mcp-use dependency to v1.16.2
+</Update>
+
+<Update label="v0.18.1" description="January 2026">
+  ## Dependency Update
+  Patch release aligned with mcp-use v1.16.1.
+
+- **Update**: Updated mcp-use dependency to v1.16.1
+</Update>
+
+<Update label="v0.18.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.18.0&title=Chat%20Prompts%20%26%20Multimodal%20Support&date=2026-01&lang=inspector" alt="Release 0.18.0" />
+  </Frame>
+  ## Chat Prompts & Multimodal Support
+  Minor release introducing prompts in chat and multimodal image support for vision-capable LLMs.
+
+### Chat Prompts
+
+- **New**: Prompts in Chat - type / to open a prompt, run it, and include its result in the thread before sending
+- **Note**: Prompts with arguments are not yet supported in this release
+
+### Multimodal Support
+
+- **New**: Image attachment support in Inspector chat
+- **New**: Upload and send images to vision-capable LLMs (GPT-4o, Claude, Gemini) using the paperclip button
+- **Enhancement**: MCP prompts that return images are now properly displayed instead of showing raw JSON
+- **Enhancement**: Full multimodal support for image content in chat interface
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.16.0
+</Update>
+
+<Update label="v0.17.3" description="January 2026">
+  ## Theme URL Parameter Fix
+  Patch release enabling dark mode through URL parameter.
+
+- **Fix**: Enable dark mode through theme URL parameter
+- **Update**: Aligned with mcp-use v1.15.3
+</Update>
+
+<Update label="v0.17.2" description="January 2026">
+  ## HMR File Watcher Fix
+  Patch release fixing file watcher resource exhaustion in containerized environments.
+
+- **Fix**: HMR file watcher exhausting inotify limits by properly ignoring node_modules
+- **Fix**: Prevented ENOSPC errors in containerized environments caused by watching files inside `node_modules/`
+- **Update**: Aligned with mcp-use v1.15.2
+</Update>
+
+<Update label="v0.17.1" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Update**: Updated mcp-use to v1.15.1
+</Update>
+
+<Update label="v0.17.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.17.0&title=MCP%20Apps%20Support%20%26%20Landing%20Pages&date=2026-01&lang=inspector" alt="Release 0.17.0" />
+  </Frame>
+  ## MCP Apps Support & Landing Pages
+  Major release introducing MCP Apps support with dual-protocol widget rendering and enhanced inspector capabilities.
+
+### MCP Apps Support
+
+- **New**: Dual-protocol support enabling widgets to work with both MCP Apps and ChatGPT Apps SDK
+- **New**: `MCPAppsRenderer` component for advanced debugging and visualization
+- **New**: `MCPAppsDebugControls` component for widget debugging
+- **New**: Sandboxed iframe support with console logging and safe area insets for isolated widget rendering
+- **New**: Widget adapters (MCP Apps, Apps SDK) with protocol helpers for seamless cross-protocol compatibility
+
+### Landing Pages
+
+- **New**: HTML landing page support for MCP server endpoints
+- **New**: Connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, and ChatGPT
+- **Enhancement**: Browser host normalization for server connections
+
+### Bug Fixes & Security
+
+- **Fix**: MCP server landing now shows the external URL instead of the internal URL
+- **Fix**: Zod JIT compilation to prevent CSP violations in sandboxed environments
+- **Security**: Fixed vulnerabilities in dependencies
+
+### Dependencies
+
+- **Update**: Updated mcp-use to v1.15.0
+</Update>
+
+<Update label="v0.16.2" description="January 2026">
+  ## UI Enhancements & Connection Handling
+  Patch release with improved UI components, widget security enhancements, and better connection management.
+
+### UI Enhancements
+
+- **Enhancement**: CustomHeadersEditor with improved focus management and title prop support
+- **Enhancement**: Standardized proxy configuration - renamed `customHeaders` to `headers` in InspectorDashboard and ServerConnectionModal for consistency
+
+### Widget Security
+
+- **Enhancement**: Widget security headers with frame domain support
+- **Enhancement**: Added `frame_domains` to widgetCSP interface for iframe embed control
+- **Enhancement**: Updated getWidgetSecurityHeaders to include frame_domains in CSP for OpenAI compatibility
+- **Enhancement**: CSP handling in OpenAIComponentRenderer prioritizes metadata from tool results and resources
+
+### Connection Handling
+
+- **Enhancement**: Improved server connection handling with new handleReconnect function
+- **Enhancement**: UI elements reflect connection states more accurately with better hover effects and error displays
+- **Enhancement**: Enhanced error handling for unauthorized connections with clearer user feedback
+- **Enhancement**: State management for connecting servers in InspectorDashboard
+
+### Dependencies
+
+- **Update**: Aligned with mcp-use v1.14.2 improvements
+</Update>
+
+<Update label="v0.16.1" description="January 2026">
+  ## Tool Output Display Fix
+  Patch release with tool output display improvement.
+
+- **Fix**: Inspector tool output now displays at full height for better content visibility
+- **Update**: Aligned with mcp-use v1.14.1
+</Update>
+
+<Update label="v0.16.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.16.0&title=RPC%20Message%20Management%20%26%20LangChain%20Fixes&date=2026-01&lang=inspector" alt="Release 0.16.0" />
+  </Frame>
+  ## RPC Message Management & LangChain Fixes
+  Release with enhanced RPC message handling and critical bug fixes for Anthropic integration.
+
+### RPC Message Management
+
+- **New**: Copy functionality for RPC messages in Prompts, Resources, and Tools tabs
+- **New**: Reusable `RpcPanel` component for consistent RPC message handling across tabs
+- **New**: Export functionality for RPC messages
+- **Enhancement**: Improved panel management with refactored ResizablePanel components
+
+### Resource Properties Management
+
+- **New**: Custom properties support for resources - dynamically configure resource properties
+- **New**: `PropsSelect` component for intuitive property selection and management
+- **New**: `PropsConfigDialog` with AI-powered property suggestions using Claude
+- **New**: `SchemaFormField` component for rendering JSON schema-based forms
+- **New**: `usePropsLLM` hook leveraging Claude for intelligent property suggestions
+- **New**: `useResourceProps` hook for managing resource props state
+
+### Inspector Improvements
+
+- **Enhancement**: Extracted MCP prompts logic into reusable `useMCPPrompts` hook
+- **Enhancement**: Server metadata display with website URLs and icons
+- **Enhancement**: Better tool management - cleared selected tools when removed from list
+- **Enhancement**: Enhanced `JSONDisplay` with improved line wrapping and font size for better readability
+- **Enhancement**: `ToolExecutionPanel` now includes collapsible description section
+- **Enhancement**: Integrated JSON metadata visualization in tool execution panel
+- **Enhancement**: `McpUIRenderer` and `OpenAIComponentRenderer` support `customProps` parameter
+- **Enhancement**: `ResourceResultDisplay` with dynamic property configuration UI
+- **Enhancement**: Enhanced Prism theme support for better code highlighting
+- **Enhancement**: Updated `useMcp` hook to expose `mcpServerUrl` for resource operations
+
+### Bug Fixes
+
+- **Fix**: Resolved Anthropic `tool_use.id` required error with LangChain 1.3.10 update
+- **Fix**: Proper tool_call ID generation ensuring unique IDs for all tool_use blocks
+- **Fix**: Improved backward compatibility by checking both 'headers' and 'customHeaders'
+
+### Dependencies
+
+- **Update**: `@langchain/anthropic` to 1.3.10
+- **Update**: `@langchain/core` to 1.1.15
+- **Update**: `langchain` to 1.2.10
+- **Update**: `react-resizable-panels` to 4.4.1
+</Update>
+
+<Update label="v0.15.3" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Enhancement**: Updated mcp-use dependency to latest version
+</Update>
+
+<Update label="v0.15.2" description="January 2026">
+  ## OAuth Proxy URL Handling Improvements
+  Patch release with improved OAuth proxy URL handling and connection logic.
+
+- **Enhancement**: Improved OAuth proxy URL derivation from callback URLs
+- **Enhancement**: Better handling of root path callbacks in OAuth flow
+- **Enhancement**: Clearer separation between OAuth proxy URLs and connection URLs
+- **Fix**: Maintains valid OAuth tokens across sessions by not clearing OAuth storage before connecting
+</Update>
+
+<Update label="v0.15.1" description="January 2026">
+  ## URL Validation & LocalStorage Enhancements
+  Patch release with URL validation improvements and localStorage functionality.
+
+- **Enhancement**: Automatically prepends "https://" to URLs without protocol for better user experience
+- **Enhancement**: Improved URL validation logic in InspectorDashboard and ServerConnectionModal
+- **Enhancement**: Added localStorage clearing functionality for MCP-related items to help with troubleshooting
+- **Fix**: Enhanced localStorage checks to verify both existence and functional methods before usage
+- **Fix**: Clear stale OAuth storage before connecting to ensure fresh authentication flow
+</Update>
+
+<Update label="v0.15.0" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.15.0&title=Chat%20Stop%20Functionality&date=2026-01&lang=inspector" alt="Release 0.15.0" />
+  </Frame>
+  ## Chat Stop Functionality
+  Minor release adding the ability to stop ongoing chat responses in the inspector.
+
+### Chat Functionality
+
+- **New**: Stop functionality for chat responses - users can now abort streaming responses
+- **New**: Export stop function from `useChatMessagesClientSide` hook connected to `abortControllerRef`
+- **New**: `abortControllerRef` added to `useChatMessages` hook for proper abort control
+- **Enhancement**: Stop button connected to abort streaming responses for better user control
+
+### UI & Authentication
+
+- **Enhancement**: Simplified authentication button logic in InspectorDashboard
+- **Enhancement**: Updated multi-server example to link directly to authentication URL
+- **Fix**: Updated dependency `hono` to 4.11.4
+</Update>
+
+<Update label="v0.14.6" description="January 2026">
+  ## Dependency Update
+  Patch release with dependency updates.
+
+- **Enhancement**: Updated mcp-use dependency to latest version
+</Update>
+
+<Update label="v0.14.5" description="January 2026">
+  ## OAuth & Metadata Enhancements
+  Minor release with OAuth proxy support, metadata caching, and favicon improvements.
+
+### OAuth & Client Info
+
+- **Enhancement**: Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+- **Enhancement**: Client info support with branding displayed on OAuth consent pages
+- **Enhancement**: Server metadata caching for immediate display on reconnect - improves UX by showing server info instantly
+- **Enhancement**: Improved logging middleware for API routes with better debugging visibility
+- **Enhancement**: Enabled OAuth proxy logging for better flow visibility
+
+### Favicon Detection
+
+- **Enhancement**: Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com → com)
+- **Enhancement**: Detection of default vs custom favicons using JSON API response
+- **Enhancement**: Prefer non-default favicons when available
+
+### Bug Fixes
+
+- **Fix**: Remove import from "mcp-use" which causes langchain import in server
+- **Enhancement**: Enhanced synchronization for tools, prompts, and resources during HMR
+</Update>
+
+<Update label="v0.14.4" description="January 2026">
+  ## Connection Fix
+  Patch release fixing autoconnect configuration parsing.
+
+- **Fix**: Autoconnect now correctly parses config objects in addition to string URLs
+</Update>
+
+<Update label="v0.14.3" description="January 2026">
+  ## Security Fixes & OAuth Improvements
+  Patch release addressing multiple security vulnerabilities and fixing OAuth flow issues.
+
+### Security Fixes
+
+- **Security**: Fixed 13 vulnerabilities (3 moderate, 10 high)
+- **Security**: Updated `langchain` to 1.2.3 (fixes serialization injection vulnerability)
+- **Security**: Updated `@langchain/core` to 1.1.8 (fixes serialization injection vulnerability)
+- **Security**: Updated `react-router` to 7.12.0 (fixes XSS and CSRF vulnerabilities)
+- **Security**: Added overrides for `qs` and `preact` vulnerabilities
+
+### OAuth & Connection Improvements
+
+- **Fix**: Resolved OAuth flow looping issue by removing duplicate fallback logic
+- **Enhancement**: Simplified connection handling with consolidated state management
+- **Enhancement**: Enhanced OAuth authentication flow with improved connection settings
+- **Enhancement**: Improved auto-connect functionality with better proxy handling and error management
+- **Enhancement**: Enhanced theme toggling with dropdown menu for better UX and accessibility
+- **Enhancement**: Updated OAuth flow management in browser provider and callback handling
+</Update>
+
+<Update label="v0.14.2" description="January 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=0.14.2&title=Automatic%20Proxy%20Fallback%20%26%20Reconnect&date=2026-01&lang=inspector" alt="Release 0.14.2" />
+  </Frame>
+  ## Automatic Proxy Fallback & Reconnect
+  Minor release with automatic proxy fallback, OAuth proxy support, and reconnect functionality.
+
+### Breaking Changes (with Deprecation Warnings)
+
+- **Breaking**: Renamed `customHeaders` to `headers` across all APIs. Old name still works but shows deprecation warnings.
+- **Breaking**: Renamed `samplingCallback` to `onSampling` for consistency. Old name still works but shows deprecation warnings.
+
+### New Features
+
+- **New**: Reconnect functionality for failed connections - reconnect button in InspectorDashboard UI
+- **New**: Reconnect option in dropdown menu for failed connections
+- **New**: Configurable clientInfo support for MCP connection initialization with full metadata
+- **New**: Automatic Proxy Fallback - automatically retries failed connections through proxy
+- **New**: OAuth Proxy Support with oauthProxyUrl configuration
+
+### Improvements
+
+- **Enhancement**: Better detection of OAuth discovery failures, CORS errors, and connection issues
+- **Enhancement**: OAuth provider uses original target URL for discovery, not proxy URL
+- **Enhancement**: HttpConnector automatic reconnection disabled, shifting responsibility to higher-level logic for better control
+
+### Bug Fixes
+
+- **Fix**: Custom headers now correctly included when copying connection configuration from saved tiles
+- **Fix**: Headers correctly read from localStorage where stored in proxyConfig.customHeaders
+</Update>
+
+<Update label="v0.14.1" description="January 2026">
+  ## Security Update
+  Patch release with security fixes and build improvements.
+
+- **Security**: Updated `@modelcontextprotocol/sdk` to 1.25.2 (fixes ReDoS vulnerability in UriTemplate regex patterns)
+- **Fix**: Updated building script to correctly export types for inspector/client components
+</Update>
+
 <Update label="v0.14.0" description="January 2026">
   ## Multi-Server Support & Browser Compatibility
-  Major release with multi-server management, improved UI responsiveness, and enhanced browser compatibility.
+  Release with multi-server management, improved UI responsiveness, and enhanced browser compatibility.
 
 ### Breaking Changes
 
@@ -59,7 +684,7 @@ tag: "New"
 
 <Update label="v0.13.0" description="December 2025">
   ## Session Management & Architecture Improvements
-  Major release aligned with mcp-use v1.11.0, featuring session management architecture and improved inspector capabilities.
+  Release aligned with mcp-use v1.11.0, featuring session management architecture and improved inspector capabilities.
 
 ### Breaking Changes
 
@@ -119,7 +744,7 @@ tag: "New"
 
 <Update label="v0.12.0" description="December 2025">
   ## Elicitation Support & API Improvements
-  Major release aligned with mcp-use v1.10.0, featuring elicitation support and enhanced inspector capabilities.
+  Release aligned with mcp-use v1.10.0, featuring elicitation support and enhanced inspector capabilities.
 
 ### Breaking Changes
 
@@ -174,7 +799,7 @@ tag: "New"
 
 <Update label="v0.9.0" description="November 2025">
   ## OAuth Authentication System
-  Major release with complete OAuth 2.0 support and enhanced inspector capabilities.
+  Release with complete OAuth 2.0 support and enhanced inspector capabilities.
 
 ### New Features
 
@@ -226,7 +851,7 @@ tag: "New"
 
 <Update label="v0.8.0" description="October 2025">
   ## Notifications, Sampling & OpenAI Apps SDK Integration
-  Major release with bidirectional notifications, LLM sampling, and comprehensive OpenAI Apps SDK support.
+  Release with bidirectional notifications, LLM sampling, and comprehensive OpenAI Apps SDK support.
 
 ### New Features
 

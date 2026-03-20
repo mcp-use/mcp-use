@@ -171,10 +171,10 @@ server.tool({
 
 ## Returning Widgets from Tools
 
-Tools can return interactive UI widgets using the `widget()` helper with the `widget` config option. This automatically configures the tool to render widgets in the Inspector and ChatGPT.
+This is the recommended way to expose widgets to a model. Since `exposeAsTool` defaults to `false`, widgets are registered as MCP resources only — defining a custom tool that calls `widget()` gives you full control over the tool's name, description, schema, and business logic.
 
 <Note>
-You must include the `widget: { name, ... }` config in your tool definition when returning widgets. This sets up all the registration-time metadata needed for proper widget rendering.
+You must include the `widget: { name, ... }` config in your tool definition when returning widgets. This sets up all the registration-time metadata needed for proper widget rendering. The widget file must exist in your `resources/` folder, but does **not** need `exposeAsTool: true` — leaving it unset (or `false`) is the correct setup for this pattern.
 </Note>
 
 ```typescript
@@ -221,7 +221,7 @@ See [UI Widgets](./ui-widgets) for complete widget creation and registration doc
 For ChatGPT and OpenAI compatible clients:
 
 <Tip>
-**Recommended Approach**: The recommended way to create OpenAI Apps SDK widgets is to use the [widget helper with returnsWidget option](./ui-widgets#custom-tools-with-widgets) or [automatic widget mounting](./ui-widgets#automatic-widget-registration), which automatically registers widgets from the `resources/` folder as tools. The manual approach below is shown for reference.
+**Recommended Approach**: The recommended way to expose widgets to a model is to use the [widget helper in a custom tool](./ui-widgets#custom-tools-with-widgets) as shown above. Alternatively, you can set `exposeAsTool: true` in your widget's metadata to [auto-register it as a tool](./ui-widgets#automatic-widget-registration). The manual approach below is shown for reference.
 </Tip>
 
 ```typescript
@@ -326,6 +326,82 @@ server.tool({
 ```
 
 </CodeGroup>
+
+## Client Identity & Caller Context
+
+Every tool handler receives `ctx.client`, which exposes both session-level client information and per-invocation caller context.
+
+### Session-level client info
+
+These values come from the MCP `initialize` handshake and remain stable for the lifetime of the connection:
+
+```typescript
+server.tool({ name: 'check-client', schema: z.object({}) }, async (_p, ctx) => {
+  const { name, version } = ctx.client.info();      // "ChatGPT", "1.0.0"
+  const hasSampling = ctx.client.can('sampling');    // true / false
+  const isAppsClient = ctx.client.supportsApps();    // MCP Apps / ChatGPT
+  const uiExt = ctx.client.extension('io.modelcontextprotocol/ui');
+  return text(`${name} ${version}, apps: ${isAppsClient}`);
+});
+```
+
+### Per-invocation caller context — `ctx.client.user()`
+
+`ctx.client.user()` returns normalized metadata from `params._meta` that some clients send with every `tools/call` request. It returns `undefined` for clients that do not include this metadata (Inspector, Claude Desktop, CLI, etc.).
+
+<Warning>
+This data is **client-reported and unverified**. Do not use it for access control. For verified identity, configure [OAuth authentication](./authentication) and use `ctx.auth`.
+</Warning>
+
+```typescript
+server.tool({ name: 'personalise', schema: z.object({}) }, async (_p, ctx) => {
+  const caller = ctx.client.user();
+
+  if (!caller) {
+    return text("Hello! (no caller context available)");
+  }
+
+  const city = caller.location?.city ?? "there";
+  const greeting = caller.locale?.startsWith("it") ? "Ciao" : "Hello";
+  return text(`${greeting} from ${city}!`);
+});
+```
+
+**Available fields on `UserContext`:**
+
+| Field | Type | Description |
+|---|---|---|
+| `subject` | `string` | Stable opaque user identifier (same across conversations) |
+| `conversationId` | `string` | Current chat thread ID (changes per chat) |
+| `locale` | `string` | BCP-47 locale, e.g. `"it-IT"` — server-side, set at session start (see note below) |
+| `location` | `object` | `{ city, region, country, timezone, latitude, longitude }` |
+| `userAgent` | `string` | Browser / host user-agent string |
+| `timezoneOffsetMinutes` | `number` | UTC offset in minutes |
+
+<Note>
+**`locale` vs `useWidget().locale`**: `ctx.client.user()?.locale` is detected server-side from the user's ChatGPT account language at session start. Inside a widget, `useWidget().locale` is the preferred alternative — it reads the same preference client-side (from `window.openai.locale` for the Apps SDK, or `HostContext.locale` for SEP-1865 hosts) and is therefore fresher and browser-aware. The values are usually the same but can differ when the account language differs from the browser language.
+</Note>
+
+### ChatGPT multi-tenant model
+
+ChatGPT establishes a **single MCP session for all users** of a deployed app. The MCP session ID alone is not enough to identify individual callers — use `ctx.client.user()` for that:
+
+```
+1 MCP session  ctx.session.sessionId              — shared across ALL users
+  N subjects   ctx.client.user()?.subject         — one per ChatGPT user account
+    M threads  ctx.client.user()?.conversationId  — one per chat conversation
+```
+
+```typescript
+server.tool({ name: 'identify-caller', schema: z.object({}) }, async (_p, ctx) => {
+  const caller = ctx.client.user();
+  return object({
+    mcpSession:     ctx.session.sessionId,          // shared transport session
+    user:           caller?.subject ?? null,         // ChatGPT user ID
+    conversation:   caller?.conversationId ?? null,  // this chat thread
+  });
+});
+```
 
 ## Logging from Tools
 

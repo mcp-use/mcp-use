@@ -1,14 +1,10 @@
-import { Buffer } from "node:buffer";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 /**
- * Shared utilities for MCP Inspector server functionality
+ * Browser-compatible utilities for MCP Inspector chat functionality
+ * Works in both Node.js and browser environments without Node.js-specific APIs
  */
 
 interface LLMConfig {
-  provider: "openai" | "anthropic";
+  provider: "openai" | "anthropic" | "google";
   model: string;
   apiKey: string;
   temperature?: number;
@@ -32,9 +28,18 @@ interface AuthConfig {
   [key: string]: unknown;
 }
 
+interface MessageAttachment {
+  type: "image" | "file";
+  data: string; // base64 encoded
+  mimeType: string;
+  name?: string;
+  size?: number;
+}
+
 interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
+  attachments?: MessageAttachment[];
 }
 
 interface ToolCall {
@@ -44,13 +49,28 @@ interface ToolCall {
 }
 
 // Type for LangChain LLM models - using any for flexibility with dynamic imports
-
 type BaseLLM = any;
 
 interface ServerConfig {
   url: string;
   headers?: Record<string, string>;
   [key: string]: unknown;
+}
+
+/**
+ * Cross-platform base64 encoding utility
+ */
+function toBase64(str: string): string {
+  // Check if we're in a browser environment
+  if (typeof window !== "undefined" && typeof window.btoa === "function") {
+    return window.btoa(str);
+  }
+  // Node.js environment
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(str).toString("base64");
+  }
+  // Fallback - shouldn't reach here in practice
+  throw new Error("No base64 encoding method available");
 }
 
 /**
@@ -71,6 +91,9 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Dynamically import mcp-use and LLM providers
+  // Note: MCPClient supports multiple servers via client.addServer(name, config)
+  // Import from main entry (not browser) since this runs server-side.
+  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
   const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
@@ -101,13 +124,14 @@ export async function* handleChatRequestStream(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
-    preventAutoAuth: true, // Prevent auto OAuth popup in server-side context
+    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
   };
 
   // Handle authentication - support both custom auth and OAuth
@@ -119,9 +143,7 @@ export async function* handleChatRequestStream(requestBody: {
       authConfig.username &&
       authConfig.password
     ) {
-      const auth = Buffer.from(
-        `${authConfig.username}:${authConfig.password}`
-      ).toString("base64");
+      const auth = toBase64(`${authConfig.username}:${authConfig.password}`);
       serverConfig.headers.Authorization = `Basic ${auth}`;
     } else if (authConfig.type === "bearer" && authConfig.token) {
       serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
@@ -145,9 +167,7 @@ export async function* handleChatRequestStream(requestBody: {
       url.password &&
       (!authConfig || authConfig.type === "none")
     ) {
-      const auth = Buffer.from(`${url.username}:${url.password}`).toString(
-        "base64"
-      );
+      const auth = toBase64(`${url.username}:${url.password}`);
       serverConfig.headers = serverConfig.headers || {};
       serverConfig.headers.Authorization = `Basic ${auth}`;
       serverConfig.url = `${url.protocol}//${url.host}${url.pathname}${url.search}`;
@@ -163,18 +183,80 @@ export async function* handleChatRequestStream(requestBody: {
     llm,
     client,
     maxSteps: 10,
-    memoryEnabled: true,
+    memoryEnabled: false, // Use externalHistory instead
+    exposeResourcesAsTools: false,
+    exposePromptsAsTools: false,
     systemPrompt:
-      "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
   });
 
-  // Format messages - use only the last user message as the query
-  const lastUserMessage = messages
-    .filter((msg: any) => msg.role === "user")
-    .pop();
+  // Import LangChain message types for history conversion
+  const { HumanMessage, AIMessage } = await import("@langchain/core/messages");
 
-  if (!lastUserMessage) {
+  // Extract last user message as the query, and build history from all prior messages
+  const lastUserMessageIndex = messages
+    .map((msg: any, i: number) => ({ msg, i }))
+    .filter(({ msg }: any) => msg.role === "user")
+    .pop()?.i;
+
+  if (lastUserMessageIndex === undefined) {
     throw new Error("No user message found");
+  }
+
+  const lastUserMessage = messages[lastUserMessageIndex];
+  const priorMessages = messages.slice(0, lastUserMessageIndex);
+
+  // Convert prior messages to LangChain format as externalHistory
+  const externalHistory = priorMessages.map((msg: any) => {
+    if (msg.role === "user") {
+      if (msg.attachments && msg.attachments.length > 0) {
+        const content: Array<any> = [
+          { type: "text", text: msg.content || "[no content]" },
+        ];
+        for (const attachment of msg.attachments) {
+          if (attachment.type === "image") {
+            content.push({
+              type: "image_url",
+              image_url: {
+                url: `data:${attachment.mimeType};base64,${attachment.data}`,
+              },
+            });
+          }
+        }
+        return new HumanMessage({ content });
+      }
+      return new HumanMessage(msg.content || "[no content]");
+    }
+    return new AIMessage(msg.content || "[no content]");
+  });
+
+  // Convert last user message to LangChain format (supporting multimodal)
+  let messageInput: any;
+  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
+    // Multimodal message with attachments
+    const content: Array<any> = [
+      {
+        type: "text",
+        text: lastUserMessage.content || "[no content]",
+      },
+    ];
+
+    // Add image attachments
+    for (const attachment of lastUserMessage.attachments) {
+      if (attachment.type === "image") {
+        content.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${attachment.mimeType};base64,${attachment.data}`,
+          },
+        });
+      }
+    }
+
+    messageInput = new HumanMessage({ content });
+  } else {
+    // Regular text message
+    messageInput = lastUserMessage.content;
   }
 
   try {
@@ -184,8 +266,13 @@ export async function* handleChatRequestStream(requestBody: {
     // Send initial assistant message event (AI SDK format)
     yield `data: ${JSON.stringify({ type: "message", id: messageId, role: "assistant" })}\n\n`;
 
-    // Use streamEvents to get real-time updates
-    for await (const event of agent.streamEvents(lastUserMessage.content)) {
+    // Use streamEvents to get real-time updates, passing conversation history
+    for await (const event of agent.streamEvents(
+      messageInput,
+      10,
+      true,
+      externalHistory
+    )) {
       // Emit text content as it streams
       if (event.event === "on_chat_model_stream" && event.data?.chunk?.text) {
         const text = event.data.chunk.text;
@@ -225,7 +312,15 @@ export async function* handleChatRequestStream(requestBody: {
 }
 
 /**
- * Handle chat API request with MCP agent (non-streaming, kept for backwards compatibility)
+ * Execute a non-streaming chat turn using an MCP agent and the specified LLM configuration.
+ *
+ * @param requestBody - Request parameters
+ * @param requestBody.mcpServerUrl - Base URL of the MCP server to connect to
+ * @param requestBody.llmConfig - LLM provider configuration (provider, model, apiKey, etc.)
+ * @param requestBody.authConfig - Optional authentication configuration for the MCP server
+ * @param requestBody.messages - Array of chat messages; only the last message with role "user" is used as the query
+ * @returns An object containing `content` with the agent's response text and `toolCalls` with recorded tool invocations (empty for this non-streaming implementation)
+ * @throws If required fields are missing, if the LLM provider is unsupported, or if no user message is found
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string;
@@ -242,6 +337,9 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Dynamically import mcp-use and LLM providers
+  // Note: MCPClient supports multiple servers via client.addServer(name, config)
+  // Import from main entry (not browser) since this runs server-side.
+  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
   const { MCPAgent, MCPClient } = await import("mcp-use");
 
   // Create LLM instance based on provider
@@ -272,13 +370,14 @@ export async function handleChatRequest(requestBody: {
   }
 
   // Create MCP client and connect to server
-  const client = new MCPClient();
+  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
+  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
   // Add server with potential authentication headers
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
-    preventAutoAuth: true, // Prevent auto OAuth popup in server-side context
+    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
   };
 
   // Handle authentication - support both custom auth and OAuth
@@ -290,9 +389,7 @@ export async function handleChatRequest(requestBody: {
       authConfig.username &&
       authConfig.password
     ) {
-      const auth = Buffer.from(
-        `${authConfig.username}:${authConfig.password}`
-      ).toString("base64");
+      const auth = toBase64(`${authConfig.username}:${authConfig.password}`);
       serverConfig.headers.Authorization = `Basic ${auth}`;
     } else if (authConfig.type === "bearer" && authConfig.token) {
       serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
@@ -325,9 +422,7 @@ export async function handleChatRequest(requestBody: {
       (!authConfig || authConfig.type === "none")
     ) {
       // Extract auth from URL
-      const auth = Buffer.from(`${url.username}:${url.password}`).toString(
-        "base64"
-      );
+      const auth = toBase64(`${url.username}:${url.password}`);
       serverConfig.headers = serverConfig.headers || {};
       serverConfig.headers.Authorization = `Basic ${auth}`;
       // Remove auth from URL to avoid double encoding
@@ -352,22 +447,84 @@ export async function handleChatRequest(requestBody: {
     llm,
     client,
     maxSteps: 10,
-    memoryEnabled: true,
+    memoryEnabled: false, // Use externalHistory instead
+    exposeResourcesAsTools: false,
+    exposePromptsAsTools: false,
     systemPrompt:
-      "You are a helpful assistant with access to MCP tools, prompts, and resources. Help users interact with the MCP server.",
+      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
   });
 
-  // Format messages - use only the last user message as the query
-  const lastUserMessage = messages
-    .filter((msg: any) => msg.role === "user")
-    .pop();
+  // Import LangChain message types for history conversion
+  const { HumanMessage, AIMessage } = await import("@langchain/core/messages");
 
-  if (!lastUserMessage) {
+  // Extract last user message as the query, and build history from all prior messages
+  const lastUserMessageIndex = messages
+    .map((msg: any, i: number) => ({ msg, i }))
+    .filter(({ msg }: any) => msg.role === "user")
+    .pop()?.i;
+
+  if (lastUserMessageIndex === undefined) {
     throw new Error("No user message found");
   }
 
-  // Get response from agent
-  const response = await agent.run(lastUserMessage.content);
+  const lastUserMessage = messages[lastUserMessageIndex];
+  const priorMessages = messages.slice(0, lastUserMessageIndex);
+
+  // Convert prior messages to LangChain format as externalHistory
+  const externalHistory = priorMessages.map((msg: any) => {
+    if (msg.role === "user") {
+      if (msg.attachments && msg.attachments.length > 0) {
+        const content: Array<any> = [
+          { type: "text", text: msg.content || "[no content]" },
+        ];
+        for (const attachment of msg.attachments) {
+          if (attachment.type === "image") {
+            content.push({
+              type: "image_url",
+              image_url: {
+                url: `data:${attachment.mimeType};base64,${attachment.data}`,
+              },
+            });
+          }
+        }
+        return new HumanMessage({ content });
+      }
+      return new HumanMessage(msg.content || "[no content]");
+    }
+    return new AIMessage(msg.content || "[no content]");
+  });
+
+  // Convert last user message to LangChain format (supporting multimodal)
+  let messageInput: any;
+  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
+    // Multimodal message with attachments
+    const content: Array<any> = [
+      {
+        type: "text",
+        text: lastUserMessage.content || "[no content]",
+      },
+    ];
+
+    // Add image attachments
+    for (const attachment of lastUserMessage.attachments) {
+      if (attachment.type === "image") {
+        content.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${attachment.mimeType};base64,${attachment.data}`,
+          },
+        });
+      }
+    }
+
+    messageInput = new HumanMessage({ content });
+  } else {
+    // Regular text message
+    messageInput = lastUserMessage.content;
+  }
+
+  // Get response from agent, passing conversation history
+  const response = await agent.run(messageInput, 10, true, externalHistory);
 
   // Clean up
   await client.closeAllSessions();
@@ -376,58 +533,6 @@ export async function handleChatRequest(requestBody: {
     content: response,
     toolCalls: [],
   };
-}
-
-/**
- * Get content type for static assets
- */
-export function getContentType(filePath: string): string {
-  if (filePath.endsWith(".js")) {
-    return "application/javascript";
-  } else if (filePath.endsWith(".css")) {
-    return "text/css";
-  } else if (filePath.endsWith(".svg")) {
-    return "image/svg+xml";
-  } else if (filePath.endsWith(".html")) {
-    return "text/html";
-  } else if (filePath.endsWith(".json")) {
-    return "application/json";
-  } else if (filePath.endsWith(".png")) {
-    return "image/png";
-  } else if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
-    return "image/jpeg";
-  } else if (filePath.endsWith(".ico")) {
-    return "image/x-icon";
-  } else {
-    return "application/octet-stream";
-  }
-}
-
-/**
- * Check if client files exist
- */
-export function checkClientFiles(clientDistPath: string): boolean {
-  return existsSync(clientDistPath);
-}
-
-/**
- * Get client dist path
- * Returns different paths depending on whether running from CLI or server
- */
-export function getClientDistPath(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-
-  // Check if we're running from dist/cli.js or dist/server/*.js
-  // CLI: dist/cli.js -> path is './web'
-  // Server: dist/server/*.js -> path is '../web'
-  if (__dirname.endsWith("dist") || __dirname.endsWith("dist/")) {
-    // Running from CLI (dist/cli.js)
-    return join(__dirname, "web");
-  }
-
-  // Running from server (dist/server/*.js)
-  return join(__dirname, "../web");
 }
 
 /**
@@ -445,10 +550,39 @@ export interface WidgetData {
   widgetCSP?: {
     connect_domains?: string[];
     resource_domains?: string[];
+    frame_domains?: string[];
   };
   devWidgetUrl?: string;
   devServerBaseUrl?: string;
   theme?: "light" | "dark";
+  // Playground settings for initializing window.openai
+  playground?: {
+    locale?: string;
+    deviceType?: "mobile" | "tablet" | "desktop";
+    capabilities?: { hover: boolean; touch: boolean };
+    safeAreaInsets?: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    };
+  };
+  // MCP Apps (SEP-1865) support
+  protocol?: "mcp-apps" | "chatgpt-app";
+  toolName?: string;
+  mimeType?: string;
+  mcpAppsCsp?: {
+    connectDomains?: string[];
+    resourceDomains?: string[];
+    frameDomains?: string[];
+    baseUriDomains?: string[];
+  };
+  mcpAppsPermissions?: {
+    camera?: Record<string, never>;
+    microphone?: Record<string, never>;
+    geolocation?: Record<string, never>;
+    clipboardWrite?: Record<string, never>;
+  };
 }
 
 const widgetDataStore = new Map<string, WidgetData>();
@@ -482,25 +616,34 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     toolResponseMetadata,
     resourceData,
     toolId,
-    widgetCSP: _widgetCSP,
+    widgetCSP,
+    mcpAppsCsp,
+    mcpAppsPermissions,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
   } = data;
 
-  console.log("[Widget Store] Received request for toolId:", toolId);
-  console.log("[Widget Store] Fields:", {
-    serverId,
-    uri,
-    hasResourceData: !!resourceData,
-    hasToolInput: !!toolInput,
-    hasToolOutput: !!toolOutput,
-    hasToolResponseMetadata: !!toolResponseMetadata,
-    toolResponseMetadata,
-    hasWidgetCSP: !!_widgetCSP,
-    devWidgetUrl,
-    devServerBaseUrl,
-  });
+  const debugWidget =
+    process.env.DEBUG != null &&
+    process.env.DEBUG !== "" &&
+    process.env.DEBUG !== "0" &&
+    process.env.DEBUG.toLowerCase() !== "false";
+  if (debugWidget) {
+    console.log("[Widget Store] Received request for toolId:", toolId);
+    console.log("[Widget Store] Fields:", {
+      serverId,
+      uri,
+      hasResourceData: !!resourceData,
+      hasToolInput: !!toolInput,
+      hasToolOutput: !!toolOutput,
+      hasToolResponseMetadata: !!toolResponseMetadata,
+      toolResponseMetadata,
+      hasWidgetCSP: !!widgetCSP,
+      devWidgetUrl,
+      devServerBaseUrl,
+    });
+  }
 
   if (!serverId || !uri || !toolId || !resourceData) {
     const missingFields = [];
@@ -526,13 +669,17 @@ export function storeWidgetData(data: Omit<WidgetData, "timestamp">): {
     resourceData,
     toolId,
     timestamp: Date.now(),
-    widgetCSP: _widgetCSP,
+    widgetCSP,
+    mcpAppsCsp,
+    mcpAppsPermissions,
     devWidgetUrl,
     devServerBaseUrl,
     theme,
   });
 
-  console.log("[Widget Store] Data stored successfully for toolId:", toolId);
+  if (debugWidget) {
+    console.log("[Widget Store] Data stored successfully for toolId:", toolId);
+  }
   return { success: true };
 }
 
@@ -561,16 +708,12 @@ export function generateWidgetContainerHtml(
       <script>
         (async function() {
           try {
-            // Change URL to "/" BEFORE loading widget (for React Router)
-            history.replaceState(null, '', '/');
-
             // Fetch the actual widget HTML using toolId
             const response = await fetch('${basePath}/api/resources/widget-content/${toolId}');
             const html = await response.text();
 
             // Replace entire document with widget HTML using proper method
             document.open();
-            // Write the HTML content - the browser will parse it properly
             document.write(html);
             document.close();
           } catch (error) {
@@ -599,15 +742,21 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
     toolResponseMetadata,
     resourceData,
     toolId,
-    widgetCSP: _widgetCSP,
-    devServerBaseUrl,
     theme,
+    playground,
   } = widgetData;
 
-  console.log("[Widget Content] Using pre-fetched resource for:", {
-    serverId,
-    uri,
-  });
+  const debugWidget =
+    process.env.DEBUG != null &&
+    process.env.DEBUG !== "" &&
+    process.env.DEBUG !== "0" &&
+    process.env.DEBUG.toLowerCase() !== "false";
+  if (debugWidget) {
+    console.log("[Widget Content] Using pre-fetched resource for:", {
+      serverId,
+      uri,
+    });
+  }
 
   // Extract HTML content from the pre-fetched resource data
   let htmlContent = "";
@@ -656,34 +805,113 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   // Safely serialize theme, defaulting to 'light' if not provided
   const safeTheme = JSON.stringify(theme === "dark" ? "dark" : "light");
 
+  // Use playground values with fallbacks to defaults
+  const locale = playground?.locale || "en-US";
+  const deviceType = playground?.deviceType || "desktop";
+  const capabilities = playground?.capabilities || {
+    hover: true,
+    touch: false,
+  };
+  const safeAreaInsets = playground?.safeAreaInsets || {
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  };
+
+  // Serialize playground values for injection
+  const safeLocale = JSON.stringify(locale);
+  const safeUserAgent = JSON.stringify({
+    device: { type: deviceType },
+    capabilities,
+  });
+  const safeSafeArea = JSON.stringify({ insets: safeAreaInsets });
+
   // Inject window.openai API script
   const apiScript = `
     <script>
       (function() {
         'use strict';
 
-        // Change URL to "/" for React Router compatibility
-        // Skip if running in Inspector dev-widget proxy to prevent redirecting iframe to Inspector home
-        if (window.location.pathname !== '/' && !window.location.pathname.includes('/dev-widget/')) {
+        // Change URL to "/" for React Router compatibility.
+        // Skip when loaded inside the inspector (widget-content endpoint)
+        // to prevent Vite HMR reloads from navigating to "/" (inspector SPA).
+        if (window.location.pathname !== '/' && !window.location.pathname.includes('/inspector/')) {
           history.replaceState(null, '', '/');
         }
 
-        // Inject MCP widget utilities for Image component and file access
-        window.__mcpPublicUrl = ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/public"` : '""'};
-        window.__getFile = function(filename) {
-          return ${devServerBaseUrl ? `"${devServerBaseUrl}/mcp-use/widgets/"` : '""'} + filename;
-        };
+        function emitWidgetRuntimeError(payload) {
+          var args = [{
+            message: payload && payload.message ? payload.message : "Unknown widget runtime error",
+            stack: payload && payload.stack ? payload.stack : undefined,
+            source: payload && payload.source ? payload.source : undefined,
+            fileName: payload && payload.fileName ? payload.fileName : undefined,
+            line: payload && payload.line ? payload.line : undefined,
+            column: payload && payload.column ? payload.column : undefined,
+            timestamp: payload && payload.timestamp ? payload.timestamp : Date.now(),
+          }];
+          try {
+            window.parent.postMessage(
+              {
+                type: "iframe-console-log",
+                level: "error",
+                args: args,
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                toolId: ${safeToolId},
+              },
+              "*"
+            );
+          } catch (emitErr) {}
+        }
+
+        window.addEventListener("error", function(event) {
+          var err = event && event.error;
+          var message =
+            (err && err.message) ||
+            (event && event.message) ||
+            "Unknown widget runtime error";
+          emitWidgetRuntimeError({
+            source: "window.error",
+            message: String(message),
+            stack: err && err.stack ? String(err.stack) : undefined,
+            fileName: event && event.filename ? String(event.filename) : undefined,
+            line: event && typeof event.lineno === "number" ? event.lineno : undefined,
+            column: event && typeof event.colno === "number" ? event.colno : undefined,
+            timestamp: Date.now(),
+          });
+        });
+
+        window.addEventListener("unhandledrejection", function(event) {
+          var reason = event ? event.reason : undefined;
+          var message = "Unhandled promise rejection";
+          var stack = undefined;
+          if (reason && typeof reason === "object") {
+            message = String(reason.message || message);
+            stack = reason.stack ? String(reason.stack) : undefined;
+          } else if (typeof reason === "string") {
+            message = reason;
+          } else if (reason != null) {
+            message = String(reason);
+          }
+          emitWidgetRuntimeError({
+            source: "window.unhandledrejection",
+            message: message,
+            stack: stack,
+            timestamp: Date.now(),
+          });
+        });
 
         const openaiAPI = {
           toolInput: ${safeToolInput},
-          toolOutput: null,  // Initially null to emulate OpenAI behavior (widget renders before tool completes)
-          toolResponseMetadata: null,  // Initially null to emulate OpenAI behavior
+          toolOutput: ${safeToolOutput},
+          toolResponseMetadata: ${safeToolResponseMetadata},
           displayMode: 'inline',
           maxHeight: 600,
           theme: ${safeTheme},
-          locale: 'en-US',
-          safeArea: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
-          userAgent: {},
+          locale: ${safeLocale},
+          safeArea: ${safeSafeArea},
+          userAgent: ${safeUserAgent},
           widgetState: null,
 
           async setWidgetState(state) {
@@ -753,6 +981,20 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             return this.sendFollowupTurn(prompt);
           },
 
+          async notifyIntrinsicHeight(height) {
+            console.log('[OpenAI Widget] notifyIntrinsicHeight called with:', height);
+            if (typeof height !== 'number' || height < 0) {
+              console.error('[OpenAI Widget] Invalid height value:', height);
+              throw new Error('Height must be a non-negative number');
+            }
+            const message = {
+              type: 'openai:notifyIntrinsicHeight',
+              height
+            };
+            console.log('[OpenAI Widget] Sending postMessage to parent:', message);
+            window.parent.postMessage(message, '*');
+          },
+
           openExternal(payload) {
             const href = typeof payload === 'string' ? payload : payload?.href;
             if (href) {
@@ -760,6 +1002,23 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             }
           }
         };
+
+        // Report CSP violations to the inspector host
+        document.addEventListener('securitypolicyviolation', function(e) {
+          window.parent.postMessage({
+            type: 'openai:csp-violation',
+            toolId: ${safeToolId},
+            directive: e.violatedDirective,
+            effectiveDirective: e.effectiveDirective,
+            blockedUri: e.blockedURI,
+            sourceFile: e.sourceFile || null,
+            lineNumber: e.lineNumber,
+            columnNumber: e.columnNumber,
+            originalPolicy: e.originalPolicy,
+            disposition: e.disposition,
+            timestamp: Date.now(),
+          }, '*');
+        });
 
         Object.defineProperty(window, 'openai', {
           value: openaiAPI,
@@ -775,6 +1034,10 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
           enumerable: true
         });
 
+        // Do not fire openai:set_globals here — window.openai is already set synchronously.
+        // useSyncExternalStore reads it on first render. Firing the event would cause a
+        // redundant second render (double flash at pending/final state).
+
         // Listen for widget state requests from inspector
         window.addEventListener('message', (event) => {
           if (event.data?.type === 'mcp-inspector:getWidgetState') {
@@ -783,30 +1046,104 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
               toolId: event.data.toolId,
               state: openaiAPI.widgetState
             }, '*');
+            return;
           }
         });
 
-        setTimeout(() => {
-          try {
-            const globalsEvent = new CustomEvent('openai:set_globals', {
-              detail: {
-                globals: {
-                  toolInput: openaiAPI.toolInput,
-                  toolOutput: openaiAPI.toolOutput,
-                  toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
-                  widgetState: openaiAPI.widgetState,
-                  displayMode: openaiAPI.displayMode,
-                  maxHeight: openaiAPI.maxHeight,
-                  theme: openaiAPI.theme,
-                  locale: openaiAPI.locale,
-                  safeArea: openaiAPI.safeArea,
-                  userAgent: openaiAPI.userAgent
-                }
-              }
-            });
-            window.dispatchEvent(globalsEvent);
-          } catch (err) {}
-        }, 0);
+        // Listen for globals changes from parent (for displayMode, theme, etc.)
+        window.addEventListener('message', (event) => {
+          // Handle new general globalsChanged message
+          if (event.data?.type === 'openai:globalsChanged') {
+            const updates = event.data.updates || {};
+            let hasChanges = false;
+
+            // Update displayMode
+            if (updates.displayMode && ['inline', 'pip', 'fullscreen'].includes(updates.displayMode)) {
+              openaiAPI.displayMode = updates.displayMode;
+              hasChanges = true;
+            }
+
+            // Update theme
+            if (updates.theme && ['light', 'dark'].includes(updates.theme)) {
+              openaiAPI.theme = updates.theme;
+              hasChanges = true;
+            }
+
+            // Update maxHeight
+            if (updates.maxHeight !== undefined && typeof updates.maxHeight === 'number') {
+              openaiAPI.maxHeight = updates.maxHeight;
+              hasChanges = true;
+            }
+
+            // Update locale
+            if (updates.locale && typeof updates.locale === 'string') {
+              openaiAPI.locale = updates.locale;
+              hasChanges = true;
+            }
+
+            // Update safeArea
+            if (updates.safeArea && typeof updates.safeArea === 'object') {
+              openaiAPI.safeArea = updates.safeArea;
+              hasChanges = true;
+            }
+
+            // Update userAgent
+            if (updates.userAgent !== undefined) {
+              openaiAPI.userAgent = updates.userAgent;
+              hasChanges = true;
+            }
+
+            // Dispatch set_globals event to notify React components if any changes occurred
+            if (hasChanges) {
+              try {
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolInput: openaiAPI.toolInput,
+                      toolOutput: openaiAPI.toolOutput,
+                      toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                      widgetState: openaiAPI.widgetState,
+                      displayMode: openaiAPI.displayMode,
+                      maxHeight: openaiAPI.maxHeight,
+                      theme: openaiAPI.theme,
+                      locale: openaiAPI.locale,
+                      safeArea: openaiAPI.safeArea,
+                      userAgent: openaiAPI.userAgent
+                    }
+                  }
+                });
+                window.dispatchEvent(globalsEvent);
+              } catch (err) {}
+            }
+          }
+          // Handle legacy displayModeChanged message for backward compatibility
+          else if (event.data?.type === 'openai:displayModeChanged') {
+            const newMode = event.data.mode;
+            if (newMode && ['inline', 'pip', 'fullscreen'].includes(newMode)) {
+              openaiAPI.displayMode = newMode;
+              // Dispatch set_globals event to notify React components
+              try {
+                const globalsEvent = new CustomEvent('openai:set_globals', {
+                  detail: {
+                    globals: {
+                      toolInput: openaiAPI.toolInput,
+                      toolOutput: openaiAPI.toolOutput,
+                      toolResponseMetadata: openaiAPI.toolResponseMetadata || null,
+                      widgetState: openaiAPI.widgetState,
+                      displayMode: newMode,
+                      maxHeight: openaiAPI.maxHeight,
+                      theme: openaiAPI.theme,
+                      locale: openaiAPI.locale,
+                      safeArea: openaiAPI.safeArea,
+                      userAgent: openaiAPI.userAgent
+                    }
+                  }
+                });
+                window.dispatchEvent(globalsEvent);
+              } catch (err) {}
+            }
+          }
+        });
 
         setTimeout(() => {
           try {
@@ -816,37 +1153,13 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             }
           } catch (err) {}
         }, 0);
-
-        // Emulate OpenAI behavior: initially toolOutput and toolResponseMetadata are null,
-        // then they get populated when the "tool execution completes"
-        setTimeout(() => {
-          try {
-            if (window.openai) {
-              window.openai.toolOutput = ${safeToolOutput};
-              window.openai.toolResponseMetadata = ${safeToolResponseMetadata};
-              
-              // Dispatch set_globals event to notify React components
-              const globalsEvent = new CustomEvent('openai:set_globals', {
-                detail: {
-                  globals: {
-                    toolOutput: window.openai.toolOutput,
-                    toolResponseMetadata: window.openai.toolResponseMetadata,
-                  }
-                }
-              });
-              window.dispatchEvent(globalsEvent);
-            }
-          } catch (err) {
-            console.error('[Inspector] Failed to populate toolOutput:', err);
-          }
-        }, 100); // Small delay to emulate tool execution time
       })();
     </script>
   `;
 
   // Inject script into HTML
   let modifiedHtml;
-  if (htmlContent.includes("<html>") && htmlContent.includes("<head>")) {
+  if (htmlContent.includes("<html") && htmlContent.includes("<head")) {
     // If it's a full HTML document, inject at the beginning of head
     // Preserve any existing base tag instead of commenting it out
     modifiedHtml = htmlContent.replace("<head>", `<head>${apiScript}`);
@@ -866,9 +1179,54 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
 </html>`;
   }
 
-  console.log("[Widget Content] Generated HTML length:", modifiedHtml.length);
+  if (debugWidget) {
+    console.log("[Widget Content] Generated HTML length:", modifiedHtml.length);
+  }
 
   return { html: modifiedHtml };
+}
+
+/**
+ * Transform MCP Apps camelCase CSP to snake_case for existing header builder
+ *
+ * MCP Apps (SEP-1865) uses camelCase (connectDomains, resourceDomains)
+ * ChatGPT Apps SDK uses snake_case (connect_domains, resource_domains)
+ *
+ * @param mcpAppsCsp - MCP Apps CSP configuration with camelCase keys
+ * @returns ChatGPT-compatible CSP configuration with snake_case keys
+ */
+export function transformMcpAppsCspToSnakeCase(mcpAppsCsp?: {
+  connectDomains?: string[];
+  resourceDomains?: string[];
+  frameDomains?: string[];
+  baseUriDomains?: string[];
+}):
+  | {
+      connect_domains?: string[];
+      resource_domains?: string[];
+      frame_domains?: string[];
+    }
+  | undefined {
+  if (!mcpAppsCsp) return undefined;
+
+  const result: {
+    connect_domains?: string[];
+    resource_domains?: string[];
+    frame_domains?: string[];
+  } = {};
+
+  if (mcpAppsCsp.connectDomains) {
+    result.connect_domains = mcpAppsCsp.connectDomains;
+  }
+  if (mcpAppsCsp.resourceDomains) {
+    result.resource_domains = mcpAppsCsp.resourceDomains;
+  }
+  if (mcpAppsCsp.frameDomains) {
+    result.frame_domains = mcpAppsCsp.frameDomains;
+  }
+  // Note: baseUriDomains is MCP Apps-specific, not in ChatGPT CSP
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 /**
@@ -878,8 +1236,10 @@ export function getWidgetSecurityHeaders(
   widgetCSP?: {
     connect_domains?: string[];
     resource_domains?: string[];
+    frame_domains?: string[];
   },
-  devServerBaseUrl?: string
+  devServerBaseUrl?: string,
+  frameAncestors?: string
 ): Record<string, string> {
   const trustedCdns = [
     "https://persistent.oaistatic.com",
@@ -936,18 +1296,33 @@ export function getWidgetSecurityHeaders(
     connectSrc = `'self' ${widgetCSP.connect_domains.join(" ")} https: wss: ws:`;
   }
 
+  // Build frame-src for embedding iframes (e.g., Cal.com embed)
+  // Use frame_domains if specified (per OpenAI spec), fall back to resource_domains for backwards compatibility
+  let frameSrc = "'self' blob:";
+  const frameDomains = widgetCSP?.frame_domains || widgetCSP?.resource_domains;
+  if (frameDomains && frameDomains.length > 0) {
+    frameSrc = `'self' blob: ${frameDomains.join(" ")}`;
+  }
+
+  // When frameAncestors param is set (e.g. MCP_INSPECTOR_FRAME_ANCESTORS): extend 'self' with it. When unset: allow all (*).
+  let frameAncestorsPolicy = "*";
+  if (frameAncestors) {
+    frameAncestorsPolicy = `'self' ${frameAncestors}`.trim();
+  }
+
   const headers: Record<string, string> = {
     "Content-Security-Policy": [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${resourceDomainsStr}`,
       "worker-src 'self' blob:",
-      "child-src 'self' blob:",
+      `child-src 'self' blob: ${frameDomains?.join(" ") || ""}`.trim(),
+      `frame-src ${frameSrc}`,
       `style-src 'self' 'unsafe-inline' ${resourceDomainsStr}`,
       `img-src ${imgSrc}`,
       `media-src ${mediaSrc}`,
       `font-src ${fontSrc}`,
       `connect-src ${connectSrc}`,
-      "frame-ancestors 'self'",
+      `frame-ancestors ${frameAncestorsPolicy}`,
     ].join("; "),
     "X-Frame-Options": "SAMEORIGIN",
     "X-Content-Type-Options": "nosniff",
@@ -960,17 +1335,25 @@ export function getWidgetSecurityHeaders(
   // This will warn about resources that would fail in production
   if (devServerOrigin) {
     const prodConnectSrc = "'self' https: wss: ws:";
+    // Build production frame-src (use frame_domains if specified, fall back to resource_domains)
+    let prodFrameSrc = "'self' blob:";
+    const prodFrameDomains =
+      widgetCSP?.frame_domains || widgetCSP?.resource_domains;
+    if (prodFrameDomains && prodFrameDomains.length > 0) {
+      prodFrameSrc = `'self' blob: ${prodFrameDomains.join(" ")}`;
+    }
     headers["Content-Security-Policy-Report-Only"] = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${prodResourceDomainsStr}`,
       "worker-src 'self' blob:",
-      "child-src 'self' blob:",
+      `child-src 'self' blob: ${prodFrameDomains?.join(" ") || ""}`.trim(),
+      `frame-src ${prodFrameSrc}`,
       `style-src 'self' 'unsafe-inline' ${prodResourceDomainsStr}`,
       "img-src 'self' data: https: blob:",
       "media-src 'self' data: https: blob:",
       `font-src 'self' data: ${prodResourceDomainsStr}`,
       `connect-src ${prodConnectSrc}`,
-      "frame-ancestors 'self'",
+      `frame-ancestors ${frameAncestorsPolicy}`,
     ].join("; ");
   }
 

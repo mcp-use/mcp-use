@@ -1,0 +1,47 @@
+import json
+from datetime import datetime
+from mcp_use.server import MCPRouter
+
+router = MCPRouter()
+
+@router.resource(
+    uri="config://app",
+    name="app_config",
+    description="Application configuration",
+    mime_type="application/json",
+)
+async def app_config() -> str:
+    """Return application configuration."""
+    return json.dumps({
+        "name": "{{PROJECT_NAME}}",
+        "version": "0.1.0",
+        "debug": True,
+    })
+
+@router.resource(
+    uri="status://health",
+    name="health_check",
+    description="Server health status",
+    mime_type="application/json",
+)
+async def health_check() -> str:
+    """Return server health information."""
+    return json.dumps({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+    })
+
+@router.resource(
+    uri="docs://{topic}",
+    name="documentation",
+    description="Retrieve documentation by topic",
+    mime_type="text/plain",
+)
+async def documentation(topic: str) -> str:
+    """Return documentation for a given topic (resource template example)."""
+    docs = {
+        "tools": "Tools are functions that MCP clients can invoke.",
+        "resources": "Resources expose data via URI-based access.",
+        "prompts": "Prompts are reusable templates for LLM interactions.",
+    }
+    return docs.get(topic, f"No documentation found for '{topic}'.")

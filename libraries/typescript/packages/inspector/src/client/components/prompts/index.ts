@@ -3,4 +3,4 @@ export { PromptsTabHeader } from "./PromptsTabHeader";
 export { SavedPromptsList, type SavedPrompt } from "./SavedPromptsList";
 export { PromptExecutionPanel } from "./PromptExecutionPanel";
 export { PromptInputForm } from "./PromptInputForm";
-export { type PromptResult, PromptResultDisplay } from "./PromptResultDisplay";
+export { PromptResultDisplay } from "./PromptResultDisplay";

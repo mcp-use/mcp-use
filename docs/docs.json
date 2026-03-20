@@ -69,6 +69,7 @@
                   "inspector/index",
                   "inspector/cli",
                   "inspector/connection-settings",
+                  "inspector/url-parameters",
                   "inspector/keyboard-shortcuts",
                   "inspector/command-palette",
                   "inspector/rpc-logging",
@@ -87,7 +88,7 @@
             "icon": "",
             "pages": [
               "home/mcp101",
-              "typescript/server/creating-apps-sdk-server",
+              "typescript/server/creating-mcp-apps-server",
               "guides/chatgpt-apps-flow"
             ]
           }
@@ -105,9 +106,9 @@
               {
                 "group": "Get Started",
                 "pages": [
+                  "python/getting-started/welcome",
                   "python/getting-started/quickstart",
-                  "python/getting-started/installation",
-                  "python/getting-started/configuration"
+                  "python/getting-started/installation"
                 ]
               },
               {
@@ -135,6 +136,13 @@
                       "python/server/elicitation",
                       "python/server/roots",
                       "python/server/notifications"
+                    ]
+                  },
+                  {
+                    "group": "Authentication",
+                    "icon": "shield",
+                    "pages": [
+                      "python/server/auth/bearer"
                     ]
                   },
                   "python/server/middleware",
@@ -374,6 +382,16 @@
                 "group": "Server",
                 "icon": "server",
                 "pages": [
+                  {
+                    "group": "Auth",
+                    "icon": "key",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_auth_bearer",
+                      "python/api-reference/mcp_use_server_auth_dependencies",
+                      "python/api-reference/mcp_use_server_auth_middleware",
+                      "python/api-reference/mcp_use_server_auth_models"
+                    ]
+                  },
                   "python/api-reference/mcp_use_server_context",
                   {
                     "group": "Logging",
@@ -386,19 +404,27 @@
                       "python/api-reference/mcp_use_server_logging_state"
                     ]
                   },
-                  "python/api-reference/mcp_use_server_middleware_middleware",
+                  {
+                    "group": "Middleware",
+                    "icon": "layers",
+                    "pages": [
+                      "python/api-reference/mcp_use_server_middleware_middleware",
+                      "python/api-reference/mcp_use_server_middleware_server_session"
+                    ]
+                  },
                   "python/api-reference/mcp_use_server_router",
                   "python/api-reference/mcp_use_server_runner",
                   "python/api-reference/mcp_use_server_server",
+                  "python/api-reference/mcp_use_server_templates_cli",
                   "python/api-reference/mcp_use_server_types",
                   {
                     "group": "Utils",
                     "icon": "tool",
                     "pages": [
                       "python/api-reference/mcp_use_server_utils_inspector",
+                      "python/api-reference/mcp_use_server_utils_json_schema",
                       "python/api-reference/mcp_use_server_utils_openmcp",
                       "python/api-reference/mcp_use_server_utils_routes",
-                      "python/api-reference/mcp_use_server_utils_signals",
                       "python/api-reference/mcp_use_server_utils_utils"
                     ]
                   }
@@ -419,6 +445,8 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_7_0",
+                  "python/changelog/1_6_0",
                   "python/changelog/1_5_2",
                   "python/changelog/1_5_0",
                   "python/changelog/1_4_1",
@@ -506,6 +534,7 @@
                       "typescript/client/server-manager",
                       "typescript/client/sampling",
                       "typescript/client/elicitation",
+                      "typescript/client/completion",
                       "typescript/client/notifications",
                       "typescript/client/logging"
                     ]
@@ -518,10 +547,11 @@
               {
                 "group": "MCP Server",
                 "icon": "server",
-                "tag": "Beta",
                 "pages": [
                   "typescript/server/index",
                   "typescript/server/configuration",
+                  "typescript/server/cli-reference",
+                  "typescript/server/examples",
                   {
                     "group": "Core Components",
                     "icon": "box",
@@ -533,18 +563,26 @@
                   },
                   "typescript/server/response-helpers",
                   {
-                    "group": "UI Widgets",
+                    "group": "MCP Apps",
                     "icon": "app-window-mac",
-                    "tag": "Apps SDK",
                     "pages": [
-                      "typescript/server/ui-widgets",
+                      "typescript/server/mcp-apps",
+                      "typescript/server/content-security-policy",
                       "typescript/server/widget-components/usewidget",
+                      "typescript/server/widget-components/usecalltool",
                       "typescript/server/widget-components/mcpuseprovider",
                       "typescript/server/widget-components/widgetcontrols",
                       "typescript/server/widget-components/errorboundary",
                       "typescript/server/widget-components/image",
                       "typescript/server/widget-components/themeprovider",
-                      "typescript/server/mcp-ui-resources"
+                      {
+                        "group": "Deprecated",
+                        "icon": "archive",
+                        "pages": [
+                          "typescript/server/ui-widgets",
+                          "typescript/server/mcp-ui-resources"
+                        ]
+                      }
                     ]
                   },
                   {
@@ -561,6 +599,7 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/server/proxy",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
@@ -578,11 +617,8 @@
                         "group": "OAuth Providers",
                         "icon": "plug",
                         "pages": [
-                          "typescript/server/authentication/providers/auth0",
                           "typescript/server/authentication/providers/workos",
-                          "typescript/server/authentication/providers/supabase",
-                          "typescript/server/authentication/providers/keycloak",
-                          "typescript/server/authentication/providers/custom"
+                          "typescript/server/authentication/providers/supabase"
                         ]
                       }
                     ]
@@ -651,6 +687,29 @@
             ]
           }
         ]
+      },
+      {
+        "product": "Inspector",
+        "description": "Debug and test MCP Apps & Servers",
+        "icon": "/images/inspector-logo.svg",
+        "groups": [
+          {
+            "group": "Inspector",
+            "pages": [
+              "inspector/index",
+              "inspector/cli",
+              "inspector/connection-settings",
+              "inspector/keyboard-shortcuts",
+              "inspector/command-palette",
+              "inspector/rpc-logging",
+              "inspector/integration",
+              "inspector/debugging-chatgpt-apps",
+              "inspector/self-hosting",
+              "inspector/development",
+              "inspector/changelog"
+            ]
+          }
+        ]
       }
     ]
   },
@@ -687,7 +746,7 @@
       {
         "label": "",
         "icon": "x-twitter",
-        "href": "https://x.com/mcpuse"
+        "href": "https://x.com/manufact"
       }
     ],
     "primary": {
@@ -698,7 +757,7 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mcp_use",
+      "x": "https://x.com/manufact",
       "linkedin": "https://www.linkedin.com/company/mcp-use",
       "github": "https://github.com/mcp-use",
       "discord": "https://discord.gg/XkNkSkMz3V"

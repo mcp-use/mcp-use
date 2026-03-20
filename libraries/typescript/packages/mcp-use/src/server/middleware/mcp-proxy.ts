@@ -109,11 +109,25 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
 
   // CRITICAL: Enable CORS and expose all headers for FastMCP session management
   // The Mcp-Session-Id header MUST be exposed for the browser to read it
+  // NOTE: Authorization must be listed explicitly — the wildcard * does NOT cover it per the Fetch spec.
   app.use(
     `${basePath}/*`,
     cors({
       origin: "*",
-      exposeHeaders: ["*"], // Expose all headers including Mcp-Session-Id for FastMCP
+      allowHeaders: [
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Target-URL",
+        "X-MCP-Target",
+        "Mcp-Session-Id",
+        "mcp-session-id",
+        "mcp-protocol-version",
+        "X-Server-Id",
+        "X-Requested-With",
+        "X-Connection-URL",
+      ],
+      exposeHeaders: ["*"],
     })
   );
 
@@ -193,17 +207,23 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       const method = c.req.method;
       const headers: Record<string, string> = {};
 
-      // Copy relevant headers, excluding proxy-specific ones and encoding preferences
+      // Copy relevant headers, stripping proxy/infrastructure headers that would
+      // confuse the target (e.g. X-Forwarded-Host from our own chain causes the
+      // gateway to resolve the wrong hostname and return 404).
       const requestHeaders = c.req.header();
       for (const [key, value] of Object.entries(requestHeaders)) {
         const lowerKey = key.toLowerCase();
         if (
           !lowerKey.startsWith("x-proxy-") &&
           !lowerKey.startsWith("x-target-") &&
+          !lowerKey.startsWith("x-mcp-") &&
+          !lowerKey.startsWith("x-forwarded-") &&
+          !lowerKey.startsWith("cf-") &&
+          lowerKey !== "x-original-host" &&
           lowerKey !== "host" &&
-          lowerKey !== "accept-encoding"
+          lowerKey !== "accept-encoding" &&
+          lowerKey !== "cdn-loop"
         ) {
-          // Don't forward accept-encoding to prevent compression issues
           headers[key] = value;
         }
       }
@@ -220,17 +240,60 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       }
 
       // Get request body for POST/PUT/PATCH methods
+      // IMPORTANT: Create a stable copy of the body bytes using .slice() to prevent
+      // ArrayBuffer detachment issues. Node.js undici can detach the underlying
+      // ArrayBuffer during fetch operations, especially with redirects.
       const body =
         method !== "GET" && method !== "HEAD"
-          ? await c.req.arrayBuffer()
+          ? new Uint8Array(await c.req.arrayBuffer()).slice()
           : undefined;
 
       // Forward request to target server
+      // Use redirect: 'manual' to handle redirects ourselves, avoiding undici's
+      // internal body re-use which can trigger detachment errors.
       const response = await fetch(targetUrl, {
         method,
         headers,
-        body: body ? new Uint8Array(body) : undefined,
+        body,
+        redirect: "manual",
       });
+
+      // Handle redirects manually to avoid ArrayBuffer detachment issues in Node.js
+      // When undici follows redirects automatically, it tries to re-use the request body,
+      // but by that point the ArrayBuffer may be detached, causing "Cannot perform
+      // ArrayBuffer.prototype.slice on a detached ArrayBuffer" errors.
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (location) {
+          // For redirects, make a new fetch to the redirect location
+          // We can reuse `body` since we created a stable copy with .slice()
+          const redirectResponse = await fetch(location, {
+            method,
+            headers,
+            body,
+            redirect: "manual",
+          });
+
+          // Return the redirect response (or follow one more level if needed)
+          const redirectHeaders: Record<string, string> = {};
+          redirectResponse.headers.forEach((value, key) => {
+            const lowerKey = key.toLowerCase();
+            if (
+              lowerKey !== "content-encoding" &&
+              lowerKey !== "transfer-encoding" &&
+              lowerKey !== "content-length"
+            ) {
+              redirectHeaders[key] = value;
+            }
+          });
+
+          return new Response(redirectResponse.body, {
+            status: redirectResponse.status,
+            statusText: redirectResponse.statusText,
+            headers: redirectHeaders,
+          });
+        }
+      }
 
       // Forward response headers, excluding problematic encoding headers
       // Node.js fetch() auto-decompresses the body but preserves these headers,
@@ -291,19 +354,68 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       }
 
-      // Return the proxied response unchanged for non-OAuth discovery responses
-      return new Response(response.body, {
+      // For streaming SSE responses (GET without content-length), pass through the body stream.
+      // For all other responses, buffer the body and set Content-Length so browsers
+      // don't hang waiting for a ReadableStream that may not signal EOF promptly.
+      const isSSE = contentType.includes("text/event-stream");
+      const isGetRequest = c.req.method === "GET";
+      const upstreamContentLength = response.headers.get("content-length");
+      const isTrueStream = isSSE && isGetRequest && !upstreamContentLength;
+
+      if (isTrueStream) {
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+        });
+      }
+
+      const bodyBuffer = await response.arrayBuffer();
+      responseHeaders["Content-Length"] = String(bodyBuffer.byteLength);
+      return new Response(bodyBuffer, {
         status: response.status,
         statusText: response.statusText,
         headers: responseHeaders,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("[MCP Proxy] Request failed:", message, error);
+
+      // Get targetUrl for better error logging
+      const url = new URL(c.req.url);
+      const targetFromQuery = url.searchParams.get("__mcp_target");
+      const targetUrl = targetFromQuery
+        ? targetFromQuery + url.pathname.replace(basePath, "")
+        : c.req.header("X-Target-URL");
+
+      // Check if this is a connection refused error (common when a stored server isn't running)
+      const isConnectionRefused =
+        error instanceof Error &&
+        (error.message.includes("ECONNREFUSED") ||
+          error.message.includes("fetch failed"));
+
+      if (isConnectionRefused) {
+        // This is expected when reconnecting to a stored server that's not running
+        // Log as a warning instead of error, without stack trace
+        console.warn(
+          `[MCP Proxy] Connection refused to ${targetUrl || "unknown target"} - server may not be running`
+        );
+      } else {
+        // Log other errors with full details
+        console.error(
+          "[MCP Proxy] Request failed:",
+          message,
+          "\nTarget URL:",
+          targetUrl || "unknown",
+          "\nError:",
+          error
+        );
+      }
+
       return c.json(
         {
           error: "Proxy request failed",
           details: message,
+          targetUrl: targetUrl || "unknown",
         },
         500
       );

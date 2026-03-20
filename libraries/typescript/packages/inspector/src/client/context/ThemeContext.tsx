@@ -25,14 +25,16 @@ interface ThemeProviderProps {
   children: ReactNode;
   defaultTheme?: Theme;
   storageKey?: string;
+  forcedTheme?: Theme;
 }
 
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = "theme",
+  forcedTheme,
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [theme, setTheme] = useState<Theme>(forcedTheme || defaultTheme);
   const [mounted, setMounted] = useState(false);
 
   // Get system theme preference
@@ -54,21 +56,23 @@ export function ThemeProvider({
     root.classList.remove("light", "dark");
     root.classList.add(actualTheme);
 
-    // Store theme preference
-    localStorage.setItem(storageKey, newTheme);
+    // Store theme preference only if not forced
+    if (!forcedTheme) {
+      localStorage.setItem(storageKey, newTheme);
+    }
   };
 
   // Initialize theme on mount
   useEffect(() => {
     setMounted(true);
 
-    // Get stored theme or use default
+    // Use forced theme if provided, otherwise get stored theme or use default
     const storedTheme = localStorage.getItem(storageKey) as Theme;
-    const initialTheme = storedTheme || defaultTheme;
+    const initialTheme = forcedTheme || storedTheme || defaultTheme;
 
     setTheme(initialTheme);
     applyTheme(initialTheme);
-  }, [defaultTheme, storageKey]);
+  }, [defaultTheme, storageKey, forcedTheme]);
 
   // Listen for system theme changes
   useEffect(() => {
@@ -90,6 +94,13 @@ export function ThemeProvider({
   }, [theme, mounted]);
 
   const handleSetTheme = (newTheme: Theme) => {
+    // Prevent theme changes when forced theme is set
+    if (forcedTheme) {
+      console.warn(
+        "[ThemeProvider] Theme is forced via URL parameter, ignoring setTheme call"
+      );
+      return;
+    }
     setTheme(newTheme);
   };
 

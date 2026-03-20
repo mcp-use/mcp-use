@@ -13,6 +13,7 @@ import {
   SamplingRequestDisplay,
 } from "./sampling";
 import { useInspector } from "@/client/context/InspectorContext";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { formatRelativeTime } from "@/client/utils/time";
 import { useConfig } from "./chat/useConfig";
 
@@ -268,7 +269,7 @@ export function SamplingTab({
   const handleCopy = useCallback(async () => {
     if (!selectedRequest) return;
     try {
-      await navigator.clipboard.writeText(
+      await copyToClipboard(
         JSON.stringify(
           {
             id: selectedRequest.id,
@@ -346,10 +347,10 @@ export function SamplingTab({
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-full">
+    <ResizablePanelGroup orientation="horizontal" className="h-full">
       <ResizablePanel defaultSize={40} minSize={30}>
         <ResizablePanelGroup
-          direction="vertical"
+          orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>

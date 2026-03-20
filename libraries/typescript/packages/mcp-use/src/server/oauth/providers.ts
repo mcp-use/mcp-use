@@ -273,7 +273,7 @@ export function oauthKeycloakProvider(
  *   name: 'my-server',
  *   version: '1.0.0',
  *   oauth: oauthWorkOSProvider({
- *     subdomain: 'my-company'
+ *     subdomain: 'my-company.authkit.app'
  *   })
  * });
  * ```
@@ -284,7 +284,7 @@ export function oauthKeycloakProvider(
  *   name: 'my-server',
  *   version: '1.0.0',
  *   oauth: oauthWorkOSProvider({
- *     subdomain: 'my-company',
+ *     subdomain: 'my-company.authkit.app',
  *     clientId: 'client_01KB5DRXBDDY1VGCBKY108SKJW'
  *   })
  * });

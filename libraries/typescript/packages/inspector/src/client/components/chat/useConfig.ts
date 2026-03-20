@@ -48,20 +48,47 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
   // Load saved LLM config from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("mcp-inspector-llm-config");
-    const apiKeys = getApiKeys();
-    if (saved) {
-      try {
-        const config = JSON.parse(saved);
-        setLLMConfig(config);
-        setTempProvider(config.provider);
-        // Load API key for the provider from provider-specific storage
-        setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
-        setTempModel(config.model);
-      } catch (error) {
-        console.error("Failed to load LLM config:", error);
+    const loadConfig = () => {
+      const saved = localStorage.getItem("mcp-inspector-llm-config");
+      const apiKeys = getApiKeys();
+      if (saved) {
+        try {
+          const config = JSON.parse(saved);
+          setLLMConfig(config);
+          setTempProvider(config.provider);
+          // Load API key for the provider from provider-specific storage
+          setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
+          setTempModel(config.model);
+        } catch (error) {
+          console.error("Failed to load LLM config:", error);
+        }
       }
-    }
+    };
+
+    // Load on mount
+    loadConfig();
+
+    // Listen for custom event when config is updated (from other components in same window)
+    const handleConfigUpdate = () => {
+      loadConfig();
+    };
+
+    // Listen for storage changes (from other browser windows/tabs)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (
+        e.key === "mcp-inspector-llm-config" ||
+        e.key === "mcp-inspector-api-keys"
+      ) {
+        loadConfig();
+      }
+    };
+
+    window.addEventListener("llm-config-updated", handleConfigUpdate);
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("llm-config-updated", handleConfigUpdate);
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, [getApiKeys]);
 
   // Load auth config from localStorage on mount
@@ -142,6 +169,10 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
       "mcp-inspector-auth-config",
       JSON.stringify(newAuthConfig)
     );
+
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent("llm-config-updated"));
+
     setConfigDialogOpen(false);
   }, [
     tempProvider,

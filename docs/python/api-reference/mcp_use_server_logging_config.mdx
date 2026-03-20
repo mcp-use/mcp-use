@@ -42,6 +42,45 @@ def __init__(inspector_path: str = "/inspector"):
 </Card>
 </div>
 
+## MCPLogsOnlyFilter
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> MCPLogsOnlyFilter</div>
+
+Filter that drops all uvicorn access log records.
+
+    MCP protocol logs are printed directly to stdout by MCPLoggingMiddleware,
+    bypassing the logging system entirely. This filter drops all uvicorn access
+    records so only the MCP: lines remain.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.logging.config import MCPLogsOnlyFilter
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize a filter.
+
+        Initialize with the name of the logger which, together with its
+        children, will have its events allowed through the filter. If no
+        name is specified, allow every event.
+
+**Parameters**
+><ParamField body="name" default='' >   Name identifier </ParamField>
+
+**Signature**
+```python wrap
+def __init__(name = ""):
+```
+
+</Card>
+</div>
+
 
 ## setup_logging
 <Card type="info">
@@ -58,7 +97,8 @@ from mcp_use.server.logging.config import setup_logging
 ><ParamField body="debug_level" type="int" default="0" >   Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc) </ParamField>
 ><ParamField body="log_level" type="str" default='INFO' >   Logging level (DEBUG, INFO, WARNING, ERROR) </ParamField>
 ><ParamField body="show_inspector_logs" type="bool" default="False" >   Whether to show inspector-related access logs (default: False) </ParamField>
-><ParamField body="inspector_path" type="str" default='/inspector' >   Path prefix for inspector routes </ParamField>
+><ParamField body="inspector_path" type="str" default='/inspector' >   Effective inspector route prefix, typically `/inspector` </ParamField>
+><ParamField body="mcp_logs_only" type="bool" default="False" >   When True, suppress all uvicorn access logs (MCP logs are printed </ParamField>
 
 **Returns**
 ><ResponseField name="returns" type="dict" >Uvicorn logging configuration dict</ResponseField>
@@ -69,7 +109,8 @@ def setup_logging(
 debug_level: int = 0,
     log_level: str = "INFO",
     show_inspector_logs: bool = False,
-    inspector_path: str = "/inspector"
+    inspector_path: str = "/inspector",
+    mcp_logs_only: bool = False
 ):
 ```
 

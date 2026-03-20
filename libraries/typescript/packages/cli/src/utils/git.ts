@@ -11,6 +11,7 @@ export interface GitInfo {
   branch?: string;
   commitSha?: string;
   commitMessage?: string;
+  hasUncommittedChanges?: boolean;
 }
 
 /**
@@ -96,6 +97,16 @@ export async function getCommitMessage(
 }
 
 /**
+ * Check if there are uncommitted changes
+ */
+export async function hasUncommittedChanges(
+  cwd: string = process.cwd()
+): Promise<boolean> {
+  const result = await gitCommand("git status --porcelain", cwd);
+  return result !== null && result.length > 0;
+}
+
+/**
  * Get all git info for current directory
  */
 export async function getGitInfo(
@@ -111,6 +122,7 @@ export async function getGitInfo(
   const branch = await getCurrentBranch(cwd);
   const commitSha = await getCommitSha(cwd);
   const commitMessage = await getCommitMessage(cwd);
+  const uncommittedChanges = await hasUncommittedChanges(cwd);
 
   let owner: string | undefined;
   let repo: string | undefined;
@@ -131,6 +143,7 @@ export async function getGitInfo(
     branch: branch || undefined,
     commitSha: commitSha || undefined,
     commitMessage: commitMessage || undefined,
+    hasUncommittedChanges: uncommittedChanges,
   };
 }
 

@@ -2,11 +2,13 @@ import type {
   ReadResourceResult,
   CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
+import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
 import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
-import type { McpContext } from "./context.js";
+import type { ClientCapabilityChecker, McpContext } from "./context.js";
+import type { UnifiedWidgetMetadata } from "../widgets/adapters/types.js";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -37,6 +39,10 @@ export interface AppsSdkMetadata extends Record<string, unknown> {
     connect_domains?: string[];
     /** Domains the widget can load resources from (scripts, styles, images, fonts) */
     resource_domains?: string[];
+    /** Domains allowed for iframe embeds (optional - by default widgets cannot render subframes) */
+    frame_domains?: string[];
+    /** Domains that can receive openExternal redirects without the safe-link modal (optional) */
+    redirect_domains?: string[];
   };
 
   /** Whether the widget prefers a border in card layout */
@@ -85,17 +91,19 @@ export interface AppsSdkToolMetadata extends Record<string, unknown> {
 }
 
 /**
- * Enhanced Resource Context that provides access to request context.
+ * Enhanced Resource Context that provides access to request context and
+ * client capability information.
  *
  * This unified context provides:
  * - `auth` - Authentication info (when OAuth is configured)
  * - `req` - Hono request object
+ * - `client` - Client capability checker (name, capabilities, MCP Apps support)
  * - All other Hono Context properties and methods
  *
  * @template HasOAuth - Whether OAuth is configured (affects auth availability)
  */
 export type EnhancedResourceContext<HasOAuth extends boolean = false> =
-  McpContext<HasOAuth>;
+  McpContext<HasOAuth> & { client: ClientCapabilityChecker };
 
 /**
  * Helper interface for bivariant parameter checking on resource callbacks.
@@ -154,17 +162,45 @@ export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
     >);
 
 /**
+ * Complete callback for a resource template
+ */
+export interface ResourceTemplateCallbacks {
+  complete?: {
+    [variable: string]: string[] | CompleteResourceTemplateCallback;
+  };
+}
+
+/**
  * Configuration for a resource template
  */
 export interface ResourceTemplateConfig {
-  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  /**
+   * URI template with {param} placeholders for dynamic resources.
+   *
+   * @example "user://{userId}/profile"
+   * @example "repo://{owner}/{repo}/file/{path}"
+   */
   uriTemplate: string;
-  /** Name of the resource */
+  /**
+   * Unique name for the template.
+   *
+   * @example "user-profile"
+   */
   name?: string;
-  /** MIME type of the resource content */
+  /**
+   * MIME type of the resource content (e.g., "text/plain", "application/json").
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
-  /** Description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
   description?: string;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -201,21 +237,43 @@ export interface ResourceTemplateDefinitionWithoutCallback {
 export interface FlatResourceTemplateDefinition<
   HasOAuth extends boolean = false,
 > {
-  /** Unique identifier for the template */
+  /**
+   * Unique identifier for the template.
+   *
+   * @example "user-profile"
+   */
   name: string;
-  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  /**
+   * URI template with {param} placeholders.
+   *
+   * @example "user://{userId}/profile"
+   */
   uriTemplate: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "User Profile"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
   description?: string;
-  /** MIME type of the resource content */
+  /**
+   * MIME type of the resource content.
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceTemplateCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -225,32 +283,71 @@ export interface FlatResourceTemplateDefinition<
  * instead of nested in a resourceTemplate property.
  */
 export interface FlatResourceTemplateDefinitionWithoutCallback {
-  /** Unique identifier for the template */
+  /**
+   * Unique identifier for the template.
+   *
+   * @example "user-profile"
+   */
   name: string;
-  /** URI template with {param} placeholders (e.g., "user://{userId}/profile") */
+  /**
+   * URI template with {param} placeholders.
+   *
+   * @example "user://{userId}/profile"
+   */
   uriTemplate: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "User Profile"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
   description?: string;
-  /** MIME type of the resource content */
+  /**
+   * MIME type of the resource content.
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
  * Resource definition with readCallback (old API)
  */
 export interface ResourceDefinition<HasOAuth extends boolean = false> {
-  /** Unique identifier for the resource */
+  /**
+   * Unique identifier for the resource.
+   *
+   * @example "app-settings"
+   */
   name: string;
-  /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
+  /**
+   * URI pattern for accessing the resource. Use a custom scheme (e.g., config://, app://).
+   *
+   * @example "config://app-settings"
+   * @example "app://greeting"
+   */
   uri: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "App Settings"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "Application configuration and user preferences"
+   */
   description?: string;
   /** MIME type of the resource content (required for old API) */
   mimeType: string;
@@ -259,6 +356,8 @@ export interface ResourceDefinition<HasOAuth extends boolean = false> {
   /** Async callback function that returns the resource content */
   readCallback: ReadResourceCallback<HasOAuth>;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -266,19 +365,42 @@ export interface ResourceDefinition<HasOAuth extends boolean = false> {
  * MIME type is optional when using response helpers - it's inferred from the helper
  */
 export interface ResourceDefinitionWithoutCallback {
-  /** Unique identifier for the resource */
+  /**
+   * Unique identifier for the resource.
+   *
+   * @example "app-settings"
+   */
   name: string;
-  /** URI pattern for accessing the resource (e.g., 'config://app-settings') */
+  /**
+   * URI pattern for accessing the resource.
+   *
+   * @example "config://app-settings"
+   * @example "app://greeting"
+   */
   uri: string;
-  /** Optional title for the resource */
+  /**
+   * Human-readable title for the resource.
+   *
+   * @example "App Settings"
+   */
   title?: string;
-  /** Optional description of the resource */
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "Application configuration and user preferences"
+   */
   description?: string;
-  /** MIME type (optional - inferred from response helpers like text(), object(), etc.) */
+  /**
+   * MIME type (optional when using text(), object(), etc.—inferred from the helper).
+   *
+   * @example "application/json"
+   */
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
   _meta?: Record<string, unknown>;
+  /** Complete callback for the resource template */
+  callbacks?: ResourceTemplateCallbacks;
 }
 
 /**
@@ -307,21 +429,47 @@ export type RemoteDomFramework = "react" | "webcomponents";
  * Base properties shared by all UI resource types
  */
 interface BaseUIResourceDefinition {
-  /** Unique identifier for the resource */
+  /**
+   * Unique identifier for the resource/widget.
+   *
+   * @example "weather-display"
+   * @example "product-search-result"
+   */
   name: string;
-  /** Human-readable title */
+  /**
+   * Human-readable title for the widget.
+   *
+   * @example "Weather Display"
+   */
   title?: string;
-  /** Description of what the widget does */
+  /**
+   * Description of what the widget does; helps the model understand when to use it.
+   *
+   * @example "Display weather information for a city"
+   */
   description?: string;
-  /** Widget properties/parameters configuration */
+  /**
+   * Widget properties/parameters configuration.
+   * Each key maps to a prop schema with type, required, default, description.
+   */
   props?: WidgetProps;
-  /** Preferred frame size [width, height] (e.g., ['800px', '600px']) */
+  /**
+   * Preferred frame size [width, height].
+   *
+   * @example ["800px", "600px"]
+   */
   size?: [string, string];
   /** Resource annotations for discovery and presentation */
   annotations?: ResourceAnnotations;
-  /** Encoding for the resource content (defaults to 'text') */
+  /**
+   * Encoding for the resource content (defaults to 'text').
+   * Use 'blob' for binary content.
+   */
   encoding?: UIEncoding;
-  /** Control automatic tool registration (defaults to true) */
+  /**
+   * Whether to auto-register this widget as an MCP tool (defaults to true).
+   * Set to false when the widget is paired with a custom server.tool().
+   */
   exposeAsTool?: boolean;
   /** Tool annotations when registered as a tool */
   toolAnnotations?: ToolAnnotations;
@@ -414,13 +562,36 @@ export interface AppsSdkUIResource extends BaseUIResourceDefinition {
 }
 
 /**
+ * MCP Apps UI resource - Official MCP Apps Extension (SEP-1865) compatible widget
+ *
+ * This type follows the official MCP Apps Extension pattern:
+ * - Uses text/html;profile=mcp-app mime type
+ * - Dual-protocol support: works with both ChatGPT and MCP Apps clients
+ * - Unified metadata format that adapters transform to protocol-specific formats
+ * - Supports MCP Apps CSP, widget preferences, and other metadata
+ *
+ * @see https://github.com/modelcontextprotocol/ext-apps
+ * @see https://blog.modelcontextprotocol.io/posts/2025-11-21-mcp-apps/
+ */
+export interface McpAppsUIResource extends BaseUIResourceDefinition {
+  type: "mcpApps";
+  /** HTML template content - the component that will be rendered */
+  htmlTemplate: string;
+  /** Unified metadata that works with both protocols (follows SEP-1865 + ChatGPT extensions) */
+  metadata?: UnifiedWidgetMetadata;
+  /** Optional: Apps SDK-specific metadata for advanced ChatGPT features */
+  appsSdkMetadata?: AppsSdkMetadata;
+}
+
+/**
  * Discriminated union of all UI resource types
  */
 export type UIResourceDefinition =
   | ExternalUrlUIResource
   | RawHtmlUIResource
   | RemoteDomUIResource
-  | AppsSdkUIResource;
+  | AppsSdkUIResource
+  | McpAppsUIResource;
 
 export interface WidgetConfig {
   /** Widget directory name */
@@ -434,12 +605,39 @@ export interface WidgetConfig {
 }
 
 export interface WidgetManifest {
+  /**
+   * Unique widget identifier (must match directory/file name).
+   *
+   * @example "weather-display"
+   */
   name: string;
+  /**
+   * Human-readable title.
+   *
+   * @example "Weather Display"
+   */
   title?: string;
+  /**
+   * Description of what the widget displays.
+   *
+   * @example "Display weather information for a city"
+   */
   description?: string;
+  /**
+   * Semantic version of the widget.
+   *
+   * @example "1.0.0"
+   */
   version?: string;
+  /** Widget props schema (type, required, default per prop) */
   props?: WidgetProps;
+  /**
+   * Preferred frame size [width, height].
+   *
+   * @example ["800px", "600px"]
+   */
   size?: [string, string];
+  /** Asset paths for scripts, styles, main entry */
   assets?: {
     main?: string;
     scripts?: string[];
@@ -448,10 +646,22 @@ export interface WidgetManifest {
 }
 
 export interface DiscoverWidgetsOptions {
-  /** Path to widgets directory (defaults to dist/resources/mcp-use/widgets) */
+  /**
+   * Path to widgets directory.
+   * Defaults to dist/resources/mcp-use/widgets.
+   *
+   * @example "./resources/widgets"
+   */
   path?: string;
-  /** Automatically register widgets without manifests */
+  /**
+   * Automatically register widgets that don't have manifests.
+   * Defaults to false.
+   */
   autoRegister?: boolean;
-  /** Filter widgets by name pattern */
+  /**
+   * Filter widgets by name pattern (string or RegExp).
+   *
+   * @example "weather-*"
+   */
   filter?: string | RegExp;
 }

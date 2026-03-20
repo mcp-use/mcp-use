@@ -705,7 +705,7 @@ describe("Telemetry Event Classes", () => {
                   name: "mcp-app",
                   description: "MCP Application",
                   uri: "app://mcp-app.html",
-                  mimeType: "text/html+mcp",
+                  mimeType: "text/html;profile=mcp-app",
                 },
                 handler: () => {},
               },

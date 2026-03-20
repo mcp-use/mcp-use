@@ -1,4 +1,7 @@
 import React from "react";
+import { Logger } from "../logging.js";
+
+const logger = Logger.get("ErrorBoundary");
 
 /**
  * ErrorBoundary that catches React errors and displays a friendly error message
@@ -20,7 +23,7 @@ export class ErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Widget Error:", error, errorInfo);
+    logger.error("Widget Error:", error, errorInfo);
   }
 
   render() {

@@ -116,6 +116,24 @@ export class RedisStreamManager implements StreamManager {
    */
   private heartbeats = new Map<string, NodeJS.Timeout>();
 
+  /**
+   * Unique identifier for this server instance, used for request/response routing.
+   */
+  private serverId = crypto.randomUUID();
+
+  /**
+   * Handler for responses forwarded from other server instances.
+   */
+  private forwardedResponseHandler?: (
+    message: unknown,
+    sessionId: string
+  ) => void;
+
+  /**
+   * Whether the server-level response channel subscription is active.
+   */
+  private serverChannelSubscribed = false;
+
   constructor(config: RedisStreamManagerConfig) {
     this.pubSubClient = config.pubSubClient;
     this.client = config.client;
@@ -145,13 +163,32 @@ export class RedisStreamManager implements StreamManager {
   }
 
   /**
-   * Register an active SSE stream and subscribe to Redis channel
+   * Register an active SSE stream and subscribe to Redis channel.
+   * Idempotent: if the session already has a subscription, it is cleaned up first.
    */
   async create(
     sessionId: string,
     controller: ReadableStreamDefaultController
   ): Promise<void> {
     try {
+      // Clean up any existing subscription for this session to avoid duplicates
+      // (e.g., client reconnects their SSE stream).
+      if (this.localControllers.has(sessionId)) {
+        const oldHeartbeat = this.heartbeats.get(sessionId);
+        if (oldHeartbeat) {
+          clearInterval(oldHeartbeat);
+          this.heartbeats.delete(sessionId);
+        }
+        const channel = this.getChannel(sessionId);
+        const deleteChannel = `delete:${channel}`;
+        try {
+          await this.pubSubClient.unsubscribe?.(channel);
+          await this.pubSubClient.unsubscribe?.(deleteChannel);
+        } catch {
+          // May fail if not subscribed yet — safe to ignore
+        }
+      }
+
       // Store controller locally
       this.localControllers.set(sessionId, controller);
 
@@ -211,11 +248,9 @@ export class RedisStreamManager implements StreamManager {
         if (localController) {
           try {
             localController.enqueue(this.textEncoder.encode(message));
-          } catch (error) {
-            console.warn(
-              `[RedisStreamManager] Failed to enqueue message for ${sessionId}:`,
-              error
-            );
+          } catch {
+            // Client disconnected or stream closed - remove stale entry
+            this.localControllers.delete(sessionId);
           }
         }
       });
@@ -430,5 +465,117 @@ export class RedisStreamManager implements StreamManager {
    */
   get localSize(): number {
     return this.localControllers.size;
+  }
+
+  // --- Distributed request/response routing ---
+
+  private getRequestRouteKey(
+    sessionId: string,
+    requestId: string | number
+  ): string {
+    return `${this.prefix}req-route:${sessionId}:${requestId}`;
+  }
+
+  private getServerChannel(): string {
+    return `${this.prefix}server:${this.serverId}`;
+  }
+
+  /**
+   * Register a pending outbound server-to-client request so the response
+   * can be routed back to this server instance from any other instance.
+   */
+  async registerOutboundRequest(
+    requestId: string | number,
+    sessionId: string
+  ): Promise<void> {
+    const key = this.getRequestRouteKey(sessionId, requestId);
+    const value = JSON.stringify({
+      serverId: this.serverId,
+      sessionId,
+    });
+    await this.client.set(key, value);
+    if (this.client.expire) {
+      await this.client.expire(key, 300); // 5 min TTL
+    }
+  }
+
+  /**
+   * Check if an inbound JSON-RPC response should be forwarded to another server.
+   * If so, publish it to the originating server's channel and return true.
+   */
+  async forwardInboundResponse(
+    message: { id: string | number; [key: string]: unknown },
+    sessionId: string
+  ): Promise<boolean> {
+    const key = this.getRequestRouteKey(sessionId, message.id);
+    const raw = await this.client.get(key);
+    if (!raw) return false;
+
+    let routeInfo: { serverId: string; sessionId: string };
+    try {
+      routeInfo = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+
+    if (routeInfo.serverId === this.serverId) {
+      // Local — the SDK Protocol on this server will handle it directly.
+      return false;
+    }
+
+    // Forward the response to the originating server's channel
+    const targetChannel = `${this.prefix}server:${routeInfo.serverId}`;
+    if (!this.client.publish) {
+      throw new Error(
+        "[RedisStreamManager] Redis client does not support publish method"
+      );
+    }
+    await this.client.publish(
+      targetChannel,
+      JSON.stringify({ response: message, sessionId: routeInfo.sessionId })
+    );
+
+    // Clean up the routing key
+    await this.client.del(key);
+    return true;
+  }
+
+  /**
+   * Register a handler for responses forwarded from other server instances.
+   * Subscribes to this server's dedicated Pub/Sub channel.
+   */
+  onForwardedResponse(
+    handler: (message: unknown, sessionId: string) => void
+  ): void {
+    this.forwardedResponseHandler = handler;
+
+    if (this.serverChannelSubscribed) return;
+    this.serverChannelSubscribed = true;
+
+    const serverChannel = this.getServerChannel();
+    if (!this.pubSubClient.subscribe) {
+      console.warn(
+        "[RedisStreamManager] Redis client does not support subscribe — response forwarding disabled"
+      );
+      return;
+    }
+    this.pubSubClient
+      .subscribe(serverChannel, (raw: string) => {
+        try {
+          const { response, sessionId } = JSON.parse(raw);
+          this.forwardedResponseHandler?.(response, sessionId);
+        } catch (error) {
+          console.warn(
+            `[RedisStreamManager] Failed to parse forwarded response:`,
+            error
+          );
+        }
+      })
+      .catch((error) => {
+        console.error(
+          `[RedisStreamManager] Failed to subscribe to server channel:`,
+          error
+        );
+      });
   }
 }

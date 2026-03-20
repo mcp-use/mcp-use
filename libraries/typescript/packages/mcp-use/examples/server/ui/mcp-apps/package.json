@@ -1,0 +1,50 @@
+{
+  "name": "mcp-apps-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Example MCP server demonstrating dual-protocol widget support (works with both ChatGPT and MCP Apps clients)",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "starter",
+    "tools",
+    "resources",
+    "prompts",
+    "uiresource",
+    "ui",
+    "react",
+    "widgets",
+    "mcp-ui",
+    "mcp-apps"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "deploy": "mcp-use deploy"
+  },
+  "dependencies": {
+    "@openai/apps-sdk-ui": "^0.2.1",
+    "@tanstack/react-query": "^5.90.12",
+    "mcp-use": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router": "^7.12.0",
+    "tailwindcss": "^4.2.0",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.0",
+    "@types/node": "^25.0.2",
+    "@vitejs/plugin-react": "^5.1.4",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  },
+  "overrides": {
+    "sugarss": "^5.0.1"
+  }
+}

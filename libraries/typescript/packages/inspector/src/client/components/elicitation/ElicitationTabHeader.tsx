@@ -37,7 +37,10 @@ export function ElicitationTabHeader({
       <div className="flex items-center gap-2 flex-1">
         {!isSearchExpanded ? (
           <>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <h2
+              className="text-lg font-medium text-gray-900 dark:text-gray-100"
+              data-testid="elicitation-tab-header"
+            >
               Elicitation
             </h2>
             <Badge

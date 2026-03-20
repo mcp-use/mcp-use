@@ -19,7 +19,8 @@ import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
 import { ObservabilityManager } from "../observability/index.js";
 import type { MCPSession } from "../session.js";
-import { extractModelInfo, Telemetry } from "../telemetry/index.js";
+import { extractModelInfo } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 import { createSystemMessage } from "./prompts/system_prompt_builder.js";
 import {
@@ -65,6 +66,7 @@ export interface RunOptions<T = string> {
   manageConnector?: boolean;
   externalHistory?: BaseMessage[];
   schema?: ZodSchema<T>;
+  signal?: AbortSignal;
 }
 
 /**
@@ -76,13 +78,15 @@ function normalizeRunOptions<T>(
   maxSteps?: number,
   manageConnector?: boolean,
   externalHistory?: BaseMessage[],
-  outputSchema?: ZodSchema<T>
+  outputSchema?: ZodSchema<T>,
+  signal?: AbortSignal
 ): {
   query: string;
   maxSteps?: number;
   manageConnector?: boolean;
   externalHistory?: BaseMessage[];
   outputSchema?: ZodSchema<T>;
+  signal?: AbortSignal;
 } {
   // Check if first argument is an options object
   if (typeof queryOrOptions === "object" && queryOrOptions !== null) {
@@ -93,6 +97,7 @@ function normalizeRunOptions<T>(
       manageConnector: options.manageConnector,
       externalHistory: options.externalHistory,
       outputSchema: options.schema,
+      signal: options.signal,
     };
   }
 
@@ -103,6 +108,7 @@ function normalizeRunOptions<T>(
     manageConnector,
     externalHistory,
     outputSchema,
+    signal,
   };
 }
 
@@ -124,6 +130,8 @@ export class MCPAgent {
   private disallowedTools: string[];
   private additionalTools: StructuredToolInterface[];
   public toolsUsedNames: string[] = [];
+  private exposeResourcesAsTools: boolean = true;
+  private exposePromptsAsTools: boolean = true;
   private useServerManager: boolean;
   private verbose: boolean;
   private observe: boolean;
@@ -253,6 +261,8 @@ export class MCPAgent {
     this.disallowedTools = options.disallowedTools ?? [];
     this.additionalTools = options.additionalTools ?? [];
     this.toolsUsedNames = options.toolsUsedNames ?? [];
+    this.exposeResourcesAsTools = options.exposeResourcesAsTools ?? true;
+    this.exposePromptsAsTools = options.exposePromptsAsTools ?? true;
     this.useServerManager = options.useServerManager ?? false;
     this.verbose = options.verbose ?? false;
     this.observe = options.observe ?? true;
@@ -435,16 +445,18 @@ export class MCPAgent {
             );
           }
         } else {
-          // Create tools, resources, and prompts from the client
-          const tools = await this.adapter.createToolsFromConnectors(
-            Object.values(this.sessions).map((session) => session.connector)
+          // Create tools from the client; resources and prompts are optional
+          const connectors = Object.values(this.sessions).map(
+            (session) => session.connector
           );
-          const resources = await this.adapter.createResourcesFromConnectors(
-            Object.values(this.sessions).map((session) => session.connector)
-          );
-          const prompts = await this.adapter.createPromptsFromConnectors(
-            Object.values(this.sessions).map((session) => session.connector)
-          );
+          const tools =
+            await this.adapter.createToolsFromConnectors(connectors);
+          const resources = this.exposeResourcesAsTools
+            ? await this.adapter.createResourcesFromConnectors(connectors)
+            : [];
+          const prompts = this.exposePromptsAsTools
+            ? await this.adapter.createPromptsFromConnectors(connectors)
+            : [];
           this._tools = [...tools, ...resources, ...prompts];
           logger.info(
             `🛠️ Created ${this._tools.length} LangChain items from client: ` +
@@ -1102,7 +1114,9 @@ export class MCPAgent {
     query: string,
     maxSteps?: number,
     manageConnector?: boolean,
-    externalHistory?: BaseMessage[]
+    externalHistory?: BaseMessage[],
+    outputSchema?: undefined,
+    signal?: AbortSignal
   ): Promise<string>;
 
   /**
@@ -1114,7 +1128,8 @@ export class MCPAgent {
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>
+    outputSchema?: ZodSchema<T>,
+    signal?: AbortSignal
   ): Promise<T>;
 
   public async run<T>(
@@ -1122,7 +1137,8 @@ export class MCPAgent {
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>
+    outputSchema?: ZodSchema<T>,
+    signal?: AbortSignal
   ): Promise<string | T> {
     // Normalize input to internal parameters
     const {
@@ -1131,12 +1147,14 @@ export class MCPAgent {
       manageConnector: manage,
       externalHistory: history,
       outputSchema: schema,
+      signal: abortSignal,
     } = normalizeRunOptions(
       queryOrOptions,
       maxSteps,
       manageConnector,
       externalHistory,
-      outputSchema
+      outputSchema,
+      signal
     );
 
     // Delegate to remote agent if in remote mode
@@ -1144,7 +1162,14 @@ export class MCPAgent {
       return this.remoteAgent.run(query, steps, manage, history, schema);
     }
 
-    const generator = this.stream<T>(query, steps, manage, history, schema);
+    const generator = this.stream<T>(
+      query,
+      steps,
+      manage,
+      history,
+      schema,
+      abortSignal
+    );
     return this._consumeAndReturn(generator);
   }
 
@@ -1167,7 +1192,8 @@ export class MCPAgent {
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>
+    outputSchema?: ZodSchema<T>,
+    signal?: AbortSignal
   ): AsyncGenerator<AgentStep, string | T, void>;
 
   public async *stream<T = string>(
@@ -1175,7 +1201,8 @@ export class MCPAgent {
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>
+    outputSchema?: ZodSchema<T>,
+    signal?: AbortSignal
   ): AsyncGenerator<AgentStep, string | T, void> {
     // Normalize input to internal parameters
     const {
@@ -1184,12 +1211,14 @@ export class MCPAgent {
       manageConnector: manage,
       externalHistory: history,
       outputSchema: schema,
+      signal: abortSignal,
     } = normalizeRunOptions(
       queryOrOptions,
       maxSteps,
       manageConnector,
       externalHistory,
-      outputSchema
+      outputSchema,
+      signal
     );
 
     // Delegate to remote agent if in remote mode
@@ -1297,9 +1326,16 @@ export class MCPAgent {
           ...(this.metadata.session_id && {
             sessionId: this.metadata.session_id,
           }),
+          // Pass abort signal if provided
+          ...(abortSignal && { signal: abortSignal }),
         });
 
         for await (const chunk of stream) {
+          // Check for abort
+          if (abortSignal?.aborted) {
+            break;
+          }
+
           // chunk is a dict with node names as keys
           // The agent node will have 'messages' with the AI response
           // The tools node will have 'messages' with tool calls and results
@@ -1696,7 +1732,8 @@ export class MCPAgent {
     maxSteps?: number,
     manageConnector?: boolean,
     externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>
+    outputSchema?: ZodSchema<T>,
+    signal?: AbortSignal
   ): AsyncGenerator<StreamEvent, void, void>;
 
   public async *streamEvents<T = string>(
@@ -1704,7 +1741,8 @@ export class MCPAgent {
     maxSteps?: number,
     manageConnector = true,
     externalHistory?: BaseMessage[],
-    outputSchema?: ZodSchema<T>
+    outputSchema?: ZodSchema<T>,
+    signal?: AbortSignal
   ): AsyncGenerator<StreamEvent, void, void> {
     // Normalize input to internal parameters
     const normalized = normalizeRunOptions(
@@ -1712,7 +1750,8 @@ export class MCPAgent {
       maxSteps,
       manageConnector,
       externalHistory,
-      outputSchema
+      outputSchema,
+      signal
     );
     let { query } = normalized;
     const {
@@ -1720,6 +1759,7 @@ export class MCPAgent {
       manageConnector: manage,
       externalHistory: history,
       outputSchema: schema,
+      signal: abortSignal,
     } = normalized;
 
     let initializedHere = false;
@@ -1808,11 +1848,18 @@ export class MCPAgent {
           ...(this.metadata.session_id && {
             sessionId: this.metadata.session_id,
           }),
+          // Pass abort signal if provided
+          ...(abortSignal && { signal: abortSignal }),
         }
       );
 
       // Yield each event
       for await (const event of eventStream) {
+        // Check for abort
+        if (abortSignal?.aborted) {
+          break;
+        }
+
         eventCount++;
 
         // Skip null or invalid events

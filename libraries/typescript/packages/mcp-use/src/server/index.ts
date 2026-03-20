@@ -25,6 +25,12 @@ export {
   runWithContext,
 } from "./context-storage.js";
 
+// Client capability utilities
+export {
+  supportsApps,
+  type UserContext,
+} from "./tools/tool-execution-helpers.js";
+
 // Response helper utilities for tools and resources
 export {
   array,
@@ -46,6 +52,30 @@ export {
   type TypedCallToolResult,
   type WidgetResponseConfig,
 } from "./utils/response-helpers.js";
+
+// Completion utilities for prompt arguments
+export {
+  completable,
+  type Completable,
+  type CompletionContext,
+} from "./utils/completion-helpers.js";
+export {
+  enumSchema,
+  legacyEnum,
+  titledEnum,
+  titledMultiEnum,
+  untitledEnum,
+  untitledMultiEnum,
+  type ElicitationEnumFieldSchema,
+  type ElicitationEnumObjectSchema,
+  type EnumOption,
+  type LegacyEnumOption,
+  type LegacyEnumSchema,
+  type TitledEnumSchema,
+  type TitledMultiEnumSchema,
+  type UntitledEnumSchema,
+  type UntitledMultiEnumSchema,
+} from "./utils/elicitation-helpers.js";
 
 // OAuth utilities for authentication and authorization
 export {
@@ -94,11 +124,27 @@ export {
 export {
   buildWidgetUrl,
   createExternalUrlResource,
+  createMcpAppsResource,
   createRawHtmlResource,
   createRemoteDomResource,
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./widgets/mcp-ui-adapter.js";
+
+// Protocol adapters for dual-protocol widget support
+export {
+  AppsSdkAdapter,
+  McpAppsAdapter,
+  type CSPConfig,
+  type ProtocolAdapter,
+  type UnifiedWidgetMetadata,
+} from "./widgets/adapters/index.js";
+
+// Re-export useful constants from @modelcontextprotocol/ext-apps
+export {
+  RESOURCE_MIME_TYPE,
+  RESOURCE_URI_META_KEY,
+} from "@modelcontextprotocol/ext-apps/server";
 
 // Middleware adapter utility functions
 export {
@@ -113,11 +159,25 @@ export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 
+// Landing page generator for browser requests
+export {
+  generateLandingPage,
+  type LandingPageTool,
+  type LandingPagePrompt,
+  type LandingPageResource,
+} from "./landing.js";
+
+// Tool registry type generator (for CLI generate-types command)
+export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
+
 export type {
+  AppsSdkUIResource,
+  ClientCapabilityChecker,
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
   GetPromptResult,
   InputDefinition,
+  McpAppsUIResource,
   McpContext,
   PromptCallback,
   PromptDefinition,

@@ -1,0 +1,55 @@
+---
+title: "Json Schema"
+description: "Utilities for producing MCP-compliant JSON Schemas API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/json_schema.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/json_schema.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/utils/json_schema.py</a>
+</Callout>
+
+Utilities for producing MCP-compliant JSON Schemas.
+
+Pydantic represents ``Optional[T]`` as ``\{"anyOf": [\{"type": "T"\}, \{"type":
+"null"\}]\}``.  While valid JSON Schema, this is not idiomatic MCP — the protocol
+signals optionality by omitting the property from the ``required`` array.  The
+``anyOf``/null pattern also confuses several MCP clients (e.g. the Inspector)
+which fail to render descriptions for those fields.
+
+``simplify_optional_schema`` walks a JSON Schema object and collapses every
+nullable ``anyOf`` into the simpler ``\{"type": "T"\}`` form.
+
+
+## simplify_optional_schema
+<Card type="info">
+### `function` simplify_optional_schema
+
+Return *schema* with nullable ``anyOf`` patterns simplified.
+
+    Returns a deep copy when properties need simplification.  When the schema
+    has no ``properties`` key (or it is empty), the original dict is returned
+    as-is since there is nothing to transform.
+
+    Only touches ``properties`` of the top-level object schema — nested
+    ``$defs`` and deeply nested objects are left as-is since MCP tool schemas
+    are typically flat.
+
+```python
+from mcp_use.server.utils.json_schema import simplify_optional_schema
+```
+
+**Parameters**
+><ParamField body="schema" type="dict[str, Any]" required="True" >   Dictionary of key-value pairs </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def simplify_optional_schema(schema: dict[str, Any]):
+```
+
+</Card>

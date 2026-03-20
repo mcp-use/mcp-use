@@ -20,15 +20,7 @@ import { NotFound } from "../ui/not-found";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { PromptMessageCard } from "./PromptMessageCard";
 import type { GetPromptResult } from "@modelcontextprotocol/sdk/types.js";
-
-export interface PromptResult {
-  promptName: string;
-  args: Record<string, unknown>;
-  result: GetPromptResult | { error?: string; isError?: boolean };
-  error?: string;
-  timestamp: number;
-  duration?: number;
-}
+import type { PromptResult } from "../../hooks/useMCPPrompts";
 
 interface PromptResultDisplayProps {
   results: PromptResult[];
@@ -77,7 +69,7 @@ function extractErrorMessage(
 
   // Handle error property directly
   if ("error" in result && result.error) {
-    return result.error;
+    return String(result.error);
   }
 
   // GetPromptResult has messages, not content
@@ -310,15 +302,16 @@ export function PromptResultDisplay({
               </div>
             ) : formattedMode && hasMessages ? (
               <div className="space-y-3">
-                {result.result.messages.map(
-                  (message: any, msgIndex: number) => (
-                    <PromptMessageCard
-                      key={msgIndex}
-                      message={message}
-                      index={msgIndex}
-                    />
-                  )
-                )}
+                {("messages" in result.result
+                  ? result.result.messages
+                  : []
+                ).map((message: any, msgIndex: number) => (
+                  <PromptMessageCard
+                    key={msgIndex}
+                    message={message}
+                    index={msgIndex}
+                  />
+                ))}
               </div>
             ) : (
               <JSONDisplay

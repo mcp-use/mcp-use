@@ -7,6 +7,7 @@ import prettierConfig from "eslint-config-prettier";
 export default [
   {
     ignores: [
+      "**/.mcp-use/**",
       "**/node_modules/**",
       "**/dist/**",
       "**/build/**",
@@ -18,6 +19,8 @@ export default [
       "packages/*/dist/**",
       "packages/*/build/**",
       "packages/*/node_modules/**",
+      "test_app/**",
+      "**/playwright-report/**",
     ],
   },
   {
@@ -276,9 +279,9 @@ export default [
       },
     },
   },
-  // mcp-use-ts package
+  // mcp-use package (source files only, excludes config/test files)
   {
-    files: ["packages/mcp-use-ts/**/*.ts"],
+    files: ["packages/mcp-use/src/**/*.ts", "packages/mcp-use/index.ts"],
     rules: {
       "import/no-extraneous-dependencies": [
         "error",

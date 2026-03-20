@@ -41,8 +41,8 @@ class OpenAIMCPAdapter(BaseAdapter[dict[str, Any]]):
         if mcp_tool.name in self.disallowed_tools:
             return None
 
-        self.tool_executors[mcp_tool.name] = (
-            lambda connector=connector, name=mcp_tool.name, **kwargs: connector.call_tool(name, kwargs)
+        self.tool_executors[mcp_tool.name] = lambda connector=connector, name=mcp_tool.name, **kwargs: (
+            connector.call_tool(name, kwargs)
         )
 
         fixed_schema = self.fix_schema(mcp_tool.inputSchema)
@@ -63,8 +63,8 @@ class OpenAIMCPAdapter(BaseAdapter[dict[str, Any]]):
         if tool_name in self.disallowed_tools:
             return None
 
-        self.tool_executors[tool_name] = (
-            lambda connector=connector, uri=mcp_resource.uri, **kwargs: connector.read_resource(uri)
+        self.tool_executors[tool_name] = lambda connector=connector, uri=mcp_resource.uri, **kwargs: (
+            connector.read_resource(uri)
         )
 
         mcp_resource_desc = mcp_resource.description
@@ -83,8 +83,8 @@ class OpenAIMCPAdapter(BaseAdapter[dict[str, Any]]):
         if mcp_prompt.name in self.disallowed_tools:
             return None
 
-        self.tool_executors[mcp_prompt.name] = (
-            lambda connector=connector, name=mcp_prompt.name, **kwargs: connector.get_prompt(name, kwargs)
+        self.tool_executors[mcp_prompt.name] = lambda connector=connector, name=mcp_prompt.name, **kwargs: (
+            connector.get_prompt(name, kwargs)
         )
 
         # Preparing JSON schema for prompt arguments

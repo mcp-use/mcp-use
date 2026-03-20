@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "mcp-use": ["../.."],
+      "mcp-use/*": ["../../src/*"]
+    }
+  },
+  "include": ["node/**/*.ts", "browser/**/*.ts"]
+}

@@ -5,6 +5,8 @@ import type {
 import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import type {
   CallToolResult,
+  CompleteRequestParams,
+  CompleteResult,
   CreateMessageRequest,
   CreateMessageResult,
   ElicitRequestFormParams,
@@ -22,7 +24,7 @@ import {
 import { logger } from "../logging.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
-import { Telemetry } from "../telemetry/index.js";
+import { Telemetry } from "../telemetry/telemetry-node.js";
 
 /**
  * Handler function for server notifications
@@ -81,9 +83,30 @@ export interface ConnectorInitOptions {
    * - Form mode: Collect structured data with JSON schema validation
    * - URL mode: Direct users to external URLs for sensitive interactions
    */
+  onElicitation?: (
+    params: ElicitRequestFormParams | ElicitRequestURLParams
+  ) => Promise<ElicitResult>;
+  /**
+   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
+   */
   elicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
+  /**
+   * Optional callback for server notifications.
+   * When provided, registered as initial notification handler.
+   */
+  onNotification?: NotificationHandler;
+  /**
+   * Reconnection options for streamable HTTP transport.
+   * Controls retry behavior of the underlying `StreamableHTTPClientTransport`.
+   */
+  reconnectionOptions?: {
+    maxReconnectionDelay?: number;
+    initialReconnectionDelay?: number;
+    reconnectionDelayGrowFactor?: number;
+    maxRetries?: number;
+  };
 }
 
 /**
@@ -101,20 +124,30 @@ export abstract class BaseConnector {
   protected rootsCache: Root[] = [];
 
   constructor(opts: ConnectorInitOptions = {}) {
-    // Support both new and deprecated name
+    // Support canonical and deprecated names
     const finalOpts = {
       ...opts,
       onSampling: opts.onSampling ?? opts.samplingCallback,
+      onElicitation: opts.onElicitation ?? opts.elicitationCallback,
     };
     if (opts.samplingCallback && !opts.onSampling) {
-      console.warn(
+      logger.warn(
         '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
+      );
+    }
+    if (opts.elicitationCallback && !opts.onElicitation) {
+      console.warn(
+        '[BaseConnector] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
       );
     }
     this.opts = finalOpts;
     // Initialize roots from options
     if (finalOpts.roots) {
       this.rootsCache = [...finalOpts.roots];
+    }
+    // Register initial notification handler if provided
+    if (finalOpts.onNotification) {
+      this.notificationHandlers.push(finalOpts.onNotification);
     }
   }
 
@@ -320,7 +353,9 @@ export abstract class BaseConnector {
       logger.debug("setupElicitationHandler: No client available");
       return;
     }
-    if (!this.opts.elicitationCallback) {
+    const elicitationCallback =
+      this.opts.onElicitation ?? this.opts.elicitationCallback;
+    if (!elicitationCallback) {
       logger.debug("setupElicitationHandler: No elicitation callback provided");
       return;
     }
@@ -336,7 +371,7 @@ export abstract class BaseConnector {
         _extra: unknown
       ) => {
         logger.debug("Server requested elicitation, forwarding to callback");
-        return await this.opts.elicitationCallback!(request.params);
+        return await elicitationCallback(request.params);
       }
     );
     logger.debug(
@@ -394,13 +429,26 @@ export abstract class BaseConnector {
     this.serverInfoCache = serverInfo || null;
 
     // Fetch and cache tools
-    const listToolsRes = await this.client.listTools(
-      undefined,
-      defaultRequestOptions
-    );
-    this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
+    // Gracefully handle servers that don't implement tools/list or have no tools
+    try {
+      const listToolsRes = await this.client.listTools(
+        undefined,
+        defaultRequestOptions
+      );
+      this.toolsCache = (listToolsRes.tools ?? []) as Tool[];
+      logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
+    } catch (err: unknown) {
+      const error = err as Error & { code?: number };
+      // If tools/list is not implemented or fails, assume no tools
+      // This commonly happens with blank servers that have no tools registered
+      if (error.code === -32601) {
+        logger.debug("Server does not implement tools/list, assuming no tools");
+      } else {
+        logger.debug("Failed to list tools, assuming empty:", error.message);
+      }
+      this.toolsCache = [];
+    }
 
-    logger.debug(`Fetched ${this.toolsCache.length} tools from server`);
     logger.debug("Server capabilities:", capabilities);
     logger.debug("Server info:", serverInfo);
     return capabilities;
@@ -473,8 +521,15 @@ export abstract class BaseConnector {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
+    logger.debug("[listTools] Fetching fresh tools from server...");
     const result = await this.client.listTools(undefined, options);
-    return (result.tools ?? []) as Tool[];
+    // Create a new array to ensure React detects the change (avoid reference equality issues)
+    const tools = result.tools ? [...result.tools] : [];
+    logger.debug(
+      `[listTools] Returned ${tools.length} tools:`,
+      tools.map((t) => t.name)
+    );
+    return tools;
   }
 
   /**
@@ -547,6 +602,28 @@ export abstract class BaseConnector {
 
     logger.debug("Listing resource templates");
     return await this.client.listResourceTemplates(undefined, options);
+  }
+
+  /**
+   * Request completion suggestions for a prompt or resource template argument
+   *
+   * @param params - Completion request parameters
+   * @param options - Request options
+   * @returns Completion suggestions from the server
+   */
+  async complete(
+    params: CompleteRequestParams,
+    options?: RequestOptions
+  ): Promise<CompleteResult> {
+    if (!this.client) {
+      throw new Error("MCP client is not connected");
+    }
+    logger.debug("[complete] Requesting completions for:", params.ref);
+    const result = await this.client.complete(params, options);
+    logger.debug(
+      `[complete] Received ${result.completion.values.length} suggestions`
+    );
+    return result;
   }
 
   /** Read a resource by URI. */

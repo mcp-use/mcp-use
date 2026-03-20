@@ -2,17 +2,23 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import * as React from "react";
 import { cn } from "@/client/lib/utils";
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+const DropdownMenu: typeof DropdownMenuPrimitive.Root =
+  DropdownMenuPrimitive.Root;
 
-const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+const DropdownMenuTrigger: typeof DropdownMenuPrimitive.Trigger =
+  DropdownMenuPrimitive.Trigger;
 
-const DropdownMenuGroup = DropdownMenuPrimitive.Group;
+const DropdownMenuGroup: typeof DropdownMenuPrimitive.Group =
+  DropdownMenuPrimitive.Group;
 
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
+const DropdownMenuPortal: typeof DropdownMenuPrimitive.Portal =
+  DropdownMenuPrimitive.Portal;
 
-const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+const DropdownMenuSub: typeof DropdownMenuPrimitive.Sub =
+  DropdownMenuPrimitive.Sub;
 
-const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+const DropdownMenuRadioGroup: typeof DropdownMenuPrimitive.RadioGroup =
+  DropdownMenuPrimitive.RadioGroup;
 
 function DropdownMenuSubTrigger({
   ref,

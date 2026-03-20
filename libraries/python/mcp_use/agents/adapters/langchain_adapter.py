@@ -13,9 +13,15 @@ from typing import Any
 from jsonschema_pydantic import jsonschema_to_pydantic
 from langchain_core.tools import BaseTool, StructuredTool
 from mcp.types import (
+    AudioContent,
+    BlobResourceContents,
     CallToolResult,
+    EmbeddedResource,
+    ImageContent,
     Prompt,
     Resource,
+    TextContent,
+    TextResourceContents,
 )
 from mcp.types import (
     Tool as MCPTool,
@@ -26,6 +32,79 @@ from mcp_use.agents.adapters.base import BaseAdapter
 from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.errors.error_formatting import format_error
 from mcp_use.logging import logger
+
+LangChainContentBlock = dict[str, Any]
+LangChainToolResult = str | LangChainContentBlock | list[LangChainContentBlock]
+
+
+def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContentBlock]:
+    """Convert MCP tool result content to LangChain-compatible format.
+
+    Maps MCP content types to LangChain content blocks:
+      - TextContent        → {"type": "text", "text": "..."}
+      - ImageContent       → {"type": "image", "source_type": "base64", ...}
+      - AudioContent       → {"type": "audio", "source_type": "base64", ...}
+      - EmbeddedResource   → text or file block depending on resource type
+
+    If the result is a single TextContent, returns a plain string for simplicity.
+    """
+    if not content:
+        return ""
+
+    # Single TextContent → plain string (most common case)
+    if len(content) == 1 and isinstance(content[0], TextContent):
+        return content[0].text
+
+    blocks: list[LangChainContentBlock] = []
+    for item in content:
+        match item:
+            case TextContent():
+                blocks.append({"type": "text", "text": item.text})
+            case ImageContent():
+                blocks.append(
+                    {
+                        "type": "image",
+                        "source_type": "base64",
+                        "data": item.data,
+                        "mime_type": item.mimeType,
+                    }
+                )
+            case AudioContent():
+                blocks.append(
+                    {
+                        "type": "audio",
+                        "source_type": "base64",
+                        "data": item.data,
+                        "mime_type": item.mimeType,
+                    }
+                )
+            case EmbeddedResource():
+                resource = item.resource
+                if isinstance(resource, TextResourceContents):
+                    blocks.append({"type": "text", "text": resource.text})
+                elif isinstance(resource, BlobResourceContents):
+                    blocks.append(
+                        {
+                            "type": "file",
+                            "source_type": "base64",
+                            "data": resource.blob,
+                            "mime_type": resource.mimeType or "application/octet-stream",
+                        }
+                    )
+                else:
+                    blocks.append({"type": "text", "text": str(resource)})
+            case _:
+                # Fallback for unknown types
+                blocks.append({"type": "text", "text": str(item)})
+
+    if not blocks:
+        return ""
+
+    # If all blocks are text, join them as a plain string
+    if all(b["type"] == "text" for b in blocks):
+        return "\n".join(b["text"] for b in blocks)
+
+    return blocks
 
 
 class LangChainAdapter(BaseAdapter[BaseTool]):
@@ -75,24 +154,37 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
         _connector = connector
         _tool_name = mcp_tool.name or "NO NAME"
 
-        async def _execute_tool(**kwargs: Any) -> str:
+        async def _execute_tool(**kwargs: Any) -> LangChainToolResult:
             """Execute the MCP tool asynchronously.
 
             Args:
                 kwargs: The arguments to pass to the tool.
 
             Returns:
-                The result of the tool execution as a string.
+                The result of the tool execution.
             """
             logger.debug(f'MCP tool: "{_tool_name}" received input: {kwargs}')
 
             try:
                 tool_result: CallToolResult = await _connector.call_tool(_tool_name, kwargs)
+                converted_content: LangChainToolResult | None = None
                 try:
-                    return str(tool_result.content)
+                    converted_content = _mcp_content_to_langchain(tool_result.content)
+                    if tool_result.isError:
+                        error_message = (
+                            converted_content
+                            if isinstance(converted_content, str)
+                            else "MCP tool returned an error result"
+                        )
+                        raise RuntimeError(error_message or "MCP tool returned an empty error result")
+                    return converted_content
                 except Exception as e:
                     logger.error(f"Error parsing tool result: {e}")
-                    return format_error(e, tool=_tool_name, tool_content=tool_result.content)
+                    return format_error(
+                        e,
+                        tool=_tool_name,
+                        tool_content=converted_content if converted_content is not None else tool_result.content,
+                    )
             except Exception as e:
                 return format_error(e, tool=_tool_name)
 

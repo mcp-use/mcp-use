@@ -5,16 +5,193 @@ import {
   checkClientFiles,
   getClientDistPath,
   getContentType,
-} from "./shared-utils.js";
+} from "./file-utils.js";
+import { getInspectorVersion } from "./version.js";
+
+// ---------------------------------------------------------------------------
+// CDN mode (opt-in)
+// Set INSPECTOR_USE_CDN=true to serve the inspector shell from CDN instead of
+// local dist/web/ files. Defaults to false so existing tests and workflows are
+// unaffected until the CDN is deployed and validated end-to-end.
+// ---------------------------------------------------------------------------
+const USE_CDN = process.env.INSPECTOR_USE_CDN === "true";
+
+// Version is embedded at build time — works regardless of where cli.js is
+// located in the installed package (avoids path-traversal bugs when bundled).
+const INSPECTOR_VERSION = getInspectorVersion();
+
+// Allow overriding the CDN base for local testing:
+//   INSPECTOR_CDN_BASE=http://localhost:4000 INSPECTOR_USE_CDN=true node dist/server/server.js
+const CDN_BASE =
+  process.env.INSPECTOR_CDN_BASE ?? "https://inspector-cdn.mcp-use.com";
+const CDN_JS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.js`;
+const CDN_CSS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.css`;
 
 /**
- * Register routes that serve the built inspector client, handle SPA entry routing, and provide a fallback when client files are missing.
- *
- * This registers asset serving under the inspector path, redirects the root path to `/inspector` while preserving query parameters, serves the SPA entry (`index.html`) for inspector routes, and installs a final catch-all that serves the SPA or a build-missing fallback page. If `clientDistPath` is not provided, the built client path is resolved automatically.
- *
- * @param clientDistPath - Optional path to the built inspector client directory; when omitted, the implementation resolves the default distribution path
+ * Runtime configuration injected into the inspector HTML at serve time.
  */
-export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
+interface RuntimeConfig {
+  /** Whether the server is running in development mode */
+  devMode?: boolean;
+  /** Override sandbox origin for MCP Apps widgets behind reverse proxies */
+  sandboxOrigin?: string | null;
+  /** Relative path to the MCP proxy (e.g. "/inspector/api/proxy"). When set, the client uses it for autoProxyFallback. Omit when the proxy is not available (e.g. Python server serving inspector). */
+  proxyUrl?: string | null;
+}
+
+/**
+ * Inject runtime configuration scripts into the inspector HTML.
+ * Used by both the CDN shell and the local file-serving path.
+ */
+function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
+  if (!config) return html;
+
+  const scripts: string[] = [];
+
+  if (config.devMode) {
+    scripts.push(`<script>window.__MCP_DEV_MODE__ = true;</script>`);
+  }
+
+  if (config.sandboxOrigin) {
+    scripts.push(
+      `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+    );
+  }
+
+  if (config.proxyUrl !== undefined) {
+    scripts.push(
+      `<script>window.__MCP_PROXY_URL__ = ${JSON.stringify(config.proxyUrl)};</script>`
+    );
+  }
+
+  if (scripts.length === 0) return html;
+
+  const injection = scripts.join("\n    ");
+  return html.replace("</head>", `    ${injection}\n  </head>`);
+}
+
+/**
+ * Generate the minimal HTML shell that loads the inspector from CDN.
+ *
+ * The JS runs in the context of the serving origin so all /inspector/api/*
+ * calls remain same-origin regardless of where the CDN script is hosted.
+ */
+function generateCdnShellHtml(config?: RuntimeConfig): string {
+  const runtimeScripts = (() => {
+    if (!config) return "";
+    const scripts: string[] = [];
+    if (config.devMode) {
+      scripts.push(`<script>window.__MCP_DEV_MODE__ = true;</script>`);
+    }
+    if (config.sandboxOrigin) {
+      scripts.push(
+        `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+      );
+    }
+    if (config.proxyUrl !== undefined) {
+      scripts.push(
+        `<script>window.__MCP_PROXY_URL__ = ${JSON.stringify(config.proxyUrl)};</script>`
+      );
+    }
+    return scripts.join("\n    ");
+  })();
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="${CDN_BASE}/favicon-black.svg"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="${CDN_BASE}/favicon-white.svg"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="${CDN_BASE}/favicon-black.svg"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="${CDN_CSS_URL}" />
+    <title>Inspector | mcp-use</title>
+    <script>window.__INSPECTOR_VERSION__ = ${JSON.stringify(INSPECTOR_VERSION)};</script>
+    ${runtimeScripts}
+  </head>
+  <body>
+    <script>
+      if (typeof window !== "undefined" && typeof window.process === "undefined") {
+        window.process = {
+          env: {},
+          platform: "browser",
+          browser: true,
+          version: "v18.0.0",
+          versions: { node: "18.0.0" },
+          cwd: () => "/",
+          nextTick: (fn, ...args) => queueMicrotask(() => fn(...args)),
+        };
+      }
+    </script>
+    <div id="root"></div>
+    <script type="module" src="${CDN_JS_URL}"></script>
+  </body>
+</html>`;
+}
+
+/**
+ * Register routes that serve the inspector client.
+ *
+ * Default (INSPECTOR_USE_CDN unset or "false"): serves built files from
+ * dist/web/ exactly as before.
+ *
+ * Opt-in (INSPECTOR_USE_CDN=true): serves a minimal inline HTML shell that
+ * loads the inspector bundle from CDN. No local file reads at request time.
+ */
+export function registerStaticRoutes(
+  app: Hono,
+  clientDistPath?: string,
+  runtimeConfig?: RuntimeConfig
+) {
+  // When the inspector's own server serves, the proxy is always available.
+  // Default proxyUrl so the client can use it; callers may override with null to disable.
+  const effectiveConfig: RuntimeConfig = {
+    ...runtimeConfig,
+    proxyUrl:
+      runtimeConfig?.proxyUrl !== undefined
+        ? runtimeConfig.proxyUrl
+        : "/inspector/api/proxy",
+  };
+
+  if (USE_CDN) {
+    const serveShell = (c: any) =>
+      c.html(generateCdnShellHtml(effectiveConfig));
+
+    app.get("/", (c) => {
+      const url = new URL(c.req.url);
+      return c.redirect(`/inspector${url.search}`);
+    });
+
+    app.get("/inspector", serveShell);
+    app.get("/inspector/*", serveShell);
+    app.post("/inspector/*", serveShell);
+    app.get("*", serveShell);
+    return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Default: local dist/web/ file serving (original behavior)
+  // -------------------------------------------------------------------------
   const distPath = clientDistPath || getClientDistPath();
 
   if (!checkClientFiles(distPath)) {
@@ -23,7 +200,6 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
       `   Run 'yarn build' in the inspector package to build the UI`
     );
 
-    // Fallback for when client is not built
     app.get("*", (c) => {
       return c.html(`
       <!DOCTYPE html>
@@ -41,13 +217,12 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
     return;
   }
 
-  // Serve static assets from /inspector/assets/* (matching Vite's base path)
+  // Serve static assets from /inspector/assets/*
   app.get("/inspector/assets/*", (c) => {
     const path = c.req.path.replace("/inspector/assets/", "assets/");
     const fullPath = join(distPath, path);
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath);
-      // Set appropriate content type based on file extension
       const contentType = getContentType(fullPath);
       c.header("Content-Type", contentType);
       return c.body(content);
@@ -55,19 +230,20 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
     return c.notFound();
   });
 
-  // Redirect root path to /inspector (preserving query parameters)
+  // Redirect root to /inspector preserving query parameters
   app.get("/", (c) => {
     const url = new URL(c.req.url);
-    const queryString = url.search; // includes the '?' if there are params
+    const queryString = url.search;
     return c.redirect(`/inspector${queryString}`);
   });
 
-  // Serve the main HTML file for /inspector and all other routes (SPA routing)
-  // Need to match both /inspector and /inspector/* for React Router to work
-  app.get("/inspector", (c) => {
+  const serveIndex = (c: any) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, "utf-8");
+      const content = injectRuntimeConfig(
+        readFileSync(indexPath, "utf-8"),
+        effectiveConfig
+      );
       return c.html(content);
     }
     return c.html(`
@@ -82,27 +258,19 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
         </body>
       </html>
     `);
-  });
-
-  // Catch-all for any /inspector/* routes (for React Router SPA routing)
-  // Handle both GET and POST since some OAuth flows use POST
-  const handleInspectorRoute = (c: any) => {
-    const indexPath = join(distPath, "index.html");
-    if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, "utf-8");
-      return c.html(content);
-    }
-    return c.notFound();
   };
 
-  app.get("/inspector/*", handleInspectorRoute);
-  app.post("/inspector/*", handleInspectorRoute);
+  app.get("/inspector", serveIndex);
+  app.get("/inspector/*", serveIndex);
+  app.post("/inspector/*", serveIndex);
 
-  // Final catch-all for root and other routes
   app.get("*", (c) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath, "utf-8");
+      const content = injectRuntimeConfig(
+        readFileSync(indexPath, "utf-8"),
+        effectiveConfig
+      );
       return c.html(content);
     }
     return c.html(`
@@ -121,7 +289,11 @@ export function registerStaticRoutes(app: Hono, clientDistPath?: string) {
 }
 
 /**
- * Register static routes with development mode proxy support
+ * Register static routes with development mode proxy support.
+ *
+ * When VITE_DEV=true, proxies all non-API requests to the Vite dev server
+ * at localhost:3000 for HMR during inspector development. Otherwise falls
+ * back to registerStaticRoutes (local files or CDN depending on INSPECTOR_USE_CDN).
  */
 export function registerStaticRoutesWithDevProxy(
   app: Hono,
@@ -132,16 +304,13 @@ export function registerStaticRoutesWithDevProxy(
     process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
   if (isDev) {
-    // Development mode: proxy client requests to Vite dev server
     console.warn(
       "🔧 Development mode: Proxying client requests to Vite dev server"
     );
 
-    // Proxy all non-API requests to Vite dev server
     app.get("*", async (c) => {
       const path = c.req.path;
 
-      // Skip API routes - both /api/ and /inspector/api/
       if (
         path.startsWith("/api/") ||
         path.startsWith("/inspector/api/") ||
@@ -151,10 +320,9 @@ export function registerStaticRoutesWithDevProxy(
       }
 
       try {
-        // Vite dev server should be running on port 3000
         const viteUrl = `http://localhost:3000${path}`;
         const response = await fetch(viteUrl, {
-          signal: AbortSignal.timeout(1000), // 1 second timeout
+          signal: AbortSignal.timeout(1000),
         });
 
         if (response.ok) {
@@ -169,7 +337,6 @@ export function registerStaticRoutesWithDevProxy(
         console.warn(`Failed to proxy to Vite dev server: ${error}`);
       }
 
-      // Fallback HTML if Vite dev server is not running
       return c.html(`
         <!DOCTYPE html>
         <html>
@@ -185,7 +352,6 @@ export function registerStaticRoutesWithDevProxy(
       `);
     });
   } else {
-    // Production mode OR dev mode with built files: use standard static file serving
     registerStaticRoutes(app, distPath);
   }
 }

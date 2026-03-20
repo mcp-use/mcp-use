@@ -43,66 +43,80 @@ export function convertToolResultToPromptResult(
   // Convert CallToolResult to GetPromptResult
   const messages: PromptMessage[] = [];
 
+  // Normalize content to an array for consistent processing
+  let contentArray: any[] = [];
+  if ((result as any).content) {
+    const content = (result as any).content;
+    if (Array.isArray(content)) {
+      // Standard case: content is already an array
+      contentArray = content;
+    } else if (typeof content === "object" && content.type) {
+      // Edge case: content is a single object with type (wrap in array)
+      contentArray = [content];
+    }
+  } else if (typeof result === "object" && (result as any).type) {
+    // Edge case: result itself is a bare content item (no content property)
+    contentArray = [result];
+  }
+
   // Process content array
-  if (result.content && result.content.length > 0) {
-    for (const content of result.content) {
-      // Each content item becomes a user message
-      // According to MCP spec, prompt messages can have text, image, audio, or resource content
-      if (content.type === "text") {
-        const textContent = content as { type: "text"; text: string };
-        messages.push({
-          role: "user",
-          content: {
-            type: "text",
-            text: textContent.text,
-          },
-        });
-      } else if (content.type === "image") {
-        const imageContent = content as {
-          type: "image";
-          data: string;
+  for (const content of contentArray) {
+    // Each content item becomes a user message
+    // According to MCP spec, prompt messages can have text, image, audio, or resource content
+    if (content.type === "text") {
+      const textContent = content as { type: "text"; text: string };
+      messages.push({
+        role: "user",
+        content: {
+          type: "text",
+          text: textContent.text,
+        },
+      });
+    } else if (content.type === "image") {
+      const imageContent = content as {
+        type: "image";
+        data: string;
+        mimeType?: string;
+      };
+      messages.push({
+        role: "user",
+        content: {
+          type: "image",
+          data: imageContent.data,
+          mimeType: imageContent.mimeType || "image/png",
+        },
+      });
+    } else if (content.type === "resource") {
+      // Embedded resource in prompt
+      const resourceContent = content as {
+        type: "resource";
+        resource: {
+          uri: string;
           mimeType?: string;
+          text?: string;
+          blob?: string;
         };
-        messages.push({
-          role: "user",
-          content: {
-            type: "image",
-            data: imageContent.data,
-            mimeType: imageContent.mimeType || "image/png",
-          },
-        });
-      } else if (content.type === "resource") {
-        // Embedded resource in prompt
-        const resourceContent = content as {
-          type: "resource";
-          resource: {
-            uri: string;
-            mimeType?: string;
-            text?: string;
-            blob?: string;
-          };
-        };
+      };
 
-        const resourceData = resourceContent.resource;
-        const embeddedResource: any = {
-          type: "resource",
-          resource: {
-            uri: resourceData.uri,
-            mimeType: resourceData.mimeType,
-          },
-        };
+      const resourceData = resourceContent.resource;
+      const embeddedResource: any = {
+        type: "resource",
+        resource: {
+          uri: resourceData.uri,
+          mimeType: resourceData.mimeType,
+        },
+      };
 
-        if (resourceData.text) {
-          embeddedResource.resource.text = resourceData.text;
-        } else if (resourceData.blob) {
-          embeddedResource.resource.blob = resourceData.blob;
-        }
-
-        messages.push({
-          role: "user",
-          content: embeddedResource,
-        });
+      if (resourceData.text) {
+        embeddedResource.resource.text = resourceData.text;
+      } else if (resourceData.blob) {
+        embeddedResource.resource.blob = resourceData.blob;
       }
+
+      messages.push({
+        role: "user",
+        content: embeddedResource,
+      });
     }
   }
 

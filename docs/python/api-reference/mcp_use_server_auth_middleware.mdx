@@ -1,0 +1,55 @@
+---
+title: "Middleware"
+description: "Authentication middleware for mcp-use server API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/auth/middleware.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/auth/middleware.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/auth/middleware.py</a>
+</Callout>
+
+Authentication middleware for mcp-use server.
+
+## AuthMiddleware
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> AuthMiddleware</div>
+
+Middleware that validates Bearer tokens on MCP endpoints.
+
+    This middleware:
+    1. Extracts Bearer token from Authorization header
+    2. Validates token with the configured BearerAuthProvider
+    3. Sets the AccessToken in context for tools to access via get_access_token()
+    4. Returns 401 for unauthenticated requests to protected paths
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.server.auth.middleware import AuthMiddleware
+```
+
+<Card type="info">
+### `method` __init__
+
+Initialize auth middleware.
+
+
+**Parameters**
+><ParamField body="app" type="ASGIApp" required="True" >   The ASGI application </ParamField>
+><ParamField body="auth_provider" type="BearerAuthProvider" required="True" >   Provider to validate tokens </ParamField>
+><ParamField body="exclude_paths" type="list[str] | None" default="None" >   Paths to exclude from authentication </ParamField>
+><ParamField body="protected_paths" type="list[str] | None" default="None" >   Paths that require authentication (default: /mcp) </ParamField>
+
+**Signature**
+```python wrap
+def __init__(app: ASGIApp, auth_provider: BearerAuthProvider, exclude_paths: list[str] | None = None, protected_paths: list[str] | None = None):
+```
+
+</Card>
+</div>

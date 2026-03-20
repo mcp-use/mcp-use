@@ -3,7 +3,11 @@
  * Provides the useMcp hook and related types.
  */
 
-export type { UseMcpOptions, UseMcpResult } from "./types.js";
+export type {
+  UseMcpOptions,
+  UseMcpResult,
+  ReconnectionOptions,
+} from "./types.js";
 export { useMcp } from "./useMcp.js";
 
 // Re-export auth callback handler for OAuth flow
@@ -41,18 +45,41 @@ export {
 export type {
   API,
   CallToolResponse,
+  MessageContentBlock,
   DeviceType,
   DisplayMode,
   OpenAiGlobals,
   SafeArea,
   SafeAreaInsets,
   Theme,
+  ToolRegistry,
   UnknownObject,
   UserAgent,
   UseWidgetResult,
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
+
+// Export useCallTool hook and related types
+export { useCallTool } from "./useCallTool.js";
+export type {
+  CallToolState,
+  SideEffects,
+  CallToolFn,
+  CallToolAsyncFn,
+  UseCallToolReturn,
+} from "./useCallTool.js";
+
+// Export generateHelpers factory and related types
+export { generateHelpers } from "./generateHelpers.js";
+export type {
+  ToolMap,
+  ToolInput,
+  ToolOutput,
+  TypedUseCallTool,
+  TypedUseToolInfo,
+  InferToolMapFromSchemas,
+} from "./generateHelpers.js";
 
 // Export multi-server client provider and hooks
 export {
@@ -74,6 +101,7 @@ export type {
 export {
   LocalStorageProvider,
   MemoryStorageProvider,
+  type CachedServerMetadata,
   type StorageProvider,
 } from "./storage/index.js";
 

@@ -1,5 +1,543 @@
 # create-mcp-use-app
 
+## 0.14.6
+
+### Patch Changes
+
+- ed0fadb: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+
+## 0.14.6-canary.0
+
+### Patch Changes
+
+- 98e09ce: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+
+## 0.14.5
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+
+## 0.14.5-canary.0
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+
+## 0.14.4
+
+### Patch Changes
+
+- ed1b034: fix(create-mcp-use-app): remove flickering behaviour from npm i
+
+## 0.14.4-canary.0
+
+### Patch Changes
+
+- 34eb6d2: fix(create-mcp-use-app): remove flickering behaviour from npm i
+
+## 0.14.3
+
+### Patch Changes
+
+- 405fac7: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+
+## 0.14.3-canary.0
+
+### Patch Changes
+
+- 869eafa: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+
+## 0.14.2
+
+### Patch Changes
+
+- 9d8a73f: fix(templates): remove unused dependencies
+- 9d8a73f: fix(templates): update gitignore
+
+## 0.14.2-canary.1
+
+### Patch Changes
+
+- 26b5a5d: fix(templates): remove unused dependencies
+
+## 0.14.2-canary.0
+
+### Patch Changes
+
+- 608a95f: fix(templates): update gitignore
+
+## 0.14.1
+
+### Patch Changes
+
+- 4546a8c: Unify logo display across all CLI entry paths
+
+## 0.14.1-canary.0
+
+### Patch Changes
+
+- 4e0f531: Unify logo display across all CLI entry paths
+
+## 0.14.0
+
+### Minor Changes
+
+- 5a73b41: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+- 5a73b41: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+### Patch Changes
+
+- 5a73b41: Improve CLI prompts, install order, branding, and project structure output
+- 5a73b41: Fix(docs): updated docs to remove outdated information
+
+## 0.14.0-canary.3
+
+### Patch Changes
+
+- 04cae62: Improve CLI prompts, install order, branding, and project structure output
+
+## 0.14.0-canary.2
+
+### Patch Changes
+
+- 76f10ec: Fix(docs): updated docs to remove outdated information
+
+## 0.14.0-canary.1
+
+### Minor Changes
+
+- f55c56e: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+## 0.14.0-canary.0
+
+### Minor Changes
+
+- ba0ea97: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+## 0.13.2
+
+### Patch Changes
+
+- 7ebe19a: Add missing @types/react and @types/react-dom to template devDependencies
+
+## 0.13.2-canary.0
+
+### Patch Changes
+
+- 0b40a3b: Add missing @types/react and @types/react-dom to template devDependencies
+
+## 0.13.1
+
+### Patch Changes
+
+- 179e800: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+
+## 0.13.1-canary.0
+
+### Patch Changes
+
+- 9ef0ba9: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+
+## 0.13.0
+
+### Minor Changes
+
+- f4e2a70: Add optional skills and dependencies installation for claude-code, cursor, and codex with interactive prompts. Users can control `--install`/`--no-install` flags. Fix test-cli.sh to point to a valid template (starter).
+
+## 0.13.0-canary.0
+
+### Minor Changes
+
+- 64fcbbc: Add optional skills and dependencies installation for claude-code, cursor, and codex with interactive prompts. Users can control `--install`/`--no-install` flags. Fix test-cli.sh to point to a valid template (starter).
+
+## 0.12.3
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+
+## 0.12.3-canary.0
+
+### Patch Changes
+
+- d0239d2: fix(mcp-use): release canary versions
+
+## 0.12.2
+
+### Patch Changes
+
+- c2b183c: fix: removed .ico white bg form templates icons
+
+## 0.12.2-canary.0
+
+### Patch Changes
+
+- f2de3fd: fix: removed .ico white bg form templates icons
+
+## 0.12.1
+
+### Patch Changes
+
+- bb28a69: Fix HMR file watcher exhausting inotify limits by properly ignoring node_modules
+
+  The HMR file watcher was attempting to watch files inside `node_modules/` despite having ignore patterns configured, which exhausted the inotify watch limit (ENOSPC errors) in containerized environments.
+
+## 0.12.1-canary.0
+
+### Patch Changes
+
+- 4d3e62e: fix(cli): fix hmr
+
+## 0.12.0
+
+### Minor Changes
+
+- 1dcba40: feat: changed templates to use mcp-apps and alias apps-sdk => mcp-apps
+
+### Patch Changes
+
+- 1dcba40: fix: rename template to mcp-apps
+- 1dcba40: fix: mcp server landing now shows the external url instead of the internal
+- 1dcba40: chore: trigger canary release
+- 1dcba40: fix docs
+- 1dcba40: chore: fix vulnerabilities in deps
+
+## 0.12.0-canary.5
+
+### Patch Changes
+
+- a078aa9: fix: mcp server landing now shows the external url instead of the internal
+
+## 0.12.0-canary.4
+
+### Patch Changes
+
+- e910f64: chore: fix vulnerabilities in deps
+
+## 0.12.0-canary.3
+
+### Patch Changes
+
+- e4ca98e: chore: trigger canary release
+
+## 0.12.0-canary.2
+
+### Patch Changes
+
+- 67823ea: fix: rename template to mcp-apps
+
+## 0.12.0-canary.1
+
+### Patch Changes
+
+- 08d3b3a: fix docs
+
+## 0.12.0-canary.0
+
+### Minor Changes
+
+- 523d9d1: feat: changed templates to use mcp-apps and alias apps-sdk => mcp-apps
+
+## 0.11.1
+
+### Patch Changes
+
+- c64a2dd: fix(weather): update weather icon and color functions to handle undefined weather types
+
+## 0.11.1-canary.0
+
+### Patch Changes
+
+- 7e87931: fix(weather): update weather icon and color functions to handle undefined weather types
+
+## 0.11.0
+
+### Minor Changes
+
+- fe72e7e: feat: improved HMR support for widgets
+- fe72e7e: docs(widget-lifecycle): add guidance on handling loading states in widgets
+- fe72e7e: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+- fe72e7e: ## Dependency Updates
+
+  Updated 36 dependencies across all TypeScript packages to their latest compatible versions.
+
+  ### Major Updates
+  - **react-resizable-panels**: 3.0.6 → 4.4.1
+    - Migrated to v4 API (`PanelGroup` → `Group`, `PanelResizeHandle` → `Separator`)
+    - Updated `direction` prop to `orientation` across all inspector tabs
+    - Maintained backward compatibility through wrapper component
+
+  ### Minor & Patch Updates
+
+  **Framework & Build Tools:**
+  - @types/node: 25.0.2 → 25.0.9
+  - @types/react: 19.2.7 → 19.2.8
+  - @typescript-eslint/eslint-plugin: 8.49.0 → 8.53.1
+  - @typescript-eslint/parser: 8.49.0 → 8.53.1
+  - prettier: 3.7.4 → 3.8.0
+  - typescript-eslint: 8.49.0 → 8.53.1
+  - vite: 7.3.0 → 7.3.1
+  - vitest: 4.0.15 → 4.0.17
+
+  **Runtime Dependencies:**
+  - @hono/node-server: 1.19.7 → 1.19.9
+  - @langchain/anthropic: 1.3.0 → 1.3.10
+  - @langchain/core: 1.1.12 → 1.1.15
+  - @langchain/google-genai: 2.1.0 → 2.1.10
+  - @langchain/openai: 1.2.0 → 1.2.2
+  - @mcp-ui/client: 5.17.1 → 5.17.3
+  - @mcp-ui/server: 5.16.2 → 5.16.3
+  - posthog-js: 1.306.1 → 1.330.0
+  - posthog-node: 5.17.2 → 5.22.0
+  - ws: 8.18.3 → 8.19.0
+
+  **UI Components:**
+  - @eslint-react/eslint-plugin: 2.3.13 → 2.7.2
+  - eslint-plugin-format: 1.1.0 → 1.3.1
+  - eslint-plugin-react-refresh: 0.4.25 → 0.4.26
+  - framer-motion: 12.23.26 → 12.27.1
+  - motion: 12.23.26 → 12.27.1
+  - markdown-to-jsx: 9.3.5 → 9.5.7
+  - lucide-react: 0.561.0 → 0.562.0
+  - vite-express: 0.21.1 → 0.22.0
+
+  **Utilities:**
+  - globby: 16.0.0 → 16.1.0
+  - fs-extra: 11.3.2 → 11.3.3
+  - ink: 6.5.1 → 6.6.0
+
+  ### Removed
+  - Removed `@ai-sdk/react` from inspector (unused, only in tests)
+  - Removed `ai` from mcp-use dev dependencies (unused, only in tests/examples)
+
+## 0.11.0-canary.3
+
+### Minor Changes
+
+- 1fb5e5e: docs(widget-lifecycle): add guidance on handling loading states in widgets
+
+## 0.11.0-canary.2
+
+### Minor Changes
+
+- 3178200: ## Dependency Updates
+
+  Updated 36 dependencies across all TypeScript packages to their latest compatible versions.
+
+  ### Major Updates
+  - **react-resizable-panels**: 3.0.6 → 4.4.1
+    - Migrated to v4 API (`PanelGroup` → `Group`, `PanelResizeHandle` → `Separator`)
+    - Updated `direction` prop to `orientation` across all inspector tabs
+    - Maintained backward compatibility through wrapper component
+
+  ### Minor & Patch Updates
+
+  **Framework & Build Tools:**
+  - @types/node: 25.0.2 → 25.0.9
+  - @types/react: 19.2.7 → 19.2.8
+  - @typescript-eslint/eslint-plugin: 8.49.0 → 8.53.1
+  - @typescript-eslint/parser: 8.49.0 → 8.53.1
+  - prettier: 3.7.4 → 3.8.0
+  - typescript-eslint: 8.49.0 → 8.53.1
+  - vite: 7.3.0 → 7.3.1
+  - vitest: 4.0.15 → 4.0.17
+
+  **Runtime Dependencies:**
+  - @hono/node-server: 1.19.7 → 1.19.9
+  - @langchain/anthropic: 1.3.0 → 1.3.10
+  - @langchain/core: 1.1.12 → 1.1.15
+  - @langchain/google-genai: 2.1.0 → 2.1.10
+  - @langchain/openai: 1.2.0 → 1.2.2
+  - @mcp-ui/client: 5.17.1 → 5.17.3
+  - @mcp-ui/server: 5.16.2 → 5.16.3
+  - posthog-js: 1.306.1 → 1.330.0
+  - posthog-node: 5.17.2 → 5.22.0
+  - ws: 8.18.3 → 8.19.0
+
+  **UI Components:**
+  - @eslint-react/eslint-plugin: 2.3.13 → 2.7.2
+  - eslint-plugin-format: 1.1.0 → 1.3.1
+  - eslint-plugin-react-refresh: 0.4.25 → 0.4.26
+  - framer-motion: 12.23.26 → 12.27.1
+  - motion: 12.23.26 → 12.27.1
+  - markdown-to-jsx: 9.3.5 → 9.5.7
+  - lucide-react: 0.561.0 → 0.562.0
+  - vite-express: 0.21.1 → 0.22.0
+
+  **Utilities:**
+  - globby: 16.0.0 → 16.1.0
+  - fs-extra: 11.3.2 → 11.3.3
+  - ink: 6.5.1 → 6.6.0
+
+  ### Removed
+  - Removed `@ai-sdk/react` from inspector (unused, only in tests)
+  - Removed `ai` from mcp-use dev dependencies (unused, only in tests/examples)
+
+## 0.11.0-canary.1
+
+### Minor Changes
+
+- ad66391: fix: improved HMR support for widgets
+
+## 0.11.0-canary.0
+
+### Minor Changes
+
+- 53fdb48: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+
+## 0.10.3
+
+### Patch Changes
+
+- a62db70: Fix .gitignore file not being created in generated projects.
+  Fix long initialization due to wrong git initialization
+
+## 0.10.3-canary.0
+
+### Patch Changes
+
+- 372dad4: Fix .gitignore file not being created in generated projects.
+  Fix long initialization due to wrong git initialization
+
+## 0.10.2
+
+### Patch Changes
+
+- bcdecd4: This release includes significant enhancements to OAuth flow handling, server metadata caching, and favicon detection:
+
+  **OAuth Flow Enhancements**
+  - Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+  - Added automatic metadata URL rewriting from gateway URLs to actual server URLs
+  - Implemented resource parameter rewriting for authorize and token requests to use actual server URLs
+  - Added WWW-Authenticate header discovery for OAuth metadata endpoints
+  - Store and reuse OAuth proxy settings in callback flow for CORS bypass during token exchange
+  - Added X-Forwarded-Host support for proper proxy URL construction in dev environments
+
+  **Client Info Support**
+  - Added `clientInfo` configuration prop to `McpClientProvider` for OAuth registration
+  - Client info (name, version, icons, websiteUrl) is now sent during OAuth registration and displayed on consent pages
+  - Supports per-server client info override
+  - Inspector now includes client info with branding
+
+  **Server Metadata Caching**
+  - Added `CachedServerMetadata` interface for storing server name, version, icons, and other metadata
+  - Extended `StorageProvider` interface with optional metadata methods (`getServerMetadata`, `setServerMetadata`, `removeServerMetadata`)
+  - Implemented metadata caching in `LocalStorageProvider` and `MemoryStorageProvider`
+  - Server metadata is now automatically cached when servers connect and used as initial display while fetching fresh data
+  - Improves UX by showing server info immediately on reconnect
+
+  **Inspector Improvements**
+  - Added logging middleware to API routes for better debugging
+  - Simplified server ID handling by removing redundant URL decoding (searchParams.get() already decodes)
+  - Added X-Forwarded-Host header forwarding in Vite proxy configuration
+  - Enabled OAuth proxy logging for better visibility
+
+  **Favicon Detection Improvements**
+  - Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com → com)
+  - Added detection of default vs custom favicons using JSON API response
+  - Prefer non-default favicons when available
+  - Better handling of fallback cases
+
+  **Other Changes**
+  - Updated multi-server example with Supabase OAuth proxy example
+  - Added connectionUrl parameter passing for resource field rewriting throughout OAuth flow
+  - Improved logging and error messages throughout OAuth flow
+
+- bcdecd4: fix: remove import from "mcp-use" which causes langchain import in server
+- bcdecd4: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+## 0.10.2-canary.2
+
+### Patch Changes
+
+- e962a16: fix: remove import from "mcp-use" which causes langchain import in server
+
+## 0.10.2-canary.1
+
+### Patch Changes
+
+- 118cb30: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+## 0.10.2-canary.0
+
+### Patch Changes
+
+- dfb30a6: This release includes significant enhancements to OAuth flow handling, server metadata caching, and favicon detection:
+
+  **OAuth Flow Enhancements**
+  - Enhanced OAuth proxy to support gateway/proxy scenarios (e.g., Supabase MCP servers)
+  - Added automatic metadata URL rewriting from gateway URLs to actual server URLs
+  - Implemented resource parameter rewriting for authorize and token requests to use actual server URLs
+  - Added WWW-Authenticate header discovery for OAuth metadata endpoints
+  - Store and reuse OAuth proxy settings in callback flow for CORS bypass during token exchange
+  - Added X-Forwarded-Host support for proper proxy URL construction in dev environments
+
+  **Client Info Support**
+  - Added `clientInfo` configuration prop to `McpClientProvider` for OAuth registration
+  - Client info (name, version, icons, websiteUrl) is now sent during OAuth registration and displayed on consent pages
+  - Supports per-server client info override
+  - Inspector now includes client info with branding
+
+  **Server Metadata Caching**
+  - Added `CachedServerMetadata` interface for storing server name, version, icons, and other metadata
+  - Extended `StorageProvider` interface with optional metadata methods (`getServerMetadata`, `setServerMetadata`, `removeServerMetadata`)
+  - Implemented metadata caching in `LocalStorageProvider` and `MemoryStorageProvider`
+  - Server metadata is now automatically cached when servers connect and used as initial display while fetching fresh data
+  - Improves UX by showing server info immediately on reconnect
+
+  **Inspector Improvements**
+  - Added logging middleware to API routes for better debugging
+  - Simplified server ID handling by removing redundant URL decoding (searchParams.get() already decodes)
+  - Added X-Forwarded-Host header forwarding in Vite proxy configuration
+  - Enabled OAuth proxy logging for better visibility
+
+  **Favicon Detection Improvements**
+  - Enhanced favicon detector to try all subdomain levels (e.g., mcp.supabase.com → supabase.com → com)
+  - Added detection of default vs custom favicons using JSON API response
+  - Prefer non-default favicons when available
+  - Better handling of fallback cases
+
+  **Other Changes**
+  - Updated multi-server example with Supabase OAuth proxy example
+  - Added connectionUrl parameter passing for resource field rewriting throughout OAuth flow
+  - Improved logging and error messages throughout OAuth flow
+
 ## 0.10.1
 
 ### Patch Changes
@@ -96,13 +634,13 @@
 
   **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
 
-  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+  **Learn more:** [LangChain Integration](https://mcp-use.com/docs/typescript/agent/llm-integration)
 
   ### WebSocket Transport Removed
 
   WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
 
-  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+  **Learn more:** [Client Configuration](https://mcp-use.com/docs/typescript/client/client-configuration)
 
   ## Features
 
@@ -159,7 +697,7 @@
   **Deprecated:**
   - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
 
-  **Learn more:** [Session Management](/typescript/server/session-management)
+  **Learn more:** [Session Management](https://mcp-use.com/docs/typescript/server/session-management)
 
   ### Favicon Support for Widgets
 
@@ -177,13 +715,13 @@
   - CLI build process includes favicon in widget HTML pages
   - Long-term caching (1 year) for favicon assets
 
-  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://mcp-use.com/docs/typescript/server/configuration)
 
   ### CLI Client Support
 
   Added dedicated CLI client support for better command-line integration and testing.
 
-  **Learn more:** [CLI Client](/typescript/client/cli)
+  **Learn more:** [CLI Client](https://mcp-use.com/docs/typescript/client/cli)
 
   ### Enhanced Session Methods
   - `callTool()` method now defaults args to an empty object
@@ -213,7 +751,7 @@
 
   Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
 
-  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+  **Learn more:** [useMcp Hook](https://mcp-use.com/docs/typescript/client/usemcp)
 
   ### Session & Transport Fixes
   - Fixed transport cleanup when session becomes idle

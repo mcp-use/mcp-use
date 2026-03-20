@@ -66,7 +66,7 @@ Main hook that provides access to all widget functionality.
   
   // Actions
   callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResponse>;
-  sendFollowUpMessage: (prompt: string) => Promise<void>;
+  sendFollowUpMessage: (content: string | MessageContentBlock[]) => Promise<void>;
   openExternal: (href: string) => void;
   requestDisplayMode: (mode: DisplayMode) => Promise<{ mode: DisplayMode }>;
   
@@ -322,5 +322,5 @@ The `useWidget` hook is designed to work seamlessly with MCP-use's widget system
 3. **Build system** handles bundling and deployment
 4. **Type safety** is maintained throughout the entire stack
 
-See the [MCP-use documentation](https://mcp-use.github.io) for more information on building and deploying widgets.
+See the [MCP-use documentation](https://mcp-use.com/docs) for more information on building and deploying widgets.
 

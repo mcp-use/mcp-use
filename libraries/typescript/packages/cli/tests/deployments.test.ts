@@ -268,7 +268,7 @@ describe("Deployment API Methods", () => {
   });
 
   describe("redeployDeployment", () => {
-    it("should redeploy deployment", async () => {
+    it("should redeploy deployment without config", async () => {
       const redeployed = { ...mockDeployment, status: "building" as const };
       apiInstance.redeployDeployment.mockResolvedValue(redeployed);
 
@@ -280,6 +280,91 @@ describe("Deployment API Methods", () => {
       );
     });
 
+    it("should redeploy deployment with RedeploymentConfig", async () => {
+      const redeployed = {
+        ...mockDeployment,
+        status: "building" as const,
+        source: {
+          ...mockDeployment.source,
+          env: { NODE_ENV: "production", NEW_SECRET: "value123" },
+          buildCommand: "npm run build",
+          startCommand: "npm start",
+          port: 8080,
+        },
+      };
+      apiInstance.redeployDeployment.mockResolvedValue(redeployed);
+
+      const config = {
+        buildCommand: "npm run build",
+        startCommand: "npm start",
+        port: 8080,
+        env: { NODE_ENV: "production", NEW_SECRET: "value123" },
+      };
+
+      const result = await apiInstance.redeployDeployment(
+        "dep_123456789",
+        config
+      );
+
+      expect(result.status).toBe("building");
+      expect(apiInstance.redeployDeployment).toHaveBeenCalledWith(
+        "dep_123456789",
+        config
+      );
+    });
+
+    it("should redeploy with only env vars in config", async () => {
+      const redeployed = {
+        ...mockDeployment,
+        status: "building" as const,
+        source: {
+          ...mockDeployment.source,
+          env: { API_KEY: "new-key", DATABASE_URL: "postgres://localhost" },
+        },
+      };
+      apiInstance.redeployDeployment.mockResolvedValue(redeployed);
+
+      const config = {
+        env: { API_KEY: "new-key", DATABASE_URL: "postgres://localhost" },
+      };
+
+      const result = await apiInstance.redeployDeployment(
+        "dep_123456789",
+        config
+      );
+
+      expect(result.source.env).toEqual({
+        API_KEY: "new-key",
+        DATABASE_URL: "postgres://localhost",
+      });
+      expect(apiInstance.redeployDeployment).toHaveBeenCalledWith(
+        "dep_123456789",
+        config
+      );
+    });
+
+    it("should redeploy with partial config (only port)", async () => {
+      const redeployed = {
+        ...mockDeployment,
+        status: "building" as const,
+        port: 4000,
+      };
+      apiInstance.redeployDeployment.mockResolvedValue(redeployed);
+
+      const config = { port: 4000 };
+
+      const result = await apiInstance.redeployDeployment(
+        "dep_123456789",
+        config
+      );
+
+      expect(result.port).toBe(4000);
+      expect(apiInstance.redeployDeployment).toHaveBeenCalledWith(
+        "dep_123456789",
+        config
+      );
+    });
+
     it("should handle redeploy errors", async () => {
       apiInstance.redeployDeployment.mockRejectedValue(
         new Error("API request failed: 500 Redeploy failed")
@@ -288,6 +373,18 @@ describe("Deployment API Methods", () => {
       await expect(
         apiInstance.redeployDeployment("dep_123456789")
       ).rejects.toThrow("500");
+    });
+
+    it("should handle redeploy with config errors", async () => {
+      apiInstance.redeployDeployment.mockRejectedValue(
+        new Error("API request failed: 400 Invalid configuration")
+      );
+
+      const config = { port: -1 }; // Invalid port
+
+      await expect(
+        apiInstance.redeployDeployment("dep_123456789", config)
+      ).rejects.toThrow("400");
     });
   });
 

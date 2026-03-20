@@ -24,6 +24,15 @@ export interface JsonRpcRequest {
 }
 
 /**
+ * JSON-RPC success response object structure
+ */
+export interface JsonRpcResponse {
+  jsonrpc: "2.0";
+  id: string | number;
+  result?: unknown;
+}
+
+/**
  * JSON-RPC error response object structure
  */
 export interface JsonRpcError {
@@ -91,6 +100,30 @@ export function createRequest(
 }
 
 /**
+ * Create a JSON-RPC success response object
+ *
+ * @param id - Request ID
+ * @param result - Result data (optional)
+ * @returns JSON-RPC response object
+ *
+ * @example
+ * ```typescript
+ * const response = createResponse("123", { data: "value" });
+ * const emptyResponse = createResponse("456");
+ * ```
+ */
+export function createResponse(
+  id: string | number,
+  result?: unknown
+): JsonRpcResponse {
+  return {
+    jsonrpc: "2.0" as const,
+    id,
+    ...(result !== undefined && { result }),
+  };
+}
+
+/**
  * Create a JSON-RPC error response object
  *
  * @param code - Error code (e.g., -32000 for application errors)
@@ -134,3 +167,32 @@ export const JsonRpcErrorCode = {
   // Application-specific errors (from -32000 to -32099)
   APPLICATION_ERROR: -32000,
 } as const;
+
+/**
+ * Runtime type guard: checks if a message is a JSON-RPC response (success or error).
+ * Uses duck-typing for speed — no Zod parsing overhead.
+ */
+export function isJsonRpcResponse(
+  msg: unknown
+): msg is JsonRpcResponse | JsonRpcError {
+  return (
+    !!msg &&
+    typeof msg === "object" &&
+    "id" in msg &&
+    ("result" in msg || "error" in msg)
+  );
+}
+
+/**
+ * Runtime type guard: checks if a message is a JSON-RPC request (has id + method, not a response).
+ */
+export function isJsonRpcRequest(msg: unknown): msg is JsonRpcRequest {
+  return (
+    !!msg &&
+    typeof msg === "object" &&
+    "id" in msg &&
+    "method" in msg &&
+    !("result" in msg) &&
+    !("error" in msg)
+  );
+}

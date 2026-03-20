@@ -17,6 +17,7 @@ import {
 } from "@/client/components/ui/select";
 import { Switch } from "@/client/components/ui/switch";
 import { cn } from "@/client/lib/utils";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { Cog, Copy, FileText, Shield } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -173,7 +174,7 @@ export function ConnectionSettingsForm({
     };
 
     try {
-      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      await copyToClipboard(JSON.stringify(config, null, 2));
       toast.success("Configuration copied to clipboard");
     } catch {
       toast.error("Failed to copy configuration to clipboard");
@@ -284,6 +285,7 @@ export function ConnectionSettingsForm({
       {/* Copy Config Button - positioned absolutely on styled variant */}
       {showExportButton && (
         <Button
+          data-testid="connection-form-copy-config-button"
           variant="ghost"
           onClick={handleCopyConfig}
           className={cn(
@@ -302,6 +304,7 @@ export function ConnectionSettingsForm({
       <div className="space-y-2">
         <Label className={labelClassName}>URL</Label>
         <Input
+          data-testid="connection-form-url-input"
           placeholder="http://localhost:3000"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -336,6 +339,7 @@ export function ConnectionSettingsForm({
               </Label>
               <Switch
                 id="auto-switch"
+                data-testid="connection-form-auto-switch"
                 checked={autoSwitch}
                 onCheckedChange={(value) => {
                   setAutoSwitch(value);
@@ -350,7 +354,10 @@ export function ConnectionSettingsForm({
           )}
         </div>
         <Select value={connectionType} onValueChange={setConnectionType}>
-          <SelectTrigger className={cn("w-full", selectTriggerClassName)}>
+          <SelectTrigger
+            className={cn("w-full", selectTriggerClassName)}
+            data-testid="connection-form-type-select"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -367,6 +374,7 @@ export function ConnectionSettingsForm({
           <DialogTrigger asChild>
             <div className="relative flex-1 ">
               <Button
+                data-testid="connection-form-auth-button"
                 variant="outline"
                 className={cn(
                   (clientId || scope) && "border-2",
@@ -390,6 +398,7 @@ export function ConnectionSettingsForm({
               <div className="space-y-2">
                 <Label className="text-sm">Client ID</Label>
                 <Input
+                  data-testid="auth-dialog-client-id-input"
                   placeholder="Client ID"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
@@ -400,6 +409,7 @@ export function ConnectionSettingsForm({
               <div className="space-y-2">
                 <Label className="text-sm">Redirect URL</Label>
                 <Input
+                  data-testid="auth-dialog-redirect-url-input"
                   value={redirectUrl}
                   onChange={(e) => setRedirectUrl(e.target.value)}
                 />
@@ -409,6 +419,7 @@ export function ConnectionSettingsForm({
               <div className="space-y-2">
                 <Label className="text-sm">Scope</Label>
                 <Input
+                  data-testid="auth-dialog-scope-input"
                   placeholder="Scope (space-separated)"
                   value={scope}
                   onChange={(e) => setScope(e.target.value)}
@@ -427,6 +438,7 @@ export function ConnectionSettingsForm({
           <DialogTrigger asChild>
             <div className="relative flex-1 ">
               <Button
+                data-testid="connection-form-headers-button"
                 variant="outline"
                 className={cn(
                   "w-full justify-center hover:text-white cursor-pointer",
@@ -443,6 +455,7 @@ export function ConnectionSettingsForm({
               <DialogTitle>Custom Headers</DialogTitle>
             </DialogHeader>
             <CustomHeadersEditor
+              title={<></>}
               headers={customHeaders}
               onChange={setCustomHeaders}
               onSave={() => setHeadersDialogOpen(false)}
@@ -454,6 +467,7 @@ export function ConnectionSettingsForm({
         <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
           <DialogTrigger asChild>
             <Button
+              data-testid="connection-form-config-button"
               variant="outline"
               className={cn(
                 "flex-1  justify-center hover:text-white cursor-pointer",
@@ -476,6 +490,7 @@ export function ConnectionSettingsForm({
                   <span className="text-muted-foreground text-xs">(?)</span>
                 </Label>
                 <Input
+                  data-testid="config-dialog-request-timeout-input"
                   type="number"
                   value={requestTimeout}
                   onChange={(e) => setRequestTimeout(e.target.value)}
@@ -492,7 +507,10 @@ export function ConnectionSettingsForm({
                   value={resetTimeoutOnProgress}
                   onValueChange={setResetTimeoutOnProgress}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    className="w-full"
+                    data-testid="config-dialog-reset-timeout-select"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -509,6 +527,7 @@ export function ConnectionSettingsForm({
                   <span className="text-muted-foreground text-xs">(?)</span>
                 </Label>
                 <Input
+                  data-testid="config-dialog-max-timeout-input"
                   type="number"
                   value={maxTotalTimeout}
                   onChange={(e) => setMaxTotalTimeout(e.target.value)}
@@ -522,6 +541,7 @@ export function ConnectionSettingsForm({
                   <span className="text-muted-foreground text-xs">(?)</span>
                 </Label>
                 <Input
+                  data-testid="config-dialog-proxy-address-input"
                   value={proxyAddress}
                   onChange={(e) => setProxyAddress(e.target.value)}
                   placeholder=""
@@ -539,6 +559,7 @@ export function ConnectionSettingsForm({
       {/* Connect Button */}
       {showConnectButton && (
         <Button
+          data-testid="connection-form-connect-button"
           onClick={onConnect}
           disabled={!url.trim() || isConnecting}
           className={cn(
@@ -592,7 +613,9 @@ export function ConnectionSettingsForm({
               Cancel
             </Button>
           )}
-          <Button onClick={onSave}>Save Connection Options</Button>
+          <Button data-testid="connection-form-save-button" onClick={onSave}>
+            Save Connection Options
+          </Button>
         </div>
       )}
     </div>

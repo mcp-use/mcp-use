@@ -94,7 +94,7 @@ Creates a new MCP server instance using the class constructor (recommended).
   - `host` (string, optional): Hostname for widget URLs (default: 'localhost')
   - `baseUrl` (string, optional): Full base URL (overrides host:port)
   - `allowedOrigins` (string[], optional): Allowed origins for DNS rebinding protection
-  - `sessionIdleTimeoutMs` (number, optional): Idle timeout for sessions (default: 300000)
+  - `sessionIdleTimeoutMs` (number, optional): Idle timeout for sessions (default: 86400000)
   - `oauth` (OAuthProvider, optional): OAuth authentication configuration
 
 **Returns:** `MCPServer` instance

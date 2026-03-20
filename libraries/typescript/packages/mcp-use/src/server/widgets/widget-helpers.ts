@@ -5,23 +5,61 @@
  * and prop handling.
  */
 
-import type { Hono as HonoType, Context } from "hono";
+import type { Context, Hono as HonoType } from "hono";
 import type {
+  InputDefinition,
   UIResourceContent,
   UIResourceDefinition,
-  InputDefinition,
   WidgetProps,
 } from "../types/index.js";
+import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./mcp-ui-adapter.js";
-import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+
+/**
+ * Slugify a widget name to make it URI-safe
+ *
+ * Converts widget names to valid URI components by:
+ * - Converting to lowercase
+ * - Replacing spaces and invalid characters with dashes
+ * - Removing consecutive dashes
+ * - Trimming dashes from start/end
+ *
+ * @param name - Widget name to slugify
+ * @returns URI-safe slugified name
+ *
+ * @example
+ * ```typescript
+ * slugifyWidgetName('My Awesome Widget')
+ * // Returns: 'my-awesome-widget'
+ *
+ * slugifyWidgetName('Product Search Results 2')
+ * // Returns: 'product-search-results-2'
+ * ```
+ */
+export function slugifyWidgetName(name: string): string {
+  // Prevent ReDoS by limiting input length
+  const MAX_LENGTH = 300;
+  if (name.length > MAX_LENGTH) {
+    name = name.substring(0, MAX_LENGTH);
+  }
+
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9-_.]/g, "-") // Replace invalid chars with dash
+    .replace(/-+/g, "-") // Replace multiple consecutive dashes with single dash
+    .replace(/^-+/, "") // Trim dashes from start
+    .replace(/-+$/, ""); // Trim dashes from end
+}
 
 /**
  * Generate a widget URI with optional build ID for cache busting
  *
- * @param widgetName - Widget name/identifier
+ * The widget name is automatically slugified to ensure URI compliance.
+ *
+ * @param widgetName - Widget name/identifier (will be slugified)
  * @param buildId - Optional build ID for cache busting
  * @param extension - Optional file extension (e.g., '.html')
  * @param suffix - Optional suffix (e.g., random ID for dynamic URIs)
@@ -31,6 +69,9 @@ import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
  * ```typescript
  * generateWidgetUri('kanban-board', 'abc123', '.html')
  * // Returns: 'ui://widget/kanban-board-abc123.html'
+ *
+ * generateWidgetUri('My Widget', 'abc123', '.html')
+ * // Returns: 'ui://widget/my-widget-abc123.html'
  * ```
  */
 export function generateWidgetUri(
@@ -39,7 +80,9 @@ export function generateWidgetUri(
   extension: string = "",
   suffix: string = ""
 ): string {
-  const parts = [widgetName];
+  // Slugify the widget name to ensure URI compliance
+  const slugifiedName = slugifyWidgetName(widgetName);
+  const parts = [slugifiedName];
 
   // Add build ID if available (for cache busting)
   if (buildId) {
@@ -314,9 +357,11 @@ export function processWidgetHtml(
     );
 
     // Add window.__getFile and window.__mcpPublicUrl to head
+    // Use slugified name for URL routing
+    const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${widgetName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
     );
   }
 
@@ -354,6 +399,8 @@ export function createWidgetRegistration(
         props?: unknown;
         inputs?: unknown;
         schema?: unknown;
+        metadata?: unknown;
+        appsSdkMetadata?: unknown;
         [key: string]: unknown;
       },
   html: string,
@@ -363,11 +410,12 @@ export function createWidgetRegistration(
   name: string;
   title: string;
   description: string;
-  type: "appsSdk";
+  type: "appsSdk" | "mcpApps";
   props: import("../types/resource.js").WidgetProps;
   _meta: Record<string, unknown>;
   htmlTemplate: string;
-  appsSdkMetadata: Record<string, any>;
+  appsSdkMetadata?: Record<string, any>;
+  metadata?: Record<string, any>;
 } {
   // Use props field (preferred) with fallback to inputs/schema for backward compatibility
   const props = (metadata.props ||
@@ -377,63 +425,122 @@ export function createWidgetRegistration(
   const description =
     (metadata.description as string | undefined) || `Widget: ${widgetName}`;
   const title = (metadata.title as string | undefined) || widgetName;
-  // Extract exposeAsTool flag (defaults to true if not specified)
+  // Extract exposeAsTool flag (defaults to false — use exposeAsTool: true to opt in)
   const exposeAsTool =
-    metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : true;
+    metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : false;
+
+  // Auto-detect widget type based on metadata presence:
+  // - Default → mcpApps (dual-protocol for both ChatGPT and MCP Apps clients)
+  // - If only `appsSdkMetadata` is present → appsSdk (legacy ChatGPT-only)
+  const widgetType =
+    metadata.appsSdkMetadata && !metadata.metadata ? "appsSdk" : "mcpApps";
 
   const mcp_connect_domain = serverConfig.serverBaseUrl
     ? new URL(serverConfig.serverBaseUrl || "").origin
     : null;
 
-  return {
+  // Get slugified name for URL routing
+  const slugifiedName = slugifyWidgetName(widgetName);
+
+  const baseRegistration = {
     name: widgetName,
     title: title as string,
     description: description as string,
-    type: "appsSdk",
+    type: widgetType as "appsSdk" | "mcpApps",
     props: props as import("../types/resource.js").WidgetProps,
     _meta: {
       "mcp-use/widget": {
         name: widgetName,
+        slugifiedName: slugifiedName,
         title: title,
         description: description,
-        type: "appsSdk",
+        type: widgetType,
         props: props,
         html: html,
         dev: isDev,
         exposeAsTool: exposeAsTool,
       },
+      ui: {},
+      // mcp-use private extension: props schema for inspector PropsConfigDialog.
+      // Not part of SEP-1865; other hosts will ignore this key.
+      ...(props && Object.keys(props).length > 0
+        ? { "mcp-use/propsSchema": props }
+        : {}),
       ...(metadata._meta || {}),
     },
     htmlTemplate: html,
-    appsSdkMetadata: {
-      "openai/widgetDescription": description,
-      "openai/toolInvocation/invoking": `Loading ${widgetName}...`,
-      "openai/toolInvocation/invoked": `${widgetName} ready`,
-      "openai/widgetAccessible": true,
-      "openai/resultCanProduceWidget": true,
-      ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
-        {}),
-      "openai/widgetCSP": {
-        connect_domains: [
-          // always also add the base url of the server
-          ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-          ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-            ?.connect_domains as string[]) || []),
-        ],
-        resource_domains: [
-          "https://*.oaistatic.com",
-          "https://*.oaiusercontent.com",
-          ...(isDev ? [] : ["https://*.openai.com"]),
-          // always also add the base url of the server
-          ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-          // add additional CSP URLs from environment variable
-          ...serverConfig.cspUrls,
-          ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-            ?.resource_domains as string[]) || []),
-        ],
-      },
-    },
   };
+
+  // For appsSdk type (no unified metadata), add appsSdkMetadata
+  if (widgetType === "appsSdk") {
+    return {
+      ...baseRegistration,
+      type: "appsSdk" as const,
+      appsSdkMetadata: {
+        "openai/widgetDescription": description,
+        "openai/toolInvocation/invoking": `Loading ${widgetName}...`,
+        "openai/toolInvocation/invoked": `${widgetName} ready`,
+        "openai/widgetAccessible": true,
+        "openai/resultCanProduceWidget": true,
+        "openai/widgetDomain": "https://chatgpt.com", // Default domain (required for app submission)
+        ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
+          {}),
+        "openai/widgetCSP": {
+          connect_domains: [
+            // always also add the base url of the server
+            ...(mcp_connect_domain ? [mcp_connect_domain] : []),
+            ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+              ?.connect_domains as string[]) || []),
+          ],
+          resource_domains: [
+            "https://*.oaistatic.com",
+            "https://*.oaiusercontent.com",
+            ...(isDev ? [] : ["https://*.openai.com"]),
+            // always also add the base url of the server
+            ...(mcp_connect_domain ? [mcp_connect_domain] : []),
+            // add additional CSP URLs from environment variable
+            ...serverConfig.cspUrls,
+            ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+              ?.resource_domains as string[]) || []),
+          ],
+          // frame_domains for iframe embeds (optional per OpenAI spec)
+          ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+            ?.frame_domains
+            ? {
+                frame_domains: (metadata.appsSdkMetadata as any)?.[
+                  "openai/widgetCSP"
+                ]?.frame_domains as string[],
+              }
+            : {}),
+          // redirect_domains for openExternal redirects (optional per OpenAI spec)
+          ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
+            ?.redirect_domains
+            ? {
+                redirect_domains: (metadata.appsSdkMetadata as any)?.[
+                  "openai/widgetCSP"
+                ]?.redirect_domains as string[],
+              }
+            : {}),
+        },
+      },
+    };
+  } else {
+    // For mcpApps type (has unified metadata), generate dual-protocol support
+    return {
+      ...baseRegistration,
+      type: "mcpApps" as const,
+      metadata: {
+        description,
+        invoking: `Loading ${widgetName}...`,
+        invoked: `${widgetName} ready`,
+        ...((metadata.metadata as Record<string, unknown> | undefined) || {}),
+      },
+      // Include appsSdkMetadata if provided for advanced ChatGPT features
+      ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined)
+        ? { appsSdkMetadata: metadata.appsSdkMetadata as Record<string, any> }
+        : {}),
+    };
+  }
 }
 
 export async function createWidgetUIResource(
@@ -468,12 +575,48 @@ export async function createWidgetUIResource(
     urlConfig
   );
 
-  // Merge definition._meta into the resource's _meta
-  // This includes mcp-use/widget metadata alongside appsSdkMetadata
+  // Merge fields from definition._meta into the resource content _meta.
+  // Per SEP-1865, content item _meta.ui must only contain: csp, prefersBorder, domain, permissions.
+  // "mcp-use/widget" (internal bookkeeping with html, dev flag, etc.) is always stripped.
+  // "mcp-use/propsSchema" is kept as a top-level _meta extension so the inspector can
+  // render the props config dialog from the resources/read content response.
   if (definition._meta && Object.keys(definition._meta).length > 0) {
+    const resourceMeta = uiResource.resource._meta ?? {};
+    const defMeta = definition._meta as {
+      ui?: Record<string, unknown>;
+      [k: string]: unknown;
+    };
+    // Only include spec-compliant ui fields in content _meta.
+    // scriptDirectives is kept as a practical extension used by the sandbox proxy.
+    const specUiKeys = new Set([
+      "csp",
+      "prefersBorder",
+      "domain",
+      "permissions",
+    ]);
+    const defUiFiltered = defMeta.ui
+      ? Object.fromEntries(
+          Object.entries(defMeta.ui).filter(([k]) => specUiKeys.has(k))
+        )
+      : undefined;
+    const mergedUi =
+      resourceMeta.ui || defUiFiltered
+        ? {
+            ...((resourceMeta.ui as Record<string, unknown>) || {}),
+            ...(defUiFiltered || {}),
+          }
+        : undefined;
+    // Strip only "mcp-use/widget" (internal bookkeeping with html, slugifiedName, etc.).
+    // Other mcp-use/* keys like "mcp-use/propsSchema" pass through as top-level _meta extensions.
+    const defMetaPublic = Object.fromEntries(
+      Object.entries(defMeta).filter(
+        ([k]) => k !== "ui" && k !== "mcp-use/widget"
+      )
+    );
     uiResource.resource._meta = {
-      ...uiResource.resource._meta,
-      ...definition._meta,
+      ...resourceMeta,
+      ...defMetaPublic,
+      ...(mergedUi !== undefined ? { ui: mergedUi } : {}),
     };
   }
 

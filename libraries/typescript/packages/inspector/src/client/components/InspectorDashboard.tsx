@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useMcpClient, type McpServerOptions } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
@@ -90,7 +91,7 @@ export function InspectorDashboard() {
         name?: string;
         proxyConfig?: {
           proxyAddress?: string;
-          customHeaders?: Record<string, string>;
+          headers?: Record<string, string>;
         };
         transportType?: "http" | "sse";
       }
@@ -167,7 +168,7 @@ export function InspectorDashboard() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const [connectingServers, setConnectingServers] = useState<Set<string>>(
+  const [_connectingServers, setConnectingServers] = useState<Set<string>>(
     new Set()
   );
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
@@ -215,19 +216,35 @@ export function InspectorDashboard() {
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
 
-    // Validate URL format
+    // Validate URL format and auto-add https:// if protocol is missing
+    let normalizedUrl = url.trim();
     try {
-      const parsedUrl = new URL(url.trim());
+      const parsedUrl = new URL(normalizedUrl);
       const isValid =
         parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
       if (!isValid) {
-        toast.error("Invalid URL protocol. Please use http://, https://");
+        toast.error("Invalid URL protocol. Please use http:// or https://");
         return;
       }
     } catch (error) {
-      toast.error("Invalid URL format. Please enter a valid URL.");
-      return;
+      // If parsing fails, try adding https:// prefix
+      try {
+        const urlWithHttps = `https://${normalizedUrl}`;
+        const parsedUrl = new URL(urlWithHttps);
+        const isValid =
+          parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+
+        if (!isValid) {
+          toast.error("Invalid URL protocol. Please use http:// or https://");
+          return;
+        }
+        // Use the normalized URL with https://
+        normalizedUrl = urlWithHttps;
+      } catch (retryError) {
+        toast.error("Invalid URL format. Please enter a valid URL.");
+        return;
+      }
     }
 
     // Convert custom headers array to object
@@ -252,10 +269,19 @@ export function InspectorDashboard() {
 
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
-      url: url.trim(),
-      name: url.trim(),
+      url: normalizedUrl,
+      name: normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
+      clientOptions: {
+        capabilities: {
+          extensions: {
+            "io.modelcontextprotocol/ui": {
+              mimeTypes: ["text/html;profile=mcp-app"],
+            },
+          },
+        },
+      },
       ...(proxyConfig
         ? {
             proxyConfig,
@@ -270,7 +296,7 @@ export function InspectorDashboard() {
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
-    addServer(url.trim(), serverConfig);
+    addServer(normalizedUrl, serverConfig);
 
     // Track server added
     const telemetry = Telemetry.getInstance();
@@ -305,7 +331,7 @@ export function InspectorDashboard() {
 
   const handleCopyError = async (errorMessage: string) => {
     try {
-      await navigator.clipboard.writeText(errorMessage);
+      await copyToClipboard(errorMessage);
       toast.success("Error message copied to clipboard");
     } catch {
       toast.error("Failed to copy error message");
@@ -331,11 +357,16 @@ export function InspectorDashboard() {
         );
       }
 
-      // Extract customHeaders from stored config (which has the original proxyConfig)
+      // Extract headers from stored config (which has the original proxyConfig)
+      // Check both 'headers' and 'customHeaders' for backwards compatibility
       const customHeaders =
+        storedConfig?.proxyConfig?.headers ||
         storedConfig?.proxyConfig?.customHeaders ||
+        storedConfig?.headers ||
         storedConfig?.customHeaders ||
+        connection.proxyConfig?.headers ||
         connection.proxyConfig?.customHeaders ||
+        connection.headers ||
         connection.customHeaders ||
         {};
 
@@ -361,7 +392,7 @@ export function InspectorDashboard() {
         oauth: connection.oauth,
       };
 
-      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      await copyToClipboard(JSON.stringify(config, null, 2));
       toast.success("Connection configuration copied to clipboard");
     } catch {
       toast.error("Failed to copy connection configuration");
@@ -380,7 +411,7 @@ export function InspectorDashboard() {
       transportType: "http" | "sse";
       proxyConfig?: {
         proxyAddress?: string;
-        customHeaders?: Record<string, string>;
+        headers?: Record<string, string>;
       };
     }) => {
       if (!editingConnectionId) return;
@@ -417,15 +448,8 @@ export function InspectorDashboard() {
   );
 
   const handleServerClick = (connection: any) => {
-    // If failed, try to reconnect the server
+    // Don't allow clicking failed connections - use the reload button instead
     if (connection.state === "failed") {
-      console.warn(
-        "[InspectorDashboard] Connecting server and setting pending navigation:",
-        connection.id
-      );
-      setConnectingServers((prev) => new Set(prev).add(connection.id));
-      setPendingNavigation(connection.id);
-      connectServer(connection.id);
       return;
     }
 
@@ -444,22 +468,33 @@ export function InspectorDashboard() {
     navigate(`/?${params.toString()}`);
   };
 
+  const handleReconnect = (connection: any) => {
+    console.log("[InspectorDashboard] Reconnecting server:", connection.id);
+    if (connection.state === "failed" && connection.retry) {
+      connection.retry();
+    } else {
+      connectServer(connection.id);
+    }
+  };
+
   // Monitor connecting servers and remove them from the set when they connect or fail
   useEffect(() => {
-    connectingServers.forEach((serverId) => {
-      const connection = connections.find((c) => c.id === serverId);
-      if (
-        connection &&
-        (connection.state === "ready" || connection.state === "failed")
-      ) {
-        setConnectingServers((prev) => {
-          const next = new Set(prev);
+    setConnectingServers((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      prev.forEach((serverId) => {
+        const connection = connections.find((c) => c.id === serverId);
+        if (
+          connection &&
+          (connection.state === "ready" || connection.state === "failed")
+        ) {
           next.delete(serverId);
-          return next;
-        });
-      }
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
     });
-  }, [connections, connectingServers]);
+  }, [connections]);
 
   // Monitor pending navigation and navigate when server becomes ready
   useEffect(() => {
@@ -561,8 +596,13 @@ export function InspectorDashboard() {
               {connections.map((connection) => (
                 <div
                   key={connection.id}
+                  data-testid={`server-tile-${connection.id}`}
                   onClick={() => handleServerClick(connection)}
-                  className="group rounded-lg bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/15 p-4 transition-colors cursor-pointer"
+                  className={`group rounded-lg bg-zinc-100 dark:bg-white/10 p-4 transition-colors ${
+                    connection.state === "ready"
+                      ? "hover:bg-zinc-200 dark:hover:bg-white/15 cursor-pointer"
+                      : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -574,7 +614,7 @@ export function InspectorDashboard() {
                             connection.name}
                         </h4>
                         <div className="flex items-center gap-2">
-                          {connectingServers.has(connection.id) ? (
+                          {updatingConnections.has(connection.id) ? (
                             <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
                           ) : connection.error &&
                             connection.state !== "ready" ? (
@@ -582,11 +622,22 @@ export function InspectorDashboard() {
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
+                                  data-testid={`server-tile-status-${connection.state}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleCopyError(connection.error!);
                                   }}
-                                  className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                                  className={`w-2 h-2 rounded-full transition-colors ${
+                                    (connection.error.includes("401") ||
+                                      connection.error.includes(
+                                        "Unauthorized"
+                                      )) &&
+                                    connection.error.includes(
+                                      "does not support OAuth"
+                                    )
+                                      ? "bg-yellow-500 animate-status-pulse-yellow hover:bg-yellow-600"
+                                      : "bg-rose-500 animate-status-pulse-red hover:bg-rose-600"
+                                  }`}
                                   title="Click to copy error message"
                                   aria-label="Copy error message to clipboard"
                                 />
@@ -597,6 +648,7 @@ export function InspectorDashboard() {
                             </Tooltip>
                           ) : (
                             <div
+                              data-testid={`server-tile-status-${connection.state}`}
                               className={`w-2 h-2 rounded-full ${
                                 connection.state === "ready"
                                   ? "bg-emerald-600 animate-status-pulse"
@@ -616,10 +668,14 @@ export function InspectorDashboard() {
                           <TooltipTrigger asChild>
                             <button
                               type="button"
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                navigator.clipboard.writeText(connection.url);
-                                toast.success("URL copied to clipboard");
+                                try {
+                                  await copyToClipboard(connection.url);
+                                  toast.success("URL copied to clipboard");
+                                } catch {
+                                  toast.error("Failed to copy URL");
+                                }
                               }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
                               title="Copy URL"
@@ -638,6 +694,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-copy-config"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -657,6 +714,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-info"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -677,6 +735,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-settings"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -696,6 +755,7 @@ export function InspectorDashboard() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
+                            data-testid="server-tile-remove"
                             variant="secondary"
                             size="sm"
                             onClick={(e) =>
@@ -712,14 +772,19 @@ export function InspectorDashboard() {
                           <p>Remove connection</p>
                         </TooltipContent>
                       </Tooltip>
-                      {connection.state === "ready" && (
+                      {(connection.state === "ready" ||
+                        connection.state === "failed" ||
+                        connection.state === "discovering") && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
+                              data-testid="server-tile-reconnect"
                               variant="secondary"
                               size="sm"
                               onClick={(e) =>
-                                handleActionClick(e, connection.retry)
+                                handleActionClick(e, () =>
+                                  handleReconnect(connection)
+                                )
                               }
                               className="h-8 w-8 p-0"
                             >
@@ -727,7 +792,13 @@ export function InspectorDashboard() {
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Resync connection</p>
+                            <p>
+                              {connection.state === "failed"
+                                ? "Retry connection"
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -774,15 +845,21 @@ export function InspectorDashboard() {
                             <Settings className="h-4 w-4 mr-2" />
                             Edit connection settings
                           </DropdownMenuItem>
-                          {connection.state === "ready" && (
+                          {(connection.state === "ready" ||
+                            connection.state === "failed" ||
+                            connection.state === "discovering") && (
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                connection.retry();
+                                handleReconnect(connection);
                               }}
                             >
                               <RotateCcw className="h-4 w-4 mr-2" />
-                              Resync connection
+                              {connection.state === "failed"
+                                ? "Retry connection"
+                                : connection.state === "discovering"
+                                  ? "Reconnect"
+                                  : "Resync connection"}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
@@ -802,42 +879,45 @@ export function InspectorDashboard() {
                   {(connection.state === "pending_auth" ||
                     connection.state === "authenticating") && (
                     <div className="text-sm text-yellow-600 dark:text-yellow-400 mt-2">
-                      <Button
-                        size="sm"
-                        className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
-                        variant="outline"
-                        onClick={(e) =>
-                          handleActionClick(e, connection.authenticate)
-                        }
-                        disabled={connection.state === "authenticating"}
-                      >
-                        {connection.state === "authenticating" ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Authenticating...
-                          </>
-                        ) : (
-                          "Authenticate"
-                        )}
-                      </Button>
-                      {connection.authUrl &&
-                        connection.state === "pending_auth" && (
-                          <>
-                            {" "}
-                            or{" "}
-                            <a
-                              href={connection.authUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              open auth page
-                            </a>
-                          </>
-                        )}
+                      {connection.state === "authenticating" ? (
+                        <Button
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          disabled
+                        >
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Authenticating...
+                        </Button>
+                      ) : connection.authUrl ? (
+                        <Button
+                          data-testid="server-tile-authenticate"
+                          size="sm"
+                          className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
+                          variant="outline"
+                          asChild
+                        >
+                          <a
+                            href={connection.authUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Authenticate
+                          </a>
+                        </Button>
+                      ) : null}
                     </div>
                   )}
+                  {connection.state === "failed" &&
+                    connection.error &&
+                    (connection.error.includes("401") ||
+                      connection.error.includes("Unauthorized")) &&
+                    connection.error.includes("does not support OAuth") && (
+                      <div className="text-sm mt-2 p-2 bg-yellow-500/10 dark:bg-yellow-400/10 border border-yellow-500/20 dark:border-yellow-400/20 rounded text-yellow-800 dark:text-yellow-400">
+                        {connection.error}
+                      </div>
+                    )}
                 </div>
               ))}
             </div>

@@ -1,14 +1,46 @@
 ---
-title: "Library Updates"
+title: "Updates"
 description: "New updates and improvements"
-icon:  "history"
+icon: "history"
 ---
 
 import { Contributors } from '/snippets/contributors.jsx'
 
+<Update label="v1.7.0 - 2026‑03‑17">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.7.0&title=CLI%20Scaffolding%20and%20Full%20Conformance&date=2026-03-17" alt="Release 1.7.0" />
+  </Frame>
+  ## CLI Scaffolding & Full Conformance
+  - **New**: `create-mcp-use` CLI for scaffolding new MCP projects ([#1097](https://github.com/mcp-use/mcp-use/pull/1097))
+  - **New**: Auto-retry next available port when default is in use ([#1163](https://github.com/mcp-use/mcp-use/pull/1163))
+  - **New**: `mcp_logs_only` option to hide non-MCP HTTP access logs ([#1164](https://github.com/mcp-use/mcp-use/pull/1164))
+  - **New**: Conformance test infrastructure for server + client ([#1008](https://github.com/mcp-use/mcp-use/pull/1008))
+  - **New**: Protocol handlers for logging, completions, subscriptions ([#1004](https://github.com/mcp-use/mcp-use/pull/1004))
+  - **Fix**: 100% client conformance (20/20) — SSE retry fix ([#1019](https://github.com/mcp-use/mcp-use/pull/1019))
+  - **Fix**: WeakSet for resource subscriptions to prevent memory leak ([#1093](https://github.com/mcp-use/mcp-use/pull/1093))
+  - **Fix**: Simplified Optional parameter JSON Schema ([#1141](https://github.com/mcp-use/mcp-use/pull/1141))
+  - **Fix**: Respect configured inspector path ([#1176](https://github.com/mcp-use/mcp-use/pull/1176))
+
+  <Contributors users="pietrozullo,renvins,stakeswky,Yuukidiv" />
+</Update>
+
+<Update label="v1.6.0 - 2026‑01‑21">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.6.0&title=Bearer%20Token%20Auth%20and%20Middleware&date=2026-01-21" alt="Release 1.6.0" />
+  </Frame>
+  ## Bearer Token Auth & Middleware
+  - **New**: Bearer Token authentication for Python MCP servers ([#841](https://github.com/mcp-use/mcp-use/pull/841))
+  - **New**: Intercept MCP handshake with `on_initialize` middleware ([#769](https://github.com/mcp-use/mcp-use/pull/769))
+  - **Fix**: DNS rebinding protection for cloud/proxy deployments ([#825](https://github.com/mcp-use/mcp-use/pull/825))
+  - **Fix**: Improved debug and `pretty_print_jsonrpc` behavior ([#814](https://github.com/mcp-use/mcp-use/pull/814))
+  - **Fix**: Added timeout mechanism to `ConnectionManager.stop()` ([#726](https://github.com/mcp-use/mcp-use/pull/726))
+
+  <Contributors users="pietrozullo,renvins,Incharajayaram" />
+</Update>
+
 <Update label="v1.5.2 - 2025‑01‑12">
   <Frame>
-    <img src="http://localhost:3002/api/og/release?v=1.5.2&title=Roots%20support%20and%20OAuth%202.1&date=2025-01-12" alt="Release 1.5.2" />
+    <img src="https://mcp-use.com/api/og/release?v=1.5.2&title=Roots%20support%20and%20OAuth%202.1&date=2025-01-12" alt="Release 1.5.2" />
   </Frame>
   ## Roots & OAuth 2.1
   - **New**: Roots support in MCPClient and MCPServer for hierarchical resource organization ([#751](https://github.com/mcp-use/mcp-use/pull/751))
@@ -22,7 +54,7 @@ import { Contributors } from '/snippets/contributors.jsx'
 
 <Update label="v1.5.0 - 2025‑12‑01">
   <Frame>
-    <img src="http://localhost:3002/api/og/release?v=1.5.0&title=Complete%20MCP%20Server%20SDK&date=2025-12-01" alt="Release 1.5.0" />
+    <img src="https://mcp-use.com/api/og/release?v=1.5.0&title=Complete%20MCP%20Server%20SDK&date=2025-12-01" alt="Release 1.5.0" />
   </Frame>
   ## Complete MCP Server SDK
   - **Major**: Complete MCP Server SDK with MCPServer class, routing, and production features
@@ -44,7 +76,7 @@ import { Contributors } from '/snippets/contributors.jsx'
 
 <Update label="v1.4.1 - 2025‑11‑20">
   <Frame>
-    <img src="http://localhost:3002/api/og/release?v=1.4.1&title=Code%20Mode%20and%20Pretty%20Display&date=2025-11-20" alt="Release 1.4.1" />
+    <img src="https://mcp-use.com/api/og/release?v=1.4.1&title=Code%20Mode%20and%20Pretty%20Display&date=2025-11-20" alt="Release 1.4.1" />
   </Frame>
   ## Code Mode & Pretty Display
   - **New**: Code Mode integration for direct code execution through MCP servers with isolated environments
@@ -60,7 +92,7 @@ import { Contributors } from '/snippets/contributors.jsx'
 
 <Update label="v1.4.0 - 2025‑10‑27">
   <Frame>
-    <img src="http://localhost:3002/api/og/release?v=1.4.0&title=LangChain%201.0%20and%20Provider%20Adapters&date=2025-10-27" alt="Release 1.4.0" />
+    <img src="https://mcp-use.com/api/og/release?v=1.4.0&title=LangChain%201.0%20and%20Provider%20Adapters&date=2025-10-27" alt="Release 1.4.0" />
   </Frame>
   ## LangChain 1.0 & Provider Adapters
   - **Major**: Upgraded to LangChain 1.0.0 for improved performance and simplified agent patterns
@@ -85,7 +117,7 @@ import { Contributors } from '/snippets/contributors.jsx'
 
 <Update label="v1.3.12 - 2025‑10‑02">
   <Frame>
-    <img src="http://localhost:3002/api/og/release?v=1.3.12&title=Middleware%20and%20Documentation&date=2025-10-02" alt="Release 1.3.12" />
+    <img src="https://mcp-use.com/api/og/release?v=1.3.12&title=Middleware%20and%20Documentation&date=2025-10-02" alt="Release 1.3.12" />
   </Frame>
   ## Middleware & Documentation
   - **New**: Comprehensive middleware system for request/response interception ([#269](https://github.com/mcp-use/mcp-use/pull/269))
@@ -101,7 +133,7 @@ import { Contributors } from '/snippets/contributors.jsx'
 
 <Update label="v1.3.11 - 2025‑09‑29">
   <Frame>
-    <img src="http://localhost:3002/api/og/release?v=1.3.11&title=Auth%20Revolution&date=2025-09-29" alt="Release 1.3.11" />
+    <img src="https://mcp-use.com/api/og/release?v=1.3.11&title=Auth%20Revolution&date=2025-09-29" alt="Release 1.3.11" />
   </Frame>
   ## Auth Revolution
   - **New**: Complete OAuth2 and Bearer token authentication framework ([#149](https://github.com/pietrozullo/mcp-use/pull/149))

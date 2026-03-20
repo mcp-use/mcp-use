@@ -1,14 +1,20 @@
 """
-Minimal MCP Server Middleware Example
+MCP Server Middleware Examples
 
-- Logging (on_request, on_call_tool)
-- Auth (x-api-key)
-- Rate limiting (per session)
-- Validation (simple)
-- Tools: echo, session_id
+This file demonstrates the middleware system for MCP servers, showing common patterns
+like logging, authentication, rate limiting, and validation.
+
+Key concepts demonstrated:
+- on_initialize: Intercept client connections during MCP handshake
+- on_request: Intercept ALL requests (wraps other hooks)
+- on_call_tool: Intercept only tool calls
+- Typed context: Each hook gets fully-typed context.message (IDE autocomplete works!)
+- Middleware order: First added = outermost (sees requests first, responses last)
 
 Session IDs come from the SDK via the mcp-session-id header (context.session_id).
 Spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
+
+Run with: python middleware_example.py
 """
 
 import time
@@ -19,9 +25,66 @@ from typing import Any
 from mcp_use.server import MCPServer
 from mcp_use.server.middleware import CallNext, Middleware, ServerMiddlewareContext
 
+# =============================================================================
+# CONNECTION MIDDLEWARE (on_initialize)
+# These run during the MCP handshake, before any tools/resources are accessed.
+# =============================================================================
+
+
+class ConnectionGuard(Middleware):
+    """Log incoming client connections.
+
+    Uses on_initialize to intercept the MCP handshake. The context.message is
+    typed as InitializeRequestParams, giving you access to:
+    - clientInfo.name: Client application name
+    - clientInfo.version: Client version
+    - protocolVersion: MCP protocol version
+    - capabilities: What the client supports
+    """
+
+    async def on_initialize(self, context, call_next):
+        client_name = context.message.clientInfo.name
+        print(f"Incoming connection from: {client_name}")
+
+        return await call_next(context)
+
+
+class ClientCapabilitiesGuard(Middleware):
+    """Reject clients that don't support required capabilities.
+
+    Demonstrates:
+    - Typed context: context.message.capabilities is fully typed
+    - Early rejection: Raise an exception to reject the connection
+    """
+
+    async def on_initialize(self, context, call_next) -> Any:
+        print(f"Client capabilities: {context.message.capabilities}")
+
+        capabilities = context.message.capabilities
+        if not capabilities.elicitation:
+            raise ValueError("Client must support elicitation")
+        if not capabilities.sampling:
+            raise ValueError("Client must support sampling")
+        if not capabilities.roots:
+            raise ValueError("Client must support roots")
+        return await call_next(context)
+
+
+# =============================================================================
+# REQUEST MIDDLEWARE (on_request)
+# These run for EVERY request type, wrapping all other hooks.
+# =============================================================================
+
 
 class LoggingMiddleware(Middleware):
-    """Minimal logging."""
+    """Log all requests with timing.
+
+    Demonstrates:
+    - on_request: Runs for ALL requests (tools, resources, prompts, etc.)
+    - on_call_tool: Additional logging specific to tool calls
+    - Hook nesting: on_request wraps on_call_tool when both are defined
+    - Error handling: Catch, log, and re-raise exceptions
+    """
 
     async def on_request(self, context: ServerMiddlewareContext[Any], call_next: CallNext[Any, Any]) -> Any:
         start = time.time()
@@ -36,12 +99,25 @@ class LoggingMiddleware(Middleware):
             raise
 
     async def on_call_tool(self, context, call_next):
+        # This runs INSIDE on_request for tool calls
         print(f"  tool={context.message.name} args={context.message.arguments or {}}")
         return await call_next(context)
 
 
+# =============================================================================
+# TOOL-SPECIFIC MIDDLEWARE (on_call_tool)
+# These only run for tool calls, not for resources or prompts.
+# =============================================================================
+
+
 class AuthenticationMiddleware(Middleware):
-    """Tiny x-api-key check."""
+    """Check x-api-key header for tool calls.
+
+    Demonstrates:
+    - on_call_tool: Only intercepts tool execution
+    - Header access: context.headers (available on HTTP transports)
+    - Configurable middleware: Pass valid keys via constructor
+    """
 
     def __init__(self, valid_api_keys: set[str] | None = None):
         self.valid_api_keys = valid_api_keys or {"test-key-123"}
@@ -54,7 +130,13 @@ class AuthenticationMiddleware(Middleware):
 
 
 class RateLimitingMiddleware(Middleware):
-    """Per-session rate limit (simple)."""
+    """Limit tool calls per session.
+
+    Demonstrates:
+    - Session-based state: Use context.session_id to track per-client limits
+    - Stateful middleware: Store request history in instance variables
+    - Sliding window: Only count requests from last 60 seconds
+    """
 
     def __init__(self, max_requests_per_minute: int = 30):
         self.max = max_requests_per_minute
@@ -71,7 +153,13 @@ class RateLimitingMiddleware(Middleware):
 
 
 class ValidationMiddleware(Middleware):
-    """Simple validation for echo length."""
+    """Validate tool arguments before execution.
+
+    Demonstrates:
+    - Typed context: context.message is CallToolRequestParams
+    - Tool-specific validation: Check message.name to apply rules per tool
+    - Early rejection: Raise before call_next to skip execution
+    """
 
     async def on_call_tool(self, context, call_next):
         if context.message.name == "echo":
@@ -81,19 +169,36 @@ class ValidationMiddleware(Middleware):
         return await call_next(context)
 
 
+# =============================================================================
+# SERVER SETUP
+# Middleware order matters: first added = outermost (sees requests first)
+# =============================================================================
+
 server = MCPServer(
     name="Middleware Demo Server",
     version="1.0.0",
     instructions="Minimal middleware demo",
     middleware=[
+        # 1. Logging first - sees all requests including rejected ones
         LoggingMiddleware(),
+        # 2. Auth early - reject unauthorized before expensive operations
         AuthenticationMiddleware(),
+        # 3. Rate limiting - protect resources from abuse
         RateLimitingMiddleware(max_requests_per_minute=10),
+        # 4. Validation - check data before handler runs
         ValidationMiddleware(),
+        # 5-6. Connection guards - run during handshake (on_initialize)
+        ConnectionGuard(),
+        ClientCapabilitiesGuard(),
     ],
     debug=True,
     pretty_print_jsonrpc=True,
 )
+
+
+# =============================================================================
+# TOOLS, RESOURCES, AND PROMPTS
+# =============================================================================
 
 
 @server.tool()

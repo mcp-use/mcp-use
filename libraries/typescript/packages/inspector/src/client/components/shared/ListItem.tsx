@@ -13,13 +13,15 @@ interface ListItemProps {
   /** Primary title text */
   title: ReactNode;
   /** Optional description text */
-  description?: string;
+  description?: ReactNode;
   /** Optional metadata to display (like badges, tags, etc.) */
   metadata?: ReactNode;
   /** Click handler */
   onClick: () => void;
   /** Optional additional class names */
   className?: string;
+  /** Optional data-testid for testing */
+  "data-testid"?: string;
 }
 
 export function ListItem({
@@ -32,10 +34,12 @@ export function ListItem({
   metadata,
   onClick,
   className,
+  "data-testid": dataTestId,
 }: ListItemProps) {
   return (
     <button
       id={id}
+      data-testid={dataTestId}
       type="button"
       onClick={onClick}
       className={cn(
@@ -66,7 +70,6 @@ export function ListItem({
             <h3 className={cn("font-medium truncate font-mono text-sm")}>
               {title}
             </h3>
-            {/* {metadata} */}
           </div>
           {description && (
             <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
@@ -74,6 +77,11 @@ export function ListItem({
             </p>
           )}
         </div>
+        {metadata && (
+          <div className="flex-shrink-0 flex items-center self-center">
+            {metadata}
+          </div>
+        )}
       </div>
     </button>
   );

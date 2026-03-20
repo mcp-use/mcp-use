@@ -7,7 +7,10 @@ from mcp_use.server.logging.state import get_method_info, set_method_info
 
 
 def get_logging_config(
-    debug_level: int = 0, show_inspector_logs: bool = False, inspector_path: str = "/inspector"
+    debug_level: int = 0,
+    show_inspector_logs: bool = False,
+    inspector_path: str = "/inspector",
+    mcp_logs_only: bool = False,
 ) -> dict:
     """Get logging configuration for MCP server.
 
@@ -15,12 +18,16 @@ def get_logging_config(
         debug_level: Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc)
         show_inspector_logs: Whether to show inspector-related access logs (default: False)
         inspector_path: Path prefix for inspector routes
+        mcp_logs_only: When True, suppress all uvicorn access logs. Default: False.
 
     Returns:
         Uvicorn logging configuration dict
     """
     return setup_logging(
-        debug_level=debug_level, show_inspector_logs=show_inspector_logs, inspector_path=inspector_path
+        debug_level=debug_level,
+        show_inspector_logs=show_inspector_logs,
+        inspector_path=inspector_path,
+        mcp_logs_only=mcp_logs_only,
     )
 
 

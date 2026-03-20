@@ -6,38 +6,112 @@ icon: "hammer"
 
 Tools are the primary way your MCP server exposes functionality to clients. They represent actions that an AI agent can invoke to perform tasks.
 
-## Basic Tool Definition
-
-Use the `@server.tool()` decorator to define a tool:
+## Example
 
 ```python
-from mcp_use.server import MCPServer
+@server.tool(
+    name="get_weather",
+    title="Weather Information Provider",
+    description="Get current weather information for a location",
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        openWorldHint=True,
+    ),
+)
+async def get_weather(
+    location: Annotated[str, Field(description="City name or zip code")],
+    units: Annotated[str, Field(description="Temperature units", default="celsius")],
+    context: Context,
+) -> str:
+    """Get current weather information for a location."""
+    await context.info(f"Fetching weather for {location}")
+    return f"Weather in {location}: 22 {units}"
+```
 
-server = MCPServer(name="My Server")
+## Anatomy of a Tool
 
+Here's the JSON-RPC response that the example above produces when a client calls `tools/list`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "tools": [
+      {
+        "name": "get_weather",
+        "title": "Weather Information Provider",
+        "description": "Get current weather information for a location",
+        "annotations": {
+          "readOnlyHint": true,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "City name or zip code"
+            },
+            "units": {
+              "type": "string",
+              "description": "Temperature units",
+              "default": "celsius"
+            }
+          },
+          "required": ["location"]
+        }
+      }
+    ]
+  }
+}
+```
+
+Here's what maps to what:
+
+| Python | MCP Schema | Notes |
+|--------|-----------|-------|
+| `name="get_weather"` | `"name"` | Falls back to function name if omitted |
+| `title="Weather Information Provider"` | `"title"` | Human-readable display name |
+| `description="Get current weather..."` | `"description"` | Falls back to docstring if omitted |
+| `annotations=ToolAnnotations(...)` | `"annotations"` | Behavioral hints for clients |
+| `location: str` | `"type": "string"` | Python type hint &rarr; JSON Schema type |
+| `Field(description="City name...")` | property `"description"` | Argument-level description |
+| `default="celsius"` | `"default": "celsius"` | Makes the parameter optional |
+| No default on `location` | `"required": ["location"]` | Parameters without defaults are required |
+| `context: Context` | *(not in schema)* | Automatically excluded from the schema |
+
+<Tip>
+Always use `Annotated[type, Field(description="...")]` for your tool parameters. Without it, LLMs calling your tool won't know what each argument means.
+</Tip>
+
+## Minimal Definition
+
+At minimum, a tool only needs a function with type hints:
+
+```python
 @server.tool()
 def greet(name: str) -> str:
     """Greet someone by name."""
     return f"Hello, {name}!"
 ```
 
-The function's docstring becomes the tool's description, and type hints define the input schema.
+The function name becomes the tool name, the docstring becomes the description, and type hints define the input schema.
 
 ## Tool Options
 
-The `@server.tool()` decorator accepts several options:
+The `@server.tool()` decorator accepts these options:
 
 ```python
-from mcp.types import ToolAnnotations
-
 @server.tool(
     name="custom_name",           # Override the function name
     title="Custom Title",         # Human-readable title
     description="Custom desc",    # Override the docstring
-    annotations=ToolAnnotations(  # MCP tool annotations
-        destructiveHint=True,     # Tool may modify data
-        readOnlyHint=False,       # Tool is not read-only
+    annotations=ToolAnnotations(  # Behavioral hints for clients
+        destructiveHint=True,
+        readOnlyHint=False,
     ),
+    structured_output=True,       # Return structured JSON output
 )
 def my_tool(param: str) -> str:
     return param
@@ -62,7 +136,9 @@ Tools can be async for non-blocking I/O operations:
 import httpx
 
 @server.tool()
-async def fetch_url(url: str) -> str:
+async def fetch_url(
+    url: Annotated[str, Field(description="The URL to fetch content from")],
+) -> str:
     """Fetch content from a URL."""
     async with httpx.AsyncClient() as client:
         response = await client.get(url)
@@ -71,38 +147,120 @@ async def fetch_url(url: str) -> str:
 
 ## Using Context
 
-Access the MCP context for advanced features like logging and progress reporting:
+Access the MCP context for logging and progress reporting. Add a `Context` parameter — it's automatically excluded from the tool's input schema:
 
 ```python
-from mcp.server.fastmcp import Context
+from mcp_use.server import Context
 
 @server.tool()
-async def long_task(items: list[str], context: Context) -> str:
+async def long_task(
+    items: Annotated[list[str], Field(description="Items to process")],
+    context: Context,
+) -> str:
     """Process items with progress reporting."""
     results = []
     for i, item in enumerate(items):
-        # Report progress
         await context.report_progress(i, len(items))
         results.append(f"Processed: {item}")
     return "\n".join(results)
 ```
 
+## Parameter Types and JSON Schema
+
+Every tool parameter becomes a property in the tool's `inputSchema`. mcp-use uses [Pydantic](https://docs.pydantic.dev/) to generate [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/schema) from your Python type hints.
+
+### Type mapping
+
+| Python type | JSON Schema | Notes |
+|-------------|-------------|-------|
+| `str` | `{"type": "string"}` | |
+| `int` | `{"type": "integer"}` | |
+| `float` | `{"type": "number"}` | |
+| `bool` | `{"type": "boolean"}` | |
+| `list[str]` | `{"type": "array", "items": {"type": "string"}}` | Works with any item type |
+| `dict[str, Any]` | `{"type": "object"}` | |
+| `Literal["a", "b"]` | `{"type": "string", "enum": ["a", "b"]}` | Renders as a dropdown in the Inspector |
+
+### Required, optional, and nullable
+
+How you declare a parameter determines whether it appears in the `required` array:
+
+```python
+@server.tool()
+def example(
+    # Required — no default, goes into "required"
+    name: Annotated[str, Field(description="User name")],
+
+    # Optional with default — NOT in "required", default shown in schema
+    limit: Annotated[int, Field(description="Max results")] = 10,
+
+    # Nullable — NOT in "required", type stays "string" (not anyOf)
+    company: Annotated[str | None, Field(description="Company filter")] = None,
+) -> str: ...
+```
+
+This produces:
+
+```json
+{
+  "properties": {
+    "name":    { "type": "string",  "description": "User name" },
+    "limit":   { "type": "integer", "description": "Max results", "default": 10 },
+    "company": { "type": "string",  "description": "Company filter", "default": null }
+  },
+  "required": ["name"]
+}
+```
+
+<Tip>
+`Optional[str]` and `str | None` are identical at runtime and produce the same schema.
+</Tip>
+
+### Enum parameters with Literal
+
+Use `Literal` to restrict a parameter to a fixed set of values. MCP clients like the Inspector render these as dropdown selects:
+
+```python
+from typing import Literal
+
+@server.tool()
+def create_event(
+    title: Annotated[str, Field(description="Event title")],
+    visibility: Annotated[
+        Literal["public", "private", "team"],
+        Field(description="Who can see this event"),
+    ],
+    recurrence: Annotated[
+        Literal["none", "daily", "weekly", "monthly"],
+        Field(description="Recurrence pattern"),
+    ] = "none",
+) -> dict: ...
+```
+
+Produces `{"type": "string", "enum": ["public", "private", "team"]}` in the schema.
+
+<Note>
+mcp-use automatically simplifies Pydantic's nullable `anyOf` schemas. Without this,
+`str | None` would produce `{"anyOf": [{"type": "string"}, {"type": "null"}]}` which
+breaks description rendering in the MCP Inspector and fails validation in some clients
+like Google's Gemini API. mcp-use collapses this into `{"type": "string", "default": null}`.
+</Note>
+
 ## Complex Input Types
 
-Use Pydantic models or dataclasses for complex inputs:
+Use Pydantic models for complex inputs:
 
 ```python
 from pydantic import BaseModel
 
 class SearchQuery(BaseModel):
-    query: str
-    max_results: int = 10
-    include_metadata: bool = False
+    query: str = Field(description="The search query string")
+    max_results: int = Field(default=10, description="Maximum number of results to return")
+    include_metadata: bool = Field(default=False, description="Whether to include metadata")
 
 @server.tool()
 def search(params: SearchQuery) -> list[str]:
     """Search with complex parameters."""
-    # params.query, params.max_results, etc.
     return ["result1", "result2"]
 ```
 
@@ -129,59 +287,16 @@ def list_tool() -> list[str]:
 
 ## Error Handling
 
-Raise exceptions to indicate errors:
+Raise exceptions to indicate errors. The error message will be returned to the client:
 
 ```python
 @server.tool()
-def divide(a: float, b: float) -> float:
+def divide(
+    a: Annotated[float, Field(description="Dividend")],
+    b: Annotated[float, Field(description="Divisor")],
+) -> float:
     """Divide two numbers."""
     if b == 0:
         raise ValueError("Cannot divide by zero")
     return a / b
-```
-
-The error message will be returned to the client.
-
-## Complete Example
-
-```python
-from datetime import datetime
-from mcp.server.fastmcp import Context
-from mcp.types import ToolAnnotations
-from mcp_use.server import MCPServer
-
-server = MCPServer(name="Calculator Server", version="1.0.0")
-
-@server.tool()
-def add(a: int, b: int) -> int:
-    """Add two numbers."""
-    return a + b
-
-@server.tool(
-    name="divide",
-    annotations=ToolAnnotations(readOnlyHint=True)
-)
-def safe_divide(a: float, b: float) -> float:
-    """Safely divide two numbers."""
-    if b == 0:
-        raise ValueError("Division by zero")
-    return a / b
-
-@server.tool()
-async def batch_calculate(
-    operations: list[dict],
-    context: Context
-) -> list[float]:
-    """Perform multiple calculations with progress."""
-    results = []
-    for i, op in enumerate(operations):
-        await context.report_progress(i, len(operations))
-        if op["type"] == "add":
-            results.append(op["a"] + op["b"])
-        elif op["type"] == "multiply":
-            results.append(op["a"] * op["b"])
-    return results
-
-if __name__ == "__main__":
-    server.run(transport="streamable-http", run_debug=True)
 ```

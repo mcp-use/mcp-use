@@ -229,6 +229,7 @@ class TestMCPClientSessionManagement:
             message_handler=None,
             logging_callback=None,
             middleware=[default_logging_middleware],
+            verify=True,
             roots=None,
             list_roots_callback=None,
         )
@@ -290,6 +291,7 @@ class TestMCPClientSessionManagement:
             message_handler=None,
             logging_callback=None,
             middleware=[default_logging_middleware],
+            verify=True,
             roots=None,
             list_roots_callback=None,
         )
@@ -484,6 +486,7 @@ class TestMCPClientSessionManagement:
             message_handler=None,
             logging_callback=None,
             middleware=[default_logging_middleware],
+            verify=True,
             roots=None,
             list_roots_callback=None,
         )
@@ -496,6 +499,7 @@ class TestMCPClientSessionManagement:
             message_handler=None,
             logging_callback=None,
             middleware=[default_logging_middleware],
+            verify=True,
             roots=None,
             list_roots_callback=None,
         )
@@ -557,6 +561,7 @@ class TestMCPClientSessionManagement:
             message_handler=None,
             logging_callback=None,
             middleware=[default_logging_middleware],
+            verify=True,
             roots=None,
             list_roots_callback=None,
         )

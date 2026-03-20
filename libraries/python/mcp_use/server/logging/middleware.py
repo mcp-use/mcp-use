@@ -83,8 +83,8 @@ class MCPLoggingMiddleware(BaseHTTPMiddleware):
         if method_info:
             await self._log_access_info(request, method_info, response, start_time)
 
-        # Log debug info only in DEBUG=2 mode
-        if self.debug_level >= 2 and method_info:
+        # Log debug info if pretty_print is enabled OR debug_level >= 2
+        if method_info and (self.pretty_print_jsonrpc or self.debug_level >= 2):
             await self._log_debug_info(request, method_info, body_bytes, response_body, start_time, response_too_large)
 
         return response

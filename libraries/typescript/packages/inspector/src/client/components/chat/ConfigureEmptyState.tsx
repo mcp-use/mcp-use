@@ -1,5 +1,4 @@
 import { Key, Settings } from "lucide-react";
-import React from "react";
 
 import { Button } from "@/client/components/ui/button";
 
@@ -21,7 +20,10 @@ export function ConfigureEmptyState({
         provider and API key. Your credentials are stored locally and used only
         for this chat.
       </p>
-      <Button onClick={onConfigureClick}>
+      <Button
+        onClick={onConfigureClick}
+        data-testid="chat-configure-api-key-button"
+      >
         <Settings className="h-4 w-4 mr-2" />
         Configure API Key
       </Button>

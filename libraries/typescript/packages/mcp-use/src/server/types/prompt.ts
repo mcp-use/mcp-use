@@ -5,7 +5,7 @@ import type {
 import type { InputDefinition, OptionalizeUndefinedFields } from "./common.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
-import type { McpContext } from "./context.js";
+import type { ClientCapabilityChecker, McpContext } from "./context.js";
 
 // Re-export MCP SDK types for convenience
 export type { GetPromptResult };
@@ -13,17 +13,19 @@ export type { GetPromptResult };
 export type { GetPromptResult as PromptResult };
 
 /**
- * Enhanced Prompt Context that provides access to request context.
+ * Enhanced Prompt Context that provides access to request context and
+ * client capability information.
  *
  * This unified context provides:
  * - `auth` - Authentication info (when OAuth is configured)
  * - `req` - Hono request object
+ * - `client` - Client capability checker (name, capabilities, MCP Apps support)
  * - All other Hono Context properties and methods
  *
  * @template HasOAuth - Whether OAuth is configured (affects auth availability)
  */
 export type EnhancedPromptContext<HasOAuth extends boolean = false> =
-  McpContext<HasOAuth>;
+  McpContext<HasOAuth> & { client: ClientCapabilityChecker };
 
 /**
  * Extract input type from a prompt definition's schema
@@ -64,15 +66,33 @@ export interface PromptDefinition<
   TInput = Record<string, any>,
   HasOAuth extends boolean = false,
 > {
-  /** Unique identifier for the prompt */
+  /**
+   * Unique identifier for the prompt .
+   *
+   * @example "code-review-template"
+   * @example "daily-standup"
+   */
   name: string;
-  /** Human-readable title for the prompt */
+  /**
+   * Human-readable title displayed in prompt lists.
+   *
+   * @example "Code Review Template"
+   */
   title?: string;
-  /** Description of what the prompt does */
+  /**
+   * Description of what the prompt does; helps users choose the right prompt.
+   *
+   * @example "Generate a code review checklist for the given file type"
+   */
   description?: string;
   /** Argument definitions (legacy, use schema instead) */
+  /** @deprecated Use schema instead */
   args?: InputDefinition[];
-  /** Zod schema for input validation (preferred) */
+  /**
+   * Zod schema for input validation. Use .describe() on each field for user guidance.
+   *
+   * @example z.object({ language: z.string().describe("Programming language"), filePath: z.string().optional().describe("Path to file") })
+   */
   schema?: z.ZodObject<any>;
   /** Async callback function that generates the prompt */
   cb: PromptCallback<TInput, HasOAuth>;
@@ -82,14 +102,31 @@ export interface PromptDefinition<
  * Prompt definition without cb callback (new API with separate callback parameter)
  */
 export interface PromptDefinitionWithoutCallback {
-  /** Unique identifier for the prompt */
+  /**
+   * Unique identifier for the prompt .
+   *
+   * @example "code-review-template"
+   */
   name: string;
-  /** Human-readable title for the prompt */
+  /**
+   * Human-readable title displayed in prompt lists.
+   *
+   * @example "Code Review Template"
+   */
   title?: string;
-  /** Description of what the prompt does */
+  /**
+   * Description of what the prompt does.
+   *
+   * @example "Generate a code review checklist for the given file type"
+   */
   description?: string;
   /** Argument definitions (legacy, use schema instead) */
+  /** @deprecated Use schema instead */
   args?: InputDefinition[];
-  /** Zod schema for input validation (preferred) */
+  /**
+   * Zod schema for input validation.
+   *
+   * @example z.object({ language: z.string().describe("Programming language") })
+   */
   schema?: z.ZodObject<any>;
 }

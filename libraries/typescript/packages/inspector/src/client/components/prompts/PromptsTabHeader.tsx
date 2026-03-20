@@ -12,6 +12,8 @@ interface PromptsTabHeaderProps {
   onSearchBlur: () => void;
   onTabSwitch: () => void;
   searchInputRef: React.RefObject<HTMLInputElement>;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export function PromptsTabHeader({
@@ -25,6 +27,8 @@ export function PromptsTabHeader({
   onSearchBlur,
   onTabSwitch,
   searchInputRef,
+  onRefresh,
+  isRefreshing,
 }: PromptsTabHeaderProps) {
   return (
     <ListTabHeader
@@ -45,6 +49,8 @@ export function PromptsTabHeader({
       onSearchBlur={onSearchBlur}
       onTabSwitch={onTabSwitch}
       searchInputRef={searchInputRef}
+      onRefresh={onRefresh}
+      isRefreshing={isRefreshing}
     />
   );
 }

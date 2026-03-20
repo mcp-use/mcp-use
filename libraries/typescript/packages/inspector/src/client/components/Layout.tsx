@@ -1,6 +1,10 @@
 import { Spinner } from "@/client/components/ui/spinner";
 import { TooltipProvider } from "@/client/components/ui/tooltip";
-import { useInspector, type TabType } from "@/client/context/InspectorContext";
+import {
+  useInspector,
+  type EmbeddedConfig,
+  type TabType,
+} from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
@@ -54,6 +58,15 @@ export function Layout({ children }: LayoutProps) {
         proxyConfig,
         transportType,
         preventAutoAuth: true,
+        clientOptions: {
+          capabilities: {
+            extensions: {
+              "io.modelcontextprotocol/ui": {
+                mimeTypes: ["text/html;profile=mcp-app"],
+              },
+            },
+          },
+        },
       });
     },
     [addServer]
@@ -95,7 +108,7 @@ export function Layout({ children }: LayoutProps) {
     const embeddedConfigParam = urlParams.get("embeddedConfig");
 
     if (embedded) {
-      let config: { backgroundColor?: string; padding?: string } = {};
+      let config: EmbeddedConfig = {};
       if (embeddedConfigParam) {
         try {
           config = JSON.parse(embeddedConfigParam);
@@ -104,6 +117,11 @@ export function Layout({ children }: LayoutProps) {
         }
       }
       setEmbeddedMode(true, config);
+
+      // Apply defaultTab from embeddedConfig (overrides ?tab= param)
+      if (config.defaultTab) {
+        setActiveTab(config.defaultTab);
+      }
     }
   }, []); // Only run once on mount
 
@@ -418,29 +436,50 @@ export function Layout({ children }: LayoutProps) {
   // Sync URL query params with selected server state
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    const decodedServerId = serverParam
-      ? decodeURIComponent(serverParam)
-      : null;
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverId = searchParams.get("server");
+
+    // If server= is a URL and no matching connection exists, treat it as autoConnect=
+    if (
+      serverId &&
+      (serverId.startsWith("http://") || serverId.startsWith("https://"))
+    ) {
+      const existingConnection = connections.find(
+        (conn) => conn.id === serverId
+      );
+
+      if (!existingConnection) {
+        // Redirect to use autoConnect= parameter instead
+        const params = new URLSearchParams(searchParams);
+        params.delete("server");
+        params.set("autoConnect", serverId);
+        navigate(`/?${params.toString()}`, { replace: true });
+        return;
+      }
+    }
 
     // Update selected server if changed
-    if (decodedServerId !== selectedServerId) {
-      setSelectedServerId(decodedServerId);
+    if (serverId !== selectedServerId) {
+      setSelectedServerId(serverId);
     }
-  }, [location.search, selectedServerId, setSelectedServerId]);
+  }, [
+    location.search,
+    selectedServerId,
+    setSelectedServerId,
+    connections,
+    navigate,
+  ]);
 
   // Handle failed server connections - redirect to home
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    const serverParam = searchParams.get("server");
-    if (!serverParam) {
+    const serverId = searchParams.get("server");
+    if (!serverId) {
       return;
     }
 
-    const decodedServerId = decodeURIComponent(serverParam);
-    const serverConnection = connections.find(
-      (conn) => conn.id === decodedServerId
-    );
+    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
+    const serverConnection = connections.find((conn) => conn.id === serverId);
 
     // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {
@@ -454,6 +493,100 @@ export function Layout({ children }: LayoutProps) {
       return () => clearTimeout(timeoutId);
     }
   }, [location.search, navigate, connections]);
+
+  // Handle mcp-inspector:connect_servers postMessage from parent frame.
+  // Allows a host page to securely pass server configs (incl. auth) without
+  // putting tokens in the URL.
+  useEffect(() => {
+    if (!isEmbedded) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (!event.data || typeof event.data !== "object") return;
+      if (event.data.type !== "mcp-inspector:connect_servers") return;
+
+      const serverList = event.data.servers;
+      if (!Array.isArray(serverList) || serverList.length === 0) return;
+
+      let firstServerId: string | null = null;
+      for (const srv of serverList) {
+        if (!srv.url || typeof srv.url !== "string") continue;
+
+        const url: string = srv.url;
+        const name: string = srv.name ?? "Server";
+        const transportType: "http" | "sse" = srv.transportType ?? "http";
+
+        // Build custom headers from auth config (same logic as useAutoConnect)
+        const customHeaders: Record<string, string> = {
+          ...(srv.headers ?? {}),
+        };
+        if (srv.auth?.access_token) {
+          const tokenType = srv.auth.token_type || "bearer";
+          const formatted =
+            tokenType.charAt(0).toUpperCase() + tokenType.slice(1);
+          customHeaders.Authorization = `${formatted} ${srv.auth.access_token}`;
+        }
+
+        const proxyConfig: {
+          proxyAddress: string;
+          headers?: Record<string, string>;
+        } = {
+          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+          ...(Object.keys(customHeaders).length > 0 && {
+            headers: customHeaders,
+          }),
+        };
+
+        // Avoid duplicates
+        const existing = connections.find((c) => c.url === url);
+        if (!existing) {
+          addConnection(url, name, proxyConfig, transportType);
+        }
+
+        if (!firstServerId) {
+          firstServerId = url;
+        }
+      }
+
+      // Confirm back to parent
+      if (window.parent !== window) {
+        window.parent.postMessage(
+          {
+            type: "mcp-inspector:servers_connected",
+            count: serverList.length,
+          },
+          "*"
+        );
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [isEmbedded, connections, addConnection]);
+
+  // Auto-select the first ready server when new servers connect via postMessage.
+  // This handles the case where connect_servers adds servers and we need to
+  // navigate to one of them once it's ready.
+  const postMessageAutoSelectRef = useRef(false);
+  useEffect(() => {
+    if (!isEmbedded || postMessageAutoSelectRef.current) return;
+    if (selectedServerId) return;
+
+    const readyServer = connections.find((c) => c.state === "ready");
+    if (readyServer) {
+      postMessageAutoSelectRef.current = true;
+      setSelectedServerId(readyServer.id);
+      const params = new URLSearchParams(location.search);
+      params.set("server", readyServer.id);
+      navigate(`/?${params.toString()}`, { replace: true });
+    }
+  }, [
+    isEmbedded,
+    connections,
+    selectedServerId,
+    setSelectedServerId,
+    navigate,
+    location.search,
+  ]);
 
   // Centralized keyboard shortcuts
   useKeyboardShortcuts({
@@ -518,34 +651,44 @@ export function Layout({ children }: LayoutProps) {
   }
 
   // Apply embedded styling
+  const isSingleTab = isEmbedded && embeddedConfig.singleTab;
+
   const containerStyle: React.CSSProperties = isEmbedded
     ? {
         backgroundColor: embeddedConfig.backgroundColor || "#f3f3f3",
-        padding: embeddedConfig.padding || "0.5rem",
+        padding: isSingleTab ? "0" : embeddedConfig.padding || "0.5rem",
       }
     : {};
 
   const containerClassName = isEmbedded
-    ? "h-screen flex flex-col gap-2 sm:gap-4"
+    ? isSingleTab
+      ? "h-screen flex flex-col"
+      : "h-screen flex flex-col gap-2 sm:gap-4"
     : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+
+  const mainClassName = isSingleTab
+    ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
+    : "flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto";
 
   return (
     <TooltipProvider>
       <div className={containerClassName} style={containerStyle}>
-        {/* Header */}
-        <LayoutHeader
-          connections={connections}
-          selectedServer={selectedServer}
-          activeTab={activeTab}
-          onServerSelect={handleServerSelect}
-          onTabChange={setActiveTab}
-          onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-          onOpenConnectionOptions={handleOpenConnectionOptions}
-          embedded={isEmbedded}
-        />
+        {/* Header - hidden in single-tab mode */}
+        {!isSingleTab && (
+          <LayoutHeader
+            connections={connections}
+            selectedServer={selectedServer}
+            activeTab={activeTab}
+            onServerSelect={handleServerSelect}
+            onTabChange={setActiveTab}
+            onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
+            onOpenConnectionOptions={handleOpenConnectionOptions}
+            embedded={isEmbedded}
+          />
+        )}
 
         {/* Main Content */}
-        <main className="flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto">
+        <main className={mainClassName}>
           <LayoutContent
             selectedServer={selectedServer}
             activeTab={activeTab}

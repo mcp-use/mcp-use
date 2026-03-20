@@ -68,6 +68,7 @@ export function PromptExecutionPanel({
                 disabled={isExecuting || !isConnected}
                 size="sm"
                 className="lg:size-default pr-1! gap-0"
+                data-testid="prompt-execute-button"
               >
                 {isExecuting ? (
                   <>

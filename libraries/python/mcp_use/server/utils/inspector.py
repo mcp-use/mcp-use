@@ -1,16 +1,26 @@
 import logging
+import os
+from urllib.parse import urlencode
 
 import httpx
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, RedirectResponse
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 logger = logging.getLogger(__name__)
 
-CDN_BASE_URL = "https://unpkg.com/@mcp-use/inspector@latest/dist/web"
-INDEX_URL = f"{CDN_BASE_URL}/index.html"
+# Override with INSPECTOR_CDN_BASE_URL (e.g. http://localhost:2967) for E2E or local dev
+INSPECTOR_CDN_BASE_URL = os.environ.get(
+    "INSPECTOR_CDN_BASE_URL",
+    "https://unpkg.com/@mcp-use/inspector@latest/dist/web",
+).rstrip("/")
+INDEX_URL = f"{INSPECTOR_CDN_BASE_URL}/index.html"
 
 
-async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
+async def _inspector_index(
+    request: Request,
+    mcp_path: str = "/mcp",
+    inspector_path: str = "/inspector",
+):
     """Serve the inspector index.html file with autoconnect parameter."""
     # Get the server URL from the request
     server_url = f"{request.url.scheme}://{request.url.netloc}{mcp_path}"
@@ -21,7 +31,9 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
 
     if not server_param and not autoconnect_param:
         # Redirect to add the autoConnect parameter (note: capital C)
-        autoconnect_url = f"{request.url.scheme}://{request.url.netloc}/inspector?autoConnect={server_url}"
+        autoconnect_url = (
+            f"{request.url.scheme}://{request.url.netloc}{inspector_path}?{urlencode({'autoConnect': server_url})}"
+        )
         return RedirectResponse(url=autoconnect_url, status_code=302)
 
     # Fetch the CDN file
@@ -29,7 +41,9 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(INDEX_URL, follow_redirects=True)
             if response.status_code == 200:
-                return HTMLResponse(response.text)
+                html = response.text.replace('src="/inspector/assets/', f'src="{INSPECTOR_CDN_BASE_URL}/assets/')
+                html = html.replace('href="/inspector/assets/', f'href="{INSPECTOR_CDN_BASE_URL}/assets/')
+                return HTMLResponse(html)
             else:
                 logger.warning(
                     f"Failed to fetch inspector from CDN: {INDEX_URL} returned status {response.status_code}"
@@ -57,14 +71,12 @@ async def _inspector_index(request: Request, mcp_path: str = "/mcp"):
 async def _inspector_static(request: Request):
     """Serve static files from the CDN."""
     path = request.path_params.get("path", "")
-    cdn_url = f"{CDN_BASE_URL}/{path}"
+    cdn_url = f"{INSPECTOR_CDN_BASE_URL}/{path}"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(cdn_url, follow_redirects=True)
             if response.status_code == 200:
-                return HTMLResponse(
-                    content=response.content, media_type=response.headers.get("Content-Type", "text/plain")
-                )
+                return Response(content=response.content, media_type=response.headers.get("Content-Type", "text/plain"))
             else:
                 logger.warning(
                     f"Failed to fetch static file from CDN: {cdn_url} returned status {response.status_code}"

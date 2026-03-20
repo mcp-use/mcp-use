@@ -110,7 +110,7 @@ Build your first MCP server in minutes with this step-by-step guide:
 
     ```python
     if __name__ == "__main__":
-        server.run(transport="streamable-http", run_debug=True)
+        server.run(transport="streamable-http", debug=True)
     ```
 
     Then run it:
@@ -159,7 +159,7 @@ def get_time() -> str:
     return datetime.now().isoformat()
 
 if __name__ == "__main__":
-    server.run(transport="streamable-http", run_debug=True)
+    server.run(transport="streamable-http", debug=True)
 ```
 
 ### Transport Options
@@ -186,6 +186,30 @@ Debug mode provides:
 - `/openmcp.json` endpoint for server discovery
 - `/docs` endpoint with interactive documentation
 - Enhanced logging with detailed request information
+
+### Server Icons
+
+Add icons to your server implementation so MCP clients can display them:
+
+```python
+from mcp.types import Icon
+from mcp_use.server import MCPServer
+
+server = MCPServer(
+    name="My Server",
+    icons=[Icon(src="https://example.com/icon.svg", mime_type="image/svg+xml")],
+)
+```
+
+Icons are included in the `initialize` response and can be used by clients for display in tool pickers, server lists, etc. You can also set icons on individual tools via the `@server.tool()` decorator:
+
+```python
+@server.tool(
+    icons=[Icon(src="https://example.com/tool-icon.png", mime_type="image/png")],
+)
+def my_tool(param: str) -> str:
+    return param
+```
 
 ## Next Steps
 

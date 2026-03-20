@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { consoleLogBus } from "../console-log-bus";
 
 export interface ConsoleLogEntry {
   id: string;
@@ -88,7 +89,7 @@ export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
     logIdCounterRef.current = 0;
   }, []);
 
-  // Listen for console log messages from iframes
+  // Listen for console log messages from iframes (postMessage)
   useEffect(() => {
     if (!enabled) return;
 
@@ -113,6 +114,12 @@ export function useIframeConsole(options: UseIframeConsoleOptions = {}) {
     return () => {
       window.removeEventListener("message", handleMessage);
     };
+  }, [enabled, addLog]);
+
+  // Subscribe to console log bus (for MCP Apps and other internal sources)
+  useEffect(() => {
+    if (!enabled) return;
+    return consoleLogBus.subscribe(addLog);
   }, [enabled, addLog]);
 
   return {

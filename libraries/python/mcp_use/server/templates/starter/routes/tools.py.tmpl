@@ -1,0 +1,31 @@
+from typing import Annotated
+from pydantic import Field
+from mcp_use.server import MCPRouter, Context
+
+router = MCPRouter()
+
+@router.tool()
+async def greet(
+    name: Annotated[str, Field(description="Name of the person to greet")],
+) -> str:
+    """Return a friendly greeting."""
+    return f"Hello, {name}! Welcome to {{PROJECT_NAME}}."
+
+
+@router.tool()
+async def add(
+    a: Annotated[int, Field(description="First number")],
+    b: Annotated[int, Field(description="Second number")],
+) -> int:
+    """Add two numbers together."""
+    return a + b
+
+
+@router.tool()
+async def echo(
+    message: Annotated[str, Field(description="The message to echo back")],
+    context: Context,
+) -> str:
+    """Echo a message back, demonstrating Context usage."""
+    await context.log("info", f"Echoing: {message}")
+    return f"Echo: {message}"

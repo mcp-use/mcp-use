@@ -9,17 +9,27 @@
 import { setTimeout as sleep } from "timers/promises";
 
 import {
-  MCPServer,
-  text,
-  image,
-  resource,
-  error,
-  object,
-  binary,
-  mix,
   audio,
+  binary,
+  completable,
+  enumSchema,
+  error,
+  image,
+  legacyEnum,
+  MCPServer,
+  mix,
+  object,
+  resource,
+  text,
+  titledEnum,
+  titledMultiEnum,
+  untitledEnum,
+  untitledMultiEnum,
+  widget,
 } from "mcp-use/server";
 import { z } from "zod";
+
+const SERVER_PORT = process.env.PORT || "3000";
 
 // Create server instance
 const server = new MCPServer({
@@ -27,6 +37,19 @@ const server = new MCPServer({
   version: "1.0.0",
   description:
     "MCP Conformance Test Server implementing all supported features.",
+  favicon: "icon.svg",
+  icons: [
+    {
+      src: "icon.svg",
+      mimeType: "image/svg+xml",
+      sizes: ["512x512"],
+    },
+  ],
+  // Keep DNS rebinding protection enabled for conformance runs.
+  allowedOrigins: [
+    `http://localhost:${SERVER_PORT}`,
+    `http://127.0.0.1:${SERVER_PORT}`,
+  ],
 });
 
 // 1x1 red PNG pixel as base64
@@ -53,6 +76,38 @@ server.tool(
   },
   async ({ message = "Hello, World!" }: { message?: string }) =>
     text(`Echo: ${message}`)
+);
+
+// tools-call-typed-arguments
+// Optional fields are used so generated schemas can include anyOf/null patterns.
+server.tool(
+  {
+    name: "test_typed_arguments",
+    description:
+      "Validates argument typing for boolean, array, and object parameters",
+    schema: z.object({
+      flag: z.boolean().optional(),
+      tags: z.array(z.string()).optional(),
+      config: z
+        .object({
+          mode: z.string(),
+          count: z.number(),
+        })
+        .optional(),
+    }),
+  },
+  async ({ flag = false, tags = [], config = { mode: "default", count: 0 } }) =>
+    text(
+      JSON.stringify({
+        flagType: typeof flag,
+        tagsIsArray: Array.isArray(tags),
+        configIsObject:
+          typeof config === "object" &&
+          config !== null &&
+          !Array.isArray(config),
+        values: { flag, tags, config },
+      })
+    )
 );
 
 // tools-call-image
@@ -224,6 +279,52 @@ server.tool(
   }
 );
 
+// tools-call-elicitation-sep1330-enums
+server.tool(
+  {
+    name: "test_elicitation_sep1330_enums",
+    description:
+      "A tool that uses elicitation with all 5 enum variants (SEP-1330)",
+  },
+  async (params, ctx) => {
+    try {
+      const result = await ctx.elicit({
+        message: "Please choose your options",
+        requestedSchema: enumSchema({
+          untitledSingle: untitledEnum(["option1", "option2", "option3"]),
+          titledSingle: titledEnum([
+            { value: "value1", title: "First Option" },
+            { value: "value2", title: "Second Option" },
+            { value: "value3", title: "Third Option" },
+          ]),
+          legacyEnum: legacyEnum([
+            { value: "opt1", name: "Option One" },
+            { value: "opt2", name: "Option Two" },
+            { value: "opt3", name: "Option Three" },
+          ]),
+          untitledMulti: untitledMultiEnum(["option1", "option2", "option3"]),
+          titledMulti: titledMultiEnum([
+            { value: "value1", title: "First Choice" },
+            { value: "value2", title: "Second Choice" },
+            { value: "value3", title: "Third Choice" },
+          ]),
+        }),
+      });
+
+      if (result.action === "accept") {
+        return text(
+          `Elicitation completed: action=accept, content=${JSON.stringify(result.data)}`
+        );
+      } else if (result.action === "decline") {
+        return text("Elicitation completed: action=decline");
+      }
+      return text("Elicitation completed: action=cancel");
+    } catch (err: any) {
+      return error(`Elicitation error: ${err.message || String(err)}`);
+    }
+  }
+);
+
 // tools-call-error
 server.tool(
   {
@@ -231,6 +332,40 @@ server.tool(
     description: "A tool that raises an error for testing error handling",
   },
   async () => error("This is an intentional error for testing")
+);
+
+// tools-call-record-schema
+// Tests z.record() schema roundtrip: additionalProperties and descriptions should be preserved
+server.tool(
+  {
+    name: "test_record_schema",
+    description:
+      "Tests z.record() schema roundtrip with additionalProperties and descriptions",
+    schema: z.object({
+      files: z
+        .record(z.string(), z.string())
+        .describe(
+          "REQUIRED. A {path: code} object mapping file paths to source code strings."
+        ),
+      entryFile: z
+        .string()
+        .optional()
+        .describe('Entry file path (default: "/src/Video.tsx").'),
+      title: z.string().optional().describe("Title shown in the video player"),
+      durationInFrames: z
+        .number()
+        .optional()
+        .describe("Total duration in frames (default: 150)"),
+      fps: z.number().optional().describe("Frames per second (default: 30)"),
+      width: z.number().optional().describe("Width in pixels (default: 1920)"),
+      height: z
+        .number()
+        .optional()
+        .describe("Height in pixels (default: 1080)"),
+    }),
+  },
+  async (params: any) =>
+    text(`Received ${Object.keys(params.files || {}).length} files`)
 );
 
 // =============================================================================
@@ -274,6 +409,11 @@ server.resourceTemplate(
       name: "Template Resource",
       description: "A templated resource",
       mimeType: "application/json",
+      callbacks: {
+        complete: {
+          id: ["foo", "bar", "baz", "qux"],
+        },
+      },
     },
   },
   async (uri: URL, variables: Record<string, any>) => ({
@@ -342,8 +482,12 @@ server.prompt(
     name: "test_prompt_with_arguments",
     description: "A prompt that accepts arguments",
     schema: z.object({
-      arg1: z.string().optional(),
-      arg2: z.string().optional(),
+      arg1: completable(z.string().optional(), () => {
+        return ["default1"];
+      }),
+      arg2: completable(z.string().optional(), () => {
+        return ["default2"];
+      }),
     }),
   },
   async ({ arg1 = "default1", arg2 = "default2" }) =>
@@ -374,6 +518,74 @@ server.prompt(
   },
   async (params) =>
     mix(text("Here is a test image:"), image(RED_PIXEL_PNG, "image/png"))
+);
+
+// =============================================================================
+// UI WIDGET: get-weather-delayed (weather display with artificial delay)
+// =============================================================================
+
+const weatherData: Record<
+  string,
+  {
+    temperature: number;
+    conditions: string;
+    humidity: number;
+    windSpeed: number;
+  }
+> = {
+  tokyo: {
+    temperature: 22,
+    conditions: "Partly Cloudy",
+    humidity: 65,
+    windSpeed: 12,
+  },
+  london: { temperature: 15, conditions: "Rainy", humidity: 80, windSpeed: 20 },
+  "new york": {
+    temperature: 18,
+    conditions: "Sunny",
+    humidity: 55,
+    windSpeed: 8,
+  },
+  paris: { temperature: 17, conditions: "Cloudy", humidity: 70, windSpeed: 15 },
+};
+
+server.tool(
+  {
+    name: "get-weather-delayed",
+    description:
+      "Get weather with artificial 5-second delay to test widget lifecycle (Issue #930)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+      delay: z
+        .number()
+        .default(5000)
+        .describe("Delay in milliseconds (default: 5000)"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city, delay }) => {
+    await sleep(delay);
+
+    const cityLower = city.toLowerCase();
+    const weather = weatherData[cityLower] || {
+      temperature: 20,
+      conditions: "Unknown",
+      humidity: 50,
+      windSpeed: 10,
+    };
+
+    return widget({
+      props: {
+        city,
+        ...weather,
+      },
+      message: `Current weather in ${city}: ${weather.conditions}, ${weather.temperature}°C (fetched after ${delay}ms delay)`,
+    });
+  }
 );
 
 await server.listen();

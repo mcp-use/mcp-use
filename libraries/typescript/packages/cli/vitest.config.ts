@@ -8,5 +8,8 @@ export default defineConfig({
     exclude: ["node_modules", "dist"],
     testTimeout: 30000,
     hookTimeout: 30000,
+    env: {
+      MCP_USE_ANONYMIZED_TELEMETRY: "false",
+    },
   },
 });

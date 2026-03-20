@@ -22,8 +22,27 @@ class InspectorLogFilter(logging.Filter):
         return True
 
 
+class MCPLogsOnlyFilter(logging.Filter):
+    """Filter that drops all uvicorn access log records.
+
+    MCP protocol logs are printed directly to stdout by MCPLoggingMiddleware,
+    bypassing the logging system entirely. This filter drops all uvicorn access
+    records so only the MCP: lines remain.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if args is not None and isinstance(args, tuple) and len(args) >= 3:
+            return False
+        return True
+
+
 def setup_logging(
-    debug_level: int = 0, log_level: str = "INFO", show_inspector_logs: bool = False, inspector_path: str = "/inspector"
+    debug_level: int = 0,
+    log_level: str = "INFO",
+    show_inspector_logs: bool = False,
+    inspector_path: str = "/inspector",
+    mcp_logs_only: bool = False,
 ) -> dict:
     """Set up logging configuration for MCP server.
 
@@ -31,7 +50,10 @@ def setup_logging(
         debug_level: Debug level (0: production, 1: debug+routes, 2: debug+routes+jsonrpc)
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
         show_inspector_logs: Whether to show inspector-related access logs (default: False)
-        inspector_path: Path prefix for inspector routes
+        inspector_path: Effective inspector route prefix, typically `/inspector`
+            or a prefixed route like `/mcp/inspector`
+        mcp_logs_only: When True, suppress all uvicorn access logs (MCP logs are printed
+            directly by the middleware). Default: False.
 
     Returns:
         Uvicorn logging configuration dict
@@ -69,15 +91,22 @@ def setup_logging(
     filters = {}
     if not show_inspector_logs:
         filters["inspector_filter"] = {"()": InspectorLogFilter, "inspector_path": inspector_path}
+    if mcp_logs_only:
+        filters["mcp_logs_only_filter"] = {"()": MCPLogsOnlyFilter}
 
-    # Build access handler with optional filter
+    # Build access handler with optional filters
+    access_filters = []
+    if not show_inspector_logs:
+        access_filters.append("inspector_filter")
+    if mcp_logs_only:
+        access_filters.append("mcp_logs_only_filter")
     access_handler = {
         "formatter": "access",
         "class": "logging.StreamHandler",
         "stream": "ext://sys.stdout",
     }
-    if not show_inspector_logs:
-        access_handler["filters"] = ["inspector_filter"]
+    if access_filters:
+        access_handler["filters"] = access_filters
 
     return {
         "version": 1,

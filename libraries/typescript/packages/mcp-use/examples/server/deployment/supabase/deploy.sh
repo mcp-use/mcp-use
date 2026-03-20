@@ -353,35 +353,57 @@ fi
 
 print_success "Copied HTML files and metadata to $FUNCTION_DIR"
 
-# Check if index.ts exists, if not copy from current root
+# Check if index.ts exists, if not copy from current root or src/
 if [ ! -f "$FUNCTION_DIR/index.ts" ]; then
     print_warning "index.ts not found in $FUNCTION_DIR"
     
-    # Check if we have index.ts in the current root
+    # Try to find the source file in order of preference
+    SOURCE_FILE=""
     if [ -f "index.ts" ]; then
-        print_info "Copying index.ts from current root..."
-        cp "index.ts" "$FUNCTION_DIR/"
+        SOURCE_FILE="index.ts"
+    elif [ -f "src/index.ts" ]; then
+        SOURCE_FILE="src/index.ts"
+    elif [ -f "src/server.ts" ]; then
+        SOURCE_FILE="src/server.ts"
+    fi
+    
+    if [ -n "$SOURCE_FILE" ]; then
+        print_info "Copying $SOURCE_FILE..."
+        cp "$SOURCE_FILE" "$FUNCTION_DIR/index.ts"
         
-        # Update PROJECT_REF in index.ts
+        # Update PROJECT_REF in index.ts if it exists
         sed -i.bak "s/nnpumlykjksvxivhywwo/$PROJECT_ID/g" "$FUNCTION_DIR/index.ts"
         rm -f "$FUNCTION_DIR/index.ts.bak"
-        print_success "Copied and updated index.ts"
+        print_success "Copied and updated index.ts from $SOURCE_FILE"
     else
-        print_error "No index.ts found"
+        print_error "No index.ts or server.ts found"
         echo ""
-        echo "Please ensure you have an index.ts file in the current root directory"
+        echo "Please ensure you have one of the following files:"
+        echo "  - index.ts (in current root)"
+        echo "  - src/index.ts"
+        echo "  - src/server.ts"
         exit 1
     fi
 fi
 
 # Create/override deno.json with mcp-use dependency
 print_info "Creating deno.json with mcp-use@$MCP_USE_VERSION dependency..."
+# Note: Hybrid zod mapping to satisfy conflicting requirements:
+# - @modelcontextprotocol/sdk imports "zod/v3" and needs "z.custom" (available in Zod v3)
+# - Other deps import "zod/v4" and "zod/v4-mini"
+# - We map "zod" and "zod/v3" to Zod v3, and "zod/v4" variants to Zod v4
+# - We use esm.sh for all zod imports to match the deployment environment
 cat > "$FUNCTION_DIR/deno.json" << EOF
 {
   "imports": {
-    "mcp-use/client": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/client",
-    "mcp-use/server": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/server",
-    "zod": "npm:zod@^4.2.0"
+    "mcp-use/client": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/client?no-dts&external=zod",
+    "mcp-use/server": "https://esm.sh/mcp-use@${MCP_USE_VERSION}/server?no-dts&external=zod",
+    "zod": "https://esm.sh/zod@3.24.4",
+    "zod/v3": "https://esm.sh/zod@3.24.4",
+    "zod/v4": "https://esm.sh/zod@4.2.0",
+    "zod/v4-mini": "https://esm.sh/zod@4.2.0",
+    "zod/v4/mini": "https://esm.sh/zod@4.2.0",
+    "zod/v4/core": "https://esm.sh/zod@4.2.0"
   }
 }
 

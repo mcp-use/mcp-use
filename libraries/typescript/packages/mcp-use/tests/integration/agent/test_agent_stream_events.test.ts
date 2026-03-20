@@ -252,6 +252,8 @@ describe("agent.streamEvents() integration test", () => {
       model: OPENAI_MODEL,
       temperature: 0,
       apiKey: "invalid-key-12345",
+      timeout: 5000, // Add 5 second timeout to fail fast
+      maxRetries: 0, // Disable retries to fail immediately
     });
 
     const agent = new MCPAgent({ llm, client, maxSteps: 5 });

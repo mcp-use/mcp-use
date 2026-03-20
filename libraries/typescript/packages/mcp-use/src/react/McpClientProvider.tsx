@@ -16,9 +16,13 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import { Logger } from "../logging.js";
 import type { StorageProvider } from "./storage/StorageProvider.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
 import { useMcp } from "./useMcp.js";
+
+// Module-level logger for McpClientProvider & friends
+const providerLogger = Logger.get("McpClientProvider");
 
 // ===== Types =====
 
@@ -86,9 +90,13 @@ export interface McpServer extends UseMcpResult {
  */
 export interface McpServerOptions extends Omit<
   UseMcpOptions,
-  "samplingCallback" | "onElicitation" | "onNotification"
+  | "samplingCallback"
+  | "onElicitation"
+  | "elicitationCallback"
+  | "onNotification"
 > {
   name?: string;
+  authProvider?: UseMcpOptions["authProvider"];
   // Optional callbacks for app-specific handling (e.g., toasts)
   onSamplingRequest?: (request: PendingSamplingRequest) => void;
   onElicitationRequest?: (request: PendingElicitationRequest) => void;
@@ -100,6 +108,7 @@ export interface McpServerOptions extends Omit<
  */
 export interface McpClientContextType {
   servers: McpServer[];
+  /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
   updateServer: (
@@ -139,6 +148,25 @@ interface McpServerWrapperProps {
         enabled?: boolean;
         proxyAddress?: string;
       };
+  clientInfo?: {
+    name: string;
+    title?: string;
+    version: string;
+    description?: string;
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    websiteUrl?: string;
+    /**
+     * Default capabilities advertised to all servers managed by this provider.
+     * Per-server `clientOptions.capabilities` are merged on top, with per-server
+     * values taking precedence. Stripped from the MCP `clientInfo` wire field.
+     */
+    capabilities?: Record<string, unknown>;
+  };
+  cachedMetadata?: import("./storage/StorageProvider.js").CachedServerMetadata;
   onUpdate: (server: McpServer) => void;
   rpcWrapTransport?: (transport: any, serverId: string) => any;
   onGlobalSamplingRequest?: (
@@ -178,6 +206,8 @@ function McpServerWrapper({
   options,
   defaultProxyConfig,
   defaultAutoProxyFallback,
+  clientInfo: providerClientInfo,
+  cachedMetadata,
   onUpdate,
   rpcWrapTransport,
   onGlobalSamplingRequest,
@@ -217,8 +247,23 @@ function McpServerWrapper({
         rest.autoProxyFallback !== undefined
           ? rest.autoProxyFallback
           : defaultAutoProxyFallback,
+      // Merge provider clientInfo with server-specific clientInfo
+      // Server-specific takes precedence
+      clientInfo: rest.clientInfo
+        ? providerClientInfo
+          ? { ...providerClientInfo, ...rest.clientInfo }
+          : rest.clientInfo
+        : providerClientInfo,
+      // Pass cached metadata as initial server info if available
+      _initialServerInfo: cachedMetadata,
     };
-  }, [options, defaultProxyConfig, defaultAutoProxyFallback]);
+  }, [
+    options,
+    defaultProxyConfig,
+    defaultAutoProxyFallback,
+    providerClientInfo,
+    cachedMetadata,
+  ]);
 
   // Merge user's wrapTransport with RPC logging wrapper
   const combinedWrapTransport = useMemo(() => {
@@ -484,9 +529,53 @@ function McpServerWrapper({
     [notifications]
   );
 
+  // Create stable fingerprints for tools/resources/prompts that detect ANY content changes
+  // This catches renames, schema changes, description updates, etc.
+  const toolsFingerprint = useMemo(() => {
+    const fingerprint = JSON.stringify(
+      mcp.tools
+        .map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema,
+          _meta: (t as any)._meta,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    return fingerprint;
+  }, [mcp.tools, id]);
+  const resourcesFingerprint = useMemo(
+    () =>
+      JSON.stringify(
+        mcp.resources
+          .map((r) => ({
+            uri: r.uri,
+            name: r.name,
+            description: r.description,
+            mimeType: r.mimeType,
+          }))
+          .sort((a, b) => a.uri.localeCompare(b.uri))
+      ),
+    [mcp.resources]
+  );
+  const promptsFingerprint = useMemo(
+    () =>
+      JSON.stringify(
+        mcp.prompts
+          .map((p) => ({
+            name: p.name,
+            description: p.description,
+            arguments: p.arguments,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      ),
+    [mcp.prompts]
+  );
+
   // Update parent when state changes
   const onUpdateRef = useRef(onUpdate);
   const prevServerRef = useRef<McpServer | null>(null);
+  const prevFingerprintsRef = useRef({ tools: "", resources: "", prompts: "" });
 
   useEffect(() => {
     onUpdateRef.current = onUpdate;
@@ -513,14 +602,22 @@ function McpServerWrapper({
 
     // Only update if something actually changed
     const prevServer = prevServerRef.current;
+    const prevFingerprints = prevFingerprintsRef.current;
+
+    // Check if tools/resources/prompts content changed (not just length)
+    const toolsChanged = prevFingerprints.tools !== toolsFingerprint;
+    const resourcesChanged =
+      prevFingerprints.resources !== resourcesFingerprint;
+    const promptsChanged = prevFingerprints.prompts !== promptsFingerprint;
+
     if (
       !prevServer ||
       prevServer.state !== server.state ||
       prevServer.error !== server.error ||
       prevServer.authUrl !== server.authUrl ||
-      prevServer.tools.length !== server.tools.length ||
-      prevServer.resources.length !== server.resources.length ||
-      prevServer.prompts.length !== server.prompts.length ||
+      toolsChanged ||
+      resourcesChanged ||
+      promptsChanged ||
       prevServer.serverInfo !== server.serverInfo ||
       prevServer.capabilities !== server.capabilities ||
       prevServer.notifications.length !== server.notifications.length ||
@@ -532,7 +629,16 @@ function McpServerWrapper({
       !prevServer.client
     ) {
       prevServerRef.current = server;
+      prevFingerprintsRef.current = {
+        tools: toolsFingerprint,
+        resources: resourcesFingerprint,
+        prompts: promptsFingerprint,
+      };
       onUpdateRef.current(server);
+    } else {
+      providerLogger.debug(
+        `[McpServerWrapper ${id}] No meaningful changes detected, skipping onUpdate`
+      );
     }
   }, [
     id,
@@ -542,11 +648,10 @@ function McpServerWrapper({
     mcp.state,
     mcp.error,
     mcp.authUrl,
-    // Use array LENGTHS instead of array references to avoid triggering on reference changes
-    mcp.tools.length,
-    mcp.resources.length,
-    mcp.resourceTemplates.length,
-    mcp.prompts.length,
+    // Use fingerprints to detect content changes (including renames)
+    toolsFingerprint,
+    resourcesFingerprint,
+    promptsFingerprint,
     // serverInfo and capabilities - include for reference comparison
     mcp.serverInfo,
     mcp.capabilities,
@@ -605,6 +710,49 @@ export interface McpClientProviderProps {
         enabled?: boolean;
         proxyAddress?: string;
       };
+
+  /**
+   * Client info for all servers (used for OAuth registration and server capabilities).
+   * Can be overridden per-server in addServer() options.
+   *
+   * The optional `capabilities` field sets default MCP capabilities advertised to
+   * every server managed by this provider (e.g. MCP Apps / SEP-1865 extensions).
+   * It is merged with per-server `clientOptions.capabilities` (per-server takes
+   * precedence) and is stripped from the actual MCP `clientInfo` wire field.
+   */
+  clientInfo?: {
+    /** Client name displayed on OAuth consent pages (required) */
+    name: string;
+    /** Client title/display name */
+    title?: string;
+    /** Client version (required) */
+    version: string;
+    /** Client description */
+    description?: string;
+    /** Client icons (first icon used as logo_uri for OAuth) */
+    icons?: Array<{
+      src: string;
+      mimeType?: string;
+      sizes?: string[];
+    }>;
+    /** Client website URL (used as client_uri for OAuth) */
+    websiteUrl?: string;
+    /**
+     * Default capabilities advertised to all servers managed by this provider.
+     * Per-server `clientOptions.capabilities` are merged on top, with per-server
+     * values taking precedence. Stripped from the MCP `clientInfo` wire field.
+     *
+     * @example
+     * ```tsx
+     * capabilities: {
+     *   extensions: {
+     *     "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] },
+     *   },
+     * }
+     * ```
+     */
+    capabilities?: Record<string, unknown>;
+  };
 
   /**
    * Storage provider for persisting server configurations
@@ -705,6 +853,7 @@ export function McpClientProvider({
   mcpServers,
   defaultProxyConfig,
   defaultAutoProxyFallback = true,
+  clientInfo,
   storageProvider,
   enableRpcLogging = false,
   onServerAdded,
@@ -716,6 +865,11 @@ export function McpClientProvider({
   const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
   const [servers, setServers] = useState<McpServer[]>([]);
   const [storageLoaded, setStorageLoaded] = useState(false);
+
+  // Store cached server metadata
+  const cachedMetadataRef = useRef<
+    Record<string, import("./storage/StorageProvider.js").CachedServerMetadata>
+  >({});
 
   // Load RPC transport wrapper if enabled
   const [rpcWrapTransport, setRpcWrapTransport] = useState<
@@ -733,12 +887,15 @@ export function McpClientProvider({
     // Load the RPC logger dynamically
     import("./rpc-logger.js")
       .then((module) => {
-        console.log("[McpClientProvider] RPC logger loaded");
+        providerLogger.debug("[McpClientProvider] RPC logger loaded");
         setRpcWrapTransport(() => module.wrapTransportForLogging);
         setRpcLoggingReady(true); // RPC logging loaded, mark as ready
       })
       .catch((err) => {
-        console.error("[McpClientProvider] Failed to load RPC logger:", err);
+        providerLogger.error(
+          "[McpClientProvider] Failed to load RPC logger:",
+          err
+        );
         setRpcWrapTransport(undefined);
         setRpcLoggingReady(true); // Failed to load, but still mark as ready to unblock
       });
@@ -748,14 +905,14 @@ export function McpClientProvider({
   // Wait for RPC logging to be ready before loading servers
   useEffect(() => {
     if (!rpcLoggingReady) {
-      console.log(
+      providerLogger.debug(
         "[McpClientProvider] Waiting for RPC logging to be ready before loading servers"
       );
       return;
     }
 
     const loadServers = async () => {
-      console.log(
+      providerLogger.debug(
         "[McpClientProvider] Loading servers, storageProvider:",
         !!storageProvider,
         "mcpServers:",
@@ -769,7 +926,7 @@ export function McpClientProvider({
             id,
             options,
           }));
-          console.log(
+          providerLogger.debug(
             "[McpClientProvider] Loaded from mcpServers prop:",
             configs.length
           );
@@ -785,10 +942,44 @@ export function McpClientProvider({
           storageProvider.getServers()
         );
 
-        console.log(
+        providerLogger.debug(
           "[McpClientProvider] Loaded from storage:",
           Object.keys(storedServers).length
         );
+
+        // Load cached metadata if supported by storage provider
+        if (storageProvider.getServerMetadata) {
+          try {
+            const serverIds = Object.keys(storedServers);
+            const metadataPromises = serverIds.map(async (id) => {
+              const metadata = await Promise.resolve(
+                storageProvider.getServerMetadata!(id)
+              );
+              return [id, metadata] as const;
+            });
+            const metadataEntries = await Promise.all(metadataPromises);
+            cachedMetadataRef.current = Object.fromEntries(
+              metadataEntries.filter(
+                (
+                  entry
+                ): entry is [
+                  string,
+                  import("./storage/StorageProvider.js").CachedServerMetadata,
+                ] => entry[1] !== undefined
+              )
+            );
+            providerLogger.debug(
+              "[McpClientProvider] Loaded cached metadata for",
+              Object.keys(cachedMetadataRef.current).length,
+              "servers"
+            );
+          } catch (metadataError) {
+            providerLogger.warn(
+              "[McpClientProvider] Failed to load cached metadata:",
+              metadataError
+            );
+          }
+        }
 
         // Merge with initial mcpServers (mcpServers takes precedence)
         const mergedServers = { ...storedServers, ...mcpServers };
@@ -799,14 +990,14 @@ export function McpClientProvider({
           options,
         }));
 
-        console.log(
+        providerLogger.debug(
           "[McpClientProvider] Total servers after merge:",
           configs.length
         );
         setServerConfigs(configs);
         setStorageLoaded(true);
       } catch (error) {
-        console.error(
+        providerLogger.error(
           "[McpClientProvider] Failed to load from storage:",
           error
         );
@@ -841,7 +1032,10 @@ export function McpClientProvider({
 
         await Promise.resolve(storageProvider.setServers(serversToSave));
       } catch (error) {
-        console.error("[McpClientProvider] Failed to save to storage:", error);
+        providerLogger.error(
+          "[McpClientProvider] Failed to save to storage:",
+          error
+        );
       }
     };
 
@@ -850,19 +1044,47 @@ export function McpClientProvider({
 
   const handleServerUpdate = useCallback(
     (updatedServer: McpServer) => {
+      providerLogger.debug(
+        `[McpClientProvider] handleServerUpdate called for server ${updatedServer.id}`,
+        {
+          toolCount: updatedServer.tools.length,
+          state: updatedServer.state,
+        }
+      );
+
+      const callbacksToRun: Array<() => void> = [];
+
       setServers((prev) => {
         const index = prev.findIndex((s) => s.id === updatedServer.id);
         const isNewServer = index === -1;
 
         if (isNewServer) {
-          // New server - call onServerAdded callback
-          onServerAdded?.(updatedServer.id, updatedServer);
+          providerLogger.debug(
+            `[McpClientProvider] Adding new server ${updatedServer.id} to state`
+          );
+          // Defer callbacks outside the state updater to avoid triggering
+          // render-phase updates in user-provided handlers.
+          callbacksToRun.push(() =>
+            onServerAdded?.(updatedServer.id, updatedServer)
+          );
           return [...prev, updatedServer];
         }
 
         // Check if actually changed to avoid loops
         const current = prev[index];
         const stateChanged = current.state !== updatedServer.state;
+        const serverInfoChanged =
+          current.serverInfo !== updatedServer.serverInfo;
+
+        providerLogger.debug(
+          `[McpClientProvider] Comparing server ${updatedServer.id}:`,
+          {
+            toolsChanged: current.tools !== updatedServer.tools,
+            currentToolCount: current.tools.length,
+            updatedToolCount: updatedServer.tools.length,
+            stateChanged,
+          }
+        );
 
         if (
           current.state === updatedServer.state &&
@@ -880,33 +1102,74 @@ export function McpClientProvider({
           current.pendingElicitationRequests.length ===
             updatedServer.pendingElicitationRequests.length
         ) {
+          providerLogger.debug(
+            `[McpClientProvider] No changes detected for server ${updatedServer.id}, skipping update`
+          );
           return prev;
         }
 
+        providerLogger.debug(
+          `[McpClientProvider] Updating server ${updatedServer.id} in state`
+        );
+
         // State changed - call callback
         if (stateChanged) {
-          onServerStateChange?.(updatedServer.id, updatedServer.state);
+          callbacksToRun.push(() =>
+            onServerStateChange?.(updatedServer.id, updatedServer.state)
+          );
+        }
+
+        // Server info changed - update cached metadata
+        if (
+          serverInfoChanged &&
+          updatedServer.serverInfo &&
+          storageProvider?.setServerMetadata
+        ) {
+          const metadata: import("./storage/StorageProvider.js").CachedServerMetadata =
+            {
+              name: updatedServer.serverInfo.name,
+              version: updatedServer.serverInfo.version,
+              title: updatedServer.serverInfo.title,
+              websiteUrl: updatedServer.serverInfo.websiteUrl,
+              icons: updatedServer.serverInfo.icons,
+              icon: updatedServer.serverInfo.icon,
+            };
+
+          // Update cached metadata ref
+          cachedMetadataRef.current[updatedServer.id] = metadata;
+
+          // Save to storage asynchronously
+          Promise.resolve(
+            storageProvider.setServerMetadata(updatedServer.id, metadata)
+          ).catch((err) => {
+            providerLogger.error(
+              "[McpClientProvider] Failed to save server metadata:",
+              err
+            );
+          });
         }
 
         const newServers = [...prev];
         newServers[index] = updatedServer;
         return newServers;
       });
+
+      if (callbacksToRun.length > 0) {
+        queueMicrotask(() => {
+          callbacksToRun.forEach((callback) => callback());
+        });
+      }
     },
-    [onServerAdded, onServerStateChange]
+    [onServerAdded, onServerStateChange, storageProvider]
   );
 
   const addServer = useCallback((id: string, options: McpServerOptions) => {
-    console.log("[McpClientProvider] addServer called:", id, options);
     setServerConfigs((prev) => {
-      // Check if already exists
-      if (prev.find((s) => s.id === id)) {
-        console.warn(
-          `[McpClientProvider] Server with id "${id}" already exists`
-        );
-        return prev;
-      }
-      console.log("[McpClientProvider] Adding new server to configs:", id);
+      if (prev.find((s) => s.id === id)) return prev;
+      providerLogger.debug(
+        "[McpClientProvider] Adding new server to configs:",
+        id
+      );
       return [...prev, { id, options }];
     });
   }, []);
@@ -939,7 +1202,7 @@ export function McpClientProvider({
         // Find the current server configuration
         const currentConfig = serverConfigs.find((s) => s.id === id);
         if (!currentConfig) {
-          console.warn(
+          providerLogger.warn(
             `[McpClientProvider] Cannot update server "${id}" - not found`
           );
           resolve();
@@ -947,9 +1210,12 @@ export function McpClientProvider({
         }
 
         // Merge the new options with the existing ones
-        const updatedOptions: McpServerOptions = {
+        const updatedOptions: McpServerOptions & { _updateVersion?: number } = {
           ...currentConfig.options,
           ...options,
+          // Add a version counter to force React to remount the wrapper
+          _updateVersion:
+            ((currentConfig.options as any)._updateVersion || 0) + 1,
         };
 
         // Disconnect the old server
@@ -997,17 +1263,53 @@ export function McpClientProvider({
     [servers, addServer, removeServer, updateServer, getServer, storageLoaded]
   );
 
+  // Strip `capabilities` from clientInfo — it is a provider-level default for
+  // MCP capabilities, not a standard MCP clientInfo wire field.
+  const { capabilities: defaultCapabilities, ...clientInfoWithoutCaps } =
+    clientInfo || {};
+  const clientInfoForWrapper = useMemo(
+    () =>
+      Object.keys(clientInfoWithoutCaps).length
+        ? (clientInfoWithoutCaps as typeof clientInfo)
+        : undefined,
+    [clientInfo]
+  );
+
+  // Merge defaultCapabilities into each server's clientOptions.capabilities.
+  // Memoized so the merged options objects are stable references across renders —
+  // a new object on every render would cause McpServerWrapper to reconnect.
+  const mergedServerConfigs = useMemo(
+    () =>
+      serverConfigs.map((config) => ({
+        id: config.id,
+        options: defaultCapabilities
+          ? ({
+              ...config.options,
+              clientOptions: {
+                ...config.options.clientOptions,
+                capabilities: {
+                  ...defaultCapabilities,
+                  ...config.options.clientOptions?.capabilities,
+                },
+              },
+            } as McpServerOptions)
+          : config.options,
+      })),
+    [serverConfigs, defaultCapabilities]
+  );
+
   return (
     <McpClientContext.Provider value={contextValue}>
       {children}
-      {/* Render a wrapper for each configured server */}
-      {serverConfigs.map((config) => (
+      {mergedServerConfigs.map((config) => (
         <McpServerWrapper
-          key={config.id}
+          key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
           id={config.id}
           options={config.options}
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
+          clientInfo={clientInfoForWrapper}
+          cachedMetadata={cachedMetadataRef.current[config.id]}
           onUpdate={handleServerUpdate}
           rpcWrapTransport={rpcWrapTransport}
           onGlobalSamplingRequest={onSamplingRequest}

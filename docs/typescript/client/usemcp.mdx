@@ -241,6 +241,7 @@ interface McpServerOptions {
   preventAutoAuth?: boolean; // Prevent automatic OAuth popup (default: true)
   useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
   callbackUrl?: string; // OAuth callback URL
+  authProvider?: OAuthClientProvider; // Optional external OAuth provider (headless/custom runtimes)
   clientInfo?: {
     name: string;
     version: string;
@@ -249,9 +250,15 @@ interface McpServerOptions {
     websiteUrl?: string;
   };
 
-  // Reconnection
-  autoRetry?: boolean | number; // Auto-retry on failure
-  autoReconnect?: boolean | number; // Auto-reconnect on drop (default: 3000ms)
+  // Reconnection & Health Checks
+  autoRetry?: boolean | number; // Auto-retry on initial failure
+  autoReconnect?: boolean | number | {  // Auto-reconnect on drop (default: 3000ms)
+    enabled?: boolean;                  // Enable/disable (default: true)
+    initialDelay?: number;              // Delay before reconnect in ms (default: 3000)
+    healthCheckInterval?: number | false; // Health check polling in ms, or false to disable (default: 10000)
+    healthCheckTimeout?: number;        // Time before connection considered dead in ms (default: 30000)
+  };
+  reconnectionOptions?: ReconnectionOptions; // SDK-level transport reconnection
 
   // Advanced
   wrapTransport?: (transport: any, serverId: string) => any;
@@ -555,7 +562,7 @@ function NotificationPanel({ serverId }: { serverId: string }) {
 
 ## Sampling & Elicitation
 
-Handle interactive server requests (AI sampling, form elicitation):
+Handle interactive server requests (AI sampling, form elicitation). For elicitation, you can use helpers from `mcp-use` (e.g. `acceptWithDefaults`, `validate`) inside your callback; see [Elicitation](/typescript/client/elicitation).
 
 ```typescript
 function SamplingHandler() {
@@ -648,6 +655,77 @@ function ServerMonitor() {
   <MyApp />
 </McpClientProvider>;
 ```
+
+## Reconnection & Health Checks
+
+When `autoReconnect` is enabled (the default), the hook monitors connection health by sending periodic HEAD requests to the server. If the server becomes unreachable, it automatically reconnects.
+
+### How it works
+
+1. After a successful connection, a health check timer starts
+2. Every **10 seconds** (default), a HEAD request is sent to the server URL
+3. If no successful response is received for **30 seconds** (default), the connection is considered broken
+4. The hook transitions to `"discovering"` state and reconnects after a configurable delay
+
+### Configuration
+
+`autoReconnect` accepts three forms:
+
+```typescript
+// Boolean: enable with defaults (3s reconnect delay, 10s health check interval)
+useMcp({ url: '...', autoReconnect: true })
+
+// Number: custom reconnect delay in ms
+useMcp({ url: '...', autoReconnect: 5000 })
+
+// Object: full control over reconnection and health checks
+useMcp({
+  url: '...',
+  autoReconnect: {
+    enabled: true,
+    initialDelay: 5000,         // Wait 5s before reconnecting
+    healthCheckInterval: 30000, // Poll every 30s instead of 10s
+    healthCheckTimeout: 60000,  // Wait 60s before declaring dead
+  },
+})
+```
+
+### Disabling health checks
+
+You can disable health check polling entirely while still reconnecting on transport-level failures:
+
+```typescript
+useMcp({
+  url: '...',
+  autoReconnect: {
+    healthCheckInterval: false, // No HEAD request polling
+  },
+})
+```
+
+### SDK-level reconnection options
+
+The `reconnectionOptions` prop controls the underlying `StreamableHTTPClientTransport` retry behavior, separate from the health check system:
+
+```typescript
+import type { ReconnectionOptions } from 'mcp-use/react'
+
+useMcp({
+  url: '...',
+  reconnectionOptions: {
+    initialReconnectionDelay: 2000,        // Start with 2s delay (default: 1000)
+    maxReconnectionDelay: 60000,           // Cap at 60s (default: 30000)
+    reconnectionDelayGrowFactor: 2,        // Double each retry (default: 1.5)
+    maxRetries: 5,                         // Retry up to 5 times (default: 2)
+  },
+})
+```
+
+<Note>
+  `autoReconnect` controls the **application-level** health monitoring (HEAD request polling and reconnect triggers).
+  `reconnectionOptions` controls the **transport-level** retry behavior within the MCP SDK when the SSE stream drops.
+  Both can be used together for robust connection handling.
+</Note>
 
 ## API Reference
 
@@ -746,6 +824,40 @@ const result = await server.callTool(
 
 Same API as standalone `useMcp`, but accessed per-server.
 
+#### `complete(params)`
+
+Request autocomplete suggestions for prompt arguments or resource template URIs:
+
+```typescript
+// Complete a prompt argument
+const result = await server.complete({
+  ref: { type: 'ref/prompt', name: 'code-review' },
+  argument: { name: 'language', value: 'py' }
+});
+
+console.log('Suggestions:', result.completion.values);
+// Output: ['python', 'pytorch', ...]
+
+// Complete a resource template URI variable
+const result = await server.complete({
+  ref: { type: 'ref/resource', uri: 'file:///{path}' },
+  argument: { name: 'path', value: '/home' }
+});
+```
+
+See [Completions](/typescript/client/completion) for detailed usage and examples.
+
+#### `refreshResourceTemplates()`
+
+Manually refresh the resource templates list from the server:
+
+```typescript
+await server.refreshResourceTemplates();
+console.log('Updated templates:', server.resourceTemplates);
+```
+
+The `resourceTemplates` state is automatically populated on connection and updated when notifications are received. Use this method to force a refresh when needed.
+
 ## Standalone useMcp Hook
 
 For simple single-server applications, you can use `useMcp` directly without the provider:
@@ -771,6 +883,18 @@ function SimpleApp() {
     </div>
   );
 }
+```
+
+With elicitation (same pattern as the Node client):
+
+```typescript
+import { useMcp } from "mcp-use/react";
+import { acceptWithDefaults } from "mcp-use";
+
+const mcp = useMcp({
+  url: "http://localhost:3000/mcp",
+  onElicitation: async (params) => acceptWithDefaults(params),
+});
 ```
 
 <Note>

@@ -228,6 +228,38 @@ server.tool({
 });
 ```
 
+### Identifying the client and checking for MCP Apps support
+
+Use `ctx.client.info()` to get the client's name and version from the MCP initialize handshake. Use `ctx.client.extension(id)` to access any MCP extension (SEP-1724), and `ctx.client.supportsApps()` as a convenience check for MCP Apps support (SEP-1865, `io.modelcontextprotocol/ui` extension):
+
+```typescript
+server.tool({
+  name: 'conditional-widget',
+  description: 'Returns a widget for MCP Apps clients, plain text otherwise',
+  schema: z.object({ query: z.string() })
+}, async (params, ctx) => {
+  // Who is connecting?
+  const { name, version } = ctx.client.info();
+  // e.g. { name: "claude-desktop", version: "1.2.0" }
+
+  // Access any MCP extension (SEP-1724)
+  const uiExt = ctx.client.extension('io.modelcontextprotocol/ui');
+  // { mimeTypes: ['text/html;profile=mcp-app'] } | undefined
+
+  // Convenience check for MCP Apps support (SEP-1865)
+  if (ctx.client.supportsApps()) {
+    const result = await fetchData(params.query);
+    return widget({ props: result, output: text(`Found ${result.length} items`) });
+  }
+
+  return text(`Results for: ${params.query}`);
+});
+```
+
+<Note>
+`ctx.client.supportsApps()` checks whether the current client supports the MCP Apps standard. This check is **per-connection** — different clients connecting to the same server may return different values. There is no server-wide "all clients support apps" flag.
+</Note>
+
 ## Example
 
 ```typescript

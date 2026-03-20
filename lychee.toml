@@ -1,0 +1,33 @@
+# Accept redirects (302, 307) as valid - these are fine
+accept = ["100..=103", "200..=299", "302", "307"]
+
+# Exclude patterns - links that are known to be okay or not checkable in CI
+exclude = [
+  
+  # npmjs.com - 403s are rate limiting, packages exist
+  "^https://www\\.npmjs\\.com",
+  "^https://npmjs\\.com",
+  "npmjs\\.com",
+  
+  # OpenAI platform docs - requires authentication
+  "^https://platform\\.openai\\.com/docs/apps",
+  
+  # Auth0 dashboard - redirects are fine
+  "^https://manage\\.auth0\\.com",
+  
+  # WorkOS - some redirects and network issues in CI
+  "^https://dashboard\\.workos\\.com",
+  "^https://community\\.workos\\.com",
+  
+  # Lychee GitHub repository - self-reference
+  "^https://github\\.com/lycheeverse/lychee",
+  
+  # Example/template URLs
+  "^https://github\\.com/your-org/",
+
+]
+
+exclude_loopback = true
+exclude_link_local = true
+# Maximum number of redirects to follow
+max_redirects = 5

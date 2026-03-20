@@ -1,0 +1,32 @@
+{
+  "name": "express-middleware-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Example demonstrating Express and Hono middleware compatibility",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "mcp-use",
+    "express",
+    "middleware"
+  ],
+  "main": "index.ts",
+  "scripts": {
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "4.3.5",
+    "morgan": "^1.10.1",
+    "express-rate-limit": "^7.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@9.1.4+sha1.2432063d815cfa88fd9fef1d85a445e3f609851d"
+}

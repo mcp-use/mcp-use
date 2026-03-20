@@ -167,7 +167,7 @@ export function ServerDropdown({
           <DropdownMenuTrigger asChild>
             <ShimmerButton
               className={cn(
-                "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
+                "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start  text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
                 !selectedServer && "pl-4",
                 selectedServer && "pr-20"
               )}

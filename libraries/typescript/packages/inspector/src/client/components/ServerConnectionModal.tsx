@@ -23,7 +23,7 @@ interface ServerConnectionModalProps {
     transportType: "http" | "sse";
     proxyConfig?: {
       proxyAddress?: string;
-      customHeaders?: Record<string, string>;
+      headers?: Record<string, string>;
     };
   }) => void;
 }
@@ -65,23 +65,53 @@ export function ServerConnectionModal({
   // Prefill form when connection changes
   useEffect(() => {
     if (connection && open) {
+      // Try to get the original stored config from localStorage
+      // This contains the headers and proxyConfig that were originally saved
+      let storedConfig: any = null;
+      try {
+        const stored = localStorage.getItem("mcp-inspector-connections");
+        if (stored) {
+          const allServers = JSON.parse(stored);
+          storedConfig = allServers[connection.id];
+        }
+      } catch (e) {
+        // If we can't read from localStorage, fall back to connection object
+        console.warn(
+          "[ServerConnectionModal] Could not read from localStorage:",
+          e
+        );
+      }
+
       setUrl(connection.url);
 
       // Transport type is always HTTP now (SSE is deprecated)
       // No need to set transportType from connection
 
       // Determine connection type based on proxyConfig
-      if (connection.proxyConfig?.proxyAddress) {
+      const proxyAddress =
+        storedConfig?.proxyConfig?.proxyAddress ||
+        connection.proxyConfig?.proxyAddress;
+      if (proxyAddress) {
         setConnectionType("Via Proxy");
-        setProxyAddress(connection.proxyConfig.proxyAddress);
+        setProxyAddress(proxyAddress);
       } else {
         setConnectionType("Direct");
         setProxyAddress(`${window.location.origin}/inspector/api/proxy`);
       }
 
-      // Convert customHeaders from Record<string, string> to CustomHeader[]
+      // Convert headers from Record<string, string> to CustomHeader[]
+      // Check both 'headers' and 'customHeaders' for backwards compatibility
+      // Prioritize stored config over connection object
       const headersToConvert =
-        connection.proxyConfig?.customHeaders || connection.customHeaders || {};
+        storedConfig?.proxyConfig?.headers ||
+        storedConfig?.proxyConfig?.customHeaders ||
+        storedConfig?.headers ||
+        storedConfig?.customHeaders ||
+        connection.proxyConfig?.headers ||
+        connection.proxyConfig?.customHeaders ||
+        connection.headers ||
+        connection.customHeaders ||
+        {};
       const headerArray: CustomHeader[] = Object.entries(headersToConvert).map(
         ([name, value], index) => ({
           id: `header-${index}`,
@@ -96,9 +126,10 @@ export function ServerConnectionModal({
   const handleConnect = () => {
     if (!url.trim()) return;
 
-    // Validate URL format before attempting connection
+    // Validate URL format and auto-add https:// if protocol is missing
+    let normalizedUrl = url.trim();
     try {
-      const parsedUrl = new URL(url.trim());
+      const parsedUrl = new URL(normalizedUrl);
       const isValid =
         parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 
@@ -107,8 +138,23 @@ export function ServerConnectionModal({
         return;
       }
     } catch (error) {
-      toast.error("Invalid URL format. Please enter a valid URL.");
-      return;
+      // If parsing fails, try adding https:// prefix
+      try {
+        const urlWithHttps = `https://${normalizedUrl}`;
+        const parsedUrl = new URL(urlWithHttps);
+        const isValid =
+          parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+
+        if (!isValid) {
+          toast.error("Invalid URL protocol. Please use http:// or https://");
+          return;
+        }
+        // Use the normalized URL with https://
+        normalizedUrl = urlWithHttps;
+      } catch (retryError) {
+        toast.error("Invalid URL format. Please enter a valid URL.");
+        return;
+      }
     }
 
     // Prepare proxy configuration if "Via Proxy" is selected
@@ -116,7 +162,7 @@ export function ServerConnectionModal({
       connectionType === "Via Proxy" && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
-            customHeaders: customHeaders.reduce(
+            headers: customHeaders.reduce(
               (acc, header) => {
                 if (header.name && header.value) {
                   acc[header.name] = header.value;
@@ -127,7 +173,7 @@ export function ServerConnectionModal({
             ),
           }
         : {
-            customHeaders: customHeaders.reduce(
+            headers: customHeaders.reduce(
               (acc, header) => {
                 if (header.name && header.value) {
                   acc[header.name] = header.value;
@@ -142,7 +188,7 @@ export function ServerConnectionModal({
     const actualTransportType = "http";
 
     onConnect({
-      url,
+      url: normalizedUrl,
       name: connection?.name,
       transportType: actualTransportType,
       proxyConfig,

@@ -1,7 +1,7 @@
 ---
 title: Supabase
 description: Deploy your MCP server on Supabase Edge Functions
-icon: "); -webkit-mask-image: url('/images/icons/supabase.svg'); mask-image: url('/images/icons/supabase.svg');/*"
+icon: "/images/icons/supabase.svg"
 ---
 
 This guide demonstrates how to deploy an MCP server on [Supabase Edge Functions](https://supabase.com/docs/guides/functions), which runs on Deno and provides a serverless environment for your MCP applications.
@@ -270,7 +270,7 @@ export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/wi
 # MCP_SERVER_URL: Where the MCP server runs (for API calls in widgets)
 export MCP_SERVER_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME"
 
-# CSP_URLS: Supabase project URL (for Content Security Policy)
+# CSP_URLS: Supabase project URL (for Content Security Policy). See [Content Security Policy](../content-security-policy) for full CSP docs.
 export CSP_URLS="https://YOUR_PROJECT_REF.supabase.co"
 ```
 
@@ -336,7 +336,7 @@ supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-r
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
 
-**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [UI Widgets documentation](/typescript/server/ui-widgets#apps-sdk-metadata) for examples.
+**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/ui-widgets#apps-sdk-metadata) for examples.
 </Note>
 
 ### 9. Deploy the Function

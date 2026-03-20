@@ -1,0 +1,110 @@
+---
+title: "URL Parameters"
+description: "Deep links and auto-connect via query parameters"
+icon: "link"
+---
+
+The Inspector supports URL query parameters for deep linking to a specific server or tab and for auto-connecting to a server on load.
+
+## Parameters
+
+| Parameter | Purpose | Values |
+|-----------|---------|--------|
+| **server** | Select a connected server by ID, or open and connect to a server by URL | Connection ID (URL) or HTTP(S) URL |
+| **autoConnect** | Open Inspector and connect to a server automatically | URL string or JSON config |
+| **tab** | Open a specific tab | `tools`, `prompts`, `resources`, `chat`, `sampling`, `elicitation`, `notifications`, `playground` |
+| **tunnelUrl** | Tunnel subdomain or URL (preserved when navigating) | URL string |
+| **embedded** | Run Inspector in embedded mode (e.g. iframe) | `true` |
+| **embeddedConfig** | Embedded mode styling (background, padding) | JSON string |
+
+## server
+
+Select an already-connected server by its connection ID (the server URL). If the value is an HTTP(S) URL and no matching connection exists, the Inspector treats it like **autoConnect**: it connects to that URL and then selects the server.
+
+**Examples:**
+
+```
+# Select existing server by ID
+/?server=https://mcp.example.com/mcp
+
+# Open and connect to a new server (alias for autoConnect when not connected)
+/?server=https://new-server.com/mcp
+```
+
+## autoConnect
+
+Open the Inspector and connect to a server automatically. Use a plain URL or a JSON object for advanced options (name, auth, transport type, etc.).
+
+**Plain URL:**
+
+```
+/?autoConnect=https://mcp.example.com/mcp
+```
+
+**JSON config** (URL-encode the value in the query string):
+
+```json
+{"url":"https://mcp.example.com/mcp","name":"My Server","transportType":"sse"}
+```
+
+Supported JSON fields: `url` (required), `name`, `transportType` (`"http"` or `"sse"`), `connectionType` (`"Direct"` or `"Via Proxy"`), `customHeaders`, `auth` (OAuth tokens), `requestTimeout`, `resetTimeoutOnProgress`, `maxTotalTimeout`.
+
+<Tip>
+When passing a JSON object for **autoConnect**, URL-encode the value so special characters are valid in the query string.
+</Tip>
+
+## tab
+
+Open the Inspector with a specific tab selected.
+
+**Valid values:** `tools`, `prompts`, `resources`, `chat`, `sampling`, `elicitation`, `notifications`, `playground`
+
+**Example:**
+
+```
+/?tab=tools
+```
+
+Combine with **server** or **autoConnect** to open a server and tab in one link:
+
+```
+/?server=https://mcp.example.com/mcp&tab=tools
+```
+
+## tunnelUrl
+
+Used with the CLI tunnel; stores the tunnel subdomain or URL and is preserved when navigating. Typically set by the Inspector or CLI; you rarely need to set it manually.
+
+## embedded
+
+Run the Inspector in embedded mode (e.g. inside an iframe with reduced chrome).
+
+**Example:**
+
+```
+/?embedded=true
+```
+
+## embeddedConfig
+
+Optional JSON config for embedded mode styling. Use with **embedded=true**.
+
+**Example** (URL-encoded):
+
+```json
+{"backgroundColor":"#f5f5f5","padding":"16px"}
+```
+
+## Example URLs
+
+Open Inspector and auto-connect to a server:
+
+```
+https://inspector.mcp-use.com/inspect?autoConnect=https://your-server.com/mcp
+```
+
+Open Inspector, connect to a server, and show the Tools tab:
+
+```
+https://inspector.mcp-use.com/inspect?server=https://your-server.com/mcp&tab=tools
+```

@@ -63,10 +63,22 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     "/inspector/api/tel/", // Telemetry endpoints (posthog, scarf)
     "/inspector/api/rpc/stream", // RPC stream (SSE)
     "/inspector/api/rpc/log", // RPC log endpoint
+    "/inspector", // Inspector UI and static assets
+    "/mcp-use/widgets/", // Dev widget Vite proxy and assets
+    "/mcp-use/public/", // Public static files
   ];
+  // Also skip GET /mcp (SSE/health) and GET /inspector/api/* (API polling, dev-widget, etc.)
+  const isNoisyGet =
+    method === "GET" &&
+    (pathname === "/mcp" ||
+      pathname.startsWith("/inspector/api/") ||
+      pathname.startsWith("/mcp-use/"));
 
-  // Skip logging for noisy paths but still process the request
-  if (noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath))) {
+  // Skip logging for noisy paths and noisy GETs but still process the request
+  if (
+    noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath)) ||
+    isNoisyGet
+  ) {
     await next();
     return;
   }

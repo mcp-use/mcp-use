@@ -1,5 +1,2117 @@
 # @mcp-use/cli
 
+## 2.19.0
+
+### Minor Changes
+
+- ed0fadb: feat: use esbuild for transpilation, separate type checking from build
+
+  `mcp-use build` now uses esbuild for TypeScript transpilation instead of tsc. esbuild strips types without analyzing them, so it cannot OOM on complex type graphs (Zod v4, Prisma, etc.). Type checking runs separately via `tsc --noEmit` after transpilation — if it fails or OOMs, the build output is still produced. Use `--no-typecheck` to skip type checking entirely for faster builds.
+
+### Patch Changes
+
+- ed0fadb: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+- ed0fadb: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- ed0fadb: Fix Windows crash in `mcp-use dev` and `mcp-use generate-types` where raw OS paths (e.g. `C:\project\index.ts`) were passed to `tsImport` instead of `file://` URLs, causing `ERR_UNSUPPORTED_ESM_URL_SCHEME`.
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+  - mcp-use@1.21.5
+  - @mcp-use/inspector@0.24.5
+
+## 2.19.0-canary.3
+
+### Patch Changes
+
+- b4ad0e8: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- Updated dependencies [b4ad0e8]
+  - mcp-use@1.21.5-canary.3
+  - @mcp-use/inspector@0.24.5-canary.3
+
+## 2.19.0-canary.2
+
+### Patch Changes
+
+- 3b0a426: Fix Windows crash in `mcp-use dev` and `mcp-use generate-types` where raw OS paths (e.g. `C:\project\index.ts`) were passed to `tsImport` instead of `file://` URLs, causing `ERR_UNSUPPORTED_ESM_URL_SCHEME`.
+  - mcp-use@1.21.5-canary.2
+  - @mcp-use/inspector@0.24.5-canary.2
+
+## 2.19.0-canary.1
+
+### Patch Changes
+
+- 98e09ce: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+- Updated dependencies [98e09ce]
+  - mcp-use@1.21.5-canary.1
+  - @mcp-use/inspector@0.24.5-canary.1
+
+## 2.19.0-canary.0
+
+### Minor Changes
+
+- cfff626: feat: use esbuild for transpilation, separate type checking from build
+
+  `mcp-use build` now uses esbuild for TypeScript transpilation instead of tsc. esbuild strips types without analyzing them, so it cannot OOM on complex type graphs (Zod v4, Prisma, etc.). Type checking runs separately via `tsc --noEmit` after transpilation — if it fails or OOMs, the build output is still produced. Use `--no-typecheck` to skip type checking entirely for faster builds.
+
+### Patch Changes
+
+- Updated dependencies [cfff626]
+  - mcp-use@1.21.5-canary.0
+  - @mcp-use/inspector@0.24.5-canary.0
+
+## 2.18.3
+
+### Patch Changes
+
+- dd77c3c: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- dd77c3c: Fix `mcp-use build` hanging after completion by adding `process.exit(0)` to the build command's success path
+- Updated dependencies [dd77c3c]
+- Updated dependencies [dd77c3c]
+  - mcp-use@1.21.4
+  - @mcp-use/inspector@0.24.4
+
+## 2.18.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4a5e680]
+  - mcp-use@1.21.4-canary.2
+  - @mcp-use/inspector@0.24.4-canary.2
+
+## 2.18.3-canary.1
+
+### Patch Changes
+
+- d4f479d: Fix stale mcp-use-ts references in README badges, image URLs, and eslint config to point to the new mcp-use monorepo
+- Updated dependencies [d4f479d]
+  - mcp-use@1.21.4-canary.1
+  - @mcp-use/inspector@0.24.4-canary.1
+
+## 2.18.3-canary.0
+
+### Patch Changes
+
+- 98f6521: Fix `mcp-use build` hanging after completion by adding `process.exit(0)` to the build command's success path
+  - mcp-use@1.21.4-canary.0
+  - @mcp-use/inspector@0.24.4-canary.0
+
+## 2.18.2
+
+### Patch Changes
+
+- Updated dependencies [d8d6d06]
+  - @mcp-use/inspector@0.24.3
+  - mcp-use@1.21.3
+
+## 2.18.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c509930]
+  - @mcp-use/inspector@0.24.3-canary.0
+  - mcp-use@1.21.3-canary.0
+
+## 2.18.1
+
+### Patch Changes
+
+- Updated dependencies [8d55603]
+  - @mcp-use/inspector@0.24.2
+  - mcp-use@1.21.2
+
+## 2.18.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [76320f0]
+  - @mcp-use/inspector@0.24.2-canary.0
+  - mcp-use@1.21.2-canary.0
+
+## 2.18.0
+
+### Minor Changes
+
+- ed1b034: feat(deploy): add --root-dir option for monorepo support
+
+### Patch Changes
+
+- ed1b034: feat(build): run tool registry type generation during build
+
+  `mcp-use build` now generates `.mcp-use/tool-registry.d.ts` before TypeScript compilation when a server file exists. This fixes intermittent TS errors (e.g. `useCallTool` args typed as `null`) when `postinstall` typegen runs before source files are present (e.g. in Docker multi-stage builds). The `generate-types` command now uses the same shared helper.
+
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+- Updated dependencies [ed1b034]
+  - @mcp-use/inspector@0.24.1
+  - mcp-use@1.21.1
+
+## 2.18.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [3cae276]
+  - @mcp-use/inspector@0.24.1-canary.6
+  - mcp-use@1.21.1-canary.6
+
+## 2.18.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [fb91a61]
+  - mcp-use@1.21.1-canary.5
+  - @mcp-use/inspector@0.24.1-canary.5
+
+## 2.18.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [bdeaadb]
+  - mcp-use@1.21.1-canary.4
+  - @mcp-use/inspector@0.24.1-canary.4
+
+## 2.18.0-canary.3
+
+### Patch Changes
+
+- 53fb21a: feat(build): run tool registry type generation during build
+
+  `mcp-use build` now generates `.mcp-use/tool-registry.d.ts` before TypeScript compilation when a server file exists. This fixes intermittent TS errors (e.g. `useCallTool` args typed as `null`) when `postinstall` typegen runs before source files are present (e.g. in Docker multi-stage builds). The `generate-types` command now uses the same shared helper.
+  - mcp-use@1.21.1-canary.3
+  - @mcp-use/inspector@0.24.1-canary.3
+
+## 2.18.0-canary.2
+
+### Minor Changes
+
+- c5d5a75: feat(deploy): add --root-dir option for monorepo support
+
+### Patch Changes
+
+- mcp-use@1.21.1-canary.2
+- @mcp-use/inspector@0.24.1-canary.2
+
+## 2.17.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3e3767e]
+  - @mcp-use/inspector@0.24.1-canary.1
+  - mcp-use@1.21.1-canary.1
+
+## 2.17.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f0a872a]
+- Updated dependencies [ef8a0cf]
+  - @mcp-use/inspector@0.24.1-canary.0
+  - mcp-use@1.21.1-canary.0
+
+## 2.17.0
+
+### Minor Changes
+
+- 405fac7: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- 405fac7: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- 405fac7: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+- 405fac7: feat(deploy): update dashboard URL construction to use dynamic web URL
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+- Updated dependencies [405fac7]
+  - mcp-use@1.21.0
+  - @mcp-use/inspector@0.24.0
+
+## 2.17.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [cb89d47]
+  - @mcp-use/inspector@0.24.0-canary.14
+  - mcp-use@1.21.0-canary.14
+
+## 2.17.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [a903dd8]
+  - mcp-use@1.21.0-canary.13
+  - @mcp-use/inspector@0.24.0-canary.13
+
+## 2.17.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [2f6a6a0]
+  - mcp-use@1.21.0-canary.12
+  - @mcp-use/inspector@0.24.0-canary.12
+
+## 2.17.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [71fd188]
+  - @mcp-use/inspector@0.24.0-canary.11
+  - mcp-use@1.21.0-canary.11
+
+## 2.17.0-canary.10
+
+### Patch Changes
+
+- 28dc5bf: feat(deploy): update dashboard URL construction to use dynamic web URL
+  - mcp-use@1.21.0-canary.10
+  - @mcp-use/inspector@0.24.0-canary.10
+
+## 2.17.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [3aa578a]
+  - @mcp-use/inspector@0.24.0-canary.9
+  - mcp-use@1.21.0-canary.9
+
+## 2.17.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [0747144]
+  - mcp-use@1.21.0-canary.8
+  - @mcp-use/inspector@0.24.0-canary.8
+
+## 2.17.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [6f66801]
+  - mcp-use@1.21.0-canary.7
+  - @mcp-use/inspector@0.24.0-canary.7
+
+## 2.17.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [d9f946a]
+  - mcp-use@1.21.0-canary.6
+  - @mcp-use/inspector@0.24.0-canary.6
+
+## 2.17.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [2a8a9d1]
+  - @mcp-use/inspector@0.24.0-canary.5
+  - mcp-use@1.21.0-canary.5
+
+## 2.17.0-canary.4
+
+### Minor Changes
+
+- 22a596e: feat(mcp-use): enhance host information and capabilities handling
+
+### Patch Changes
+
+- 22a596e: feat: ctx.client.user(), MCP Apps capabilities fix, CLI tunnel inspector fix
+
+  ### mcp-use
+
+  **ctx.client.user()** — new per-invocation method on the tool context that extracts
+  end-user metadata from `tools/call` `params._meta` (e.g. ChatGPT `openai/*` keys).
+  Returns `undefined` on clients that don't send request-level metadata. The `UserContext`
+  type is exported from `mcp-use/server`.
+
+  ChatGPT runs a single MCP session for all users of a deployed app — use
+  `ctx.client.user()?.subject` to identify the user and `?.conversationId` for the thread.
+
+  **MCP Apps capabilities fix** — patched the MCP SDK's `ClientCapabilitiesSchema` to
+  preserve the `extensions` field (previously stripped by Zod's default `$strip` mode),
+  so `ctx.client.supportsApps()` now correctly returns `true` for clients that advertise
+  `io.modelcontextprotocol/ui`.
+
+  **Session isolation fix** — `findSessionContext` no longer falls back to an arbitrary
+  session when the correct one can't be matched, preventing metadata leakage in
+  multi-connection scenarios.
+
+  ### @mcp-use/inspector
+
+  The Inspector now advertises MCP Apps support (`io.modelcontextprotocol/ui`) in its
+  `clientInfo.capabilities`. The `capabilities` field on `McpClientProvider.clientInfo`
+  is a new provider-level default that applies to all server connections, including those
+  restored from localStorage.
+
+  ### @mcp-use/cli
+
+  Fixed: the Inspector's `?autoConnect=` URL now uses the tunnel endpoint when
+  `--tunnel` is active, instead of always pointing to `localhost`.
+
+- Updated dependencies [22a596e]
+- Updated dependencies [22a596e]
+  - mcp-use@1.21.0-canary.4
+  - @mcp-use/inspector@0.24.0-canary.4
+
+## 2.16.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [560a0ae]
+  - mcp-use@1.21.0-canary.3
+  - @mcp-use/inspector@0.23.2-canary.3
+
+## 2.16.1-canary.2
+
+### Patch Changes
+
+- 869eafa: Remove deprecated @types/tar dependency and update tar to latest version. The tar package now includes its own TypeScript definitions, making @types/tar redundant.
+  - mcp-use@1.20.6-canary.2
+  - @mcp-use/inspector@0.23.2-canary.2
+
+## 2.16.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [1c8d340]
+  - mcp-use@1.20.6-canary.1
+  - @mcp-use/inspector@0.23.2-canary.1
+
+## 2.16.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [85f4bff]
+  - @mcp-use/inspector@0.23.2-canary.0
+  - mcp-use@1.20.6-canary.0
+
+## 2.16.0
+
+### Minor Changes
+
+- ee3c3c5: feat(cli): added support for --tunnel flag with full chatgpt hmr
+
+### Patch Changes
+
+- mcp-use@1.20.5
+- @mcp-use/inspector@0.23.1
+
+## 2.16.0-canary.0
+
+### Minor Changes
+
+- 7a5f8fd: feat(cli): added support for --tunnel flag with full chatgpt hmr
+
+### Patch Changes
+
+- mcp-use@1.20.5-canary.0
+- @mcp-use/inspector@0.23.1-canary.0
+
+## 2.15.4
+
+### Patch Changes
+
+- Updated dependencies [9d8a73f]
+  - @mcp-use/inspector@0.23.0
+  - mcp-use@1.20.4
+
+## 2.15.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [452d274]
+  - @mcp-use/inspector@0.23.0-canary.0
+  - mcp-use@1.20.4-canary.0
+
+## 2.15.3
+
+### Patch Changes
+
+- Updated dependencies [322ab53]
+  - @mcp-use/inspector@0.22.3
+  - mcp-use@1.20.3
+
+## 2.15.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [0b9818c]
+  - @mcp-use/inspector@0.22.3-canary.0
+  - mcp-use@1.20.3-canary.0
+
+## 2.15.2
+
+### Patch Changes
+
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+- Updated dependencies [455c18f]
+  - mcp-use@1.20.2
+  - @mcp-use/inspector@0.22.2
+
+## 2.15.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [89cdd0b]
+- Updated dependencies [89cdd0b]
+- Updated dependencies [89cdd0b]
+- Updated dependencies [89cdd0b]
+  - mcp-use@1.20.2-canary.0
+  - @mcp-use/inspector@0.22.2-canary.0
+
+## 2.15.1
+
+### Patch Changes
+
+- Updated dependencies [4546a8c]
+  - @mcp-use/inspector@0.22.1
+  - mcp-use@1.20.1
+
+## 2.15.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fbd1dfe]
+  - @mcp-use/inspector@0.22.1-canary.0
+  - mcp-use@1.20.1-canary.0
+
+## 2.15.0
+
+### Minor Changes
+
+- 5a73b41: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+- 5a73b41: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+### Patch Changes
+
+- 5a73b41: Fix(docs): updated docs to remove outdated information
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+- Updated dependencies [5a73b41]
+  - @mcp-use/inspector@0.22.0
+  - mcp-use@1.20.0
+
+## 2.15.0-canary.4
+
+### Patch Changes
+
+- 76f10ec: Fix(docs): updated docs to remove outdated information
+- Updated dependencies [76f10ec]
+  - @mcp-use/inspector@0.22.0-canary.4
+  - mcp-use@1.20.0-canary.4
+
+## 2.15.0-canary.3
+
+### Minor Changes
+
+- f55c56e: - fix(@mcp-use/cli): fallback MCP_URL when tunnel is unavailable
+  - fix(create-mcp-use-app): product-search-result template styling and CSP metadata
+  - fix(@mcp-use/inspector): reconnect logic; Tools tab only sends explicitly set fields; resource annotations include \_meta
+  - feat(@mcp-use/inspector): CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
+  - fix(mcp-use): widget CSP fallback from tool metadata; protocol and mount-widgets-dev improvements
+
+### Patch Changes
+
+- Updated dependencies [f55c56e]
+  - @mcp-use/inspector@0.22.0-canary.3
+  - mcp-use@1.20.0-canary.3
+
+## 2.15.0-canary.2
+
+### Minor Changes
+
+- ba0ea97: - **@mcp-use/cli**: Add update check that notifies when a newer mcp-use release is available. Fix TSC build to use node with increased heap and avoid npx installing wrong package.
+  - **create-mcp-use-app**: Add @types/react and @types/react-dom to template devDependencies. Slim down generated READMEs. Improve mcp-apps template (Carousel, product-search-result widget). Include .mcp-use in tsconfig. Fix postinstall script.
+  - **@mcp-use/inspector**: Improve Iframe Console with expandable logs, level filter, search, resizable height. Add widget debug context for chat. Refactor MCP Apps debug controls (tool props JSON view, required props hint, SEP-1865 semantics). Add CDN build. Fix useSyncExternalStore first-render handling.
+  - **mcp-use**: Refactor useWidget to merge props from toolInput and structuredContent per SEP-1865. Add updateModelContext and useMcp clientOptions. Add typescript to examples.
+
+### Patch Changes
+
+- Updated dependencies [ba0ea97]
+  - @mcp-use/inspector@0.22.0-canary.2
+  - mcp-use@1.20.0-canary.2
+
+## 2.14.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [8abb736]
+  - mcp-use@1.19.4-canary.1
+  - @mcp-use/inspector@0.21.2-canary.1
+
+## 2.14.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fbf1308]
+  - @mcp-use/inspector@0.21.2-canary.0
+  - mcp-use@1.19.4-canary.0
+
+## 2.14.0
+
+### Minor Changes
+
+- 7ebe19a: Add mcp-use skills add and mcp-use skills install commands to the cli to install AI agent skills (Cursor, Claude Code, Codex) from the mcp-use repository
+
+### Patch Changes
+
+- mcp-use@1.19.3
+- @mcp-use/inspector@0.21.1
+
+## 2.14.0-canary.0
+
+### Minor Changes
+
+- 54324c6: Add mcp-use skills add and mcp-use skills install commands to the cli to install AI agent skills (Cursor, Claude Code, Codex) from the mcp-use repository
+
+### Patch Changes
+
+- mcp-use@1.19.3-canary.0
+- @mcp-use/inspector@0.21.1-canary.0
+
+## 2.13.10
+
+### Patch Changes
+
+- 179e800: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+- Updated dependencies [179e800]
+  - @mcp-use/inspector@0.21.0
+  - mcp-use@1.19.2
+
+## 2.13.10-canary.2
+
+### Patch Changes
+
+- 9ef0ba9: - fix(cli): add generate-types command for auto-generating TypeScript type definitions from tool schemas
+  - fix(mcp-use): add useCallTool hook for calling MCP tools with TanStack Query-like state management
+  - fix(mcp-use): add tool registry type generation utilities (generateToolRegistryTypes, zod-to-ts converter)
+  - fix(mcp-use): add type-safe helper functions for tool calls via generateHelpers
+  - fix(inspector): improve MCPAppsRenderer loading logic and enhance useWidget for iframe handling
+  - chore(create-mcp-use-app): update project template dependencies and TypeScript configuration
+  - docs: add comprehensive useCallTool documentation and update CLI reference with generate-types command
+- Updated dependencies [9ef0ba9]
+  - @mcp-use/inspector@0.21.0-canary.2
+  - mcp-use@1.19.2-canary.2
+
+## 2.13.10-canary.1
+
+### Patch Changes
+
+- Updated dependencies [894d21a]
+- Updated dependencies [894d21a]
+  - @mcp-use/inspector@0.21.0-canary.1
+  - mcp-use@1.19.2-canary.1
+
+## 2.13.10-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1921562]
+  - mcp-use@1.19.2-canary.0
+  - @mcp-use/inspector@0.20.2-canary.0
+
+## 2.13.9
+
+### Patch Changes
+
+- Updated dependencies [568901e]
+  - @mcp-use/inspector@0.20.1
+  - mcp-use@1.19.1
+
+## 2.13.9-canary.0
+
+### Patch Changes
+
+- Updated dependencies [344dc29]
+  - @mcp-use/inspector@0.20.1-canary.0
+  - mcp-use@1.19.1-canary.0
+
+## 2.13.8
+
+### Patch Changes
+
+- f4e2a70: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- f4e2a70: fix(inspector): enhance MCPAppsRenderer and OpenAIComponentRenderer with loading states and spinner
+  - Updated MCPAppsRenderer to include a loading spinner during widget initialization, improving user feedback.
+  - Introduced a new `isReady` state to manage the loading state effectively.
+  - Enhanced OpenAIComponentRenderer to adjust display properties based on the new configuration for better responsiveness.
+  - Added a maximum width for the Picture-in-Picture mode in MCP_APPS_CONFIG for improved layout control.
+  - Refactored iframe loading handling to ensure proper state management and user experience during loading phases.
+
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+- Updated dependencies [f4e2a70]
+  - @mcp-use/inspector@0.20.0
+  - mcp-use@1.19.0
+
+## 2.13.8-canary.6
+
+### Patch Changes
+
+- 8774ef6: fix(inspector): enhance MCPAppsRenderer and OpenAIComponentRenderer with loading states and spinner
+  - Updated MCPAppsRenderer to include a loading spinner during widget initialization, improving user feedback.
+  - Introduced a new `isReady` state to manage the loading state effectively.
+  - Enhanced OpenAIComponentRenderer to adjust display properties based on the new configuration for better responsiveness.
+  - Added a maximum width for the Picture-in-Picture mode in MCP_APPS_CONFIG for improved layout control.
+  - Refactored iframe loading handling to ensure proper state management and user experience during loading phases.
+
+- Updated dependencies [8774ef6]
+  - @mcp-use/inspector@0.20.0-canary.6
+  - mcp-use@1.19.0-canary.6
+
+## 2.13.8-canary.5
+
+### Patch Changes
+
+- Updated dependencies [5823280]
+  - mcp-use@1.19.0-canary.5
+  - @mcp-use/inspector@0.20.0-canary.5
+
+## 2.13.8-canary.4
+
+### Patch Changes
+
+- Updated dependencies [21b3c0b]
+  - mcp-use@1.19.0-canary.4
+  - @mcp-use/inspector@0.20.0-canary.4
+
+## 2.13.8-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [dea387a]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+- Updated dependencies [aa81040]
+  - @mcp-use/inspector@0.20.0-canary.3
+  - mcp-use@1.19.0-canary.3
+
+## 2.13.8-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e8383a7]
+- Updated dependencies [1a8a2a6]
+  - mcp-use@1.19.0-canary.2
+  - @mcp-use/inspector@0.19.1-canary.2
+
+## 2.13.8-canary.1
+
+### Patch Changes
+
+- 8e3cfb8: fix: use correct MIME type for mcp_apps resource counting and disable telemetry in local test runs
+- Updated dependencies [8e3cfb8]
+  - mcp-use@1.19.0-canary.1
+  - @mcp-use/inspector@0.19.1-canary.1
+
+## 2.13.8-canary.0
+
+### Patch Changes
+
+- Updated dependencies [df8d269]
+  - mcp-use@1.19.0-canary.0
+  - @mcp-use/inspector@0.19.1-canary.0
+
+## 2.13.7
+
+### Patch Changes
+
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+- Updated dependencies [3334a67]
+  - @mcp-use/inspector@0.19.0
+  - mcp-use@1.18.0
+
+## 2.13.7-canary.3
+
+### Patch Changes
+
+- Updated dependencies [c93a061]
+  - @mcp-use/inspector@0.19.0-canary.3
+  - mcp-use@1.18.0-canary.3
+
+## 2.13.7-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4a2b65e]
+  - @mcp-use/inspector@0.19.0-canary.2
+  - mcp-use@1.18.0-canary.2
+
+## 2.13.7-canary.1
+
+### Patch Changes
+
+- Updated dependencies [52cd2a8]
+  - mcp-use@1.18.0-canary.1
+  - @mcp-use/inspector@0.18.10-canary.1
+
+## 2.13.7-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c3a452a]
+  - mcp-use@1.18.0-canary.0
+  - @mcp-use/inspector@0.18.10-canary.0
+
+## 2.13.6
+
+### Patch Changes
+
+- 32b19dc: fix: increased threshold for bundle size warning
+- Updated dependencies [32b19dc]
+- Updated dependencies [32b19dc]
+  - @mcp-use/inspector@0.18.9
+  - mcp-use@1.17.4
+
+## 2.13.6-canary.0
+
+### Patch Changes
+
+- 4a118cc: fix: increased threshold for bundle size warning
+- Updated dependencies [4a118cc]
+- Updated dependencies [4a118cc]
+  - @mcp-use/inspector@0.18.9-canary.0
+  - mcp-use@1.17.4-canary.0
+
+## 2.13.5
+
+### Patch Changes
+
+- Updated dependencies [af55041]
+- Updated dependencies [af55041]
+  - @mcp-use/inspector@0.18.8
+  - mcp-use@1.17.3
+
+## 2.13.5-canary.1
+
+### Patch Changes
+
+- Updated dependencies [f437838]
+  - @mcp-use/inspector@0.18.8-canary.1
+  - mcp-use@1.17.3-canary.1
+
+## 2.13.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a872832]
+  - @mcp-use/inspector@0.18.8-canary.0
+  - mcp-use@1.17.3-canary.0
+
+## 2.13.4
+
+### Patch Changes
+
+- Updated dependencies [5760a10]
+- Updated dependencies [5760a10]
+- Updated dependencies [5760a10]
+  - @mcp-use/inspector@0.18.7
+  - mcp-use@1.17.2
+
+## 2.13.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [3644a26]
+  - mcp-use@1.17.2-canary.1
+  - @mcp-use/inspector@0.18.7-canary.1
+
+## 2.13.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [316870a]
+- Updated dependencies [3d48e19]
+  - @mcp-use/inspector@0.18.7-canary.0
+  - mcp-use@1.17.2-canary.0
+
+## 2.13.3
+
+### Patch Changes
+
+- Updated dependencies [df428ca]
+  - mcp-use@1.17.1
+  - @mcp-use/inspector@0.18.6
+
+## 2.13.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [637edaf]
+  - mcp-use@1.17.1-canary.0
+  - @mcp-use/inspector@0.18.6-canary.0
+
+## 2.13.2
+
+### Patch Changes
+
+- 3d787ba: Improve reverse proxy support, HMR reliability, and widget handling across the stack.
+
+  ### `mcp-use` (minor)
+  - **Custom HTTP route HMR:** Routes registered via `server.get()`, `server.post()`, etc. now support hot module replacement — handlers are hot-swapped without a server restart.
+  - **Widget tool protection during HMR:** Widget-registered tools are no longer accidentally removed when `index.ts` HMR sync runs. Tools tagged with `_meta["mcp-use/widget"]` are preserved.
+  - **Dynamic widget creation:** The `resources/` directory is auto-created if missing, and the dev server watches for new widgets even if none exist at startup. This enables workflows where widgets are created after the server starts
+  - **Vite HMR WebSocket proxy:** A TCP-level WebSocket proxy forwards HMR `upgrade` requests from the main HTTP server to Vite's internal HMR port, enabling hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels).
+  - **`MCP_URL` environment variable:** Can now be pre-set by users to an external proxy URL. The CLI will not overwrite it, allowing correct widget URLs and HMR WebSocket connections behind reverse proxies.
+  - **List-changed notifications on removal:** `sendToolListChanged()`, `sendResourceListChanged()`, and `sendPromptListChanged()` now also fire when items are removed, not just added/updated.
+  - **Pre-initialized request handlers:** Tool, prompt, and resource request handlers are pre-registered during session initialization, preventing `Method not found` errors when clients connect to servers that start with zero registrations and add them dynamically.
+  - **Widget type default changed:** Widgets now default to `mcpApps` (dual-protocol) instead of `appsSdk`. Only widgets with explicit `appsSdkMetadata` and no `metadata` field use the `appsSdk` type.
+  - **`window.__mcpServerUrl` global:** Injected into widget HTML so widgets can dynamically construct API URLs (e.g., `fetch(window.__mcpServerUrl + '/api/data')`).
+
+  ### `@mcp-use/inspector` (patch)
+  - **`MCP_INSPECTOR_FRAME_ANCESTORS` env var:** Controls which origins can embed the inspector in iframes via CSP `frame-ancestors`. Defaults to `*` in development and `'self'` in production.
+  - **`mountInspector` configuration options:** Accepts new `devMode` (boolean) and `sandboxOrigin` (string | null) options for controlling sandbox behavior in different deployment environments.
+  - **Runtime config injection:** `__MCP_DEV_MODE__` and `__MCP_SANDBOX_ORIGIN__` window globals are injected into the served HTML at runtime, enabling client-side configuration without rebuild.
+  - **Localhost URL conversion:** Server-side fetches of widget HTML now convert external proxy URLs to `localhost` to avoid reverse proxy catch-all routes returning SPA HTML instead of Vite-served widget content.
+  - **Simplified URL rewriting:** Widget asset URLs are now rewritten to bare server-relative paths that resolve directly through Vite middleware, improving reliability behind reverse proxies.
+  - **Fixed infinite re-render loop:** Removed excessive `useEffect` dependencies in `MCPAppsRenderer` that caused continuous re-fetching of widget HTML.
+
+  ### `@mcp-use/cli` (patch)
+  - **Respect user-provided `MCP_URL`:** The CLI no longer overwrites `MCP_URL` if already set, allowing users to configure external proxy URLs for reverse proxy setups.
+
+- Updated dependencies [3d787ba]
+- Updated dependencies [3d787ba]
+- Updated dependencies [3d787ba]
+  - mcp-use@1.17.0
+  - @mcp-use/inspector@0.18.5
+
+## 2.13.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [4c881d3]
+  - @mcp-use/inspector@0.18.5-canary.2
+  - mcp-use@1.17.0-canary.2
+
+## 2.13.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [31fdb69]
+  - mcp-use@1.17.0-canary.1
+  - @mcp-use/inspector@0.18.5-canary.1
+
+## 2.13.2-canary.0
+
+### Patch Changes
+
+- 4a03ce0: Improve reverse proxy support, HMR reliability, and widget handling across the stack.
+
+  ### `mcp-use` (minor)
+  - **Custom HTTP route HMR:** Routes registered via `server.get()`, `server.post()`, etc. now support hot module replacement — handlers are hot-swapped without a server restart.
+  - **Widget tool protection during HMR:** Widget-registered tools are no longer accidentally removed when `index.ts` HMR sync runs. Tools tagged with `_meta["mcp-use/widget"]` are preserved.
+  - **Dynamic widget creation:** The `resources/` directory is auto-created if missing, and the dev server watches for new widgets even if none exist at startup. This enables workflows where widgets are created after the server starts
+  - **Vite HMR WebSocket proxy:** A TCP-level WebSocket proxy forwards HMR `upgrade` requests from the main HTTP server to Vite's internal HMR port, enabling hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels).
+  - **`MCP_URL` environment variable:** Can now be pre-set by users to an external proxy URL. The CLI will not overwrite it, allowing correct widget URLs and HMR WebSocket connections behind reverse proxies.
+  - **List-changed notifications on removal:** `sendToolListChanged()`, `sendResourceListChanged()`, and `sendPromptListChanged()` now also fire when items are removed, not just added/updated.
+  - **Pre-initialized request handlers:** Tool, prompt, and resource request handlers are pre-registered during session initialization, preventing `Method not found` errors when clients connect to servers that start with zero registrations and add them dynamically.
+  - **Widget type default changed:** Widgets now default to `mcpApps` (dual-protocol) instead of `appsSdk`. Only widgets with explicit `appsSdkMetadata` and no `metadata` field use the `appsSdk` type.
+  - **`window.__mcpServerUrl` global:** Injected into widget HTML so widgets can dynamically construct API URLs (e.g., `fetch(window.__mcpServerUrl + '/api/data')`).
+
+  ### `@mcp-use/inspector` (patch)
+  - **`MCP_INSPECTOR_FRAME_ANCESTORS` env var:** Controls which origins can embed the inspector in iframes via CSP `frame-ancestors`. Defaults to `*` in development and `'self'` in production.
+  - **`mountInspector` configuration options:** Accepts new `devMode` (boolean) and `sandboxOrigin` (string | null) options for controlling sandbox behavior in different deployment environments.
+  - **Runtime config injection:** `__MCP_DEV_MODE__` and `__MCP_SANDBOX_ORIGIN__` window globals are injected into the served HTML at runtime, enabling client-side configuration without rebuild.
+  - **Localhost URL conversion:** Server-side fetches of widget HTML now convert external proxy URLs to `localhost` to avoid reverse proxy catch-all routes returning SPA HTML instead of Vite-served widget content.
+  - **Simplified URL rewriting:** Widget asset URLs are now rewritten to bare server-relative paths that resolve directly through Vite middleware, improving reliability behind reverse proxies.
+  - **Fixed infinite re-render loop:** Removed excessive `useEffect` dependencies in `MCPAppsRenderer` that caused continuous re-fetching of widget HTML.
+
+  ### `@mcp-use/cli` (patch)
+  - **Respect user-provided `MCP_URL`:** The CLI no longer overwrites `MCP_URL` if already set, allowing users to configure external proxy URLs for reverse proxy setups.
+
+- Updated dependencies [4a03ce0]
+  - mcp-use@1.17.0-canary.0
+  - @mcp-use/inspector@0.18.5-canary.0
+
+## 2.13.1
+
+### Patch Changes
+
+- ac3e216: fix(mcp-use): release canary versions
+- ac3e216: fix(cli): use build manifest entryPoint for start command and support multiple server output paths
+
+  **Build Command Improvements:**
+  - Find source server file before TypeScript compilation
+  - Determine compiled entry point location based on tsconfig patterns
+  - Write `entryPoint` to `dist/mcp-use.json` manifest for reliable server location
+  - Handle multiple possible output paths:
+    - `dist/index.js` (rootDir set to project root)
+    - `dist/src/index.js` (no rootDir, source in src/)
+    - Custom paths based on tsconfig configuration
+
+  **Start Command Improvements:**
+  - Read `entryPoint` from `dist/mcp-use.json` manifest for accurate server location
+  - Fallback to checking common server file locations if manifest doesn't exist:
+    - `dist/index.js`
+    - `dist/server.js`
+    - `dist/src/index.js`
+    - `dist/src/server.js`
+  - Clear error message when no built server file is found, listing all attempted locations
+
+  Commits: 116a3be4 (partial)
+
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+- Updated dependencies [ac3e216]
+  - @mcp-use/inspector@0.18.4
+  - mcp-use@1.16.4
+
+## 2.13.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f7ca602]
+  - mcp-use@1.16.4-canary.3
+  - @mcp-use/inspector@0.18.4-canary.3
+
+## 2.13.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [03094a1]
+  - @mcp-use/inspector@0.18.4-canary.2
+  - mcp-use@1.16.4-canary.2
+
+## 2.13.1-canary.1
+
+### Patch Changes
+
+- d0239d2: fix(mcp-use): release canary versions
+- Updated dependencies [d0239d2]
+  - @mcp-use/inspector@0.18.4-canary.1
+  - mcp-use@1.16.4-canary.1
+
+## 2.13.1-canary.0
+
+### Patch Changes
+
+- 7c2d7e3: fix(cli): use build manifest entryPoint for start command and support multiple server output paths
+
+  **Build Command Improvements:**
+  - Find source server file before TypeScript compilation
+  - Determine compiled entry point location based on tsconfig patterns
+  - Write `entryPoint` to `dist/mcp-use.json` manifest for reliable server location
+  - Handle multiple possible output paths:
+    - `dist/index.js` (rootDir set to project root)
+    - `dist/src/index.js` (no rootDir, source in src/)
+    - Custom paths based on tsconfig configuration
+
+  **Start Command Improvements:**
+  - Read `entryPoint` from `dist/mcp-use.json` manifest for accurate server location
+  - Fallback to checking common server file locations if manifest doesn't exist:
+    - `dist/index.js`
+    - `dist/server.js`
+    - `dist/src/index.js`
+    - `dist/src/server.js`
+  - Clear error message when no built server file is found, listing all attempted locations
+
+  Commits: 116a3be4 (partial)
+
+- Updated dependencies [7c2d7e3]
+- Updated dependencies [7c2d7e3]
+- Updated dependencies [7c2d7e3]
+  - mcp-use@1.16.4-canary.0
+  - @mcp-use/inspector@0.18.4-canary.0
+
+## 2.13.0
+
+### Minor Changes
+
+- b1b2895: Update CLI to Manufact branding and fix authentication issues
+  - Changed default web URL from `mcp-use.com` to `manufact.com` for login flow
+  - Fixed 431 "Request Header Fields Too Large" error by increasing callback server header limit to 16KB
+  - Updated all user-facing messages to reference "Manufact" instead of "mcp-use"
+  - Updated dashboard, inspector, and settings URLs to use `manufact.com` domain
+  - Kept gateway domain as `run.mcp-use.com` for backward compatibility with existing deployments
+
+### Patch Changes
+
+- mcp-use@1.16.3
+- @mcp-use/inspector@0.18.3
+
+## 2.13.0-canary.0
+
+### Minor Changes
+
+- c0822e1: Update CLI to Manufact branding and fix authentication issues
+  - Changed default web URL from `mcp-use.com` to `manufact.com` for login flow
+  - Fixed 431 "Request Header Fields Too Large" error by increasing callback server header limit to 16KB
+  - Updated all user-facing messages to reference "Manufact" instead of "mcp-use"
+  - Updated dashboard, inspector, and settings URLs to use `manufact.com` domain
+  - Kept gateway domain as `run.mcp-use.com` for backward compatibility with existing deployments
+
+### Patch Changes
+
+- mcp-use@1.16.3-canary.0
+- @mcp-use/inspector@0.18.3-canary.0
+
+## 2.12.6
+
+### Patch Changes
+
+- Updated dependencies [53ae49d]
+- Updated dependencies [53ae49d]
+  - @mcp-use/inspector@0.18.2
+  - mcp-use@1.16.2
+
+## 2.12.6-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fea26ff]
+- Updated dependencies [37af1bf]
+  - @mcp-use/inspector@0.18.2-canary.0
+  - mcp-use@1.16.2-canary.0
+
+## 2.12.5
+
+### Patch Changes
+
+- Updated dependencies [4bdb92e]
+  - mcp-use@1.16.1
+  - @mcp-use/inspector@0.18.1
+
+## 2.12.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [eb8d7a6]
+  - mcp-use@1.16.1-canary.0
+  - @mcp-use/inspector@0.18.1-canary.0
+
+## 2.12.4
+
+### Patch Changes
+
+- Updated dependencies [32f2113]
+- Updated dependencies [32f2113]
+- Updated dependencies [32f2113]
+  - @mcp-use/inspector@0.18.0
+  - mcp-use@1.16.0
+
+## 2.12.4-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3e2821f]
+  - mcp-use@1.16.0-canary.3
+  - @mcp-use/inspector@0.18.0-canary.3
+
+## 2.12.4-canary.2
+
+### Patch Changes
+
+- Updated dependencies [09c0300]
+  - @mcp-use/inspector@0.18.0-canary.2
+  - mcp-use@1.16.0-canary.2
+
+## 2.12.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9b9f371]
+  - mcp-use@1.16.0-canary.1
+  - @mcp-use/inspector@0.18.0-canary.1
+
+## 2.12.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [144ad6a]
+  - @mcp-use/inspector@0.18.0-canary.0
+  - mcp-use@1.15.4-canary.0
+
+## 2.12.3
+
+### Patch Changes
+
+- 4666a37: fix: hmr not working if 0 tools initially
+- Updated dependencies [4666a37]
+- Updated dependencies [4666a37]
+  - @mcp-use/inspector@0.17.3
+  - mcp-use@1.15.3
+
+## 2.12.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [10cdce9]
+  - @mcp-use/inspector@0.17.3-canary.1
+  - mcp-use@1.15.3-canary.1
+
+## 2.12.3-canary.0
+
+### Patch Changes
+
+- 013101d: fix: hmr not working if 0 tools initially
+- Updated dependencies [013101d]
+  - mcp-use@1.15.3-canary.0
+  - @mcp-use/inspector@0.17.3-canary.0
+
+## 2.12.2
+
+### Patch Changes
+
+- bb28a69: Fix HMR file watcher exhausting inotify limits by properly ignoring node_modules
+
+  The HMR file watcher was attempting to watch files inside `node_modules/` despite having ignore patterns configured, which exhausted the inotify watch limit (ENOSPC errors) in containerized environments.
+
+- Updated dependencies [bb28a69]
+  - @mcp-use/inspector@0.17.2
+  - mcp-use@1.15.2
+
+## 2.12.2-canary.1
+
+### Patch Changes
+
+- 4d3e62e: fix(cli): fix hmr
+- Updated dependencies [4d3e62e]
+  - @mcp-use/inspector@0.17.2-canary.1
+  - mcp-use@1.15.2-canary.1
+
+## 2.12.2-canary.0
+
+### Patch Changes
+
+- eb777a4: Fix HMR file watcher exhausting inotify limits by properly ignoring node_modules
+
+  The HMR file watcher was attempting to watch files inside `node_modules/` despite having ignore patterns configured, which exhausted the inotify watch limit (ENOSPC errors) in containerized environments.
+  - mcp-use@1.15.2-canary.0
+  - @mcp-use/inspector@0.17.2-canary.0
+
+## 2.12.1
+
+### Patch Changes
+
+- 0742f22: fix(cli): preserve serverId when redeploying and refactor MCP server URL generation
+  - mcp-use@1.15.1
+  - @mcp-use/inspector@0.17.1
+
+## 2.12.1-canary.0
+
+### Patch Changes
+
+- 7eb787f: fix(cli): preserve serverId when redeploying and refactor MCP server URL generation
+  - mcp-use@1.15.1-canary.0
+  - @mcp-use/inspector@0.17.1-canary.0
+
+## 2.12.0
+
+### Minor Changes
+
+- 1dcba40: feat: add MCP Apps support with dual-protocol widget rendering
+  - Add dual-protocol support enabling widgets to work with both MCP Apps and ChatGPT Apps SDK
+  - Add MCPAppsRenderer and MCPAppsDebugControls components for advanced debugging and visualization
+  - Add sandboxed iframe support with console logging and safe area insets for isolated widget rendering
+  - Add widget adapters (MCP Apps, Apps SDK) with protocol helpers for seamless cross-protocol compatibility
+  - Add browser host normalization for server connections in CLI
+  - Fix Zod JIT compilation to prevent CSP violations in sandboxed environments
+  - Add MCP Apps documentation and example server
+
+  feat: add HTML landing page for MCP server endpoints
+  - Add `generateLandingPage()` function that generates styled HTML landing pages for browser GET requests
+  - Include connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, and ChatGPT
+
+### Patch Changes
+
+- 1dcba40: fix: mcp server landing now shows the external url instead of the internal
+- 1dcba40: chore: trigger canary release
+- 1dcba40: fix docs
+- 1dcba40: chore: fix vulnerabilities in deps
+- Updated dependencies [1dcba40]
+- Updated dependencies [1dcba40]
+- Updated dependencies [1dcba40]
+- Updated dependencies [1dcba40]
+- Updated dependencies [1dcba40]
+  - @mcp-use/inspector@0.17.0
+  - mcp-use@1.15.0
+
+## 2.12.0-canary.4
+
+### Patch Changes
+
+- a078aa9: fix: mcp server landing now shows the external url instead of the internal
+- Updated dependencies [a078aa9]
+  - @mcp-use/inspector@0.17.0-canary.4
+  - mcp-use@1.15.0-canary.4
+
+## 2.12.0-canary.3
+
+### Patch Changes
+
+- e910f64: chore: fix vulnerabilities in deps
+- Updated dependencies [e910f64]
+  - @mcp-use/inspector@0.17.0-canary.3
+  - mcp-use@1.15.0-canary.3
+
+## 2.12.0-canary.2
+
+### Patch Changes
+
+- e4ca98e: chore: trigger canary release
+- Updated dependencies [e4ca98e]
+  - @mcp-use/inspector@0.17.0-canary.2
+  - mcp-use@1.15.0-canary.2
+
+## 2.12.0-canary.1
+
+### Patch Changes
+
+- 08d3b3a: fix docs
+- Updated dependencies [08d3b3a]
+  - @mcp-use/inspector@0.17.0-canary.1
+  - mcp-use@1.15.0-canary.1
+
+## 2.12.0-canary.0
+
+### Minor Changes
+
+- 93fd6f4: feat: add MCP Apps support with dual-protocol widget rendering
+  - Add dual-protocol support enabling widgets to work with both MCP Apps and ChatGPT Apps SDK
+  - Add MCPAppsRenderer and MCPAppsDebugControls components for advanced debugging and visualization
+  - Add sandboxed iframe support with console logging and safe area insets for isolated widget rendering
+  - Add widget adapters (MCP Apps, Apps SDK) with protocol helpers for seamless cross-protocol compatibility
+  - Add browser host normalization for server connections in CLI
+  - Fix Zod JIT compilation to prevent CSP violations in sandboxed environments
+  - Add MCP Apps documentation and example server
+
+  feat: add HTML landing page for MCP server endpoints
+  - Add `generateLandingPage()` function that generates styled HTML landing pages for browser GET requests
+  - Include connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, and ChatGPT
+
+### Patch Changes
+
+- Updated dependencies [93fd6f4]
+  - @mcp-use/inspector@0.17.0-canary.0
+  - mcp-use@1.15.0-canary.0
+
+## 2.11.2
+
+### Patch Changes
+
+- 8326a66: fix: pass environment variables and deployment config during redeployment
+
+  When redeploying an existing deployment, the CLI now properly passes environment variables, build command, start command, and port configuration to the redeployment API endpoint. Previously, redeployments would not include these updated settings.
+
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+- Updated dependencies [8326a66]
+  - @mcp-use/inspector@0.16.2
+  - mcp-use@1.14.2
+
+## 2.11.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f1171de]
+  - mcp-use@1.14.2-canary.4
+  - @mcp-use/inspector@0.16.2-canary.4
+
+## 2.11.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [6ff396a]
+  - mcp-use@1.14.2-canary.3
+  - @mcp-use/inspector@0.16.2-canary.3
+
+## 2.11.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [fb6a8f0]
+  - @mcp-use/inspector@0.16.2-canary.2
+  - mcp-use@1.14.2-canary.2
+
+## 2.11.2-canary.1
+
+### Patch Changes
+
+- e58a72d: fix: pass environment variables and deployment config during redeployment
+
+  When redeploying an existing deployment, the CLI now properly passes environment variables, build command, start command, and port configuration to the redeployment API endpoint. Previously, redeployments would not include these updated settings.
+  - mcp-use@1.14.2-canary.1
+  - @mcp-use/inspector@0.16.2-canary.1
+
+## 2.11.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [3124ca9]
+- Updated dependencies [3124ca9]
+- Updated dependencies [3124ca9]
+  - @mcp-use/inspector@0.16.2-canary.0
+  - mcp-use@1.14.2-canary.0
+
+## 2.11.1
+
+### Patch Changes
+
+- Updated dependencies [c64a2dd]
+  - @mcp-use/inspector@0.16.1
+  - mcp-use@1.14.1
+
+## 2.11.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [7e87931]
+  - @mcp-use/inspector@0.16.1-canary.0
+  - mcp-use@1.14.1-canary.0
+
+## 2.11.0
+
+### Minor Changes
+
+- fe72e7e: feat: improved HMR support for widgets
+- fe72e7e: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+- fe72e7e: ## Dependency Updates
+
+  Updated 36 dependencies across all TypeScript packages to their latest compatible versions.
+
+  ### Major Updates
+  - **react-resizable-panels**: 3.0.6 → 4.4.1
+    - Migrated to v4 API (`PanelGroup` → `Group`, `PanelResizeHandle` → `Separator`)
+    - Updated `direction` prop to `orientation` across all inspector tabs
+    - Maintained backward compatibility through wrapper component
+
+  ### Minor & Patch Updates
+
+  **Framework & Build Tools:**
+  - @types/node: 25.0.2 → 25.0.9
+  - @types/react: 19.2.7 → 19.2.8
+  - @typescript-eslint/eslint-plugin: 8.49.0 → 8.53.1
+  - @typescript-eslint/parser: 8.49.0 → 8.53.1
+  - prettier: 3.7.4 → 3.8.0
+  - typescript-eslint: 8.49.0 → 8.53.1
+  - vite: 7.3.0 → 7.3.1
+  - vitest: 4.0.15 → 4.0.17
+
+  **Runtime Dependencies:**
+  - @hono/node-server: 1.19.7 → 1.19.9
+  - @langchain/anthropic: 1.3.0 → 1.3.10
+  - @langchain/core: 1.1.12 → 1.1.15
+  - @langchain/google-genai: 2.1.0 → 2.1.10
+  - @langchain/openai: 1.2.0 → 1.2.2
+  - @mcp-ui/client: 5.17.1 → 5.17.3
+  - @mcp-ui/server: 5.16.2 → 5.16.3
+  - posthog-js: 1.306.1 → 1.330.0
+  - posthog-node: 5.17.2 → 5.22.0
+  - ws: 8.18.3 → 8.19.0
+
+  **UI Components:**
+  - @eslint-react/eslint-plugin: 2.3.13 → 2.7.2
+  - eslint-plugin-format: 1.1.0 → 1.3.1
+  - eslint-plugin-react-refresh: 0.4.25 → 0.4.26
+  - framer-motion: 12.23.26 → 12.27.1
+  - motion: 12.23.26 → 12.27.1
+  - markdown-to-jsx: 9.3.5 → 9.5.7
+  - lucide-react: 0.561.0 → 0.562.0
+  - vite-express: 0.21.1 → 0.22.0
+
+  **Utilities:**
+  - globby: 16.0.0 → 16.1.0
+  - fs-extra: 11.3.2 → 11.3.3
+  - ink: 6.5.1 → 6.6.0
+
+  ### Removed
+  - Removed `@ai-sdk/react` from inspector (unused, only in tests)
+  - Removed `ai` from mcp-use dev dependencies (unused, only in tests/examples)
+
+### Patch Changes
+
+- fe72e7e: Fix displayPackageVersions() to work in standalone installations
+  - Added optional projectPath parameter to resolve packages dynamically
+  - Uses createRequire() to find packages in user's node_modules (standalone installation)
+  - Falls back to relative paths for monorepo development
+  - Added debug logging when packages aren't found (via DEBUG or VERBOSE env vars)
+
+- fe72e7e: fix(cli): enhance CLI to display package versions during dev and build commands
+- fe72e7e: ### Inspector Enhancements
+  - **New**: Custom properties support for resources - `PropsSelect` component for dynamic prop configuration
+  - **New**: `PropsConfigDialog` for managing resource properties with AI-powered suggestions
+  - **New**: `SchemaFormField` for rendering JSON schema-based forms
+  - **New**: `usePropsLLM` hook for AI-powered property suggestions
+  - **New**: `useResourceProps` hook for managing resource props state
+  - **Enhancement**: Enhanced `JSONDisplay` with improved line wrapping and font size for better readability
+  - **Enhancement**: Collapsible description section in `ToolExecutionPanel`
+  - **Enhancement**: Integrated JSON metadata visualization in tool execution panel
+  - **Enhancement**: Enhanced `McpUIRenderer` and `OpenAIComponentRenderer` with `customProps` support
+  - **Enhancement**: Updated `ResourceResultDisplay` with dynamic property configuration
+
+  ### CLI Improvements
+  - **New**: `MCP_URL` environment variable for server URL configuration
+
+  ### MCP Proxy
+  - **Enhancement**: Improved error logging with better context
+  - **Enhancement**: Connection refused errors now logged as warnings
+  - **Enhancement**: Error responses now include target URL for easier debugging
+
+- fe72e7e: refactor(cli): streamline widget building process with parallel execution
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+- Updated dependencies [fe72e7e]
+  - @mcp-use/inspector@0.16.0
+  - mcp-use@1.14.0
+
+## 2.11.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [453661d]
+  - @mcp-use/inspector@0.16.0-canary.13
+  - mcp-use@1.14.0-canary.13
+
+## 2.11.0-canary.12
+
+### Patch Changes
+
+- f428514: Fix displayPackageVersions() to work in standalone installations
+  - Added optional projectPath parameter to resolve packages dynamically
+  - Uses createRequire() to find packages in user's node_modules (standalone installation)
+  - Falls back to relative paths for monorepo development
+  - Added debug logging when packages aren't found (via DEBUG or VERBOSE env vars)
+  - mcp-use@1.14.0-canary.12
+  - @mcp-use/inspector@0.16.0-canary.12
+
+## 2.11.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [805092b]
+  - @mcp-use/inspector@0.16.0-canary.11
+  - mcp-use@1.14.0-canary.11
+
+## 2.11.0-canary.10
+
+### Patch Changes
+
+- 945d93d: ### Inspector Enhancements
+  - **New**: Custom properties support for resources - `PropsSelect` component for dynamic prop configuration
+  - **New**: `PropsConfigDialog` for managing resource properties with AI-powered suggestions
+  - **New**: `SchemaFormField` for rendering JSON schema-based forms
+  - **New**: `usePropsLLM` hook for AI-powered property suggestions
+  - **New**: `useResourceProps` hook for managing resource props state
+  - **Enhancement**: Enhanced `JSONDisplay` with improved line wrapping and font size for better readability
+  - **Enhancement**: Collapsible description section in `ToolExecutionPanel`
+  - **Enhancement**: Integrated JSON metadata visualization in tool execution panel
+  - **Enhancement**: Enhanced `McpUIRenderer` and `OpenAIComponentRenderer` with `customProps` support
+  - **Enhancement**: Updated `ResourceResultDisplay` with dynamic property configuration
+
+  ### CLI Improvements
+  - **New**: `MCP_URL` environment variable for server URL configuration
+
+  ### MCP Proxy
+  - **Enhancement**: Improved error logging with better context
+  - **Enhancement**: Connection refused errors now logged as warnings
+  - **Enhancement**: Error responses now include target URL for easier debugging
+
+- Updated dependencies [945d93d]
+  - @mcp-use/inspector@0.16.0-canary.10
+  - mcp-use@1.14.0-canary.10
+
+## 2.11.0-canary.9
+
+### Patch Changes
+
+- 782bb3e: feat(cli): enhance CLI to display package versions during dev and build commands
+  - mcp-use@1.14.0-canary.9
+  - @mcp-use/inspector@0.16.0-canary.9
+
+## 2.11.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [e96063a]
+  - mcp-use@1.14.0-canary.8
+  - @mcp-use/inspector@0.16.0-canary.8
+
+## 2.11.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [0cfeb1d]
+- Updated dependencies [4652707]
+  - mcp-use@1.14.0-canary.7
+  - @mcp-use/inspector@0.16.0-canary.7
+
+## 2.11.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [1fb5e5e]
+- Updated dependencies [948e0ae]
+  - mcp-use@1.14.0-canary.6
+  - @mcp-use/inspector@0.16.0-canary.6
+
+## 2.11.0-canary.5
+
+### Patch Changes
+
+- da4c861: refactor(cli): streamline widget building process with parallel execution
+  - mcp-use@1.14.0-canary.5
+  - @mcp-use/inspector@0.16.0-canary.5
+
+## 2.11.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [3a94755]
+  - mcp-use@1.14.0-canary.4
+  - @mcp-use/inspector@0.16.0-canary.4
+
+## 2.11.0-canary.3
+
+### Minor Changes
+
+- 3178200: ## Dependency Updates
+
+  Updated 36 dependencies across all TypeScript packages to their latest compatible versions.
+
+  ### Major Updates
+  - **react-resizable-panels**: 3.0.6 → 4.4.1
+    - Migrated to v4 API (`PanelGroup` → `Group`, `PanelResizeHandle` → `Separator`)
+    - Updated `direction` prop to `orientation` across all inspector tabs
+    - Maintained backward compatibility through wrapper component
+
+  ### Minor & Patch Updates
+
+  **Framework & Build Tools:**
+  - @types/node: 25.0.2 → 25.0.9
+  - @types/react: 19.2.7 → 19.2.8
+  - @typescript-eslint/eslint-plugin: 8.49.0 → 8.53.1
+  - @typescript-eslint/parser: 8.49.0 → 8.53.1
+  - prettier: 3.7.4 → 3.8.0
+  - typescript-eslint: 8.49.0 → 8.53.1
+  - vite: 7.3.0 → 7.3.1
+  - vitest: 4.0.15 → 4.0.17
+
+  **Runtime Dependencies:**
+  - @hono/node-server: 1.19.7 → 1.19.9
+  - @langchain/anthropic: 1.3.0 → 1.3.10
+  - @langchain/core: 1.1.12 → 1.1.15
+  - @langchain/google-genai: 2.1.0 → 2.1.10
+  - @langchain/openai: 1.2.0 → 1.2.2
+  - @mcp-ui/client: 5.17.1 → 5.17.3
+  - @mcp-ui/server: 5.16.2 → 5.16.3
+  - posthog-js: 1.306.1 → 1.330.0
+  - posthog-node: 5.17.2 → 5.22.0
+  - ws: 8.18.3 → 8.19.0
+
+  **UI Components:**
+  - @eslint-react/eslint-plugin: 2.3.13 → 2.7.2
+  - eslint-plugin-format: 1.1.0 → 1.3.1
+  - eslint-plugin-react-refresh: 0.4.25 → 0.4.26
+  - framer-motion: 12.23.26 → 12.27.1
+  - motion: 12.23.26 → 12.27.1
+  - markdown-to-jsx: 9.3.5 → 9.5.7
+  - lucide-react: 0.561.0 → 0.562.0
+  - vite-express: 0.21.1 → 0.22.0
+
+  **Utilities:**
+  - globby: 16.0.0 → 16.1.0
+  - fs-extra: 11.3.2 → 11.3.3
+  - ink: 6.5.1 → 6.6.0
+
+  ### Removed
+  - Removed `@ai-sdk/react` from inspector (unused, only in tests)
+  - Removed `ai` from mcp-use dev dependencies (unused, only in tests/examples)
+
+### Patch Changes
+
+- Updated dependencies [3178200]
+  - @mcp-use/inspector@0.16.0-canary.3
+  - mcp-use@1.14.0-canary.3
+
+## 2.11.0-canary.2
+
+### Minor Changes
+
+- ad66391: fix: improved HMR support for widgets
+
+### Patch Changes
+
+- Updated dependencies [ad66391]
+  - @mcp-use/inspector@0.16.0-canary.2
+  - mcp-use@1.14.0-canary.2
+
+## 2.11.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [199199d]
+  - @mcp-use/inspector@0.16.0-canary.1
+  - mcp-use@1.14.0-canary.1
+
+## 2.11.0-canary.0
+
+### Minor Changes
+
+- 53fdb48: feat: allow to set serverInfo (title, name, icons, websiteUrl, description), and updated templates to have defaults
+
+### Patch Changes
+
+- Updated dependencies [53fdb48]
+  - @mcp-use/inspector@0.16.0-canary.0
+  - mcp-use@1.14.0-canary.0
+
+## 2.10.3
+
+### Patch Changes
+
+- b65d05d: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+- Updated dependencies [b65d05d]
+  - mcp-use@1.13.5
+  - @mcp-use/inspector@0.15.3
+
+## 2.10.3-canary.0
+
+### Patch Changes
+
+- de5f030: feat(cli): add .gitignore and CLAUDE.md for CLI documentation
+  - mcp-use@1.13.5-canary.0
+  - @mcp-use/inspector@0.15.3-canary.0
+
+## 2.10.2
+
+### Patch Changes
+
+- Updated dependencies [dd8d07d]
+  - mcp-use@1.13.4
+  - @mcp-use/inspector@0.15.2
+
+## 2.10.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5c65df2]
+  - mcp-use@1.13.4-canary.0
+  - @mcp-use/inspector@0.15.2-canary.0
+
+## 2.10.1
+
+### Patch Changes
+
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+- Updated dependencies [294d17d]
+  - @mcp-use/inspector@0.15.1
+  - mcp-use@1.13.3
+
+## 2.10.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b06fa78]
+  - @mcp-use/inspector@0.15.1-canary.2
+  - mcp-use@1.13.3-canary.2
+
+## 2.10.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3f2ebf]
+  - @mcp-use/inspector@0.15.1-canary.1
+  - mcp-use@1.13.3-canary.1
+
+## 2.10.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d446ee5]
+  - @mcp-use/inspector@0.15.1-canary.0
+  - mcp-use@1.13.3-canary.0
+
+## 2.10.0
+
+### Minor Changes
+
+- 0144a31: feat(cli): enhance login and deployment commands
+  - Updated the login command to handle errors gracefully
+  - Modified the deployment command to prompt users for login if not authenticated
+  - Removed the `fromSource` option from the deployment command
+  - Added checks for uncommitted changes in the git repository before deployment
+  - Updated various commands to consistently use `npx mcp-use login` for login instructions
+
+  refactor(inspector, multi-server-example): authentication UI and logic
+  - Simplified the authentication button logic in InspectorDashboard
+  - Updated the multi-server example to directly link to the authentication URL
+
+### Patch Changes
+
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+- Updated dependencies [0144a31]
+  - @mcp-use/inspector@0.15.0
+  - mcp-use@1.13.2
+
+## 2.10.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [7b137c2]
+  - mcp-use@1.13.2-canary.1
+  - @mcp-use/inspector@0.15.0-canary.1
+
+## 2.10.0-canary.0
+
+### Minor Changes
+
+- 450ab65: feat(cli): enhance login and deployment commands
+  - Updated the login command to handle errors gracefully
+  - Modified the deployment command to prompt users for login if not authenticated
+  - Removed the `fromSource` option from the deployment command
+  - Added checks for uncommitted changes in the git repository before deployment
+  - Updated various commands to consistently use `npx mcp-use login` for login instructions
+
+  refactor(inspector, multi-server-example): authentication UI and logic
+  - Simplified the authentication button logic in InspectorDashboard
+  - Updated the multi-server example to directly link to the authentication URL
+
+### Patch Changes
+
+- Updated dependencies [52be97c]
+- Updated dependencies [c9bde52]
+- Updated dependencies [450ab65]
+  - @mcp-use/inspector@0.15.0-canary.0
+  - mcp-use@1.13.2-canary.0
+
+## 2.9.1
+
+### Patch Changes
+
+- b8626dc: chore: update mcp-use version
+- Updated dependencies [b8626dc]
+- Updated dependencies [b8626dc]
+  - mcp-use@1.13.1
+  - @mcp-use/inspector@0.14.6
+
+## 2.9.1-canary.1
+
+### Patch Changes
+
+- 727df09: chore: update mcp-use version
+- Updated dependencies [727df09]
+  - @mcp-use/inspector@0.14.6-canary.1
+  - mcp-use@1.13.1-canary.1
+
+## 2.9.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [548206f]
+  - mcp-use@1.13.1-canary.0
+  - @mcp-use/inspector@0.14.6-canary.0
+
+## 2.9.0
+
+### Minor Changes
+
+- bcdecd4: feat: Hot Module Reloading (HMR) for MCP server development
+
+  Added HMR support to the `mcp-use dev` command. When you modify your server file (add/remove/update tools, prompts, or resources), changes are applied instantly without restarting the server or dropping client connections.
+
+  **Features:**
+  - Tools, prompts, and resources can be added, removed, or updated on-the-fly
+  - Connected clients (like the inspector) receive `list_changed` notifications and auto-refresh
+  - No changes required to user code - existing server files work as-is
+  - Syntax errors during reload are caught gracefully without crashing the server
+
+  **How it works:**
+  - CLI uses `chokidar` to watch `src/` directory and root `.ts`/`.tsx` files
+  - On file change, the module is re-imported with cache-busting
+  - `syncRegistrationsFrom()` diffs registrations and uses the SDK's native `RegisteredTool.update()` and `remove()` methods
+  - `list_changed` notifications are sent to all connected sessions
+
+  **Usage:**
+
+  ```bash
+  mcp-use dev  # HMR enabled by default
+  mcp-use dev --no-hmr  # Disable HMR, use tsx watch instead
+  ```
+
+- bcdecd4: feat(cli): enhance hot module reloading and server management
+  - Improved hot module reloading (HMR) support by allowing local `tsx` usage, falling back to `npx` if not found
+  - Updated server command execution to handle TypeScript imports more effectively
+  - Enhanced file watching capabilities to include `.ts` and `.tsx` files while ignoring unnecessary patterns
+  - Streamlined tool, prompt, and resource registration during HMR to directly inject into active sessions without removal, preserving existing configurations
+  - Added detailed logging for file changes and watcher readiness to improve developer experience
+
+### Patch Changes
+
+- bcdecd4: Add comprehensive test suite for Hot Module Replacement (HMR) functionality
+
+  **Testing Approach:**
+
+  Tests use minimal mocking, focusing on:
+  - Real `MCPServer` instances
+  - Actual console logs (the developer experience)
+  - Direct registration state inspection
+  - Light session mocking only for injection tests
+
+  This approach is more robust and less brittle than heavy mocking, as tests verify real behavior and won't break when SDK internals change.
+
+  **Test Coverage:**
+
+  **Unit Tests** (`tests/unit/server/hmr.test.ts` - 15 tests):
+  - Tool registration (add, update, inject)
+  - Prompt registration (add, inject)
+  - Resource registration (add, inject)
+  - Notification sending (tools/list_changed, prompts/list_changed, resources/list_changed)
+  - Entry methods (enable, disable, remove, update)
+  - Error handling for injection failures
+  - Graceful notification error handling
+
+  **Integration Tests** (`tests/integration/hmr-cli.test.ts`):
+  - End-to-end file change detection
+  - Tool addition via HMR
+  - Tool description updates
+  - Syntax error handling and recovery
+  - Connection persistence during HMR
+
+  **CLI Tests** (`packages/cli/tests/tsx-resolution.test.ts`):
+  - tsx binary resolution from package.json bin field
+  - Handling string and object bin formats
+  - Graceful error handling for missing bin field
+  - Preference for 'tsx' entry in object form
+
+  All tests include proper setup/teardown, mocking, and comprehensive assertions.
+
+- bcdecd4: fix: remove import from "mcp-use" which causes langchain import in server
+- bcdecd4: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+- Updated dependencies [bcdecd4]
+  - mcp-use@1.13.0
+  - @mcp-use/inspector@0.14.5
+
+## 2.9.0-canary.3
+
+### Patch Changes
+
+- e962a16: fix: remove import from "mcp-use" which causes langchain import in server
+- Updated dependencies [e962a16]
+  - @mcp-use/inspector@0.14.5-canary.3
+  - mcp-use@1.13.0-canary.3
+
+## 2.9.0-canary.2
+
+### Patch Changes
+
+- 118cb30: feat(hmr): enhance synchronization for tools, prompts, and resources
+  - Implemented a generic synchronization mechanism for hot module replacement (HMR) that updates tools, prompts, and resources in active sessions without removal.
+  - Added support for detecting changes in definitions, including renames and updates, ensuring seamless integration during HMR.
+  - Improved logging for changes in registrations, enhancing developer visibility into updates during the HMR process.
+  - Introduced a new file for HMR synchronization logic, centralizing the handling of updates across different primitive types.
+
+- Updated dependencies [118cb30]
+  - @mcp-use/inspector@0.14.5-canary.2
+  - mcp-use@1.13.0-canary.2
+
+## 2.9.0-canary.1
+
+### Minor Changes
+
+- 7359d66: feat(cli): enhance hot module reloading and server management
+  - Improved hot module reloading (HMR) support by allowing local `tsx` usage, falling back to `npx` if not found
+  - Updated server command execution to handle TypeScript imports more effectively
+  - Enhanced file watching capabilities to include `.ts` and `.tsx` files while ignoring unnecessary patterns
+  - Streamlined tool, prompt, and resource registration during HMR to directly inject into active sessions without removal, preserving existing configurations
+  - Added detailed logging for file changes and watcher readiness to improve developer experience
+
+### Patch Changes
+
+- 7359d66: Add comprehensive test suite for Hot Module Replacement (HMR) functionality
+
+  **Testing Approach:**
+
+  Tests use minimal mocking, focusing on:
+  - Real `MCPServer` instances
+  - Actual console logs (the developer experience)
+  - Direct registration state inspection
+  - Light session mocking only for injection tests
+
+  This approach is more robust and less brittle than heavy mocking, as tests verify real behavior and won't break when SDK internals change.
+
+  **Test Coverage:**
+
+  **Unit Tests** (`tests/unit/server/hmr.test.ts` - 15 tests):
+  - Tool registration (add, update, inject)
+  - Prompt registration (add, inject)
+  - Resource registration (add, inject)
+  - Notification sending (tools/list_changed, prompts/list_changed, resources/list_changed)
+  - Entry methods (enable, disable, remove, update)
+  - Error handling for injection failures
+  - Graceful notification error handling
+
+  **Integration Tests** (`tests/integration/hmr-cli.test.ts`):
+  - End-to-end file change detection
+  - Tool addition via HMR
+  - Tool description updates
+  - Syntax error handling and recovery
+  - Connection persistence during HMR
+
+  **CLI Tests** (`packages/cli/tests/tsx-resolution.test.ts`):
+  - tsx binary resolution from package.json bin field
+  - Handling string and object bin formats
+  - Graceful error handling for missing bin field
+  - Preference for 'tsx' entry in object form
+
+  All tests include proper setup/teardown, mocking, and comprehensive assertions.
+
+- Updated dependencies [7359d66]
+  - mcp-use@1.13.0-canary.1
+  - @mcp-use/inspector@0.14.5-canary.1
+
+## 2.9.0-canary.0
+
+### Minor Changes
+
+- 0be9ed8: feat: Hot Module Reloading (HMR) for MCP server development
+
+  Added HMR support to the `mcp-use dev` command. When you modify your server file (add/remove/update tools, prompts, or resources), changes are applied instantly without restarting the server or dropping client connections.
+
+  **Features:**
+  - Tools, prompts, and resources can be added, removed, or updated on-the-fly
+  - Connected clients (like the inspector) receive `list_changed` notifications and auto-refresh
+  - No changes required to user code - existing server files work as-is
+  - Syntax errors during reload are caught gracefully without crashing the server
+
+  **How it works:**
+  - CLI uses `chokidar` to watch `src/` directory and root `.ts`/`.tsx` files
+  - On file change, the module is re-imported with cache-busting
+  - `syncRegistrationsFrom()` diffs registrations and uses the SDK's native `RegisteredTool.update()` and `remove()` methods
+  - `list_changed` notifications are sent to all connected sessions
+
+  **Usage:**
+
+  ```bash
+  mcp-use dev  # HMR enabled by default
+  mcp-use dev --no-hmr  # Disable HMR, use tsx watch instead
+  ```
+
+### Patch Changes
+
+- Updated dependencies [dfb30a6]
+- Updated dependencies [0be9ed8]
+  - @mcp-use/inspector@0.14.5-canary.0
+  - mcp-use@1.13.0-canary.0
+
 ## 2.8.4
 
 ### Patch Changes
@@ -548,13 +2660,13 @@
 
   **Note:** `@langchain/core` and `langchain` moved from dependencies to optional peer dependencies.
 
-  **Learn more:** [LangChain Integration](/typescript/agent/llm-integration)
+  **Learn more:** [LangChain Integration](https://mcp-use.com/docs/typescript/agent/llm-integration)
 
   ### WebSocket Transport Removed
 
   WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
 
-  **Learn more:** [Client Configuration](/typescript/client/client-configuration)
+  **Learn more:** [Client Configuration](https://mcp-use.com/docs/typescript/client/client-configuration)
 
   ## Features
 
@@ -611,7 +2723,7 @@
   **Deprecated:**
   - `autoCreateSessionOnInvalidId` - Now follows MCP spec strictly (returns 404 for invalid sessions)
 
-  **Learn more:** [Session Management](/typescript/server/session-management)
+  **Learn more:** [Session Management](https://mcp-use.com/docs/typescript/server/session-management)
 
   ### Favicon Support for Widgets
 
@@ -629,13 +2741,13 @@
   - CLI build process includes favicon in widget HTML pages
   - Long-term caching (1 year) for favicon assets
 
-  **Learn more:** [UI Widgets](/typescript/server/ui-widgets) and [Server Configuration](/typescript/server/configuration)
+  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://mcp-use.com/docs/typescript/server/configuration)
 
   ### CLI Client Support
 
   Added dedicated CLI client support for better command-line integration and testing.
 
-  **Learn more:** [CLI Client](/typescript/client/cli)
+  **Learn more:** [CLI Client](https://mcp-use.com/docs/typescript/client/cli)
 
   ### Enhanced Session Methods
   - `callTool()` method now defaults args to an empty object
@@ -665,7 +2777,7 @@
 
   Migrated from `react-router-dom` to `react-router` for better compatibility and reduced bundle size.
 
-  **Learn more:** [useMcp Hook](/typescript/client/usemcp)
+  **Learn more:** [useMcp Hook](https://mcp-use.com/docs/typescript/client/usemcp)
 
   ### Session & Transport Fixes
   - Fixed transport cleanup when session becomes idle

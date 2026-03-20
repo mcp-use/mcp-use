@@ -9,6 +9,7 @@ export interface ProjectLink {
   deploymentName: string;
   deploymentUrl?: string;
   linkedAt: string;
+  serverId?: string;
 }
 
 // Get .mcp-use directory path

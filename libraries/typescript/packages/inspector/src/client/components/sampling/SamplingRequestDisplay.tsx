@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
@@ -10,26 +10,26 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { Textarea } from "@/client/components/ui/textarea";
-import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { LLMConfig } from "../chat/types";
-import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
-import { toast } from "sonner";
-import {
-  Check,
-  Copy,
-  Download,
-  Maximize2,
-  X,
-  Loader2,
-  Sparkles,
-} from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
+import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  Check,
+  Copy,
+  Download,
+  Loader2,
+  Maximize2,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import type { LLMConfig } from "../chat/types";
 import { useSamplingLLM } from "./useSamplingLLM";
 
 interface SamplingRequestDisplayProps {
@@ -75,7 +75,11 @@ export function SamplingRequestDisplay({
   // Reset form when request changes
   useEffect(() => {
     if (request) {
-      setModel("stub-model");
+      setModel(
+        responseMode === "llm" && llmConfig?.model
+          ? llmConfig.model
+          : "stub-model"
+      );
       setStopReason("endTurn");
       setRole("assistant");
       setContentType("text");
@@ -86,14 +90,41 @@ export function SamplingRequestDisplay({
     }
   }, [request?.id]);
 
+  // Update model when switching to LLM mode
+  useEffect(() => {
+    if (responseMode === "llm" && llmConfig?.model) {
+      setModel(llmConfig.model);
+    }
+  }, [responseMode, llmConfig?.model]);
+
   const handleGenerateWithLLM = async () => {
-    if (!request || !isAvailable) return;
+    if (!request || !isAvailable) {
+      console.log("[SamplingRequestDisplay] Cannot generate:", {
+        hasRequest: !!request,
+        isAvailable,
+      });
+      return;
+    }
+
+    console.log("[SamplingRequestDisplay] Starting LLM generation:", {
+      requestId: request.id,
+      llmConfig,
+    });
 
     setIsGenerating(true);
     setGenerationError(null);
 
     try {
       const result = await generateResponse({ request: request.request });
+
+      console.log("[SamplingRequestDisplay] LLM generation result:", {
+        result,
+        model: result.model,
+        stopReason: result.stopReason,
+        role: result.role,
+        contentIsArray: Array.isArray(result.content),
+        content: result.content,
+      });
 
       // Populate form fields with LLM response
       setModel(result.model || llmConfig?.model || "stub-model");
@@ -104,15 +135,32 @@ export function SamplingRequestDisplay({
         ? result.content[0]
         : result.content;
 
+      console.log("[SamplingRequestDisplay] Setting content:", {
+        contentType: content.type,
+        hasText: "text" in content,
+        text: "text" in content ? content.text : undefined,
+      });
+
       if (content.type === "text") {
         setContentType("text");
         setTextContent(content.text || "");
+        console.log("[SamplingRequestDisplay] Set text content:", content.text);
       } else if (content.type === "image") {
         setContentType("image");
         setImageData(content.data || "");
         setImageMimeType(content.mimeType || "image/png");
+        console.log("[SamplingRequestDisplay] Set image content");
       }
+
+      console.log("[SamplingRequestDisplay] Form state after update:", {
+        model,
+        stopReason,
+        role,
+        contentType,
+        textContent,
+      });
     } catch (error) {
+      console.error("[SamplingRequestDisplay] LLM generation error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate response";
       setGenerationError(errorMessage);
@@ -121,6 +169,7 @@ export function SamplingRequestDisplay({
       });
     } finally {
       setIsGenerating(false);
+      console.log("[SamplingRequestDisplay] Generation complete");
     }
   };
 
@@ -189,6 +238,7 @@ export function SamplingRequestDisplay({
             React.createElement(
               "button",
               {
+                "data-testid": "sampling-view-tool-result",
                 className:
                   "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
                 onClick: () => {
@@ -330,12 +380,23 @@ export function SamplingRequestDisplay({
                 <SelectTrigger
                   id={`responseMode-${request.id}`}
                   className="w-32 h-8 text-xs"
+                  data-testid="sampling-response-mode-select"
                 >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="llm">LLM</SelectItem>
+                  <SelectItem
+                    value="manual"
+                    data-testid="sampling-response-mode-manual"
+                  >
+                    Manual
+                  </SelectItem>
+                  <SelectItem
+                    value="llm"
+                    data-testid="sampling-response-mode-llm"
+                  >
+                    LLM
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -350,12 +411,16 @@ export function SamplingRequestDisplay({
                     disabled={isGenerating}
                     size="sm"
                     className="flex items-center gap-2"
+                    data-testid="sampling-generate-llm-button"
                   >
                     {isGenerating ? (
-                      <>
+                      <span
+                        data-testid="sampling-generating"
+                        className="flex items-center gap-2"
+                      >
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Generating...
-                      </>
+                      </span>
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4" />
@@ -373,7 +438,10 @@ export function SamplingRequestDisplay({
                 </div>
               )}
               {generationError && (
-                <div className="text-xs text-red-600 dark:text-red-400">
+                <div
+                  className="text-xs text-red-600 dark:text-red-400"
+                  data-testid="sampling-generation-error"
+                >
                   {generationError}
                 </div>
               )}
@@ -388,6 +456,7 @@ export function SamplingRequestDisplay({
               onChange={(e) => setModel(e.target.value)}
               placeholder="stub-model"
               disabled={responseMode === "llm" && isGenerating}
+              data-testid="sampling-model-input"
             />
           </div>
 
@@ -399,6 +468,7 @@ export function SamplingRequestDisplay({
               onChange={(e) => setStopReason(e.target.value)}
               placeholder="endTurn"
               disabled={responseMode === "llm" && isGenerating}
+              data-testid="sampling-stop-reason-input"
             />
           </div>
 
@@ -409,7 +479,10 @@ export function SamplingRequestDisplay({
               onValueChange={(v) => setRole(v as "assistant" | "user")}
               disabled={responseMode === "llm" && isGenerating}
             >
-              <SelectTrigger id={`role-${request.id}`}>
+              <SelectTrigger
+                id={`role-${request.id}`}
+                data-testid="sampling-role-select"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -426,7 +499,10 @@ export function SamplingRequestDisplay({
               onValueChange={(v) => setContentType(v as "text" | "image")}
               disabled={responseMode === "llm" && isGenerating}
             >
-              <SelectTrigger id={`contentType-${request.id}`}>
+              <SelectTrigger
+                id={`contentType-${request.id}`}
+                data-testid="sampling-content-type-select"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -446,6 +522,7 @@ export function SamplingRequestDisplay({
                 placeholder="Enter response text..."
                 rows={6}
                 disabled={responseMode === "llm" && isGenerating}
+                data-testid="sampling-text-content"
               />
             </div>
           )}
@@ -486,6 +563,7 @@ export function SamplingRequestDisplay({
           onClick={handleApprove}
           className="flex-1"
           disabled={responseMode === "llm" && isGenerating}
+          data-testid="sampling-approve-button"
         >
           Approve
         </Button>
@@ -494,6 +572,7 @@ export function SamplingRequestDisplay({
           variant="outline"
           className="flex-1"
           disabled={responseMode === "llm" && isGenerating}
+          data-testid="sampling-reject-button"
         >
           Reject
         </Button>

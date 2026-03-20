@@ -1,5 +1,4 @@
 import { Check, Copy, Loader2, Wrench, X } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/client/components/ui/button";
 import {
   Sheet,
@@ -10,14 +9,16 @@ import {
   SheetTrigger,
 } from "@/client/components/ui/sheet";
 import { cn } from "@/client/lib/utils";
-import { JSONDisplay } from "../shared/JSONDisplay";
+import { copyToClipboard } from "@/client/utils/clipboard";
 import { analyzeJSON } from "@/client/utils/jsonUtils";
+import { JSONDisplay } from "../shared/JSONDisplay";
 
 interface ToolCallDisplayProps {
   toolName: string;
   args: Record<string, unknown>;
   result?: any;
   state?: "call" | "result" | "error";
+  partialArgs?: Record<string, unknown>;
 }
 
 export function ToolCallDisplay({
@@ -25,8 +26,9 @@ export function ToolCallDisplay({
   args,
   result,
   state = "result",
+  partialArgs,
 }: ToolCallDisplayProps) {
-  const [_copied, setCopied] = useState(false);
+  const displayArgs = state === "call" && partialArgs ? partialArgs : args;
 
   const getStatusIcon = () => {
     switch (state) {
@@ -60,12 +62,6 @@ export function ToolCallDisplay({
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const formatContent = (content: any): string => {
     if (typeof content === "object") {
       const jsonInfo = analyzeJSON(content);
@@ -77,7 +73,10 @@ export function ToolCallDisplay({
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <div className="flex max-w-min items-center gap-3 p-1 rounded-full border bg-card hover:bg-accent/50 transition-colors cursor-pointer my-4">
+        <div
+          className="flex max-w-min items-center gap-3 p-1 rounded-full border bg-card hover:bg-accent/50 transition-colors cursor-pointer my-4"
+          data-testid={`chat-tool-call-${toolName}`}
+        >
           {/* Tool Icon */}
           <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
             <Wrench className="size-4 text-muted-foreground" />
@@ -88,9 +87,9 @@ export function ToolCallDisplay({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium truncate">
                 {toolName}(
-                {Object.keys(args).length > 0 ? (
+                {Object.keys(displayArgs).length > 0 ? (
                   <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
-                    {Object.keys(args).length} args
+                    {Object.keys(displayArgs).length} args
                   </span>
                 ) : (
                   ""
@@ -106,6 +105,7 @@ export function ToolCallDisplay({
               "w-8 h-8 rounded-full flex items-center justify-center",
               getStatusBg()
             )}
+            data-testid={`chat-tool-call-status-${state}`}
           >
             {getStatusIcon()}
           </div>
@@ -115,14 +115,21 @@ export function ToolCallDisplay({
       <SheetContent
         side="right"
         className="w-[400px] sm:w-[540px] p-4 overflow-y-auto"
+        data-testid="chat-tool-drawer"
       >
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
             Tool Call Details
           </SheetTitle>
-          <SheetDescription>
-            {toolName} -{state}
+          <SheetDescription className="flex items-center gap-2">
+            {toolName} — {state}
+            {state === "call" && (
+              <span className="flex items-center gap-1 text-blue-500 dark:text-blue-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                streaming…
+              </span>
+            )}
           </SheetDescription>
         </SheetHeader>
 
@@ -130,14 +137,14 @@ export function ToolCallDisplay({
           {/* Arguments */}
           <div>
             <h3 className="text-sm font-medium mb-2">Arguments</h3>
-            <div className="relative">
+            <div className="relative" data-testid="chat-tool-drawer-args">
               <pre className="text-xs bg-muted/50 rounded-lg p-3 overflow-x-auto border font-mono leading-relaxed max-h-48 whitespace-pre-wrap break-words">
-                {formatContent(args)}
+                {formatContent(displayArgs)}
               </pre>
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => copyToClipboard(formatContent(args))}
+                onClick={() => copyToClipboard(formatContent(displayArgs))}
                 className="absolute top-2 right-2 h-6 w-6 p-0 opacity-70 hover:opacity-100"
                 title="Copy arguments"
               >
@@ -150,7 +157,7 @@ export function ToolCallDisplay({
           {result && (
             <div>
               <h3 className="text-sm font-medium mb-2">Result</h3>
-              <div className="relative">
+              <div className="relative" data-testid="chat-tool-drawer-result">
                 {typeof result === "string" ? (
                   <div
                     className={cn(

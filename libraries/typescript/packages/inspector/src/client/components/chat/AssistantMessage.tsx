@@ -1,6 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { MarkdownRenderer } from "@/client/components/shared/MarkdownRenderer";
+import { copyToClipboard } from "@/client/utils/clipboard";
 
 /**
  * Button that copies the provided text to the clipboard and shows a brief visual confirmation.
@@ -12,7 +13,7 @@ function CopyButton({ text }: { text: string }) {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text);
+    await copyToClipboard(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -32,24 +33,33 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-interface AssistantMessageProps {
+export interface AssistantMessageProps {
   content: string;
   timestamp?: Date | number;
+  /** Internal: indicates the message is currently being streamed */
+  _isStreaming?: boolean;
 }
 
 export function AssistantMessage({
   content,
   timestamp,
+  _isStreaming: _,
 }: AssistantMessageProps) {
   if (!content || content.length === 0) {
     return null;
   }
 
   return (
-    <div className="flex items-start gap-6 group/message relative">
+    <div
+      className="flex items-start gap-6 group/message relative"
+      data-testid="chat-message-assistant"
+    >
       <div className="flex-1 min-w-0">
         <div className="wrap-break-word">
-          <div className="text-base leading-7 font-sans text-start wrap-break-word transition-all duration-300 ease-in-out">
+          <div
+            className="text-base leading-7 font-sans text-start wrap-break-word transition-all duration-300 ease-in-out"
+            data-testid="chat-message-content"
+          >
             <MarkdownRenderer content={content} />
           </div>
         </div>

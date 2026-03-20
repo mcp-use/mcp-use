@@ -1,12 +1,32 @@
-import type { AuthConfig, LLMConfig, Message } from "./types";
-import { useCallback, useState } from "react";
-import { hashString } from "./utils";
+import { useCallback, useRef, useState } from "react";
+import type { PromptResult } from "../../hooks/useMCPPrompts";
+import { convertPromptResultsToMessages } from "./conversion";
+import type {
+  AuthConfig,
+  LLMConfig,
+  Message,
+  MessageAttachment,
+} from "./types";
+import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
+
+interface WidgetModelContext {
+  content?: Array<{ type: string; text: string }>;
+  structuredContent?: Record<string, unknown>;
+}
 
 interface UseChatMessagesProps {
   mcpServerUrl: string;
   llmConfig: LLMConfig | null;
   authConfig: AuthConfig | null;
   isConnected: boolean;
+  /** Custom API endpoint URL for chat streaming. Defaults to "/inspector/api/chat/stream". */
+  chatApiUrl?: string;
+  /** When chatApiUrl is not yet available, called before sending to resolve the URL. Useful for background initialization. */
+  waitForChatApiUrl?: () => Promise<string | undefined>;
+  /** Active widget model contexts to inject into the LLM conversation */
+  widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
+  /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
+  initialMessages?: Message[];
 }
 
 export function useChatMessages({
@@ -14,25 +34,58 @@ export function useChatMessages({
   llmConfig,
   authConfig,
   isConnected,
+  chatApiUrl,
+  waitForChatApiUrl,
+  widgetModelContexts,
+  initialMessages,
 }: UseChatMessagesProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
+  const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (userInput: string) => {
-      if (!userInput.trim() || !llmConfig || !isConnected) {
+    async (
+      userInput: string,
+      promptResults: PromptResult[],
+      extraAttachments?: MessageAttachment[]
+    ) => {
+      const allAttachments = [...attachments, ...(extraAttachments ?? [])];
+      // Can send if there's text, prompt results, or attachments
+      const hasContent =
+        userInput.trim() ||
+        promptResults.length > 0 ||
+        allAttachments.length > 0;
+      if (!hasContent || !llmConfig || !isConnected) {
         return;
       }
 
-      const userMessage: Message = {
-        id: `user-${Date.now()}`,
-        role: "user",
-        content: userInput.trim(),
-        timestamp: Date.now(),
-      };
+      const promptResultsMessages =
+        convertPromptResultsToMessages(promptResults);
 
-      setMessages((prev) => [...prev, userMessage]);
+      // Only create a user message if there's actual user input or user-uploaded attachments
+      // Don't create one when only using prompt results (they create their own messages)
+      const userMessages: Message[] = [...promptResultsMessages];
+
+      if (userInput.trim() || allAttachments.length > 0) {
+        const userMessage: Message = {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: userInput.trim(),
+          timestamp: Date.now(),
+          attachments: allAttachments.length > 0 ? allAttachments : undefined,
+        };
+        userMessages.push(userMessage);
+      }
+
+      setMessages((prev) => [...prev, ...userMessages]);
       setIsLoading(true);
+
+      // Clear attachments after sending
+      setAttachments([]);
+
+      // Create abort controller for cancellation
+      abortControllerRef.current = new AbortController();
 
       try {
         // If using OAuth, retrieve tokens from localStorage
@@ -62,20 +115,57 @@ export function useChatMessages({
           }
         }
 
-        // Call the streaming chat API endpoint
-        const response = await fetch("/inspector/api/chat/stream", {
+        // Build widget state context messages (per SEP-1865 ui/update-model-context)
+        // These inform the LLM about current widget UI state so it can reason about what the user sees.
+        const widgetContextMessages: Array<{ role: string; content: string }> =
+          [];
+        if (widgetModelContexts && widgetModelContexts.size > 0) {
+          const parts: string[] = [];
+          for (const [, ctx] of widgetModelContexts) {
+            if (!ctx) continue;
+            if (ctx.content?.length) {
+              parts.push(ctx.content.map((c) => c.text).join("\n"));
+            } else if (ctx.structuredContent) {
+              parts.push(JSON.stringify(ctx.structuredContent));
+            }
+          }
+          if (parts.length > 0) {
+            widgetContextMessages.push({
+              role: "user",
+              content: `[Current Widget State]\n${parts.join("\n")}`,
+            });
+          }
+        }
+
+        const resolvedUrl =
+          chatApiUrl ??
+          (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
+          "/inspector/api/chat/stream";
+
+        const response = await fetch(resolvedUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          signal: abortControllerRef.current.signal,
           body: JSON.stringify({
             mcpServerUrl,
             llmConfig,
             authConfig: authConfigWithTokens,
-            messages: [...messages, userMessage].map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            messages: [
+              ...[...messages, ...userMessages].map((m) => ({
+                role: m.role,
+                content:
+                  m.content ||
+                  (m.parts
+                    ?.filter((p) => p.type === "text")
+                    .map((p) => p.text)
+                    .join("") ??
+                    ""),
+                attachments: m.attachments,
+              })),
+              ...widgetContextMessages,
+            ],
           }),
         });
 
@@ -93,7 +183,7 @@ export function useChatMessages({
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
-            state?: string;
+            state?: "pending" | "result" | "error";
           };
         }> = [];
 
@@ -119,6 +209,12 @@ export function useChatMessages({
 
         let buffer = "";
         while (true) {
+          // Check for abort
+          if (abortControllerRef.current?.signal.aborted) {
+            await reader.cancel();
+            break;
+          }
+
           const { done, value } = await reader.read();
 
           if (done) break;
@@ -216,7 +312,10 @@ export function useChatMessages({
 
                 if (toolPart && toolPart.toolInvocation) {
                   toolPart.toolInvocation.result = event.result;
-                  toolPart.toolInvocation.state = "result";
+                  // Check if result indicates an error
+                  toolPart.toolInvocation.state = event.result?.isError
+                    ? "error"
+                    : "result";
                   console.log(
                     "[Parts after tool-result]",
                     parts.length,
@@ -263,7 +362,38 @@ export function useChatMessages({
             }
           }
         }
+
+        // If aborted, mark any pending tool calls as cancelled
+        if (abortControllerRef.current?.signal.aborted) {
+          for (const part of parts) {
+            if (
+              part.type === "tool-invocation" &&
+              part.toolInvocation?.state === "pending"
+            ) {
+              part.toolInvocation.state = "error";
+              part.toolInvocation.result = "Cancelled by user";
+            }
+          }
+
+          // Update messages with cancelled tool calls
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? {
+                    ...msg,
+                    parts: [...parts],
+                    content: "",
+                  }
+                : msg
+            )
+          );
+        }
       } catch (error) {
+        // Don't show Abort Error
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
         // Extract detailed error message with HTTP status
         let errorDetail = "Unknown error occurred";
         if (error instanceof Error) {
@@ -290,19 +420,73 @@ export function useChatMessages({
         setMessages((prev) => [...prev, errorMessage]);
       } finally {
         setIsLoading(false);
+        abortControllerRef.current = null;
       }
     },
-    [llmConfig, isConnected, mcpServerUrl, messages, authConfig]
+    [
+      llmConfig,
+      isConnected,
+      mcpServerUrl,
+      messages,
+      authConfig,
+      attachments,
+      chatApiUrl,
+      waitForChatApiUrl,
+    ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
 
+  const stop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  const addAttachment = useCallback(async (file: File) => {
+    try {
+      const attachment = await fileToAttachment(file);
+
+      setAttachments((prev) => {
+        const newAttachments = [...prev, attachment];
+
+        // Check total size
+        if (!isValidTotalSize(newAttachments)) {
+          alert("Total attachment size exceeds 20MB limit");
+          return prev;
+        }
+
+        return newAttachments;
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert("Failed to add attachment");
+      }
+    }
+  }, []);
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const clearAttachments = useCallback(() => {
+    setAttachments([]);
+  }, []);
+
   return {
     messages,
     isLoading,
+    attachments,
     sendMessage,
     clearMessages,
+    setMessages,
+    stop,
+    addAttachment,
+    removeAttachment,
+    clearAttachments,
   };
 }

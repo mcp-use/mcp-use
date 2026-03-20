@@ -36,6 +36,44 @@ interface ElicitationRequestDisplayProps {
   onFullscreen: () => void;
 }
 
+interface EnumChoice {
+  const: string;
+  title?: string;
+}
+
+function isEnumChoice(value: unknown): value is EnumChoice {
+  if (!value || typeof value !== "object") return false;
+  const maybeChoice = value as { const?: unknown; title?: unknown };
+  return (
+    typeof maybeChoice.const === "string" &&
+    (maybeChoice.title === undefined || typeof maybeChoice.title === "string")
+  );
+}
+
+function getSingleSelectChoices(field: Record<string, any>): EnumChoice[] {
+  const oneOf = Array.isArray(field.oneOf)
+    ? field.oneOf.filter(isEnumChoice)
+    : [];
+  const anyOf = Array.isArray(field.anyOf)
+    ? field.anyOf.filter(isEnumChoice)
+    : [];
+
+  return oneOf.length > 0 ? oneOf : anyOf;
+}
+
+function getMultiSelectChoices(field: Record<string, any>): EnumChoice[] {
+  const items =
+    field.items && typeof field.items === "object" ? field.items : {};
+  const anyOf = Array.isArray(items.anyOf)
+    ? items.anyOf.filter(isEnumChoice)
+    : [];
+  const oneOf = Array.isArray(items.oneOf)
+    ? items.oneOf.filter(isEnumChoice)
+    : [];
+
+  return anyOf.length > 0 ? anyOf : oneOf;
+}
+
 export function ElicitationRequestDisplay({
   request,
   onApprove,
@@ -69,6 +107,8 @@ export function ElicitationRequestDisplay({
           // Set default values if available
           if (field.default !== undefined) {
             initialData[fieldName] = field.default;
+          } else if (field.type === "array") {
+            initialData[fieldName] = [];
           } else if (field.type === "boolean") {
             initialData[fieldName] = false;
           } else if (field.type === "number" || field.type === "integer") {
@@ -143,6 +183,7 @@ export function ElicitationRequestDisplay({
             React.createElement(
               "button",
               {
+                "data-testid": "elicitation-view-tool-result",
                 className:
                   "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
                 onClick: () => {
@@ -212,6 +253,17 @@ export function ElicitationRequestDisplay({
           const fieldType = field.type || "string";
           const fieldLabel = field.title || fieldName;
           const fieldDescription = field.description;
+          const singleSelectChoices = getSingleSelectChoices(field);
+          const isSingleSelectChoiceField = singleSelectChoices.length > 0;
+          const isEnumField = Array.isArray(field.enum);
+          const isUntitledMultiSelectField =
+            fieldType === "array" && Array.isArray(field.items?.enum);
+          const multiSelectChoices = getMultiSelectChoices(field);
+          const isTitledMultiSelectField =
+            fieldType === "array" && multiSelectChoices.length > 0;
+          const selectedMultiValues = Array.isArray(formData[fieldName])
+            ? (formData[fieldName] as string[])
+            : [];
 
           return (
             <div key={fieldName} className="space-y-2">
@@ -229,6 +281,7 @@ export function ElicitationRequestDisplay({
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id={`field-${fieldName}`}
+                    data-testid={`elicitation-field-${fieldName}`}
                     checked={formData[fieldName] || false}
                     onCheckedChange={(checked) =>
                       handleFieldChange(fieldName, checked)
@@ -244,6 +297,7 @@ export function ElicitationRequestDisplay({
               ) : fieldType === "number" || fieldType === "integer" ? (
                 <Input
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   type="number"
                   value={formData[fieldName] || ""}
                   onChange={(e) =>
@@ -256,24 +310,110 @@ export function ElicitationRequestDisplay({
                   }
                   placeholder={field.default?.toString() || ""}
                 />
-              ) : field.enum ? (
+              ) : isSingleSelectChoiceField ? (
                 <select
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   value={formData[fieldName] || ""}
                   onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <option value="">Select...</option>
-                  {field.enum.map((option: string) => (
-                    <option key={option} value={option}>
-                      {option}
+                  {singleSelectChoices.map((choice) => (
+                    <option key={choice.const} value={choice.const}>
+                      {choice.title || choice.const}
                     </option>
                   ))}
                 </select>
+              ) : isEnumField ? (
+                <select
+                  id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
+                  value={formData[fieldName] || ""}
+                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="">Select...</option>
+                  {field.enum.map((option: string, index: number) => (
+                    <option key={option} value={option}>
+                      {field.enumNames?.[index] || option}
+                    </option>
+                  ))}
+                </select>
+              ) : isUntitledMultiSelectField ? (
+                <div
+                  className="space-y-2"
+                  data-testid={`elicitation-field-${fieldName}`}
+                >
+                  {field.items.enum.map((option: string) => {
+                    const checkboxId = `field-${fieldName}-${option}`;
+                    const checked = selectedMultiValues.includes(option);
+
+                    return (
+                      <div key={option} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={checkboxId}
+                          checked={checked}
+                          onCheckedChange={(nextChecked) => {
+                            const updatedValues = nextChecked
+                              ? [...selectedMultiValues, option]
+                              : selectedMultiValues.filter(
+                                  (value) => value !== option
+                                );
+                            handleFieldChange(fieldName, updatedValues);
+                          }}
+                        />
+                        <Label
+                          htmlFor={checkboxId}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {option}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : isTitledMultiSelectField ? (
+                <div
+                  className="space-y-2"
+                  data-testid={`elicitation-field-${fieldName}`}
+                >
+                  {multiSelectChoices.map((choice) => {
+                    const checkboxId = `field-${fieldName}-${choice.const}`;
+                    const checked = selectedMultiValues.includes(choice.const);
+
+                    return (
+                      <div
+                        key={choice.const}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          id={checkboxId}
+                          checked={checked}
+                          onCheckedChange={(nextChecked) => {
+                            const updatedValues = nextChecked
+                              ? [...selectedMultiValues, choice.const]
+                              : selectedMultiValues.filter(
+                                  (value) => value !== choice.const
+                                );
+                            handleFieldChange(fieldName, updatedValues);
+                          }}
+                        />
+                        <Label
+                          htmlFor={checkboxId}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {choice.title || choice.const}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : fieldType === "string" &&
                 (field.format === "textarea" || field.maxLength > 100) ? (
                 <Textarea
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   value={formData[fieldName] || ""}
                   onChange={(e) => handleFieldChange(fieldName, e.target.value)}
                   placeholder={field.default || ""}
@@ -282,6 +422,7 @@ export function ElicitationRequestDisplay({
               ) : (
                 <Input
                   id={`field-${fieldName}`}
+                  data-testid={`elicitation-field-${fieldName}`}
                   type="text"
                   value={formData[fieldName] || ""}
                   onChange={(e) => handleFieldChange(fieldName, e.target.value)}
@@ -463,13 +604,27 @@ export function ElicitationRequestDisplay({
 
       {/* Actions Footer */}
       <div className="flex gap-2 p-4 border-t dark:border-zinc-700">
-        <Button onClick={handleAccept} className="flex-1">
+        <Button
+          onClick={handleAccept}
+          className="flex-1"
+          data-testid="elicitation-accept-button"
+        >
           Accept
         </Button>
-        <Button onClick={handleDecline} variant="outline" className="flex-1">
+        <Button
+          onClick={handleDecline}
+          variant="outline"
+          className="flex-1"
+          data-testid="elicitation-decline-button"
+        >
           Decline
         </Button>
-        <Button onClick={handleCancel} variant="outline" className="flex-1">
+        <Button
+          onClick={handleCancel}
+          variant="outline"
+          className="flex-1"
+          data-testid="elicitation-cancel-button"
+        >
           Cancel
         </Button>
       </div>

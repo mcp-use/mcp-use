@@ -1,0 +1,47 @@
+---
+title: "Version 1.6.0"
+description: "Bearer Token authentication, on_initialize middleware, and bug fixes"
+icon: "key"
+og:image: "https://mcp-use.com/api/og/release?v=1.6.0"
+---
+
+import { Contributors } from '/snippets/contributors.jsx'
+
+<Card img="https://mcp-use.com/api/og/release?v=1.6.0" title="Release 1.6.0" href="https://github.com/mcp-use/mcp-use/releases/tag/python-v1.6.0">
+  This release introduces **Bearer Token authentication** for Python MCP servers, adds **on_initialize middleware** for intercepting MCP handshakes, and includes several important bug fixes.
+</Card>
+
+## New Features
+
+### Bearer Token Authentication
+**[PR #841](https://github.com/mcp-use/mcp-use/pull/841) by @pietrozullo**
+
+Added Bearer Token authentication support for Python MCP servers, enabling secure token-based authentication for server connections.
+
+### On Initialize Middleware
+**[PR #769](https://github.com/mcp-use/mcp-use/pull/769) by @renvins**
+
+Introduced the ability to intercept MCP handshakes with `on_initialize` middleware, allowing custom logic during the initialization phase of MCP connections.
+
+## Bug Fixes
+
+### DNS Rebinding Protection
+**[PR #825](https://github.com/mcp-use/mcp-use/pull/825) by @pietrozullo**
+
+Fixed DNS rebinding protection for cloud and proxy deployments, improving security for production environments.
+
+### Debug and Pretty Print JSONRPC Improvements
+**[PR #814](https://github.com/mcp-use/mcp-use/pull/814) by @pietrozullo**
+
+Improved the debug and `pretty_print_jsonrpc` behavior for better debugging experience.
+
+### ConnectionManager Timeout
+**[PR #726](https://github.com/mcp-use/mcp-use/pull/726) by @Incharajayaram**
+
+Added a timeout mechanism to `ConnectionManager.stop()` to prevent hanging connections during shutdown.
+
+## Contributors
+
+Thank you to all contributors who made this release possible
+
+<Contributors users="pietrozullo,renvins,Incharajayaram" />

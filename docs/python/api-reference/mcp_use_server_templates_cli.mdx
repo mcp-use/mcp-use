@@ -1,0 +1,194 @@
+---
+title: "Cli"
+description: "CLI tool to scaffold a new MCP server project using mcp-use API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/templates/cli.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/templates/cli.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/server/templates/cli.py</a>
+</Callout>
+
+CLI tool to scaffold a new MCP server project using mcp-use.
+
+
+## copy_template
+<Card type="info">
+### `function` copy_template
+
+Copy the template to the target folder after replacing placeholders.
+
+```python
+from mcp_use.server.templates.cli import copy_template
+```
+
+**Parameters**
+><ParamField body="template_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+><ParamField body="target_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+><ParamField body="context" type="dict[str, str]" required="True" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def copy_template(template_dir: pathlib.Path, target_dir: pathlib.Path, context: dict[str, str]):
+```
+
+</Card>
+
+
+## detect_installer
+<Card type="info">
+### `function` detect_installer
+
+Detect the best available package installer. Returns (name, install_command).
+
+```python
+from mcp_use.server.templates.cli import detect_installer
+```
+
+**Returns**
+><ResponseField name="returns" type="tuple[str, list[str]]" />
+
+**Signature**
+```python wrap
+def detect_installer():
+```
+
+</Card>
+
+
+## get_available_templates
+<Card type="info">
+### `function` get_available_templates
+
+Returns the list of available templates.
+
+```python
+from mcp_use.server.templates.cli import get_available_templates
+```
+
+**Returns**
+><ResponseField name="returns" type="list[str]" />
+
+**Signature**
+```python wrap
+def get_available_templates():
+```
+
+</Card>
+
+
+## install_dependencies
+<Card type="info">
+### `function` install_dependencies
+
+Prompt user to install dependencies and run the installer. Returns True if installed.
+
+```python
+from mcp_use.server.templates.cli import install_dependencies
+```
+
+**Parameters**
+><ParamField body="target_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def install_dependencies(target_dir: pathlib.Path):
+```
+
+</Card>
+
+
+## main
+<Card type="info">
+### `function` main
+
+```python
+from mcp_use.server.templates.cli import main
+```
+
+**Signature**
+```python wrap
+def main():
+```
+
+</Card>
+
+
+## render_template
+<Card type="info">
+### `function` render_template
+
+Replace \{\{KEY\}\} placeholders with context values.
+
+```python
+from mcp_use.server.templates.cli import render_template
+```
+
+**Parameters**
+><ParamField body="content" type="str" required="True" >   String value </ParamField>
+><ParamField body="context" type="dict[str, str]" required="True" >   Dictionary of key-value pairs </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def render_template(content: str, context: dict[str, str]):
+```
+
+</Card>
+
+
+## run_install
+<Card type="info">
+### `function` run_install
+
+Run the installer, capturing output. Returns True on success.
+
+```python
+from mcp_use.server.templates.cli import run_install
+```
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
+><ParamField body="cmd" type="list[str]" required="True" >   List of items </ParamField>
+><ParamField body="target_dir" type="pathlib.Path" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="bool" />
+
+**Signature**
+```python wrap
+def run_install(name: str, cmd: list[str], target_dir: pathlib.Path):
+```
+
+</Card>
+
+
+## validate_project_name
+<Card type="info">
+### `function` validate_project_name
+
+Check if the inserted name is a valid project name.
+
+```python
+from mcp_use.server.templates.cli import validate_project_name
+```
+
+**Parameters**
+><ParamField body="name" type="str" required="True" >   Name identifier </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="str" />
+
+**Signature**
+```python wrap
+def validate_project_name(name: str):
+```
+
+</Card>

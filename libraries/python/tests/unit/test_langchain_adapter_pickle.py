@@ -10,6 +10,7 @@ import copy
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
+from mcp.types import CallToolResult, TextContent
 from mcp.types import Tool as MCPTool
 
 from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
@@ -139,8 +140,9 @@ class TestLangChainAdapterToolExecution(unittest.IsolatedAsyncioTestCase):
 
         # Create a mock connector that returns a result
         mock_connector = MagicMock()
-        mock_result = MagicMock()
-        mock_result.content = "Tool execution result"
+        mock_result = CallToolResult(
+            content=[TextContent(type="text", text="Tool execution result")],
+        )
         mock_connector.call_tool = AsyncMock(return_value=mock_result)
 
         mcp_tool = MCPTool(
@@ -167,13 +169,15 @@ class TestLangChainAdapterToolExecution(unittest.IsolatedAsyncioTestCase):
 
         # Create two different mock connectors
         mock_connector_1 = MagicMock()
-        mock_result_1 = MagicMock()
-        mock_result_1.content = "Result from connector 1"
+        mock_result_1 = CallToolResult(
+            content=[TextContent(type="text", text="Result from connector 1")],
+        )
         mock_connector_1.call_tool = AsyncMock(return_value=mock_result_1)
 
         mock_connector_2 = MagicMock()
-        mock_result_2 = MagicMock()
-        mock_result_2.content = "Result from connector 2"
+        mock_result_2 = CallToolResult(
+            content=[TextContent(type="text", text="Result from connector 2")],
+        )
         mock_connector_2.call_tool = AsyncMock(return_value=mock_result_2)
 
         mcp_tool_1 = MCPTool(

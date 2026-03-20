@@ -3,6 +3,7 @@
  */
 
 import type { OAuthProvider } from "../oauth/providers/types.js";
+import type { cors } from "hono/cors";
 import type { z } from "zod";
 
 /**
@@ -36,32 +37,76 @@ export type InferZodInput<S> = S extends z.ZodTypeAny
   : Record<string, any>;
 
 export interface ServerConfig {
-  name: string;
-  version: string;
-  description?: string;
-  host?: string; // Hostname for widget URLs and server endpoints (defaults to 'localhost')
-  baseUrl?: string; // Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
   /**
-   * Allowed origins for DNS rebinding protection
+   * Unique identifier for the MCP server .
    *
-   * **Development mode** (NODE_ENV !== "production"):
-   * - If not set: All origins are allowed (DNS rebinding protection disabled)
-   * - This enables direct browser connections from any origin for easier development
+   * @example "my-mcp-server"
+   * @example "product-search-api"
+   */
+  name: string;
+  /**
+   * Semantic version of the server.
    *
-   * **Production mode** (NODE_ENV === "production"):
-   * - If not set: DNS rebinding protection is disabled (not recommended for production)
-   * - If set to empty array: DNS rebinding protection is disabled
-   * - If set with origins: DNS rebinding protection is enabled with those specific origins
+   * @example "1.0.0"
+   */
+  version: string;
+  /**
+   * Human-readable description of what the server does.
+   * Shown to clients during discovery.
+   *
+   * @example "MCP server for product search and recommendations"
+   */
+  description?: string;
+  /**
+   * Hostname for widget URLs and server endpoints.
+   * Defaults to 'localhost' in development.
+   *
+   * @example "api.example.com"
+   */
+  host?: string;
+  /**
+   * Full base URL (overrides host:port for widget URLs).
+   * Use when deploying behind a reverse proxy or to a known public URL.
+   *
+   * @example "https://myserver.com"
+   * @example "https://api.example.com/mcp"
+   */
+  baseUrl?: string;
+  /**
+   * Custom CORS options for the server.
+   *
+   * By default, mcp-use enables permissive CORS (`origin: "*"`) for development ergonomics.
+   * Set this to customize allowed origins, headers, methods, credentials, etc.
    *
    * @example
    * ```typescript
-   * // Development: No need to set (allows all origins)
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   cors: {
+   *     origin: ['https://app.mycompany.com'],
+   *     allowMethods: ['GET', 'POST', 'OPTIONS'],
+   *   },
+   * });
+   * ```
+   */
+  cors?: Partial<Parameters<typeof cors>[0]>;
+  /**
+   * Allowed origins for DNS rebinding protection
+   *
+   * - If not set: DNS rebinding protection is disabled (all Host values accepted)
+   * - If set to empty array: DNS rebinding protection is disabled
+   * - If set with origins: Host validation is enabled globally for the server
+   *
+   * @example
+   * ```typescript
+   * // Default behavior (no host validation)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0'
    * });
    *
-   * // Production: Explicitly set allowed origins
+   * // Explicit protection (applies to all routes)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0',
@@ -73,7 +118,7 @@ export interface ServerConfig {
    * ```
    */
   allowedOrigins?: string[];
-  sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 300000 = 5 minutes)
+  sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
   /**
    * @deprecated This option is deprecated and will be removed in a future version.
    *
@@ -265,13 +310,107 @@ export interface ServerConfig {
    * ```
    */
   favicon?: string;
+  /**
+   * Display name for the server
+   *
+   * A human-readable title that will be shown in MCP clients and inspector UI.
+   * If not provided, the `name` field will be used as the display name.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-mcp-server',
+   *   title: 'My Awesome MCP Server', // display name
+   *   version: '1.0.0'
+   * });
+   * ```
+   */
+  title?: string; // display name
+  /**
+   * Website URL for the server
+   *
+   * Optional URL to the server's website or documentation.
+   * This will be included in the server info displayed to clients.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   websiteUrl: 'https://myserver.com'
+   * });
+   * ```
+   */
+  websiteUrl?: string;
+  /**
+   * Array of server icons
+   *
+   * Icons that represent the server in various sizes and formats.
+   * Used by MCP clients and inspector UI to display server branding.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   icons: [
+   *     {
+   *       src: 'icon.svg',
+   *       mimeType: 'image/svg+xml',
+   *       sizes: ['512x512', '256x256']
+   *     },
+   *     {
+   *       src: 'icon-192.png',
+   *       mimeType: 'image/png',
+   *       sizes: ['192x192']
+   *     }
+   *   ]
+   * });
+   * ```
+   */
+  icons?: Array<{
+    src: string;
+    mimeType?: string;
+    sizes?: string[];
+    theme?: "light" | "dark";
+  }>;
 }
 
+/**
+ * Input parameter definition (legacy; prefer Zod schema with .describe()).
+ * Used by tools.inputs and prompts.args.
+ */
 export interface InputDefinition {
+  /**
+   * Parameter name (camelCase or kebab-case).
+   *
+   * @example "query"
+   * @example "maxResults"
+   */
   name: string;
+  /**
+   * Parameter type.
+   *
+   * @example "string"
+   * @example "number"
+   */
   type: "string" | "number" | "boolean" | "object" | "array";
+  /**
+   * Human-readable description; helps the model understand the parameter.
+   *
+   * @example "Search query to filter results"
+   */
   description?: string;
+  /**
+   * Whether the parameter is required (defaults to false).
+   */
   required?: boolean;
+  /**
+   * Default value when the parameter is omitted.
+   *
+   * @example 10
+   * @example "all"
+   */
   default?: unknown;
 }
 
@@ -279,10 +418,23 @@ export interface InputDefinition {
  * Annotations provide hints to clients about how to use or display resources
  */
 export interface ResourceAnnotations {
-  /** Intended audience(s) for this resource */
+  /**
+   * Intended audience(s) for this resource.
+   *
+   * @example ["user", "assistant"]
+   */
   audience?: ("user" | "assistant")[];
-  /** Priority from 0.0 (least important) to 1.0 (most important) */
+  /**
+   * Priority from 0.0 (least important) to 1.0 (most important).
+   * Clients may use this for ordering or filtering.
+   *
+   * @example 0.8
+   */
   priority?: number;
-  /** ISO 8601 formatted timestamp of last modification */
+  /**
+   * ISO 8601 formatted timestamp of last modification.
+   *
+   * @example "2025-01-15T10:30:00Z"
+   */
   lastModified?: string;
 }

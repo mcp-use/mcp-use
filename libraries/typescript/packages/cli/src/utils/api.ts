@@ -19,6 +19,7 @@ export interface GitHubSource {
   type: "github";
   repo: string;
   branch?: string;
+  rootDir?: string;
   startCommand?: string;
   runtime?: "node" | "python";
   port?: number;
@@ -45,6 +46,7 @@ export interface CreateDeploymentRequest {
   source: DeploymentSource;
   customDomain?: string;
   healthCheckPath?: string;
+  serverId?: string;
 }
 
 export interface Deployment {
@@ -68,6 +70,8 @@ export interface Deployment {
   gitCommitSha?: string;
   gitBranch?: string;
   gitCommitMessage?: string;
+  serverId?: string;
+  serverSlug?: string; // Computed field from backend
 }
 
 export interface UpdateDeploymentRequest {
@@ -75,6 +79,13 @@ export interface UpdateDeploymentRequest {
   customDomain?: string;
   env?: Record<string, string>;
   status?: "running" | "stopped";
+}
+export interface RedeploymentConfig {
+  buildCommand?: string;
+  startCommand?: string;
+  port?: number;
+  env?: Record<string, string>;
+  rootDir?: string;
 }
 
 export interface DeploymentListResponse {
@@ -89,8 +100,47 @@ export interface LogsResponse {
   };
 }
 
+export interface GitHubInstallation {
+  id: string;
+  installation_id: string;
+}
+
+export interface GitHubConnectionStatus {
+  is_connected: boolean;
+  installations?: GitHubInstallation[];
+}
+
+export interface GitHubAppNameResponse {
+  app_name: string;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  owner: {
+    login: string;
+  };
+  branches?: Array<{
+    name: string;
+    commit: {
+      sha: string;
+    };
+  }>;
+}
+
+export interface GitHubReposResponse {
+  user: {
+    login: string;
+    id: number;
+    avatar_url: string;
+  };
+  repos: GitHubRepo[];
+}
+
 /**
- * API client for mcp-use cloud
+ * API client for Manufact cloud
  */
 export class McpUseAPI {
   private baseUrl: string;
@@ -375,12 +425,19 @@ export class McpUseAPI {
 
   /**
    * Redeploy deployment
+   *
+   * @param deploymentId - The deployment ID to redeploy
+   * @param configOrFilePath - Either a RedeploymentConfig object with updated settings,
+   *                           or a file path string for source code upload
    */
   async redeployDeployment(
     deploymentId: string,
-    filePath?: string
+    configOrFilePath?: RedeploymentConfig | string
   ): Promise<Deployment> {
-    if (filePath) {
+    // If it's a string, treat it as a file path (backward compatibility)
+    if (typeof configOrFilePath === "string") {
+      const filePath = configOrFilePath;
+
       // Redeploy with file upload (for local source)
       const { readFile } = await import("node:fs/promises");
       const { basename } = await import("node:path");
@@ -417,12 +474,15 @@ export class McpUseAPI {
         throw new Error(`Redeploy failed: ${error}`);
       }
       return response.json();
-    } else {
-      // Redeploy GitHub source
-      return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
-        method: "POST",
-      });
     }
+
+    // If it's a config object or undefined, use JSON body
+    const config = configOrFilePath as RedeploymentConfig | undefined;
+
+    return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
+      method: "POST",
+      body: config ? JSON.stringify(config) : undefined,
+    });
   }
 
   /**
@@ -445,5 +505,30 @@ export class McpUseAPI {
       { timeout: 60000 } // 60 second timeout for logs
     );
     return response.data.logs;
+  }
+
+  /**
+   * Get GitHub connection status
+   */
+  async getGitHubConnectionStatus(): Promise<GitHubConnectionStatus> {
+    return this.request<GitHubConnectionStatus>("/github/connection");
+  }
+
+  /**
+   * Get GitHub app name
+   */
+  async getGitHubAppName(): Promise<string> {
+    const response =
+      await this.request<GitHubAppNameResponse>("/github/appname");
+    return response.app_name;
+  }
+
+  /**
+   * Get accessible GitHub repositories
+   */
+  async getGitHubRepos(refresh: boolean = false): Promise<GitHubReposResponse> {
+    return this.request<GitHubReposResponse>(
+      `/github/repos${refresh ? "?refresh=true" : ""}`
+    );
   }
 }

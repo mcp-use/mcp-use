@@ -8,6 +8,9 @@ export interface StoredState {
   expiry: number;
   metadata?: OAuthMetadata; // Optional: might not be needed if auth() rediscovers
   serverUrlHash: string;
+  // Snapshot of PKCE verifier captured at auth initiation time.
+  // Used to avoid verifier drift when multiple auth attempts overlap.
+  codeVerifier?: string;
   // Add provider options needed on callback:
   providerOptions: {
     serverUrl: string;
@@ -15,6 +18,9 @@ export interface StoredState {
     clientName: string;
     clientUri: string;
     callbackUrl: string;
+    // OAuth proxy settings for CORS bypass during token exchange
+    oauthProxyUrl?: string;
+    connectionUrl?: string;
   };
   // Track which flow was used (popup vs redirect)
   flowType?: "popup" | "redirect";

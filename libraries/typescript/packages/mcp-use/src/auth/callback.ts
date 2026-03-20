@@ -110,12 +110,111 @@ export async function onMcpAuthorization() {
       throw new Error("Stored state is missing required provider options.");
     }
     const { serverUrl, ...providerOptions } = storedStateData.providerOptions;
+    const rawConnectionUrl = providerOptions.connectionUrl;
+    const isHostedGatewayConnection = Boolean(
+      rawConnectionUrl &&
+      /run\.mcp-use\.com|mcp-use\.run/.test(rawConnectionUrl)
+    );
+    // Local inspector proxy URLs should NOT be used as connectionUrl during callback,
+    // otherwise metadata resource gets rewritten to proxy and fails SDK validation.
+    const callbackConnectionUrl = isHostedGatewayConnection
+      ? rawConnectionUrl
+      : undefined;
+    // Infer OAuth proxy URL from callback URL if not stored
+    // The callback URL is like: http://localhost:3000/inspector/oauth/callback
+    // The OAuth proxy URL should be: http://localhost:3000/inspector/api/oauth
+    // Only infer when connectionUrl is set (meaning a proxy was used for the connection).
+    // When connecting directly to a CORS-enabled server (no proxy), inferring an OAuth proxy
+    // would cause PRM resource mismatch since the proxy rewrites the resource field.
+    let oauthProxyUrl = providerOptions.oauthProxyUrl;
+    const connectionUrl = callbackConnectionUrl;
+    if (!oauthProxyUrl && connectionUrl) {
+      try {
+        const callbackUrl = new URL(window.location.href);
+        // Check if this looks like an inspector callback
+        if (callbackUrl.pathname.includes("/oauth/callback")) {
+          // Derive the OAuth proxy URL from the callback URL
+          // e.g., /inspector/oauth/callback -> /inspector/api/oauth
+          let basePath = callbackUrl.pathname.replace(
+            /\/oauth\/callback.*$/,
+            ""
+          );
+
+          // IMPORTANT: If the callback is at root /oauth/callback (empty basePath),
+          // the OAuth proxy is likely at /inspector/api/oauth since that's where
+          // the inspector package mounts its routes. This handles the case where:
+          // - The hosted inspector serves the callback at /oauth/callback (via Next.js page)
+          // - But the OAuth proxy is mounted at /inspector/api/oauth (via inspector package)
+          if (!basePath || basePath === "") {
+            const isGatewayConnection = /run\.mcp-use\.com|mcp-use\.run/.test(
+              connectionUrl
+            );
+            if (isGatewayConnection) {
+              console.log(
+                `${logPrefix} Gateway connection detected; skipping default /inspector OAuth proxy inference`
+              );
+            } else {
+              basePath = "/inspector";
+              console.log(
+                `${logPrefix} Callback at root /oauth/callback, using /inspector as base path for OAuth proxy`
+              );
+            }
+          }
+
+          // basePath is non-empty for inspector callbacks (/inspector) and empty for
+          // gateway connections (the gateway-detection block above deliberately skips
+          // setting basePath). Only infer the OAuth proxy URL when we have a real base path.
+          if (basePath) {
+            oauthProxyUrl = `${callbackUrl.origin}${basePath}/api/oauth`;
+            // NOTE: We only infer oauthProxyUrl here, NOT connectionUrl.
+            // connectionUrl is the MCP gateway/proxy URL that the client connected to,
+            // which is different from the OAuth proxy URL. If the client connected
+            // directly to the MCP server (no gateway), connectionUrl should remain
+            // undefined so the SDK uses the original serverUrl for client info lookup.
+          }
+          console.log(
+            `${logPrefix} Inferred OAuth proxy URL from callback: ${oauthProxyUrl}`
+          );
+        }
+      } catch (e) {
+        console.warn(`${logPrefix} Could not infer OAuth proxy URL:`, e);
+      }
+    }
 
     // --- Instantiate Provider ---
     console.log(
       `${logPrefix} Re-instantiating provider for server: ${serverUrl}`
     );
-    provider = new BrowserOAuthClientProvider(serverUrl, providerOptions);
+    provider = new BrowserOAuthClientProvider(serverUrl, {
+      ...providerOptions,
+      oauthProxyUrl,
+      connectionUrl,
+    });
+
+    // Restore PKCE verifier for this auth state.
+    // We hydrate both the original state-hash key and the reconstructed provider key
+    // to tolerate URL normalization/hash drift between auth start and callback.
+    const stateVerifierKey = `${providerOptions.storageKeyPrefix}_${storedStateData.serverUrlHash}_code_verifier`;
+    const verifierForState: string | null =
+      storedStateData.codeVerifier || localStorage.getItem(stateVerifierKey);
+
+    if (verifierForState) {
+      localStorage.setItem(stateVerifierKey, verifierForState);
+      localStorage.setItem(provider.getKey("code_verifier"), verifierForState);
+    } else {
+      throw new Error(
+        `[${providerOptions.storageKeyPrefix}] Code verifier missing for OAuth state ${state}. Please restart authentication.`
+      );
+    }
+
+    // Install fetch interceptor if OAuth proxy was configured or inferred
+    // This is needed to bypass CORS for token exchange requests
+    if (oauthProxyUrl) {
+      console.log(
+        `${logPrefix} Installing fetch interceptor for token exchange (proxy: ${oauthProxyUrl})`
+      );
+      provider.installFetchInterceptor();
+    }
 
     // --- Call SDK Auth Function ---
     console.log(`${logPrefix} Calling SDK auth() to exchange code...`);
@@ -124,10 +223,18 @@ export async function onMcpAuthorization() {
     // 2. Use provider.codeVerifier()
     // 3. Call exchangeAuthorization()
     // 4. Use provider.saveTokens() on success
-    // Extract base URL (origin) for OAuth discovery - OAuth metadata should be at the origin level
-    const baseUrl = new URL(serverUrl).origin;
+
+    // Use the original MCP server URL for local inspector proxy flows so OAuth token
+    // exchange uses the real MCP resource value (not /inspector/api/proxy).
+    // Keep gateway URLs as sdkServerUrl when using hosted gateway connections.
+    const sdkServerUrl =
+      isHostedGatewayConnection && connectionUrl ? connectionUrl : serverUrl;
+    console.log(
+      `${logPrefix} Using SDK serverUrl: ${sdkServerUrl} (connectionUrl: ${connectionUrl || "none"})`
+    );
+
     const authResult = await auth(provider, {
-      serverUrl: baseUrl,
+      serverUrl: sdkServerUrl,
       authorizationCode: code,
     });
 
@@ -262,10 +369,10 @@ export async function onMcpAuthorization() {
     if (stateKey) {
       localStorage.removeItem(stateKey);
     }
-    // Clean up potentially dangling verifier or last_auth_url if auth failed badly
-    // Note: saveTokens should clean these on success
+    // Clean up potentially dangling auth URL if auth failed badly.
+    // Keep code_verifier to allow a retried callback/token exchange to recover.
+    // It will be cleared by saveTokens() on success.
     if (provider) {
-      localStorage.removeItem(provider.getKey("code_verifier"));
       localStorage.removeItem(provider.getKey("last_auth_url"));
     }
   }

@@ -1,7 +1,7 @@
 [project]
 name = "mcp-use"
-version = "1.5.2"
-description = "MCP Library for LLMs"
+version = "1.7.0"
+description = "Full Stack MCP framework for python, build MCP agents, clients, and servers."
 authors = [
     {name = "mcp-use, Inc.", email = "dev@mcp-use.io"},
     {name = "Pietro Zullo", email = "pietro.zullo@gmail.com"}
@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "mcp>=1.10.0",
+    "mcp>=1.24.0",
     "langchain>=1.0.0",
     "websockets>=15.0",
     "httpx>=0.27.1",
@@ -98,3 +98,6 @@ exclude = ["tests/**"]
 
 [tool.ty.rules]
 possibly-missing-attribute = "ignore"
+
+[project.scripts]
+create-mcp-use = "mcp_use.server.templates.cli:main"
