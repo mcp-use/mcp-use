@@ -125,7 +125,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "vite-express": "^0.22.0",
-    "zod": "4.3.5"
+    "zod": "4.3.5",
+    "@mcp-use/modelcontextprotocol-sdk": "1.24.3-mcp-use.2"
   },
   "publishConfig": {
     "access": "public"

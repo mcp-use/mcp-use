@@ -11,10 +11,13 @@
     "path": "node:path",
     "fs": "node:fs",
     "fs/promises": "node:fs/promises",
-    "async_hooks": "node:async_hooks"
+    "async_hooks": "node:async_hooks",
+    "@mcp-use/modelcontextprotocol-sdk": "npm:@mcp-use/modelcontextprotocol-sdk@^1.24.3-mcp-use.2"
   },
   "compilerOptions": {
-    "lib": ["deno.window", "deno.unstable"]
+    "lib": [
+      "deno.window",
+      "deno.unstable"
+    ]
   }
 }
-
