@@ -6,6 +6,24 @@ icon: "history"
 
 import { Contributors } from '/snippets/contributors.jsx'
 
+<Update label="v1.7.0 - 2026‑03‑17">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.7.0&title=CLI%20Scaffolding%20and%20Full%20Conformance&date=2026-03-17" alt="Release 1.7.0" />
+  </Frame>
+  ## CLI Scaffolding & Full Conformance
+  - **New**: `create-mcp-use` CLI for scaffolding new MCP projects ([#1097](https://github.com/mcp-use/mcp-use/pull/1097))
+  - **New**: Auto-retry next available port when default is in use ([#1163](https://github.com/mcp-use/mcp-use/pull/1163))
+  - **New**: `mcp_logs_only` option to hide non-MCP HTTP access logs ([#1164](https://github.com/mcp-use/mcp-use/pull/1164))
+  - **New**: Conformance test infrastructure for server + client ([#1008](https://github.com/mcp-use/mcp-use/pull/1008))
+  - **New**: Protocol handlers for logging, completions, subscriptions ([#1004](https://github.com/mcp-use/mcp-use/pull/1004))
+  - **Fix**: 100% client conformance (20/20) — SSE retry fix ([#1019](https://github.com/mcp-use/mcp-use/pull/1019))
+  - **Fix**: WeakSet for resource subscriptions to prevent memory leak ([#1093](https://github.com/mcp-use/mcp-use/pull/1093))
+  - **Fix**: Simplified Optional parameter JSON Schema ([#1141](https://github.com/mcp-use/mcp-use/pull/1141))
+  - **Fix**: Respect configured inspector path ([#1176](https://github.com/mcp-use/mcp-use/pull/1176))
+
+  <Contributors users="pietrozullo,renvins,stakeswky,Yuukidiv" />
+</Update>
+
 <Update label="v1.6.0 - 2026‑01‑21">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.6.0&title=Bearer%20Token%20Auth%20and%20Middleware&date=2026-01-21" alt="Release 1.6.0" />

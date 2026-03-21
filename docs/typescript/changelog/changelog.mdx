@@ -86,6 +86,43 @@ tag: "New"
 - **Documentation**: Per-server elicitation and sampling callbacks examples; proxy servers section
 </Update>
 
+<Update label="v1.20.5" description="February 2026">
+  ## CLI Tunnel Support
+  Patch release adding tunnel flag for ChatGPT HMR.
+
+- **New** (@mcp-use/cli): Support for `--tunnel` flag with full ChatGPT HMR
+- **Update**: Updated @mcp-use/inspector to v0.23.1
+- **Update**: Updated @mcp-use/cli to v2.16.0
+</Update>
+
+<Update label="v1.20.4" description="February 2026">
+  ## Inspector Embedded Chat
+  Patch release with inspector embedded chat improvements.
+
+- **Enhancement** (@mcp-use/inspector): Improved embedded chat
+- **Update**: Updated @mcp-use/inspector to v0.23.0
+- **Update**: Updated @mcp-use/cli to v2.15.4
+</Update>
+
+<Update label="v1.20.3" description="February 2026">
+  ## Inspector Standalone Deployment Fix
+  Patch release fixing inspector standalone deployment version import.
+
+- **Fix** (@mcp-use/inspector): Standalone deployment was importing the version from the wrong path
+- **Update**: Updated @mcp-use/inspector to v0.22.3
+- **Update**: Updated @mcp-use/cli to v2.15.3
+</Update>
+
+<Update label="v1.20.2" description="February 2026">
+  ## Health Monitoring & MCPAgentOptions
+  Patch release with dynamic auth headers for health checks and MCPAgentOptions for chat agent.
+
+- **Enhancement**: `getAuthHeaders` parameter to `startConnectionHealthMonitoring` for customizable authentication headers during health checks; HEAD requests allowed without authentication
+- **Enhancement**: `exposeResourcesAsTools` and `exposePromptsAsTools` options in MCPAgentOptions (both default to `true`); inspector chat tab sets both to `false` so agent only exposes actual MCP tools
+- **Update**: Updated @mcp-use/inspector to v0.22.2
+- **Update**: Updated @mcp-use/cli to v2.15.2
+</Update>
+
 <Update label="v1.20.1" description="February 2026">
   ## Widget Status Texts & CSP Handling
   Patch release with widget metadata enhancements and CSP improvements.
@@ -121,6 +158,16 @@ tag: "New"
 - **Fix**: WorkOS subdomain config to accept full AuthKit domain (e.g., `name.authkit.app`)
 - **Update**: Updated @mcp-use/inspector to v0.22.0
 - **Update**: Updated @mcp-use/cli to v2.15.0
+</Update>
+
+<Update label="v1.19.3" description="February 2026">
+  ## CLI Skills & Template Updates
+  Patch release with CLI skills commands and create-mcp-use-app template improvements.
+
+- **New** (@mcp-use/cli): `mcp-use skills add` and `mcp-use skills install` commands to install AI agent skills (Cursor, Claude Code, Codex) from the mcp-use repository
+- **Enhancement** (create-mcp-use-app): Add @types/react and @types/react-dom to template devDependencies
+- **Update**: Updated @mcp-use/inspector to v0.21.1
+- **Update**: Updated @mcp-use/cli to v2.14.0
 </Update>
 
 <Update label="v1.19.2" description="February 2026">
