@@ -28,6 +28,7 @@ import {
   createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
+import { telFetch } from "./tel-fetch.js";
 
 /**
  * Produce a random identifier suitable for session or user IDs.
@@ -303,11 +304,13 @@ export class Telemetry {
       const posthogOptions: {
         host: string;
         disableGeoip: boolean;
+        fetch: typeof telFetch;
         flushAt?: number;
         flushInterval?: number;
       } = {
         host: this.HOST,
         disableGeoip: false,
+        fetch: telFetch,
       };
 
       if (isServerlessEnvironment) {
