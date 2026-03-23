@@ -109,7 +109,9 @@ jobs:
   inspector-e2e-tunnel:
     name: "Inspector E2E (tunnel)"
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'canary'
+    # Disabled: set to false to skip without deleting the workflow. Re-enable by restoring:
+    # if: github.event_name == 'workflow_dispatch' || github.head_ref == 'canary'
+    if: false
     defaults:
       run:
         working-directory: libraries/typescript

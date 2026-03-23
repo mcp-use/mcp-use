@@ -17,7 +17,6 @@ import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createSkillsCommand } from "./commands/skills.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
-
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -230,12 +229,11 @@ async function startTunnel(
 
     proc.stdout?.on("data", (data) => {
       const text = data.toString();
-      // Filter out shutdown messages from tunnel package
       const isShutdownMessage =
         text.includes("Shutting down") || text.includes("🛑");
+      const isErrorMessage = text.includes("✖") || text.includes("Error:");
 
-      // Suppress tunnel output during shutdown or if it's a shutdown message
-      if (!isShuttingDown && !isShutdownMessage) {
+      if (!isShuttingDown && !isShutdownMessage && !isErrorMessage) {
         process.stdout.write(text);
       }
 
@@ -1294,6 +1292,7 @@ program
   .option("--tunnel", "Expose server through a tunnel")
   .action(async (options) => {
     try {
+      process.env.MCP_USE_CLI_DEV = "1";
       const projectPath = path.resolve(options.path);
       let port = parseInt(options.port, 10);
       const host = options.host;
@@ -1330,12 +1329,35 @@ program
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
+              const apiBase =
+                process.env.MCP_USE_TUNNEL_API || "https://local.mcp-use.run";
+              try {
+                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                  method: "DELETE",
+                });
+              } catch {
+                // Best-effort cleanup; ignore DELETE failures
+              }
             }
           } catch {
             // Manifest doesn't exist or is invalid, that's okay
           }
 
-          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
+          try {
+            tunnelInfo = await startTunnel(port, existingSubdomain);
+          } catch (e) {
+            if (existingSubdomain) {
+              console.log(
+                chalk.yellow(
+                  `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
+                )
+              );
+              tunnelInfo = await startTunnel(port);
+            } else {
+              throw e;
+            }
+          }
           tunnelUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           tunnelSubdomain = tunnelInfo.subdomain;
@@ -1385,7 +1407,6 @@ program
       } else if (!process.env.MCP_URL) {
         process.env.MCP_URL = mcpUrl;
       }
-
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
@@ -1709,7 +1730,7 @@ program
       }
 
       // Watch for file changes - watch .ts/.tsx files in project directory
-      const watcher = chokidar.watch(".", {
+      let watcher = chokidar.watch(".", {
         cwd: projectPath,
         ignored: (path: string, stats?: any) => {
           // Normalize path separators for cross-platform compatibility
@@ -1776,7 +1797,7 @@ program
       let reloadTimeout: NodeJS.Timeout | null = null;
       let isReloading = false;
 
-      watcher.on("change", async (filePath: string) => {
+      const hmrOnChange = async (filePath: string) => {
         // Only handle .ts and .tsx files (not .d.ts)
         if (
           (!filePath.endsWith(".ts") && !filePath.endsWith(".tsx")) ||
@@ -1885,7 +1906,208 @@ program
 
           isReloading = false;
         }, 100);
-      });
+      };
+      watcher.on("change", hmrOnChange);
+
+      // Expose project path so tunnel.ts can read the manifest for subdomain reuse
+      process.env.MCP_USE_PROJECT_PATH = projectPath;
+
+      // Expose in-process restart hook for the inspector tunnel toggle.
+      // Tears down the running server and re-sets up everything as if
+      // `mcp-use dev` was called with or without --tunnel.
+      (globalThis as any).__mcpUseDevRestart = async (withTunnel: boolean) => {
+        console.log(
+          chalk.yellow(
+            `\n[DEV] Restarting ${withTunnel ? "with" : "without"} tunnel…`
+          )
+        );
+
+        // Suppress noise from in-flight requests terminated during teardown
+        const origStderrWrite = process.stderr.write.bind(process.stderr);
+        const stderrFilter = (chunk: any, ...args: any[]) => {
+          const str =
+            typeof chunk === "string" ? chunk : (chunk?.toString?.() ?? "");
+          if (
+            str.includes("TypeError: terminated") ||
+            str.includes("SocketError") ||
+            str.includes("UND_ERR_SOCKET")
+          ) {
+            return true;
+          }
+          return origStderrWrite(chunk, ...args);
+        };
+        process.stderr.write = stderrFilter as typeof process.stderr.write;
+
+        // 1. Tear down
+        watcher.close();
+        if (tunnelProcess && typeof tunnelProcess.kill === "function") {
+          if (typeof (tunnelProcess as any).markShutdown === "function") {
+            (tunnelProcess as any).markShutdown();
+          }
+          const dyingProc = tunnelProcess;
+          tunnelProcess = undefined;
+          dyingProc.kill("SIGINT");
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+              try {
+                dyingProc.kill("SIGKILL");
+              } catch {
+                /* ignore */
+              }
+              resolve();
+            }, 5000);
+            dyingProc.on("exit", () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+          });
+        }
+        if (tunnelSubdomain) {
+          const apiBase =
+            process.env.MCP_USE_API || "https://local.mcp-use.run";
+          try {
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+          } catch {
+            /* ignore */
+          }
+          tunnelSubdomain = undefined;
+        }
+        if (runningServer && typeof runningServer.forceClose === "function") {
+          await runningServer.forceClose();
+        } else if (runningServer && typeof runningServer.close === "function") {
+          await runningServer.close();
+        }
+
+        // 2. Start tunnel if requested
+        tunnelUrl = undefined;
+        if (withTunnel) {
+          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          let existingSubdomain: string | undefined;
+          try {
+            const manifestContent = await readFile(manifestPath, "utf-8");
+            const manifest = JSON.parse(manifestContent);
+            existingSubdomain = manifest.tunnel?.subdomain;
+            if (existingSubdomain) {
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              try {
+                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                  method: "DELETE",
+                });
+              } catch {
+                /* ignore */
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+          let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
+          try {
+            tunnelInfo = await startTunnel(port, existingSubdomain);
+          } catch {
+            if (existingSubdomain) {
+              console.log(
+                chalk.yellow(
+                  `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
+                )
+              );
+              tunnelInfo = await startTunnel(port);
+            } else {
+              throw new Error("Failed to start tunnel");
+            }
+          }
+          tunnelUrl = tunnelInfo.url;
+          tunnelProcess = tunnelInfo.process;
+          tunnelSubdomain = tunnelInfo.subdomain;
+          process.env.MCP_URL = tunnelUrl;
+
+          // Persist subdomain
+          try {
+            const mPath = path.join(projectPath, "dist", "mcp-use.json");
+            let manifest: any = {};
+            try {
+              manifest = JSON.parse(await readFile(mPath, "utf-8"));
+            } catch {
+              /* ignore */
+            }
+            if (!manifest.tunnel) manifest.tunnel = {};
+            manifest.tunnel.subdomain = tunnelSubdomain;
+            await mkdir(path.dirname(mPath), { recursive: true });
+            await writeFile(mPath, JSON.stringify(manifest, null, 2), "utf-8");
+          } catch {
+            /* ignore */
+          }
+        } else {
+          process.env.MCP_URL = `http://${host}:${port}`;
+        }
+
+        // 3. Re-import server module (HMR mode stays true so user's listen() is a no-op)
+        console.log(chalk.gray(`Loading server from ${serverFile}...`));
+        runningServer = await importServerModule();
+        if (!runningServer) {
+          console.error(
+            chalk.red("Error: Could not find MCPServer instance after restart.")
+          );
+          return;
+        }
+        // Temporarily disable HMR flag so our listen() actually starts the server
+        (globalThis as any).__mcpUseHmrMode = false;
+        await runningServer.listen(port);
+        (globalThis as any).__mcpUseHmrMode = true;
+
+        const browserHost = normalizeBrowserHost(host);
+        const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+        const autoConnectEndpoint = tunnelUrl
+          ? `${tunnelUrl}/mcp`
+          : mcpEndpoint;
+        console.log(chalk.green.bold(`✓ Restarted`));
+        console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+        if (tunnelUrl) {
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+        }
+        console.log(
+          chalk.whiteBright(
+            `Inspector: http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
+          )
+        );
+        console.log(chalk.gray(`Watching for changes...\n`));
+
+        // 4. Re-create watcher (reuses same config)
+        watcher = chokidar.watch(".", {
+          cwd: projectPath,
+          ignored: (p: string, stats?: any) => {
+            const np = p.replace(/\\/g, "/");
+            if (/(^|\/)\.[^/]/.test(np)) return true;
+            if (np.includes("/node_modules/") || np.endsWith("/node_modules"))
+              return true;
+            if (np.includes("/dist/") || np.endsWith("/dist")) return true;
+            if (np.includes("/resources/") || np.endsWith("/resources"))
+              return true;
+            if (stats?.isFile() && np.endsWith(".d.ts")) return true;
+            return false;
+          },
+          persistent: true,
+          ignoreInitial: true,
+          depth: 3,
+        });
+        watcher
+          .on("ready", () => console.log(chalk.gray(`[HMR] Watcher ready`)))
+          .on("error", (err: unknown) =>
+            console.error(
+              chalk.red(
+                `[HMR] Watcher error: ${err instanceof Error ? err.message : String(err)}`
+              )
+            )
+          )
+          .on("change", hmrOnChange);
+
+        // Restore stderr once the new server is stable
+        setTimeout(() => {
+          process.stderr.write = origStderrWrite;
+        }, 2000);
+      };
 
       // Handle cleanup
       let hmrCleanupInProgress = false;
@@ -1977,6 +2199,16 @@ program
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
+              // Release the stale subdomain so the first attempt can reclaim it
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              try {
+                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                  method: "DELETE",
+                });
+              } catch {
+                // Best-effort cleanup; ignore DELETE failures
+              }
             }
           } catch (error) {
             // Manifest doesn't exist or is invalid, that's okay
@@ -1987,7 +2219,21 @@ program
             );
           }
 
-          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
+          try {
+            tunnelInfo = await startTunnel(port, existingSubdomain);
+          } catch (e) {
+            if (existingSubdomain) {
+              console.log(
+                chalk.yellow(
+                  `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
+                )
+              );
+              tunnelInfo = await startTunnel(port);
+            } else {
+              throw e;
+            }
+          }
           mcpUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           const subdomain = tunnelInfo.subdomain;

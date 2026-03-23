@@ -29,6 +29,8 @@ export function mountInspector(
     devMode?: boolean;
     /** Override the sandbox origin for MCP Apps widgets (e.g., for production reverse proxies) */
     sandboxOrigin?: string | null;
+    /** Port the host app listens on (embedded inspector); required for tunnel start */
+    serverPort?: number;
   }
 ): void {
   // Find the built client files

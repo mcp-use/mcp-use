@@ -321,6 +321,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public serverHost: string;
 
+  /** @internal Closes the Node HTTP listener when {@link listen} was used */
+  private _httpServerClose?: () => Promise<void>;
+  /** @internal Force-closes all connections and stops listening immediately */
+  private _httpServerForceClose?: () => Promise<void>;
+
   /**
    * Full base URL for the server (e.g., "https://example.com").
    * Used for generating widget URLs and OAuth callbacks.
@@ -3898,9 +3903,43 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this._trackServerRun("http");
 
     // Start server using runtime-aware helper
-    await startServer(this.app, this.serverPort, this.serverHost, {
-      onDenoRequest: rewriteSupabaseRequest,
-    });
+    const httpHandle = await startServer(
+      this.app,
+      this.serverPort,
+      this.serverHost,
+      {
+        onDenoRequest: rewriteSupabaseRequest,
+      }
+    );
+    this._httpServerClose = httpHandle.close;
+    this._httpServerForceClose = httpHandle.forceClose;
+  }
+
+  /**
+   * Stops the HTTP listener started by {@link listen} (Node.js). No-op if not listening or on Deno no-op handle.
+   */
+  public async close(): Promise<void> {
+    if (this._httpServerClose) {
+      const close = this._httpServerClose;
+      this._httpServerClose = undefined;
+      this._httpServerForceClose = undefined;
+      await close();
+    }
+  }
+
+  /**
+   * Force-closes all connections and stops listening immediately.
+   * Unlike {@link close}, this doesn't wait for keep-alive connections to drain.
+   */
+  public async forceClose(): Promise<void> {
+    if (this._httpServerForceClose) {
+      const forceClose = this._httpServerForceClose;
+      this._httpServerClose = undefined;
+      this._httpServerForceClose = undefined;
+      await forceClose();
+    } else {
+      await this.close();
+    }
   }
 
   private _trackServerRun(transport: string): void {
