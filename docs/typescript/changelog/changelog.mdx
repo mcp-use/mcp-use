@@ -6,6 +6,24 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.22.0" description="March 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.22.0&title=Vite%208%2C%20MCP%20Middleware%20%26%20Model%20Context&date=2026-03&lang=typescript" alt="Release 1.22.0" />
+  </Frame>
+  ## Vite 8, MCP Middleware & Model Context
+  Minor release with Vite 8 across tooling, MCP operation middleware, files and model context APIs, elicit and adapter fixes, and Inspector tunnel controls.
+
+- **New**: MCP operation-level middleware — `server.use("mcp:*", ...)` and specific patterns (`mcp:tools/call`, `mcp:tools/list`, `mcp:resources/read`, `mcp:resources/list`, `mcp:prompts/get`, `mcp:prompts/list`) with typed `MiddlewareContext` (`method`, `params`, `session`, `auth`, `state`)
+- **New**: `useFiles` React hook with `isSupported` and `modelVisible` for file attachments; `ModelContext` component and `modelContext` imperative API for server-side model context injection
+- **Enhancement**: Vite 8.0 with Rolldown bundler and `@vitejs/plugin-react` 6 across packages, examples, and CLI/inspector tooling
+- **Enhancement**: Conformance client — pass `reconnectionOptions` so SDK-level SSE reconnection behaves correctly when `autoReconnect` is disabled
+- **Fix**: Elicit — map `result.content` to `result.data` for Zod validation; spec-compliant clients use `content`; backward-compatible fallback to `data`
+- **Fix**: LangChainAdapter — tool name collisions when exposing resources/prompts as tools; `reserveName` resolves prefixed names with a numeric suffix when needed; prompt names sanitized like resource names
+- **Enhancement** (@mcp-use/inspector): Start/stop the `mcp-use dev` tunnel from the Inspector (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v0.25.0
+- **Update**: Updated @mcp-use/cli to v2.20.0
+</Update>
+
 <Update label="v1.21.5" description="March 2026">
   ## Zod Peer Dep, Esbuild Build & Windows Fix
   Patch release with Zod peer dependency, esbuild transpilation, TypeGen Zod v4 fixes, and Windows path handling.

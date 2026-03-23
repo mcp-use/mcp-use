@@ -6,6 +6,16 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.25.0" description="March 2026">
+  ## Tunnel Controls & Vite 8
+  Minor release with tunnel management for `mcp-use dev`, Vite 8 build stack, and elicit payload alignment with the MCP spec.
+
+- **New**: Start/stop the `mcp-use dev` tunnel from the Inspector
+- **Enhancement**: Vite 8.0 with Rolldown bundler and `@vitejs/plugin-react` 6 in the inspector build
+- **Fix**: Elicit — send `content` instead of `data` per the MCP spec; aligns with `createElicitMethod` validation on the client
+- **Update**: Updated mcp-use to v1.22.0
+</Update>
+
 <Update label="v0.24.5" description="March 2026">
   ## Dependency Updates
   Patch release with dependency updates.
