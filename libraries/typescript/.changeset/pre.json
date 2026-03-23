@@ -12,6 +12,7 @@
     "fix-elicit-content-mapping",
     "fix-react-sse-retry-conformance",
     "fix-tool-name-collision-reserve",
+    "shy-webs-share",
     "use-files-and-model-context",
     "vite8-upgrade-and-test-fixes"
   ]

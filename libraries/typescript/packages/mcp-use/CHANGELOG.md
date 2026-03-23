@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.22.0-canary.6
+
+### Minor Changes
+
+- 9d48429: feat(tunnel): added ability to start/stop the mcp-use dev tunnel from the inspector
+
+### Patch Changes
+
+- Updated dependencies [9d48429]
+  - @mcp-use/inspector@0.25.0-canary.6
+  - @mcp-use/cli@2.20.0-canary.6
+
 ## 1.22.0-canary.5
 
 ### Patch Changes
