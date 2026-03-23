@@ -42,12 +42,14 @@ vi.mock("node:os", () => ({
   homedir: vi.fn().mockReturnValue("/mock/home"),
 }));
 
-// Mock the startServer function to prevent actual server start
+// Mock the startServer function to prevent actual server start (must return HttpServerHandle)
 vi.mock("../../../src/server/utils/index.js", async () => {
   const actual = await vi.importActual("../../../src/server/utils/index.js");
+  const close = vi.fn().mockResolvedValue(undefined);
+  const forceClose = vi.fn().mockResolvedValue(undefined);
   return {
     ...actual,
-    startServer: vi.fn().mockResolvedValue(undefined),
+    startServer: vi.fn().mockResolvedValue({ close, forceClose }),
   };
 });
 
