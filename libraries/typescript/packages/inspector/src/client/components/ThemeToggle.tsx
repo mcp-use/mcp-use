@@ -24,7 +24,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
 
   const getThemeIcon = () => {
     if (theme === "system") return <Monitor className="size-4" />;
-    if (theme === "light") return <SunDim className="size-4" />;
+    if (theme === "light") return <SunDim className="size-5" />;
     return <Moon className="size-4" />;
   };
 
@@ -99,7 +99,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
             className="pl-2 pr-0 flex items-center gap-2 justify-end"
           >
             <span>Light</span>
-            <SunDim className="mr-2 h-4 w-4" />
+            <SunDim className="mr-2 size-5" />
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem
             value="dark"

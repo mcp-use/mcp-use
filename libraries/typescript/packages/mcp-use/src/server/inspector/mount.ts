@@ -70,6 +70,7 @@ export async function mountInspectorUI(
       // This avoids requiring a sandbox-{hostname} subdomain that doesn't exist
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
+      serverPort: typeof serverPort === "number" ? serverPort : undefined,
     });
     console.log(
       `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`

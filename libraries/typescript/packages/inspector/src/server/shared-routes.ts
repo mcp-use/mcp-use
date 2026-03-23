@@ -11,6 +11,12 @@ import {
   handleChatRequestStream,
   storeWidgetData,
 } from "./shared-utils.js";
+import {
+  getTunnelStatus,
+  setServerPort,
+  startTunnel,
+  stopTunnel,
+} from "./tunnel.js";
 import { formatErrorResponse } from "./utils.js";
 
 /**
@@ -33,10 +39,20 @@ function getFrameAncestorsFromEnv(): string | undefined {
 /**
  * Register inspector-specific routes (proxy, chat, config, widget rendering)
  */
+export type InspectorRoutesConfig = {
+  autoConnectUrl?: string | null;
+  /** HTTP port the app listens on (embedded inspector); required for tunnel start */
+  serverPort?: number;
+};
+
 export function registerInspectorRoutes(
   app: Hono,
-  config?: { autoConnectUrl?: string | null }
+  config?: InspectorRoutesConfig
 ) {
+  if (typeof config?.serverPort === "number") {
+    setServerPort(config.serverPort);
+  }
+
   app.get("/inspector/health", (c) => {
     return c.json({ status: "ok", timestamp: new Date().toISOString() });
   });
@@ -407,5 +423,108 @@ export function registerInspectorRoutes(
         "Access-Control-Expose-Headers": "*",
       },
     });
+  });
+
+  // Tunnel management endpoints
+  app.get("/inspector/api/tunnel/status", (c) => {
+    const status = getTunnelStatus();
+    return c.json(status);
+  });
+
+  app.post("/inspector/api/tunnel/start", async (c) => {
+    try {
+      const result = await startTunnel();
+      return c.json(result);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to start tunnel";
+      return c.json({ error: message }, 500);
+    }
+  });
+
+  app.delete("/inspector/api/tunnel/stop", (c) => {
+    const stopped = stopTunnel();
+    return c.json({ stopped });
+  });
+
+  /** Public MCP URL and CLI dev session (set by `mcp-use dev` / MCP_URL) */
+  app.get("/inspector/api/dev/info", (c) => {
+    const mcpUrl = process.env.MCP_URL ?? null;
+    const portEnv = process.env.PORT;
+    const fromCli = process.env.MCP_USE_CLI_DEV === "1";
+    const tunnel = getTunnelStatus();
+    let portNum: number | null = null;
+    if (portEnv !== undefined) {
+      const n = parseInt(portEnv, 10);
+      if (!Number.isNaN(n)) portNum = n;
+    }
+    // Derive tunnelUrl from MCP_URL when the inspector tunnel module has none
+    let tunnelUrl = tunnel.url ?? null;
+    if (!tunnelUrl && mcpUrl) {
+      try {
+        const u = new URL(mcpUrl);
+        if (u.protocol === "https:") tunnelUrl = u.origin;
+      } catch {
+        /* ignore */
+      }
+    }
+    return c.json({
+      mcpUrl,
+      port: portNum,
+      fromCli,
+      tunnelUrl,
+    });
+  });
+
+  /**
+   * Restart the dev server with the tunnel enabled.
+   * Delegates to the CLI restart hook which re-spawns the process with --tunnel.
+   */
+  app.post("/inspector/api/dev/start-tunnel", (c) => {
+    const restart = (globalThis as any).__mcpUseDevRestart as
+      | ((withTunnel: boolean) => void)
+      | undefined;
+    if (!restart) {
+      return c.json(
+        { error: "Dev restart not available (not running via mcp-use dev)" },
+        500
+      );
+    }
+    setTimeout(() => restart(true), 200);
+    return c.json({ ok: true, restarting: true });
+  });
+
+  /** Restart the dev server without the tunnel. */
+  app.post("/inspector/api/dev/stop-tunnel", (c) => {
+    const restart = (globalThis as any).__mcpUseDevRestart as
+      | ((withTunnel: boolean) => void)
+      | undefined;
+    if (!restart) {
+      return c.json(
+        { error: "Dev restart not available (not running via mcp-use dev)" },
+        500
+      );
+    }
+    setTimeout(() => restart(false), 200);
+    return c.json({ ok: true, restarting: true });
+  });
+
+  // Legacy aliases
+  app.post("/inspector/api/dev/restart-with-tunnel", (c) => {
+    const restart = (globalThis as any).__mcpUseDevRestart as
+      | ((withTunnel: boolean) => void)
+      | undefined;
+    if (!restart) return c.json({ error: "Not available" }, 500);
+    setTimeout(() => restart(true), 200);
+    return c.json({ ok: true, restarting: true });
+  });
+
+  app.post("/inspector/api/dev/restart-without-tunnel", (c) => {
+    const restart = (globalThis as any).__mcpUseDevRestart as
+      | ((withTunnel: boolean) => void)
+      | undefined;
+    if (!restart) return c.json({ error: "Not available" }, 500);
+    setTimeout(() => restart(false), 200);
+    return c.json({ ok: true, restarting: true });
   });
 }
