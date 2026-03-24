@@ -8,6 +8,7 @@
     "mcp-use": "1.22.0"
   },
   "changesets": [
+    "cli-organization-support",
     "ctx-auth-optional-typing",
     "error-boundary-fallback",
     "inspector-chat-tool-history",
