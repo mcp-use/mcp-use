@@ -10,7 +10,7 @@ import {
   adaptConnectMiddleware,
   isExpressMiddleware,
 } from "../connect-adapter.js";
-import type { McpMiddlewareFn } from "../middleware/mcp-middleware.js";
+import type { McpMiddlewareFnFor } from "../middleware/mcp-middleware.js";
 
 /**
  * Express/Connect middleware signature
@@ -95,12 +95,19 @@ export function installCustomRoutesMiddleware(
 }
 
 /**
- * Typed overload for MCP operation-level middleware registered via `server.use('mcp:...', fn)`.
+ * Typed overloads for MCP operation-level middleware registered via `server.use('mcp:...', fn)`.
  * Exported so `McpServerInstance` can include it, giving callers automatic type inference
  * for `ctx` and `next` without explicit annotations.
+ *
+ * Known patterns (`mcp:tools/call`, `mcp:resources/read`, `mcp:prompts/get`) narrow the
+ * `ctx.params` type so that `ctx.params.name`, `ctx.params.uri`, etc. are directly accessible
+ * without a manual cast.
  */
 export type WithMcpUse = {
-  use(pattern: `mcp:${string}`, ...handlers: McpMiddlewareFn[]): any;
+  use<P extends string>(
+    pattern: `mcp:${P}`,
+    ...handlers: McpMiddlewareFnFor<P>[]
+  ): any;
 };
 
 /**
