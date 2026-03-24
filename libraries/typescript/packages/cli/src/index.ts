@@ -2511,6 +2511,7 @@ program
     "--org <slug-or-id>",
     "Deploy to a specific organization (by slug or ID)"
   )
+  .option("-y, --yes", "Skip confirmation prompts")
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -2522,6 +2523,7 @@ program
       envFile: options.envFile,
       rootDir: options.rootDir,
       org: options.org,
+      yes: options.yes,
     });
   });
 
