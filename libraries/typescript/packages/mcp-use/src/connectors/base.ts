@@ -194,6 +194,16 @@ export abstract class BaseConnector {
   protected setupNotificationHandler(): void {
     if (!this.client) return;
 
+    const forwardToUserHandlers = async (notification: Notification) => {
+      for (const handler of this.notificationHandlers) {
+        try {
+          await handler(notification);
+        } catch (err) {
+          logger.error("Error in notification handler:", err);
+        }
+      }
+    };
+
     // Use fallbackNotificationHandler to catch all notifications
     this.client.fallbackNotificationHandler = async (
       notification: Notification
@@ -211,19 +221,33 @@ export abstract class BaseConnector {
           await this.onPromptsListChanged();
           break;
         default:
-          // Other notification methods are handled by user-registered handlers
           break;
       }
 
-      // Then call user-registered handlers
-      for (const handler of this.notificationHandlers) {
-        try {
-          await handler(notification);
-        } catch (err) {
-          logger.error("Error in notification handler:", err);
-        }
-      }
+      await forwardToUserHandlers(notification);
     };
+
+    // The SDK registers specific handlers for progress and cancelled notifications
+    // that bypass fallbackNotificationHandler entirely. Override them to also
+    // forward to user-registered handlers so they appear in notification UIs.
+    const client = this.client as any;
+    const handlersMap = client._notificationHandlers as Map<
+      string,
+      (notification: Notification) => Promise<void>
+    >;
+
+    for (const method of [
+      "notifications/progress",
+      "notifications/cancelled",
+    ]) {
+      const originalHandler = handlersMap.get(method);
+      if (originalHandler) {
+        handlersMap.set(method, async (notification: Notification) => {
+          await originalHandler(notification);
+          await forwardToUserHandlers(notification);
+        });
+      }
+    }
   }
 
   /**

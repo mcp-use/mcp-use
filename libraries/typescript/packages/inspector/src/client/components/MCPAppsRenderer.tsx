@@ -1142,7 +1142,7 @@ function MCPAppsRendererBase({
             </div>
           )}
           <div
-            className="relative w-full"
+            className="relative w-full h-full"
             style={{ maxWidth: iframeStyle.maxWidth }}
           >
             <div className="absolute -top-8 left-2 z-10 h-full">
