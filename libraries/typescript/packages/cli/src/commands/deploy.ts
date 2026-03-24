@@ -4,7 +4,7 @@ import path from "node:path";
 import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
-import { getWebUrl, isLoggedIn } from "../utils/config.js";
+import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { loginCommand } from "./auth.js";
@@ -180,6 +180,7 @@ interface DeployOptions {
   env?: string[];
   envFile?: string;
   rootDir?: string;
+  org?: string;
 }
 
 /**
@@ -487,14 +488,18 @@ async function displayDeploymentProgress(
       // Determine the MCP Server URL to display
       const mcpServerUrl = getMcpServerUrl(finalDeployment);
 
-      // Determine dashboard URL if server exists
-      // Uses /cloud/servers/[id] - frontend redirects to /cloud/[org-slug]/servers/[id]
+      // Determine dashboard URL with org slug for direct navigation
       let dashboardUrl: string | null = null;
       const webUrl = (await getWebUrl()).replace(/\/$/, "");
-      if (finalDeployment.serverSlug) {
-        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverSlug}`;
-      } else if (finalDeployment.serverId) {
-        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverId}`;
+      const config = await readConfig();
+      const orgSlug = config.profileSlug;
+      const serverRef = finalDeployment.serverSlug || finalDeployment.serverId;
+      if (serverRef) {
+        if (orgSlug) {
+          dashboardUrl = `${webUrl}/cloud/${orgSlug}/servers/${serverRef}`;
+        } else {
+          dashboardUrl = `${webUrl}/cloud/servers/${serverRef}`;
+        }
       }
 
       const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(
@@ -997,6 +1002,39 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Check if project is linked to an existing deployment
     const api = await McpUseAPI.create();
 
+    // Resolve --org flag: match by slug or ID against the user's profiles
+    if (options.org) {
+      try {
+        const authInfo = await api.testAuth();
+        const match = (authInfo.profiles ?? []).find(
+          (p) =>
+            p.slug === options.org ||
+            p.id === options.org ||
+            p.profile_name.toLowerCase() === options.org!.toLowerCase()
+        );
+        if (match) {
+          api.setProfileId(match.id);
+          const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
+          console.log(
+            chalk.gray("Organization: ") + chalk.cyan(match.profile_name) + slug
+          );
+        } else {
+          console.error(
+            chalk.red(
+              `✗ Organization "${options.org}" not found. Run ${chalk.white("npx mcp-use org list")} to see available organizations.`
+            )
+          );
+          process.exit(1);
+        }
+      } catch (error) {
+        console.error(
+          chalk.red("✗ Failed to resolve organization:"),
+          chalk.red(error instanceof Error ? error.message : "Unknown error")
+        );
+        process.exit(1);
+      }
+    }
+
     // Pre-flight GitHub connection and repo access check (REQUIRED for GitHub repos)
     let githubVerified = false;
     try {
@@ -1201,6 +1239,23 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       healthCheckPath: "/healthz",
       serverId,
     };
+
+    // Show target organization if not already shown by --org flag
+    if (!options.org) {
+      try {
+        const config = await readConfig();
+        if (config.profileName) {
+          const slug = config.profileSlug
+            ? chalk.gray(` (${config.profileSlug})`)
+            : "";
+          console.log(
+            chalk.gray("Organization: ") + chalk.cyan(config.profileName) + slug
+          );
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
 
     // Create deployment
     console.log(chalk.gray("Creating deployment..."));

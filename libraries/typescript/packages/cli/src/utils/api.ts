@@ -1,4 +1,4 @@
-import { getApiKey, getApiUrl } from "./config.js";
+import { getApiKey, getApiUrl, getProfileId } from "./config.js";
 
 export interface APIKeyCreateRequest {
   name: string;
@@ -9,10 +9,19 @@ export interface APIKeyCreateResponse {
   name: string;
 }
 
+export interface ProfileInfo {
+  id: string;
+  profile_name: string;
+  slug: string | null;
+  role: string;
+}
+
 export interface AuthTestResponse {
   message: string;
   user_id: string;
   email: string;
+  profiles: ProfileInfo[];
+  default_profile_id: string | null;
 }
 
 export interface GitHubSource {
@@ -145,10 +154,12 @@ export interface GitHubReposResponse {
 export class McpUseAPI {
   private baseUrl: string;
   private apiKey: string | undefined;
+  private profileId: string | undefined;
 
-  constructor(baseUrl?: string, apiKey?: string) {
+  constructor(baseUrl?: string, apiKey?: string, profileId?: string) {
     this.baseUrl = baseUrl || "";
     this.apiKey = apiKey;
+    this.profileId = profileId;
   }
 
   /**
@@ -157,7 +168,15 @@ export class McpUseAPI {
   static async create(): Promise<McpUseAPI> {
     const baseUrl = await getApiUrl();
     const apiKey = await getApiKey();
-    return new McpUseAPI(baseUrl, apiKey ?? undefined);
+    const profileId = await getProfileId();
+    return new McpUseAPI(baseUrl, apiKey ?? undefined, profileId ?? undefined);
+  }
+
+  /**
+   * Override the profile ID for this API client instance (e.g. from --org flag)
+   */
+  setProfileId(profileId: string): void {
+    this.profileId = profileId;
   }
 
   /**
@@ -180,6 +199,10 @@ export class McpUseAPI {
 
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
+    }
+
+    if (this.profileId) {
+      headers["x-profile-id"] = this.profileId;
     }
 
     // Add timeout support (default 30 seconds)
@@ -246,6 +269,15 @@ export class McpUseAPI {
   }
 
   /**
+   * Set the user's default profile (organization) on the server
+   */
+  async setDefaultProfile(profileId: string): Promise<void> {
+    await this.request(`/profiles/${profileId}/set-default`, {
+      method: "POST",
+    });
+  }
+
+  /**
    * Create deployment
    */
   async createDeployment(
@@ -275,6 +307,9 @@ export class McpUseAPI {
 
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
+    }
+    if (this.profileId) {
+      headers["x-profile-id"] = this.profileId;
     }
 
     const response = await fetch(url, { headers });
@@ -378,6 +413,9 @@ export class McpUseAPI {
     if (this.apiKey) {
       headers["x-api-key"] = this.apiKey;
     }
+    if (this.profileId) {
+      headers["x-profile-id"] = this.profileId;
+    }
 
     const response = await fetch(url, {
       method: "POST",
@@ -459,6 +497,7 @@ export class McpUseAPI {
 
       const headers: Record<string, string> = {};
       if (this.apiKey) headers["x-api-key"] = this.apiKey;
+      if (this.profileId) headers["x-profile-id"] = this.profileId;
 
       const response = await fetch(
         `${this.baseUrl}/deployments/${deploymentId}/redeploy`,

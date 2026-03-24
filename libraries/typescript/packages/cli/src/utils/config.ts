@@ -5,6 +5,9 @@ import path from "node:path";
 export interface McpConfig {
   apiKey?: string;
   apiUrl?: string;
+  profileId?: string;
+  profileName?: string;
+  profileSlug?: string;
 }
 
 const CONFIG_DIR = path.join(os.homedir(), ".mcp-use");
@@ -85,6 +88,14 @@ export async function getApiKey(): Promise<string | null> {
 export async function isLoggedIn(): Promise<boolean> {
   const apiKey = await getApiKey();
   return !!apiKey;
+}
+
+/**
+ * Get the stored profile (organization) ID from config
+ */
+export async function getProfileId(): Promise<string | null> {
+  const config = await readConfig();
+  return config.profileId || null;
 }
 
 /**
