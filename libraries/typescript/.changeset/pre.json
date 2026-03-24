@@ -10,6 +10,7 @@
   "changesets": [
     "ctx-auth-optional-typing",
     "error-boundary-fallback",
+    "inspector-chat-tool-history",
     "typed-middleware-and-tool-fixes"
   ]
 }
