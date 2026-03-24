@@ -1,0 +1,204 @@
+---
+title: "useFiles()"
+description: "Hook for file upload and download in widgets"
+icon: "file-arrow-up"
+---
+
+The `useFiles` hook provides file upload and download capabilities for widgets. It exposes an `isSupported` flag so you can gracefully handle environments where files are not available.
+
+<Warning>
+**ChatGPT only.** File operations (`upload` and `getDownloadUrl`) are only available in the ChatGPT Apps SDK environment. The MCP Apps specification (SEP-1865) has [deferred file handling](https://github.com/modelcontextprotocol/ext-apps/issues/201), meaning MCP Apps clients such as Claude, Goose, and VS Code do **not** support file operations. Always check `isSupported` before calling `upload` or `getDownloadUrl`.
+</Warning>
+
+## Import
+
+```typescript
+import { useFiles } from "mcp-use/react";
+```
+
+## Return values
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isSupported` | `boolean` | `true` only in the ChatGPT Apps SDK environment where `window.openai.uploadFile` and `window.openai.getFileDownloadUrl` are available. |
+| `upload` | `(file: File, options?: UploadOptions) => Promise<FileMetadata>` | Upload a file to the host. Returns `{ fileId }`. Throws if `isSupported` is `false`. |
+| `getDownloadUrl` | `(file: FileMetadata) => Promise<{ downloadUrl: string }>` | Get a temporary download URL for a previously uploaded file. Throws if `isSupported` is `false`. |
+
+### `UploadOptions`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `modelVisible` | `boolean` | `true` | Whether the uploaded file should be visible to the model. When `true`, the `fileId` is appended to `imageIds` in widget state so ChatGPT includes the file in the model's conversation context. When `false`, the file is uploaded but the model won't see it. |
+
+## Basic usage
+
+Always gate file operations behind `isSupported`:
+
+```tsx
+import { useFiles } from "mcp-use/react";
+
+function MyWidget() {
+  const { upload, getDownloadUrl, isSupported } = useFiles();
+
+  if (!isSupported) {
+    return (
+      <p>File operations are not available in this host.</p>
+    );
+  }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Model-visible by default — ChatGPT will include the file in context
+    const { fileId } = await upload(file);
+
+    // Upload privately — model won't see it
+    const { fileId: privateFileId } = await upload(file, { modelVisible: false });
+  }
+
+  async function handleDownload(fileId: string) {
+    const { downloadUrl } = await getDownloadUrl({ fileId });
+    window.open(downloadUrl, "_blank");
+  }
+
+  return (
+    <div>
+      <input type="file" onChange={handleFileSelect} />
+    </div>
+  );
+}
+```
+
+## Model visibility
+
+By default, every uploaded file is tracked in widget state under `imageIds`. ChatGPT reads this field to include the file in the model's conversation context on future turns — the model can then reference the content of the uploaded image.
+
+Pass `{ modelVisible: false }` when you want to upload a file for widget-only use without exposing it to the model:
+
+```tsx
+// User uploads a private reference image — widget uses it, model doesn't see it
+const { fileId } = await upload(referenceFile, { modelVisible: false });
+const { downloadUrl } = await getDownloadUrl({ fileId });
+// Use downloadUrl for <img src={...} /> in the widget only
+```
+
+<Note>
+`imageIds` state is preserved across `setWidgetState` calls — uploading a file won't wipe other widget state.
+</Note>
+```
+
+## `FileMetadata` type
+
+```typescript
+type FileMetadata = { fileId: string };
+```
+
+`fileId` is an opaque string identifier assigned by the host. Store it in widget state to retrieve the download URL later.
+
+## Full upload and download example
+
+```tsx
+import { useFiles, useWidgetState } from "mcp-use/react";
+import { useState } from "react";
+
+interface FileState {
+  uploadedFileId: string | null;
+}
+
+function FileWidget() {
+  const { upload, getDownloadUrl, isSupported } = useFiles();
+  const [state, setState] = useWidgetState<FileState>();
+  const [isUploading, setIsUploading] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+
+  if (!isSupported) {
+    return (
+      <div className="notice">
+        File operations require ChatGPT Apps SDK.
+        This host does not support file uploads yet.
+      </div>
+    );
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const { fileId } = await upload(file);
+      // Persist the fileId in widget state so the model can reference it
+      await setState({ uploadedFileId: fileId });
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function handleGetLink() {
+    if (!state?.uploadedFileId) return;
+    const { downloadUrl } = await getDownloadUrl({
+      fileId: state.uploadedFileId,
+    });
+    setDownloadUrl(downloadUrl);
+  }
+
+  return (
+    <div>
+      <input type="file" onChange={handleUpload} disabled={isUploading} />
+
+      {state?.uploadedFileId && !downloadUrl && (
+        <button onClick={handleGetLink}>Get download link</button>
+      )}
+
+      {downloadUrl && (
+        <a href={downloadUrl} target="_blank" rel="noreferrer">
+          Download file
+        </a>
+      )}
+    </div>
+  );
+}
+```
+
+<Note>
+Download URLs are **temporary** (typically valid for 5 minutes). Do not store the URL — call `getDownloadUrl` each time you need to display or fetch the file. Store the `fileId` in widget state instead.
+</Note>
+
+## Detection logic
+
+`isSupported` is computed once on mount:
+
+```typescript
+const isSupported =
+  typeof window !== "undefined" &&
+  typeof window.openai?.uploadFile === "function" &&
+  typeof window.openai?.getFileDownloadUrl === "function";
+```
+
+This is `true` only in the ChatGPT Apps SDK host. In all other environments (MCP Apps clients, URL params fallback, SSR) it is `false`.
+
+## Error handling
+
+Calling `upload` or `getDownloadUrl` when `isSupported` is `false` throws a descriptive error:
+
+```
+[useFiles] File upload is not supported in this host.
+Check `isSupported` before calling `upload`.
+File operations are only available in the ChatGPT Apps SDK environment.
+```
+
+Wrap calls in try/catch to handle host-level errors (network failures, policy violations):
+
+```tsx
+try {
+  const { fileId } = await upload(file);
+} catch (err) {
+  console.error("Upload failed:", err);
+}
+```
+
+## Related
+
+- [`useWidget()`](./usewidget) — Access widget props and state
+- [`<ModelContext />`](./modelcontext) — Annotate UI state for the model

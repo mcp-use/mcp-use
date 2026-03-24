@@ -446,6 +446,7 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_7_0",
                   "python/changelog/1_6_0",
                   "python/changelog/1_5_2",
                   "python/changelog/1_5_0",
@@ -575,6 +576,8 @@
                       "typescript/server/widget-components/errorboundary",
                       "typescript/server/widget-components/image",
                       "typescript/server/widget-components/themeprovider",
+                      "typescript/server/widget-components/modelcontext",
+                      "typescript/server/widget-components/usefiles",
                       {
                         "group": "Deprecated",
                         "icon": "archive",
@@ -599,6 +602,7 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/server/middleware",
                       "typescript/server/proxy",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",

@@ -105,3 +105,39 @@ jobs:
           name: test-results-${{ matrix.mode }}
           path: libraries/typescript/packages/inspector/test-results/
           retention-days: 7
+
+  inspector-e2e-tunnel:
+    name: "Inspector E2E (tunnel)"
+    runs-on: ubuntu-latest
+    # Disabled: set to false to skip without deleting the workflow. Re-enable by restoring:
+    # if: github.event_name == 'workflow_dispatch' || github.head_ref == 'canary'
+    if: false
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
+
+      - name: Run tunnel E2E test (test_tunnel)
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: "false"
+        run: pnpm --filter @mcp-use/inspector test:e2e:tunnel

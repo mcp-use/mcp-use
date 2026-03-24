@@ -6,23 +6,36 @@ rss: true
 tag: "New"
 ---
 
-<Update label="v1.21.2" description="March 2026">
-  ## Inspector Proxy Fix for Embedded Servers
-  Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
+<Update label="v1.22.0" description="March 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.22.0&title=Vite%208%2C%20MCP%20Middleware%20%26%20Model%20Context&date=2026-03&lang=typescript" alt="Release 1.22.0" />
+  </Frame>
+  ## Vite 8, MCP Middleware & Model Context
+  Minor release with Vite 8 across tooling, MCP operation middleware, files and model context APIs, elicit and adapter fixes, and Inspector tunnel controls.
 
-- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
-- **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
-- **Update**: Updated @mcp-use/inspector to v0.24.2
-- **Update**: Updated @mcp-use/cli to v2.18.1
+- **New**: MCP operation-level middleware — `server.use("mcp:*", ...)` and specific patterns (`mcp:tools/call`, `mcp:tools/list`, `mcp:resources/read`, `mcp:resources/list`, `mcp:prompts/get`, `mcp:prompts/list`) with typed `MiddlewareContext` (`method`, `params`, `session`, `auth`, `state`)
+- **New**: `useFiles` React hook with `isSupported` and `modelVisible` for file attachments; `ModelContext` component and `modelContext` imperative API for server-side model context injection
+- **Enhancement**: Vite 8.0 with Rolldown bundler and `@vitejs/plugin-react` 6 across packages, examples, and CLI/inspector tooling
+- **Enhancement**: Conformance client — pass `reconnectionOptions` so SDK-level SSE reconnection behaves correctly when `autoReconnect` is disabled
+- **Fix**: Elicit — map `result.content` to `result.data` for Zod validation; spec-compliant clients use `content`; backward-compatible fallback to `data`
+- **Fix**: LangChainAdapter — tool name collisions when exposing resources/prompts as tools; `reserveName` resolves prefixed names with a numeric suffix when needed; prompt names sanitized like resource names
+- **Enhancement** (@mcp-use/inspector): Start/stop the `mcp-use dev` tunnel from the Inspector (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v0.25.0
+- **Update**: Updated @mcp-use/cli to v2.20.0
 </Update>
 
-<Update label="v1.21.3" description="March 2026">
-  ## Inspector Sandbox Host Fix
-  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+<Update label="v1.21.5" description="March 2026">
+  ## Zod Peer Dep, Esbuild Build & Windows Fix
+  Patch release with Zod peer dependency, esbuild transpilation, TypeGen Zod v4 fixes, and Windows path handling.
 
-- **Fix** (@mcp-use/inspector): Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
-- **Update**: Updated @mcp-use/inspector to v0.24.3
-- **Update**: Updated @mcp-use/cli to v2.18.2
+- **Fix**: Move zod from dependencies to peerDependencies — prevents duplicate type trees when users have a different Zod v4 version; avoids type errors or OOM during `mcp-use build`
+- **Fix**: TypeGen crash with Zod v4 enum schemas — `zod-to-ts` now handles Zod v4 `ZodEnum` (`_def.entries`), `ZodDiscriminatedUnion`; CLI reports success/failure of type generation instead of silently failing
+- **Fix** (@mcp-use/cli): Windows crash in `mcp-use dev` and `mcp-use generate-types` — use `file://` URL in tsImport instead of raw OS paths (fixes `ERR_UNSUPPORTED_ESM_URL_SCHEME`)
+- **Fix**: Dependabot security alerts — updated flatted, tar, hono, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps
+- **Enhancement** (@mcp-use/cli): `mcp-use build` uses esbuild for transpilation instead of tsc — avoids OOM on complex type graphs (Zod v4, Prisma); type checking runs separately via `tsc --noEmit`; add `--no-typecheck` to skip type checking for faster builds
+- **Update**: Updated @mcp-use/inspector to v0.24.5
+- **Update**: Updated @mcp-use/cli to v2.19.0
+- **Update**: Updated create-mcp-use-app to v0.14.6
 </Update>
 
 <Update label="v1.21.4" description="March 2026">
@@ -36,6 +49,25 @@ tag: "New"
 - **Update**: Updated @mcp-use/cli to v2.18.3
 </Update>
 
+<Update label="v1.21.3" description="March 2026">
+  ## Inspector Sandbox Host Fix
+  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+
+- **Fix** (@mcp-use/inspector): Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
+- **Update**: Updated @mcp-use/inspector to v0.24.3
+- **Update**: Updated @mcp-use/cli to v2.18.2
+</Update>
+
+<Update label="v1.21.2" description="March 2026">
+  ## Inspector Proxy Fix for Embedded Servers
+  Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
+
+- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
+- **Update**: Updated @mcp-use/inspector to v0.24.2
+- **Update**: Updated @mcp-use/cli to v2.18.1
+</Update>
+
 <Update label="v1.21.1" description="March 2026">
   ## Session Persistence & CLI Improvements
   Patch release with session recovery fix, CLI enhancements, and create-mcp-use-app install improvements.
@@ -47,18 +79,6 @@ tag: "New"
 - **Update**: Updated @mcp-use/inspector to v0.24.1
 - **Update**: Updated @mcp-use/cli to v2.18.0
 - **Update**: Updated create-mcp-use-app to v0.14.4
-</Update>
-
-<Update label="v1.20.1" description="February 2026">
-  ## Widget Status Texts & CSP Handling
-  Patch release with widget metadata enhancements and CSP improvements.
-
-- **New**: `invoking` and `invoked` properties in widget metadata for customizable status messages during tool execution
-- **Breaking**: McpUseProvider no longer includes BrowserRouter; add it explicitly if your widget uses react-router
-- **Enhancement**: MCPAppsDebugControls CSP mode violation indicators; sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
-- **Fix** (create-mcp-use-app): Unify logo display across all CLI entry paths
-- **Update**: Updated @mcp-use/inspector to v0.22.1
-- **Update**: Updated @mcp-use/cli to v2.15.1
 </Update>
 
 <Update label="v1.21.0" description="March 2026">
@@ -84,6 +104,55 @@ tag: "New"
 - **Documentation**: Per-server elicitation and sampling callbacks examples; proxy servers section
 </Update>
 
+<Update label="v1.20.5" description="February 2026">
+  ## CLI Tunnel Support
+  Patch release adding tunnel flag for ChatGPT HMR.
+
+- **New** (@mcp-use/cli): Support for `--tunnel` flag with full ChatGPT HMR
+- **Update**: Updated @mcp-use/inspector to v0.23.1
+- **Update**: Updated @mcp-use/cli to v2.16.0
+</Update>
+
+<Update label="v1.20.4" description="February 2026">
+  ## Inspector Embedded Chat
+  Patch release with inspector embedded chat improvements.
+
+- **Enhancement** (@mcp-use/inspector): Improved embedded chat
+- **Update**: Updated @mcp-use/inspector to v0.23.0
+- **Update**: Updated @mcp-use/cli to v2.15.4
+</Update>
+
+<Update label="v1.20.3" description="February 2026">
+  ## Inspector Standalone Deployment Fix
+  Patch release fixing inspector standalone deployment version import.
+
+- **Fix** (@mcp-use/inspector): Standalone deployment was importing the version from the wrong path
+- **Update**: Updated @mcp-use/inspector to v0.22.3
+- **Update**: Updated @mcp-use/cli to v2.15.3
+</Update>
+
+<Update label="v1.20.2" description="February 2026">
+  ## Health Monitoring & MCPAgentOptions
+  Patch release with dynamic auth headers for health checks and MCPAgentOptions for chat agent.
+
+- **Enhancement**: `getAuthHeaders` parameter to `startConnectionHealthMonitoring` for customizable authentication headers during health checks; HEAD requests allowed without authentication
+- **Enhancement**: `exposeResourcesAsTools` and `exposePromptsAsTools` options in MCPAgentOptions (both default to `true`); inspector chat tab sets both to `false` so agent only exposes actual MCP tools
+- **Update**: Updated @mcp-use/inspector to v0.22.2
+- **Update**: Updated @mcp-use/cli to v2.15.2
+</Update>
+
+<Update label="v1.20.1" description="February 2026">
+  ## Widget Status Texts & CSP Handling
+  Patch release with widget metadata enhancements and CSP improvements.
+
+- **New**: `invoking` and `invoked` properties in widget metadata for customizable status messages during tool execution
+- **Breaking**: McpUseProvider no longer includes BrowserRouter; add it explicitly if your widget uses react-router
+- **Enhancement**: MCPAppsDebugControls CSP mode violation indicators; sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
+- **Fix** (create-mcp-use-app): Unify logo display across all CLI entry paths
+- **Update**: Updated @mcp-use/inspector to v0.22.1
+- **Update**: Updated @mcp-use/cli to v2.15.1
+</Update>
+
 <Update label="v1.20.0" description="February 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.20.0&title=Widget%20Debug%20%26%20CSP%20Improvements&date=2026-02&lang=typescript" alt="Release 1.20.0" />
@@ -107,6 +176,16 @@ tag: "New"
 - **Fix**: WorkOS subdomain config to accept full AuthKit domain (e.g., `name.authkit.app`)
 - **Update**: Updated @mcp-use/inspector to v0.22.0
 - **Update**: Updated @mcp-use/cli to v2.15.0
+</Update>
+
+<Update label="v1.19.3" description="February 2026">
+  ## CLI Skills & Template Updates
+  Patch release with CLI skills commands and create-mcp-use-app template improvements.
+
+- **New** (@mcp-use/cli): `mcp-use skills add` and `mcp-use skills install` commands to install AI agent skills (Cursor, Claude Code, Codex) from the mcp-use repository
+- **Enhancement** (create-mcp-use-app): Add @types/react and @types/react-dom to template devDependencies
+- **Update**: Updated @mcp-use/inspector to v0.21.1
+- **Update**: Updated @mcp-use/cli to v2.14.0
 </Update>
 
 <Update label="v1.19.2" description="February 2026">

@@ -10,6 +10,7 @@ import {
   adaptConnectMiddleware,
   isExpressMiddleware,
 } from "../connect-adapter.js";
+import type { McpMiddlewareFn } from "../middleware/mcp-middleware.js";
 
 /**
  * Express/Connect middleware signature
@@ -94,9 +95,20 @@ export function installCustomRoutesMiddleware(
 }
 
 /**
- * Extended Hono type that accepts both Hono and Express middleware in use() method
+ * Typed overload for MCP operation-level middleware registered via `server.use('mcp:...', fn)`.
+ * Exported so `McpServerInstance` can include it, giving callers automatic type inference
+ * for `ctx` and `next` without explicit annotations.
  */
-type ExtendedHonoUse = {
+export type WithMcpUse = {
+  use(pattern: `mcp:${string}`, ...handlers: McpMiddlewareFn[]): any;
+};
+
+/**
+ * Extended Hono type that accepts both Hono and Express middleware in use() method.
+ * The `mcp:` overload must come first so TypeScript picks it before the generic
+ * string overload when a literal like "mcp:tools/call" is passed.
+ */
+type ExtendedHonoUse = WithMcpUse & {
   use(...handlers: AcceptableMiddleware[]): any;
   use(path: string, ...handlers: AcceptableMiddleware[]): any;
 };
@@ -120,6 +132,20 @@ export function createHonoProxy<T extends object>(
           // Hono's use signature: use(path?, ...handlers)
           // Check if the first arg is a path (string) or a handler (function)
           const hasPath = typeof args[0] === "string";
+
+          // MCP middleware: string starting with 'mcp:' routes to the MCP middleware
+          // registry on the target (MCPServerClass), not to Hono.
+          if (hasPath && (args[0] as string).startsWith("mcp:")) {
+            const pattern = (args[0] as string).slice(4); // strip 'mcp:'
+            const handlers = args.slice(1) as ((...a: any[]) => any)[];
+            if (typeof (target as any)._registerMcpMiddleware === "function") {
+              for (const h of handlers) {
+                (target as any)._registerMcpMiddleware(pattern, h);
+              }
+            }
+            return target;
+          }
+
           const path: string = hasPath ? (args[0] as string) : "*";
           const handlers: AcceptableMiddleware[] = hasPath
             ? (args.slice(1) as AcceptableMiddleware[])

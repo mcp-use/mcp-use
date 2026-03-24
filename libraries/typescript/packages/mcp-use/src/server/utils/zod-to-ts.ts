@@ -89,7 +89,12 @@ export function zodToTypeString(schema: z.ZodTypeAny): string {
     }
 
     case "ZodEnum": {
-      const values = def.values as string[];
+      const values = Array.isArray(def.values)
+        ? (def.values as string[])
+        : def.entries
+          ? Object.values(def.entries as Record<string, string>)
+          : undefined;
+      if (!values || values.length === 0) return "string";
       return values.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(" | ");
     }
 
@@ -160,15 +165,17 @@ export function zodToTypeString(schema: z.ZodTypeAny): string {
     }
 
     case "ZodUnion": {
-      const options = def.options as z.ZodTypeAny[];
-      const typeStrings = options.map(zodToTypeString);
-      return typeStrings.join(" | ");
+      const options = def.options as z.ZodTypeAny[] | undefined;
+      if (!options) return "unknown";
+      return options.map(zodToTypeString).join(" | ");
     }
 
     case "ZodDiscriminatedUnion": {
-      const options = Array.from(def.optionsMap.values()) as z.ZodTypeAny[];
-      const typeStrings = options.map(zodToTypeString);
-      return typeStrings.join(" | ");
+      const options = def.optionsMap
+        ? (Array.from(def.optionsMap.values()) as z.ZodTypeAny[])
+        : (def.options as z.ZodTypeAny[] | undefined);
+      if (!options) return "unknown";
+      return options.map(zodToTypeString).join(" | ");
     }
 
     case "ZodIntersection": {
@@ -178,9 +185,9 @@ export function zodToTypeString(schema: z.ZodTypeAny): string {
     }
 
     case "ZodTuple": {
-      const items = def.items as z.ZodTypeAny[];
-      const typeStrings = items.map(zodToTypeString);
-      return `[${typeStrings.join(", ")}]`;
+      const items = def.items as z.ZodTypeAny[] | undefined;
+      if (!items) return "unknown[]";
+      return `[${items.map(zodToTypeString).join(", ")}]`;
     }
 
     case "ZodEffects": {

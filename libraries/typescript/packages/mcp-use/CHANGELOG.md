@@ -1,5 +1,280 @@
 # mcp-use
 
+## 1.22.0
+
+### Minor Changes
+
+- b76df33: Add MCP operation-level middleware via `server.use('mcp:...', fn)`
+
+  Introduces a Hono-style middleware system for intercepting MCP operations (tool calls, resource reads, prompt fetches, and list operations) without touching HTTP routing.
+
+  **Usage:**
+
+  ```typescript
+  // Fires for every MCP operation
+  server.use("mcp:*", async (ctx, next) => {
+    console.log(`→ [${ctx.method}]`, ctx.params);
+    const result = await next();
+    console.log(`← [${ctx.method}] done`);
+    return result;
+  });
+
+  // Only fires on tool calls — ctx and next are fully typed automatically
+  server.use("mcp:tools/call", async (ctx, next) => {
+    if (ctx.auth && !ctx.auth.scopes.includes("tools:*")) {
+      throw new Error("Insufficient scope");
+    }
+    return next();
+  });
+  ```
+
+  **Patterns:** `mcp:*` (catch-all), `mcp:tools/call`, `mcp:tools/list`, `mcp:resources/read`, `mcp:resources/list`, `mcp:prompts/get`, `mcp:prompts/list`.
+
+  **`MiddlewareContext` fields:** `method`, `params`, `session`, `auth` (populated when OAuth is configured), `state` (per-request `Map` for sharing data between middleware).
+
+  Middleware runs in registration order (onion model), is compatible with HMR, and integrates with the existing OAuth scope system. The `mcp:` prefix clearly distinguishes MCP middleware from HTTP middleware registered via the same `server.use()` call.
+
+- b76df33: feat(tunnel): added ability to start/stop the mcp-use dev tunnel from the inspector
+- b76df33: Add `useFiles` React hook with `isSupported` detection and `modelVisible` option for file attachment widgets; add `ModelContext` component and `modelContext` imperative API for injecting model context from the server side.
+- b76df33: Upgrade to Vite 8 with Rolldown bundler and fix all test failures
+
+  **Vite 8 upgrade:**
+  - Upgrade `vite` from v7.3.x to v8.0.0 across all packages and examples
+  - Upgrade `@vitejs/plugin-react` from v5 to v6 (Oxc-based transforms)
+  - Migrate `rollupOptions` to `rolldownOptions` in all vite configs
+  - Migrate `optimizeDeps.esbuildOptions` to `optimizeDeps.rolldownOptions`
+  - Remove deprecated `build.commonjsOptions` (no-op in Vite 8)
+  - Switch programmatic `minify: "esbuild"` to `minify: true` (Oxc minifier)
+  - Extract `loadConfigFile` from `config.ts` into `config-file.ts` to prevent `require("fs")` leaking into browser bundles
+
+  **Test fixes (35 pre-existing failures):**
+  - Telemetry tests: add `vi.resetModules()`, async flush for fire-and-forget tracking, `type: "ai"` on agent mocks, missing adapter methods
+  - response-helpers tests: update widget() assertions from `_meta["mcp-use/props"]` to `structuredContent` per SEP-1865
+  - HMR tests: add widget config markers, mock `registerPrompt`/`registerResource` on sessions, update error message assertions
+  - ai_sdk_compatibility test: fix `StreamEvent` import to `@langchain/core/tracers/log_stream`
+  - distributed-stream-routing test: use OS-assigned ports instead of fixed port to eliminate EADDRINUSE race condition
+  - browser-react-no-node-deps test: fix `execSync` → `execFileSync` call
+
+  **CI fix:**
+  - Quote glob in `test:unit` script (`'tests/integration/**'`) to prevent shell expansion that was causing unit tests to be silently skipped in CI
+  - Add missing dev dependencies: `ai`, `morgan`, `@types/morgan`, `express-rate-limit`
+
+### Patch Changes
+
+- b76df33: fix: map elicit result `content` to `data` for Zod validation
+
+  The MCP SDK returns form data in `result.content` per the elicitation spec, but
+  `createElicitMethod` was checking `result.data` which is always undefined from
+  spec-compliant clients. This caused Zod validation to never run, leaving
+  `result.data` as undefined for tool callbacks using `ctx.elicit()` with a Zod
+  schema.
+
+  Now reads `result.content` (with fallback to `result.data` for backward
+  compatibility) and always maps accepted form data to `result.data` so the typed
+  API works correctly. Also fixes the inspector to send `content` instead of
+  `data` per the MCP spec.
+
+- b76df33: Fix sse-retry conformance test for React client by passing explicit reconnectionOptions to preserve SDK-level SSE reconnection when autoReconnect is disabled
+- b76df33: Fix tool name collisions between resources, prompts, and regular tools in LangChainAdapter. The `reserveName` method now checks whether the prefixed fallback name (`resource_<name>` / `prompt_<name>`) is itself already taken, falling back to a numeric suffix when needed. Prompt names are also now sanitized consistently with resource names.
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+  - @mcp-use/inspector@0.25.0
+  - @mcp-use/cli@2.20.0
+
+## 1.22.0-canary.6
+
+### Minor Changes
+
+- 9d48429: feat(tunnel): added ability to start/stop the mcp-use dev tunnel from the inspector
+
+### Patch Changes
+
+- Updated dependencies [9d48429]
+  - @mcp-use/inspector@0.25.0-canary.6
+  - @mcp-use/cli@2.20.0-canary.6
+
+## 1.22.0-canary.5
+
+### Patch Changes
+
+- bd7c2f6: fix: map elicit result `content` to `data` for Zod validation
+
+  The MCP SDK returns form data in `result.content` per the elicitation spec, but
+  `createElicitMethod` was checking `result.data` which is always undefined from
+  spec-compliant clients. This caused Zod validation to never run, leaving
+  `result.data` as undefined for tool callbacks using `ctx.elicit()` with a Zod
+  schema.
+
+  Now reads `result.content` (with fallback to `result.data` for backward
+  compatibility) and always maps accepted form data to `result.data` so the typed
+  API works correctly. Also fixes the inspector to send `content` instead of
+  `data` per the MCP spec.
+
+- Updated dependencies [bd7c2f6]
+  - @mcp-use/inspector@0.25.0-canary.5
+  - @mcp-use/cli@2.20.0-canary.5
+
+## 1.22.0-canary.4
+
+### Patch Changes
+
+- f2034db: Fix tool name collisions between resources, prompts, and regular tools in LangChainAdapter. The `reserveName` method now checks whether the prefixed fallback name (`resource_<name>` / `prompt_<name>`) is itself already taken, falling back to a numeric suffix when needed. Prompt names are also now sanitized consistently with resource names.
+  - @mcp-use/cli@2.20.0-canary.4
+  - @mcp-use/inspector@0.25.0-canary.4
+
+## 1.22.0-canary.3
+
+### Minor Changes
+
+- 42c93aa: Add `useFiles` React hook with `isSupported` detection and `modelVisible` option for file attachment widgets; add `ModelContext` component and `modelContext` imperative API for injecting model context from the server side.
+
+### Patch Changes
+
+- @mcp-use/cli@2.20.0-canary.3
+- @mcp-use/inspector@0.25.0-canary.3
+
+## 1.22.0-canary.2
+
+### Minor Changes
+
+- 0f9ee27: Add MCP operation-level middleware via `server.use('mcp:...', fn)`
+
+  Introduces a Hono-style middleware system for intercepting MCP operations (tool calls, resource reads, prompt fetches, and list operations) without touching HTTP routing.
+
+  **Usage:**
+
+  ```typescript
+  // Fires for every MCP operation
+  server.use("mcp:*", async (ctx, next) => {
+    console.log(`→ [${ctx.method}]`, ctx.params);
+    const result = await next();
+    console.log(`← [${ctx.method}] done`);
+    return result;
+  });
+
+  // Only fires on tool calls — ctx and next are fully typed automatically
+  server.use("mcp:tools/call", async (ctx, next) => {
+    if (ctx.auth && !ctx.auth.scopes.includes("tools:*")) {
+      throw new Error("Insufficient scope");
+    }
+    return next();
+  });
+  ```
+
+  **Patterns:** `mcp:*` (catch-all), `mcp:tools/call`, `mcp:tools/list`, `mcp:resources/read`, `mcp:resources/list`, `mcp:prompts/get`, `mcp:prompts/list`.
+
+  **`MiddlewareContext` fields:** `method`, `params`, `session`, `auth` (populated when OAuth is configured), `state` (per-request `Map` for sharing data between middleware).
+
+  Middleware runs in registration order (onion model), is compatible with HMR, and integrates with the existing OAuth scope system. The `mcp:` prefix clearly distinguishes MCP middleware from HTTP middleware registered via the same `server.use()` call.
+
+### Patch Changes
+
+- @mcp-use/cli@2.20.0-canary.2
+- @mcp-use/inspector@0.25.0-canary.2
+
+## 1.22.0-canary.1
+
+### Minor Changes
+
+- e103822: Upgrade to Vite 8 with Rolldown bundler and fix all test failures
+
+  **Vite 8 upgrade:**
+  - Upgrade `vite` from v7.3.x to v8.0.0 across all packages and examples
+  - Upgrade `@vitejs/plugin-react` from v5 to v6 (Oxc-based transforms)
+  - Migrate `rollupOptions` to `rolldownOptions` in all vite configs
+  - Migrate `optimizeDeps.esbuildOptions` to `optimizeDeps.rolldownOptions`
+  - Remove deprecated `build.commonjsOptions` (no-op in Vite 8)
+  - Switch programmatic `minify: "esbuild"` to `minify: true` (Oxc minifier)
+  - Extract `loadConfigFile` from `config.ts` into `config-file.ts` to prevent `require("fs")` leaking into browser bundles
+
+  **Test fixes (35 pre-existing failures):**
+  - Telemetry tests: add `vi.resetModules()`, async flush for fire-and-forget tracking, `type: "ai"` on agent mocks, missing adapter methods
+  - response-helpers tests: update widget() assertions from `_meta["mcp-use/props"]` to `structuredContent` per SEP-1865
+  - HMR tests: add widget config markers, mock `registerPrompt`/`registerResource` on sessions, update error message assertions
+  - ai_sdk_compatibility test: fix `StreamEvent` import to `@langchain/core/tracers/log_stream`
+  - distributed-stream-routing test: use OS-assigned ports instead of fixed port to eliminate EADDRINUSE race condition
+  - browser-react-no-node-deps test: fix `execSync` → `execFileSync` call
+
+  **CI fix:**
+  - Quote glob in `test:unit` script (`'tests/integration/**'`) to prevent shell expansion that was causing unit tests to be silently skipped in CI
+  - Add missing dev dependencies: `ai`, `morgan`, `@types/morgan`, `express-rate-limit`
+
+### Patch Changes
+
+- Updated dependencies [e103822]
+  - @mcp-use/inspector@0.25.0-canary.1
+  - @mcp-use/cli@2.20.0-canary.1
+
+## 1.21.6-canary.0
+
+### Patch Changes
+
+- aafea7b: Fix sse-retry conformance test for React client by passing explicit reconnectionOptions to preserve SDK-level SSE reconnection when autoReconnect is disabled
+  - @mcp-use/cli@2.19.1-canary.0
+  - @mcp-use/inspector@0.24.6-canary.0
+
+## 1.21.5
+
+### Patch Changes
+
+- ed0fadb: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+- ed0fadb: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- ed0fadb: fix: move zod from dependencies to peerDependencies to prevent duplicate type trees
+
+  When users had a different Zod v4 version than the bundled 4.3.5, npm/pnpm installed two copies. TypeScript then performed expensive structural comparisons of deeply recursive Zod types at every `server.tool()` and `ctx.elicit()` boundary, causing type errors or OOM during `mcp-use build`. Making Zod a peerDependency (`^4.0.0`) ensures a single shared instance.
+
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+- Updated dependencies [ed0fadb]
+  - @mcp-use/cli@2.19.0
+  - @mcp-use/inspector@0.24.5
+
+## 1.21.5-canary.3
+
+### Patch Changes
+
+- b4ad0e8: fix: TypeGen crash with Zod v4 enum schemas
+
+  `zod-to-ts` assumed Zod v3 internal structure for `ZodEnum` (`_def.values`), which is `undefined` in Zod v4 where enum entries are stored as `_def.entries`. This caused `Cannot read properties of undefined (reading 'map')` during `mcp-use build` for any project using `z.enum()` with Zod v4. Added v4 fallback paths for `ZodEnum`, `ZodDiscriminatedUnion`, and null guards for `ZodUnion` and `ZodTuple`. Also fixed the CLI reporting success when type generation silently failed.
+
+- Updated dependencies [b4ad0e8]
+  - @mcp-use/cli@2.19.0-canary.3
+  - @mcp-use/inspector@0.24.5-canary.3
+
+## 1.21.5-canary.2
+
+### Patch Changes
+
+- Updated dependencies [3b0a426]
+  - @mcp-use/cli@2.19.0-canary.2
+  - @mcp-use/inspector@0.24.5-canary.2
+
+## 1.21.5-canary.1
+
+### Patch Changes
+
+- 98e09ce: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+- Updated dependencies [98e09ce]
+  - @mcp-use/inspector@0.24.5-canary.1
+  - @mcp-use/cli@2.19.0-canary.1
+
+## 1.21.5-canary.0
+
+### Patch Changes
+
+- cfff626: fix: move zod from dependencies to peerDependencies to prevent duplicate type trees
+
+  When users had a different Zod v4 version than the bundled 4.3.5, npm/pnpm installed two copies. TypeScript then performed expensive structural comparisons of deeply recursive Zod types at every `server.tool()` and `ctx.elicit()` boundary, causing type errors or OOM during `mcp-use build`. Making Zod a peerDependency (`^4.0.0`) ensures a single shared instance.
+
+- Updated dependencies [cfff626]
+  - @mcp-use/cli@2.19.0-canary.0
+  - @mcp-use/inspector@0.24.5-canary.0
+
 ## 1.21.4
 
 ### Patch Changes

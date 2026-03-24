@@ -152,7 +152,7 @@ export function ElicitationRequestDisplay({
 
       onApprove(request.id, {
         action: "accept",
-        data: formData,
+        content: formData,
       });
     } else if (isUrlMode) {
       onApprove(request.id, {

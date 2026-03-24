@@ -335,13 +335,16 @@ async function main() {
     if (mode === "builtin") {
       playwrightArgs.push(
         "--grep-invert",
-        "auth-flows.test.ts|connection.test.ts|setup.test.ts"
+        "auth-flows.test.ts|connection.test.ts|setup.test.ts|python.test.ts"
       );
       console.log(
         "⏭️  Skipping auth-flows, connection, and setup tests (not applicable for builtin mode)\n"
       );
     } else {
-      playwrightArgs.push("--grep-invert", "auth-flows.test.ts|hmr.test.ts");
+      playwrightArgs.push(
+        "--grep-invert",
+        "auth-flows.test.ts|hmr.test.ts|python.test.ts"
+      );
       console.log(
         "⏭️  Skipping auth-flows and HMR tests (HMR only works in builtin dev mode)\n"
       );

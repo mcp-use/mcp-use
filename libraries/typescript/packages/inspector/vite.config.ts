@@ -127,7 +127,7 @@ export default defineConfig({
   build: {
     minify: true,
     outDir: "dist/web",
-    rollupOptions: {
+    rolldownOptions: {
       external: [
         "langfuse-langchain",
         "langfuse",
@@ -135,7 +135,6 @@ export default defineConfig({
         "os",
       ],
       onwarn(warning, warn) {
-        // Suppress warnings about externalized modules for refractor
         if (
           warning.code === "UNRESOLVED_IMPORT" &&
           warning.exporter?.includes("refractor")
@@ -144,10 +143,6 @@ export default defineConfig({
         }
         warn(warning);
       },
-    },
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      include: [/node_modules/],
     },
   },
   server: {

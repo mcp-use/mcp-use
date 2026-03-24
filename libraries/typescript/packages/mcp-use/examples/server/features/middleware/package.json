@@ -1,0 +1,21 @@
+{
+  "name": "middleware-example",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "MCP server demonstrating operation-level middleware",
+  "scripts": {
+    "dev": "mcp-use dev",
+    "start": "mcp-use start",
+    "build": "mcp-use build"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

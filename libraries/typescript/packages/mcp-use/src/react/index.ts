@@ -32,6 +32,9 @@ export type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
+// Export ModelContext component and module-level API
+export { ModelContext, modelContext } from "./model-context.js";
+
 // Export OpenAI Apps SDK widget hooks and types
 export { ErrorBoundary } from "./ErrorBoundary.js";
 export { Image } from "./Image.js";
@@ -45,6 +48,7 @@ export {
 export type {
   API,
   CallToolResponse,
+  FileMetadata,
   MessageContentBlock,
   DeviceType,
   DisplayMode,
@@ -59,6 +63,10 @@ export type {
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
+
+// Export useFiles hook
+export { useFiles } from "./useFiles.js";
+export type { UseFilesResult, UploadOptions } from "./useFiles.js";
 
 // Export useCallTool hook and related types
 export { useCallTool } from "./useCallTool.js";

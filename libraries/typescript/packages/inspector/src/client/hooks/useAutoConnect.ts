@@ -3,6 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 
+/** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
+export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
+
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
 
@@ -340,10 +343,13 @@ export function useAutoConnect({
           const urlParams = new URLSearchParams(window.location.search);
           const tunnelUrl = urlParams.get("tunnelUrl");
           const tab = urlParams.get("tab");
+          const openTunnelPopover = urlParams.get("openTunnelPopover");
           const params = new URLSearchParams();
           params.set("server", existing.id);
           if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
           if (tab) params.set("tab", tab);
+          if (openTunnelPopover)
+            params.set("openTunnelPopover", openTunnelPopover);
           navigate(`/?${params.toString()}`);
         } else {
           // Connection exists but not ready - track it for navigation when ready
@@ -372,9 +378,33 @@ export function useAutoConnect({
       return;
     }
 
+    const trySessionReconnect = (): boolean => {
+      if (typeof sessionStorage === "undefined") return false;
+      try {
+        const raw = sessionStorage.getItem(INSPECTOR_RECONNECT_STORAGE_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw) as ConnectionConfig;
+        sessionStorage.removeItem(INSPECTOR_RECONNECT_STORAGE_KEY);
+        if (!parsed?.url || !parsed.transportType) return false;
+        handleAutoConnectConfig(parsed);
+        return true;
+      } catch {
+        try {
+          sessionStorage.removeItem(INSPECTOR_RECONNECT_STORAGE_KEY);
+        } catch {
+          /* ignore */
+        }
+        return false;
+      }
+    };
+
     // In embedded mode, we don't need to wait for storage to load
     // Proceed immediately with autoConnect
     if (embedded) {
+      if (trySessionReconnect()) {
+        setConfigLoaded(true);
+        return;
+      }
       const urlParams = new URLSearchParams(window.location.search);
       let queryAutoConnectParam = urlParams.get("autoConnect");
 
@@ -413,6 +443,11 @@ export function useAutoConnect({
       return;
     }
 
+    if (trySessionReconnect()) {
+      setConfigLoaded(true);
+      return;
+    }
+
     // Check for autoConnect query parameter first
     const urlParams = new URLSearchParams(window.location.search);
     let queryAutoConnectParam = urlParams.get("autoConnect");
@@ -429,7 +464,6 @@ export function useAutoConnect({
 
     if (queryAutoConnectParam) {
       const config = parseAutoConnectParam(queryAutoConnectParam);
-
       if (config) {
         handleAutoConnectConfig(config);
       }
@@ -474,10 +508,12 @@ export function useAutoConnect({
       const urlParams = new URLSearchParams(window.location.search);
       const tunnelUrl = urlParams.get("tunnelUrl");
       const tab = urlParams.get("tab");
+      const openTunnelPopover = urlParams.get("openTunnelPopover");
       const params = new URLSearchParams();
       params.set("server", connection.id);
       if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
       if (tab) params.set("tab", tab);
+      if (openTunnelPopover) params.set("openTunnelPopover", openTunnelPopover);
       navigate(`/?${params.toString()}`);
 
       setTimeout(() => {

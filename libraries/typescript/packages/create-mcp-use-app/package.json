@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.14.5",
+  "version": "0.14.6",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -54,7 +54,7 @@
     "ink-text-input": "^6.0.0",
     "ora": "^9.0.0",
     "react": "^19.2.3",
-    "tar": "^7.5.9"
+    "tar": "^7.5.11"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

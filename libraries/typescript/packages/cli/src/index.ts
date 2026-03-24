@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
@@ -16,7 +17,6 @@ import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createSkillsCommand } from "./commands/skills.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
-
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -229,12 +229,11 @@ async function startTunnel(
 
     proc.stdout?.on("data", (data) => {
       const text = data.toString();
-      // Filter out shutdown messages from tunnel package
       const isShutdownMessage =
         text.includes("Shutting down") || text.includes("🛑");
+      const isErrorMessage = text.includes("✖") || text.includes("Error:");
 
-      // Suppress tunnel output during shutdown or if it's a shutdown message
-      if (!isShuttingDown && !isShutdownMessage) {
+      if (!isShuttingDown && !isShutdownMessage && !isErrorMessage) {
         process.stdout.write(text);
       }
 
@@ -325,7 +324,7 @@ async function findServerFile(projectPath: string): Promise<string> {
 async function generateToolRegistryTypesForServer(
   projectPath: string,
   serverFileRelative: string
-): Promise<void> {
+): Promise<boolean> {
   const serverFile = path.join(projectPath, serverFileRelative);
   const serverFileExists = await access(serverFile)
     .then(() => true)
@@ -343,7 +342,7 @@ async function generateToolRegistryTypesForServer(
     (globalThis as any).__mcpUseLastServer = undefined;
 
     const { tsImport } = await import("tsx/esm/api");
-    await tsImport(serverFile, {
+    await tsImport(pathToFileURL(serverFile).href, {
       parentURL: import.meta.url,
       tsconfig: path.join(projectPath, "tsconfig.json"),
     });
@@ -364,7 +363,11 @@ async function generateToolRegistryTypesForServer(
       throw new Error("generateToolRegistryTypes not found in mcp-use package");
     }
 
-    await generateToolRegistryTypes(server.registrations.tools, projectPath);
+    const success = await generateToolRegistryTypes(
+      server.registrations.tools,
+      projectPath
+    );
+    return success;
   } finally {
     (globalThis as any).__mcpUseHmrMode = previousHmrMode ?? false;
   }
@@ -820,7 +823,7 @@ export default {
           // Source maps can use eval-based mappings which break strict CSP policies
           sourcemap: false,
           // Minify for smaller bundle size
-          minify: "esbuild",
+          minify: true,
           // Widgets bundle React+Zod; suppress expected chunk size warning
           chunkSizeWarningLimit: 1024,
           // For inline builds, disable CSS code splitting and inline all assets
@@ -830,10 +833,9 @@ export default {
                 assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
               }
             : {}),
-          rollupOptions: {
+          rolldownOptions: {
             input: path.join(tempDir, "index.html"),
             external: (id) => {
-              // Don't externalize posthog-node or path - we're stubbing them
               return false;
             },
           },
@@ -959,6 +961,139 @@ export default {
   return builtWidgets;
 }
 
+/**
+ * Collect TypeScript files from tsconfig include/exclude patterns using only
+ * Node.js built-ins (no globby/fast-glob, which break in ESM bundles).
+ */
+async function collectTsFiles(
+  projectPath: string,
+  includePatterns: string[],
+  excludePatterns: string[]
+): Promise<string[]> {
+  const { promises: fs } = await import("node:fs");
+
+  // Separate literal files from directory globs
+  const literalFiles: string[] = [];
+  const dirPrefixes: string[] = [];
+
+  for (const pattern of includePatterns) {
+    if (pattern.includes("*")) {
+      // Extract directory prefix before the first wildcard
+      const prefix = pattern.split("*")[0].replace(/\/+$/, "") || ".";
+      dirPrefixes.push(prefix);
+    } else {
+      literalFiles.push(pattern);
+    }
+  }
+
+  const files: string[] = [];
+
+  // Add literal files that exist and are .ts/.tsx (not .d.ts)
+  for (const file of literalFiles) {
+    if (/\.tsx?$/.test(file) && !file.endsWith(".d.ts")) {
+      try {
+        await access(path.join(projectPath, file));
+        files.push(file);
+      } catch {
+        // File doesn't exist, skip
+      }
+    }
+  }
+
+  // Recursively scan directories
+  const excludeSet = new Set(excludePatterns.map((e) => e.replace(/\*+/g, "")));
+  for (const prefix of dirPrefixes) {
+    const dirPath = path.join(projectPath, prefix);
+    try {
+      const entries = await fs.readdir(dirPath, { recursive: true });
+      for (const entry of entries) {
+        const entryStr = String(entry);
+        const rel = path.join(prefix, entryStr);
+        if (
+          /\.tsx?$/.test(entryStr) &&
+          !entryStr.endsWith(".d.ts") &&
+          !excludeSet.has(rel.split(path.sep)[0])
+        ) {
+          files.push(rel);
+        }
+      }
+    } catch {
+      // Directory doesn't exist, skip
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Transpile TypeScript files using esbuild instead of tsc.
+ * esbuild strips types without analyzing them, so it cannot OOM on complex types.
+ * Reads the project's tsconfig.json to determine source files, outDir, and compiler options.
+ */
+async function transpileWithEsbuild(projectPath: string): Promise<void> {
+  const esbuild = await import("esbuild");
+  const { promises: fs } = await import("node:fs");
+
+  const tsconfigPath = path.join(projectPath, "tsconfig.json");
+  let tsconfig: any = {};
+  try {
+    const raw = await fs.readFile(tsconfigPath, "utf-8");
+    tsconfig = JSON.parse(raw);
+  } catch {
+    // No tsconfig — use defaults
+  }
+
+  const compilerOptions = tsconfig.compilerOptions || {};
+  const outDir = compilerOptions.outDir || "./dist";
+  const includePatterns = tsconfig.include || ["**/*.ts", "**/*.tsx"];
+  const excludePatterns = tsconfig.exclude || ["node_modules", "dist"];
+
+  const files = await collectTsFiles(
+    projectPath,
+    includePatterns,
+    excludePatterns
+  );
+
+  if (files.length === 0) {
+    console.log(chalk.yellow("  No TypeScript files found to transpile."));
+    return;
+  }
+
+  // Map tsconfig jsx setting to esbuild equivalent
+  const jsxMap: Record<string, "automatic" | "transform" | "preserve"> = {
+    "react-jsx": "automatic",
+    "react-jsxdev": "automatic",
+    react: "transform",
+    preserve: "preserve",
+  };
+  const jsx = jsxMap[compilerOptions.jsx] || undefined;
+
+  const target = (compilerOptions.target || "ES2022").toLowerCase();
+
+  const moduleStr = (compilerOptions.module || "ESNext").toLowerCase();
+  const format: "esm" | "cjs" = moduleStr.includes("commonjs") ? "cjs" : "esm";
+
+  // Match tsc's rootDir behavior: when set, esbuild's outbase should map to it
+  // so that `src/index.ts` → `dist/index.js` (not `dist/src/index.js`).
+  const outbase = compilerOptions.rootDir
+    ? path.resolve(projectPath, compilerOptions.rootDir)
+    : projectPath;
+
+  await esbuild.build({
+    entryPoints: files.map((f) => path.join(projectPath, f)),
+    outdir: path.join(projectPath, outDir),
+    outbase,
+    bundle: false,
+    format,
+    target,
+    jsx,
+    sourcemap: compilerOptions.sourceMap ?? true,
+    tsconfig: tsconfigPath,
+    platform: "node",
+    logLevel: "warning",
+  });
+}
+
 program
   .command("build")
   .description("Build TypeScript and MCP UI widgets")
@@ -969,6 +1104,7 @@ program
     "Inline all JS/CSS into HTML (required for VS Code MCP Apps)"
   )
   .option("--no-inline", "Keep JS/CSS as separate files (default)")
+  .option("--no-typecheck", "Skip TypeScript type checking (faster builds)")
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
@@ -992,26 +1128,57 @@ program
 
       if (sourceServerFile) {
         console.log(chalk.gray("Generating tool registry types..."));
-        await generateToolRegistryTypesForServer(projectPath, sourceServerFile);
-        console.log(chalk.green("✓ Tool registry types generated"));
+        const typeGenOk = await generateToolRegistryTypesForServer(
+          projectPath,
+          sourceServerFile
+        );
+        if (typeGenOk) {
+          console.log(chalk.green("✓ Tool registry types generated"));
+        } else {
+          console.log(
+            chalk.yellow(
+              "⚠ Tool registry type generation had errors (non-blocking)"
+            )
+          );
+        }
       }
 
-      // Then run tsc (now schemas are available for import)
-      // Use the locally installed typescript binary directly rather than npx to
-      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package when
-      // typescript is not found in node_modules.
-      // Raise the Node.js heap limit for tsc to avoid OOM on projects with
-      // heavy transitive types (React, Zod v4, etc.).
+      // Transpile TypeScript with esbuild (fast, no OOM on complex types).
+      // Type checking is a separate step via tsc --noEmit (skippable with --no-typecheck).
       console.log(chalk.gray("Building TypeScript..."));
-      await runCommand(
-        "node",
-        [
-          "--max-old-space-size=4096",
-          path.join(projectPath, "node_modules", "typescript", "bin", "tsc"),
-        ],
-        projectPath
-      ).promise;
+      await transpileWithEsbuild(projectPath);
       console.log(chalk.green("✓ TypeScript build complete!"));
+
+      // Type-check with tsc --noEmit (separate from transpilation).
+      // Uses the locally installed typescript binary directly rather than npx to
+      // prevent npx from auto-installing the unrelated `tsc@2.0.4` package.
+      if (options.typecheck !== false) {
+        console.log(chalk.gray("Type checking..."));
+        try {
+          await runCommand(
+            "node",
+            [
+              "--max-old-space-size=4096",
+              path.join(
+                projectPath,
+                "node_modules",
+                "typescript",
+                "bin",
+                "tsc"
+              ),
+              "--noEmit",
+            ],
+            projectPath
+          ).promise;
+          console.log(chalk.green("✓ Type check passed!"));
+        } catch {
+          console.error(
+            chalk.red("✗ Type check failed.") +
+              chalk.gray(" Use --no-typecheck to skip.")
+          );
+          process.exit(1);
+        }
+      }
 
       // Determine where the entry point was compiled to
       let entryPoint: string | undefined;
@@ -1125,6 +1292,7 @@ program
   .option("--tunnel", "Expose server through a tunnel")
   .action(async (options) => {
     try {
+      process.env.MCP_USE_CLI_DEV = "1";
       const projectPath = path.resolve(options.path);
       let port = parseInt(options.port, 10);
       const host = options.host;
@@ -1161,12 +1329,35 @@ program
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
+              const apiBase =
+                process.env.MCP_USE_TUNNEL_API || "https://local.mcp-use.run";
+              try {
+                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                  method: "DELETE",
+                });
+              } catch {
+                // Best-effort cleanup; ignore DELETE failures
+              }
             }
           } catch {
             // Manifest doesn't exist or is invalid, that's okay
           }
 
-          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
+          try {
+            tunnelInfo = await startTunnel(port, existingSubdomain);
+          } catch (e) {
+            if (existingSubdomain) {
+              console.log(
+                chalk.yellow(
+                  `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
+                )
+              );
+              tunnelInfo = await startTunnel(port);
+            } else {
+              throw e;
+            }
+          }
           tunnelUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           tunnelSubdomain = tunnelInfo.subdomain;
@@ -1216,7 +1407,6 @@ program
       } else if (!process.env.MCP_URL) {
         process.env.MCP_URL = mcpUrl;
       }
-
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
@@ -1351,7 +1541,7 @@ program
 
       const chokidarModule = await import("chokidar");
       const chokidar = (chokidarModule as any).default || chokidarModule;
-      const { pathToFileURL, fileURLToPath } = await import("node:url");
+      const { fileURLToPath } = await import("node:url");
       const { createRequire } = await import("node:module");
 
       // Try to get tsx's tsImport function for TypeScript support
@@ -1404,7 +1594,7 @@ program
           // tsImport handles TypeScript compilation and does not cache loaded modules,
           // so the entire dependency tree is re-evaluated on each call.
           // The ?t= timestamp is kept as a safety measure for edge cases.
-          await tsImport(`${serverFilePath}?t=${Date.now()}`, {
+          await tsImport(`${serverFileUrl}?t=${Date.now()}`, {
             parentURL: import.meta.url,
             onImport: (file: string) => {
               const filePath = file.startsWith("file://")
@@ -1540,7 +1730,7 @@ program
       }
 
       // Watch for file changes - watch .ts/.tsx files in project directory
-      const watcher = chokidar.watch(".", {
+      let watcher = chokidar.watch(".", {
         cwd: projectPath,
         ignored: (path: string, stats?: any) => {
           // Normalize path separators for cross-platform compatibility
@@ -1607,7 +1797,7 @@ program
       let reloadTimeout: NodeJS.Timeout | null = null;
       let isReloading = false;
 
-      watcher.on("change", async (filePath: string) => {
+      const hmrOnChange = async (filePath: string) => {
         // Only handle .ts and .tsx files (not .d.ts)
         if (
           (!filePath.endsWith(".ts") && !filePath.endsWith(".tsx")) ||
@@ -1716,7 +1906,208 @@ program
 
           isReloading = false;
         }, 100);
-      });
+      };
+      watcher.on("change", hmrOnChange);
+
+      // Expose project path so tunnel.ts can read the manifest for subdomain reuse
+      process.env.MCP_USE_PROJECT_PATH = projectPath;
+
+      // Expose in-process restart hook for the inspector tunnel toggle.
+      // Tears down the running server and re-sets up everything as if
+      // `mcp-use dev` was called with or without --tunnel.
+      (globalThis as any).__mcpUseDevRestart = async (withTunnel: boolean) => {
+        console.log(
+          chalk.yellow(
+            `\n[DEV] Restarting ${withTunnel ? "with" : "without"} tunnel…`
+          )
+        );
+
+        // Suppress noise from in-flight requests terminated during teardown
+        const origStderrWrite = process.stderr.write.bind(process.stderr);
+        const stderrFilter = (chunk: any, ...args: any[]) => {
+          const str =
+            typeof chunk === "string" ? chunk : (chunk?.toString?.() ?? "");
+          if (
+            str.includes("TypeError: terminated") ||
+            str.includes("SocketError") ||
+            str.includes("UND_ERR_SOCKET")
+          ) {
+            return true;
+          }
+          return origStderrWrite(chunk, ...args);
+        };
+        process.stderr.write = stderrFilter as typeof process.stderr.write;
+
+        // 1. Tear down
+        watcher.close();
+        if (tunnelProcess && typeof tunnelProcess.kill === "function") {
+          if (typeof (tunnelProcess as any).markShutdown === "function") {
+            (tunnelProcess as any).markShutdown();
+          }
+          const dyingProc = tunnelProcess;
+          tunnelProcess = undefined;
+          dyingProc.kill("SIGINT");
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+              try {
+                dyingProc.kill("SIGKILL");
+              } catch {
+                /* ignore */
+              }
+              resolve();
+            }, 5000);
+            dyingProc.on("exit", () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+          });
+        }
+        if (tunnelSubdomain) {
+          const apiBase =
+            process.env.MCP_USE_API || "https://local.mcp-use.run";
+          try {
+            await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
+              method: "DELETE",
+            });
+          } catch {
+            /* ignore */
+          }
+          tunnelSubdomain = undefined;
+        }
+        if (runningServer && typeof runningServer.forceClose === "function") {
+          await runningServer.forceClose();
+        } else if (runningServer && typeof runningServer.close === "function") {
+          await runningServer.close();
+        }
+
+        // 2. Start tunnel if requested
+        tunnelUrl = undefined;
+        if (withTunnel) {
+          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          let existingSubdomain: string | undefined;
+          try {
+            const manifestContent = await readFile(manifestPath, "utf-8");
+            const manifest = JSON.parse(manifestContent);
+            existingSubdomain = manifest.tunnel?.subdomain;
+            if (existingSubdomain) {
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              try {
+                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                  method: "DELETE",
+                });
+              } catch {
+                /* ignore */
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+          let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
+          try {
+            tunnelInfo = await startTunnel(port, existingSubdomain);
+          } catch {
+            if (existingSubdomain) {
+              console.log(
+                chalk.yellow(
+                  `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
+                )
+              );
+              tunnelInfo = await startTunnel(port);
+            } else {
+              throw new Error("Failed to start tunnel");
+            }
+          }
+          tunnelUrl = tunnelInfo.url;
+          tunnelProcess = tunnelInfo.process;
+          tunnelSubdomain = tunnelInfo.subdomain;
+          process.env.MCP_URL = tunnelUrl;
+
+          // Persist subdomain
+          try {
+            const mPath = path.join(projectPath, "dist", "mcp-use.json");
+            let manifest: any = {};
+            try {
+              manifest = JSON.parse(await readFile(mPath, "utf-8"));
+            } catch {
+              /* ignore */
+            }
+            if (!manifest.tunnel) manifest.tunnel = {};
+            manifest.tunnel.subdomain = tunnelSubdomain;
+            await mkdir(path.dirname(mPath), { recursive: true });
+            await writeFile(mPath, JSON.stringify(manifest, null, 2), "utf-8");
+          } catch {
+            /* ignore */
+          }
+        } else {
+          process.env.MCP_URL = `http://${host}:${port}`;
+        }
+
+        // 3. Re-import server module (HMR mode stays true so user's listen() is a no-op)
+        console.log(chalk.gray(`Loading server from ${serverFile}...`));
+        runningServer = await importServerModule();
+        if (!runningServer) {
+          console.error(
+            chalk.red("Error: Could not find MCPServer instance after restart.")
+          );
+          return;
+        }
+        // Temporarily disable HMR flag so our listen() actually starts the server
+        (globalThis as any).__mcpUseHmrMode = false;
+        await runningServer.listen(port);
+        (globalThis as any).__mcpUseHmrMode = true;
+
+        const browserHost = normalizeBrowserHost(host);
+        const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+        const autoConnectEndpoint = tunnelUrl
+          ? `${tunnelUrl}/mcp`
+          : mcpEndpoint;
+        console.log(chalk.green.bold(`✓ Restarted`));
+        console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+        if (tunnelUrl) {
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+        }
+        console.log(
+          chalk.whiteBright(
+            `Inspector: http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
+          )
+        );
+        console.log(chalk.gray(`Watching for changes...\n`));
+
+        // 4. Re-create watcher (reuses same config)
+        watcher = chokidar.watch(".", {
+          cwd: projectPath,
+          ignored: (p: string, stats?: any) => {
+            const np = p.replace(/\\/g, "/");
+            if (/(^|\/)\.[^/]/.test(np)) return true;
+            if (np.includes("/node_modules/") || np.endsWith("/node_modules"))
+              return true;
+            if (np.includes("/dist/") || np.endsWith("/dist")) return true;
+            if (np.includes("/resources/") || np.endsWith("/resources"))
+              return true;
+            if (stats?.isFile() && np.endsWith(".d.ts")) return true;
+            return false;
+          },
+          persistent: true,
+          ignoreInitial: true,
+          depth: 3,
+        });
+        watcher
+          .on("ready", () => console.log(chalk.gray(`[HMR] Watcher ready`)))
+          .on("error", (err: unknown) =>
+            console.error(
+              chalk.red(
+                `[HMR] Watcher error: ${err instanceof Error ? err.message : String(err)}`
+              )
+            )
+          )
+          .on("change", hmrOnChange);
+
+        // Restore stderr once the new server is stable
+        setTimeout(() => {
+          process.stderr.write = origStderrWrite;
+        }, 2000);
+      };
 
       // Handle cleanup
       let hmrCleanupInProgress = false;
@@ -1808,6 +2199,16 @@ program
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
+              // Release the stale subdomain so the first attempt can reclaim it
+              const apiBase =
+                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              try {
+                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                  method: "DELETE",
+                });
+              } catch {
+                // Best-effort cleanup; ignore DELETE failures
+              }
             }
           } catch (error) {
             // Manifest doesn't exist or is invalid, that's okay
@@ -1818,7 +2219,21 @@ program
             );
           }
 
-          const tunnelInfo = await startTunnel(port, existingSubdomain);
+          let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
+          try {
+            tunnelInfo = await startTunnel(port, existingSubdomain);
+          } catch (e) {
+            if (existingSubdomain) {
+              console.log(
+                chalk.yellow(
+                  `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
+                )
+              );
+              tunnelInfo = await startTunnel(port);
+            } else {
+              throw e;
+            }
+          }
           mcpUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           const subdomain = tunnelInfo.subdomain;
@@ -2098,8 +2513,17 @@ program
 
     try {
       console.log(chalk.blue("Generating tool registry types..."));
-      await generateToolRegistryTypesForServer(projectPath, options.server);
-      console.log(chalk.green("✓ Tool registry types generated successfully"));
+      const success = await generateToolRegistryTypesForServer(
+        projectPath,
+        options.server
+      );
+      if (success) {
+        console.log(
+          chalk.green("✓ Tool registry types generated successfully")
+        );
+      } else {
+        console.log(chalk.yellow("⚠ Tool registry type generation had errors"));
+      }
       process.exit(0);
     } catch (error) {
       console.error(
