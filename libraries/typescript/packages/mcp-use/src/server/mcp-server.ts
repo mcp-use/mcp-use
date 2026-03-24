@@ -1308,6 +1308,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         };
 
         const innerFn = async () => {
+          // Propagate auth and any middleware state to the enhanced context
+          // so tool handlers see data set by middleware (e.g., bearer auth).
+          if (mwCtx.auth && !(enhancedContext as any).auth) {
+            (enhancedContext as any).auth = mwCtx.auth;
+          }
+          for (const [key, value] of mwCtx.state) {
+            (enhancedContext as any)[key] = value;
+          }
+
           if (actualCallback.length >= 2) {
             return await actualCallback(mwCtx.params, enhancedContext);
           }
@@ -2813,6 +2822,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         };
 
         const innerFn = async () => {
+          // Propagate auth and any middleware state to the enhanced context
+          if (mwCtx.auth && !(enhancedContext as any).auth) {
+            (enhancedContext as any).auth = mwCtx.auth;
+          }
+          for (const [key, value] of mwCtx.state) {
+            (enhancedContext as any)[key] = value;
+          }
+
           if (actualCallback.length >= 2) {
             return await (actualCallback as any)(mwCtx.params, enhancedContext);
           }
