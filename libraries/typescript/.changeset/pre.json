@@ -8,6 +8,7 @@
     "mcp-use": "1.22.0"
   },
   "changesets": [
+    "ctx-auth-optional-typing",
     "typed-middleware-and-tool-fixes"
   ]
 }
