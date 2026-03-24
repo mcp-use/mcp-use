@@ -4,7 +4,7 @@ description: "Error boundary component for graceful error handling in widgets"
 icon: "bug"
 ---
 
-The `ErrorBoundary` component catches React errors anywhere in the child component tree, logs those errors, and displays a friendly fallback UI instead of crashing the entire widget.
+The `ErrorBoundary` component catches React errors anywhere in the child component tree, logs those errors, and displays a fallback UI instead of crashing the entire widget.
 
 ## Import
 
@@ -21,6 +21,8 @@ import { ErrorBoundary } from 'mcp-use/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `children` | `React.ReactNode` | **required** | The widget content to wrap |
+| `fallback` | `ReactNode \| (error: Error) => ReactNode` | Built-in error card | Custom UI to render when an error is caught |
+| `onError` | `(error: Error, errorInfo: React.ErrorInfo) => void` | — | Callback invoked when an error is caught |
 
 ## Basic Usage
 
@@ -34,6 +36,61 @@ function MyWidget() {
     </ErrorBoundary>
   );
 }
+```
+
+## Custom Fallback
+
+Pass a `fallback` prop to render your own error UI instead of the default red error card.
+
+### Static Fallback
+
+```tsx
+<ErrorBoundary fallback={<div>Something went wrong. Please try again.</div>}>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+### Dynamic Fallback with Error Details
+
+Pass a function to receive the error object:
+
+```tsx
+<ErrorBoundary fallback={(error) => (
+  <div className="p-4 rounded bg-yellow-50 text-yellow-800">
+    <p className="font-bold">Oops!</p>
+    <p className="text-sm">{error.message}</p>
+  </div>
+)}>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+## Error Callback
+
+Use `onError` to log errors to an analytics service or perform side effects:
+
+```tsx
+<ErrorBoundary
+  onError={(error, errorInfo) => {
+    analytics.track('widget_error', {
+      message: error.message,
+      stack: errorInfo.componentStack,
+    });
+  }}
+>
+  <MyWidget />
+</ErrorBoundary>
+```
+
+You can combine `fallback` and `onError`:
+
+```tsx
+<ErrorBoundary
+  fallback={<div>Something went wrong</div>}
+  onError={(error) => console.error('Widget crashed:', error)}
+>
+  <MyWidget />
+</ErrorBoundary>
 ```
 
 ## Automatic Inclusion
@@ -50,9 +107,9 @@ import { McpUseProvider } from 'mcp-use/react';
 
 The error boundary wraps your widget content as the innermost wrapper, ensuring all errors are caught.
 
-## Error Display
+## Default Error Display
 
-When an error occurs, the boundary displays:
+When no `fallback` is provided and an error occurs, the boundary displays:
 
 - A red-bordered error container
 - The error message in a readable format
@@ -62,16 +119,15 @@ The error UI is styled to be visible but not intrusive, allowing users to unders
 
 ## Error Logging
 
-Errors are automatically logged to the console with:
+Errors are always logged to the console with:
 
 - The error object
 - React error info (component stack, etc.)
 
-This helps with debugging during development.
+This happens regardless of whether `onError` is provided.
 
 
 ## Related Components
 
 - [`McpUseProvider`](./mcpuseprovider) - Includes ErrorBoundary automatically
 - [`useWidget`](./usewidget) - Widget hook for accessing props and actions
-
