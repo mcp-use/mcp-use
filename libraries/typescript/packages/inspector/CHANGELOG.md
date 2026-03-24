@@ -1,5 +1,16 @@
 # @mcp-use/inspector
 
+## 0.25.1-canary.2
+
+### Patch Changes
+
+- 8500c06: Add `fallback` and `onError` props to ErrorBoundary
+
+  The `ErrorBoundary` component now accepts an optional `fallback` prop (`ReactNode` or `(error: Error) => ReactNode`) for custom error UI, and an `onError` callback for error reporting. When no fallback is provided, the default red error card is shown (backward compatible).
+
+- Updated dependencies [8500c06]
+  - mcp-use@1.22.1-canary.2
+
 ## 0.25.1-canary.1
 
 ### Patch Changes

@@ -9,6 +9,7 @@
   },
   "changesets": [
     "ctx-auth-optional-typing",
+    "error-boundary-fallback",
     "typed-middleware-and-tool-fixes"
   ]
 }
