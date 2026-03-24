@@ -29,10 +29,15 @@ export interface ClientCapabilityChecker {
 }
 
 /**
- * Base MCP Context without OAuth
+ * Base MCP Context without OAuth.
+ *
+ * `auth` is typed as optional `AuthInfo` rather than `never` so that
+ * `ctx.auth` is always accessible for null-checking. This allows the
+ * common pattern: `if (!ctx.auth) return error("Not authenticated")`
+ * even when OAuth is conditionally configured at runtime.
  */
 export interface McpContextBase extends HonoContext {
-  auth?: never;
+  auth?: AuthInfo;
 }
 
 /**
@@ -57,7 +62,10 @@ export interface McpContextWithAuth extends HonoContext {
 }
 
 /**
- * Conditional MCP Context type based on OAuth configuration
+ * Conditional MCP Context type based on OAuth configuration.
+ *
+ * - `true`  → `auth: AuthInfo` (guaranteed present, OAuth is configured)
+ * - `false` → `auth?: AuthInfo` (optional, allows null-checking for conditional OAuth)
  */
 export type McpContext<HasOAuth extends boolean = false> = HasOAuth extends true
   ? McpContextWithAuth
