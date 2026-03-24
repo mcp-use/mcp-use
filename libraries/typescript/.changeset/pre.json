@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "0.25.0",
     "mcp-use": "1.22.0"
   },
-  "changesets": []
+  "changesets": [
+    "typed-middleware-and-tool-fixes"
+  ]
 }
