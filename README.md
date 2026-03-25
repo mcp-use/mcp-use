@@ -166,213 +166,24 @@ Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/ui
 
 Ready-to-use MCP Apps you can deploy in one click or remix as your own.
 
-<details>
-<summary><b>Chart Builder</b> — ECharts in your chat</summary>
-
-![Chart Builder](https://raw.githubusercontent.com/mcp-use/mcp-chart-builder/main/repo-assets/demo.gif)
-
-**Tools:** `create-chart`
-
-**URL:** `https://yellow-shadow-21833.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-chart-builder&branch=main&project-name=mcp-chart-builder&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Diagram Builder</b> — Mermaid diagrams in your chat</summary>
-
-![Diagram Builder](https://raw.githubusercontent.com/mcp-use/mcp-diagram-builder/main/repo-assets/demo.gif)
-
-**Tools:** `create-diagram`, `edit-diagram`
-
-**URL:** `https://lucky-darkness-402ph.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-diagram-builder&branch=main&project-name=mcp-diagram-builder&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Slide Deck</b> — Presentations in your chat</summary>
-
-![Slide Deck](https://raw.githubusercontent.com/mcp-use/mcp-slide-deck/main/repo-assets/demo.gif)
-
-**Tools:** `create-slides`, `edit-slide`
-
-**URL:** `https://solitary-block-r6m6x.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-slide-deck&branch=main&project-name=mcp-slide-deck&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Maps Explorer</b> — Leaflet maps in your chat</summary>
-
-![Maps Explorer](https://raw.githubusercontent.com/mcp-use/mcp-maps-explorer/main/repo-assets/demo.gif)
-
-**Tools:** `show-map`, `get-place-details`, `add-markers`
-
-**URL:** `https://super-night-ttde2.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-maps-explorer&branch=main&project-name=mcp-maps-explorer&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Kanban Board</b> — Trello in your chat</summary>
-
-![Kanban Board](https://raw.githubusercontent.com/mcp-use/mcp-kanban-board/main/repo-assets/demo.gif)
-
-**Tools:** `show-board`, `add-task`, `move-task`, `summarize-board`
-
-**URL:** `https://noisy-wood-rtnia.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-kanban-board&branch=main&project-name=mcp-kanban-board&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Hugging Face Spaces</b> — AI demos in your chat</summary>
-
-![Hugging Face Spaces](https://raw.githubusercontent.com/mcp-use/mcp-huggingface-spaces/main/repo-assets/demo.gif)
-
-**Tools:** `search-spaces`, `show-space`, `trending-spaces`
-
-**URL:** `https://gentle-frost-pvxpk.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-huggingface-spaces&branch=main&project-name=mcp-huggingface-spaces&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Quiz Master</b> — Interactive quizzes in your chat</summary>
-
-![Quiz Master](https://raw.githubusercontent.com/mcp-use/mcp-quiz-master/main/repo-assets/demo.gif)
-
-**Tools:** `start-quiz`, `get-score`
-
-**URL:** `https://wispy-mountain-37qlg.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-quiz-master&branch=main&project-name=mcp-quiz-master&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Recipe Finder</b> — Discover recipes in your chat</summary>
-
-![Recipe Finder](https://raw.githubusercontent.com/mcp-use/mcp-recipe-finder/main/repo-assets/demo.gif)
-
-**Tools:** `search-recipes`, `get-recipe`, `meal-plan`, `recipe-suggestion`
-
-**URL:** `https://bold-tree-1fe79.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-recipe-finder&branch=main&project-name=mcp-recipe-finder&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Widget Gallery</b> — Every widget type in one place</summary>
-
-![Widget Gallery](https://raw.githubusercontent.com/mcp-use/mcp-widget-gallery/main/repo-assets/demo.gif)
-
-**Tools:** `show-react-widget`, `html-greeting`, `mcp-ui-poll`, `programmatic-counter`, `detect-client`
-
-**URL:** `https://wandering-lake-mmxhs.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-widget-gallery&branch=main&project-name=mcp-widget-gallery&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Multi Server Hub</b> — Compose MCP servers with middleware</summary>
-
-![Multi Server Hub](https://raw.githubusercontent.com/mcp-use/mcp-multi-server-hub/main/repo-assets/demo.gif)
-
-**Tools:** `hub-status`, `hub-config-example`, `audit-log`
-
-**URL:** `https://soft-voice-4nxfi.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-multi-server-hub&branch=main&project-name=mcp-multi-server-hub&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>File Manager</b> — File vault in your chat</summary>
-
-![File Manager](https://raw.githubusercontent.com/mcp-use/mcp-file-manager/main/repo-assets/demo.gif)
-
-**Tools:** `open-vault`, `get-file`, `list-files`
-
-**URL:** `https://muddy-pond-eyays.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-file-manager&branch=main&project-name=mcp-file-manager&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Progress Demo</b> — Progress reporting and notifications</summary>
-
-![Progress Demo](https://raw.githubusercontent.com/mcp-use/mcp-progress-demo/main/repo-assets/demo.gif)
-
-**Tools:** `process-data`, `fetch-report`, `delete-dataset`, `search-external`, `failing-tool`
-
-**URL:** `https://crimson-river-pzsz1.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-progress-demo&branch=main&project-name=mcp-progress-demo&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>i18n Adaptive</b> — Multilingual adaptive context</summary>
-
-![i18n Adaptive](https://raw.githubusercontent.com/mcp-use/mcp-i18n-adaptive/main/repo-assets/demo.gif)
-
-**Tools:** `show-context`, `detect-caller`
-
-**URL:** `https://falling-grass-58yov.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-i18n-adaptive&branch=main&project-name=mcp-i18n-adaptive&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Media Mixer</b> — Rich media responses in your chat</summary>
-
-![Media Mixer](https://raw.githubusercontent.com/mcp-use/mcp-media-mixer/main/repo-assets/demo.gif)
-
-**Tools:** `generate-image`, `generate-audio`, `generate-pdf`, `get-report`, `get-html-snippet`, `get-xml-config`, `get-stylesheet`, `get-script`, `get-data-array`
-
-**URL:** `https://wandering-breeze-nuipu.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-media-mixer&branch=main&project-name=mcp-media-mixer&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Resource Watcher</b> — MCP resources, subscriptions, and roots</summary>
-
-![Resource Watcher](https://raw.githubusercontent.com/mcp-use/mcp-resource-watcher/main/repo-assets/demo.gif)
-
-**Tools:** `show-config`, `update-config`, `toggle-feature`, `list-roots`
-
-**URL:** `https://fragrant-term-zmdks.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-resource-watcher&branch=main&project-name=mcp-resource-watcher&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
-
-<details>
-<summary><b>Live Feed</b> — Real-time streaming in your chat</summary>
-
-_Demo GIF was not recorded for this template; use the deployed URL below._
-
-**Tools:** `open-feed`, `broadcast-message`, `toggle-auto-updates`, `list-sessions`
-
-**URL:** `https://floral-feather-c784m.run.mcp-use.com/mcp`
-
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-live-feed&branch=main&project-name=mcp-live-feed&port=3000&runtime=node&base-image=node%3A20)
-
-</details>
+| Preview | Name | Tools | URL | Deploy |
+| --- | --- | --- | --- | --- |
+| ![Chart Builder](https://raw.githubusercontent.com/mcp-use/mcp-chart-builder/main/repo-assets/demo.gif) | Chart Builder | `create-chart` | `https://yellow-shadow-21833.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-chart-builder&branch=main&project-name=mcp-chart-builder&port=3000&runtime=node&base-image=node%3A20) |
+| ![Diagram Builder](https://raw.githubusercontent.com/mcp-use/mcp-diagram-builder/main/repo-assets/demo.gif) | Diagram Builder | `create-diagram`, `edit-diagram` | `https://lucky-darkness-402ph.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-diagram-builder&branch=main&project-name=mcp-diagram-builder&port=3000&runtime=node&base-image=node%3A20) |
+| ![Slide Deck](https://raw.githubusercontent.com/mcp-use/mcp-slide-deck/main/repo-assets/demo.gif) | Slide Deck | `create-slides`, `edit-slide` | `https://solitary-block-r6m6x.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-slide-deck&branch=main&project-name=mcp-slide-deck&port=3000&runtime=node&base-image=node%3A20) |
+| ![Maps Explorer](https://raw.githubusercontent.com/mcp-use/mcp-maps-explorer/main/repo-assets/demo.gif) | Maps Explorer | `show-map`, `get-place-details`, `add-markers` | `https://super-night-ttde2.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-maps-explorer&branch=main&project-name=mcp-maps-explorer&port=3000&runtime=node&base-image=node%3A20) |
+| ![Kanban Board](https://raw.githubusercontent.com/mcp-use/mcp-kanban-board/main/repo-assets/demo.gif) | Kanban Board | `show-board`, `add-task`, `move-task`, `summarize-board` | `https://noisy-wood-rtnia.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-kanban-board&branch=main&project-name=mcp-kanban-board&port=3000&runtime=node&base-image=node%3A20) |
+| ![Hugging Face Spaces](https://raw.githubusercontent.com/mcp-use/mcp-huggingface-spaces/main/repo-assets/demo.gif) | Hugging Face Spaces | `search-spaces`, `show-space`, `trending-spaces` | `https://gentle-frost-pvxpk.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-huggingface-spaces&branch=main&project-name=mcp-huggingface-spaces&port=3000&runtime=node&base-image=node%3A20) |
+| ![Quiz Master](https://raw.githubusercontent.com/mcp-use/mcp-quiz-master/main/repo-assets/demo.gif) | Quiz Master | `start-quiz`, `get-score` | `https://wispy-mountain-37qlg.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-quiz-master&branch=main&project-name=mcp-quiz-master&port=3000&runtime=node&base-image=node%3A20) |
+| ![Recipe Finder](https://raw.githubusercontent.com/mcp-use/mcp-recipe-finder/main/repo-assets/demo.gif) | Recipe Finder | `search-recipes`, `get-recipe`, `meal-plan`, `recipe-suggestion` | `https://bold-tree-1fe79.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-recipe-finder&branch=main&project-name=mcp-recipe-finder&port=3000&runtime=node&base-image=node%3A20) |
+| ![Widget Gallery](https://raw.githubusercontent.com/mcp-use/mcp-widget-gallery/main/repo-assets/demo.gif) | Widget Gallery | `show-react-widget`, `html-greeting`, `mcp-ui-poll`, `programmatic-counter`, `detect-client` | `https://wandering-lake-mmxhs.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-widget-gallery&branch=main&project-name=mcp-widget-gallery&port=3000&runtime=node&base-image=node%3A20) |
+| ![Multi Server Hub](https://raw.githubusercontent.com/mcp-use/mcp-multi-server-hub/main/repo-assets/demo.gif) | Multi Server Hub | `hub-status`, `hub-config-example`, `audit-log` | `https://soft-voice-4nxfi.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-multi-server-hub&branch=main&project-name=mcp-multi-server-hub&port=3000&runtime=node&base-image=node%3A20) |
+| ![File Manager](https://raw.githubusercontent.com/mcp-use/mcp-file-manager/main/repo-assets/demo.gif) | File Manager | `open-vault`, `get-file`, `list-files` | `https://muddy-pond-eyays.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-file-manager&branch=main&project-name=mcp-file-manager&port=3000&runtime=node&base-image=node%3A20) |
+| ![Progress Demo](https://raw.githubusercontent.com/mcp-use/mcp-progress-demo/main/repo-assets/demo.gif) | Progress Demo | `process-data`, `fetch-report`, `delete-dataset`, `search-external`, `failing-tool` | `https://crimson-river-pzsz1.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-progress-demo&branch=main&project-name=mcp-progress-demo&port=3000&runtime=node&base-image=node%3A20) |
+| ![i18n Adaptive](https://raw.githubusercontent.com/mcp-use/mcp-i18n-adaptive/main/repo-assets/demo.gif) | i18n Adaptive | `show-context`, `detect-caller` | `https://falling-grass-58yov.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-i18n-adaptive&branch=main&project-name=mcp-i18n-adaptive&port=3000&runtime=node&base-image=node%3A20) |
+| ![Media Mixer](https://raw.githubusercontent.com/mcp-use/mcp-media-mixer/main/repo-assets/demo.gif) | Media Mixer | `generate-image`, `generate-audio`, `generate-pdf`, `get-report`, `get-html-snippet`, `get-xml-config`, `get-stylesheet`, `get-script`, `get-data-array` | `https://wandering-breeze-nuipu.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-media-mixer&branch=main&project-name=mcp-media-mixer&port=3000&runtime=node&base-image=node%3A20) |
+| ![Resource Watcher](https://raw.githubusercontent.com/mcp-use/mcp-resource-watcher/main/repo-assets/demo.gif) | Resource Watcher | `show-config`, `update-config`, `toggle-feature`, `list-roots` | `https://fragrant-term-zmdks.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-resource-watcher&branch=main&project-name=mcp-resource-watcher&port=3000&runtime=node&base-image=node%3A20) |
+| _(No demo GIF)_ | Live Feed | `open-feed`, `broadcast-message`, `toggle-auto-updates`, `list-sessions` | `https://floral-feather-c784m.run.mcp-use.com/mcp` | [![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-live-feed&branch=main&project-name=mcp-live-feed&port=3000&runtime=node&base-image=node%3A20) |
 
 ---
 ### <img src="./static/python.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> Python
