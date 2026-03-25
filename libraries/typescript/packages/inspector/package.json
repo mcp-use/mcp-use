@@ -93,7 +93,7 @@
     "@langchain/core": "^1.1.26",
     "@langchain/google-genai": "^2.1.19",
     "@langchain/openai": "^1.2.8",
-    "@mcp-ui/client": "^6.1.0",
+    "@mcp-ui/client": "^7.0.0",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
