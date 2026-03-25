@@ -20,10 +20,6 @@
     "deploy": "mcp-use deploy"
   },
   "dependencies": {
-    "@openai/apps-sdk-ui": "^0.2.1",
-    "@tanstack/react-query": "^5.90.21",
-    "cors": "^2.8.6",
-    "express": "^5.2.1",
     "mcp-use": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -32,17 +28,10 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.0"
-  },
-  "overrides": {
-    "sugarss": "^5.0.1",
-    "lodash": "4.17.23"
+    "typescript": "^5.9.3"
   }
 }
