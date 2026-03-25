@@ -35,13 +35,13 @@ import { Tel } from "../telemetry/index.js";
 export abstract class BaseMCPClient {
   /**
    * Internal configuration object containing MCP server definitions.
-   * @internal
+   * @protected
    */
   protected config: Record<string, any> = {};
 
   /**
    * Map of server names to their active sessions.
-   * @internal
+   * @protected
    */
   protected sessions: Record<string, MCPSession> = {};
 
@@ -232,7 +232,7 @@ export abstract class BaseMCPClient {
    *
    * @param serverConfig - Server configuration object
    * @returns Platform-specific connector instance
-   * @internal
+   * @protected
    */
   protected abstract createConnectorFromConfig(
     serverConfig: Record<string, any>

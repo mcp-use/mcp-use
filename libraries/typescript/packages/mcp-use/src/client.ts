@@ -503,7 +503,10 @@ export class MCPClient extends BaseMCPClient {
     fs.writeFileSync(filepath, JSON.stringify(this.config, null, 2), "utf-8");
   }
 
-  /** @internal */
+  /**
+   * Create a connector from server configuration (Node.js version)
+   * Supports all connector types including StdioConnector (lazy-loaded to avoid pulling Node-only code into browser bundles).
+   */
   protected async createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): Promise<BaseConnector> {

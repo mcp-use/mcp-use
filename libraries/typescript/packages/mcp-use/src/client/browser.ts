@@ -49,7 +49,10 @@ export class BrowserMCPClient extends BaseMCPClient {
     return new BrowserMCPClient(cfg);
   }
 
-  /** @internal */
+  /**
+   * Create a connector from server configuration (Browser version)
+   * Supports HTTP connector only
+   */
   protected createConnectorFromConfig(
     serverConfig: Record<string, any>
   ): BaseConnector {
