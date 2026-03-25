@@ -1,20 +1,56 @@
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import {
+  AIMessage,
+  HumanMessage,
+  ToolMessage,
+  type BaseMessage,
+} from "@langchain/core/messages";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import type { Message } from "./types";
+
+function extractTextContent(m: Message): string {
+  let raw =
+    typeof m.content === "string"
+      ? m.content
+      : Array.isArray(m.content)
+        ? (m.content as Array<{ text?: string }>)
+            .map((x) => x?.text ?? "")
+            .join("\n")
+        : JSON.stringify(m.content ?? "");
+
+  if (!raw.trim() && m.parts && m.parts.length > 0) {
+    raw = m.parts
+      .filter((p) => p.type === "text" && p.text)
+      .map((p) => p.text!)
+      .join("");
+  }
+
+  return raw.trim();
+}
+
+/**
+ * Strip `_meta` from a tool result before serializing for the model.
+ * Keeps `structuredContent`, `content`, `isError`, and everything else.
+ */
+function serializeToolResult(result: unknown): string {
+  if (result && typeof result === "object") {
+    const { _meta, ...rest } = result as Record<string, unknown>;
+    return JSON.stringify(rest);
+  }
+  return typeof result === "string" ? result : JSON.stringify(result);
+}
 
 /**
  * Converts inspector Message[] to LangChain BaseMessage[] for use as externalHistory
  * (e.g. in agent.streamEvents(..., externalHistory, ...)).
  *
- * Supports multimodal messages with image attachments.
+ * Supports multimodal messages with image attachments and preserves tool
+ * call / tool result context across conversation turns.
  *
  * @param messages - Inspector Messages
  * @returns LangChain BaseMessages
  */
-export function convertMessagesToLangChain(
-  messages: Message[]
-): (HumanMessage | AIMessage)[] {
-  return messages.map((m) => {
+export function convertMessagesToLangChain(messages: Message[]): BaseMessage[] {
+  return messages.flatMap((m): BaseMessage[] => {
     // Handle user messages with attachments (multimodal)
     if (m.role === "user" && m.attachments && m.attachments.length > 0) {
       const textContent =
@@ -26,7 +62,6 @@ export function convertMessagesToLangChain(
                 .join("\n")
             : JSON.stringify(m.content ?? "");
 
-      // Build multimodal content array
       const content: Array<any> = [
         {
           type: "text",
@@ -34,7 +69,6 @@ export function convertMessagesToLangChain(
         },
       ];
 
-      // Add image attachments
       for (const attachment of m.attachments) {
         if (attachment.type === "image") {
           content.push({
@@ -46,32 +80,52 @@ export function convertMessagesToLangChain(
         }
       }
 
-      return new HumanMessage({ content });
+      return [new HumanMessage({ content })];
     }
 
-    // Handle regular messages (text only)
-    let raw =
-      typeof m.content === "string"
-        ? m.content
-        : Array.isArray(m.content)
-          ? (m.content as Array<{ text?: string }>)
-              .map((x) => x?.text ?? "")
-              .join("\n")
-          : JSON.stringify(m.content ?? "");
-
-    // Fall back to parts when content is empty (streamed assistant messages
-    // store their text in parts, not content)
-    if (!raw.trim() && m.parts && m.parts.length > 0) {
-      raw = m.parts
-        .filter((p) => p.type === "text" && p.text)
-        .map((p) => p.text!)
-        .join("");
+    // Handle user messages (text only)
+    if (m.role === "user") {
+      const content = extractTextContent(m) || "[no content]";
+      return [new HumanMessage(content)];
     }
 
-    const content = raw.trim() || "[no content]";
-    return m.role === "user"
-      ? new HumanMessage(content)
-      : new AIMessage(content);
+    // --- Assistant messages ---
+
+    const toolParts = (m.parts ?? []).filter(
+      (p) =>
+        p.type === "tool-invocation" &&
+        p.toolInvocation &&
+        p.toolInvocation.result !== undefined
+    );
+
+    // No tool invocations — plain assistant text
+    if (toolParts.length === 0) {
+      const content = extractTextContent(m) || "[no content]";
+      return [new AIMessage(content)];
+    }
+
+    // Reconstruct AIMessage with tool_calls + ToolMessages for each result.
+    const textContent = extractTextContent(m);
+    const toolCalls = toolParts.map((p, i) => ({
+      name: p.toolInvocation!.toolName,
+      args: p.toolInvocation!.args,
+      id: `call_${p.toolInvocation!.toolName}_${i}`,
+    }));
+
+    const aiMsg = new AIMessage({
+      content: textContent || "",
+      tool_calls: toolCalls,
+    });
+
+    const toolMessages = toolParts.map(
+      (p, i) =>
+        new ToolMessage({
+          content: serializeToolResult(p.toolInvocation!.result),
+          tool_call_id: `call_${p.toolInvocation!.toolName}_${i}`,
+        })
+    );
+
+    return [aiMsg, ...toolMessages];
   });
 }
 

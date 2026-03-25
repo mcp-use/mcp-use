@@ -1,5 +1,53 @@
 # @mcp-use/inspector
 
+## 0.25.1-canary.5
+
+### Patch Changes
+
+- mcp-use@1.22.1-canary.5
+
+## 0.25.1-canary.4
+
+### Patch Changes
+
+- mcp-use@1.22.1-canary.4
+
+## 0.25.1-canary.3
+
+### Patch Changes
+
+- f28452e: Preserve tool call results (including `structuredContent`) in Inspector chat history across conversation turns
+
+  Previously, `convertMessagesToLangChain` only emitted `HumanMessage` and `AIMessage`, dropping all tool invocation data when reconstructing conversation history. This meant the model lost context about previous tool calls and their results on subsequent turns.
+
+  Now, assistant messages with tool-invocation parts are properly reconstructed as an `AIMessage` with `tool_calls` followed by `ToolMessage` objects for each completed invocation. The `_meta` field is stripped from tool results before they reach the model, while `structuredContent` and all other fields are preserved.
+  - mcp-use@1.22.1-canary.3
+
+## 0.25.1-canary.2
+
+### Patch Changes
+
+- 8500c06: Add `fallback` and `onError` props to ErrorBoundary
+
+  The `ErrorBoundary` component now accepts an optional `fallback` prop (`ReactNode` or `(error: Error) => ReactNode`) for custom error UI, and an `onError` callback for error reporting. When no fallback is provided, the default red error card is shown (backward compatible).
+
+- Updated dependencies [8500c06]
+  - mcp-use@1.22.1-canary.2
+
+## 0.25.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cfa387a]
+  - mcp-use@1.22.1-canary.1
+
+## 0.25.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5e9d5a8]
+  - mcp-use@1.22.1-canary.0
+
 ## 0.25.0
 
 ### Minor Changes

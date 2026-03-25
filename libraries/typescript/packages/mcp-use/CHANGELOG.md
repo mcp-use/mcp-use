@@ -1,5 +1,64 @@
 # mcp-use
 
+## 1.22.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [e743a07]
+  - @mcp-use/cli@2.21.0-canary.5
+  - @mcp-use/inspector@0.25.1-canary.5
+
+## 1.22.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [7934749]
+  - @mcp-use/cli@2.21.0-canary.4
+  - @mcp-use/inspector@0.25.1-canary.4
+
+## 1.22.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f28452e]
+  - @mcp-use/inspector@0.25.1-canary.3
+  - @mcp-use/cli@2.20.1-canary.3
+
+## 1.22.1-canary.2
+
+### Patch Changes
+
+- 8500c06: Add `fallback` and `onError` props to ErrorBoundary
+
+  The `ErrorBoundary` component now accepts an optional `fallback` prop (`ReactNode` or `(error: Error) => ReactNode`) for custom error UI, and an `onError` callback for error reporting. When no fallback is provided, the default red error card is shown (backward compatible).
+
+- Updated dependencies [8500c06]
+  - @mcp-use/inspector@0.25.1-canary.2
+  - @mcp-use/cli@2.20.1-canary.2
+
+## 1.22.1-canary.1
+
+### Patch Changes
+
+- cfa387a: Fix middleware-to-tool-handler context propagation and `ctx.auth` typing
+  - **Singleton AsyncLocalStorage**: The `context-storage` module now uses `globalThis` to guarantee a single `AsyncLocalStorage` instance even when bundlers split the module into multiple chunks. Previously, dynamic imports from resources, prompts, and proxy handlers could get a different instance, causing `getRequestContext()` to return `undefined` in tool handlers.
+  - **Safe Hono context extraction**: Replaced `Object.create(honoContext)` with explicit property extraction in `createEnhancedContext` and `buildHandlerContext`. Hono's `Context` class uses JavaScript private fields (`#req`, `#var`) that cannot be accessed through prototype chains — `Object.create()` caused `TypeError: Cannot read private member #req`. The new approach copies public data (variables from `c.set()`, `req`, `env`) into a plain object.
+  - **Auth propagation from middleware to tools**: MCP middleware `ctx.auth` and `ctx.state` values are now forwarded to the enhanced tool context before the callback runs. This ensures data set by HTTP middleware (e.g., bearer token auth via `c.set("auth", ...)`) is accessible as `ctx.auth` in tool handlers.
+  - **`ctx.auth` typing**: `ctx.auth` is now typed as `AuthInfo | undefined` (instead of `never`) when OAuth is not configured, allowing `if (!ctx.auth) return error(...)` guards in servers with conditional OAuth.
+  - @mcp-use/cli@2.20.1-canary.1
+  - @mcp-use/inspector@0.25.1-canary.1
+
+## 1.22.1-canary.0
+
+### Patch Changes
+
+- 5e9d5a8: Improve MCP middleware and tool typing ergonomics
+  - **Typed MCP middleware context**: `server.use("mcp:tools/call", ...)` now narrows `ctx.params` to `{ name: string; arguments?: Record<string, unknown> }` instead of the generic `Record<string, unknown>`. Same for `mcp:resources/read` (typed `uri`) and `mcp:prompts/get` (typed `name` + `arguments`). Wildcard patterns (`mcp:*`) fall back to the base `MiddlewareContext`.
+  - **`outputSchema` + response helpers compatibility**: Tools with `outputSchema` can now return `text()`, `mix()`, `markdown()`, and other content helpers without a type error. The callback return type is widened to `Promise<TypedCallToolResult<TOutput> | CallToolResult>`.
+  - **Typed `resourceTemplate` params**: `server.resourceTemplate()` now accepts an optional `schema` field (Zod schema). When provided, the callback's `params` argument is narrowed to `z.infer<schema>` instead of `Record<string, any>`, matching how `server.tool()` works.
+  - @mcp-use/cli@2.20.1-canary.0
+  - @mcp-use/inspector@0.25.1-canary.0
+
 ## 1.22.0
 
 ### Minor Changes

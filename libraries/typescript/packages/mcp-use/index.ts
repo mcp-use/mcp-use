@@ -47,7 +47,11 @@ export {
 } from "./src/observability/index.js";
 
 // Export telemetry utilities
-export { setTelemetrySource, Telemetry } from "./src/telemetry/index.js";
+export {
+  setTelemetrySource,
+  Telemetry,
+  telFetch,
+} from "./src/telemetry/index.js";
 
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./src/version.js";

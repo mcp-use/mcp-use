@@ -12,8 +12,10 @@ import {
   getApiKey,
   getWebUrl,
   isLoggedIn,
+  readConfig,
   writeConfig,
 } from "../utils/config.js";
+import type { ProfileInfo } from "../utils/api.js";
 
 const LOGIN_TIMEOUT = 300000; // 5 minutes
 
@@ -302,6 +304,60 @@ async function startCallbackServer(
 }
 
 /**
+ * Prompt user to pick an organization from a numbered list.
+ * Returns the selected profile or null if selection fails.
+ */
+export async function promptOrgSelection(
+  profiles: ProfileInfo[],
+  defaultProfileId?: string | null
+): Promise<ProfileInfo | null> {
+  if (profiles.length === 0) return null;
+
+  if (profiles.length === 1) {
+    return profiles[0];
+  }
+
+  console.log(chalk.cyan.bold("\n🏢 Select an organization:\n"));
+
+  for (let i = 0; i < profiles.length; i++) {
+    const p = profiles[i];
+    const marker = p.id === defaultProfileId ? chalk.green(" (current)") : "";
+    const slug = p.slug ? chalk.gray(` (${p.slug})`) : "";
+    console.log(
+      `  ${chalk.white(`${i + 1}.`)} ${p.profile_name}${slug}${marker}`
+    );
+  }
+
+  const readline = await import("node:readline");
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    const defaultIdx = defaultProfileId
+      ? profiles.findIndex((p) => p.id === defaultProfileId)
+      : 0;
+    const defaultDisplay = defaultIdx >= 0 ? defaultIdx + 1 : 1;
+
+    rl.question(
+      chalk.gray(`\nEnter number [${defaultDisplay}]: `),
+      (answer) => {
+        rl.close();
+        const trimmed = answer.trim();
+        const idx = trimmed === "" ? defaultIdx : parseInt(trimmed, 10) - 1;
+        if (idx >= 0 && idx < profiles.length) {
+          resolve(profiles[idx]);
+        } else {
+          console.log(chalk.yellow("Invalid selection, using default."));
+          resolve(profiles[defaultIdx >= 0 ? defaultIdx : 0]);
+        }
+      }
+    );
+  });
+}
+
+/**
  * Login command - opens browser for OAuth flow
  */
 export async function loginCommand(options?: {
@@ -383,7 +439,7 @@ export async function loginCommand(options?: {
 
     console.log(chalk.green.bold("\n✓ Successfully logged in!"));
 
-    // Show user info card (same as whoami)
+    // Show user info and select organization
     try {
       const api = await McpUseAPI.create();
       const authInfo = await api.testAuth();
@@ -396,6 +452,40 @@ export async function loginCommand(options?: {
       if (apiKey) {
         const masked = apiKey.substring(0, 6) + "...";
         console.log(chalk.white("API Key: ") + chalk.gray(masked));
+      }
+
+      // Organization selection
+      const profiles = authInfo.profiles ?? [];
+      if (profiles.length > 0) {
+        let selectedProfile: ProfileInfo | null = null;
+
+        if (profiles.length === 1) {
+          selectedProfile = profiles[0];
+        } else {
+          selectedProfile = await promptOrgSelection(
+            profiles,
+            authInfo.default_profile_id
+          );
+        }
+
+        if (selectedProfile) {
+          const config = await readConfig();
+          await writeConfig({
+            ...config,
+            profileId: selectedProfile.id,
+            profileName: selectedProfile.profile_name,
+            profileSlug: selectedProfile.slug ?? undefined,
+          });
+
+          const slug = selectedProfile.slug
+            ? chalk.gray(` (${selectedProfile.slug})`)
+            : "";
+          console.log(
+            chalk.white("Org:     ") +
+              chalk.cyan(selectedProfile.profile_name) +
+              slug
+          );
+        }
       }
     } catch (error) {
       // If fetching user info fails, just skip it
@@ -486,9 +576,38 @@ export async function whoamiCommand(): Promise<void> {
 
     const apiKey = await getApiKey();
     if (apiKey) {
-      // Show first 6 characters
       const masked = apiKey.substring(0, 6) + "...";
       console.log(chalk.white("API Key: ") + chalk.gray(masked));
+    }
+
+    // Show organization info
+    const config = await readConfig();
+    const profiles = authInfo.profiles ?? [];
+    if (profiles.length > 0) {
+      const activeProfile = profiles.find(
+        (p) => p.id === (config.profileId || authInfo.default_profile_id)
+      );
+
+      if (activeProfile) {
+        const slug = activeProfile.slug
+          ? chalk.gray(` (${activeProfile.slug})`)
+          : "";
+        console.log(
+          chalk.white("Org:     ") +
+            chalk.cyan(activeProfile.profile_name) +
+            slug
+        );
+      }
+
+      if (profiles.length > 1) {
+        console.log(
+          chalk.gray(
+            `\n  ${profiles.length} organizations available. Use ` +
+              chalk.white("npx mcp-use org list") +
+              " to see all."
+          )
+        );
+      }
     }
   } catch (error) {
     console.error(

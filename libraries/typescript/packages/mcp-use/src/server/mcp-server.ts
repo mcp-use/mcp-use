@@ -86,6 +86,7 @@ import type {
 import type {
   ReadResourceCallback,
   ReadResourceTemplateCallback,
+  InferTemplateParams,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ResourceTemplateCallbacks,
@@ -1307,6 +1308,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         };
 
         const innerFn = async () => {
+          // Propagate auth and any middleware state to the enhanced context
+          // so tool handlers see data set by middleware (e.g., bearer auth).
+          if (mwCtx.auth && !(enhancedContext as any).auth) {
+            (enhancedContext as any).auth = mwCtx.auth;
+          }
+          for (const [key, value] of mwCtx.state) {
+            (enhancedContext as any)[key] = value;
+          }
+
           if (actualCallback.length >= 2) {
             return await actualCallback(mwCtx.params, enhancedContext);
           }
@@ -2603,11 +2613,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.resourceTemplate = ((
       templateDefinition:
-        | import("./types/index.js").ResourceTemplateDefinition<HasOAuth>
+        | import("./types/index.js").ResourceTemplateDefinition<HasOAuth, any>
         | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
-        | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth>
+        | import("./types/index.js").FlatResourceTemplateDefinition<
+            HasOAuth,
+            any
+          >
         | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
-      callback?: import("./types/index.js").ReadResourceTemplateCallback<HasOAuth>
+      callback?: import("./types/index.js").ReadResourceTemplateCallback<
+        any,
+        HasOAuth
+      >
     ) => {
       const actualCallback =
         callback || (templateDefinition as any).readCallback;
@@ -2806,6 +2822,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         };
 
         const innerFn = async () => {
+          // Propagate auth and any middleware state to the enhanced context
+          if (mwCtx.auth && !(enhancedContext as any).auth) {
+            (enhancedContext as any).auth = mwCtx.auth;
+          }
+          for (const [key, value] of mwCtx.state) {
+            (enhancedContext as any)[key] = value;
+          }
+
           if (actualCallback.length >= 2) {
             return await (actualCallback as any)(mwCtx.params, enhancedContext);
           }
@@ -3457,13 +3481,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link ResourceTemplateDefinition} for all configuration options
    * @see {@link resource} for static resources
    */
-  public resourceTemplate!: (
-    templateDefinition:
-      | ResourceTemplateDefinition<HasOAuth>
+  public resourceTemplate!: <
+    T extends
+      | ResourceTemplateDefinition<HasOAuth, any>
       | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
-      | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth>
+      | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth, any>
       | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
-    callback?: ReadResourceTemplateCallback<HasOAuth>
+  >(
+    templateDefinition: T,
+    callback?: ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>
   ) => this;
 
   /**

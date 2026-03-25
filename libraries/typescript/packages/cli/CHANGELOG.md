@@ -1,5 +1,65 @@
 # @mcp-use/cli
 
+## 2.21.0-canary.5
+
+### Patch Changes
+
+- e743a07: Add `-y` / `--yes` to `mcp-use deploy` for non-interactive runs
+  - Skip confirmation prompts (MCP project, uncommitted changes, final deploy, GitHub connect/retry) when the flag is set
+  - If not logged in and `--yes` is passed, exit with an error instructing users to run `mcp-use login` first (browser login cannot be automated)
+  - With `--yes`, post-GitHub-setup “Press Enter” is replaced by polling connection status instead of blocking on stdin
+  - mcp-use@1.22.1-canary.5
+  - @mcp-use/inspector@0.25.1-canary.5
+
+## 2.21.0-canary.4
+
+### Minor Changes
+
+- 7934749: Add organization support to the CLI
+  - `mcp-use org list` / `switch` / `current` commands to manage organizations
+  - `mcp-use deploy --org <slug-or-id>` to deploy to a specific organization
+  - Login flow now prompts for organization selection when the user belongs to multiple orgs
+  - `whoami` displays the active organization
+  - All API requests include `x-profile-id` header for org-scoped operations
+  - Organization preference is persisted in `~/.mcp-use/config.json`
+
+### Patch Changes
+
+- mcp-use@1.22.1-canary.4
+- @mcp-use/inspector@0.25.1-canary.4
+
+## 2.20.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f28452e]
+  - @mcp-use/inspector@0.25.1-canary.3
+  - mcp-use@1.22.1-canary.3
+
+## 2.20.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8500c06]
+  - mcp-use@1.22.1-canary.2
+  - @mcp-use/inspector@0.25.1-canary.2
+
+## 2.20.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cfa387a]
+  - mcp-use@1.22.1-canary.1
+  - @mcp-use/inspector@0.25.1-canary.1
+
+## 2.20.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5e9d5a8]
+  - mcp-use@1.22.1-canary.0
+  - @mcp-use/inspector@0.25.1-canary.0
+
 ## 2.20.0
 
 ### Minor Changes

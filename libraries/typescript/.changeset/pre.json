@@ -1,0 +1,18 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.20.0",
+    "create-mcp-use-app": "0.14.6",
+    "@mcp-use/inspector": "0.25.0",
+    "mcp-use": "1.22.0"
+  },
+  "changesets": [
+    "cli-deploy-yes-flag",
+    "cli-organization-support",
+    "ctx-auth-optional-typing",
+    "error-boundary-fallback",
+    "inspector-chat-tool-history",
+    "typed-middleware-and-tool-fixes"
+  ]
+}

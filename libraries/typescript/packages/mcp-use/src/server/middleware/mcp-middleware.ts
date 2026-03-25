@@ -48,6 +48,67 @@ export interface MiddlewareContext {
   state: Map<string, unknown>;
 }
 
+/** Params shape for `tools/call` method */
+export interface ToolsCallParams {
+  name: string;
+  arguments?: Record<string, unknown>;
+  _meta?: Record<string, unknown>;
+}
+
+/** Params shape for `resources/read` method */
+export interface ResourcesReadParams {
+  uri: string;
+  _meta?: Record<string, unknown>;
+}
+
+/** Params shape for `prompts/get` method */
+export interface PromptsGetParams {
+  name: string;
+  arguments?: Record<string, string>;
+  _meta?: Record<string, unknown>;
+}
+
+/** Context with narrowed `params` for `tools/call` */
+export interface ToolsCallMiddlewareContext extends MiddlewareContext {
+  method: "tools/call";
+  params: ToolsCallParams & Record<string, unknown>;
+}
+
+/** Context with narrowed `params` for `resources/read` */
+export interface ResourcesReadMiddlewareContext extends MiddlewareContext {
+  method: "resources/read";
+  params: ResourcesReadParams & Record<string, unknown>;
+}
+
+/** Context with narrowed `params` for `prompts/get` */
+export interface PromptsGetMiddlewareContext extends MiddlewareContext {
+  method: "prompts/get";
+  params: PromptsGetParams & Record<string, unknown>;
+}
+
+/**
+ * Map from MCP middleware pattern strings to their narrowed context type.
+ * Used by `McpMiddlewareFnFor<P>` to infer the correct `ctx` parameter.
+ */
+export interface McpMiddlewarePatternMap {
+  "tools/call": ToolsCallMiddlewareContext;
+  "resources/read": ResourcesReadMiddlewareContext;
+  "prompts/get": PromptsGetMiddlewareContext;
+}
+
+/**
+ * A typed MCP middleware function whose `ctx` is narrowed based on the
+ * pattern string `P`. Falls back to the base `MiddlewareContext` for
+ * wildcard or unrecognized patterns.
+ */
+export type McpMiddlewareFnFor<P extends string> =
+  P extends keyof McpMiddlewarePatternMap
+    ? (
+        ctx: McpMiddlewarePatternMap[P],
+        next: () => Promise<unknown>
+      ) => Promise<unknown>
+    : McpMiddlewareFn;
+
 /**
  * A single MCP middleware function.
  *
