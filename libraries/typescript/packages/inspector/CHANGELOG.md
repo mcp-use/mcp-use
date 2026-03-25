@@ -1,5 +1,40 @@
 # @mcp-use/inspector
 
+## 0.26.0-canary.3
+
+### Minor Changes
+
+- 1637670: Move mcp-use from dependencies to peerDependencies in @mcp-use/inspector. This ensures consumers share a single copy of mcp-use types, fixing TS2322 errors caused by pnpm creating multiple peer-variant copies with nominally-incompatible private/protected class members. Also add stripInternal to mcp-use tsconfig and mark internal class members with @internal to reduce .d.ts surface area.
+
+### Patch Changes
+
+- Updated dependencies [1637670]
+  - mcp-use@1.22.2-canary.3
+
+## 0.26.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [6af0a9b]
+  - mcp-use@1.22.2-canary.2
+
+## 0.26.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cffa4c3]
+  - mcp-use@1.22.2-canary.1
+
+## 0.26.0-canary.0
+
+### Minor Changes
+
+- a412783: Upgrade @mcp-ui/client from ^6.1.0 to ^7.0.0. Replace removed UIResourceRenderer with sandboxed iframes for legacy ui:// resources. Drop remote-dom support (removed upstream). MCP Apps rendering via MCPAppsRenderer is unaffected.
+
+### Patch Changes
+
+- mcp-use@1.22.2-canary.0
+
 ## 0.25.1
 
 ### Patch Changes

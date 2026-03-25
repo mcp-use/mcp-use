@@ -30,6 +30,31 @@ import { MCPSession } from "./session.js";
 import { Tel } from "./telemetry/telemetry-node.js";
 import { getPackageVersion } from "./version.js";
 
+function trackNodeClientInit(
+  config: Record<string, any>,
+  codeMode: boolean,
+  callbacks: CallbackConfig
+): void {
+  const servers = Object.keys(config.mcpServers ?? {});
+  const hasSamplingCallback = !!(
+    callbacks.onSampling ?? callbacks.samplingCallback
+  );
+  const hasElicitationCallback = !!(
+    callbacks.onElicitation ?? callbacks.elicitationCallback
+  );
+  Tel.getInstance()
+    .trackMCPClientInit({
+      codeMode,
+      sandbox: false,
+      allCallbacks: hasSamplingCallback && hasElicitationCallback,
+      verify: false,
+      servers,
+      numServers: servers.length,
+      isBrowser: false,
+    })
+    .catch((e) => logger.debug(`Failed to track MCPClient init: ${e}`));
+}
+
 /**
  * Custom function type for code execution in code mode.
  * Allows providing a custom executor implementation.
@@ -377,30 +402,7 @@ export class MCPClient extends BaseMCPClient {
       this._setupCodeModeConnector();
     }
 
-    this._trackClientInit();
-  }
-
-  private _trackClientInit(): void {
-    const servers = Object.keys(this.config.mcpServers ?? {});
-    const hasSamplingCallback = !!(
-      this._globalCallbacks.onSampling ?? this._globalCallbacks.samplingCallback
-    );
-    const hasElicitationCallback = !!(
-      this._globalCallbacks.onElicitation ??
-      this._globalCallbacks.elicitationCallback
-    );
-
-    Tel.getInstance()
-      .trackMCPClientInit({
-        codeMode: this.codeMode,
-        sandbox: false, // Sandbox not supported in TS yet
-        allCallbacks: hasSamplingCallback && hasElicitationCallback,
-        verify: false, // No verify option in TS client
-        servers,
-        numServers: servers.length,
-        isBrowser: false, // Node.js MCPClient
-      })
-      .catch((e) => logger.debug(`Failed to track MCPClient init: ${e}`));
+    trackNodeClientInit(this.config, this.codeMode, this._globalCallbacks);
   }
 
   /**

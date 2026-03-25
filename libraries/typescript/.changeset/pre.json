@@ -1,0 +1,18 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "2.21.0",
+    "create-mcp-use-app": "0.14.6",
+    "@mcp-use/inspector": "0.25.1",
+    "mcp-use": "1.22.1"
+  },
+  "changesets": [
+    "clean-template-deps",
+    "fix-private-field-peer-compat",
+    "inspector-mcp-use-peer-dep",
+    "revert-strip-internal",
+    "upgrade-mcp-ui-client-v7",
+    "wicked-candles-scream"
+  ]
+}

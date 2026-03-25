@@ -6,6 +6,17 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v0.26.0" description="March 2026">
+  ## Peer Dependency Alignment & MCP UI v7
+  Minor release aligning inspector dependency strategy for shared type safety and upgrading MCP UI client rendering internals.
+
+- **Fix**: Moved `mcp-use` from `dependencies` to `peerDependencies` in `@mcp-use/inspector` so consumers reuse a single `mcp-use` type instance (prevents pnpm duplicate-type TS2322 conflicts)
+- **Enhancement**: Upgraded `@mcp-ui/client` from v6 to v7
+- **Enhancement**: Replaced removed legacy `UIResourceRenderer` path with sandboxed iframe rendering for legacy `ui://` resources
+- **Enhancement**: Removed remote-dom usage to align with upstream `@mcp-ui/client` v7 changes
+- **Update**: Updated mcp-use to v1.22.2
+</Update>
+
 <Update label="v0.25.1" description="March 2026">
   ## Chat History Tool Results & ErrorBoundary Customization
   Patch release improving chat history reconstruction so tool calls/results (including `structuredContent`) persist across turns, plus ErrorBoundary fallback/reporting hooks.
