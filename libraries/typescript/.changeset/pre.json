@@ -9,6 +9,7 @@
   },
   "changesets": [
     "clean-template-deps",
+    "fix-private-field-peer-compat",
     "upgrade-mcp-ui-client-v7",
     "wicked-candles-scream"
   ]

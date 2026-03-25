@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.22.2-canary.2
+
+### Patch Changes
+
+- 6af0a9b: Fix TypeScript type incompatibility when mcp-use is resolved as multiple pnpm peer-variant copies. Moved \_trackClientInit from a class method to a standalone function so it no longer appears in .d.ts, eliminating nominal type conflicts across duplicate installations.
+  - @mcp-use/cli@2.21.1-canary.2
+  - @mcp-use/inspector@0.26.0-canary.2
+
 ## 1.22.2-canary.1
 
 ### Patch Changes
