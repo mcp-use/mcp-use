@@ -9,6 +9,7 @@
     "strict": true,
     "declaration": true,
     "declarationMap": true,
+    "stripInternal": true,
     "outDir": "./dist",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
