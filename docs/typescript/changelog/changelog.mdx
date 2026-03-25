@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.22.2" description="March 2026">
+  ## Type Compatibility & Peer Dependency Alignment
+  Patch release focused on pnpm peer-variant type compatibility, inspector dependency alignment, and template dependency cleanup.
+
+- **Fix**: Resolved TypeScript nominal type conflicts when `mcp-use` is installed as multiple pnpm peer-variant copies — moved internal client-init tracking off class surface to avoid `.d.ts` incompatibilities
+- **Fix**: Reverted `stripInternal`/`@internal` approach that degraded downstream tool handler type inference; keeps type safety while preserving consumer inference behavior
+- **Fix** (@mcp-use/inspector): Moved `mcp-use` from `dependencies` to `peerDependencies` so consumers share a single `mcp-use` type instance (addresses TS2322 duplicate-type scenarios)
+- **Update** (@mcp-use/inspector): Upgraded `@mcp-ui/client` to v7; replaced removed legacy renderer path with sandboxed iframe handling for `ui://` resources and removed remote-dom usage
+- **Update**: Updated @mcp-use/inspector to v0.26.0
+- **Update**: Updated @mcp-use/cli to v2.21.1
+- **Update**: Updated create-mcp-use-app to v0.14.7
+</Update>
+
 <Update label="v1.22.1" description="March 2026">
   ## CLI Organizations, Non-Interactive Deploy & Typed Middleware
   Patch release with CLI org management, non-interactive deployments, improved middleware/tool context propagation, typed middleware ergonomics, and ErrorBoundary customization.
