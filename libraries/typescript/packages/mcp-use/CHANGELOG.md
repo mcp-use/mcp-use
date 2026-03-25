@@ -1,5 +1,18 @@
 # mcp-use
 
+## 1.22.2
+
+### Patch Changes
+
+- 6255bbd: Fix TypeScript type incompatibility when mcp-use is resolved as multiple pnpm peer-variant copies. Moved \_trackClientInit from a class method to a standalone function so it no longer appears in .d.ts, eliminating nominal type conflicts across duplicate installations.
+- 6255bbd: Move mcp-use from dependencies to peerDependencies in @mcp-use/inspector. This ensures consumers share a single copy of mcp-use types, fixing TS2322 errors caused by pnpm creating multiple peer-variant copies with nominally-incompatible private/protected class members. Also add stripInternal to mcp-use tsconfig and mark internal class members with @internal to reduce .d.ts surface area.
+- 6255bbd: Revert stripInternal tsconfig option and @internal annotations that broke tool handler type inference in downstream consumers. The peer dep fix for @mcp-use/inspector is the correct solution for pnpm type duplication.
+- 6255bbd: chore: fix protected method in the mcpclient to avoid peer dep duplication
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+  - @mcp-use/inspector@0.26.0
+  - @mcp-use/cli@2.21.1
+
 ## 1.22.2-canary.4
 
 ### Patch Changes
