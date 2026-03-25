@@ -380,7 +380,7 @@ export class MCPClient extends BaseMCPClient {
     this._trackClientInit();
   }
 
-  private _trackClientInit(): void {
+  protected _trackClientInit(): void {
     const servers = Object.keys(this.config.mcpServers ?? {});
     const hasSamplingCallback = !!(
       this._globalCallbacks.onSampling ?? this._globalCallbacks.samplingCallback
