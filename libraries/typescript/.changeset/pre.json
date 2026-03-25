@@ -8,6 +8,7 @@
     "mcp-use": "1.22.1"
   },
   "changesets": [
-    "clean-template-deps"
+    "clean-template-deps",
+    "upgrade-mcp-ui-client-v7"
   ]
 }
