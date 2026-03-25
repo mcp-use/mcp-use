@@ -1,5 +1,24 @@
 # @mcp-use/inspector
 
+## 0.25.1
+
+### Patch Changes
+
+- 7d2112e: Add `fallback` and `onError` props to ErrorBoundary
+
+  The `ErrorBoundary` component now accepts an optional `fallback` prop (`ReactNode` or `(error: Error) => ReactNode`) for custom error UI, and an `onError` callback for error reporting. When no fallback is provided, the default red error card is shown (backward compatible).
+
+- 7d2112e: Preserve tool call results (including `structuredContent`) in Inspector chat history across conversation turns
+
+  Previously, `convertMessagesToLangChain` only emitted `HumanMessage` and `AIMessage`, dropping all tool invocation data when reconstructing conversation history. This meant the model lost context about previous tool calls and their results on subsequent turns.
+
+  Now, assistant messages with tool-invocation parts are properly reconstructed as an `AIMessage` with `tool_calls` followed by `ToolMessage` objects for each completed invocation. The `_meta` field is stripped from tool results before they reach the model, while `structuredContent` and all other fields are preserved.
+
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+  - mcp-use@1.22.1
+
 ## 0.25.1-canary.5
 
 ### Patch Changes

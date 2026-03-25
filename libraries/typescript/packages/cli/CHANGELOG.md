@@ -1,5 +1,31 @@
 # @mcp-use/cli
 
+## 2.21.0
+
+### Minor Changes
+
+- 7d2112e: Add organization support to the CLI
+  - `mcp-use org list` / `switch` / `current` commands to manage organizations
+  - `mcp-use deploy --org <slug-or-id>` to deploy to a specific organization
+  - Login flow now prompts for organization selection when the user belongs to multiple orgs
+  - `whoami` displays the active organization
+  - All API requests include `x-profile-id` header for org-scoped operations
+  - Organization preference is persisted in `~/.mcp-use/config.json`
+
+### Patch Changes
+
+- 7d2112e: Add `-y` / `--yes` to `mcp-use deploy` for non-interactive runs
+  - Skip confirmation prompts (MCP project, uncommitted changes, final deploy, GitHub connect/retry) when the flag is set
+  - If not logged in and `--yes` is passed, exit with an error instructing users to run `mcp-use login` first (browser login cannot be automated)
+  - With `--yes`, post-GitHub-setup “Press Enter” is replaced by polling connection status instead of blocking on stdin
+
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+  - mcp-use@1.22.1
+  - @mcp-use/inspector@0.25.1
+
 ## 2.21.0-canary.5
 
 ### Patch Changes
