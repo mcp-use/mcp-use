@@ -9,6 +9,7 @@
   },
   "changesets": [
     "clean-template-deps",
-    "upgrade-mcp-ui-client-v7"
+    "upgrade-mcp-ui-client-v7",
+    "wicked-candles-scream"
   ]
 }

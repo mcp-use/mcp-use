@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.22.2-canary.1
+
+### Patch Changes
+
+- cffa4c3: chore: fix protected method in the mcpclient to avoid peer dep duplication
+  - @mcp-use/cli@2.21.1-canary.1
+  - @mcp-use/inspector@0.26.0-canary.1
+
 ## 1.22.2-canary.0
 
 ### Patch Changes
