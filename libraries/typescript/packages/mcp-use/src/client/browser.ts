@@ -30,7 +30,7 @@ export class BrowserMCPClient extends BaseMCPClient {
     this._trackClientInit();
   }
 
-  private _trackClientInit(): void {
+  protected _trackClientInit(): void {
     const servers = Object.keys(this.config.mcpServers ?? {});
 
     Tel.getInstance()
