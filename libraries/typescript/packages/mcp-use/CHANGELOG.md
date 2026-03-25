@@ -1,5 +1,12 @@
 # mcp-use
 
+## 1.22.2-canary.4
+
+### Patch Changes
+
+- f36d835: Revert stripInternal tsconfig option and @internal annotations that broke tool handler type inference in downstream consumers. The peer dep fix for @mcp-use/inspector is the correct solution for pnpm type duplication.
+  - @mcp-use/cli@2.21.1-canary.4
+
 ## 1.22.2-canary.3
 
 ### Patch Changes
