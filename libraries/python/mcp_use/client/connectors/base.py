@@ -5,6 +5,7 @@ This module provides the base connector interface that all MCP connectors
 must implement.
 """
 
+import asyncio
 import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
@@ -83,6 +84,7 @@ class BaseConnector(ABC):
         self._resources: list[Resource] | None = None
         self._prompts: list[Prompt] | None = None
         self._connected = False
+        self._disconnect_lock = asyncio.Lock()
         self._initialized = False  # Track if client_session.initialize() has been called
         self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
         self.sampling_callback = sampling_callback
@@ -193,14 +195,15 @@ class BaseConnector(ABC):
     @telemetry("connector_disconnect")
     async def disconnect(self) -> None:
         """Close the connection to the MCP implementation."""
-        if not self._connected:
-            logger.debug("Not connected to MCP implementation")
-            return
+        async with self._disconnect_lock:
+            if not self._connected:
+                logger.debug("Not connected to MCP implementation")
+                return
 
-        logger.debug("Disconnecting from MCP implementation")
-        await self._cleanup_resources()
-        self._connected = False
-        logger.debug("Disconnected from MCP implementation")
+            logger.debug("Disconnecting from MCP implementation")
+            self._connected = False
+            await self._cleanup_resources()
+            logger.debug("Disconnected from MCP implementation")
 
     async def _cleanup_resources(self) -> None:
         """Clean up all resources associated with this connector."""
