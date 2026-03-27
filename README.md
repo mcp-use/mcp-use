@@ -256,6 +256,40 @@ Or connect your GitHub repo on [manufact.com](https://manufact.com) — producti
 
 ---
 
+## Security Hardening
+
+MCP servers are accessible to any connected LLM client — there's no built-in access control or audit trail in the protocol. For production deployments, consider wrapping your server with a security gateway.
+
+**Shadow mode** — see what agents are doing without blocking anything:
+
+```bash
+npx protect-mcp -- npx @mcp-use/cli start
+```
+
+**Enforce mode** — apply per-tool policies (block, rate-limit, require approval):
+
+```bash
+npx protect-mcp --policy policy.json --enforce -- npx @mcp-use/cli start
+```
+
+Example policy for mcp-use:
+
+```json
+{
+  "tools": {
+    "deploy": { "require_approval": true },
+    "delete_*": { "block": true },
+    "*": { "rate_limit": "30/minute" }
+  }
+}
+```
+
+Every decision is optionally Ed25519-signed and [independently verifiable](https://www.npmjs.com/package/@veritasacta/verify) offline. Zero code changes required.
+
+Learn more: [protect-mcp on npm](https://www.npmjs.com/package/protect-mcp) · [IETF Internet-Draft](https://datatracker.ietf.org/doc/draft-farley-acta-signed-receipts/)
+
+---
+
 ## Package Overview
 
 This monorepo contains multiple packages for both Python and TypeScript:
