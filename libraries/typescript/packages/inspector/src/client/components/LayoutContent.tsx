@@ -120,7 +120,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ToolsTab
-            key={`tools-${selectedServer.id}-${selectedServer.state}`}
+            key={`tools-${selectedServer.id}`}
             ref={toolsSearchRef}
             tools={selectedServer.tools}
             callTool={selectedServer.callTool}
@@ -137,7 +137,7 @@ export function LayoutContent({
           className="h-full"
         >
           <PromptsTab
-            key={`prompts-${selectedServer.id}-${selectedServer.state}`}
+            key={`prompts-${selectedServer.id}`}
             ref={promptsSearchRef}
             prompts={selectedServer.prompts}
             callPrompt={(name, args) =>
@@ -165,7 +165,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ResourcesTab
-            key={`resources-${selectedServer.id}-${selectedServer.state}`}
+            key={`resources-${selectedServer.id}`}
             ref={resourcesSearchRef}
             resources={selectedServer.resources}
             readResource={selectedServer.readResource}
@@ -182,7 +182,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ChatTab
-            key={`chat-${selectedServer.id}-${selectedServer.state}`}
+            key={`chat-${selectedServer.id}`}
             connection={selectedServer}
             isConnected={
               embeddedConfig.forceConnected || selectedServer.state === "ready"
@@ -227,7 +227,7 @@ export function LayoutContent({
           className="h-full"
         >
           <SamplingTab
-            key={`sampling-${selectedServer.id}-${selectedServer.state}`}
+            key={`sampling-${selectedServer.id}`}
             pendingRequests={selectedServer.pendingSamplingRequests}
             onApprove={selectedServer.approveSampling}
             onReject={selectedServer.rejectSampling}
@@ -243,7 +243,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ElicitationTab
-            key={`elicitation-${selectedServer.id}-${selectedServer.state}`}
+            key={`elicitation-${selectedServer.id}`}
             pendingRequests={selectedServer.pendingElicitationRequests}
             onApprove={selectedServer.approveElicitation}
             onReject={selectedServer.rejectElicitation}
@@ -260,7 +260,7 @@ export function LayoutContent({
           className="h-full"
         >
           <NotificationsTab
-            key={`notifications-${selectedServer.id}-${selectedServer.state}`}
+            key={`notifications-${selectedServer.id}`}
             notifications={selectedServer.notifications}
             unreadCount={selectedServer.unreadNotificationCount}
             markNotificationRead={selectedServer.markNotificationRead}

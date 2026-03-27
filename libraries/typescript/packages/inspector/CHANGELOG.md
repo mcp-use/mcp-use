@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.26.1-canary.0
+
+### Patch Changes
+
+- 8cb5d98: Restore mcp-use as both a dependency and peerDependency. The dependency is needed for tsup to bundle non-React subpaths (mcp-use/auth, mcp-use/browser) with their transitive deps (langchain). The peerDependency ensures mcp-use/react types are shared with the host app.
+  - mcp-use@1.22.3-canary.0
+
 ## 0.26.0
 
 ### Minor Changes

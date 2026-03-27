@@ -105,6 +105,7 @@
       "body-parser": ">=2.2.1",
       "brace-expansion": ">=2.0.2",
       "@isaacs/brace-expansion": ">=5.0.1",
+      "picomatch": ">=4.0.4",
       "form-data": ">=4.0.4",
       "lodash": ">=4.17.23",
       "@eslint/plugin-kit": ">=0.3.4"
