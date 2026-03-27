@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.22.3
+
+### Patch Changes
+
+- Updated dependencies [0ec6068]
+  - @mcp-use/inspector@0.26.1
+  - @mcp-use/cli@2.21.2
+
 ## 1.22.3-canary.0
 
 ### Patch Changes
