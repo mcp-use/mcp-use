@@ -248,7 +248,7 @@ export async function mountWidgetsDev(
     const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${widget.entry}'
+import Component from '${widget.entry.replace(/\\/g, "/")}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
@@ -489,7 +489,7 @@ if (container && Component) {
         const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${entryPath}'
+import Component from '${entryPath.replace(/\\/g, "/")}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
