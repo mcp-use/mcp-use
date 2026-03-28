@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 2.21.3-canary.0
+
+### Patch Changes
+
+- cca2612: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [cca2612]
+  - mcp-use@1.22.4-canary.0
+  - @mcp-use/inspector@0.26.2-canary.0
+
 ## 2.21.2
 
 ### Patch Changes
