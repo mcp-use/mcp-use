@@ -1324,6 +1324,11 @@ export default PostHog;
         `[WIDGET] Failed to load metadata for ${widget.name}:`,
         error
       );
+      console.warn(
+        `[WIDGET] ⚠ Widget "${widget.name}" will be registered without CSP, description, or other metadata from widgetMetadata.\n` +
+          `  This is usually caused by a browser-only import (e.g. "import L from 'leaflet'") at module scope.\n` +
+          `  Fix: use a dynamic import inside useEffect instead so the module can be evaluated during SSR.`
+      );
     }
 
     // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for initial registration.

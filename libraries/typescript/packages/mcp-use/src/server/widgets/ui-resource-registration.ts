@@ -214,12 +214,18 @@ export function uiResourceRegistration<T extends UIResourceServer>(
           const buildIdPart = getBuildIdPart(server.buildId);
           const outputTemplate = `ui://widget/${enrichedDefinition.name}${buildIdPart}.html`;
 
-          // Update tool metadata with dual-protocol support
-          toolReg.config._meta = buildDualProtocolMetadata(
+          // Mutate _meta in place so the MCP SDK's internal _registeredTools
+          // reference (which shares this object) also sees the update.
+          // Replacing the object would leave the SDK with a stale reference.
+          const dualMeta = buildDualProtocolMetadata(
             enrichedDefinition,
-            outputTemplate,
-            toolReg.config._meta
+            outputTemplate
           );
+          if (toolReg.config._meta) {
+            Object.assign(toolReg.config._meta, dualMeta);
+          } else {
+            toolReg.config._meta = dualMeta;
+          }
         }
       }
     }
