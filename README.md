@@ -256,6 +256,34 @@ Or connect your GitHub repo on [manufact.com](https://manufact.com) — producti
 
 ---
 
+## Security Hardening
+
+MCP servers connected through mcp-use have no built-in access control — any connected LLM client can call any tool. For production deployments, wrap your MCP servers with a security gateway:
+
+```bash
+# Shadow mode — log every tool call without blocking
+npx protect-mcp -- node your-mcp-server.js
+
+# Enforce mode — per-tool policies
+npx protect-mcp --policy policy.json --enforce -- node your-mcp-server.js
+```
+
+[protect-mcp](https://npmjs.com/package/protect-mcp) adds:
+- **Per-tool policies** — block, rate-limit, or require approval for specific tools
+- **Signed audit trail** — Ed25519-signed receipts for every decision, verifiable offline
+- **Trust tiers** — progressive access based on agent identity
+- **Cedar support** — AWS Cedar policies via WASM for enterprise policy-as-code
+
+Every decision can be independently verified:
+
+```bash
+npx @veritasacta/verify --self-test
+```
+
+See the [IETF Internet-Draft](https://datatracker.ietf.org/doc/draft-farley-acta-signed-receipts/) for the receipt format specification.
+
+---
+
 ## Package Overview
 
 This monorepo contains multiple packages for both Python and TypeScript:
