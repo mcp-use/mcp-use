@@ -361,7 +361,8 @@ async function generateToolRegistryTypesForServer(
 
     const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
     const { generateToolRegistryTypes } = await import(
-      path.join(mcpUsePath, "dist", "src", "server", "index.js")
+      pathToFileURL(path.join(mcpUsePath, "dist", "src", "server", "index.js"))
+        .href
     ).then((mod) => mod);
 
     if (!generateToolRegistryTypes) {
