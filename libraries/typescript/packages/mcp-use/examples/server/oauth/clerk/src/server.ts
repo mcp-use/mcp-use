@@ -6,19 +6,17 @@
  * - Clerk OIDC Discovery: https://clerk.com/docs/backend-requests/making/jwt-templates#oidc-discovery
  * - Clerk JWT Verification: https://clerk.com/docs/backend-requests/handling/manual-jwt
  *
- * Environment variables (zero-config setup):
- * - MCP_USE_OAUTH_CLERK_DOMAIN (required) — e.g. my-app.clerk.accounts.dev
+ * Environment variables:
+ * - MCP_USE_OAUTH_CLERK_DOMAIN    (required) — e.g. my-app.clerk.accounts.dev
  */
-
-// @ts-nocheck
 import { MCPServer, oauthClerkProvider, error, object } from "mcp-use/server";
 
-// Create MCP server with OAuth auto-configured from environment variables!
+// Create MCP server with OAuth auto-configured from environment variables
 const server = new MCPServer({
   name: "clerk-oauth-example",
   version: "1.0.0",
   description: "MCP server with Clerk OAuth authentication",
-  // 🎉 Zero-config! OAuth is fully configured via MCP_USE_OAUTH_* environment variables
+  // Zero-config: OAuth is fully configured via MCP_USE_OAUTH_* environment variables
   oauth: oauthClerkProvider(),
 });
 
@@ -47,9 +45,19 @@ server.tool(
     })
 );
 
-// fetches the full user profile from Clerk's userinfo endpoint
-// using the authenticated access token.
-
+/**
+ * Fetches the full user profile from Clerk.
+ *
+ * Clerk issues two token types depending on tenant configuration and client:
+ *
+ * - Opaque tokens (oat_...) — issued to real MCP clients (Cursor, Claude Code).
+ *   Verified and fetched via Clerk's /oauth/userinfo endpoint. Note:
+ *   ClerkOAuthProvider.verifyToken() already validates these via the same
+ *   endpoint; this call retrieves the full userinfo payload for the tool response.
+ *
+ * - JWT session tokens — issued in Inspector / browser flows.
+ *   Profile fetched from Clerk Backend API using the user's sub + CLERK_SECRET_KEY.
+ */
 server.tool(
   {
     name: "get-clerk-user-profile",
@@ -62,48 +70,48 @@ server.tool(
 
       const token = ctx.auth.accessToken as string;
 
-      // Opaque OAuth tokens (oat_...) — issued to real MCP clients.
-      // Call /oauth/userinfo directly with the token.
+      // Opaque tokens — call /oauth/userinfo directly
       if (token.startsWith("oat_")) {
         const res = await fetch(`https://${domain}/oauth/userinfo`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) return error(`Clerk userinfo failed: ${res.status} ${res.statusText}`);
-        return object(await res.json());
+        return object(await res.json() as Record<string, unknown>);
       }
 
-      // JWT session tokens — issued in Inspector / browser flows.
-      // Use Clerk Backend API to fetch full user profile by sub (user ID).
+      // JWT session tokens — use Clerk Backend API
       const secretKey = process.env.CLERK_SECRET_KEY;
       if (!secretKey) {
         return error(
-          "CLERK_SECRET_KEY is not set. Add it to .env to fetch full user profiles in Inspector/browser flows. " +
-          "Real MCP clients (Cursor, Claude Code) receive oat_ tokens which work without a secret key."
+          "CLERK_SECRET_KEY is not set. Add it to .env to fetch full user profiles " +
+          "in Inspector / browser flows. Real MCP clients (Cursor, Claude Code) " +
+          "receive oat_ tokens which do not require a secret key."
         );
       }
 
       const userId = ctx.auth.user.userId;
       const res = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${secretKey}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${secretKey}` },
       });
 
       if (!res.ok) return error(`Clerk API request failed: ${res.status} ${res.statusText}`);
 
-      const user = await res.json();
+      const user = await res.json() as Record<string, unknown>;
+      const emailAddresses = user.email_addresses as Array<Record<string, unknown>> | undefined;
+      const primaryEmail = emailAddresses?.[0];
+      const verification = primaryEmail?.verification as Record<string, unknown> | undefined;
+
       return object({
         id: user.id,
-        email: user.email_addresses?.[0]?.email_address,
-        email_verified: user.email_addresses?.[0]?.verification?.status === "verified",
+        email: primaryEmail?.email_address,
+        email_verified: verification?.status === "verified",
         first_name: user.first_name,
         last_name: user.last_name,
         name: [user.first_name, user.last_name].filter(Boolean).join(" ") || undefined,
         username: user.username,
         picture: user.image_url,
-        created_at: user.created_at ? new Date(user.created_at).toISOString() : undefined,
-        last_sign_in: user.last_sign_in_at ? new Date(user.last_sign_in_at).toISOString() : undefined,
+        created_at: user.created_at ? new Date(user.created_at as number).toISOString() : undefined,
+        last_sign_in: user.last_sign_in_at ? new Date(user.last_sign_in_at as number).toISOString() : undefined,
         public_metadata: user.public_metadata,
       });
     } catch (err) {

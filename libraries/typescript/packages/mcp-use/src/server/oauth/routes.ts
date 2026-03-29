@@ -3,7 +3,7 @@
  *
  * Sets up OAuth 2.0 endpoints based on the provider's mode:
  *
- * **Direct Mode** (e.g., WorkOS):
+ * **Direct Mode** (e.g., WorkOS, Clerk):
  * - Clients communicate directly with the OAuth provider
  * - MCP server only provides metadata endpoints for discovery
  * - No proxying of OAuth requests
@@ -20,7 +20,7 @@ import type { OAuthProvider } from "./providers/types.js";
 /**
  * Setup OAuth routes on the Hono app
  *
- * In direct mode (e.g., WorkOS), creates:
+ * In direct mode (e.g., WorkOS, Clerk), creates:
  * - GET /.well-known/oauth-authorization-server - Proxies provider's OAuth metadata
  * - GET /.well-known/oauth-protected-resource - Protected resource metadata
  *
@@ -38,6 +38,32 @@ export function setupOAuthRoutes(
   baseUrl: string
 ): void {
   const mode = provider.getMode?.() || "proxy"; // Default to proxy for backward compatibility
+
+  // Whether this provider uses OIDC Discovery exclusively
+  // (/.well-known/openid-configuration) rather than the OAuth 2.0
+  // Authorization Server Metadata endpoint (/.well-known/oauth-authorization-server).
+  //
+  // When true, the MCP server advertises itself (baseUrl) as the
+  // authorization_server so clients fetch metadata from us. We then proxy
+  // the request to the provider using the OIDC fallback in fetchProviderMetadata().
+  //
+  // This is necessary for Clerk, which does not expose the RFC 8414 endpoint.
+  // WorkOS and Auth0 support RFC 8414 natively so isOidcOnly is false for them.
+  const isOidcOnly =
+    typeof provider.usesOidcDiscovery === "function" &&
+    provider.usesOidcDiscovery() === true;
+
+  // For OIDC-only providers (e.g. Clerk), advertise our own baseUrl as the
+  // authorization_server so MCP clients fetch metadata from us and we can
+  // proxy to the OIDC discovery endpoint.
+  // For all other providers (e.g. WorkOS), point directly at the provider.
+  const advertisedAuthServer = isOidcOnly ? baseUrl : provider.getIssuer();
+
+  if (isOidcOnly) {
+    console.log(
+      `[OAuth] Provider uses OIDC-only discovery — advertising ${baseUrl} as authorization_server`
+    );
+  }
 
   // Enable CORS for all OAuth-related endpoints
   // This is required for browser-based MCP clients to discover OAuth metadata
@@ -213,7 +239,8 @@ export function setupOAuthRoutes(
    *   - Return MCP server endpoints
    */
   const handleAuthorizationServerMetadata = async (c: Context) => {
-    console.log(`[OAuth] Metadata request (mode: ${mode})`);
+    const requestPath = new URL(c.req.url).pathname;
+    console.log(`[OAuth] Metadata request: ${requestPath} (mode: ${mode})`);
 
     if (mode === "direct") {
       try {
@@ -221,10 +248,33 @@ export function setupOAuthRoutes(
           provider.getIssuer()
         );
 
+        // Strip registration_endpoint when the provider has a pre-registered
+        // client configured AND is NOT an OIDC-only provider.
+        //
+        // For OIDC-only providers (e.g. Clerk, isOidcOnly === true), we must
+        // keep registration_endpoint so MCP clients can complete the DCR flow.
+        //
+        // For non-OIDC providers with a pre-registered client (e.g. WorkOS
+        // with clientId set), we strip registration_endpoint to signal that
+        // DCR is not available and clients must use the known client ID.
+        const hasRegisteredClient =
+          !isOidcOnly &&
+          typeof provider.getRegistrationEndpoint === "function" &&
+          (provider as any).config?.clientId;
+
+        if (hasRegisteredClient) {
+          console.log(
+            `[OAuth] Provider has pre-registered client — removing DCR endpoint`
+          );
+          delete metadata.registration_endpoint;
+        }
+
         console.log(`[OAuth] Provider metadata retrieved successfully`);
         console.log(`[OAuth]   - Issuer: ${metadata.issuer}`);
+        console.log(`[OAuth]   - OIDC-only discovery: ${isOidcOnly}`);
         console.log(
-          `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint || "not available (using pre-registered client)"}`
+          `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint ?? "not available (pre-registered client)"
+          }`
         );
         return c.json(metadata);
       } catch (error) {
@@ -268,20 +318,25 @@ export function setupOAuthRoutes(
   );
 
   /**
-   * OAuth Protected Resource Metadata
-   * As per RFC 9728: https://tools.ietf.org/html/rfc9728
+   * OAuth Protected Resource Metadata (RFC 9728)
    *
-   * This tells MCP clients which authorization server(s) to use.
-   * In both modes, this points to the actual OAuth provider (not the MCP server).
+   * For OIDC-only providers (usesOidcDiscovery() === true, e.g. Clerk), we
+   * advertise our own baseUrl as the authorization_server. MCP clients fetch
+   * metadata from our local server, which proxies the provider's OIDC metadata
+   * via fetchProviderMetadata(). This makes OIDC-only providers fully compatible
+   * with MCP clients that only know /.well-known/oauth-authorization-server.
+   *
+   * For providers that fully implement RFC 8414 (e.g. WorkOS), we advertise
+   * the provider's issuer directly so MCP clients talk to them natively.
    */
   app.get("/.well-known/oauth-protected-resource", (c: Context) => {
     console.log(`[OAuth] Protected resource metadata request (mode: ${mode})`);
     console.log(`[OAuth]   - Resource: ${baseUrl}`);
-    console.log(`[OAuth]   - Authorization server: ${provider.getIssuer()}`);
+    console.log(`[OAuth]   - Authorization server: ${advertisedAuthServer}`);
 
     return c.json({
       resource: baseUrl,
-      authorization_servers: [provider.getIssuer()],
+      authorization_servers: [advertisedAuthServer],
       bearer_methods_supported: ["header"],
     });
   });
@@ -290,7 +345,7 @@ export function setupOAuthRoutes(
   app.get("/.well-known/oauth-protected-resource/mcp", (c: Context) => {
     return c.json({
       resource: `${baseUrl}/mcp`,
-      authorization_servers: [provider.getIssuer()],
+      authorization_servers: [advertisedAuthServer],
       bearer_methods_supported: ["header"],
     });
   });

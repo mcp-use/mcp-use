@@ -135,21 +135,22 @@ server.tool(
       const res = await fetch(`https://${domain}/oauth/userinfo`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-      return object(await res.json())
+      return object(await res.json() as Record<string, unknown>)
     }
 
     // JWT session tokens (Inspector) — use Clerk Backend API
     const res = await fetch(`https://api.clerk.com/v1/users/${ctx.auth.user.userId}`, {
       headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
     })
-    const user = await res.json()
+    const user = await res.json() as Record<string, unknown>
+    const emails = user.email_addresses as Array<Record<string, unknown>> | undefined
     return object({
-      id:          user.id,
-      email:       user.email_addresses?.[0]?.email_address,
-      name:        [user.first_name, user.last_name].filter(Boolean).join(' '),
-      picture:     user.image_url,
+      id:           user.id,
+      email:        emails?.[0]?.email_address,
+      name:         [user.first_name, user.last_name].filter(Boolean).join(' '),
+      picture:      user.image_url,
       last_sign_in: user.last_sign_in_at
-        ? new Date(user.last_sign_in_at).toISOString()
+        ? new Date(user.last_sign_in_at as number).toISOString()
         : undefined,
     })
   }

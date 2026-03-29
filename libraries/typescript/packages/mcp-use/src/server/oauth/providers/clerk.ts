@@ -2,8 +2,13 @@
  * Clerk OAuth Provider
  *
  * Implements OAuth authentication for Clerk tenants.
- * Supports JWKS-based JWT verification with user info, org claims,
- * and permissions extraction — following the same pattern as Auth0OAuthProvider.
+ * Supports two token formats issued by Clerk:
+ *
+ * 1. **Opaque tokens** (`oat_...`) — issued to OAuth clients (e.g. Cursor, Claude Code).
+ *    Verified via network call to Clerk's `/oauth/userinfo` endpoint.
+ *
+ * 2. **JWT session tokens** — issued in Inspector / browser flows.
+ *    Verified locally using JWKS (or skipped when `verifyJwt: false` for dev).
  */
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import type { OAuthProvider, OAuthMode, UserInfo, ClerkOAuthConfig } from "./types.js";
@@ -28,7 +33,22 @@ export class ClerkOAuthProvider implements OAuthProvider {
   }
 
   async verifyToken(token: string): Promise<any> {
+    // Opaque tokens (oat_...) cannot be parsed as JWTs.
+    // Verify them by calling Clerk's /oauth/userinfo endpoint.
+    if (token.startsWith("oat_")) {
+      const res = await fetch(`${this.issuer}/oauth/userinfo`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        throw new Error(
+          `Clerk opaque token verification failed: ${res.status} ${res.statusText}`
+        );
+      }
+      const payload = await res.json() as Record<string, unknown>;
+      return { payload };
+    }
 
+    // JWT session tokens — skip verification in dev if configured.
     if (this.config.verifyJwt === false) {
       console.warn("[Clerk OAuth] ⚠️  JWT verification is disabled");
       console.warn("[Clerk OAuth]     Enable verifyJwt: true for production");
@@ -39,7 +59,7 @@ export class ClerkOAuthProvider implements OAuthProvider {
       }
       const payload = JSON.parse(
         Buffer.from(parts[1], "base64url").toString("utf8")
-      );
+      ) as Record<string, unknown>;
       return { payload };
     }
 
