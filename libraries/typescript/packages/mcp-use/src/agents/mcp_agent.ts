@@ -12,6 +12,7 @@ import {
 } from "langchain";
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
+import { stripJsonSchemaPropertyNames } from "../utils/json_schema_sanitizer.js";
 import { LangChainAdapter } from "../adapters/langchain_adapter.js";
 import type { MCPClient } from "../client.js";
 import type { BaseConnector } from "../connectors/base.js";
@@ -19,7 +20,7 @@ import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
 import { ObservabilityManager } from "../observability/index.js";
 import type { MCPSession } from "../session.js";
-import { extractModelInfo } from "../telemetry/index.js";
+import { extractModelInfo, getModelProvider } from "../telemetry/index.js";
 import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
 import { createSystemMessage } from "./prompts/system_prompt_builder.js";
@@ -542,6 +543,35 @@ export class MCPAgent {
     }
   }
 
+  /**
+   * Google GenAI function declarations reject JSON Schema `propertyNames` (e.g. from Zod
+   * `z.record()`). Convert tool schemas to plain JSON Schema and strip unsupported keys.
+   */
+  private rewriteToolSchemasForGoogleGenAI(): void {
+    if (!this.llm || this._tools.length === 0) {
+      return;
+    }
+    const provider = getModelProvider(this.llm as any);
+    if (provider !== "chatgooglegenerativeai") {
+      return;
+    }
+    for (const tool of this._tools) {
+      const schema = (tool as { schema?: unknown }).schema;
+      if (!schema || typeof schema !== "object") {
+        continue;
+      }
+      if (!("_def" in schema)) {
+        continue;
+      }
+      const jsonSchema = {
+        ...(toJSONSchema(schema as ZodSchema) as Record<string, unknown>),
+      };
+      delete jsonSchema.$schema;
+      stripJsonSchemaPropertyNames(jsonSchema);
+      (tool as { schema: unknown }).schema = jsonSchema;
+    }
+  }
+
   private createAgent(): ReactAgent {
     if (!this.llm) {
       throw new Error("LLM is required to create agent");
@@ -549,6 +579,8 @@ export class MCPAgent {
 
     const systemContent =
       (this.systemMessage?.content as string) ?? "You are a helpful assistant.";
+
+    this.rewriteToolSchemasForGoogleGenAI();
 
     const toolNames = this._tools.map((tool) => tool.name);
     logger.info(`🧠 Agent ready with tools: ${toolNames.join(", ")}`);
