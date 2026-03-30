@@ -7,6 +7,7 @@ import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutes } from "./shared-static.js";
+import { setServerPort } from "./tunnel.js";
 import { findAvailablePort, isValidUrl } from "./utils.js";
 
 // Parse command line arguments
@@ -90,6 +91,7 @@ async function startServer() {
       fetch: app.fetch,
       port,
     });
+    setServerPort(port);
     console.log(`🚀 MCP Inspector running on http://localhost:${port}`);
     if (mcpUrl) {
       console.log(`📡 Auto-connecting to: ${mcpUrl}`);

@@ -86,6 +86,7 @@ import type {
 import type {
   ReadResourceCallback,
   ReadResourceTemplateCallback,
+  InferTemplateParams,
   ResourceDefinition,
   ResourceTemplateDefinition,
   ResourceTemplateCallbacks,
@@ -111,6 +112,13 @@ import {
   rewriteSupabaseRequest,
   startServer,
 } from "./utils/index.js";
+import type { WithMcpUse } from "./utils/hono-proxy.js";
+import type {
+  McpMiddlewareEntry,
+  McpMiddlewareFn,
+  MiddlewareContext,
+} from "./middleware/mcp-middleware.js";
+import { composeMiddleware } from "./middleware/mcp-middleware.js";
 
 /**
  * Validates that a key is safe to use as a property name to prevent prototype pollution.
@@ -297,6 +305,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public _customRoutes = new Map<string, ((...args: any[]) => any)[]>();
 
   /**
+   * Registered MCP operation-level middleware entries.
+   * Populated via `server.use('mcp:...', handler)`.
+   * Read dynamically at invocation time (not captured at registration).
+   * @internal
+   */
+  public mcpMiddlewares: McpMiddlewareEntry[] = [];
+
+  /**
    * Port number the server is listening on (set after calling {@link listen}).
    */
   public serverPort?: number;
@@ -305,6 +321,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * Hostname the server is bound to (default: "localhost").
    */
   public serverHost: string;
+
+  /** @internal Closes the Node HTTP listener when {@link listen} was used */
+  private _httpServerClose?: () => Promise<void>;
+  /** @internal Force-closes all connections and stops listening immediately */
+  private _httpServerForceClose?: () => Promise<void>;
 
   /**
    * Full base URL for the server (e.g., "https://example.com").
@@ -428,6 +449,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public cleanupSessionRefs(sessionId: string): void {
     this.sessionRegisteredRefs.delete(sessionId);
+  }
+
+  /**
+   * Register an MCP operation-level middleware.
+   *
+   * Called internally by the `server.use('mcp:...', handler)` proxy.
+   * Applications should use `server.use('mcp:tools/call', handler)` instead.
+   *
+   * @param pattern - MCP method pattern (without 'mcp:' prefix), e.g. 'tools/call', 'tools/*', '*'
+   * @param handler - Middleware function
+   * @internal
+   */
+  public _registerMcpMiddleware(
+    pattern: string,
+    handler: McpMiddlewareFn
+  ): void {
+    this.mcpMiddlewares.push({ pattern, handler });
   }
 
   /**
@@ -1170,6 +1208,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     prompts: { added: number; removed: number; updated: number };
     resources: { added: number; removed: number; updated: number };
   } {
+    // Sync MCP middleware entries from the new module (HMR)
+    this.mcpMiddlewares = other.mcpMiddlewares;
+
     // Build session contexts array (shared across all primitives)
     const sessionContexts = Array.from(this.sessions.entries()).map(
       ([sessionId, session]) => ({
@@ -1258,12 +1299,32 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           requestMeta
         );
 
-        const executeCallback = async () => {
-          if (actualCallback.length >= 2) {
-            return await actualCallback(params, enhancedContext);
-          }
-          return await actualCallback(params);
+        const mwCtx: MiddlewareContext = {
+          method: "tools/call",
+          params: params as Record<string, unknown>,
+          session: sessionId ? { sessionId } : undefined,
+          auth: requestContext?.get("auth"),
+          state: new Map(),
         };
+
+        const innerFn = async () => {
+          // Propagate auth and any middleware state to the enhanced context
+          // so tool handlers see data set by middleware (e.g., bearer auth).
+          if (mwCtx.auth && !(enhancedContext as any).auth) {
+            (enhancedContext as any).auth = mwCtx.auth;
+          }
+          for (const [key, value] of mwCtx.state) {
+            (enhancedContext as any)[key] = value;
+          }
+
+          if (actualCallback.length >= 2) {
+            return await actualCallback(mwCtx.params, enhancedContext);
+          }
+          return await actualCallback(mwCtx.params);
+        };
+
+        const executeCallback = () =>
+          composeMiddleware(this.mcpMiddlewares, "tools/call", innerFn)(mwCtx);
 
         if (requestContext) {
           return await runWithContext(requestContext, executeCallback);
@@ -2552,11 +2613,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.resourceTemplate = ((
       templateDefinition:
-        | import("./types/index.js").ResourceTemplateDefinition<HasOAuth>
+        | import("./types/index.js").ResourceTemplateDefinition<HasOAuth, any>
         | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
-        | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth>
+        | import("./types/index.js").FlatResourceTemplateDefinition<
+            HasOAuth,
+            any
+          >
         | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
-      callback?: import("./types/index.js").ReadResourceTemplateCallback<HasOAuth>
+      callback?: import("./types/index.js").ReadResourceTemplateCallback<
+        any,
+        HasOAuth
+      >
     ) => {
       const actualCallback =
         callback || (templateDefinition as any).readCallback;
@@ -2746,12 +2813,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           requestMeta
         );
 
-        const executeCallback = async () => {
-          if (actualCallback.length >= 2) {
-            return await (actualCallback as any)(params, enhancedContext);
-          }
-          return await (actualCallback as any)(params);
+        const mwCtx: MiddlewareContext = {
+          method: "tools/call",
+          params: params as Record<string, unknown>,
+          session: sessionId ? { sessionId } : undefined,
+          auth: requestContext?.get("auth"),
+          state: new Map(),
         };
+
+        const innerFn = async () => {
+          // Propagate auth and any middleware state to the enhanced context
+          if (mwCtx.auth && !(enhancedContext as any).auth) {
+            (enhancedContext as any).auth = mwCtx.auth;
+          }
+          for (const [key, value] of mwCtx.state) {
+            (enhancedContext as any)[key] = value;
+          }
+
+          if (actualCallback.length >= 2) {
+            return await (actualCallback as any)(mwCtx.params, enhancedContext);
+          }
+          return await (actualCallback as any)(mwCtx.params);
+        };
+
+        const executeCallback = () =>
+          composeMiddleware(this.mcpMiddlewares, "tools/call", innerFn)(mwCtx);
 
         const startTime = Date.now();
         let success = true;
@@ -2819,11 +2905,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let success = true;
         let errorType: string | null = null;
 
-        try {
+        const mwCtx: MiddlewareContext = {
+          method: "prompts/get",
+          params: params as Record<string, unknown>,
+          session: sessionId ? { sessionId } : undefined,
+          auth: getRequestContext()?.get("auth"),
+          state: new Map(),
+        };
+
+        const innerFn = async () => {
           const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
 
           const result = await (handler as any)(
-            params,
+            mwCtx.params,
             (handler as any).length >= 2 ? enhancedCtx : undefined
           );
 
@@ -2836,6 +2930,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           const { convertToolResultToPromptResult } =
             await import("./prompts/conversion.js");
           return convertToolResultToPromptResult(result) as any;
+        };
+
+        try {
+          return await composeMiddleware(
+            this.mcpMiddlewares,
+            "prompts/get",
+            innerFn
+          )(mwCtx);
         } catch (err) {
           success = false;
           errorType = err instanceof Error ? err.name : "unknown_error";
@@ -2875,7 +2977,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         let errorType: string | null = null;
         let contents: any[] = [];
 
-        try {
+        const mwCtx: MiddlewareContext = {
+          method: "resources/read",
+          params: { uri: config.uri },
+          session: sessionId ? { sessionId } : undefined,
+          auth: getRequestContext()?.get("auth"),
+          state: new Map(),
+        };
+
+        const innerFn = async () => {
           const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
 
           const result = await (handler as any)(
@@ -2887,7 +2997,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             return result as any;
           }
           // Convert CallToolResult to ReadResourceResult
-          // Import convertToolResultToResourceResult dynamically to avoid circular dependencies
           const { convertToolResultToResourceResult } =
             await import("./resources/conversion.js");
           const converted = convertToolResultToResourceResult(
@@ -2896,6 +3005,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           ) as any;
           contents = converted.contents || [];
           return converted;
+        };
+
+        try {
+          return await composeMiddleware(
+            this.mcpMiddlewares,
+            "resources/read",
+            innerFn
+          )(mwCtx);
         } catch (err) {
           success = false;
           errorType = err instanceof Error ? err.name : "unknown_error";
@@ -3103,12 +3220,77 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Register resource subscription handlers
     this.subscriptionManager.registerHandlers(newServer, this.sessions);
 
+    // Wrap native SDK list handlers with MCP middleware support.
+    // The closures capture `this` so they always read the current mcpMiddlewares array,
+    // which means HMR middleware updates are picked up automatically without re-wrapping.
+    this._wrapListHandlers(newServer, sessionId);
+
     // Store refs for hot reload support (if sessionId provided)
     if (sessionId) {
       this.sessionRegisteredRefs.set(sessionId, sessionRefs);
     }
 
     return newServer;
+  }
+
+  /**
+   * Wrap native SDK list request handlers (tools/list, resources/list, prompts/list)
+   * with the MCP middleware chain.
+   *
+   * Each wrapped handler reads `this.mcpMiddlewares` at invocation time, so HMR
+   * middleware updates are picked up automatically.
+   *
+   * @internal
+   */
+  private _wrapListHandlers(
+    nativeSrv: OfficialMcpServer,
+    sessionId?: string
+  ): void {
+    const handlers = (nativeSrv as any).server?._requestHandlers as
+      | Map<string, (req: any, extra: any) => any>
+      | undefined;
+    if (!handlers) return;
+
+    const wrapListMethod = (
+      method: "tools/list" | "resources/list" | "prompts/list",
+      resultKey: "tools" | "resources" | "prompts"
+    ) => {
+      const original = handlers.get(method);
+      if (!original) return;
+      // Avoid double-wrapping the same function
+      if ((original as any).__mcpListWrapped) return;
+
+      const mcpMiddlewares = () => this.mcpMiddlewares;
+      const wrapped = async (req: any, extra: any) => {
+        const mwCtx: MiddlewareContext = {
+          method,
+          params: {},
+          session: sessionId ? { sessionId } : undefined,
+          auth: getRequestContext()?.get("auth"),
+          state: new Map(),
+        };
+        const innerFn = async () => {
+          const result = await original(req, extra);
+          return result[resultKey] ?? result;
+        };
+        const filtered = await composeMiddleware(
+          mcpMiddlewares(),
+          method,
+          innerFn
+        )(mwCtx);
+        // If middleware returned an array, reconstruct the list result shape
+        if (Array.isArray(filtered)) {
+          return { [resultKey]: filtered };
+        }
+        return filtered;
+      };
+      (wrapped as any).__mcpListWrapped = true;
+      handlers.set(method, wrapped);
+    };
+
+    wrapListMethod("tools/list", "tools");
+    wrapListMethod("resources/list", "resources");
+    wrapListMethod("prompts/list", "prompts");
   }
 
   /**
@@ -3299,13 +3481,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link ResourceTemplateDefinition} for all configuration options
    * @see {@link resource} for static resources
    */
-  public resourceTemplate!: (
-    templateDefinition:
-      | ResourceTemplateDefinition<HasOAuth>
+  public resourceTemplate!: <
+    T extends
+      | ResourceTemplateDefinition<HasOAuth, any>
       | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
-      | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth>
+      | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth, any>
       | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
-    callback?: ReadResourceTemplateCallback<HasOAuth>
+  >(
+    templateDefinition: T,
+    callback?: ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>
   ) => this;
 
   /**
@@ -3745,9 +3929,43 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this._trackServerRun("http");
 
     // Start server using runtime-aware helper
-    await startServer(this.app, this.serverPort, this.serverHost, {
-      onDenoRequest: rewriteSupabaseRequest,
-    });
+    const httpHandle = await startServer(
+      this.app,
+      this.serverPort,
+      this.serverHost,
+      {
+        onDenoRequest: rewriteSupabaseRequest,
+      }
+    );
+    this._httpServerClose = httpHandle.close;
+    this._httpServerForceClose = httpHandle.forceClose;
+  }
+
+  /**
+   * Stops the HTTP listener started by {@link listen} (Node.js). No-op if not listening or on Deno no-op handle.
+   */
+  public async close(): Promise<void> {
+    if (this._httpServerClose) {
+      const close = this._httpServerClose;
+      this._httpServerClose = undefined;
+      this._httpServerForceClose = undefined;
+      await close();
+    }
+  }
+
+  /**
+   * Force-closes all connections and stops listening immediately.
+   * Unlike {@link close}, this doesn't wait for keep-alive connections to drain.
+   */
+  public async forceClose(): Promise<void> {
+    if (this._httpServerForceClose) {
+      const forceClose = this._httpServerForceClose;
+      this._httpServerClose = undefined;
+      this._httpServerForceClose = undefined;
+      await forceClose();
+    } else {
+      await this.close();
+    }
   }
 
   private _trackServerRun(transport: string): void {
@@ -3914,8 +4132,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 }
 
-export type McpServerInstance<HasOAuth extends boolean = false> =
-  MCPServerClass<HasOAuth> & HonoType;
+export type McpServerInstance<HasOAuth extends boolean = false> = WithMcpUse &
+  MCPServerClass<HasOAuth> &
+  HonoType;
 
 // Type alias for use in type annotations (e.g., function parameters)
 export type MCPServer<HasOAuth extends boolean = false> =

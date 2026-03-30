@@ -5,6 +5,7 @@ import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
+import { setServerPort } from "./tunnel.js";
 import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
 
 const app = new Hono();
@@ -114,6 +115,8 @@ async function startServer() {
       fetch: app.fetch,
       port,
     });
+
+    setServerPort(port);
 
     if (isDev) {
       console.warn(

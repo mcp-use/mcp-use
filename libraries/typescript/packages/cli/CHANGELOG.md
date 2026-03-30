@@ -1,5 +1,283 @@
 # @mcp-use/cli
 
+## 2.21.2
+
+### Patch Changes
+
+- Updated dependencies [0ec6068]
+  - @mcp-use/inspector@0.26.1
+  - mcp-use@1.22.3
+
+## 2.21.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [8cb5d98]
+  - @mcp-use/inspector@0.26.1-canary.0
+  - mcp-use@1.22.3-canary.0
+
+## 2.21.1
+
+### Patch Changes
+
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+  - mcp-use@1.22.2
+  - @mcp-use/inspector@0.26.0
+
+## 2.21.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f36d835]
+  - mcp-use@1.22.2-canary.4
+
+## 2.21.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [1637670]
+  - @mcp-use/inspector@0.26.0-canary.3
+  - mcp-use@1.22.2-canary.3
+
+## 2.21.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [6af0a9b]
+  - mcp-use@1.22.2-canary.2
+  - @mcp-use/inspector@0.26.0-canary.2
+
+## 2.21.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cffa4c3]
+  - mcp-use@1.22.2-canary.1
+  - @mcp-use/inspector@0.26.0-canary.1
+
+## 2.21.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a412783]
+  - @mcp-use/inspector@0.26.0-canary.0
+  - mcp-use@1.22.2-canary.0
+
+## 2.21.0
+
+### Minor Changes
+
+- 7d2112e: Add organization support to the CLI
+  - `mcp-use org list` / `switch` / `current` commands to manage organizations
+  - `mcp-use deploy --org <slug-or-id>` to deploy to a specific organization
+  - Login flow now prompts for organization selection when the user belongs to multiple orgs
+  - `whoami` displays the active organization
+  - All API requests include `x-profile-id` header for org-scoped operations
+  - Organization preference is persisted in `~/.mcp-use/config.json`
+
+### Patch Changes
+
+- 7d2112e: Add `-y` / `--yes` to `mcp-use deploy` for non-interactive runs
+  - Skip confirmation prompts (MCP project, uncommitted changes, final deploy, GitHub connect/retry) when the flag is set
+  - If not logged in and `--yes` is passed, exit with an error instructing users to run `mcp-use login` first (browser login cannot be automated)
+  - With `--yes`, post-GitHub-setup “Press Enter” is replaced by polling connection status instead of blocking on stdin
+
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+  - mcp-use@1.22.1
+  - @mcp-use/inspector@0.25.1
+
+## 2.21.0-canary.5
+
+### Patch Changes
+
+- e743a07: Add `-y` / `--yes` to `mcp-use deploy` for non-interactive runs
+  - Skip confirmation prompts (MCP project, uncommitted changes, final deploy, GitHub connect/retry) when the flag is set
+  - If not logged in and `--yes` is passed, exit with an error instructing users to run `mcp-use login` first (browser login cannot be automated)
+  - With `--yes`, post-GitHub-setup “Press Enter” is replaced by polling connection status instead of blocking on stdin
+  - mcp-use@1.22.1-canary.5
+  - @mcp-use/inspector@0.25.1-canary.5
+
+## 2.21.0-canary.4
+
+### Minor Changes
+
+- 7934749: Add organization support to the CLI
+  - `mcp-use org list` / `switch` / `current` commands to manage organizations
+  - `mcp-use deploy --org <slug-or-id>` to deploy to a specific organization
+  - Login flow now prompts for organization selection when the user belongs to multiple orgs
+  - `whoami` displays the active organization
+  - All API requests include `x-profile-id` header for org-scoped operations
+  - Organization preference is persisted in `~/.mcp-use/config.json`
+
+### Patch Changes
+
+- mcp-use@1.22.1-canary.4
+- @mcp-use/inspector@0.25.1-canary.4
+
+## 2.20.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f28452e]
+  - @mcp-use/inspector@0.25.1-canary.3
+  - mcp-use@1.22.1-canary.3
+
+## 2.20.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8500c06]
+  - mcp-use@1.22.1-canary.2
+  - @mcp-use/inspector@0.25.1-canary.2
+
+## 2.20.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cfa387a]
+  - mcp-use@1.22.1-canary.1
+  - @mcp-use/inspector@0.25.1-canary.1
+
+## 2.20.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5e9d5a8]
+  - mcp-use@1.22.1-canary.0
+  - @mcp-use/inspector@0.25.1-canary.0
+
+## 2.20.0
+
+### Minor Changes
+
+- b76df33: feat(tunnel): added ability to start/stop the mcp-use dev tunnel from the inspector
+- b76df33: Upgrade to Vite 8 with Rolldown bundler and fix all test failures
+
+  **Vite 8 upgrade:**
+  - Upgrade `vite` from v7.3.x to v8.0.0 across all packages and examples
+  - Upgrade `@vitejs/plugin-react` from v5 to v6 (Oxc-based transforms)
+  - Migrate `rollupOptions` to `rolldownOptions` in all vite configs
+  - Migrate `optimizeDeps.esbuildOptions` to `optimizeDeps.rolldownOptions`
+  - Remove deprecated `build.commonjsOptions` (no-op in Vite 8)
+  - Switch programmatic `minify: "esbuild"` to `minify: true` (Oxc minifier)
+  - Extract `loadConfigFile` from `config.ts` into `config-file.ts` to prevent `require("fs")` leaking into browser bundles
+
+  **Test fixes (35 pre-existing failures):**
+  - Telemetry tests: add `vi.resetModules()`, async flush for fire-and-forget tracking, `type: "ai"` on agent mocks, missing adapter methods
+  - response-helpers tests: update widget() assertions from `_meta["mcp-use/props"]` to `structuredContent` per SEP-1865
+  - HMR tests: add widget config markers, mock `registerPrompt`/`registerResource` on sessions, update error message assertions
+  - ai_sdk_compatibility test: fix `StreamEvent` import to `@langchain/core/tracers/log_stream`
+  - distributed-stream-routing test: use OS-assigned ports instead of fixed port to eliminate EADDRINUSE race condition
+  - browser-react-no-node-deps test: fix `execSync` → `execFileSync` call
+
+  **CI fix:**
+  - Quote glob in `test:unit` script (`'tests/integration/**'`) to prevent shell expansion that was causing unit tests to be silently skipped in CI
+  - Add missing dev dependencies: `ai`, `morgan`, `@types/morgan`, `express-rate-limit`
+
+### Patch Changes
+
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+- Updated dependencies [b76df33]
+  - mcp-use@1.22.0
+  - @mcp-use/inspector@0.25.0
+
+## 2.20.0-canary.6
+
+### Minor Changes
+
+- 9d48429: feat(tunnel): added ability to start/stop the mcp-use dev tunnel from the inspector
+
+### Patch Changes
+
+- Updated dependencies [9d48429]
+  - @mcp-use/inspector@0.25.0-canary.6
+  - mcp-use@1.22.0-canary.6
+
+## 2.20.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bd7c2f6]
+  - mcp-use@1.22.0-canary.5
+  - @mcp-use/inspector@0.25.0-canary.5
+
+## 2.20.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f2034db]
+  - mcp-use@1.22.0-canary.4
+  - @mcp-use/inspector@0.25.0-canary.4
+
+## 2.20.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [42c93aa]
+  - mcp-use@1.22.0-canary.3
+  - @mcp-use/inspector@0.25.0-canary.3
+
+## 2.20.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [0f9ee27]
+  - mcp-use@1.22.0-canary.2
+  - @mcp-use/inspector@0.25.0-canary.2
+
+## 2.20.0-canary.1
+
+### Minor Changes
+
+- e103822: Upgrade to Vite 8 with Rolldown bundler and fix all test failures
+
+  **Vite 8 upgrade:**
+  - Upgrade `vite` from v7.3.x to v8.0.0 across all packages and examples
+  - Upgrade `@vitejs/plugin-react` from v5 to v6 (Oxc-based transforms)
+  - Migrate `rollupOptions` to `rolldownOptions` in all vite configs
+  - Migrate `optimizeDeps.esbuildOptions` to `optimizeDeps.rolldownOptions`
+  - Remove deprecated `build.commonjsOptions` (no-op in Vite 8)
+  - Switch programmatic `minify: "esbuild"` to `minify: true` (Oxc minifier)
+  - Extract `loadConfigFile` from `config.ts` into `config-file.ts` to prevent `require("fs")` leaking into browser bundles
+
+  **Test fixes (35 pre-existing failures):**
+  - Telemetry tests: add `vi.resetModules()`, async flush for fire-and-forget tracking, `type: "ai"` on agent mocks, missing adapter methods
+  - response-helpers tests: update widget() assertions from `_meta["mcp-use/props"]` to `structuredContent` per SEP-1865
+  - HMR tests: add widget config markers, mock `registerPrompt`/`registerResource` on sessions, update error message assertions
+  - ai_sdk_compatibility test: fix `StreamEvent` import to `@langchain/core/tracers/log_stream`
+  - distributed-stream-routing test: use OS-assigned ports instead of fixed port to eliminate EADDRINUSE race condition
+  - browser-react-no-node-deps test: fix `execSync` → `execFileSync` call
+
+  **CI fix:**
+  - Quote glob in `test:unit` script (`'tests/integration/**'`) to prevent shell expansion that was causing unit tests to be silently skipped in CI
+  - Add missing dev dependencies: `ai`, `morgan`, `@types/morgan`, `express-rate-limit`
+
+### Patch Changes
+
+- Updated dependencies [e103822]
+  - mcp-use@1.22.0-canary.1
+  - @mcp-use/inspector@0.25.0-canary.1
+
+## 2.19.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [aafea7b]
+  - mcp-use@1.21.6-canary.0
+  - @mcp-use/inspector@0.24.6-canary.0
+
 ## 2.19.0
 
 ### Minor Changes

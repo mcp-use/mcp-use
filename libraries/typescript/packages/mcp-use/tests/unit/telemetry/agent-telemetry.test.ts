@@ -46,6 +46,7 @@ vi.mock("langchain", () => ({
         agent: {
           messages: [
             {
+              type: "ai",
               content: "Test response",
               tool_calls: [],
             },
@@ -123,6 +124,8 @@ vi.mock("../../../src/adapters/langchain_adapter.js", () => ({
         func: vi.fn().mockResolvedValue("Test tool result"),
       },
     ]);
+    createResourcesFromConnectors = vi.fn().mockResolvedValue([]);
+    createPromptsFromConnectors = vi.fn().mockResolvedValue([]);
     static createTools = vi.fn().mockResolvedValue([
       {
         name: "test_tool",
@@ -172,6 +175,7 @@ describe("MCPAgent Telemetry Integration", () => {
     // Save original environment
     originalEnv = { ...process.env };
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
+    vi.resetModules();
     vi.clearAllMocks();
     mockCapture.mockClear();
 

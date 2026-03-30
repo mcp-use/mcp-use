@@ -125,7 +125,7 @@ function startLocalCdnServer(cdnDistDir) {
           : cdnDistDir + (process.platform === "win32" ? "\\" : "/");
       if (!file.startsWith(rootWithSep)) {
         res.writeHead(404);
-        res.end(`Not found: ${urlPath}`);
+        res.end(`Not found: ${escapeHtml(urlPath)}`);
         return;
       }
       try {

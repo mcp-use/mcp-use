@@ -746,12 +746,15 @@ See [WidgetControls documentation](./widget-components/widgetcontrols) for detai
 
 #### `ErrorBoundary`
 
-Error boundary component for graceful error handling.
+Error boundary component for graceful error handling. Supports custom fallback UI and error callbacks.
 
 ```typescript
 import { ErrorBoundary } from 'mcp-use/react';
 
-<ErrorBoundary>
+<ErrorBoundary
+  fallback={(error) => <div>Error: {error.message}</div>}
+  onError={(error) => console.error(error)}
+>
   {children}
 </ErrorBoundary>
 ```

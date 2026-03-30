@@ -96,9 +96,9 @@ export default defineConfig({
     },
     outDir: "dist/cdn",
     minify: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        inlineDynamicImports: true,
+        codeSplitting: false,
       },
       external: [
         "langfuse-langchain",
@@ -115,10 +115,6 @@ export default defineConfig({
         }
         warn(warning);
       },
-    },
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      include: [/node_modules/],
     },
   },
   ssr: {

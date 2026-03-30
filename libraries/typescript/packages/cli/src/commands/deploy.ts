@@ -4,7 +4,7 @@ import path from "node:path";
 import open from "open";
 import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
-import { getWebUrl, isLoggedIn } from "../utils/config.js";
+import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
 import { getGitInfo, isGitHubUrl } from "../utils/git.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { loginCommand } from "./auth.js";
@@ -180,6 +180,9 @@ interface DeployOptions {
   env?: string[];
   envFile?: string;
   rootDir?: string;
+  org?: string;
+  /** Skip interactive confirmation prompts (non-interactive / CI) */
+  yes?: boolean;
 }
 
 /**
@@ -362,7 +365,8 @@ function getMcpServerUrl(deployment: Deployment): string {
  */
 async function displayDeploymentProgress(
   api: McpUseAPI,
-  deployment: Deployment
+  deployment: Deployment,
+  progressOptions?: { yes?: boolean }
 ): Promise<void> {
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let frameIndex = 0;
@@ -487,14 +491,18 @@ async function displayDeploymentProgress(
       // Determine the MCP Server URL to display
       const mcpServerUrl = getMcpServerUrl(finalDeployment);
 
-      // Determine dashboard URL if server exists
-      // Uses /cloud/servers/[id] - frontend redirects to /cloud/[org-slug]/servers/[id]
+      // Determine dashboard URL with org slug for direct navigation
       let dashboardUrl: string | null = null;
       const webUrl = (await getWebUrl()).replace(/\/$/, "");
-      if (finalDeployment.serverSlug) {
-        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverSlug}`;
-      } else if (finalDeployment.serverId) {
-        dashboardUrl = `${webUrl}/cloud/servers/${finalDeployment.serverId}`;
+      const config = await readConfig();
+      const orgSlug = config.profileSlug;
+      const serverRef = finalDeployment.serverSlug || finalDeployment.serverId;
+      if (serverRef) {
+        if (orgSlug) {
+          dashboardUrl = `${webUrl}/cloud/${orgSlug}/servers/${serverRef}`;
+        } else {
+          dashboardUrl = `${webUrl}/cloud/servers/${serverRef}`;
+        }
       }
 
       const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(
@@ -527,11 +535,20 @@ async function displayDeploymentProgress(
         // Check for GitHub access errors and offer to fix
         if (finalDeployment.error.includes("No GitHub installations found")) {
           console.log();
-          const retry = await promptGitHubInstallation(api, "not_connected");
+          const retry = await promptGitHubInstallation(
+            api,
+            "not_connected",
+            undefined,
+            { yes: progressOptions?.yes }
+          );
           if (retry) {
             console.log(chalk.cyan("\n🔄 Retrying deployment...\n"));
             const newDeployment = await api.redeployDeployment(deployment.id);
-            await displayDeploymentProgress(api, newDeployment);
+            await displayDeploymentProgress(
+              api,
+              newDeployment,
+              progressOptions
+            );
             return;
           }
         } else if (
@@ -553,12 +570,17 @@ async function displayDeploymentProgress(
           const retry = await promptGitHubInstallation(
             api,
             "no_access",
-            repoName
+            repoName,
+            { yes: progressOptions?.yes }
           );
           if (retry) {
             console.log(chalk.cyan("\n🔄 Retrying deployment...\n"));
             const newDeployment = await api.redeployDeployment(deployment.id);
-            await displayDeploymentProgress(api, newDeployment);
+            await displayDeploymentProgress(
+              api,
+              newDeployment,
+              progressOptions
+            );
             return;
           }
         }
@@ -627,14 +649,74 @@ async function checkRepoAccess(
   }
 }
 
+const GITHUB_SETUP_POLL_INTERVAL_MS = 2000;
+const GITHUB_SETUP_POLL_MAX_MS = 120_000;
+
+/**
+ * After opening the GitHub App URL, wait for the user to finish setup.
+ * In interactive mode, waits for Enter. With `yes`, polls connection/repo access.
+ */
+async function waitForGitHubSetupAfterBrowser(
+  api: McpUseAPI,
+  repoName: string | undefined,
+  yes: boolean
+): Promise<void> {
+  if (!yes) {
+    console.log(chalk.gray("Waiting for GitHub configuration..."));
+    await prompt(
+      chalk.white("Press Enter when you've completed the GitHub setup..."),
+      "y"
+    );
+    return;
+  }
+
+  console.log(
+    chalk.gray(
+      "Waiting for GitHub configuration (polling every 2s, up to 2 min)..."
+    )
+  );
+  const deadline = Date.now() + GITHUB_SETUP_POLL_MAX_MS;
+
+  while (Date.now() < deadline) {
+    try {
+      const status = await api.getGitHubConnectionStatus();
+      if (!status.is_connected) {
+        await new Promise((r) => setTimeout(r, GITHUB_SETUP_POLL_INTERVAL_MS));
+        continue;
+      }
+      if (repoName) {
+        const parts = repoName.split("/");
+        const owner = parts[0];
+        const repo = parts[1];
+        if (owner && repo && (await checkRepoAccess(api, owner, repo))) {
+          return;
+        }
+      } else {
+        return;
+      }
+    } catch {
+      // keep polling
+    }
+    await new Promise((r) => setTimeout(r, GITHUB_SETUP_POLL_INTERVAL_MS));
+  }
+
+  console.log(
+    chalk.yellow(
+      "⚠️  Timed out waiting for GitHub setup. Continuing with verification..."
+    )
+  );
+}
+
 /**
  * Prompt user to install/configure GitHub App with repo verification
  */
 async function promptGitHubInstallation(
   api: McpUseAPI,
   reason: "not_connected" | "no_access",
-  repoName?: string
+  repoName?: string,
+  opts?: { yes?: boolean }
 ): Promise<boolean> {
+  const yes = !!opts?.yes;
   console.log();
 
   if (reason === "not_connected") {
@@ -653,12 +735,14 @@ async function promptGitHubInstallation(
     );
   }
 
-  const shouldInstall = await prompt(
-    chalk.white(
-      `Would you like to ${reason === "not_connected" ? "connect" : "configure"} GitHub now? (Y/n): `
-    ),
-    "y"
-  );
+  const shouldInstall = yes
+    ? true
+    : await prompt(
+        chalk.white(
+          `Would you like to ${reason === "not_connected" ? "connect" : "configure"} GitHub now? (Y/n): `
+        ),
+        "y"
+      );
 
   if (!shouldInstall) {
     return false;
@@ -710,12 +794,7 @@ async function promptGitHubInstallation(
     // Open the browser
     await open(installUrl);
 
-    // Wait for user confirmation
-    console.log(chalk.gray("Waiting for GitHub configuration..."));
-    await prompt(
-      chalk.white("Press Enter when you've completed the GitHub setup..."),
-      "y"
-    );
+    await waitForGitHubSetupAfterBrowser(api, repoName, yes);
 
     // Verify connection (best effort)
     console.log(chalk.gray("Verifying GitHub connection..."));
@@ -789,6 +868,17 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Check if logged in
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
+      if (options.yes) {
+        console.log(
+          chalk.gray(
+            "Run " +
+              chalk.white("npx mcp-use login") +
+              " first. Non-interactive deploy requires an existing session."
+          )
+        );
+        process.exit(1);
+      }
+
       const shouldLogin = await prompt(
         chalk.white("Would you like to login now? (Y/n): "),
         "y"
@@ -852,12 +942,14 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           "⚠️  This doesn't appear to be an MCP server project (no mcp-use or @modelcontextprotocol/sdk dependency found)."
         )
       );
-      const shouldContinue = await prompt(
-        chalk.white("Continue anyway? (y/n): ")
-      );
-      if (!shouldContinue) {
-        console.log(chalk.gray("Deployment cancelled."));
-        process.exit(0);
+      if (!options.yes) {
+        const shouldContinue = await prompt(
+          chalk.white("Continue anyway? (y/n): ")
+        );
+        if (!shouldContinue) {
+          console.log(chalk.gray("Deployment cancelled."));
+          process.exit(0);
+        }
       }
       console.log();
     }
@@ -910,13 +1002,15 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         )
       );
 
-      const shouldContinue = await prompt(
-        chalk.white("Continue with deployment from GitHub? (y/n): ")
-      );
+      if (!options.yes) {
+        const shouldContinue = await prompt(
+          chalk.white("Continue with deployment from GitHub? (y/n): ")
+        );
 
-      if (!shouldContinue) {
-        console.log(chalk.gray("Deployment cancelled."));
-        process.exit(0);
+        if (!shouldContinue) {
+          console.log(chalk.gray("Deployment cancelled."));
+          process.exit(0);
+        }
       }
       console.log();
     }
@@ -944,16 +1038,18 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     console.log();
 
     // Confirm deployment
-    const shouldDeploy = await prompt(
-      chalk.white(
-        `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (Y/n): `
-      ),
-      "y"
-    );
+    if (!options.yes) {
+      const shouldDeploy = await prompt(
+        chalk.white(
+          `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (Y/n): `
+        ),
+        "y"
+      );
 
-    if (!shouldDeploy) {
-      console.log(chalk.gray("Deployment cancelled."));
-      process.exit(0);
+      if (!shouldDeploy) {
+        console.log(chalk.gray("Deployment cancelled."));
+        process.exit(0);
+      }
     }
 
     // Detect project settings (use projectDir for subfolder-aware detection)
@@ -997,6 +1093,39 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // Check if project is linked to an existing deployment
     const api = await McpUseAPI.create();
 
+    // Resolve --org flag: match by slug or ID against the user's profiles
+    if (options.org) {
+      try {
+        const authInfo = await api.testAuth();
+        const match = (authInfo.profiles ?? []).find(
+          (p) =>
+            p.slug === options.org ||
+            p.id === options.org ||
+            p.profile_name.toLowerCase() === options.org!.toLowerCase()
+        );
+        if (match) {
+          api.setProfileId(match.id);
+          const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
+          console.log(
+            chalk.gray("Organization: ") + chalk.cyan(match.profile_name) + slug
+          );
+        } else {
+          console.error(
+            chalk.red(
+              `✗ Organization "${options.org}" not found. Run ${chalk.white("npx mcp-use org list")} to see available organizations.`
+            )
+          );
+          process.exit(1);
+        }
+      } catch (error) {
+        console.error(
+          chalk.red("✗ Failed to resolve organization:"),
+          chalk.red(error instanceof Error ? error.message : "Unknown error")
+        );
+        process.exit(1);
+      }
+    }
+
     // Pre-flight GitHub connection and repo access check (REQUIRED for GitHub repos)
     let githubVerified = false;
     try {
@@ -1010,7 +1139,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         const installed = await promptGitHubInstallation(
           api,
           "not_connected",
-          repoFullName
+          repoFullName,
+          { yes: options.yes }
         );
         if (!installed) {
           console.log(chalk.gray("Deployment cancelled."));
@@ -1049,7 +1179,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           const configured = await promptGitHubInstallation(
             api,
             "no_access",
-            repoFullName
+            repoFullName,
+            { yes: options.yes }
           );
           if (!configured) {
             console.log(chalk.gray("Deployment cancelled."));
@@ -1151,7 +1282,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           });
 
           // Display progress
-          await displayDeploymentProgress(api, deployment);
+          await displayDeploymentProgress(api, deployment, {
+            yes: options.yes,
+          });
 
           // Open in browser if requested
           if (options.open && deployment.domain) {
@@ -1202,6 +1335,23 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       serverId,
     };
 
+    // Show target organization if not already shown by --org flag
+    if (!options.org) {
+      try {
+        const config = await readConfig();
+        if (config.profileName) {
+          const slug = config.profileSlug
+            ? chalk.gray(` (${config.profileSlug})`)
+            : "";
+          console.log(
+            chalk.gray("Organization: ") + chalk.cyan(config.profileName) + slug
+          );
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
     // Create deployment
     console.log(chalk.gray("Creating deployment..."));
     const deployment = await api.createDeployment(deploymentRequest);
@@ -1224,7 +1374,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
 
     // Display progress
-    await displayDeploymentProgress(api, deployment);
+    await displayDeploymentProgress(api, deployment, { yes: options.yes });
 
     // Open in browser if requested
     if (options.open && deployment.domain) {

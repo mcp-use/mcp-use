@@ -85,7 +85,7 @@ z.object({
 - Add validation: `.min()`, `.max()`, `.email()`, `.url()`
 - Use `z.enum()` for fixed sets of values (not `z.string()`)
 - Use `z.array()` for lists
-- Use `z.record()` for key-value maps
+- Use `z.record(z.string(), z.string())` for key-value maps (Zod v4 requires both key and value schemas)
 
 ---
 

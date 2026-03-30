@@ -575,6 +575,8 @@
                       "typescript/server/widget-components/errorboundary",
                       "typescript/server/widget-components/image",
                       "typescript/server/widget-components/themeprovider",
+                      "typescript/server/widget-components/modelcontext",
+                      "typescript/server/widget-components/usefiles",
                       {
                         "group": "Deprecated",
                         "icon": "archive",
@@ -599,6 +601,7 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
+                      "typescript/server/middleware",
                       "typescript/server/proxy",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",

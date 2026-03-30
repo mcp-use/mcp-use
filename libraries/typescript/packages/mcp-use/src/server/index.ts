@@ -156,6 +156,20 @@ export {
 // MCP Proxy middleware for CORS proxying
 export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
 
+// MCP operation-level middleware
+export {
+  composeMiddleware,
+  matchesPattern,
+  type McpMiddlewareEntry,
+  type McpMiddlewareFn,
+  type McpMiddlewareFnFor,
+  type McpMiddlewarePatternMap,
+  type MiddlewareContext,
+  type ToolsCallMiddlewareContext,
+  type ResourcesReadMiddlewareContext,
+  type PromptsGetMiddlewareContext,
+} from "./middleware/mcp-middleware.js";
+
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
 

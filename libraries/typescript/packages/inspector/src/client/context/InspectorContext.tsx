@@ -66,6 +66,7 @@ interface InspectorState {
   selectedSamplingRequestId: string | null;
   selectedElicitationRequestId: string | null;
   tunnelUrl: string | null;
+  isTunnelStarting: boolean;
   isEmbedded: boolean;
   embeddedConfig: EmbeddedConfig;
 }
@@ -79,6 +80,7 @@ interface InspectorContextType extends InspectorState {
   setSelectedSamplingRequestId: (requestId: string | null) => void;
   setSelectedElicitationRequestId: (requestId: string | null) => void;
   setTunnelUrl: (tunnelUrl: string | null) => void;
+  setIsTunnelStarting: (starting: boolean) => void;
   setEmbeddedMode: (isEmbedded: boolean, config?: EmbeddedConfig) => void;
   navigateToItem: (
     serverId: string,
@@ -112,6 +114,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     selectedSamplingRequestId: null,
     selectedElicitationRequestId: null,
     tunnelUrl: null,
+    isTunnelStarting: false,
     isEmbedded: false,
     embeddedConfig: {},
   });
@@ -157,6 +160,10 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, tunnelUrl }));
   }, []);
 
+  const setIsTunnelStarting = useCallback((isTunnelStarting: boolean) => {
+    setState((prev) => ({ ...prev, isTunnelStarting }));
+  }, []);
+
   const setEmbeddedMode = useCallback(
     (isEmbedded: boolean, config: EmbeddedConfig = {}) => {
       setState((prev) => ({ ...prev, isEmbedded, embeddedConfig: config }));
@@ -184,7 +191,6 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
           tab === "sampling" ? itemIdentifier || null : null,
         selectedElicitationRequestId:
           tab === "elicitation" ? itemIdentifier || null : null,
-        tunnelUrl: null,
       }));
     },
     []
@@ -211,6 +217,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
     setSelectedSamplingRequestId,
     setSelectedElicitationRequestId,
     setTunnelUrl,
+    setIsTunnelStarting,
     setEmbeddedMode,
     navigateToItem,
     clearSelection,
