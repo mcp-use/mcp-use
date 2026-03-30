@@ -7,6 +7,7 @@ from typing import Any, Literal, cast
 
 from mcp.server.elicitation import ElicitationResult, ElicitSchemaModelT
 from mcp.server.fastmcp import Context as FastMCPContext
+from mcp.server.session import ServerSession
 from mcp.types import (
     CreateMessageResult,
     ElicitResult,
@@ -239,7 +240,7 @@ class Context(FastMCPContext):
         if elicitation_id is None:
             elicitation_id = uuid.uuid4().hex
 
-        session = self.request_context.session
+        session: ServerSession = self.request_context.session
         return await session.elicit_url(
             message=message,
             url=url,
