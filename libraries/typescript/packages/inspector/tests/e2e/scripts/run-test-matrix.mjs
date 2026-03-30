@@ -50,10 +50,7 @@ const conformanceServerDir = resolve(
   "../mcp-use/examples/server/features/conformance"
 );
 const workspaceRoot = resolve(inspectorDir, "../..");
-const mcpUseBin = resolve(
-  conformanceServerDir,
-  "../../../../dist/src/bin.js"
-);
+const mcpUseBin = resolve(conformanceServerDir, "../../../../dist/src/bin.js");
 
 // Track child processes and servers for cleanup
 const childProcesses = [];

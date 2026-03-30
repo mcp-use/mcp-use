@@ -58,17 +58,13 @@ test.describe("Inspector Completion", () => {
     // Assert completion dropdown appears with "default1" suggestion
     const completionDropdown = page.getByTestId("completion-dropdown");
     await expect(completionDropdown).toBeVisible();
-    await expect(
-      page.getByTestId("completion-option-default1")
-    ).toBeVisible();
+    await expect(page.getByTestId("completion-option-default1")).toBeVisible();
 
     // Select the suggestion
     await page.getByTestId("completion-option-default1").click();
 
     // Verify arg1 was filled with the selected value
-    await expect(page.getByTestId("prompt-param-arg1")).toHaveValue(
-      "default1"
-    );
+    await expect(page.getByTestId("prompt-param-arg1")).toHaveValue("default1");
 
     // Fill arg2 and execute
     await page.getByTestId("prompt-param-arg2").fill("default2");
