@@ -22,8 +22,11 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+// Structural type — avoids nominal incompatibility when pnpm creates
+// multiple peer-variant copies of mcp-use with duplicate class declarations.
+type MCPConnection = {
+  [K in keyof McpServer]: McpServer[K];
+};
 type ChatMessage = import("./chat/types").Message;
 
 export interface ChatTabProps {

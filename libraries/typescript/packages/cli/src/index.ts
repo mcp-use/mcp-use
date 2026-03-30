@@ -15,6 +15,11 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
+import {
+  orgCurrentCommand,
+  orgListCommand,
+  orgSwitchCommand,
+} from "./commands/org.js";
 import { createSkillsCommand } from "./commands/skills.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 const program = new Command();
@@ -2457,6 +2462,30 @@ program
     await whoamiCommand();
   });
 
+// Organization commands
+const orgCommand = program.command("org").description("Manage organizations");
+
+orgCommand
+  .command("list")
+  .description("List your organizations")
+  .action(async () => {
+    await orgListCommand();
+  });
+
+orgCommand
+  .command("switch")
+  .description("Switch the active organization")
+  .action(async () => {
+    await orgSwitchCommand();
+  });
+
+orgCommand
+  .command("current")
+  .description("Show the currently active organization")
+  .action(async () => {
+    await orgCurrentCommand();
+  });
+
 // Deployment command
 program
   .command("deploy")
@@ -2478,6 +2507,11 @@ program
     "--root-dir <path>",
     "Root directory within repo to deploy from (for monorepos)"
   )
+  .option(
+    "--org <slug-or-id>",
+    "Deploy to a specific organization (by slug or ID)"
+  )
+  .option("-y, --yes", "Skip confirmation prompts")
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -2488,6 +2522,8 @@ program
       env: options.env,
       envFile: options.envFile,
       rootDir: options.rootDir,
+      org: options.org,
+      yes: options.yes,
     });
   });
 

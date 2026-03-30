@@ -6,6 +6,36 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.22.2" description="March 2026">
+  ## Type Compatibility & Peer Dependency Alignment
+  Patch release focused on pnpm peer-variant type compatibility, inspector dependency alignment, and template dependency cleanup.
+
+- **Fix**: Resolved TypeScript nominal type conflicts when `mcp-use` is installed as multiple pnpm peer-variant copies — moved internal client-init tracking off class surface to avoid `.d.ts` incompatibilities
+- **Fix**: Reverted `stripInternal`/`@internal` approach that degraded downstream tool handler type inference; keeps type safety while preserving consumer inference behavior
+- **Fix** (@mcp-use/inspector): Moved `mcp-use` from `dependencies` to `peerDependencies` so consumers share a single `mcp-use` type instance (addresses TS2322 duplicate-type scenarios)
+- **Update** (@mcp-use/inspector): Upgraded `@mcp-ui/client` to v7; replaced removed legacy renderer path with sandboxed iframe handling for `ui://` resources and removed remote-dom usage
+- **Update**: Updated @mcp-use/inspector to v0.26.0
+- **Update**: Updated @mcp-use/cli to v2.21.1
+- **Update**: Updated create-mcp-use-app to v0.14.7
+</Update>
+
+<Update label="v1.22.1" description="March 2026">
+  ## CLI Organizations, Non-Interactive Deploy & Typed Middleware
+  Patch release with CLI org management, non-interactive deployments, improved middleware/tool context propagation, typed middleware ergonomics, and ErrorBoundary customization.
+
+- **New** (@mcp-use/cli): Organization commands — `mcp-use org list`, `mcp-use org switch`, `mcp-use org current`; login prompts for org selection when multiple; `whoami` shows active organization; org preference persisted in `~/.mcp-use/config.json`
+- **Enhancement** (@mcp-use/cli): Deploy to a specific org with `mcp-use deploy --org <slug-or-id>`; all org-scoped API requests include `x-profile-id`
+- **New** (@mcp-use/cli): Non-interactive deploy with `-y` / `--yes` — skips confirmations; replaces “Press Enter” with polling; errors if not logged in (requires `mcp-use login`)
+- **Fix**: Context propagation into tool handlers — singleton AsyncLocalStorage via `globalThis`, safe Hono context extraction, and forwarding middleware `ctx.auth` / `ctx.state` into enhanced tool context
+- **Fix**: `ctx.auth` typing is now `AuthInfo | undefined` when OAuth isn’t configured (enables `if (!ctx.auth) ...` guards)
+- **Enhancement**: Typed MCP middleware context — `server.use("mcp:tools/call" | "mcp:resources/read" | "mcp:prompts/get", ...)` now narrows `ctx.params` to method-specific shapes; `mcp:*` remains generic
+- **Enhancement**: `outputSchema` tools can return response helpers (`text()`, `markdown()`, `mix()`, etc.) without type errors
+- **Enhancement**: `server.resourceTemplate()` supports an optional Zod `schema` to type `params` as `z.infer<schema>`
+- **Enhancement**: `ErrorBoundary` now supports `fallback` (node or `(error) => node`) and `onError` for reporting (default UI unchanged)
+- **Update**: Updated @mcp-use/inspector to v0.25.1
+- **Update**: Updated @mcp-use/cli to v2.21.0
+</Update>
+
 <Update label="v1.22.0" description="March 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.22.0&title=Vite%208%2C%20MCP%20Middleware%20%26%20Model%20Context&date=2026-03&lang=typescript" alt="Release 1.22.0" />

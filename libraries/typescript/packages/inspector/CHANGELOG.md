@@ -1,5 +1,136 @@
 # @mcp-use/inspector
 
+## 0.26.1
+
+### Patch Changes
+
+- 0ec6068: Restore mcp-use as both a dependency and peerDependency. The dependency is needed for tsup to bundle non-React subpaths (mcp-use/auth, mcp-use/browser) with their transitive deps (langchain). The peerDependency ensures mcp-use/react types are shared with the host app.
+  - mcp-use@1.22.3
+
+## 0.26.1-canary.0
+
+### Patch Changes
+
+- 8cb5d98: Restore mcp-use as both a dependency and peerDependency. The dependency is needed for tsup to bundle non-React subpaths (mcp-use/auth, mcp-use/browser) with their transitive deps (langchain). The peerDependency ensures mcp-use/react types are shared with the host app.
+  - mcp-use@1.22.3-canary.0
+
+## 0.26.0
+
+### Minor Changes
+
+- 6255bbd: Move mcp-use from dependencies to peerDependencies in @mcp-use/inspector. This ensures consumers share a single copy of mcp-use types, fixing TS2322 errors caused by pnpm creating multiple peer-variant copies with nominally-incompatible private/protected class members. Also add stripInternal to mcp-use tsconfig and mark internal class members with @internal to reduce .d.ts surface area.
+- 6255bbd: Upgrade @mcp-ui/client from ^6.1.0 to ^7.0.0. Replace removed UIResourceRenderer with sandboxed iframes for legacy ui:// resources. Drop remote-dom support (removed upstream). MCP Apps rendering via MCPAppsRenderer is unaffected.
+
+### Patch Changes
+
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+- Updated dependencies [6255bbd]
+  - mcp-use@1.22.2
+
+## 0.26.0-canary.3
+
+### Minor Changes
+
+- 1637670: Move mcp-use from dependencies to peerDependencies in @mcp-use/inspector. This ensures consumers share a single copy of mcp-use types, fixing TS2322 errors caused by pnpm creating multiple peer-variant copies with nominally-incompatible private/protected class members. Also add stripInternal to mcp-use tsconfig and mark internal class members with @internal to reduce .d.ts surface area.
+
+### Patch Changes
+
+- Updated dependencies [1637670]
+  - mcp-use@1.22.2-canary.3
+
+## 0.26.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [6af0a9b]
+  - mcp-use@1.22.2-canary.2
+
+## 0.26.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cffa4c3]
+  - mcp-use@1.22.2-canary.1
+
+## 0.26.0-canary.0
+
+### Minor Changes
+
+- a412783: Upgrade @mcp-ui/client from ^6.1.0 to ^7.0.0. Replace removed UIResourceRenderer with sandboxed iframes for legacy ui:// resources. Drop remote-dom support (removed upstream). MCP Apps rendering via MCPAppsRenderer is unaffected.
+
+### Patch Changes
+
+- mcp-use@1.22.2-canary.0
+
+## 0.25.1
+
+### Patch Changes
+
+- 7d2112e: Add `fallback` and `onError` props to ErrorBoundary
+
+  The `ErrorBoundary` component now accepts an optional `fallback` prop (`ReactNode` or `(error: Error) => ReactNode`) for custom error UI, and an `onError` callback for error reporting. When no fallback is provided, the default red error card is shown (backward compatible).
+
+- 7d2112e: Preserve tool call results (including `structuredContent`) in Inspector chat history across conversation turns
+
+  Previously, `convertMessagesToLangChain` only emitted `HumanMessage` and `AIMessage`, dropping all tool invocation data when reconstructing conversation history. This meant the model lost context about previous tool calls and their results on subsequent turns.
+
+  Now, assistant messages with tool-invocation parts are properly reconstructed as an `AIMessage` with `tool_calls` followed by `ToolMessage` objects for each completed invocation. The `_meta` field is stripped from tool results before they reach the model, while `structuredContent` and all other fields are preserved.
+
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+- Updated dependencies [7d2112e]
+  - mcp-use@1.22.1
+
+## 0.25.1-canary.5
+
+### Patch Changes
+
+- mcp-use@1.22.1-canary.5
+
+## 0.25.1-canary.4
+
+### Patch Changes
+
+- mcp-use@1.22.1-canary.4
+
+## 0.25.1-canary.3
+
+### Patch Changes
+
+- f28452e: Preserve tool call results (including `structuredContent`) in Inspector chat history across conversation turns
+
+  Previously, `convertMessagesToLangChain` only emitted `HumanMessage` and `AIMessage`, dropping all tool invocation data when reconstructing conversation history. This meant the model lost context about previous tool calls and their results on subsequent turns.
+
+  Now, assistant messages with tool-invocation parts are properly reconstructed as an `AIMessage` with `tool_calls` followed by `ToolMessage` objects for each completed invocation. The `_meta` field is stripped from tool results before they reach the model, while `structuredContent` and all other fields are preserved.
+  - mcp-use@1.22.1-canary.3
+
+## 0.25.1-canary.2
+
+### Patch Changes
+
+- 8500c06: Add `fallback` and `onError` props to ErrorBoundary
+
+  The `ErrorBoundary` component now accepts an optional `fallback` prop (`ReactNode` or `(error: Error) => ReactNode`) for custom error UI, and an `onError` callback for error reporting. When no fallback is provided, the default red error card is shown (backward compatible).
+
+- Updated dependencies [8500c06]
+  - mcp-use@1.22.1-canary.2
+
+## 0.25.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [cfa387a]
+  - mcp-use@1.22.1-canary.1
+
+## 0.25.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5e9d5a8]
+  - mcp-use@1.22.1-canary.0
+
 ## 0.25.0
 
 ### Minor Changes

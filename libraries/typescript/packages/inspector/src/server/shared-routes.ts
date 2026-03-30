@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { telFetch } from "mcp-use";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
 import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
@@ -253,6 +254,7 @@ export function registerInspectorRoutes(
         "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI",
         {
           host: "https://eu.i.posthog.com",
+          fetch: telFetch,
         }
       );
 
@@ -270,9 +272,8 @@ export function registerInspectorRoutes(
       await posthog.shutdown();
 
       return c.json({ success: true });
-    } catch (error) {
-      console.error("[Telemetry] Error forwarding to PostHog:", error);
-      // Don't fail - telemetry should be silent
+    } catch {
+      // Don't fail — telemetry should not log
       return c.json({ success: false });
     }
   });
@@ -300,8 +301,6 @@ export function registerInspectorRoutes(
       );
 
       if (!response.ok) {
-        console.error("[Telemetry] Scarf request failed:", response.status);
-
         return c.json({
           success: false,
           status: response.status,
@@ -310,9 +309,8 @@ export function registerInspectorRoutes(
       }
 
       return c.json({ success: true });
-    } catch (error) {
-      console.error("[Telemetry] Error forwarding to Scarf:", error);
-      // Don't fail - telemetry should be silent
+    } catch {
+      // Don't fail — telemetry should not log
       return c.json({ success: false });
     }
   });

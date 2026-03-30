@@ -49,3 +49,5 @@ export {
 } from "./telemetry-browser.js";
 
 export type { RuntimeEnvironment } from "./telemetry-browser.js";
+
+export { telFetch } from "./tel-fetch.js";

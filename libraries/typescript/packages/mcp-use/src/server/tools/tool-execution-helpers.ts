@@ -28,6 +28,64 @@ import type { SessionData } from "../sessions/session-manager.js";
 import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { getRequestContext } from "../context-storage.js";
 
+/**
+ * Safely extract data from a Hono context without using `Object.create()`.
+ *
+ * Hono's `Context` class uses JavaScript private fields (`#req`, `#var`, etc.)
+ * which cannot be accessed through prototype chains. `Object.create(honoCtx)`
+ * causes `TypeError: Cannot read private member #req` when accessing `ctx.req`.
+ *
+ * This helper creates a plain object and copies only the safe, public
+ * properties — including variables set via `c.set()` in middleware (notably
+ * `auth`), the `req` getter (wrapped), and env data.
+ */
+function extractContextData(honoCtx: Context): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+
+  // Copy all variables set via c.set() — this includes auth, user data, etc.
+  try {
+    const varObj = honoCtx.var as Record<string, unknown> | undefined;
+    if (varObj && typeof varObj === "object") {
+      for (const [key, value] of Object.entries(varObj)) {
+        data[key] = value;
+      }
+    }
+  } catch {
+    // Hono private field access may fail in some edge cases
+  }
+
+  // Copy auth explicitly if set via c.set("auth", ...)
+  try {
+    const auth = honoCtx.get("auth" as any);
+    if (auth) data.auth = auth;
+  } catch {
+    // Ignore
+  }
+
+  // Wrap req safely — calling honoCtx.req on the original instance works fine,
+  // but we store the result so downstream code doesn't need the Hono instance.
+  try {
+    data.req = honoCtx.req;
+  } catch {
+    // Private field access failed
+  }
+
+  // Copy env
+  try {
+    data.env = honoCtx.env;
+  } catch {
+    // Ignore
+  }
+
+  // Provide a safe `get()` method that reads from our extracted vars
+  data.get = (key: string) => data[key];
+  data.set = (key: string, value: unknown) => {
+    data[key] = value;
+  };
+
+  return data;
+}
+
 // Re-export SessionData for backwards compatibility
 export type { SessionData };
 
@@ -915,7 +973,9 @@ export function createEnhancedContext(
   session: { id?: string };
   sendNotification: typeof sendNotification;
 } {
-  const enhancedContext = baseContext ? Object.create(baseContext) : {};
+  const enhancedContext: any = baseContext
+    ? extractContextData(baseContext)
+    : {};
 
   enhancedContext.sample = createSampleMethod(
     createMessage,
@@ -981,7 +1041,9 @@ export function buildHandlerContext(
 ): { session: SessionData | undefined; enhancedCtx: any } {
   const session = sessionId ? sessions.get(sessionId) : undefined;
   const requestContext = getRequestContext() || session?.context;
-  const enhancedCtx: any = requestContext ? Object.create(requestContext) : {};
+  const enhancedCtx: any = requestContext
+    ? extractContextData(requestContext)
+    : {};
   Object.defineProperty(enhancedCtx, "client", {
     value: createClientCapabilityChecker(
       session?.clientCapabilities,
