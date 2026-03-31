@@ -54,6 +54,26 @@ class TestDoubleCloseGuard:
         assert cleanup_call_count == 1
 
     @pytest.mark.asyncio
+    async def test_concurrent_disconnect_waits_for_cleanup(self):
+        """A concurrent disconnect() caller must block until cleanup finishes."""
+        connector = StdioConnector()
+        connector._connected = True
+
+        cleanup_done = False
+
+        async def slow_cleanup():
+            nonlocal cleanup_done
+            await asyncio.sleep(0.05)
+            cleanup_done = True
+
+        connector._cleanup_resources = slow_cleanup
+
+        # Both calls should complete, and by the time they return cleanup must be done
+        await asyncio.gather(connector.disconnect(), connector.disconnect())
+
+        assert cleanup_done is True
+
+    @pytest.mark.asyncio
     async def test_disconnect_when_not_connected_is_noop(self):
         """disconnect() on a not-connected connector should not call cleanup."""
         connector = StdioConnector()
