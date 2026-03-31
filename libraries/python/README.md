@@ -272,7 +272,7 @@ async def main():
     # Create LLM
     llm = ChatOpenAI(model="gpt-4o")
     # Alternative models:
-    # llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    # llm = ChatAnthropic(model="claude-sonnet-4-6")
     # llm = ChatGroq(model="llama3-8b-8192")
 
     # Create agent with the client
@@ -308,7 +308,7 @@ async def run_airbnb_example():
     )
 
     # Create LLM - you can choose between different models
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
@@ -361,7 +361,7 @@ async def run_blender_example():
     client = MCPClient.from_dict(config)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-3-5-sonnet-20240620")
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30)
@@ -495,7 +495,7 @@ async def main():
 
     # Create agent with the client
     agent = MCPAgent(
-        llm=ChatAnthropic(model="claude-3-5-sonnet-20240620"),
+        llm=ChatAnthropic(model="claude-sonnet-4-6"),
         client=client,
         use_server_manager=True  # Enable the Server Manager
     )

@@ -36,7 +36,7 @@ async function runMultiServerExample() {
 
   // Create agent with the client
   const agent = new MCPAgent({
-    llm: "anthropic/claude-3-5-sonnet-20240620",
+    llm: "anthropic/claude-sonnet-4-6",
     mcpServers,
     maxSteps: 30,
   });
