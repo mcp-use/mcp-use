@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.26.2-canary.1
+
+### Patch Changes
+
+- 62f95c2: feat(inspector): persist tabs on refresh
+  - mcp-use@1.22.4-canary.1
+
 ## 0.26.2-canary.0
 
 ### Patch Changes
