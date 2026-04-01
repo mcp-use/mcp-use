@@ -1,4 +1,4 @@
-/**
+claude-sonnet-4-6/**
  * Tool Context Types
  *
  * Defines the context object and related types passed to tool callbacks.

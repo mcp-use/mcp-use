@@ -1,4 +1,4 @@
-<div align="center" style="margin: 0 auto; max-width: 80%;">
+claude-sonnet-4-6<div align="center" style="margin: 0 auto; max-width: 80%;">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_white.svg">
     <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mcp-use/mcp-use/main/static/logo_black.svg">

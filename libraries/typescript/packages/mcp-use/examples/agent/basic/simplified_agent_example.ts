@@ -1,4 +1,4 @@
-/**
+claude-sonnet-4-6/**
  * Example demonstrating the new simplified MCPAgent API.
  *
  * The simplified API allows you to create an agent with just an LLM string
