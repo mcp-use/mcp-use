@@ -171,7 +171,7 @@ export interface ToolContext {
    *     { role: 'user', content: { type: 'text', text: 'Hello' } }
    *   ],
    *   maxTokens: 1500,
-   *   modelPreferences: { hints: [{ name: 'claude-3-5-sonnet' }] }
+   *   modelPreferences: { hints: [{ name: 'claude-sonnet-4-6' }] }
    * });
    *
    * // With timeout and custom progress handling

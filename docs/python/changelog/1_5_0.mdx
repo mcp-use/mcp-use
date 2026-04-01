@@ -111,7 +111,7 @@ async def smart_search(query: str, ctx: Context) -> str:
         messages=f"Refine this search query: {query}",
         max_tokens=100,
         temperature=0.7,
-        model_preferences={"hints": [{"name": "claude-3-5-sonnet"}]}
+        model_preferences={"hints": [{"name": "claude-sonnet-4-6"}]}
     )
     refined_query = result.content.text
     
@@ -299,7 +299,7 @@ async def intelligent_tool(query: str, ctx: Context) -> str:
         ],
         max_tokens=500,
         temperature=0.8,
-        model_preferences={"hints": [{"name": "claude-3-5-sonnet"}]}
+        model_preferences={"hints": [{"name": "claude-sonnet-4-6"}]}
     )
     return response.content.text
 ```

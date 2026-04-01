@@ -238,7 +238,7 @@ The Chat tab provides an interactive interface to test the MCP server with an LL
 
 1. Click **"Configure API Key"** to open the configuration modal
 2. Select your **Provider** (OpenAI, Anthropic, etc.)
-3. Choose the **Model** (gpt-4o, claude-3-5-sonnet, etc.)
+3. Choose the **Model** (gpt-4o, claude-sonnet-4-6, etc.)
 4. Enter your **API Key** (stored locally in browser)
 5. Click **"Save Configuration"**
 
