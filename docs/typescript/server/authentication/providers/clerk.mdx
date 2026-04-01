@@ -25,13 +25,6 @@ Clerk requires a pre-registered OAuth client for MCP server authentication:
 4. Click **Create**
 5. Make sure that dynamic client registration has been toggled on in the OAuth applications Setting.
 
-### 3. Get Your Secret Key
-
-1. In the Clerk Dashboard, go to **API Keys**
-2. Copy the **Secret key** — it starts with `sk_test_` (dev) or `sk_live_` (prod)
-
-The secret key is required by your MCP server to fetch full user profiles when clients authenticate via the MCP Inspector or browser-based flows. Real MCP clients (Cursor, Claude Code) receive opaque `oat_` tokens which call Clerk's `/oauth/userinfo` endpoint directly — no secret key needed.
-
 ## Configuration
 
 ### Basic Configuration
@@ -55,9 +48,6 @@ server.listen(3000)
 ```bash
 # .env
 MCP_USE_OAUTH_CLERK_DOMAIN=your-app.clerk.accounts.dev
-
-# Required for fetching full user profiles in Inspector / browser flows
-CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxx
 ```
 
 ### Full Configuration Options
@@ -76,14 +66,14 @@ const server = new MCPServer({
 
 ## User Claims
 
-Clerk JWT tokens include standard OIDC claims as well as Clerk-specific claims for organization membership, all accessible via `context.auth.user` in your tools.
+Clerk can issue OAuth access tokens in opaque or JWT format. The Clerk provider hydrates both through `/oauth/userinfo`, so the authenticated user is available directly on `context.auth.user` in your tools.
 
 | Claim | `context.auth.user` field | Notes |
 |---|---|---|
 | `sub` | `userId` | Always present |
 | `email` | `email` | Standard OIDC |
-| `first_name` + `last_name` | `name` | Combined into full name |
-| `image_url` | `picture` | Clerk uses `image_url`, not `picture` |
+| `name` | `name` | Standard OIDC |
+| `picture` | `picture` | Standard OIDC |
 | `org_id` | `org_id` | Only present if user is in an organization |
 | `org_role` | `org_role` | e.g. `admin`, `member` |
 | `org_permissions` | `org_permissions` | Array of org-scoped permissions |
@@ -113,49 +103,35 @@ server.tool(
 
 ## Fetching User Profiles
 
-Clerk issues two different token types depending on the client. Your server needs to handle both.
+Clerk supports both opaque and JWT-formatted OAuth access tokens. The provider handles both formats and populates `ctx.auth.user` for you.
 
-| Token type | Format | Issued to | How to get user profile |
-|---|---|---|---|
-| Opaque access token | `oat_...` | Real MCP clients (Cursor, Claude Code) | Call `/oauth/userinfo` with the token |
-| JWT session token | Three-part JWT | Inspector / browser flows | Call Clerk Backend API with `CLERK_SECRET_KEY` |
+| Token type | Format | How mcp-use handles it |
+|---|---|---|
+| Opaque access token | `oat_...` | Calls Clerk `/oauth/userinfo` |
+| JWT access token | Three-part JWT | Verifies with JWKS, then calls Clerk `/oauth/userinfo` |
 
 ```typescript
 server.tool(
   {
-    name: 'get-clerk-user-profile',
-    description: 'Fetch full user profile from Clerk',
+    name: 'get-user-info',
+    description: 'Get the authenticated user',
   },
   async (_args, ctx) => {
-    const domain = process.env.MCP_USE_OAUTH_CLERK_DOMAIN
-    const token = ctx.auth.accessToken as string
-
-    // Opaque tokens — call /oauth/userinfo directly
-    if (token.startsWith('oat_')) {
-      const res = await fetch(`https://${domain}/oauth/userinfo`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      return object(await res.json() as Record<string, unknown>)
-    }
-
-    // JWT session tokens (Inspector) — use Clerk Backend API
-    const res = await fetch(`https://api.clerk.com/v1/users/${ctx.auth.user.userId}`, {
-      headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-    })
-    const user = await res.json() as Record<string, unknown>
-    const emails = user.email_addresses as Array<Record<string, unknown>> | undefined
     return object({
-      id:           user.id,
-      email:        emails?.[0]?.email_address,
-      name:         [user.first_name, user.last_name].filter(Boolean).join(' '),
-      picture:      user.image_url,
-      last_sign_in: user.last_sign_in_at
-        ? new Date(user.last_sign_in_at as number).toISOString()
-        : undefined,
+      userId:          ctx.auth.user.userId,
+      email:           ctx.auth.user.email,
+      name:            ctx.auth.user.name,
+      picture:         ctx.auth.user.picture,
+      org_id:          ctx.auth.user.org_id,
+      org_role:        ctx.auth.user.org_role,
+      org_permissions: ctx.auth.user.org_permissions,
+      scopes:          ctx.auth.scopes,
     })
   }
 )
 ```
+
+If you need fields that Clerk does not expose through `/oauth/userinfo`, fetch them explicitly from Clerk's Backend API in your own tool. That is an advanced case, not the default integration path.
 
 ## Permissions
 
@@ -220,8 +196,8 @@ Open the Inspector, authenticate with Clerk, then call any tool to inspect the a
 |---|---|---|
 | Auth endpoint | `/authorize` | `/oauth/authorize` |
 | Audience claim | Required | Not used by default |
-| Name claim | `name` | `first_name` + `last_name` |
-| Avatar claim | `picture` | `image_url` |
+| Name claim | `name` | `name` |
+| Avatar claim | `picture` | `picture` |
 | Org support | Roles via permissions | `org_id`, `org_role`, `org_permissions` |
 | Config variable | `MCP_USE_OAUTH_AUTH0_DOMAIN` | `MCP_USE_OAUTH_CLERK_DOMAIN` |
 

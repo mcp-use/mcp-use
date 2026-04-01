@@ -5,10 +5,11 @@
  * Supports two token formats issued by Clerk:
  *
  * 1. **Opaque tokens** (`oat_...`) — issued to OAuth clients (e.g. Cursor, Claude Code).
- *    Verified via network call to Clerk's `/oauth/userinfo` endpoint.
+ *    Verified via Clerk's `/oauth/userinfo` endpoint.
  *
- * 2. **JWT session tokens** — issued in Inspector / browser flows.
- *    Verified locally using JWKS (or skipped when `verifyJwt: false` for dev).
+ * 2. **JWT-formatted OAuth tokens** — verified locally using JWKS
+ *    (or skipped when `verifyJwt: false` for dev), then hydrated via
+ *    Clerk's `/oauth/userinfo` endpoint so user context is consistent.
  */
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import type { OAuthProvider, OAuthMode, UserInfo, ClerkOAuthConfig } from "./types.js";
@@ -36,19 +37,13 @@ export class ClerkOAuthProvider implements OAuthProvider {
     // Opaque tokens (oat_...) cannot be parsed as JWTs.
     // Verify them by calling Clerk's /oauth/userinfo endpoint.
     if (token.startsWith("oat_")) {
-      const res = await fetch(`${this.issuer}/oauth/userinfo`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        throw new Error(
-          `Clerk opaque token verification failed: ${res.status} ${res.statusText}`
-        );
-      }
-      const payload = await res.json() as Record<string, unknown>;
+      const payload = await this.fetchUserInfo(token);
       return { payload };
     }
 
-    // JWT session tokens — skip verification in dev if configured.
+    let verifiedPayload: Record<string, unknown>;
+
+    // JWT-formatted OAuth tokens — skip verification in dev if configured.
     if (this.config.verifyJwt === false) {
       console.warn("[Clerk OAuth] ⚠️  JWT verification is disabled");
       console.warn("[Clerk OAuth]     Enable verifyJwt: true for production");
@@ -57,34 +52,42 @@ export class ClerkOAuthProvider implements OAuthProvider {
       if (parts.length !== 3) {
         throw new Error("Invalid JWT format");
       }
-      const payload = JSON.parse(
+      verifiedPayload = JSON.parse(
         Buffer.from(parts[1], "base64url").toString("utf8")
       ) as Record<string, unknown>;
-      return { payload };
+    } else {
+      try {
+        const result = await jwtVerify(token, this.getJWKS(), {
+          issuer: this.issuer,
+        });
+        verifiedPayload = result.payload as Record<string, unknown>;
+      } catch (error) {
+        throw new Error(`Clerk JWT verification failed: ${error}`);
+      }
     }
 
-    try {
-      const result = await jwtVerify(token, this.getJWKS(), {
-        issuer: this.issuer,
-      });
-      return result;
-    } catch (error) {
-      throw new Error(`Clerk JWT verification failed: ${error}`);
+    const userInfoPayload = await this.fetchUserInfo(token);
+    return {
+      payload: {
+        ...verifiedPayload,
+        ...userInfoPayload,
+      },
+    };
+  }
+
+  private async fetchUserInfo(token: string): Promise<Record<string, unknown>> {
+    const res = await fetch(`${this.issuer}/oauth/userinfo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Clerk userinfo request failed: ${res.status} ${res.statusText}`
+      );
     }
+    return await res.json() as Record<string, unknown>;
   }
 
   getUserInfo(payload: Record<string, unknown>): UserInfo {
-    const firstName = payload.first_name as string | undefined;
-    const lastName = payload.last_name as string | undefined;
-    const fullName =
-      firstName || lastName
-        ? [firstName, lastName].filter(Boolean).join(" ")
-        : undefined;
-
-    const picture =
-      (payload.image_url as string | undefined) ||
-      (payload.picture as string | undefined);
-
     const orgId = payload.org_id as string | undefined;
     const orgRole = payload.org_role as string | undefined;
     const orgPermissions = (payload.org_permissions as string[]) || [];
@@ -101,8 +104,8 @@ export class ClerkOAuthProvider implements OAuthProvider {
     return {
       userId: payload.sub as string,
       email: payload.email as string | undefined,
-      name: fullName,
-      picture,
+      name: payload.name as string | undefined,
+      picture: payload.picture as string | undefined,
       roles,
       permissions,
 
@@ -111,9 +114,6 @@ export class ClerkOAuthProvider implements OAuthProvider {
       org_permissions: orgPermissions,
 
       email_verified: payload.email_verified,
-
-      first_name: firstName,
-      last_name: lastName,
     };
   }
 
@@ -136,7 +136,6 @@ export class ClerkOAuthProvider implements OAuthProvider {
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token"];
   }
-
 
   getMode(): OAuthMode {
     return "direct";

@@ -9,7 +9,7 @@
  * Environment variables:
  * - MCP_USE_OAUTH_CLERK_DOMAIN    (required) — e.g. my-app.clerk.accounts.dev
  */
-import { MCPServer, oauthClerkProvider, error, object } from "mcp-use/server";
+import { MCPServer, error, object, oauthClerkProvider } from "mcp-use/server";
 
 // Create MCP server with OAuth auto-configured from environment variables
 const server = new MCPServer({
@@ -20,9 +20,8 @@ const server = new MCPServer({
   oauth: oauthClerkProvider(),
 });
 
-// returns authenticated user information from the Clerk JWT.
-//  Demonstrates reading standard claims (userId, email) as well as
-//  Clerk-specific claims (org_id, org_role, org_permissions).
+// Returns authenticated user information populated by the Clerk provider.
+// Demonstrates reading standard claims and Clerk org claims from ctx.auth.user.
 
 server.tool(
   {
@@ -44,84 +43,7 @@ server.tool(
       scopes: ctx.auth.scopes,
     })
 );
-
-/**
- * Fetches the full user profile from Clerk.
- *
- * Clerk issues two token types depending on tenant configuration and client:
- *
- * - Opaque tokens (oat_...) — issued to real MCP clients (Cursor, Claude Code).
- *   Verified and fetched via Clerk's /oauth/userinfo endpoint. Note:
- *   ClerkOAuthProvider.verifyToken() already validates these via the same
- *   endpoint; this call retrieves the full userinfo payload for the tool response.
- *
- * - JWT session tokens — issued in Inspector / browser flows.
- *   Profile fetched from Clerk Backend API using the user's sub + CLERK_SECRET_KEY.
- */
-server.tool(
-  {
-    name: "get-clerk-user-profile",
-    description: "Fetch full user profile from Clerk",
-  },
-  async (_args, ctx) => {
-    try {
-      const domain = process.env.MCP_USE_OAUTH_CLERK_DOMAIN;
-      if (!domain) return error("MCP_USE_OAUTH_CLERK_DOMAIN is not set");
-
-      const token = ctx.auth.accessToken as string;
-
-      // Opaque tokens — call /oauth/userinfo directly
-      if (token.startsWith("oat_")) {
-        const res = await fetch(`https://${domain}/oauth/userinfo`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) return error(`Clerk userinfo failed: ${res.status} ${res.statusText}`);
-        return object(await res.json() as Record<string, unknown>);
-      }
-
-      // JWT session tokens — use Clerk Backend API
-      const secretKey = process.env.CLERK_SECRET_KEY;
-      if (!secretKey) {
-        return error(
-          "CLERK_SECRET_KEY is not set. Add it to .env to fetch full user profiles " +
-          "in Inspector / browser flows. Real MCP clients (Cursor, Claude Code) " +
-          "receive oat_ tokens which do not require a secret key."
-        );
-      }
-
-      const userId = ctx.auth.user.userId;
-      const res = await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-        headers: { Authorization: `Bearer ${secretKey}` },
-      });
-
-      if (!res.ok) return error(`Clerk API request failed: ${res.status} ${res.statusText}`);
-
-      const user = await res.json() as Record<string, unknown>;
-      const emailAddresses = user.email_addresses as Array<Record<string, unknown>> | undefined;
-      const primaryEmail = emailAddresses?.[0];
-      const verification = primaryEmail?.verification as Record<string, unknown> | undefined;
-
-      return object({
-        id: user.id,
-        email: primaryEmail?.email_address,
-        email_verified: verification?.status === "verified",
-        first_name: user.first_name,
-        last_name: user.last_name,
-        name: [user.first_name, user.last_name].filter(Boolean).join(" ") || undefined,
-        username: user.username,
-        picture: user.image_url,
-        created_at: user.created_at ? new Date(user.created_at as number).toISOString() : undefined,
-        last_sign_in: user.last_sign_in_at ? new Date(user.last_sign_in_at as number).toISOString() : undefined,
-        public_metadata: user.public_metadata,
-      });
-    } catch (err) {
-      return error(`Failed to fetch Clerk user profile: ${err}`);
-    }
-  }
-);
-
-
-// returns a personalized greeting for the authenticated user.
+// Returns a personalized greeting for the authenticated user.
 // Demonstrates a simple real-world use case for an authenticated MCP tool.
 server.tool(
   {
@@ -132,6 +54,27 @@ server.tool(
     const name = ctx.auth.user.name ?? ctx.auth.user.email ?? "there";
     return object({
       greeting: `Hello, ${name}! You are authenticated via Clerk.`,
+      userId: ctx.auth.user.userId,
+    });
+  }
+);
+
+server.tool(
+  {
+    name: "require-email-scope",
+    description: "Verify that the authenticated user has the email scope",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth.scopes.includes("email")) {
+      return error(
+        `Missing required scope: email. Granted scopes: ${JSON.stringify(ctx.auth.scopes)}`
+      );
+    }
+
+    return object({
+      ok: true,
+      scopes: ctx.auth.scopes,
+      email: ctx.auth.user.email,
       userId: ctx.auth.user.userId,
     });
   }
