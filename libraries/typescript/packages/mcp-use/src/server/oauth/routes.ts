@@ -244,9 +244,7 @@ export function setupOAuthRoutes(
 
     if (mode === "direct") {
       try {
-        const metadata = await fetchProviderMetadata(
-          provider.getIssuer()
-        );
+        const metadata = await fetchProviderMetadata(provider.getIssuer());
 
         // Strip registration_endpoint when the provider has a pre-registered
         // client configured AND is NOT an OIDC-only provider.
@@ -273,7 +271,9 @@ export function setupOAuthRoutes(
         console.log(`[OAuth]   - Issuer: ${metadata.issuer}`);
         console.log(`[OAuth]   - OIDC-only discovery: ${isOidcOnly}`);
         console.log(
-          `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint ?? "not available (pre-registered client)"
+          `[OAuth]   - Registration endpoint: ${
+            metadata.registration_endpoint ??
+            "not available (pre-registered client)"
           }`
         );
         return c.json(metadata);

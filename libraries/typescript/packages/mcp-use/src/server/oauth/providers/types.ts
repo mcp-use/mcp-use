@@ -66,9 +66,9 @@ export interface OAuthProvider {
   getMode?(): OAuthMode;
 
   /**
-  * Get the registration endpoint URL (for direct mode with dynamic client registration)
-  * @returns The registration endpoint URL, or undefined if not supported
-  */
+   * Get the registration endpoint URL (for direct mode with dynamic client registration)
+   * @returns The registration endpoint URL, or undefined if not supported
+   */
   getRegistrationEndpoint?(): string | undefined;
 
   /**
@@ -162,8 +162,8 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
 
 export interface ClerkOAuthConfig extends BaseOAuthConfig {
   provider: "clerk";
-  domain: string;        // e.g. "my-app.clerk.accounts.dev" or custom domain
-  verifyJwt?: boolean;   // defaults to true, disabled only for local dev
+  domain: string; // e.g. "my-app.clerk.accounts.dev" or custom domain
+  verifyJwt?: boolean; // defaults to true, disabled only for local dev
 }
 
 /**

@@ -12,7 +12,12 @@
  *    Clerk's `/oauth/userinfo` endpoint so user context is consistent.
  */
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { OAuthProvider, OAuthMode, UserInfo, ClerkOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  OAuthMode,
+  UserInfo,
+  ClerkOAuthConfig,
+} from "./types.js";
 
 export class ClerkOAuthProvider implements OAuthProvider {
   protected config: ClerkOAuthConfig;
@@ -84,7 +89,7 @@ export class ClerkOAuthProvider implements OAuthProvider {
         `Clerk userinfo request failed: ${res.status} ${res.statusText}`
       );
     }
-    return await res.json() as Record<string, unknown>;
+    return (await res.json()) as Record<string, unknown>;
   }
 
   getUserInfo(payload: Record<string, unknown>): UserInfo {
