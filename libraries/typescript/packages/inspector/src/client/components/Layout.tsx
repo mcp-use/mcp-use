@@ -153,6 +153,17 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [location.search, setActiveTab]);
 
+  // Sync the URL ?tab= param whenever the active tab changes
+  const handleTabChange = useCallback(
+    (tab: TabType) => {
+      setActiveTab(tab);
+      const params = new URLSearchParams(location.search);
+      params.set("tab", tab);
+      navigate(`/?${params.toString()}`, { replace: true });
+    },
+    [setActiveTab, navigate, location.search]
+  );
+
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
     const handleNavigateToSampling = (event: globalThis.Event) => {
@@ -190,7 +201,7 @@ export function Layout({ children }: LayoutProps) {
         navigateToItem(selectedServerId, "tools", toolName);
       } else if (selectedServerId) {
         // If no toolName, just switch to tools tab
-        setActiveTab("tools");
+        handleTabChange("tools");
       }
     };
 
@@ -218,7 +229,7 @@ export function Layout({ children }: LayoutProps) {
         handleNavigateToToolResult
       );
     };
-  }, [selectedServerId, setActiveTab, navigateToItem]);
+  }, [selectedServerId, handleTabChange, navigateToItem]);
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{
@@ -379,7 +390,7 @@ export function Layout({ children }: LayoutProps) {
     } else {
       console.warn("[Layout] No serverId, just updating tab to:", tab);
       // No serverId provided, just update the tab for the current server
-      setActiveTab(tab);
+      handleTabChange(tab);
     }
   };
 
@@ -593,22 +604,22 @@ export function Layout({ children }: LayoutProps) {
     onCommandPalette: () => handleCommandPaletteOpen("keyboard"),
     onToolsTab: () => {
       if (selectedServer) {
-        setActiveTab("tools");
+        handleTabChange("tools");
       }
     },
     onPromptsTab: () => {
       if (selectedServer) {
-        setActiveTab("prompts");
+        handleTabChange("prompts");
       }
     },
     onResourcesTab: () => {
       if (selectedServer) {
-        setActiveTab("resources");
+        handleTabChange("resources");
       }
     },
     onChatTab: () => {
       if (selectedServer) {
-        setActiveTab("chat");
+        handleTabChange("chat");
       }
     },
     onHome: () => {
@@ -680,7 +691,7 @@ export function Layout({ children }: LayoutProps) {
             selectedServer={selectedServer}
             activeTab={activeTab}
             onServerSelect={handleServerSelect}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
             onOpenConnectionOptions={handleOpenConnectionOptions}
             embedded={isEmbedded}
