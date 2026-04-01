@@ -17,17 +17,10 @@ icon: "/images/icons/clerk.svg"
 
 Clerk requires a pre-registered OAuth client for MCP server authentication:
 
-1. In the Clerk Dashboard, go to **Configure → SSO → OAuth Applications**
-2. Click **Create OAuth Application**
-3. Fill in:
-   - **Name**: `mcp-use`
-   - **Redirect URI**: `http://localhost:3000/oauth/callback`
-4. Click **Create**
-5. Make sure that dynamic client registration has been toggled on in the OAuth applications Setting.
+1. In the Clerk Dashboard, go to **Configure → Developers → OAuth Applications**
+2. Make sure that dynamic client registration has been toggled on in the OAuth applications Setting.
 
 ## Configuration
-
-### Basic Configuration
 
 ```typescript
 import { MCPServer, oauthClerkProvider } from 'mcp-use/server'
@@ -36,79 +29,18 @@ const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
   oauth: oauthClerkProvider({
-    domain: process.env.MCP_USE_OAUTH_CLERK_DOMAIN!, // 'your-app.clerk.accounts.dev'
+    domain: process.env.MCP_USE_OAUTH_CLERK_DOMAIN!,
   })
 })
 
 server.listen(3000)
 ```
 
-### Environment Variables
+`domain` can also be set via the `MCP_USE_OAUTH_CLERK_DOMAIN` environment variable.
 
-```bash
-# .env
-MCP_USE_OAUTH_CLERK_DOMAIN=your-app.clerk.accounts.dev
-```
+## Access User Info
 
-### Full Configuration Options
-
-```typescript
-const server = new MCPServer({
-  oauth: oauthClerkProvider({
-    // Required
-    domain: 'your-app.clerk.accounts.dev',
-
-    // JWT verification (should be true in production)
-    verifyJwt: process.env.NODE_ENV === 'production',
-  })
-})
-```
-
-## User Claims
-
-Clerk can issue OAuth access tokens in opaque or JWT format. The Clerk provider hydrates both through `/oauth/userinfo`, so the authenticated user is available directly on `context.auth.user` in your tools.
-
-| Claim | `context.auth.user` field | Notes |
-|---|---|---|
-| `sub` | `userId` | Always present |
-| `email` | `email` | Standard OIDC |
-| `name` | `name` | Standard OIDC |
-| `picture` | `picture` | Standard OIDC |
-| `org_id` | `org_id` | Only present if user is in an organization |
-| `org_role` | `org_role` | e.g. `admin`, `member` |
-| `org_permissions` | `org_permissions` | Array of org-scoped permissions |
-
-### Access User Info in Tools
-
-```typescript
-server.tool(
-  {
-    name: 'get-user-info',
-    description: 'Get the authenticated user',
-  },
-  async (_args, ctx) => {
-    return object({
-      userId:          ctx.auth.user.userId,
-      email:           ctx.auth.user.email,
-      name:            ctx.auth.user.name,
-      picture:         ctx.auth.user.picture,
-      // Clerk org claims
-      org_id:          ctx.auth.user.org_id,
-      org_role:        ctx.auth.user.org_role,
-      org_permissions: ctx.auth.user.org_permissions,
-    })
-  }
-)
-```
-
-## Fetching User Profiles
-
-Clerk supports both opaque and JWT-formatted OAuth access tokens. The provider handles both formats and populates `ctx.auth.user` for you.
-
-| Token type | Format | How mcp-use handles it |
-|---|---|---|
-| Opaque access token | `oat_...` | Calls Clerk `/oauth/userinfo` |
-| JWT access token | Three-part JWT | Verifies with JWKS, then calls Clerk `/oauth/userinfo` |
+`mcp-use` automatically populates `ctx.auth.user` so your tools can read authenticated user data directly.
 
 ```typescript
 server.tool(
@@ -125,17 +57,18 @@ server.tool(
       org_id:          ctx.auth.user.org_id,
       org_role:        ctx.auth.user.org_role,
       org_permissions: ctx.auth.user.org_permissions,
+      permissions:     ctx.auth.permissions,
       scopes:          ctx.auth.scopes,
     })
   }
 )
 ```
 
-If you need fields that Clerk does not expose through `/oauth/userinfo`, fetch them explicitly from Clerk's Backend API in your own tool. That is an advanced case, not the default integration path.
+If you need fields that Clerk does not expose through its userinfo endpoint, fetch them explicitly from Clerk's Backend API in your own tool.
 
 ## Permissions
 
-Clerk permissions are org-scoped via `org_permissions`. For custom permissions outside organizations, use [JWT Templates](https://clerk.com/docs/backend-requests/making/jwt-templates) in the Clerk Dashboard to add custom claims to the token.
+Clerk permissions are org-scoped via `org_permissions`.
 
 ### Check Org Permissions
 
@@ -177,35 +110,10 @@ server.tool(
 )
 ```
 
-## Testing
-
-### Using MCP Inspector
-
-The Inspector includes full Clerk OAuth support:
-
-```typescript
-server.listen(3000)
-console.log('🔍 Inspector: http://localhost:3000/inspector')
-```
-
-Open the Inspector, authenticate with Clerk, then call any tool to inspect the authenticated user context.
-
-## Key Differences from Auth0
-
-| | Auth0 | Clerk |
-|---|---|---|
-| Auth endpoint | `/authorize` | `/oauth/authorize` |
-| Audience claim | Required | Not used by default |
-| Name claim | `name` | `name` |
-| Avatar claim | `picture` | `picture` |
-| Org support | Roles via permissions | `org_id`, `org_role`, `org_permissions` |
-| Config variable | `MCP_USE_OAUTH_AUTH0_DOMAIN` | `MCP_USE_OAUTH_CLERK_DOMAIN` |
-
 ## Resources
 
 - [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/clerk)
 - [Clerk Documentation](https://clerk.com/docs)
-- [Clerk JWT Templates](https://clerk.com/docs/backend-requests/making/jwt-templates)
 - [Clerk Organizations](https://clerk.com/docs/organizations/overview)
 - [Clerk JWT Verification](https://clerk.com/docs/backend-requests/handling/manual-jwt)
 

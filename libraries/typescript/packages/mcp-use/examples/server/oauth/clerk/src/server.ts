@@ -3,7 +3,6 @@
  *
  * This example demonstrates the OAuth integration with mcp-use using Clerk.
  * Learn more:
- * - Clerk OIDC Discovery: https://clerk.com/docs/backend-requests/making/jwt-templates#oidc-discovery
  * - Clerk JWT Verification: https://clerk.com/docs/backend-requests/handling/manual-jwt
  *
  * Environment variables:

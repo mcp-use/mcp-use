@@ -621,7 +621,8 @@
                         "icon": "plug",
                         "pages": [
                           "typescript/server/authentication/providers/workos",
-                          "typescript/server/authentication/providers/supabase"
+                          "typescript/server/authentication/providers/supabase",
+                          "typescript/server/authentication/providers/clerk"
                         ]
                       }
                     ]
