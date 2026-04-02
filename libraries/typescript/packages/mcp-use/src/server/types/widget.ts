@@ -1,4 +1,3 @@
-import type { AppsSdkMetadata } from "./resource.js";
 import type { InputDefinition, ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -65,17 +64,6 @@ export interface WidgetMetadata {
   annotations?: ResourceAnnotations & Partial<ToolAnnotations>;
   /** Optional metadata for the widget */
   _meta?: Record<string, unknown>;
-
-  /**
-   * Apps SDK-specific metadata (legacy ChatGPT-only format)
-   *
-   * For backward compatibility with existing ChatGPT-only widgets.
-   *
-   * **For new widgets**: Use `metadata` instead for dual-protocol support!
-   *
-   * @deprecated Prefer `metadata` for automatic dual-protocol compatibility
-   */
-  appsSdkMetadata?: AppsSdkMetadata;
 
   /**
    * Unified metadata for dual-protocol support

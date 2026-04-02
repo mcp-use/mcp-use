@@ -1,8 +1,8 @@
 /**
- * Protocol adapter types for dual-protocol widget support
+ * Protocol adapter types for MCP Apps widget support
  *
  * Adapters transform unified widget definitions into protocol-specific
- * formats for MCP Apps (SEP-1865) and ChatGPT Apps SDK.
+ * formats for MCP Apps (SEP-1865).
  */
 
 import type { UIResourceDefinition } from "../../types/resource.js";
@@ -10,21 +10,19 @@ import type { UIResourceDefinition } from "../../types/resource.js";
 /**
  * Protocol adapter interface
  *
- * Implementations transform unified widget metadata into protocol-specific
- * formats (MCP Apps or ChatGPT Apps SDK).
+ * Implementations transform unified widget metadata into MCP Apps format.
  */
 export interface ProtocolAdapter {
   /**
    * MIME type for this protocol
    * - MCP Apps: "text/html;profile=mcp-app"
-   * - Apps SDK: "text/html+skybridge"
    */
   readonly mimeType: string;
 
   /**
    * Protocol identifier
    */
-  readonly protocol: "mcp-apps" | "apps-sdk";
+  readonly protocol: "mcp-apps";
 
   /**
    * Build tool metadata for this protocol
@@ -53,9 +51,7 @@ export interface ProtocolAdapter {
 /**
  * CSP configuration (unified format)
  *
- * Maps to protocol-specific CSP formats:
- * - MCP Apps: camelCase (connectDomains, resourceDomains)
- * - Apps SDK: snake_case (connect_domains, resource_domains)
+ * Maps to MCP Apps CSP format with camelCase keys (connectDomains, resourceDomains).
  *
  * Follows SEP-1865 specification with support for arbitrary additional properties.
  */
@@ -82,7 +78,6 @@ export interface CSPConfig {
 
   /**
    * Domains for openExternal without confirmation modal
-   * (ChatGPT only - not in SEP-1865)
    */
   redirectDomains?: string[];
 

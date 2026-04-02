@@ -233,11 +233,11 @@ export interface WidgetServerConfig {
  * };
  *
  * const definition = {
- *   type: 'appsSdk',
+ *   type: 'mcpApps',
  *   name: 'kanban-board',
  *   title: 'Kanban Board',
  *   htmlTemplate: '<div>...</div>',
- *   appsSdkMetadata: { ... }
+ *   metadata: { csp: { connectDomains: ['https://api.example.com'] } }
  * };
  *
  * const uiResource = await createWidgetUIResource(definition, { title: 'My Board' }, serverConfig);
@@ -400,7 +400,6 @@ export function createWidgetRegistration(
         inputs?: unknown;
         schema?: unknown;
         metadata?: unknown;
-        appsSdkMetadata?: unknown;
         [key: string]: unknown;
       },
   html: string,
@@ -410,11 +409,10 @@ export function createWidgetRegistration(
   name: string;
   title: string;
   description: string;
-  type: "appsSdk" | "mcpApps";
+  type: "mcpApps";
   props: import("../types/resource.js").WidgetProps;
   _meta: Record<string, unknown>;
   htmlTemplate: string;
-  appsSdkMetadata?: Record<string, any>;
   metadata?: Record<string, any>;
 } {
   // Use props field (preferred) with fallback to inputs/schema for backward compatibility
@@ -429,24 +427,14 @@ export function createWidgetRegistration(
   const exposeAsTool =
     metadata.exposeAsTool !== undefined ? metadata.exposeAsTool : false;
 
-  // Auto-detect widget type based on metadata presence:
-  // - Default → mcpApps (dual-protocol for both ChatGPT and MCP Apps clients)
-  // - If only `appsSdkMetadata` is present → appsSdk (legacy ChatGPT-only)
-  const widgetType =
-    metadata.appsSdkMetadata && !metadata.metadata ? "appsSdk" : "mcpApps";
-
-  const mcp_connect_domain = serverConfig.serverBaseUrl
-    ? new URL(serverConfig.serverBaseUrl || "").origin
-    : null;
-
   // Get slugified name for URL routing
   const slugifiedName = slugifyWidgetName(widgetName);
 
-  const baseRegistration = {
+  return {
     name: widgetName,
     title: title as string,
     description: description as string,
-    type: widgetType as "appsSdk" | "mcpApps",
+    type: "mcpApps" as const,
     props: props as import("../types/resource.js").WidgetProps,
     _meta: {
       "mcp-use/widget": {
@@ -454,7 +442,7 @@ export function createWidgetRegistration(
         slugifiedName: slugifiedName,
         title: title,
         description: description,
-        type: widgetType,
+        type: "mcpApps",
         props: props,
         html: html,
         dev: isDev,
@@ -469,78 +457,13 @@ export function createWidgetRegistration(
       ...(metadata._meta || {}),
     },
     htmlTemplate: html,
+    metadata: {
+      description,
+      invoking: `Loading ${widgetName}...`,
+      invoked: `${widgetName} ready`,
+      ...((metadata.metadata as Record<string, unknown> | undefined) || {}),
+    },
   };
-
-  // For appsSdk type (no unified metadata), add appsSdkMetadata
-  if (widgetType === "appsSdk") {
-    return {
-      ...baseRegistration,
-      type: "appsSdk" as const,
-      appsSdkMetadata: {
-        "openai/widgetDescription": description,
-        "openai/toolInvocation/invoking": `Loading ${widgetName}...`,
-        "openai/toolInvocation/invoked": `${widgetName} ready`,
-        "openai/widgetAccessible": true,
-        "openai/resultCanProduceWidget": true,
-        "openai/widgetDomain": "https://chatgpt.com", // Default domain (required for app submission)
-        ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined) ||
-          {}),
-        "openai/widgetCSP": {
-          connect_domains: [
-            // always also add the base url of the server
-            ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-            ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-              ?.connect_domains as string[]) || []),
-          ],
-          resource_domains: [
-            "https://*.oaistatic.com",
-            "https://*.oaiusercontent.com",
-            ...(isDev ? [] : ["https://*.openai.com"]),
-            // always also add the base url of the server
-            ...(mcp_connect_domain ? [mcp_connect_domain] : []),
-            // add additional CSP URLs from environment variable
-            ...serverConfig.cspUrls,
-            ...(((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-              ?.resource_domains as string[]) || []),
-          ],
-          // frame_domains for iframe embeds (optional per OpenAI spec)
-          ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-            ?.frame_domains
-            ? {
-                frame_domains: (metadata.appsSdkMetadata as any)?.[
-                  "openai/widgetCSP"
-                ]?.frame_domains as string[],
-              }
-            : {}),
-          // redirect_domains for openExternal redirects (optional per OpenAI spec)
-          ...((metadata.appsSdkMetadata as any)?.["openai/widgetCSP"]
-            ?.redirect_domains
-            ? {
-                redirect_domains: (metadata.appsSdkMetadata as any)?.[
-                  "openai/widgetCSP"
-                ]?.redirect_domains as string[],
-              }
-            : {}),
-        },
-      },
-    };
-  } else {
-    // For mcpApps type (has unified metadata), generate dual-protocol support
-    return {
-      ...baseRegistration,
-      type: "mcpApps" as const,
-      metadata: {
-        description,
-        invoking: `Loading ${widgetName}...`,
-        invoked: `${widgetName} ready`,
-        ...((metadata.metadata as Record<string, unknown> | undefined) || {}),
-      },
-      // Include appsSdkMetadata if provided for advanced ChatGPT features
-      ...((metadata.appsSdkMetadata as Record<string, unknown> | undefined)
-        ? { appsSdkMetadata: metadata.appsSdkMetadata as Record<string, any> }
-        : {}),
-    };
-  }
 }
 
 export async function createWidgetUIResource(

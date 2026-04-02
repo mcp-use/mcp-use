@@ -632,11 +632,8 @@ if (container && Component) {
           const { buildDualProtocolMetadata, getBuildIdPart } =
             await import("./protocol-helpers.js");
 
-          // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
-          const widgetType =
-            metadata.appsSdkMetadata && !metadata.metadata
-              ? "appsSdk"
-              : "mcpApps";
+          // Determine widget type (always mcpApps now)
+          const widgetType = "mcpApps";
           const slugifiedName = slugifyWidgetName(widgetName);
           const description = metadata.description || `Widget: ${widgetName}`;
 
@@ -672,15 +669,14 @@ if (container && Component) {
             metadata: metadata.metadata ? enrichedCspMetadata : undefined,
           };
 
-          // Build dual-protocol _meta for the tool definition:
+          // Build MCP Apps _meta for the tool definition:
           // - MCP Apps: ui.resourceUri, ui/resourceUri (deprecated)
-          // - Apps SDK: openai/outputTemplate, openai/widgetCSP, openai/description
-          const dualProtocolMeta = buildDualProtocolMetadata(
+          const mcpAppsMeta = buildDualProtocolMetadata(
             hmrDefinition as any,
             resourceUri
           );
 
-          // Assemble full _meta: mcp-use/widget + dual-protocol fields
+          // Assemble full _meta: mcp-use/widget + protocol fields
           const fullMeta: Record<string, unknown> = {
             "mcp-use/widget": {
               name: widgetName,
@@ -697,7 +693,7 @@ if (container && Component) {
             // mcp-use private extension: props schema for inspector PropsConfigDialog.
             // Not part of SEP-1865; other hosts will ignore this key.
             ...(schemaField ? { "mcp-use/propsSchema": schemaField } : {}),
-            ...dualProtocolMeta,
+            ...mcpAppsMeta,
           };
 
           const updated = updateWidgetTool(widgetName, {

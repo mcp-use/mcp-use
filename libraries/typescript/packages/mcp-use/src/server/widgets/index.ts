@@ -31,7 +31,6 @@ export {
   createExternalUrlResource,
   createRawHtmlResource,
   createRemoteDomResource,
-  createAppsSdkResource,
   type UrlConfig,
 } from "./mcp-ui-adapter.js";
 

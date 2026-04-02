@@ -156,8 +156,6 @@ export interface ServerRunEventData {
   prompts?: Prompt[] | null;
   templates?: Prompt[] | null;
   capabilities?: Record<string, any> | null;
-  appsSdkResources?: Resource[] | null;
-  appsSdkResourcesNumber?: number;
   mcpUiResources?: Resource[] | null;
   mcpUiResourcesNumber?: number;
   mcpAppsResources?: Resource[] | null;
@@ -252,9 +250,6 @@ export function createServerRunEventData(
   }));
 
   // Filter resources by mime_type
-  const appsSdkResources = allResources.filter(
-    (r) => r.mime_type === "text/html+skybridge"
-  );
   const mcpUiResources = allResources.filter(
     (r) => r.mime_type === "text/uri-list" || r.mime_type === "text/html"
   );
@@ -313,8 +308,6 @@ export function createServerRunEventData(
       logging: true,
       resources: { subscribe: true, listChanged: true },
     },
-    appsSdkResources: appsSdkResources.length > 0 ? appsSdkResources : null,
-    appsSdkResourcesNumber: appsSdkResources.length,
     mcpUiResources: mcpUiResources.length > 0 ? mcpUiResources : null,
     mcpUiResourcesNumber: mcpUiResources.length,
     mcpAppsResources: mcpAppsResources.length > 0 ? mcpAppsResources : null,
@@ -351,10 +344,6 @@ export class ServerRunEvent extends BaseTelemetryEvent {
       capabilities: this.data.capabilities
         ? JSON.stringify(this.data.capabilities)
         : null,
-      apps_sdk_resources: this.data.appsSdkResources
-        ? JSON.stringify(this.data.appsSdkResources)
-        : null,
-      apps_sdk_resources_number: this.data.appsSdkResourcesNumber ?? 0,
       mcp_ui_resources: this.data.mcpUiResources
         ? JSON.stringify(this.data.mcpUiResources)
         : null,

@@ -566,7 +566,7 @@ describe("Telemetry Event Classes", () => {
       expect(eventData.prompts).toBeNull();
     });
 
-    it("should filter resources by mime_type for appsSdkResources (text/html+skybridge)", () => {
+    it("should filter resources by mime_type for mcpAppsResources (text/html;profile=mcp-app)", () => {
       const mockServer: MCPServerTelemetryInfo = {
         registeredTools: [],
         registeredPrompts: [],
@@ -596,7 +596,7 @@ describe("Telemetry Event Classes", () => {
                   title: "display-weather",
                   description: "Display weather for a city",
                   uri: "ui://widget/display-weather.html",
-                  mimeType: "text/html+skybridge",
+                  mimeType: "text/html;profile=mcp-app",
                 },
                 handler: () => {},
               },
@@ -609,7 +609,7 @@ describe("Telemetry Event Classes", () => {
                   title: "kanban-board",
                   description: "Widget: kanban-board",
                   uri: "ui://widget/kanban-board.html",
-                  mimeType: "text/html+skybridge",
+                  mimeType: "text/html;profile=mcp-app",
                 },
                 handler: () => {},
               },
@@ -621,11 +621,11 @@ describe("Telemetry Event Classes", () => {
 
       const eventData = createServerRunEventData(mockServer, "http");
 
-      // Should have 2 appsSdkResources (text/html+skybridge)
-      expect(eventData.appsSdkResources).toHaveLength(2);
-      expect(eventData.appsSdkResourcesNumber).toBe(2);
-      expect(eventData.appsSdkResources?.[0].name).toBe("display-weather");
-      expect(eventData.appsSdkResources?.[1].name).toBe("kanban-board");
+      // Should have 2 mcpAppsResources (text/html;profile=mcp-app)
+      expect(eventData.mcpAppsResources).toHaveLength(2);
+      expect(eventData.mcpAppsResourcesNumber).toBe(2);
+      expect(eventData.mcpAppsResources?.[0].name).toBe("display-weather");
+      expect(eventData.mcpAppsResources?.[1].name).toBe("kanban-board");
     });
 
     it("should filter resources by mime_type for mcpUiResources (text/uri-list or text/html)", () => {
@@ -764,8 +764,6 @@ describe("Telemetry Event Classes", () => {
 
       const eventData = createServerRunEventData(mockServer, "http");
 
-      expect(eventData.appsSdkResources).toBeNull();
-      expect(eventData.appsSdkResourcesNumber).toBe(0);
       expect(eventData.mcpUiResources).toBeNull();
       expect(eventData.mcpUiResourcesNumber).toBe(0);
       expect(eventData.mcpAppsResources).toBeNull();

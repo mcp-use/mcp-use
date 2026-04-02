@@ -22,7 +22,7 @@ describe("Widget Helper Integration Tests", () => {
     // Register widgets for testing
     // Widget with exposeAsTool: false (not auto-registered as tool)
     server.uiResource({
-      type: "appsSdk",
+      type: "mcpApps",
       name: "manual-widget",
       title: "Manual Widget",
       description: "Widget not auto-registered as tool",
@@ -38,7 +38,7 @@ describe("Widget Helper Integration Tests", () => {
 
     // Widget without exposeAsTool (should default to false)
     server.uiResource({
-      type: "appsSdk",
+      type: "mcpApps",
       name: "auto-widget",
       title: "Auto Widget",
       description: "Widget auto-registered as tool",
@@ -53,7 +53,7 @@ describe("Widget Helper Integration Tests", () => {
 
     // Widget with exposeAsTool: true (explicitly)
     server.uiResource({
-      type: "appsSdk",
+      type: "mcpApps",
       name: "explicit-auto-widget",
       title: "Explicit Auto Widget",
       description: "Widget explicitly auto-registered as tool",
@@ -69,7 +69,7 @@ describe("Widget Helper Integration Tests", () => {
 
     // Widget with tool annotations
     server.uiResource({
-      type: "appsSdk",
+      type: "mcpApps",
       name: "annotated-widget",
       title: "Annotated Widget",
       description: "Widget with tool annotations",
@@ -82,7 +82,7 @@ describe("Widget Helper Integration Tests", () => {
 
     // Widget with multiple annotations
     server.uiResource({
-      type: "appsSdk",
+      type: "mcpApps",
       name: "multi-annotated-widget",
       title: "Multi-Annotated Widget",
       description: "Widget with multiple tool annotations",
@@ -96,7 +96,7 @@ describe("Widget Helper Integration Tests", () => {
 
     // Widget for manual tool testing
     server.uiResource({
-      type: "appsSdk",
+      type: "mcpApps",
       name: "comparison-widget",
       title: "Comparison Widget",
       description: "Widget for comparing outputs",
@@ -248,23 +248,19 @@ describe("Widget Helper Integration Tests", () => {
 
       expect(manualTool).toBeDefined();
       expect(manualTool!._meta).toBeDefined();
-      expect(manualTool!._meta).toHaveProperty("openai/outputTemplate");
-      expect(manualTool!._meta).toHaveProperty("openai/widgetAccessible");
-      expect(manualTool!._meta).toHaveProperty("openai/resultCanProduceWidget");
+      // MCP Apps metadata: ui.resourceUri
+      expect(manualTool!._meta).toHaveProperty("ui");
+      expect((manualTool!._meta as any).ui).toHaveProperty("resourceUri");
 
       expect(autoTool).toBeDefined();
-      // auto-registered tools may not expose _meta in tools/list (host/SDK dependent)
+      // auto-registered tools should have MCP Apps metadata
       if (autoTool!._meta) {
-        expect(autoTool!._meta).toHaveProperty("openai/outputTemplate");
-        const autoUri = (autoTool!._meta as Record<string, unknown>)?.[
-          "openai/outputTemplate"
-        ] as string;
+        expect((autoTool!._meta as any).ui).toHaveProperty("resourceUri");
+        const autoUri = (autoTool!._meta as any)?.ui?.resourceUri as string;
         expect(autoUri).toMatch(/^ui:\/\/widget\/explicit-auto-widget/);
       }
 
-      const manualUri = (manualTool!._meta as Record<string, unknown>)?.[
-        "openai/outputTemplate"
-      ] as string;
+      const manualUri = (manualTool!._meta as any)?.ui?.resourceUri as string;
       expect(manualUri).toMatch(/^ui:\/\/widget\/comparison-widget.*\.html$/);
     });
 
@@ -278,18 +274,14 @@ describe("Widget Helper Integration Tests", () => {
       // Verify tool result content
       expect((result.content as any)[0]?.text).toBe("Custom message");
 
-      // Per SEP-1865: invoking, invoked, widgetAccessible, resultCanProduceWidget
-      // belong on the tool definition (tools/list), not on the tool call result
+      // Per SEP-1865: tool metadata only has ui.resourceUri
+      // Custom invoking/invoked/widgetAccessible are no longer set on tool _meta
       const { tools } = await client.listTools();
       const tool = tools.find((t) => t.name === "manual-custom-metadata-tool");
       const meta = tool?._meta as Record<string, unknown> | undefined;
 
-      expect(meta?.["openai/toolInvocation/invoking"]).toBe(
-        "Custom invoking..."
-      );
-      expect(meta?.["openai/toolInvocation/invoked"]).toBe("Custom invoked");
-      expect(meta?.["openai/widgetAccessible"]).toBe(false);
-      expect(meta?.["openai/resultCanProduceWidget"]).toBe(true);
+      expect(meta).toBeDefined();
+      expect((meta as any)?.ui?.resourceUri).toBeDefined();
     });
   });
 });

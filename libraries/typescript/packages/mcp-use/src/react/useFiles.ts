@@ -1,9 +1,9 @@
 /**
  * useFiles — React hook for file upload and download in widgets.
  *
- * File operations are only supported in the ChatGPT Apps SDK environment.
- * The MCP Apps spec (SEP-1865) has deferred file handling:
- * https://github.com/modelcontextprotocol/ext-apps/issues/201
+ * File operations are not currently supported in MCP Apps v1.
+ * The prior ChatGPT Apps SDK integration has been removed; users should
+ * rely on the MCP Apps host for any file workflows.
  *
  * Always check `isSupported` before calling `upload` or `getDownloadUrl`.
  *
@@ -94,71 +94,26 @@ export interface UseFilesResult {
  * ```
  */
 export function useFiles(): UseFilesResult {
-  const isSupported = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return (
-      typeof (window.openai as any)?.uploadFile === "function" &&
-      typeof (window.openai as any)?.getFileDownloadUrl === "function"
-    );
-  }, []);
+  const isSupported = false;
 
   const upload = useMemo(
     () =>
-      async (
-        file: File,
-        options: UploadOptions = {}
-      ): Promise<FileMetadata> => {
-        if (!isSupported) {
-          throw new Error(
-            "[useFiles] File upload is not supported in this host. " +
-              "Check `isSupported` before calling `upload`. " +
-              "File operations are only available in the ChatGPT Apps SDK environment."
-          );
-        }
-
-        const metadata = await ((window.openai as any).uploadFile(
-          file
-        ) as Promise<FileMetadata>);
-
-        // Track in imageIds so the model can see the file, unless opted out.
-        // Preserves existing privateContent to avoid wiping non-file widget state.
-        const { modelVisible = true } = options;
-        if (modelVisible && window.openai?.setWidgetState) {
-          const prev = (window.openai.widgetState ?? {}) as Record<
-            string,
-            unknown
-          >;
-          const imageIds = [
-            ...((prev.imageIds as string[] | undefined) ?? []),
-            metadata.fileId,
-          ];
-          window.openai
-            .setWidgetState({ ...prev, imageIds } as any)
-            .catch((err: unknown) => {
-              console.warn("[useFiles] Failed to track imageId:", err);
-            });
-        }
-
-        return metadata;
+      async (): Promise<FileMetadata> => {
+        throw new Error(
+          "[useFiles] File operations are not supported when only MCP Apps protocol is enabled."
+        );
       },
-    [isSupported]
+    []
   );
 
   const getDownloadUrl = useMemo(
     () =>
-      async (file: FileMetadata): Promise<{ downloadUrl: string }> => {
-        if (!isSupported) {
-          throw new Error(
-            "[useFiles] File download is not supported in this host. " +
-              "Check `isSupported` before calling `getDownloadUrl`. " +
-              "File operations are only available in the ChatGPT Apps SDK environment."
-          );
-        }
-        return (window.openai as any).getFileDownloadUrl(file) as Promise<{
-          downloadUrl: string;
-        }>;
+      async (): Promise<{ downloadUrl: string }> => {
+        throw new Error(
+          "[useFiles] File operations are not supported when only MCP Apps protocol is enabled."
+        );
       },
-    [isSupported]
+    []
   );
 
   return { isSupported, upload, getDownloadUrl };

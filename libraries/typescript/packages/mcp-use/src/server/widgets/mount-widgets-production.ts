@@ -126,7 +126,7 @@ export async function mountWidgetsProduction(
 
     console.log("[CSP] mcp_connect_domain", mcp_connect_domain);
     console.log("[CSP] cspUrls", serverConfig.cspUrls);
-    console.log("[CSP] metadata.appsSdkMetadata", metadata.appsSdkMetadata);
+    console.log("[CSP] metadata.metadata", metadata.metadata);
     console.log("[CSP] metadata._meta", metadata._meta);
 
     // Use the extracted helper to register the widget

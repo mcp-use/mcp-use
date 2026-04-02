@@ -50,11 +50,10 @@ export type RegisterWidgetCallback = (widgetDefinition: {
   name: string;
   title: string;
   description: string;
-  type: "appsSdk" | "mcpApps";
+  type: "mcpApps";
   props: import("../types/resource.js").WidgetProps;
   _meta: Record<string, unknown>;
   htmlTemplate: string;
-  appsSdkMetadata?: import("../types/resource.js").AppsSdkMetadata;
   metadata?: Record<string, any>;
 }) => void;
 
