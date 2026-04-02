@@ -87,7 +87,7 @@ async function multiProviderExample() {
   // Try different providers (uncomment the one you want to use)
   const providers = [
     "openai/gpt-4o",
-    // "anthropic/claude-sonnet-4-6-20241022",
+    // "anthropic/claude-sonnet-4-6-",
     // "google/gemini-pro",
     // "groq/llama-3.1-70b-versatile",
   ];
