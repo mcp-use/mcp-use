@@ -86,7 +86,7 @@ await adapter.create_all(client)
 # Use with Anthropic SDK
 anthropic = Anthropic()
 response = anthropic.messages.create(
-    model="claude-sonnet-4-5",
+    model="claude-sonnet-4-6",
     messages=[{"role": "user", "content": "Find hotels in Trapani"}],
     tools=adapter.tools + adapter.resources + adapter.prompts,
     max_tokens=1024

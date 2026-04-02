@@ -43,7 +43,7 @@ async def main():
         # Initial request
         messages = [{"role": "user", "content": "Please tell me the cheapest hotel for two people in Trapani."}]
         response = anthropic.messages.create(
-            model="claude-sonnet-4-5", tools=anthropic_tools, max_tokens=1024, messages=messages
+            model="claude-sonnet-4-6", tools=anthropic_tools, max_tokens=1024, messages=messages
         )
         messages.append({"role": response.role, "content": response.content})
 
@@ -95,7 +95,7 @@ async def main():
                 )
                 # Get final response
                 final_response = anthropic.messages.create(
-                    model="claude-sonnet-4-5", max_tokens=1024, tools=anthropic_tools, messages=messages
+                    model="claude-sonnet-4-6", max_tokens=1024, tools=anthropic_tools, messages=messages
                 )
                 print("\n--- Final response from the model ---")
                 print(final_response.content[0].text)

@@ -47,7 +47,7 @@ async def run_multi_server_example():
     client = MCPClient.from_dict(config)
 
     # Create LLM
-    llm = ChatAnthropic(model="claude-sonnet-4-5")
+    llm = ChatAnthropic(model="claude-sonnet-4-6")
 
     # Create agent with the client
     agent = MCPAgent(llm=llm, client=client, max_steps=30, pretty_print=True)
