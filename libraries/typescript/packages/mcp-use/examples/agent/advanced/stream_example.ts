@@ -30,7 +30,7 @@ async function streamingExample() {
   // Initialize MCP client and agent
   const client = new MCPClient(everythingServer);
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     temperature: 0,
   });
   const agent = new MCPAgent({
@@ -86,7 +86,7 @@ async function streamingExampleWithFinalResult() {
   // Initialize MCP client and agent
   const client = new MCPClient(everythingServer);
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     temperature: 0,
   });
   const agent = new MCPAgent({
@@ -150,7 +150,7 @@ async function streamEventsExample() {
   // Initialize MCP client and agent
   const client = new MCPClient(everythingServer);
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     temperature: 0,
   });
   const agent = new MCPAgent({

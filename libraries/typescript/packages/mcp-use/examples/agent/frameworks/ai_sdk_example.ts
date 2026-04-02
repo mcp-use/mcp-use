@@ -91,7 +91,7 @@ async function createApiHandler() {
 
   const client = new MCPClient(everythingServer);
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     temperature: 0.1,
   });
 
@@ -138,7 +138,7 @@ async function createEnhancedApiHandler() {
 
   const client = new MCPClient(everythingServer);
   const llm = new ChatAnthropic({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     temperature: 0.1,
   });
 
