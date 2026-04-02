@@ -1,4 +1,4 @@
-"""
+claude-sonnet-4-6"""
 Basic usage example for streaming with mcp_use.
 
 This example demonstrates how to use the mcp_use library with MCPClient

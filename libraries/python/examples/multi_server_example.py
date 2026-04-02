@@ -1,4 +1,4 @@
-"""
+claude-sonnet-4-6"""
 Example demonstrating how to use MCPClient with multiple servers.
 
 This example shows how to:

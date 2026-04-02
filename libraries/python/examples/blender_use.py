@@ -1,4 +1,4 @@
-"""
+claude-sonnet-4-6"""
 Blender MCP example for mcp_use.
 
 This example demonstrates how to use the mcp_use library with MCPClient

@@ -1,4 +1,4 @@
-/**
+claude-sonnet-4-6/**
  * AI SDK Integration Example
  *
  * This example demonstrates how to use MCPAgent's streamEvents() method

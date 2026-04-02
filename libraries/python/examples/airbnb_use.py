@@ -1,4 +1,4 @@
-"""
+claude-sonnet-4-6"""
 Example demonstrating how to use mcp_use with Airbnb.
 
 This example shows how to connect an LLM to Airbnb through MCP tools

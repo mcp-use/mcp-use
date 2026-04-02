@@ -1,4 +1,4 @@
-import asyncio
+claude-sonnet-4-6import asyncio
 
 from anthropic import Anthropic
 from dotenv import load_dotenv

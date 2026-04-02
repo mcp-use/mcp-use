@@ -1,4 +1,4 @@
-/**
+claude-sonnet-4-6/**
  * This example demonstrates how to use the stream method of MCPAgent to get
  * intermediate steps and observe the agent's reasoning process in real-time.
  *
