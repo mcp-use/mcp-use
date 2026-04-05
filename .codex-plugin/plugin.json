@@ -1,0 +1,26 @@
+{
+  "name": "mcp-use",
+  "version": "0.1.0",
+  "description": "Fullstack MCP framework for building MCP Apps and Servers in Codex",
+  "author": {
+    "name": "mcp-use",
+    "url": "https://github.com/mcp-use"
+  },
+  "homepage": "https://github.com/mcp-use/mcp-use",
+  "repository": "https://github.com/mcp-use/mcp-use",
+  "keywords": [
+    "mcp",
+    "framework",
+    "fullstack",
+    "codex"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "mcp-use",
+    "shortDescription": "Fullstack MCP framework for Codex",
+    "longDescription": "Build MCP Apps for ChatGPT/Codex and MCP Servers for AI Agents. Provides a TypeScript SDK and a Python SDK for rapid MCP development.",
+    "category": "Development",
+    "websiteURL": "https://github.com/mcp-use/mcp-use"
+  },
+  "skills": "./skills/"
+}
