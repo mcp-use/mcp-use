@@ -32,6 +32,33 @@ interface Message {
   }>;
 }
 
+function getMessageContentAsString(
+  content: Message["content"]
+): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((item) =>
+        typeof item === "string" ? item : item.text || JSON.stringify(item)
+      )
+      .join("");
+  }
+  return JSON.stringify(content);
+}
+
+/** True when the assistant message already has something to show (text, tools, or legacy fields). */
+function assistantMessageHasRenderableContent(message: Message): boolean {
+  const parts = message.parts;
+  if (parts && parts.length > 0) {
+    for (const part of parts) {
+      if (part.type === "text" && part.text?.trim()) return true;
+      if (part.type === "tool-invocation" && part.toolInvocation) return true;
+    }
+  }
+  if (message.toolCalls && message.toolCalls.length > 0) return true;
+  return getMessageContentAsString(message.content).trim().length > 0;
+}
+
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
@@ -123,23 +150,10 @@ export const MessageList = memo(
         // If last message is from user, we're thinking
         if (lastMessage.role === "user") return true;
 
-        // If last message is from assistant but empty/minimal content, we're thinking
+        // If last message is from assistant but empty/minimal content, we're thinking.
+        // Server streaming clears `content` when using `parts`; still treat non-empty parts as content.
         if (lastMessage.role === "assistant") {
-          const contentStr =
-            typeof lastMessage.content === "string"
-              ? lastMessage.content
-              : Array.isArray(lastMessage.content)
-                ? lastMessage.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(lastMessage.content);
-
-          const hasContent = contentStr && contentStr.trim().length > 0;
-          return !hasContent;
+          return !assistantMessageHasRenderableContent(lastMessage);
         }
 
         return false;
@@ -157,18 +171,7 @@ export const MessageList = memo(
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
         {messages.map((message) => {
-          const contentStr =
-            typeof message.content === "string"
-              ? message.content
-              : Array.isArray(message.content)
-                ? message.content
-                    .map((item) =>
-                      typeof item === "string"
-                        ? item
-                        : item.text || JSON.stringify(item)
-                    )
-                    .join("")
-                : JSON.stringify(message.content);
+          const contentStr = getMessageContentAsString(message.content);
 
           if (message.role === "user") {
             return (
