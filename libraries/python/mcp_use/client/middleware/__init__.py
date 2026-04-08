@@ -9,6 +9,9 @@ receive a request context and a call_next function, allowing them to process bot
 incoming requests and outgoing responses.
 """
 
+# Authorization middleware
+from .authorization import ToolAuthorizationMiddleware
+
 # Core middleware implementation
 # Default logging middleware
 from .logging import default_logging_middleware
@@ -32,6 +35,8 @@ from .middleware import (
 )
 
 __all__ = [
+    # Authorization middleware
+    "ToolAuthorizationMiddleware",
     # Core types and classes
     "MiddlewareContext",
     "MCPResponseContext",
