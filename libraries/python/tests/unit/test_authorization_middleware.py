@@ -314,6 +314,24 @@ class TestEmptyAllowlist:
 
 
 # ---------------------------------------------------------------------------
+# Pagination and metadata are preserved through list_tools filtering
+# ---------------------------------------------------------------------------
+class TestListToolsPreservesPagination:
+    @pytest.mark.asyncio
+    async def test_next_cursor_preserved_through_filtering(self):
+        async def _next_with_cursor(context: MiddlewareContext) -> ListToolsResult:
+            return ListToolsResult(
+                tools=[_tool("search_docs"), _tool("delete_note")],
+                nextCursor="next-page-token",
+            )
+
+        mw = ToolAuthorizationMiddleware(denied_tools=["delete_note"])
+        result = await mw.on_list_tools(_make_list_context(), _next_with_cursor)
+        assert [t.name for t in result.tools] == ["search_docs"]
+        assert result.nextCursor == "next-page-token"
+
+
+# ---------------------------------------------------------------------------
 # Authorizer is NOT consulted during list_tools (documented behavior)
 # ---------------------------------------------------------------------------
 class TestListToolsSkipsAuthorizer:

@@ -119,13 +119,22 @@ class ToolAuthorizationMiddleware(Middleware):
         self._agent_context: dict[str, Any] = agent_context or {}
         self._authorizer: AuthorizerFn | None = authorizer
 
+    def _static_deny_reason(self, tool_name: str) -> str | None:
+        """Return the reason a tool is denied by static rules, or ``None`` if allowed.
+
+        This is the single source of truth for allowlist/denylist evaluation,
+        used by both :meth:`on_call_tool` (for logging) and
+        :meth:`on_list_tools` (for filtering).
+        """
+        if tool_name in self._denied:
+            return "denylist"
+        if self._allowed is not None and tool_name not in self._allowed:
+            return "not_in_allowlist"
+        return None
+
     def _is_tool_allowed_by_static_rules(self, tool_name: str) -> bool:
         """Check allowlist/denylist rules only (no async authorizer)."""
-        if tool_name in self._denied:
-            return False
-        if self._allowed is not None and tool_name not in self._allowed:
-            return False
-        return True
+        return self._static_deny_reason(tool_name) is None
 
     def _log_decision(self, context: MiddlewareContext[Any], decision: str, tool_name: str, reason: str) -> None:
         """Emit an audit log entry for an allow/deny decision."""
@@ -150,20 +159,17 @@ class ToolAuthorizationMiddleware(Middleware):
                 f"[{context.id}] {context.connection_id} ToolAuthorizationMiddleware "
                 f"filtered {removed} unauthorized tool(s) from list_tools"
             )
-        return ListToolsResult(tools=filtered)
+        result.tools = filtered
+        return result
 
     async def on_call_tool(self, context: MiddlewareContext[Any], call_next: NextFunctionT) -> CallToolResult:
         tool_name: str = context.params.name
         arguments: dict[str, Any] = context.params.arguments or {}
 
-        # 1. Denylist takes unconditional precedence.
-        if tool_name in self._denied:
-            self._log_decision(context, "DENIED", tool_name, "denylist")
-            return _denied_result(tool_name)
-
-        # 2. Allowlist: if set, only listed tools are permitted.
-        if self._allowed is not None and tool_name not in self._allowed:
-            self._log_decision(context, "DENIED", tool_name, "not_in_allowlist")
+        # 1. & 2. Static rules (denylist, then allowlist).
+        deny_reason = self._static_deny_reason(tool_name)
+        if deny_reason is not None:
+            self._log_decision(context, "DENIED", tool_name, deny_reason)
             return _denied_result(tool_name)
 
         # 3. Custom authorizer for dynamic / external policy evaluation.
