@@ -8,7 +8,7 @@
  * Environment variables:
  * - MCP_USE_OAUTH_CLERK_DOMAIN    (required) — e.g. my-app.clerk.accounts.dev
  */
-import { MCPServer, error, object, oauthClerkProvider } from "mcp-use/server";
+import { MCPServer, object, oauthClerkProvider } from "mcp-use/server";
 
 // Create MCP server with OAuth auto-configured from environment variables
 const server = new MCPServer({
@@ -53,27 +53,6 @@ server.tool(
     const name = ctx.auth.user.name ?? ctx.auth.user.email ?? "there";
     return object({
       greeting: `Hello, ${name}! You are authenticated via Clerk.`,
-      userId: ctx.auth.user.userId,
-    });
-  }
-);
-
-server.tool(
-  {
-    name: "require-email-scope",
-    description: "Verify that the authenticated user has the email scope",
-  },
-  async (_args, ctx) => {
-    if (!ctx.auth.scopes.includes("email")) {
-      return error(
-        `Missing required scope: email. Granted scopes: ${JSON.stringify(ctx.auth.scopes)}`
-      );
-    }
-
-    return object({
-      ok: true,
-      scopes: ctx.auth.scopes,
-      email: ctx.auth.user.email,
       userId: ctx.auth.user.userId,
     });
   }
