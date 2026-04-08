@@ -267,6 +267,72 @@ class TestListToolsFiltering:
 
 
 # ---------------------------------------------------------------------------
+# Fail-safe behavior
+# ---------------------------------------------------------------------------
+class TestFailSafe:
+    @pytest.mark.asyncio
+    async def test_authorizer_exception_denies_call(self):
+        async def boom(tool_name, arguments, agent_context) -> bool:
+            raise RuntimeError("permission engine unreachable")
+
+        mw = ToolAuthorizationMiddleware(authorizer=boom)
+        result = await mw.on_call_tool(_make_call_context("search_docs"), _allow_next)
+        assert _is_denied(result), "Authorizer exception must fail-safe to deny"
+        assert "search_docs" in result.content[0].text
+
+    @pytest.mark.asyncio
+    async def test_next_handler_not_called_when_authorizer_raises(self):
+        called = []
+
+        async def boom(tool_name, arguments, agent_context) -> bool:
+            raise RuntimeError("boom")
+
+        async def tracking_next(context) -> CallToolResult:
+            called.append(context.params.name)
+            return CallToolResult(content=[TextContent(type="text", text="ok")], isError=False)
+
+        mw = ToolAuthorizationMiddleware(authorizer=boom)
+        await mw.on_call_tool(_make_call_context("search_docs"), tracking_next)
+        assert called == [], "call_next must not execute when authorizer fails"
+
+
+# ---------------------------------------------------------------------------
+# Empty allowlist edge case
+# ---------------------------------------------------------------------------
+class TestEmptyAllowlist:
+    @pytest.mark.asyncio
+    async def test_empty_allowlist_denies_everything(self):
+        mw = ToolAuthorizationMiddleware(allowed_tools=[])
+        result = await mw.on_call_tool(_make_call_context("search_docs"), _allow_next)
+        assert _is_denied(result)
+
+    @pytest.mark.asyncio
+    async def test_empty_allowlist_filters_all_tools_from_list(self):
+        mw = ToolAuthorizationMiddleware(allowed_tools=[])
+        result = await mw.on_list_tools(_make_list_context(), _make_list_next("search_docs", "save_note"))
+        assert result.tools == []
+
+
+# ---------------------------------------------------------------------------
+# Authorizer is NOT consulted during list_tools (documented behavior)
+# ---------------------------------------------------------------------------
+class TestListToolsSkipsAuthorizer:
+    @pytest.mark.asyncio
+    async def test_authorizer_not_called_during_list_tools(self):
+        called = []
+
+        async def track(tool_name, arguments, agent_context) -> bool:
+            called.append(tool_name)
+            return False  # would deny if asked
+
+        mw = ToolAuthorizationMiddleware(authorizer=track)
+        result = await mw.on_list_tools(_make_list_context(), _make_list_next("search_docs", "save_note"))
+        assert called == []
+        # All tools remain because only static rules apply during list_tools
+        assert {t.name for t in result.tools} == {"search_docs", "save_note"}
+
+
+# ---------------------------------------------------------------------------
 # None arguments edge case
 # ---------------------------------------------------------------------------
 class TestNoneArguments:
