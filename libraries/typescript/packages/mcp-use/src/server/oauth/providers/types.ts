@@ -102,6 +102,7 @@ export interface SupabaseOAuthConfig extends BaseOAuthConfig {
   projectId: string;
   jwtSecret?: string;
   skipVerification?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -112,6 +113,7 @@ export interface Auth0OAuthConfig extends BaseOAuthConfig {
   domain: string;
   audience: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -123,6 +125,7 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
   realm: string;
   clientId?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -134,6 +137,7 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
   clientId?: string;
   apiKey?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**

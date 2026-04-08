@@ -21,6 +21,7 @@ export interface SupabaseProviderConfig {
   projectId: string;
   jwtSecret?: string;
   skipVerification?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -30,6 +31,7 @@ export interface Auth0ProviderConfig {
   domain: string;
   audience: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -40,6 +42,7 @@ export interface KeycloakProviderConfig {
   realm: string;
   clientId?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -50,6 +53,7 @@ export interface WorkOSProviderConfig {
   clientId?: string;
   apiKey?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -117,6 +121,7 @@ export function oauthSupabaseProvider(
     projectId,
     jwtSecret,
     skipVerification: config.skipVerification,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -176,6 +181,7 @@ export function oauthAuth0Provider(
     domain,
     audience,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -241,6 +247,7 @@ export function oauthKeycloakProvider(
     realm,
     clientId,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -331,6 +338,7 @@ export function oauthWorkOSProvider(
     clientId,
     apiKey,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
   });
 }
 

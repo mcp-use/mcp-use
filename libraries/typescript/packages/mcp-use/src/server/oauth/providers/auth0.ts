@@ -92,7 +92,14 @@ export class Auth0OAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["openid", "profile", "email", "offline_access"];
+    return (
+      this.config.scopesSupported ?? [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {
