@@ -1,4 +1,9 @@
-import { getApiKey, getApiUrl, getAuthBaseUrl, getProfileId } from "./config.js";
+import {
+  getApiKey,
+  getApiUrl,
+  getAuthBaseUrl,
+  getProfileId,
+} from "./config.js";
 
 export interface ProfileInfo {
   id: string;
@@ -211,7 +216,9 @@ export class McpUseAPI {
       clearTimeout(timeoutId);
 
       if (response.status === 401) {
-        const err = new Error("Your session has expired or your API key is invalid.");
+        const err = new Error(
+          "Your session has expired or your API key is invalid."
+        );
         (err as any).status = 401;
         throw err;
       }

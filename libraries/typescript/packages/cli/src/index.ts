@@ -2436,7 +2436,10 @@ program
 program
   .command("login")
   .description("Login to mcp-use cloud")
-  .option("--api-key <key>", "Login with an API key directly (non-interactive, for CI/CD)")
+  .option(
+    "--api-key <key>",
+    "Login with an API key directly (non-interactive, for CI/CD)"
+  )
   .action(async (opts: { apiKey?: string }) => {
     try {
       await loginCommand({ apiKey: opts.apiKey });

@@ -5,7 +5,6 @@ import {
   deleteConfig,
   getApiKey,
   getAuthBaseUrl,
-  getWebUrl,
   isLoggedIn,
   readConfig,
   writeConfig,
@@ -33,7 +32,9 @@ interface DeviceTokenResponse {
 /**
  * Request a device code from the backend (RFC 8628).
  */
-async function requestDeviceCode(authBaseUrl: string): Promise<DeviceCodeResponse> {
+async function requestDeviceCode(
+  authBaseUrl: string
+): Promise<DeviceCodeResponse> {
   const url = `${authBaseUrl}/api/auth/device/code`;
   const response = await fetch(url, {
     method: "POST",
@@ -46,7 +47,9 @@ async function requestDeviceCode(authBaseUrl: string): Promise<DeviceCodeRespons
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Failed to request device code: ${response.status} ${error}`);
+    throw new Error(
+      `Failed to request device code: ${response.status} ${error}`
+    );
   }
 
   return response.json() as Promise<DeviceCodeResponse>;
@@ -64,7 +67,8 @@ async function pollForDeviceToken(
   const deadline = Date.now() + DEVICE_POLL_TIMEOUT;
 
   while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, pollingInterval * 1000));
+    const delayMs = pollingInterval * 1000;
+    await new Promise((r) => setTimeout(r, delayMs));
 
     const url = `${authBaseUrl}/api/auth/device/token`;
     const response = await fetch(url, {
@@ -95,7 +99,9 @@ async function pollForDeviceToken(
         case "expired_token":
           throw new Error("The device code has expired. Please try again.");
         default:
-          throw new Error(data.error_description || `Device auth error: ${data.error}`);
+          throw new Error(
+            data.error_description || `Device auth error: ${data.error}`
+          );
       }
     }
   }
@@ -181,7 +187,11 @@ export async function loginCommand(options?: {
           const authInfo = await api.testAuth();
           console.log(chalk.gray(`  Authenticated as ${authInfo.email}`));
         } catch {
-          console.log(chalk.gray("  (could not verify key — will be checked on next command)"));
+          console.log(
+            chalk.gray(
+              "  (could not verify key — will be checked on next command)"
+            )
+          );
         }
       }
       return;
@@ -205,12 +215,19 @@ export async function loginCommand(options?: {
 
     // Step 1: Request device + user codes
     const deviceResp = await requestDeviceCode(authBaseUrl);
-    const { device_code, user_code, verification_uri, verification_uri_complete, interval } = deviceResp;
+    const {
+      device_code,
+      user_code,
+      verification_uri,
+      verification_uri_complete,
+      interval,
+    } = deviceResp;
 
     // Format user code with a dash for readability if it's 8 chars
-    const displayCode = user_code.length === 8
-      ? `${user_code.slice(0, 4)}-${user_code.slice(4)}`
-      : user_code;
+    const displayCode =
+      user_code.length === 8
+        ? `${user_code.slice(0, 4)}-${user_code.slice(4)}`
+        : user_code;
 
     console.log(chalk.white("  Visit: ") + chalk.cyan(verification_uri));
     console.log(chalk.white("  Code:  ") + chalk.bold.white(displayCode));
@@ -226,7 +243,11 @@ export async function loginCommand(options?: {
     }
 
     // Step 2: Poll until the user approves
-    const accessToken = await pollForDeviceToken(authBaseUrl, device_code, interval || 5);
+    const accessToken = await pollForDeviceToken(
+      authBaseUrl,
+      device_code,
+      interval || 5
+    );
 
     console.log(chalk.gray("\n  Creating persistent API key..."));
 
@@ -404,8 +425,12 @@ export async function whoamiCommand(): Promise<void> {
     }
   } catch (error: any) {
     if (error?.status === 401) {
-      console.error(chalk.red("\nYour session has expired or your API key is invalid."));
-      console.log(chalk.gray(`Run ${chalk.white("mcp-use login")} to re-authenticate.\n`));
+      console.error(
+        chalk.red("\nYour session has expired or your API key is invalid.")
+      );
+      console.log(
+        chalk.gray(`Run ${chalk.white("mcp-use login")} to re-authenticate.\n`)
+      );
     } else {
       console.error(
         chalk.red.bold("\n✗ Failed to get user info:"),
