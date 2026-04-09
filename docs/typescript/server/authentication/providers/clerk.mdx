@@ -38,6 +38,29 @@ server.listen(3000)
 
 `domain` can also be set via the `MCP_USE_OAUTH_CLERK_DOMAIN` environment variable.
 
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `domain` | `string` | — | Clerk domain (e.g. `my-app.clerk.accounts.dev`) |
+| `verifyJwt` | `boolean` | `true` | Verify JWT signatures via JWKS. Disable only for local development. |
+| `fetchUserInfo` | `boolean` | `false` | Fetch additional claims (`email`, `name`, `picture`, org info) from Clerk's `/oauth/userinfo` endpoint for JWT tokens. Opaque tokens always fetch userinfo regardless of this setting. |
+
+<Note>
+By default, JWT tokens return only the claims present in the JWT payload. Clerk JWTs do not include `email`, `name`, `picture`, or organization fields. If your tools need these claims, enable `fetchUserInfo: true`. Userinfo responses are cached for 60 seconds.
+</Note>
+
+```typescript
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: oauthClerkProvider({
+    domain: process.env.MCP_USE_OAUTH_CLERK_DOMAIN!,
+    fetchUserInfo: true, // Fetch email, name, picture, org info from Clerk
+  })
+})
+```
+
 ## Access User Info
 
 `mcp-use` automatically populates `ctx.auth.user` so your tools can read authenticated user data directly.
