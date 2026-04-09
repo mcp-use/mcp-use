@@ -19,21 +19,21 @@ import type {
 
 export class BetterAuthOAuthProvider implements OAuthProvider {
   private config: BetterAuthOAuthConfig;
-  private baseURL: string;
+  private authURL: string;
   private issuer: string;
   private jwksUrl: string;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
   constructor(config: BetterAuthOAuthConfig) {
     this.config = config;
-    // Normalize baseURL by stripping trailing slash
-    this.baseURL = config.baseURL.endsWith("/")
-      ? config.baseURL.slice(0, -1)
-      : config.baseURL;
-    // Better Auth sets iss to ctx.context.baseURL (the full base URL including path)
-    this.issuer = this.baseURL;
+    // Normalize authURL by stripping trailing slash
+    this.authURL = config.authURL.endsWith("/")
+      ? config.authURL.slice(0, -1)
+      : config.authURL;
+    // Better Auth sets iss to ctx.context.authURL (the full base URL including path)
+    this.issuer = this.authURL;
     // Better Auth always exposes JWKS at /jwks
-    this.jwksUrl = `${this.baseURL}/jwks`;
+    this.jwksUrl = `${this.authURL}/jwks`;
   }
 
   private getJWKS(): ReturnType<typeof createRemoteJWKSet> {
@@ -98,11 +98,11 @@ export class BetterAuthOAuthProvider implements OAuthProvider {
   }
 
   getAuthEndpoint(): string {
-    return `${this.baseURL}/oauth2/authorize`;
+    return `${this.authURL}/oauth2/authorize`;
   }
 
   getTokenEndpoint(): string {
-    return `${this.baseURL}/oauth2/token`;
+    return `${this.authURL}/oauth2/token`;
   }
 
   getScopesSupported(): string[] {
@@ -124,6 +124,6 @@ export class BetterAuthOAuthProvider implements OAuthProvider {
     if (this.config.clientId) {
       return undefined; // No DCR when using pre-registered client
     }
-    return `${this.baseURL}/oauth2/register`;
+    return `${this.authURL}/oauth2/register`;
   }
 }

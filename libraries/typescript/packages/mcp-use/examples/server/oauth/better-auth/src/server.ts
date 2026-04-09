@@ -31,7 +31,7 @@ const server = new MCPServer({
   version: "1.0.0",
   description: "MCP server with Better Auth OAuth authentication",
   oauth: oauthBetterAuthProvider({
-    baseURL: "http://localhost:3000/api/auth",
+    authURL: "http://localhost:3000/api/auth",
   }),
 });
 

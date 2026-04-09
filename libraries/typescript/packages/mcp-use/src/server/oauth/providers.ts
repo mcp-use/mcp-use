@@ -339,7 +339,7 @@ export function oauthWorkOSProvider(
  * Configuration for Better Auth OAuth provider
  */
 export interface BetterAuthProviderConfig {
-  baseURL: string;
+  authURL: string;
   clientId?: string;
   verifyJwt?: boolean;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>;
@@ -370,7 +370,7 @@ export interface BetterAuthProviderConfig {
  *   name: 'my-server',
  *   version: '1.0.0',
  *   oauth: oauthBetterAuthProvider({
- *     baseURL: 'http://localhost:3000/api/auth'
+ *     authURL: 'http://localhost:3000/api/auth'
  *   })
  * });
  * ```
@@ -379,20 +379,20 @@ export interface BetterAuthProviderConfig {
 export function oauthBetterAuthProvider(
   config: Partial<BetterAuthProviderConfig> = {}
 ): OAuthProvider {
-  const baseURL = config.baseURL ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_URL");
+  const authURL = config.authURL ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_URL");
   const clientId =
     config.clientId ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_CLIENT_ID");
 
-  if (!baseURL) {
+  if (!authURL) {
     throw new Error(
-      "Better Auth baseURL is required. " +
-        "Set MCP_USE_OAUTH_BETTER_AUTH_URL environment variable or pass baseURL in config."
+      "Better Auth authURL is required. " +
+        "Set MCP_USE_OAUTH_BETTER_AUTH_URL environment variable or pass authURL in config."
     );
   }
 
   return new BetterAuthOAuthProvider({
     provider: "better-auth",
-    baseURL,
+    authURL,
     clientId,
     verifyJwt: config.verifyJwt,
     getUserInfo: config.getUserInfo,

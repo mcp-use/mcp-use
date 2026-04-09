@@ -141,7 +141,7 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
  */
 export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
   provider: "better-auth";
-  baseURL: string;
+  authURL: string;
   clientId?: string;
   verifyJwt?: boolean;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>;
