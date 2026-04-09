@@ -18,19 +18,6 @@ export const auth = betterAuth({
   baseURL: "http://localhost:3000",
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET || "dev-secret-change-in-production",
-  // Stateless mode: no database required. Sessions are stored in signed cookies.
-  session: {
-    cookieCache: {
-      enabled: true,
-      maxAge: 7 * 24 * 60 * 60, // 7 days
-      strategy: "jwe",
-      refreshCache: true,
-    },
-  },
-  account: {
-    storeStateStrategy: "cookie",
-    storeAccountCookie: true,
-  },
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID!,
