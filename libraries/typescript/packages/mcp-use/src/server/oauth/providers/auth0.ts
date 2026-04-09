@@ -101,4 +101,8 @@ export class Auth0OAuthProvider implements OAuthProvider {
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token"];
   }
+
+  getMode(): OAuthMode {
+    return "direct";
+  }
 }

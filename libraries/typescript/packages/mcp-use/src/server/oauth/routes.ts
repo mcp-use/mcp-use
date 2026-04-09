@@ -272,6 +272,7 @@ export function setupOAuthRoutes(
     return c.json({
       resource: baseUrl,
       authorization_servers: [provider.getIssuer()],
+      scopes_supported: provider.getScopesSupported(),
       bearer_methods_supported: ["header"],
       resource_documentation:
         mode === "direct"
@@ -285,6 +286,7 @@ export function setupOAuthRoutes(
     return c.json({
       resource: `${baseUrl}/mcp`,
       authorization_servers: [provider.getIssuer()],
+      scopes_supported: provider.getScopesSupported(),
       bearer_methods_supported: ["header"],
     });
   });
