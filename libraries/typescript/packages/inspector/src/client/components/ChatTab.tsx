@@ -72,6 +72,23 @@ export interface ChatTabProps {
   chatQuickQuestions?: string[];
   /** Initial followups shown above input in active chat mode. */
   chatFollowups?: string[];
+  /**
+   * Wire protocol used by the streaming endpoint.
+   * - `"sse"` (default): Inspector SSE protocol
+   * - `"data-stream"`: Vercel AI SDK data-stream protocol
+   */
+  streamProtocol?: import("./chat/types").StreamProtocol;
+  /** Credentials policy for the fetch request (e.g. `"include"` for cross-origin cookie auth). */
+  credentials?: RequestCredentials;
+  /** Extra headers to send with every streaming request. */
+  extraHeaders?: Record<string, string>;
+  /**
+   * Custom body builder for the streaming request.
+   * Use to send only `{ messages }` to a server-managed backend.
+   */
+  body?: (
+    messages: Array<{ role: string; content: unknown; attachments?: unknown }>
+  ) => unknown;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -103,6 +120,10 @@ export function ChatTab({
   hideToolSelector,
   chatQuickQuestions = [],
   chatFollowups = [],
+  streamProtocol,
+  credentials,
+  extraHeaders,
+  body,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -168,6 +189,10 @@ export function ChatTab({
     widgetModelContexts,
     initialMessages,
     disabledTools,
+    streamProtocol,
+    credentials,
+    extraHeaders,
+    body,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
