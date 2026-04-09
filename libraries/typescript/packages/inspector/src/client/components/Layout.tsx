@@ -311,7 +311,9 @@ export function Layout({ children }: LayoutProps) {
       if (!editingConnectionId) return;
 
       const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(editingConnectionId) ||
+        getStoredConnectionConfig<EditableConnectionConfig>(
+          editingConnectionId
+        ) ||
         connections.find(
           (connection: McpServer) => connection.id === editingConnectionId
         );

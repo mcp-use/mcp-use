@@ -111,7 +111,10 @@ export interface McpClientContextType {
   /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
-  updateServerMetadata: (id: string, metadata: { name: string }) => Promise<void>;
+  updateServerMetadata: (
+    id: string,
+    metadata: { name: string }
+  ) => Promise<void>;
   updateServer: (
     id: string,
     options: Partial<McpServerOptions>

@@ -441,7 +441,9 @@ export function InspectorDashboard() {
       if (!editingConnectionId) return;
 
       const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(editingConnectionId) ||
+        getStoredConnectionConfig<EditableConnectionConfig>(
+          editingConnectionId
+        ) ||
         connections.find(
           (connection: McpServer) => connection.id === editingConnectionId
         );
