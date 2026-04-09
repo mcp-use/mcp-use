@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.22.4-canary.2
+
+### Patch Changes
+
+- d09532e: Updated dependency `hono` to `^4.12.12`.
+- Updated dependencies [d09532e]
+  - @mcp-use/inspector@0.26.2-canary.2
+  - @mcp-use/cli@2.21.3-canary.2
+
 ## 1.22.4-canary.1
 
 ### Patch Changes

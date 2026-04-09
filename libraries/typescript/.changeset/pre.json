@@ -8,6 +8,7 @@
     "mcp-use": "1.22.3"
   },
   "changesets": [
+    "dependabot-1288811e",
     "pretty-cobras-shop",
     "sharp-rooms-appear"
   ]
