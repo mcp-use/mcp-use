@@ -167,6 +167,7 @@ export function ChatTab({
     waitForChatApiUrl,
     widgetModelContexts,
     initialMessages,
+    disabledTools,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
