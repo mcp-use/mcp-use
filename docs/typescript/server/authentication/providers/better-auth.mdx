@@ -20,13 +20,6 @@ The Better Auth provider turns your mcp-use server into an OAuth 2.1 authorizati
 npm install better-auth @better-auth/oauth-provider better-sqlite3
 ```
 
-Then generate and migrate the database tables:
-
-```bash
-npx auth@latest generate
-npx auth@latest migrate
-```
-
 ## Setup
 
 ### 1. Configure Better Auth
@@ -75,7 +68,16 @@ export const auth = betterAuth({
 });
 ```
 
-### 2. Configure the MCP Server
+### 2. Generate and Migrate the Database
+
+With your `auth.ts` in place, run the Better Auth CLI to create the required tables:
+
+```bash
+npx auth@latest generate
+npx auth@latest migrate
+```
+
+### 3. Configure the MCP Server
 
 ```typescript
 // server.ts
@@ -113,7 +115,7 @@ server.app.get("/.well-known/openid-configuration/api/auth", (c) => openIdConfig
 server.listen({ port: 3000 });
 ```
 
-### 3. Add Login and Consent Pages
+### 4. Add Login and Consent Pages
 
 Better Auth requires a login page (where users authenticate) and a consent page (where users approve requested scopes). Mount these on the Hono app:
 
