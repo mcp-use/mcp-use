@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 0.26.2-canary.4
+
+### Patch Changes
+
+- 36334a0: Fix (inspector): add disabled tools prop to the inspector chat.
+  - mcp-use@1.22.4-canary.4
+
 ## 0.26.2-canary.3
 
 ### Patch Changes
