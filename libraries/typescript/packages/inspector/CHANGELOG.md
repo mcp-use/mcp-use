@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 0.27.0-canary.5
+
+### Minor Changes
+
+- 7be81db: Feat(inspector): add support for data stream protocol
+
+### Patch Changes
+
+- mcp-use@1.22.4-canary.5
+
 ## 0.26.2-canary.4
 
 ### Patch Changes
