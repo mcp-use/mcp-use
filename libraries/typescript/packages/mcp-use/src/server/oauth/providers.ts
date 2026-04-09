@@ -59,6 +59,7 @@ export interface WorkOSProviderConfig {
 export interface ClerkProviderConfig {
   domain: string;
   verifyJwt?: boolean;
+  fetchUserInfo?: boolean;
 }
 
 /**
@@ -388,6 +389,7 @@ export function oauthClerkProvider(
     provider: "clerk",
     domain,
     verifyJwt: config.verifyJwt,
+    fetchUserInfo: config.fetchUserInfo,
   });
 }
 

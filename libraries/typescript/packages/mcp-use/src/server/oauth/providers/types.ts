@@ -164,6 +164,7 @@ export interface ClerkOAuthConfig extends BaseOAuthConfig {
   provider: "clerk";
   domain: string; // e.g. "my-app.clerk.accounts.dev" or custom domain
   verifyJwt?: boolean; // defaults to true, disabled only for local dev
+  fetchUserInfo?: boolean; // defaults to false; when true, JWT tokens also call /oauth/userinfo
 }
 
 /**
