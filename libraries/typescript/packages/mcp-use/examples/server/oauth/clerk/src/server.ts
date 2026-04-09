@@ -16,7 +16,12 @@ const server = new MCPServer({
   version: "1.0.0",
   description: "MCP server with Clerk OAuth authentication",
   // Zero-config: OAuth is fully configured via MCP_USE_OAUTH_* environment variables
-  oauth: oauthClerkProvider(),
+  // fetchUserInfo: true fetches additional claims (email, name, picture, org info)
+  // from Clerk's /oauth/userinfo endpoint. Without it, JWT tokens only contain
+  // the claims present in the JWT payload.
+  oauth: oauthClerkProvider({
+    fetchUserInfo: true,
+  }),
 });
 
 // Returns authenticated user information populated by the Clerk provider.
