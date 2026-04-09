@@ -342,7 +342,9 @@ export interface BetterAuthProviderConfig {
   authURL: string;
   clientId?: string;
   verifyJwt?: boolean;
-  getUserInfo?: (payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>;
+  getUserInfo?: (
+    payload: Record<string, unknown>
+  ) => UserInfo | Promise<UserInfo>;
 }
 
 /**

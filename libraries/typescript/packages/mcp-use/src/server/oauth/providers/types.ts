@@ -144,7 +144,9 @@ export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
   authURL: string;
   clientId?: string;
   verifyJwt?: boolean;
-  getUserInfo?: (payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>;
+  getUserInfo?: (
+    payload: Record<string, unknown>
+  ) => UserInfo | Promise<UserInfo>;
 }
 
 /**

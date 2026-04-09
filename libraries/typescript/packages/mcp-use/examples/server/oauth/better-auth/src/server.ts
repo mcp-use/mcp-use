@@ -56,9 +56,12 @@ const authServerMetadataHandler = oauthProviderAuthServerMetadata(auth, {
 server.app.get("/.well-known/oauth-authorization-server", async (c) => {
   return authServerMetadataHandler(c.req.raw);
 });
-server.app.get("/.well-known/oauth-authorization-server/api/auth", async (c) => {
-  return authServerMetadataHandler(c.req.raw);
-});
+server.app.get(
+  "/.well-known/oauth-authorization-server/api/auth",
+  async (c) => {
+    return authServerMetadataHandler(c.req.raw);
+  }
+);
 
 // Mount .well-known/openid-configuration metadata
 // Required because the openid scope is supported.
