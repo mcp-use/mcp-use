@@ -2435,14 +2435,10 @@ program
 // Authentication commands
 program
   .command("login")
-  .description("Login to mcp-use cloud")
-  .option(
-    "--api-key <key>",
-    "Login with an API key directly (non-interactive, for CI/CD)"
-  )
-  .action(async (opts: { apiKey?: string }) => {
+  .description("Login to Manufact cloud")
+  .action(async () => {
     try {
-      await loginCommand({ apiKey: opts.apiKey });
+      await loginCommand();
       process.exit(0);
     } catch (error) {
       console.error(
