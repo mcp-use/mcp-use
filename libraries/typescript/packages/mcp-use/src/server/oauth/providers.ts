@@ -10,6 +10,7 @@ import { SupabaseOAuthProvider } from "./providers/supabase.js";
 import { Auth0OAuthProvider } from "./providers/auth0.js";
 import { KeycloakOAuthProvider } from "./providers/keycloak.js";
 import { WorkOSOAuthProvider } from "./providers/workos.js";
+import { BetterAuthOAuthProvider } from "./providers/better-auth.js";
 import { CustomOAuthProvider } from "./providers/custom.js";
 import type { UserInfo } from "./providers/types.js";
 import { getEnv } from "../utils/runtime.js";
@@ -331,6 +332,70 @@ export function oauthWorkOSProvider(
     clientId,
     apiKey,
     verifyJwt: config.verifyJwt,
+  });
+}
+
+/**
+ * Configuration for Better Auth OAuth provider
+ */
+export interface BetterAuthProviderConfig {
+  baseURL: string;
+  clientId?: string;
+  verifyJwt?: boolean;
+  getUserInfo?: (payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>;
+}
+
+/**
+ * Create a Better Auth OAuth provider
+ *
+ * Uses "direct" mode where MCP clients communicate directly with Better Auth
+ * for OAuth flows. The MCP server only verifies tokens and provides metadata.
+ *
+ * Better Auth's OAuth Provider plugin exposes standard OAuth 2.0 endpoints:
+ * - /oauth2/authorize - Authorization endpoint
+ * - /oauth2/token - Token endpoint
+ * - /oauth2/register - Dynamic Client Registration
+ * - /jwks - JSON Web Key Set for token verification
+ *
+ * Environment variables:
+ * - MCP_USE_OAUTH_BETTER_AUTH_URL (required)
+ * - MCP_USE_OAUTH_BETTER_AUTH_CLIENT_ID (optional, for pre-registered client)
+ *
+ * @param config - Optional Better Auth configuration (overrides environment variables)
+ * @returns OAuthProvider instance
+ *
+ * @example Dynamic Client Registration (recommended)
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthBetterAuthProvider({
+ *     baseURL: 'http://localhost:3000/api/auth'
+ *   })
+ * });
+ * ```
+ *
+ */
+export function oauthBetterAuthProvider(
+  config: Partial<BetterAuthProviderConfig> = {}
+): OAuthProvider {
+  const baseURL = config.baseURL ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_URL");
+  const clientId =
+    config.clientId ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_CLIENT_ID");
+
+  if (!baseURL) {
+    throw new Error(
+      "Better Auth baseURL is required. " +
+        "Set MCP_USE_OAUTH_BETTER_AUTH_URL environment variable or pass baseURL in config."
+    );
+  }
+
+  return new BetterAuthOAuthProvider({
+    provider: "better-auth",
+    baseURL,
+    clientId,
+    verifyJwt: config.verifyJwt,
+    getUserInfo: config.getUserInfo,
   });
 }
 
