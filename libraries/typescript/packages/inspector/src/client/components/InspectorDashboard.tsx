@@ -969,8 +969,6 @@ export function InspectorDashboard() {
           <ConnectionSettingsForm
             alias={alias}
             setAlias={setAlias}
-            transportType="SSE"
-            setTransportType={() => {}}
             url={url}
             setUrl={setUrl}
             connectionType={connectionType}

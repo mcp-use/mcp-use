@@ -28,8 +28,6 @@ interface ConnectionSettingsFormProps {
   // Form state
   alias: string;
   setAlias: (value: string) => void;
-  transportType: string;
-  setTransportType: (value: string) => void;
   url: string;
   setUrl: (value: string) => void;
   connectionType: string;
@@ -89,8 +87,6 @@ interface ConnectionSettingsFormProps {
 export function ConnectionSettingsForm({
   alias,
   setAlias,
-  transportType: _transportType,
-  setTransportType: _setTransportType,
   url,
   setUrl,
   connectionType,

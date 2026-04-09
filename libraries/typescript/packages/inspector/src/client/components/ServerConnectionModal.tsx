@@ -220,8 +220,6 @@ export function ServerConnectionModal({
         <ConnectionSettingsForm
           alias={alias}
           setAlias={setAlias}
-          transportType="SSE"
-          setTransportType={() => {}}
           url={url}
           setUrl={setUrl}
           connectionType={connectionType}
