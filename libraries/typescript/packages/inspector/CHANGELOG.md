@@ -1,5 +1,28 @@
 # @mcp-use/inspector
 
+## 0.26.2-canary.4
+
+### Patch Changes
+
+- 36334a0: Fix (inspector): add disabled tools prop to the inspector chat.
+  - mcp-use@1.22.4-canary.4
+
+## 0.26.2-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - mcp-use@1.22.4-canary.3
+
+## 0.26.2-canary.2
+
+### Patch Changes
+
+- d09532e: Updated dependency `hono` to `^4.12.12`.
+- Updated dependencies [d09532e]
+  - mcp-use@1.22.4-canary.2
+
 ## 0.26.2-canary.1
 
 ### Patch Changes

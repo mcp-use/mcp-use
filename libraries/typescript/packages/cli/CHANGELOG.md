@@ -1,5 +1,30 @@
 # @mcp-use/cli
 
+## 2.21.3-canary.4
+
+### Patch Changes
+
+- Updated dependencies [36334a0]
+  - @mcp-use/inspector@0.26.2-canary.4
+  - mcp-use@1.22.4-canary.4
+
+## 2.21.3-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - @mcp-use/inspector@0.26.2-canary.3
+  - mcp-use@1.22.4-canary.3
+
+## 2.21.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [d09532e]
+  - @mcp-use/inspector@0.26.2-canary.2
+  - mcp-use@1.22.4-canary.2
+
 ## 2.21.3-canary.1
 
 ### Patch Changes

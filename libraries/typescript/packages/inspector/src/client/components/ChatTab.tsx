@@ -188,6 +188,7 @@ export function ChatTab({
     waitForChatApiUrl,
     widgetModelContexts,
     initialMessages,
+    disabledTools,
     streamProtocol,
     credentials,
     extraHeaders,

@@ -8,6 +8,9 @@
     "mcp-use": "1.22.3"
   },
   "changesets": [
+    "busy-nails-like",
+    "dependabot-1288811e",
+    "dependabot-d0f08e92",
     "pretty-cobras-shop",
     "sharp-rooms-appear"
   ]

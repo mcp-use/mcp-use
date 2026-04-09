@@ -28,6 +28,8 @@ interface UseChatMessagesProps {
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
   initialMessages?: Message[];
+  /** Tool names the user has disabled via the tool selector. Sent to the server so it can exclude them. */
+  disabledTools?: Set<string>;
   /**
    * Wire protocol used by the streaming endpoint.
    * - `"sse"` (default): Inspector SSE protocol (`data: {"type":"text","content":"..."}\n\n`)
@@ -59,6 +61,7 @@ export function useChatMessages({
   waitForChatApiUrl,
   widgetModelContexts,
   initialMessages,
+  disabledTools,
   streamProtocol = "sse",
   credentials,
   extraHeaders,
@@ -198,6 +201,9 @@ export function useChatMessages({
                   llmConfig,
                   authConfig: authConfigWithTokens,
                   messages: serialisedMessages,
+                  ...(disabledTools && disabledTools.size > 0
+                    ? { disabledTools: [...disabledTools] }
+                    : {}),
                 }
           ),
         });
@@ -516,7 +522,12 @@ export function useChatMessages({
       attachments,
       chatApiUrl,
       waitForChatApiUrl,
+      widgetModelContexts,
+      disabledTools,
       streamProtocol,
+      credentials,
+      extraHeaders,
+      bodyBuilder,
     ]
   );
 
