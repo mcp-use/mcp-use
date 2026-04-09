@@ -5,11 +5,11 @@
  * Supports two token formats issued by Clerk:
  *
  * 1. **Opaque tokens** (`oat_...`) — issued to OAuth clients (e.g. Cursor, Claude Code).
- *    Verified via Clerk's `/oauth/userinfo` endpoint.
+ *    Verified via Clerk's `/oauth/userinfo` endpoint. Responses are cached (60s TTL).
  *
  * 2. **JWT-formatted OAuth tokens** — verified locally using JWKS
- *    (or skipped when `verifyJwt: false` for dev), then hydrated via
- *    Clerk's `/oauth/userinfo` endpoint so user context is consistent.
+ *    (or skipped when `verifyJwt: false` for dev). When `fetchUserInfo: true`,
+ *    also calls `/oauth/userinfo` to hydrate additional claims (email, name, org info).
  */
 import { jwtVerify, createRemoteJWKSet } from "jose";
 import type {
@@ -23,6 +23,12 @@ export class ClerkOAuthProvider implements OAuthProvider {
   protected config: ClerkOAuthConfig;
   private issuer: string;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+  private userInfoCache = new Map<
+    string,
+    { data: Record<string, unknown>; expiry: number }
+  >();
+  private static CACHE_TTL = 60_000; // 60 seconds
+  private static CACHE_MAX_SIZE = 1000;
 
   constructor(config: ClerkOAuthConfig) {
     this.config = config;
@@ -36,6 +42,38 @@ export class ClerkOAuthProvider implements OAuthProvider {
       );
     }
     return this.jwks;
+  }
+
+  private getCachedUserInfo(
+    token: string
+  ): Record<string, unknown> | undefined {
+    const entry = this.userInfoCache.get(token);
+    if (!entry) return undefined;
+    if (Date.now() > entry.expiry) {
+      this.userInfoCache.delete(token);
+      return undefined;
+    }
+    return entry.data;
+  }
+
+  private setCachedUserInfo(
+    token: string,
+    data: Record<string, unknown>
+  ): void {
+    if (this.userInfoCache.size >= ClerkOAuthProvider.CACHE_MAX_SIZE) {
+      const now = Date.now();
+      for (const [key, val] of this.userInfoCache) {
+        if (now > val.expiry) this.userInfoCache.delete(key);
+      }
+    }
+    if (this.userInfoCache.size >= ClerkOAuthProvider.CACHE_MAX_SIZE) {
+      const oldest = this.userInfoCache.keys().next().value;
+      if (oldest) this.userInfoCache.delete(oldest);
+    }
+    this.userInfoCache.set(token, {
+      data,
+      expiry: Date.now() + ClerkOAuthProvider.CACHE_TTL,
+    });
   }
 
   async verifyToken(token: string): Promise<any> {
@@ -71,16 +109,23 @@ export class ClerkOAuthProvider implements OAuthProvider {
       }
     }
 
-    const userInfoPayload = await this.fetchUserInfo(token);
-    return {
-      payload: {
-        ...verifiedPayload,
-        ...userInfoPayload,
-      },
-    };
+    if (this.config.fetchUserInfo) {
+      const userInfoPayload = await this.fetchUserInfo(token);
+      return {
+        payload: {
+          ...verifiedPayload,
+          ...userInfoPayload,
+        },
+      };
+    }
+
+    return { payload: verifiedPayload };
   }
 
   private async fetchUserInfo(token: string): Promise<Record<string, unknown>> {
+    const cached = this.getCachedUserInfo(token);
+    if (cached) return cached;
+
     const res = await fetch(`${this.issuer}/oauth/userinfo`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -89,7 +134,9 @@ export class ClerkOAuthProvider implements OAuthProvider {
         `Clerk userinfo request failed: ${res.status} ${res.statusText}`
       );
     }
-    return (await res.json()) as Record<string, unknown>;
+    const data = (await res.json()) as Record<string, unknown>;
+    this.setCachedUserInfo(token, data);
+    return data;
   }
 
   getUserInfo(payload: Record<string, unknown>): UserInfo {
