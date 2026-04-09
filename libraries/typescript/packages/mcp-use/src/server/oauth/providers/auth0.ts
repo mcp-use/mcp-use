@@ -6,7 +6,12 @@
  */
 
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { OAuthProvider, UserInfo, Auth0OAuthConfig, OAuthMode } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  Auth0OAuthConfig,
+  OAuthMode,
+} from "./types.js";
 
 export class Auth0OAuthProvider implements OAuthProvider {
   private config: Auth0OAuthConfig;
