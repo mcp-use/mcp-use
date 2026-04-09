@@ -100,18 +100,8 @@ export async function getProfileId(): Promise<string | null> {
 
 /**
  * Get web URL (for browser-based auth)
- * This is the frontend URL where /device verification page lives
+ * This is the frontend URL where /auth/cli lives
  */
 export async function getWebUrl(): Promise<string> {
   return DEFAULT_WEB_URL;
-}
-
-/**
- * Derive the auth base URL from the API URL.
- * Better Auth endpoints live at /api/auth/*, not under /api/v1/.
- * e.g. "http://localhost:8000/api/v1" -> "http://localhost:8000"
- */
-export async function getAuthBaseUrl(): Promise<string> {
-  const apiUrl = await getApiUrl();
-  return apiUrl.replace(/\/api\/v1$/, "");
 }

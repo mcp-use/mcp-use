@@ -1,9 +1,13 @@
-import {
-  getApiKey,
-  getApiUrl,
-  getAuthBaseUrl,
-  getProfileId,
-} from "./config.js";
+import { getApiKey, getApiUrl, getProfileId } from "./config.js";
+
+export interface APIKeyCreateRequest {
+  name: string;
+}
+
+export interface APIKeyCreateResponse {
+  api_key: string;
+  name: string;
+}
 
 export interface ProfileInfo {
   id: string;
@@ -215,14 +219,6 @@ export class McpUseAPI {
 
       clearTimeout(timeoutId);
 
-      if (response.status === 401) {
-        const err = new Error(
-          "Your session has expired or your API key is invalid."
-        );
-        (err as any).status = 401;
-        throw err;
-      }
-
       if (!response.ok) {
         const error = await response.text();
         throw new Error(`API request failed: ${response.status} ${error}`);
@@ -241,22 +237,20 @@ export class McpUseAPI {
   }
 
   /**
-   * Create a persistent API key using a Better Auth access token.
-   * Calls Better Auth's built-in POST /api/auth/api-key/create endpoint.
+   * Create API key using JWT token
    */
-  async createApiKeyWithAccessToken(
-    accessToken: string,
+  async createApiKey(
+    jwtToken: string,
     name: string = "CLI"
-  ): Promise<{ key: string }> {
-    const authBase = await getAuthBaseUrl();
-    const url = `${authBase}/api/auth/api-key/create`;
+  ): Promise<APIKeyCreateResponse> {
+    const url = `${this.baseUrl}/api-key`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${jwtToken}`,
       },
-      body: JSON.stringify({ name, prefix: "mcp_" }),
+      body: JSON.stringify({ name }),
     });
 
     if (!response.ok) {
@@ -264,7 +258,7 @@ export class McpUseAPI {
       throw new Error(`Failed to create API key: ${response.status} ${error}`);
     }
 
-    return response.json() as Promise<{ key: string }>;
+    return response.json() as Promise<APIKeyCreateResponse>;
   }
 
   /**
