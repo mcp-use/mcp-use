@@ -58,7 +58,7 @@ from mcp_use import MCPAgent, MCPClient
 
 # Initialize Claude model
 llm = ChatAnthropic(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-6",
     temperature=0.7,
     api_key="your-api-key"  # Or set ANTHROPIC_API_KEY env var
 )
@@ -182,7 +182,7 @@ llm = ChatOpenAI(
 
 # Anthropic with custom parameters
 llm = ChatAnthropic(
-    model="claude-3-5-sonnet-20241022",
+    model="claude-sonnet-4-6",
     temperature=0.7,
     max_tokens=4000,
     top_p=0.9
@@ -274,7 +274,7 @@ def get_model_for_task(task_type: str):
     if task_type == "complex_reasoning":
         return ChatOpenAI(model="gpt-4o", temperature=0.1)
     elif task_type == "creative":
-        return ChatAnthropic(model="claude-3-5-sonnet-20241022", temperature=0.8)
+        return ChatAnthropic(model="claude-sonnet-4-6", temperature=0.8)
     else:
         return ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
 
