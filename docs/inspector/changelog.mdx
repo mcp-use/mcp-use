@@ -6,6 +6,33 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.0.0&title=Stream%20Protocol%2C%20Aliases%20%26%20Chat%20Tooling&date=2026-04&lang=inspector" alt="Release 1.0.0" />
+  </Frame>
+  ## Stream protocol, aliases & chat tooling
+  Major release with MCP stream support in chat, connection UX improvements, and dependency hardening.
+
+- **New**: MCP data stream protocol support in `ChatTab` and `useChatMessages`
+- **Enhancement**: `disabledTools` prop on `ChatTab` and `useChatMessages` for finer tool control
+- **New**: Editable MCP server aliases in connection settings; `updateServerMetadata()` from `McpClientProvider` updates display names without a full reconnect; shared `getServerDisplayName` across dashboard tiles, server dropdown, header actions, command palette, server info modal, and server icon
+- **Fix**: Alias-only edits no longer trigger a full reconnect; IME composition no longer submits the connection form when pressing Enter mid-composition
+- **Enhancement**: Persist tabs on refresh; sync URL `tab` query param when switching tabs so state survives reload
+- **Enhancement**: Tool-invocation serialization, screenshots, and message list refs for integrations such as manufact.build
+- **Update**: Removed unused `transportType` / `setTransportType` props from `ConnectionSettingsForm`
+- **Fix**: Tighter `pnpm` overrides and lockfile refresh for `pnpm audit`; `lodash` override in the mcp-apps scaffold template for standalone installs
+- **Update**: Vite 8.0.5, Hono 4.12.12, `@hono/node-server` 1.19.13
+- **Update**: Updated mcp-use to v1.23.0
+</Update>
+
+<Update label="v0.26.1" description="March 2026">
+  ## Dependency & bundling alignment
+  Patch release aligning how `@mcp-use/inspector` packages `mcp-use` for bundling and shared types.
+
+- **Fix**: Restore `mcp-use` as both a `dependency` and `peerDependency` — tsup bundles non-React subpaths with transitive deps; `peerDependency` preserves shared `mcp-use`/`react` types with the host app
+- **Update**: Updated mcp-use to v1.22.3
+</Update>
+
 <Update label="v0.26.0" description="March 2026">
   ## Peer Dependency Alignment & MCP UI v7
   Minor release aligning inspector dependency strategy for shared type safety and upgrading MCP UI client rendering internals.
