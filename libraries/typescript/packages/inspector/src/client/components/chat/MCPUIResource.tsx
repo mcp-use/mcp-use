@@ -32,7 +32,7 @@ export const MCPUIResource = memo(({ resource }: MCPUIResourceProps) => {
     <div className="my-4 p-0 border h-[350px] rounded-2xl border-zinc-200 overflow-hidden bg-card">
       <iframe
         srcDoc={html}
-        sandbox="allow-scripts allow-forms allow-popups"
+        sandbox="allow-forms allow-popups"
         title={resource.uri ?? "MCP UI Resource"}
         style={{
           width: "100%",
