@@ -1,5 +1,27 @@
 # @mcp-use/cli
 
+## 2.21.3
+
+### Patch Changes
+
+- 6d7c4df: Updated dependency `vite` to `^8.0.5`.
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- 6d7c4df: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+  - mcp-use@1.23.0
+  - @mcp-use/inspector@1.0.0
+
 ## 2.21.3-canary.10
 
 ### Patch Changes
