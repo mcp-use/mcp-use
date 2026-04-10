@@ -6,6 +6,14 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.0.1" description="April 2026">
+  ## Embedded inspector without LangChain
+  Patch release fixing server routes that imported `telFetch` from the root `mcp-use` package.
+
+- **Fix**: Import `telFetch` from `mcp-use/telemetry/tel-fetch` so shared routes do not load the root entry (which eagerly pulls the agent graph); resolves embedded inspector failures when `langchain` is not installed
+- **Update**: Updated mcp-use to v1.23.1
+</Update>
+
 <Update label="v1.0.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.0.0&title=Stream%20Protocol%2C%20Aliases%20%26%20Chat%20Tooling&date=2026-04&lang=inspector" alt="Release 1.0.0" />
