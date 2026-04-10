@@ -1,5 +1,14 @@
 # @mcp-use/inspector
 
+## 1.0.0-canary.8
+
+### Patch Changes
+
+- 9ec2039: Updated dependency `@hono/node-server` to `^1.19.13`.
+- ebc6c9f: chore(inspector): ability to reference messages in the list for integration with manufact.build
+- Updated dependencies [9ec2039]
+  - mcp-use@1.23.0-canary.8
+
 ## 1.0.0-canary.7
 
 ### Patch Changes
