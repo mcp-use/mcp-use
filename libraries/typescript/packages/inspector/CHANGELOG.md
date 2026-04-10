@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 1.0.1
+
+### Patch Changes
+
+- 6d7fd2e: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [6d7fd2e]
+  - mcp-use@1.23.1
+
 ## 1.0.1-canary.0
 
 ### Patch Changes
