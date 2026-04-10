@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+  "ignoreDependencies": [
+    "@scarf/scarf",
+    "@types/express",
+    "express",
+    "mcp-use",
+    "oauth2-mock-server",
+    "tailwindcss",
+    "tw-animate-css"
+  ],
+  "ignoreBinaries": ["tsc"]
+}
