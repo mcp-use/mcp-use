@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.8-canary.0
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+
 ## 0.14.7
 
 ### Patch Changes

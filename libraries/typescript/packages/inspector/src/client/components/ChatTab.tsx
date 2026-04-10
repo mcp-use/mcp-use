@@ -72,6 +72,23 @@ export interface ChatTabProps {
   chatQuickQuestions?: string[];
   /** Initial followups shown above input in active chat mode. */
   chatFollowups?: string[];
+  /**
+   * Wire protocol used by the streaming endpoint.
+   * - `"sse"` (default): Inspector SSE protocol
+   * - `"data-stream"`: Vercel AI SDK data-stream protocol
+   */
+  streamProtocol?: import("./chat/types").StreamProtocol;
+  /** Credentials policy for the fetch request (e.g. `"include"` for cross-origin cookie auth). */
+  credentials?: RequestCredentials;
+  /** Extra headers to send with every streaming request. */
+  extraHeaders?: Record<string, string>;
+  /**
+   * Custom body builder for the streaming request.
+   * Use to send only `{ messages }` to a server-managed backend.
+   */
+  body?: (
+    messages: Array<{ role: string; content: unknown; attachments?: unknown }>
+  ) => unknown;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -103,6 +120,10 @@ export function ChatTab({
   hideToolSelector,
   chatQuickQuestions = [],
   chatFollowups = [],
+  streamProtocol,
+  credentials,
+  extraHeaders,
+  body,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -112,6 +133,7 @@ export function ChatTab({
   const [followups, setFollowups] = useState<string[]>(chatFollowups);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
 
@@ -167,6 +189,11 @@ export function ChatTab({
     waitForChatApiUrl,
     widgetModelContexts,
     initialMessages,
+    disabledTools,
+    streamProtocol,
+    credentials,
+    extraHeaders,
+    body,
   });
   const clientSideChat = useChatMessagesClientSide(chatHookParams);
 
@@ -217,12 +244,34 @@ export function ChatTab({
   }, []);
 
   const getSerializedMessages = useCallback(() => {
-    return messages.map((message) => ({
-      id: message.id,
-      role: message.role,
-      content: serializeMessageContent(message),
-      timestamp: message.timestamp,
-    }));
+    return messages.map((message) => {
+      const textContent = serializeMessageContent(message);
+      const toolInvocations = message.parts
+        ?.filter((p) => p.type === "tool-invocation" && p.toolInvocation)
+        .map((p) => ({
+          toolName: p.toolInvocation!.toolName,
+          args: p.toolInvocation!.args,
+          state: p.toolInvocation!.state,
+          result:
+            typeof p.toolInvocation!.result === "string"
+              ? p.toolInvocation!.result.slice(0, 2000)
+              : p.toolInvocation!.result != null
+                ? JSON.stringify(p.toolInvocation!.result).slice(0, 2000)
+                : undefined,
+        }));
+      const content =
+        textContent ||
+        (toolInvocations?.length
+          ? `[Tool calls: ${toolInvocations.map((t) => `${t.toolName}(${t.state})`).join(", ")}]`
+          : "");
+      return {
+        id: message.id,
+        role: message.role,
+        content,
+        timestamp: message.timestamp,
+        toolInvocations: toolInvocations?.length ? toolInvocations : undefined,
+      };
+    });
   }, [messages, serializeMessageContent]);
 
   const postBridgeEvent = useCallback(
@@ -366,6 +415,155 @@ export function ChatTab({
         }
         setMessages(rawMessages as ChatMessage[]);
         postResult(true, { count: rawMessages.length });
+        return;
+      }
+
+      if (data.type === "mcp-inspector:chat:screenshot") {
+        const targetToolCallId = (data as any).toolCallId as
+          | string
+          | null
+          | undefined;
+
+        (async () => {
+          try {
+            let target: HTMLElement | null = null;
+
+            if (targetToolCallId) {
+              target = document.querySelector(
+                `[data-tool-call-id="${targetToolCallId}"]`
+              );
+            }
+
+            if (!target) {
+              const widgets = document.querySelectorAll("[data-tool-call-id]");
+              if (widgets.length > 0) {
+                target = widgets[widgets.length - 1] as HTMLElement;
+              }
+            }
+
+            if (!target && messagesAreaRef.current) {
+              target = messagesAreaRef.current;
+            }
+
+            if (!target) {
+              postResult(false, { error: "No screenshot target found" });
+              return;
+            }
+
+            const timeoutMs = 10000;
+            let image: string | null = null;
+            let htmlToImageError = "";
+            let html2canvasError = "";
+
+            // Try html-to-image first — uses browser-native SVG rendering,
+            // handles modern CSS (oklch, color-mix, etc.) that html2canvas cannot parse.
+            try {
+              const cdnUrl = "https://esm.sh/html-to-image@1.11.13";
+              const htmlToImage: any = await import(/* @vite-ignore */ cdnUrl);
+              if (htmlToImage?.toPng) {
+                image = await Promise.race([
+                  htmlToImage.toPng(target, {
+                    pixelRatio: 1,
+                    backgroundColor: "#ffffff",
+                    includeQueryParams: true,
+                  }),
+                  new Promise<never>((_, reject) =>
+                    setTimeout(
+                      () => reject(new Error("html-to-image timed out")),
+                      timeoutMs
+                    )
+                  ),
+                ]);
+              } else {
+                htmlToImageError = "toPng not found on module";
+              }
+            } catch (e) {
+              htmlToImageError = e instanceof Error ? e.message : String(e);
+            }
+
+            if (!image) {
+              try {
+                if (!(window as any).html2canvas) {
+                  const script = document.createElement("script");
+                  script.src =
+                    "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+                  document.head.appendChild(script);
+                  await new Promise<void>((resolve, reject) => {
+                    script.onload = () => resolve();
+                    script.onerror = () =>
+                      reject(new Error("Failed to load html2canvas"));
+                  });
+                }
+                const html2canvas = (window as any).html2canvas;
+                const canvas = await Promise.race([
+                  html2canvas(target, {
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: "#ffffff",
+                    scale: 1,
+                    logging: false,
+                    foreignObjectRendering: false,
+                  }),
+                  new Promise<never>((_, reject) =>
+                    setTimeout(
+                      () => reject(new Error("html2canvas timed out")),
+                      timeoutMs
+                    )
+                  ),
+                ]);
+                image = canvas.toDataURL("image/png");
+              } catch (e) {
+                html2canvasError = e instanceof Error ? e.message : String(e);
+              }
+            }
+
+            if (image) {
+              postBridgeEvent("mcp-inspector:chat:screenshot_result", {
+                requestId,
+                toolCallId: targetToolCallId || null,
+                image,
+                timestamp: Date.now(),
+              });
+              postResult(true);
+            } else {
+              const fallbackTarget = messagesAreaRef.current || document.body;
+              const domText =
+                fallbackTarget.innerText?.substring(0, 5000) || "";
+              const domHtml =
+                fallbackTarget.innerHTML?.substring(0, 10000) || "";
+              postBridgeEvent("mcp-inspector:chat:screenshot_result", {
+                requestId,
+                toolCallId: targetToolCallId || null,
+                image: "",
+                domText,
+                domHtml,
+                error: `html-to-image: ${htmlToImageError || "ok"}; html2canvas: ${html2canvasError || "ok"}`,
+                timestamp: Date.now(),
+              });
+              postResult(false, {
+                error: `html-to-image: ${htmlToImageError}; html2canvas: ${html2canvasError}`,
+              });
+            }
+          } catch (error) {
+            const fallbackTarget = messagesAreaRef.current || document.body;
+            const domText = fallbackTarget.innerText?.substring(0, 5000) || "";
+            postBridgeEvent("mcp-inspector:chat:screenshot_result", {
+              requestId,
+              toolCallId: targetToolCallId || null,
+              image: "",
+              domText,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : "Screenshot capture failed",
+              timestamp: Date.now(),
+            });
+            postResult(false, {
+              error:
+                error instanceof Error ? error.message : "Screenshot failed",
+            });
+          }
+        })();
         return;
       }
     };
@@ -669,7 +867,10 @@ export function ChatTab({
       />
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]">
+      <div
+        ref={messagesAreaRef}
+        className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
+      >
         {!llmConfig ? (
           <ConfigureEmptyState
             onConfigureClick={() => setConfigDialogOpen(true)}

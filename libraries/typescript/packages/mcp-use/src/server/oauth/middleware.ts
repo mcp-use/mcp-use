@@ -66,7 +66,7 @@ export function createBearerAuthMiddleware(
       const payload = result.payload;
 
       // Extract user info from payload
-      const user = provider.getUserInfo(payload);
+      const user = await provider.getUserInfo(payload);
 
       // Create complete auth object
       const scope = payload.scope as string | undefined;

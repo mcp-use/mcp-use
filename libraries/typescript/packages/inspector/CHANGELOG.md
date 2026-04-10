@@ -1,5 +1,101 @@
 # @mcp-use/inspector
 
+## 1.0.0-canary.10
+
+### Patch Changes
+
+- 5749a4b: fix(inspector): stable grainy backgrounds, mesh connect backdrop, and dependency cleanup
+  - Use inline SVG noise data URLs on `RandomGradientBackground` (avoids blocked remote `noise.svg` requests).
+  - Add `@paper-design/shaders-react` mesh gradient behind the dashboard connect panel with a fine grain overlay, persisted play/stop control (shader motion), tooltip, and outline-only icon button.
+  - Remove unused packages (`@mcp-ui/client`, top-level `langchain`, `vite-express`, `@tailwindcss/cli`) and redundant ESLint/LangChain devDependencies; declare `tsup` for builds and add `pnpm run check-deps` via Knip (`knip.json`).
+  - mcp-use@1.23.0-canary.10
+
+## 1.0.0-canary.9
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [1118308]
+  - mcp-use@1.23.0-canary.9
+
+## 1.0.0-canary.8
+
+### Patch Changes
+
+- 9ec2039: Updated dependency `@hono/node-server` to `^1.19.13`.
+- ebc6c9f: chore(inspector): ability to reference messages in the list for integration with manufact.build
+- Updated dependencies [9ec2039]
+  - mcp-use@1.23.0-canary.8
+
+## 1.0.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [10ab350]
+  - mcp-use@1.23.0-canary.7
+
+## 1.0.0-canary.6
+
+### Patch Changes
+
+- 47b8052: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+- Updated dependencies [47b8052]
+  - mcp-use@1.23.0-canary.6
+
+## 0.27.0-canary.5
+
+### Minor Changes
+
+- 7be81db: Feat(inspector): add support for data stream protocol
+
+### Patch Changes
+
+- mcp-use@1.22.4-canary.5
+
+## 0.26.2-canary.4
+
+### Patch Changes
+
+- 36334a0: Fix (inspector): add disabled tools prop to the inspector chat.
+  - mcp-use@1.22.4-canary.4
+
+## 0.26.2-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - mcp-use@1.22.4-canary.3
+
+## 0.26.2-canary.2
+
+### Patch Changes
+
+- d09532e: Updated dependency `hono` to `^4.12.12`.
+- Updated dependencies [d09532e]
+  - mcp-use@1.22.4-canary.2
+
+## 0.26.2-canary.1
+
+### Patch Changes
+
+- 62f95c2: feat(inspector): persist tabs on refresh
+  - mcp-use@1.22.4-canary.1
+
+## 0.26.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [cca2612]
+  - mcp-use@1.22.4-canary.0
+
 ## 0.26.1
 
 ### Patch Changes

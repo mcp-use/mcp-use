@@ -741,6 +741,7 @@ const {
   addServer,
   removeServer,
   updateServer,
+  updateServerMetadata,
   getServer,
   storageLoaded,
 } = useMcpClient();
@@ -752,7 +753,10 @@ addServer("my-server", {
   headers: { Authorization: "Bearer key" },
 });
 
-// Update a server's configuration (disconnects and reconnects)
+// Update a server's display name without reconnecting
+await updateServerMetadata("my-server", { name: "Production API" });
+
+// Update connection-affecting configuration (disconnects and reconnects)
 await updateServer("my-server", {
   headers: { Authorization: "Bearer new-key" },
 });

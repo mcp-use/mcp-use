@@ -20,8 +20,6 @@ export default defineConfig({
     "@langchain/anthropic",
     "@langchain/google-genai",
     "@langchain/core",
-    "langchain",
-    "@mcp-ui/client",
     "e2b",
     "@e2b/code-interpreter",
   ],
