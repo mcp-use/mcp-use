@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.23.0-canary.7
+
+### Minor Changes
+
+- 10ab350: adds Better Auth oauth provider
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.3-canary.7
+- @mcp-use/inspector@1.0.0-canary.7
+
 ## 1.23.0-canary.6
 
 ### Minor Changes
