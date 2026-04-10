@@ -4,7 +4,7 @@ Adding OAuth authentication to your MCP server.
 
 **Use for:** Protecting tools behind user authentication, accessing user identity in tool handlers, integrating with identity providers (WorkOS, Supabase, etc.)
 
-> **Recommended providers:** WorkOS and Supabase have been fully tested with the MCP Inspector and support Dynamic Client Registration (DCR) out of the box. Start with one of those if possible. The custom provider (`oauthCustomProvider`) works for any OIDC-compliant provider, but requires the provider to either support DCR or the user to supply a pre-registered `client_id` — most providers (e.g., Asana, Google, Okta) do not support DCR, which means the MCP Inspector cannot self-register and the OAuth flow will stall silently.
+> **Recommended providers:** WorkOS and Supabase have been fully tested with the MCP Inspector and support Dynamic Client Registration (DCR) out of the box. Start with one of those if possible. Better Auth is a self-hosted option that turns your MCP server into the OAuth 2.1 authorization server — more setup, but no external auth service required. The custom provider (`oauthCustomProvider`) works for any OIDC-compliant provider, but requires the provider to either support DCR or the user to supply a pre-registered `client_id` — most providers (e.g., Asana, Google, Okta) do not support DCR, which means the MCP Inspector cannot self-register and the OAuth flow will stall silently.
 
 ---
 
@@ -138,6 +138,7 @@ Or pass config explicitly to override env vars. See each provider's guide for av
 |----------|-----------------|-------------------|-------|
 | **WorkOS** | `oauthWorkOSProvider()` | `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` | [workos.md](workos.md) |
 | **Supabase** | `oauthSupabaseProvider()` | `MCP_USE_OAUTH_SUPABASE_PROJECT_ID` | [supabase.md](supabase.md) |
+| **Better Auth** | `oauthBetterAuthProvider({authURL})` | `BETTER_AUTH_SECRET` | [better-auth.md](better-auth.md) |
 | **Custom** | `oauthCustomProvider({...})` | None (all passed via config) | [custom.md](custom.md) |
 
 ---
@@ -180,6 +181,7 @@ server.tool(
 
 - **WorkOS setup** → [workos.md](workos.md)
 - **Supabase setup** → [supabase.md](supabase.md)
+- **Better Auth setup** → [better-auth.md](better-auth.md)
 - **Custom provider** → [custom.md](custom.md)
 - **Build tools** → [../server/tools.md](../server/tools.md)
 - **See examples** → [../patterns/common-patterns.md](../patterns/common-patterns.md)

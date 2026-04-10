@@ -26,7 +26,7 @@ export interface OAuthProvider {
    * @param payload - The verified JWT payload
    * @returns User information object
    */
-  getUserInfo(payload: Record<string, unknown>): UserInfo;
+  getUserInfo(payload: Record<string, unknown>): UserInfo | Promise<UserInfo>;
 
   /**
    * Get the OAuth issuer URL
@@ -137,6 +137,19 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
 }
 
 /**
+ * Better Auth OAuth provider configuration
+ */
+export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
+  provider: "better-auth";
+  authURL: string;
+  clientId?: string;
+  verifyJwt?: boolean;
+  getUserInfo?: (
+    payload: Record<string, unknown>
+  ) => UserInfo | Promise<UserInfo>;
+}
+
+/**
  * Custom OAuth provider configuration
  */
 export interface CustomOAuthConfig extends BaseOAuthConfig {
@@ -159,4 +172,5 @@ export type OAuthConfig =
   | Auth0OAuthConfig
   | KeycloakOAuthConfig
   | WorkOSOAuthConfig
+  | BetterAuthOAuthConfig
   | CustomOAuthConfig;
