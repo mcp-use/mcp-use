@@ -115,6 +115,14 @@ export class Auth0OAuthProvider implements OAuthProvider {
   }
 
   getMode(): OAuthMode {
-    return "direct";
+    return this.config.mode ?? "direct";
+  }
+
+  getClientId(): string | undefined {
+    return this.config.clientId;
+  }
+
+  getClientSecret(): string | undefined {
+    return this.config.clientSecret;
   }
 }

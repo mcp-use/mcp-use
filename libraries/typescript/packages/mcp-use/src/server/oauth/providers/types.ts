@@ -72,8 +72,8 @@ export interface OAuthProvider {
   getRegistrationEndpoint?(): string | undefined;
 
   /**
-   * Get the OAuth client ID (for pre-registered client flows)
-   * @returns The client ID, or undefined if using dynamic client registration
+   * Get the configured OAuth client ID
+   * @returns The client ID, or undefined if not configured
    */
   getClientId?(): string | undefined;
 
@@ -84,10 +84,10 @@ export interface OAuthProvider {
   getUserInfoEndpoint?(): string | undefined;
 
   /**
-   * Get the audience for JWT verification
-   * @returns The audience string, or undefined if not configured
+   * Get the configured OAuth client secret
+   * @returns The client secret, or undefined if not configured
    */
-  getAudience?(): string | undefined;
+  getClientSecret?(): string | undefined;
 }
 
 /**
@@ -111,6 +111,9 @@ export interface UserInfo {
 export interface BaseOAuthConfig {
   provider: string;
   scopesSupported?: string[];
+  clientId?: string;
+  clientSecret?: string;
+  mode?: OAuthMode;
 }
 
 /**
@@ -140,7 +143,6 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
   provider: "keycloak";
   serverUrl: string;
   realm: string;
-  clientId?: string;
   verifyJwt?: boolean;
 }
 
@@ -150,7 +152,6 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
 export interface WorkOSOAuthConfig extends BaseOAuthConfig {
   provider: "workos";
   subdomain: string;
-  clientId?: string;
   apiKey?: string;
   verifyJwt?: boolean;
 }
@@ -161,7 +162,6 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
 export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
   provider: "better-auth";
   authURL: string;
-  clientId?: string;
   verifyJwt?: boolean;
   getUserInfo?: (
     payload: Record<string, unknown>
@@ -188,8 +188,6 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   clientSecret?: string;
   /** OAuth mode: 'proxy' or 'direct' */
   mode?: OAuthMode;
-  /** Audience for JWT verification */
-  audience?: string;
 }
 
 /**

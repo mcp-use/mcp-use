@@ -11,7 +11,12 @@ import {
   decodeProtectedHeader,
   decodeJwt,
 } from "jose";
-import type { OAuthProvider, UserInfo, SupabaseOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  SupabaseOAuthConfig,
+  OAuthMode,
+} from "./types.js";
 
 export class SupabaseOAuthProvider implements OAuthProvider {
   private config: SupabaseOAuthConfig;
@@ -122,5 +127,17 @@ export class SupabaseOAuthProvider implements OAuthProvider {
 
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token"];
+  }
+
+  getMode(): OAuthMode {
+    return this.config.mode ?? "direct";
+  }
+
+  getClientId(): string | undefined {
+    return this.config.clientId;
+  }
+
+  getClientSecret(): string | undefined {
+    return this.config.clientSecret;
   }
 }

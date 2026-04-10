@@ -121,9 +121,15 @@ export class BetterAuthOAuthProvider implements OAuthProvider {
   }
 
   getMode(): OAuthMode {
-    // Direct mode: clients communicate directly with Better Auth
-    // The MCP server only verifies tokens and provides metadata
-    return "direct";
+    return this.config.mode ?? "direct";
+  }
+
+  getClientId(): string | undefined {
+    return this.config.clientId;
+  }
+
+  getClientSecret(): string | undefined {
+    return this.config.clientSecret;
   }
 
   getRegistrationEndpoint(): string | undefined {

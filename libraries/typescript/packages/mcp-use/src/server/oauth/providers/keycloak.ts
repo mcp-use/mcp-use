@@ -6,7 +6,12 @@
  */
 
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { OAuthProvider, UserInfo, KeycloakOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  KeycloakOAuthConfig,
+  OAuthMode,
+} from "./types.js";
 
 export class KeycloakOAuthProvider implements OAuthProvider {
   private config: KeycloakOAuthConfig;
@@ -141,5 +146,17 @@ export class KeycloakOAuthProvider implements OAuthProvider {
 
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token", "client_credentials"];
+  }
+
+  getMode(): OAuthMode {
+    return this.config.mode ?? "direct";
+  }
+
+  getClientId(): string | undefined {
+    return this.config.clientId;
+  }
+
+  getClientSecret(): string | undefined {
+    return this.config.clientSecret;
   }
 }

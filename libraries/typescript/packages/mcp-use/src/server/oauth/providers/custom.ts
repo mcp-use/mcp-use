@@ -82,7 +82,7 @@ export class CustomOAuthProvider implements OAuthProvider {
   }
 
   getMode(): OAuthMode {
-    return this.config.mode ?? "proxy";
+    return this.config.mode ?? "direct";
   }
 
   getUserInfoEndpoint(): string | undefined {
@@ -93,7 +93,7 @@ export class CustomOAuthProvider implements OAuthProvider {
     return this.config.clientId;
   }
 
-  getAudience(): string | undefined {
-    return this.config.audience;
+  getClientSecret(): string | undefined {
+    return this.config.clientSecret;
   }
 }

@@ -12,7 +12,7 @@ import { KeycloakOAuthProvider } from "./providers/keycloak.js";
 import { WorkOSOAuthProvider } from "./providers/workos.js";
 import { BetterAuthOAuthProvider } from "./providers/better-auth.js";
 import { CustomOAuthProvider } from "./providers/custom.js";
-import type { UserInfo } from "./providers/types.js";
+import type { UserInfo, OAuthMode } from "./providers/types.js";
 import { getEnv } from "../utils/runtime.js";
 
 /**
@@ -23,6 +23,9 @@ export interface SupabaseProviderConfig {
   jwtSecret?: string;
   skipVerification?: boolean;
   scopesSupported?: string[];
+  clientId?: string;
+  clientSecret?: string;
+  mode?: OAuthMode;
 }
 
 /**
@@ -33,6 +36,9 @@ export interface Auth0ProviderConfig {
   audience: string;
   verifyJwt?: boolean;
   scopesSupported?: string[];
+  clientId?: string;
+  clientSecret?: string;
+  mode?: OAuthMode;
 }
 
 /**
@@ -42,6 +48,8 @@ export interface KeycloakProviderConfig {
   serverUrl: string;
   realm: string;
   clientId?: string;
+  clientSecret?: string;
+  mode?: OAuthMode;
   verifyJwt?: boolean;
   scopesSupported?: string[];
 }
@@ -52,6 +60,8 @@ export interface KeycloakProviderConfig {
 export interface WorkOSProviderConfig {
   subdomain: string;
   clientId?: string;
+  clientSecret?: string;
+  mode?: OAuthMode;
   apiKey?: string;
   verifyJwt?: boolean;
   scopesSupported?: string[];
@@ -69,9 +79,8 @@ export interface CustomProviderConfig {
   userInfoEndpoint?: string;
   clientId?: string;
   clientSecret?: string;
-  mode?: "proxy" | "direct";
+  mode?: OAuthMode;
   scopesSupported?: string[];
-  audience?: string;
   grantTypesSupported?: string[];
   getUserInfo?: (payload: any) => UserInfo;
 }
@@ -128,6 +137,9 @@ export function oauthSupabaseProvider(
     jwtSecret,
     skipVerification: config.skipVerification,
     scopesSupported: config.scopesSupported,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    mode: config.mode,
   });
 }
 
@@ -188,6 +200,9 @@ export function oauthAuth0Provider(
     audience,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
+    clientId: config.clientId,
+    clientSecret: config.clientSecret,
+    mode: config.mode,
   });
 }
 
@@ -252,6 +267,8 @@ export function oauthKeycloakProvider(
     serverUrl,
     realm,
     clientId,
+    clientSecret: config.clientSecret,
+    mode: config.mode,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
   });
@@ -342,6 +359,8 @@ export function oauthWorkOSProvider(
     provider: "workos",
     subdomain,
     clientId,
+    clientSecret: config.clientSecret,
+    mode: config.mode,
     apiKey,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
@@ -354,6 +373,8 @@ export function oauthWorkOSProvider(
 export interface BetterAuthProviderConfig {
   authURL: string;
   clientId?: string;
+  clientSecret?: string;
+  mode?: OAuthMode;
   verifyJwt?: boolean;
   scopesSupported?: string[];
   getUserInfo?: (
@@ -410,6 +431,8 @@ export function oauthBetterAuthProvider(
     provider: "better-auth",
     authURL,
     clientId,
+    clientSecret: config.clientSecret,
+    mode: config.mode,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
     getUserInfo: config.getUserInfo,

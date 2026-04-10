@@ -108,9 +108,15 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   }
 
   getMode(): OAuthMode {
-    // Always proxy — WorkOS is an external provider, so the MCP server must
-    // proxy OAuth metadata and endpoints to avoid browser CORS issues.
-    return "proxy";
+    return this.config.mode ?? "direct";
+  }
+
+  getClientId(): string | undefined {
+    return this.config.clientId;
+  }
+
+  getClientSecret(): string | undefined {
+    return this.config.clientSecret;
   }
 
   getClientId(): string | undefined {
