@@ -6,6 +6,46 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.23.1" description="April 2026">
+  ## Embedded inspector without LangChain
+  Patch release fixing embedded inspector when the agent graph is not installed, and clearer diagnostics when mounting the inspector UI fails.
+
+- **Fix**: Export `telFetch` from `mcp-use/telemetry/tel-fetch` (tsup build) so inspector server code does not import the root `mcp-use` entry, which eagerly loads the agent stack — fixes embedded inspector when `langchain` is not installed
+- **Fix**: Log inspector UI mount failures in development or when `MCP_USE_DEBUG` is set (production remains quiet)
+- **Fix** (@mcp-use/inspector): `telFetch` import uses the telemetry subpath (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v1.0.1
+- **Update**: Updated @mcp-use/cli to v2.21.4
+</Update>
+
+<Update label="v1.23.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.23.0&title=Better%20Auth%2C%20Server%20Metadata%20%26%20Inspector%201.0&date=2026-04&lang=typescript" alt="Release 1.23.0" />
+  </Frame>
+  ## Better Auth, server metadata & Inspector 1.0
+  Minor release adding a Better Auth OAuth provider, metadata-only client updates, dependency hardening, and a major Inspector release.
+
+- **New**: Better Auth OAuth provider for MCP servers — see authentication docs and `examples/server/oauth/better-auth`
+- **New**: `updateServerMetadata()` on `McpClientProvider` updates display metadata without reconnecting; connection-affecting changes still use `updateServer()`
+- **Fix**: Windows-compatible ESM import paths for dev and tooling
+- **Enhancement** (@mcp-use/inspector): Stream protocol in chat, `disabledTools`, editable server aliases with shared display-name resolution, tab persistence and URL sync, tool-invocation serialization and screenshots (see inspector changelog)
+- **Update**: Vite 8.0.5, Hono 4.12.12, `@hono/node-server` 1.19.13 across the TypeScript workspace
+- **Fix**: Tighter `pnpm` overrides and lockfile refresh for `pnpm audit`; `lodash` override in the mcp-apps scaffold template for standalone installs
+- **Documentation**: `updateServerMetadata` in the `useMcpClient` API reference; authentication overview links to the Better Auth guide
+- **Update**: Updated @mcp-use/inspector to v1.0.0
+- **Update**: Updated @mcp-use/cli to v2.21.3
+- **Update**: Updated create-mcp-use-app to v0.14.8
+</Update>
+
+<Update label="v1.22.3" description="March 2026">
+  ## Inspector dependency & bundling alignment
+  Patch release adjusting how `@mcp-use/inspector` depends on `mcp-use` so bundling and shared types both work.
+
+- **Fix** (@mcp-use/inspector): Restore `mcp-use` as both a `dependency` and `peerDependency` — needed to bundle non-React subpaths (`mcp-use/auth`, `mcp-use/browser`) with transitive deps (e.g. LangChain), while `peerDependency` keeps `mcp-use`/`react` types aligned with the host app
+- **Update**: Updated @mcp-use/inspector to v0.26.1
+- **Update**: Updated @mcp-use/cli to v2.21.2
+- **Update**: Updated create-mcp-use-app to v0.14.7
+</Update>
+
 <Update label="v1.22.2" description="March 2026">
   ## Type Compatibility & Peer Dependency Alignment
   Patch release focused on pnpm peer-variant type compatibility, inspector dependency alignment, and template dependency cleanup.

@@ -1,5 +1,148 @@
 # mcp-use
 
+## 1.23.1
+
+### Patch Changes
+
+- 6d7fd2e: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [6d7fd2e]
+  - @mcp-use/inspector@1.0.1
+  - @mcp-use/cli@2.21.4
+
+## 1.23.1-canary.0
+
+### Patch Changes
+
+- b3680f9: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [b3680f9]
+  - @mcp-use/inspector@1.0.1-canary.0
+  - @mcp-use/cli@2.21.4-canary.0
+
+## 1.23.0
+
+### Minor Changes
+
+- 6d7c4df: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+- 6d7c4df: adds Better Auth oauth provider
+
+### Patch Changes
+
+- 6d7c4df: Updated dependency `@hono/node-server` to `^1.19.13`.
+- 6d7c4df: Updated dependency `hono` to `^4.12.12`.
+- 6d7c4df: Updated dependency `vite` to `^8.0.5`.
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- 6d7c4df: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+  - @mcp-use/inspector@1.0.0
+  - @mcp-use/cli@2.21.3
+
+## 1.23.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [5749a4b]
+  - @mcp-use/inspector@1.0.0-canary.10
+  - @mcp-use/cli@2.21.3-canary.10
+
+## 1.23.0-canary.9
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [1118308]
+  - @mcp-use/cli@2.21.3-canary.9
+  - @mcp-use/inspector@1.0.0-canary.9
+
+## 1.23.0-canary.8
+
+### Patch Changes
+
+- 9ec2039: Updated dependency `@hono/node-server` to `^1.19.13`.
+- Updated dependencies [9ec2039]
+- Updated dependencies [ebc6c9f]
+  - @mcp-use/inspector@1.0.0-canary.8
+  - @mcp-use/cli@2.21.3-canary.8
+
+## 1.23.0-canary.7
+
+### Minor Changes
+
+- 10ab350: adds Better Auth oauth provider
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.3-canary.7
+- @mcp-use/inspector@1.0.0-canary.7
+
+## 1.23.0-canary.6
+
+### Minor Changes
+
+- 47b8052: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+### Patch Changes
+
+- Updated dependencies [47b8052]
+  - @mcp-use/inspector@1.0.0-canary.6
+  - @mcp-use/cli@2.21.3-canary.6
+
+## 1.22.4-canary.5
+
+### Patch Changes
+
+- Updated dependencies [7be81db]
+  - @mcp-use/inspector@0.27.0-canary.5
+  - @mcp-use/cli@2.21.3-canary.5
+
+## 1.22.4-canary.4
+
+### Patch Changes
+
+- Updated dependencies [36334a0]
+  - @mcp-use/inspector@0.26.2-canary.4
+  - @mcp-use/cli@2.21.3-canary.4
+
+## 1.22.4-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - @mcp-use/cli@2.21.3-canary.3
+  - @mcp-use/inspector@0.26.2-canary.3
+
+## 1.22.4-canary.2
+
+### Patch Changes
+
+- d09532e: Updated dependency `hono` to `^4.12.12`.
+- Updated dependencies [d09532e]
+  - @mcp-use/inspector@0.26.2-canary.2
+  - @mcp-use/cli@2.21.3-canary.2
+
 ## 1.22.4-canary.1
 
 ### Patch Changes

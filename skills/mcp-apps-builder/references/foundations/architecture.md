@@ -23,10 +23,10 @@ The underlying Hono web application that handles HTTP routing and middleware.
 
 ```typescript
 // Add custom HTTP routes
-server.app.get('/health', (c) => c.json({ status: 'ok' }));
+server.get('/health', (c) => c.json({ status: 'ok' }));
 
 // Add Hono middleware
-server.app.use(async (c, next) => {
+server.use(async (c, next) => {
   console.log(`Request: ${c.req.method} ${c.req.url}`);
   await next();
 });
@@ -347,5 +347,4 @@ server.use(async (c, next) => {
 
 - **Build tools** → [../server/tools.md](../server/tools.md)
 - **Add resources** → [../server/resources.md](../server/resources.md)
-- **Add middleware** → [../server/middleware.md](../server/middleware.md)
 - **Understand primitives** → [concepts.md](concepts.md)

@@ -9,7 +9,12 @@ import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
-import { useMcpClient } from "mcp-use/react";
+import {
+  getStoredConnectionConfig,
+  isAliasOnlyConnectionUpdate,
+  type EditableConnectionConfig,
+} from "@/client/utils/connectionUpdates";
+import { useMcpClient, type McpServer } from "mcp-use/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -40,6 +45,7 @@ export function Layout({ children }: LayoutProps) {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServerMetadata,
     updateServer,
     storageLoaded: configLoaded,
   } = useMcpClient();
@@ -81,6 +87,20 @@ export function Layout({ children }: LayoutProps) {
       }
     },
     [updateServer]
+  );
+
+  const updateConnectionMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      try {
+        await updateServerMetadata(id, metadata);
+      } catch (error) {
+        console.error(
+          `[Layout] Failed to update connection metadata for ${id}:`,
+          error
+        );
+      }
+    },
+    [updateServerMetadata]
   );
   const {
     selectedServerId,
@@ -298,16 +318,16 @@ export function Layout({ children }: LayoutProps) {
   );
 
   const handleUpdateConnection = useCallback(
-    (config: {
-      url: string;
-      name?: string;
-      transportType: "http" | "sse";
-      proxyConfig?: {
-        proxyAddress?: string;
-        customHeaders?: Record<string, string>;
-      };
-    }) => {
+    (config: EditableConnectionConfig) => {
       if (!editingConnectionId) return;
+
+      const currentConnection =
+        getStoredConnectionConfig<EditableConnectionConfig>(
+          editingConnectionId
+        ) ||
+        connections.find(
+          (connection: McpServer) => connection.id === editingConnectionId
+        );
 
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
@@ -318,6 +338,13 @@ export function Layout({ children }: LayoutProps) {
           config.proxyConfig,
           config.transportType
         );
+      } else if (
+        currentConnection &&
+        isAliasOnlyConnectionUpdate(currentConnection, config)
+      ) {
+        updateConnectionMetadata(editingConnectionId, {
+          name: config.name || config.url,
+        });
       } else {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
@@ -334,8 +361,10 @@ export function Layout({ children }: LayoutProps) {
     },
     [
       editingConnectionId,
+      connections,
       removeConnection,
       addConnection,
+      updateConnectionMetadata,
       updateConnectionConfig,
     ]
   );

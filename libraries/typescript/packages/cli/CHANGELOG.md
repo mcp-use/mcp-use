@@ -1,5 +1,118 @@
 # @mcp-use/cli
 
+## 2.21.4
+
+### Patch Changes
+
+- Updated dependencies [6d7fd2e]
+  - mcp-use@1.23.1
+  - @mcp-use/inspector@1.0.1
+
+## 2.21.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b3680f9]
+  - mcp-use@1.23.1-canary.0
+  - @mcp-use/inspector@1.0.1-canary.0
+
+## 2.21.3
+
+### Patch Changes
+
+- 6d7c4df: Updated dependency `vite` to `^8.0.5`.
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- 6d7c4df: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+  - mcp-use@1.23.0
+  - @mcp-use/inspector@1.0.0
+
+## 2.21.3-canary.10
+
+### Patch Changes
+
+- Updated dependencies [5749a4b]
+  - @mcp-use/inspector@1.0.0-canary.10
+  - mcp-use@1.23.0-canary.10
+
+## 2.21.3-canary.9
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [1118308]
+  - mcp-use@1.23.0-canary.9
+  - @mcp-use/inspector@1.0.0-canary.9
+
+## 2.21.3-canary.8
+
+### Patch Changes
+
+- Updated dependencies [9ec2039]
+- Updated dependencies [ebc6c9f]
+  - @mcp-use/inspector@1.0.0-canary.8
+  - mcp-use@1.23.0-canary.8
+
+## 2.21.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [10ab350]
+  - mcp-use@1.23.0-canary.7
+  - @mcp-use/inspector@1.0.0-canary.7
+
+## 2.21.3-canary.6
+
+### Patch Changes
+
+- Updated dependencies [47b8052]
+  - mcp-use@1.23.0-canary.6
+  - @mcp-use/inspector@1.0.0-canary.6
+
+## 2.21.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [7be81db]
+  - @mcp-use/inspector@0.27.0-canary.5
+  - mcp-use@1.22.4-canary.5
+
+## 2.21.3-canary.4
+
+### Patch Changes
+
+- Updated dependencies [36334a0]
+  - @mcp-use/inspector@0.26.2-canary.4
+  - mcp-use@1.22.4-canary.4
+
+## 2.21.3-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - @mcp-use/inspector@0.26.2-canary.3
+  - mcp-use@1.22.4-canary.3
+
+## 2.21.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [d09532e]
+  - @mcp-use/inspector@0.26.2-canary.2
+  - mcp-use@1.22.4-canary.2
+
 ## 2.21.3-canary.1
 
 ### Patch Changes

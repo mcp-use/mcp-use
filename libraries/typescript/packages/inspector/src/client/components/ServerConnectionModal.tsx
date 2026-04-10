@@ -2,6 +2,15 @@ import type { McpServer } from "mcp-use/react";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
+type MCPConnectionWithConfig = MCPConnection & {
+  proxyConfig?: {
+    proxyAddress?: string;
+    headers?: Record<string, string>;
+    customHeaders?: Record<string, string>;
+  };
+  headers?: Record<string, string>;
+  customHeaders?: Record<string, string>;
+};
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { useEffect, useState } from "react";
 import {
@@ -10,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/client/components/ui/dialog";
+import { getConfiguredServerAlias } from "@/client/utils/serverNames";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import { toast } from "sonner";
 
@@ -44,6 +54,7 @@ export function ServerConnectionModal({
   onConnect,
 }: ServerConnectionModalProps) {
   // Form state
+  const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
   const [connectionType, setConnectionType] = useState("Direct");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
@@ -65,6 +76,8 @@ export function ServerConnectionModal({
   // Prefill form when connection changes
   useEffect(() => {
     if (connection && open) {
+      const connectionWithConfig = connection as MCPConnectionWithConfig;
+
       // Try to get the original stored config from localStorage
       // This contains the headers and proxyConfig that were originally saved
       let storedConfig: any = null;
@@ -83,6 +96,7 @@ export function ServerConnectionModal({
       }
 
       setUrl(connection.url);
+      setAlias(getConfiguredServerAlias(storedConfig || connection));
 
       // Transport type is always HTTP now (SSE is deprecated)
       // No need to set transportType from connection
@@ -90,7 +104,7 @@ export function ServerConnectionModal({
       // Determine connection type based on proxyConfig
       const proxyAddress =
         storedConfig?.proxyConfig?.proxyAddress ||
-        connection.proxyConfig?.proxyAddress;
+        connectionWithConfig.proxyConfig?.proxyAddress;
       if (proxyAddress) {
         setConnectionType("Via Proxy");
         setProxyAddress(proxyAddress);
@@ -107,10 +121,10 @@ export function ServerConnectionModal({
         storedConfig?.proxyConfig?.customHeaders ||
         storedConfig?.headers ||
         storedConfig?.customHeaders ||
-        connection.proxyConfig?.headers ||
-        connection.proxyConfig?.customHeaders ||
-        connection.headers ||
-        connection.customHeaders ||
+        connectionWithConfig.proxyConfig?.headers ||
+        connectionWithConfig.proxyConfig?.customHeaders ||
+        connectionWithConfig.headers ||
+        connectionWithConfig.customHeaders ||
         {};
       const headerArray: CustomHeader[] = Object.entries(headersToConvert).map(
         ([name, value], index) => ({
@@ -189,7 +203,7 @@ export function ServerConnectionModal({
 
     onConnect({
       url: normalizedUrl,
-      name: connection?.name,
+      name: alias.trim() || normalizedUrl,
       transportType: actualTransportType,
       proxyConfig,
     });
@@ -204,8 +218,8 @@ export function ServerConnectionModal({
           <DialogTitle>Edit Connection Settings</DialogTitle>
         </DialogHeader>
         <ConnectionSettingsForm
-          transportType="SSE"
-          setTransportType={() => {}}
+          alias={alias}
+          setAlias={setAlias}
           url={url}
           setUrl={setUrl}
           connectionType={connectionType}

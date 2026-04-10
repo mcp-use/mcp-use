@@ -1,6 +1,6 @@
 ---
 title: "Overview"
-description: "Add OAuth 2.0/2.1 authentication to your MCP server with support for Auth0, WorkOS, Supabase, Keycloak, and custom providers"
+description: "Add OAuth 2.0/2.1 authentication to your MCP server with support for Auth0, Better Auth, WorkOS, Supabase, Keycloak, and custom providers"
 icon: "shield-check"
 ---
 
@@ -48,6 +48,7 @@ await server.listen(3000)
 mcp-use includes built-in support for major identity providers. Each provider is documented in detail:
 
 - [Auth0](/typescript/server/authentication/providers/auth0) - Full OAuth 2.1 with PKCE and JWKS verification
+- [Better Auth](/typescript/server/authentication/providers/better-auth) - Self-hosted OAuth 2.1 authorization server via the Better Auth OAuth Provider plugin
 - [WorkOS](/typescript/server/authentication/providers/workos) - Enterprise SSO with direct mode OAuth
 - [Supabase](/typescript/server/authentication/providers/supabase) - Authentication for Supabase projects
 - [Keycloak](/typescript/server/authentication/providers/keycloak) - Enterprise SSO with realm roles

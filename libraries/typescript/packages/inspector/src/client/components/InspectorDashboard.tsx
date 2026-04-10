@@ -7,7 +7,8 @@ import {
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
 import { NotFound } from "@/client/components/ui/not-found";
-import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
+import { MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL } from "@/client/components/ui/random-gradient-background";
+import { MeshGradient } from "@paper-design/shaders-react";
 import {
   Tooltip,
   TooltipContent,
@@ -20,12 +21,27 @@ import {
   Info,
   Loader2,
   MoreVertical,
+  Play,
   RotateCcw,
   Settings,
+  Square,
 } from "lucide-react";
-import { useMcpClient, type McpServerOptions } from "mcp-use/react";
+import {
+  useMcpClient,
+  type McpServer,
+  type McpServerOptions,
+} from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import {
+  getStoredConnectionConfig,
+  isAliasOnlyConnectionUpdate,
+  type EditableConnectionConfig,
+} from "@/client/utils/connectionUpdates";
+import {
+  getConfiguredServerAlias,
+  getServerDisplayName,
+} from "@/client/utils/serverNames";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
@@ -33,6 +49,9 @@ import type { CustomHeader } from "./CustomHeadersEditor";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
+
+const CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY =
+  "mcp-inspector-connect-panel-mesh-animation-paused";
 
 /**
  * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
@@ -52,6 +71,7 @@ export function InspectorDashboard() {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServerMetadata,
     updateServer,
   } = useMcpClient();
 
@@ -127,6 +147,20 @@ export function InspectorDashboard() {
     [updateServer]
   );
 
+  const updateConnectionMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      try {
+        await updateServerMetadata(id, metadata);
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to update connection metadata for ${id}:`,
+          error
+        );
+      }
+    },
+    [updateServerMetadata]
+  );
+
   const connectServer = useCallback(
     async (id: string) => {
       // Check if already updating this connection
@@ -195,6 +229,7 @@ export function InspectorDashboard() {
   }, []); // Only run once on mount
 
   // Form state
+  const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
   const [connectionType, setConnectionType] = useState("Direct");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
@@ -212,6 +247,62 @@ export function InspectorDashboard() {
       : "/inspector/oauth/callback"
   );
   const [scope, setScope] = useState("");
+
+  const connectFormGradientRef = useRef<HTMLDivElement>(null);
+  const [connectFormGradientSize, setConnectFormGradientSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
+  const measureConnectFormGradient = useCallback(() => {
+    if (connectFormGradientRef.current) {
+      const { width, height } =
+        connectFormGradientRef.current.getBoundingClientRect();
+      setConnectFormGradientSize({
+        width: Math.round(width),
+        height: Math.round(height),
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(measureConnectFormGradient);
+    const ro = new ResizeObserver(measureConnectFormGradient);
+    if (connectFormGradientRef.current) {
+      ro.observe(connectFormGradientRef.current);
+    }
+    window.addEventListener("resize", measureConnectFormGradient);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", measureConnectFormGradient);
+    };
+  }, [measureConnectFormGradient]);
+
+  const [meshAnimationPaused, setMeshAnimationPaused] = useState(() => {
+    try {
+      return (
+        localStorage.getItem(CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY) === "true"
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleMeshAnimationPaused = useCallback(() => {
+    setMeshAnimationPaused((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(
+          CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY,
+          next ? "true" : "false"
+        );
+      } catch {
+        // ignore quota / private mode
+      }
+      return next;
+    });
+  }, []);
 
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
@@ -270,7 +361,7 @@ export function InspectorDashboard() {
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
       url: normalizedUrl,
-      name: normalizedUrl,
+      name: alias.trim() || normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       clientOptions: {
@@ -314,13 +405,14 @@ export function InspectorDashboard() {
       });
 
     // Reset form
+    setAlias("");
     setUrl("");
     setCustomHeaders([]);
     setClientId("");
     setScope("");
 
     toast.success("Server added successfully");
-  }, [url, connectionType, proxyAddress, customHeaders, addServer]);
+  }, [url, alias, connectionType, proxyAddress, customHeaders, addServer]);
 
   const handleClearAllConnections = () => {
     // Remove all connections
@@ -381,7 +473,9 @@ export function InspectorDashboard() {
 
       const config = {
         url: connection.url,
-        name: connection.name,
+        ...(getConfiguredServerAlias(storedConfig || connection)
+          ? { name: getConfiguredServerAlias(storedConfig || connection) }
+          : {}),
         transportType: connection.transportType || "http",
         connectionType,
         proxyConfig,
@@ -405,16 +499,16 @@ export function InspectorDashboard() {
   };
 
   const handleUpdateConnection = useCallback(
-    (config: {
-      url: string;
-      name?: string;
-      transportType: "http" | "sse";
-      proxyConfig?: {
-        proxyAddress?: string;
-        headers?: Record<string, string>;
-      };
-    }) => {
+    (config: EditableConnectionConfig) => {
       if (!editingConnectionId) return;
+
+      const currentConnection =
+        getStoredConnectionConfig<EditableConnectionConfig>(
+          editingConnectionId
+        ) ||
+        connections.find(
+          (connection: McpServer) => connection.id === editingConnectionId
+        );
 
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
@@ -425,6 +519,13 @@ export function InspectorDashboard() {
           config.proxyConfig,
           config.transportType
         );
+      } else if (
+        currentConnection &&
+        isAliasOnlyConnectionUpdate(currentConnection, config)
+      ) {
+        updateConnectionMetadata(editingConnectionId, {
+          name: config.name || config.url,
+        });
       } else {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
@@ -441,8 +542,10 @@ export function InspectorDashboard() {
     },
     [
       editingConnectionId,
+      connections,
       removeConnection,
       addConnection,
+      updateConnectionMetadata,
       updateConnectionConfig,
     ]
   );
@@ -609,9 +712,7 @@ export function InspectorDashboard() {
                       <div className="flex items-center gap-3">
                         <ServerIcon server={connection} size="md" />
                         <h4 className="font-semibold text-sm">
-                          {connection.serverInfo?.title ||
-                            connection.serverInfo?.name ||
-                            connection.name}
+                          {getServerDisplayName(connection)}
                         </h4>
                         <div className="flex items-center gap-2">
                           {updatingConnections.has(connection.id) ? (
@@ -925,11 +1026,65 @@ export function InspectorDashboard() {
         </div>
       </div>
 
-      <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
+      <div
+        ref={connectFormGradientRef}
+        className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex"
+      >
+        <div className="absolute inset-0 z-0 overflow-hidden dark:opacity-60 pointer-events-none">
+          <MeshGradient
+            width={connectFormGradientSize?.width ?? 1280}
+            height={connectFormGradientSize?.height ?? 720}
+            colors={["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"]}
+            distortion={0.8}
+            swirl={0.1}
+            grainMixer={0}
+            grainOverlay={0.2}
+            speed={meshAnimationPaused ? 0 : 1}
+          />
+        </div>
+        <div
+          className="absolute inset-0 z-[1] pointer-events-none opacity-[0.07] mix-blend-soft-light dark:opacity-[0.06]"
+          aria-hidden
+        >
+          <div
+            className="absolute inset-0 noise"
+            style={{
+              background: `url("${MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL}")`,
+              filter: "contrast(150%) brightness(550%)",
+            }}
+          />
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={toggleMeshAnimationPaused}
+              aria-label={
+                meshAnimationPaused
+                  ? "Enable background shader animation"
+                  : "Disable background shader animation"
+              }
+              className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
+            >
+              {meshAnimationPaused ? (
+                <Play className="h-3 w-3 ml-px" fill="currentColor" />
+              ) : (
+                <Square className="h-2.5 w-2.5" fill="currentColor" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>
+              {meshAnimationPaused
+                ? "Enable shader animation"
+                : "Disable shader animation"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
         <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
           <ConnectionSettingsForm
-            transportType="SSE"
-            setTransportType={() => {}}
+            alias={alias}
+            setAlias={setAlias}
             url={url}
             setUrl={setUrl}
             connectionType={connectionType}
@@ -956,7 +1111,6 @@ export function InspectorDashboard() {
             showExportButton={true}
           />
         </div>
-        <RandomGradientBackground className="absolute inset-0" />
       </div>
 
       {/* Connection Options Dialog */}

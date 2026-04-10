@@ -11,6 +11,10 @@ import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { JSONDisplay } from "./shared/JSONDisplay";
+import {
+  getConfiguredServerAlias,
+  getServerDisplayName,
+} from "@/client/utils/serverNames";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -37,6 +41,12 @@ export function ServerCapabilitiesModal({
   if (!connection) return null;
 
   const capabilities = connection.capabilities || {};
+  const alias = getConfiguredServerAlias(connection);
+  const canonicalName =
+    connection.serverInfo?.name ||
+    connection.serverInfo?.title ||
+    connection.url ||
+    connection.name;
 
   const copyUrl = async () => {
     if (connection.url) {
@@ -75,13 +85,21 @@ export function ServerCapabilitiesModal({
                     </span>
                   </div>
                 )}
+                {alias && (
+                  <div className="flex flex-col items-start gap-2">
+                    <span className="text-sm font-medium shrink-0">Alias</span>
+                    <span className="text-xs font-mono bg-muted rounded-md p-1 px-2">
+                      {alias}
+                    </span>
+                  </div>
+                )}
                 <div className="flex flex-col items-start gap-2">
                   <span className="text-sm font-medium shrink-0">Name</span>
                   <span
                     className="text-xs font-mono bg-muted rounded-md p-1 px-2"
                     data-testid="server-info-name"
                   >
-                    {connection.serverInfo?.name || connection.name}
+                    {canonicalName}
                   </span>
                 </div>
                 {connection.url && (
@@ -170,7 +188,7 @@ export function ServerCapabilitiesModal({
             <div data-testid="server-info-capabilities">
               <JSONDisplay
                 data={capabilities}
-                filename={`capabilities-${connection.name}-${Date.now()}.json`}
+                filename={`capabilities-${getServerDisplayName(connection)}-${Date.now()}.json`}
               />
             </div>
           </div>

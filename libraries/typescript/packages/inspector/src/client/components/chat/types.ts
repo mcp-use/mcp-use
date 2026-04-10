@@ -66,6 +66,8 @@ export interface MCPConfig {
   mcpServers: Record<string, MCPServerConfig>;
 }
 
+export type StreamProtocol = "sse" | "data-stream";
+
 export const DEFAULT_MODELS = {
   openai: "gpt-4o",
   anthropic: "claude-haiku-4-5-20251001",
