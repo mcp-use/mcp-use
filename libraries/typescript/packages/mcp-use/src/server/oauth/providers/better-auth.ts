@@ -106,7 +106,9 @@ export class BetterAuthOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["openid", "profile", "email", "offline_access"];
+    return (
+      this.config.scopesSupported ?? ["openid", "profile", "email", "offline_access"]
+    );
   }
 
   getGrantTypesSupported(): string[] {
