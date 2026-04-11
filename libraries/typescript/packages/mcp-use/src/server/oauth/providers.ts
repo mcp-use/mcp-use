@@ -350,6 +350,7 @@ export interface BetterAuthProviderConfig {
   authURL: string;
   clientId?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
   getUserInfo?: (
     payload: Record<string, unknown>
   ) => UserInfo | Promise<UserInfo>;
@@ -405,6 +406,7 @@ export function oauthBetterAuthProvider(
     authURL,
     clientId,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
     getUserInfo: config.getUserInfo,
   });
 }
