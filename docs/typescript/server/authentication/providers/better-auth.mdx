@@ -199,6 +199,10 @@ oauthBetterAuthProvider({
   // Optional: disable JWT verification (development only)
   verifyJwt: process.env.NODE_ENV === "production",
 
+  // Optional: override supported scopes (advertised in OAuth metadata)
+  // Default: ['openid', 'profile', 'email', 'offline_access']
+  scopesSupported: ['openid', 'profile', 'email', 'offline_access'],
+
   // Optional: custom user info extraction from the JWT payload
   getUserInfo: (payload) => ({
     userId: payload.sub as string,
