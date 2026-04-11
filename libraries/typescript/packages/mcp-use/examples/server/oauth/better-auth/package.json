@@ -1,15 +1,17 @@
 {
-  "name": "simple-example",
+  "name": "better-auth-oauth-example",
   "type": "module",
   "version": "1.0.0",
-  "description": "Simple MCP server example with hello world tool",
+  "description": "MCP server example with Better Auth OAuth authentication",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
     "server",
     "example",
-    "hello-world"
+    "better-auth",
+    "oauth",
+    "authentication"
   ],
   "main": "dist/server.js",
   "scripts": {
@@ -18,16 +20,13 @@
     "start": "mcp-use start"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.2.0",
-    "@vitejs/plugin-react": "^6.0.0",
     "mcp-use": "workspace:*",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "vite": "^8.0.5",
-    "zod": "4.3.5"
+    "better-auth": "latest",
+    "@better-auth/oauth-provider": "latest"
   },
   "devDependencies": {
     "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

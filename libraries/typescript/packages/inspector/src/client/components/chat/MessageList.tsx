@@ -231,24 +231,30 @@ export const MessageList = memo(
                           {(part.toolInvocation.result ||
                             part.toolInvocation.state === "streaming" ||
                             isWidgetTool(part.toolInvocation.toolName)) && (
-                            <ToolResultRenderer
-                              toolName={part.toolInvocation.toolName}
-                              toolArgs={part.toolInvocation.args}
-                              result={part.toolInvocation.result || null}
-                              serverId={serverId}
-                              readResource={readResource}
-                              serverBaseUrl={serverBaseUrl}
-                              toolMeta={getToolMeta(
-                                part.toolInvocation.toolName
-                              )}
-                              onSendFollowUp={handleFollowUp}
-                              partialToolArgs={part.toolInvocation.partialArgs}
-                              cancelled={
-                                part.toolInvocation.state === "error" &&
-                                part.toolInvocation.result ===
-                                  "Cancelled by user"
-                              }
-                            />
+                            <div
+                              data-tool-call-id={`${message.id}-${part.toolInvocation.toolName}-${partIndex}`}
+                            >
+                              <ToolResultRenderer
+                                toolName={part.toolInvocation.toolName}
+                                toolArgs={part.toolInvocation.args}
+                                result={part.toolInvocation.result || null}
+                                serverId={serverId}
+                                readResource={readResource}
+                                serverBaseUrl={serverBaseUrl}
+                                toolMeta={getToolMeta(
+                                  part.toolInvocation.toolName
+                                )}
+                                onSendFollowUp={handleFollowUp}
+                                partialToolArgs={
+                                  part.toolInvocation.partialArgs
+                                }
+                                cancelled={
+                                  part.toolInvocation.state === "error" &&
+                                  part.toolInvocation.result ===
+                                    "Cancelled by user"
+                                }
+                              />
+                            </div>
                           )}
                         </div>
                       );
@@ -281,16 +287,18 @@ export const MessageList = memo(
                               {/* Render immediately for widget tools, even if result is null */}
                               {(toolCall.result ||
                                 isWidgetTool(toolCall.toolName)) && (
-                                <ToolResultRenderer
-                                  toolName={toolCall.toolName}
-                                  toolArgs={toolCall.args}
-                                  result={toolCall.result || null}
-                                  serverId={serverId}
-                                  readResource={readResource}
-                                  serverBaseUrl={serverBaseUrl}
-                                  toolMeta={getToolMeta(toolCall.toolName)}
-                                  onSendFollowUp={handleFollowUp}
-                                />
+                                <div data-tool-call-id={toolCallKey}>
+                                  <ToolResultRenderer
+                                    toolName={toolCall.toolName}
+                                    toolArgs={toolCall.args}
+                                    result={toolCall.result || null}
+                                    serverId={serverId}
+                                    readResource={readResource}
+                                    serverBaseUrl={serverBaseUrl}
+                                    toolMeta={getToolMeta(toolCall.toolName)}
+                                    onSendFollowUp={handleFollowUp}
+                                  />
+                                </div>
                               )}
                             </div>
                           );

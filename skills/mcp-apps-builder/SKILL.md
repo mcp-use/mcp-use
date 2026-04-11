@@ -83,7 +83,7 @@ Load these before diving into tools/resources/widgets sections.
 ---
 
 ### 🔐 Adding Authentication?
-**When:** Protecting your server with OAuth (WorkOS, Supabase, or custom)
+**When:** Protecting your server with OAuth (WorkOS, Supabase, Better Auth, or custom)
 
 - **[overview.md](references/authentication/overview.md)**
   - When: First time adding auth, understanding `ctx.auth`, or choosing a provider
@@ -96,6 +96,10 @@ Load these before diving into tools/resources/widgets sections.
 - **[supabase.md](references/authentication/supabase.md)**
   - When: Using Supabase for authentication
   - Covers: Setup, env vars, HS256 vs ES256, RLS-aware API calls
+
+- **[better-auth.md](references/authentication/better-auth.md)**
+  - When: Using Better Auth with the `@better-auth/oauth-provider` plugin (self-hosted OAuth 2.1)
+  - Covers: `oauthBetterAuthProvider`, auth URL / metadata routes, login and consent flows
 
 - **[custom.md](references/authentication/custom.md)**
   - When: Using any other identity provider (GitHub, Okta, Azure AD, Google, etc.)

@@ -11,11 +11,13 @@ export type { OAuthProvider, UserInfo } from "./providers/types.js";
 // Export provider factory functions
 export {
   oauthAuth0Provider,
+  oauthBetterAuthProvider,
   oauthCustomProvider,
   oauthKeycloakProvider,
   oauthSupabaseProvider,
   oauthWorkOSProvider,
   type Auth0ProviderConfig,
+  type BetterAuthProviderConfig,
   type CustomProviderConfig,
   type KeycloakProviderConfig,
   type SupabaseProviderConfig,

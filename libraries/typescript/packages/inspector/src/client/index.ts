@@ -69,6 +69,7 @@ export type {
   MessageAttachment,
   MCPServerConfig,
   MCPConfig,
+  StreamProtocol,
 } from "./components/chat/types.js";
 
 // Chat hooks
