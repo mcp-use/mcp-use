@@ -88,6 +88,14 @@ export interface OAuthProvider {
    * @returns The client secret, or undefined if not configured
    */
   getClientSecret?(): string | undefined;
+
+  /**
+   * Get extra parameters to include in the authorize redirect URL.
+   * Used by proxy mode to inject provider-specific params (e.g., Auth0 audience)
+   * that the MCP client wouldn't know to send.
+   * @returns Record of extra query parameters, or undefined
+   */
+  getExtraAuthorizeParams?(): Record<string, string> | undefined;
 }
 
 /**

@@ -54,15 +54,17 @@ export function setupOAuthRoutes(
 
   // Also enable CORS on OAuth endpoints in proxy mode
   if (mode === "proxy") {
-    app.use(
-      "/authorize",
-      cors({
-        origin: "*",
-        allowMethods: ["GET", "POST", "OPTIONS"],
-        allowHeaders: ["Content-Type", "Authorization"],
-        maxAge: 86400,
-      })
-    );
+    for (const path of ["/authorize", "/register"]) {
+      app.use(
+        path,
+        cors({
+          origin: "*",
+          allowMethods: ["GET", "POST", "OPTIONS"],
+          allowHeaders: ["Content-Type", "Authorization"],
+          maxAge: 86400,
+        })
+      );
+    }
     app.use(
       "/token",
       cors({
@@ -84,8 +86,9 @@ export function setupOAuthRoutes(
       const params =
         c.req.method === "POST" ? await c.req.parseBody() : c.req.query();
 
-      // Required OAuth parameters
-      const clientId = params.client_id;
+      // Use server-configured clientId if available, otherwise fall back to request
+      const serverClientId = provider.getClientId?.();
+      const clientId = serverClientId || params.client_id;
       const redirectUri = params.redirect_uri;
       const responseType = params.response_type;
       const codeChallenge = params.code_challenge;
@@ -122,6 +125,17 @@ export function setupOAuthRoutes(
       if (scope) authUrl.searchParams.set("scope", scope as string);
       if (audience) authUrl.searchParams.set("audience", audience as string);
 
+      // Inject provider-specific params (e.g., Auth0 audience) that the
+      // MCP client wouldn't know to send. Client-provided values take precedence.
+      const extraParams = provider.getExtraAuthorizeParams?.();
+      if (extraParams) {
+        for (const [key, value] of Object.entries(extraParams)) {
+          if (!authUrl.searchParams.has(key)) {
+            authUrl.searchParams.set(key, value);
+          }
+        }
+      }
+
       // Redirect to provider
       return c.redirect(authUrl.toString(), 302);
     };
@@ -130,11 +144,58 @@ export function setupOAuthRoutes(
     app.post("/authorize", handleAuthorize);
 
     /**
+     * Registration endpoint (RFC 7591) - returns the server's pre-registered client
+     *
+     * In proxy mode, the server holds the upstream credentials. This endpoint
+     * lets MCP clients "register" and receive a client_id to use for the flow.
+     * The actual upstream client_id/secret are injected by the proxy transparently.
+     */
+    app.post("/register", async (c: Context) => {
+      const serverClientId = provider.getClientId?.();
+      if (!serverClientId) {
+        return c.json(
+          {
+            error: "invalid_request",
+            error_description:
+              "Dynamic client registration is not available. Configure a clientId on the provider.",
+          },
+          400
+        );
+      }
+
+      const body = await c.req.json();
+
+      return c.json(
+        {
+          client_id: serverClientId,
+          client_name: body.client_name || "MCP Client",
+          redirect_uris: body.redirect_uris || [],
+          grant_types: body.grant_types || ["authorization_code"],
+          response_types: body.response_types || ["code"],
+          token_endpoint_auth_method:
+            body.token_endpoint_auth_method || "none",
+        },
+        201
+      );
+    });
+
+    /**
      * Token endpoint - proxies to provider's token exchange
      */
     app.post("/token", async (c: Context) => {
       try {
         const body = await c.req.parseBody();
+        const tokenBody = { ...(body as Record<string, string>) };
+
+        // Inject server-configured credentials if available
+        const serverClientId = provider.getClientId?.();
+        const serverClientSecret = provider.getClientSecret?.();
+        if (serverClientId) {
+          tokenBody.client_id = serverClientId;
+        }
+        if (serverClientSecret) {
+          tokenBody.client_secret = serverClientSecret;
+        }
 
         // Forward the request to provider
         const response = await fetch(provider.getTokenEndpoint(), {
@@ -142,7 +203,7 @@ export function setupOAuthRoutes(
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: new URLSearchParams(body as Record<string, string>).toString(),
+          body: new URLSearchParams(tokenBody).toString(),
         });
 
         const data = await response.json();
@@ -199,8 +260,7 @@ export function setupOAuthRoutes(
 
         // Check if provider has a pre-registered client (stored in provider config)
         // If so, remove registration_endpoint to prevent clients from using DCR
-        const hasRegisteredClient =
-          provider.getRegistrationEndpoint && provider.getClientId?.();
+        const hasRegisteredClient = provider.getClientId?.();
 
         if (hasRegisteredClient) {
           console.log(
@@ -229,8 +289,8 @@ export function setupOAuthRoutes(
     } else {
       // Proxy mode: Return MCP server endpoints
       console.log(`[OAuth] Returning proxy mode metadata`);
-      return c.json({
-        issuer: provider.getIssuer(),
+      const metadata: Record<string, unknown> = {
+        issuer: baseUrl,
         authorization_endpoint: `${baseUrl}/authorize`,
         token_endpoint: `${baseUrl}/token`,
         response_types_supported: ["code"],
@@ -242,7 +302,14 @@ export function setupOAuthRoutes(
           "none",
         ],
         scopes_supported: provider.getScopesSupported(),
-      });
+      };
+
+      // Include registration endpoint if server has a pre-registered client
+      if (provider.getClientId?.()) {
+        metadata.registration_endpoint = `${baseUrl}/register`;
+      }
+
+      return c.json(metadata);
     }
   };
 
@@ -270,13 +337,11 @@ export function setupOAuthRoutes(
 
     return c.json({
       resource: baseUrl,
-      authorization_servers: [provider.getIssuer()],
+      // In proxy mode, the MCP server IS the authorization server from the client's
+      // perspective. In direct mode, clients talk to the provider directly.
+      authorization_servers: [mode === "proxy" ? baseUrl : provider.getIssuer()],
       scopes_supported: provider.getScopesSupported(),
       bearer_methods_supported: ["header"],
-      resource_documentation:
-        mode === "direct"
-          ? "This resource uses direct OAuth flow. Clients communicate directly with the authorization server."
-          : undefined,
     });
   });
 
