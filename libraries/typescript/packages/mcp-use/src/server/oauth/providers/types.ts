@@ -92,6 +92,7 @@ export interface UserInfo {
  */
 export interface BaseOAuthConfig {
   provider: string;
+  scopesSupported?: string[];
 }
 
 /**
@@ -102,7 +103,6 @@ export interface SupabaseOAuthConfig extends BaseOAuthConfig {
   projectId: string;
   jwtSecret?: string;
   skipVerification?: boolean;
-  scopesSupported?: string[];
 }
 
 /**
@@ -113,7 +113,6 @@ export interface Auth0OAuthConfig extends BaseOAuthConfig {
   domain: string;
   audience: string;
   verifyJwt?: boolean;
-  scopesSupported?: string[];
 }
 
 /**
@@ -125,7 +124,6 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
   realm: string;
   clientId?: string;
   verifyJwt?: boolean;
-  scopesSupported?: string[];
 }
 
 /**
@@ -137,7 +135,6 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
   clientId?: string;
   apiKey?: string;
   verifyJwt?: boolean;
-  scopesSupported?: string[];
 }
 
 /**
@@ -149,7 +146,6 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   jwksUrl: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  scopesSupported?: string[];
   grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
