@@ -363,6 +363,7 @@ export function InspectorDashboard() {
       url: normalizedUrl,
       name: alias.trim() || normalizedUrl,
       transportType: "http",
+      callbackUrl: redirectUrl,
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       clientOptions: {
         capabilities: {

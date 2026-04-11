@@ -182,6 +182,12 @@ export function registerStaticRoutes(
       return c.redirect(`/inspector${url.search}`);
     });
 
+    // Redirect /oauth/callback to /inspector/oauth/callback for SPA routing
+    app.get("/oauth/callback", (c) => {
+      const url = new URL(c.req.url);
+      return c.redirect(`/inspector/oauth/callback${url.search}`, 302);
+    });
+
     app.get("/inspector", serveShell);
     app.get("/inspector/*", serveShell);
     app.post("/inspector/*", serveShell);
@@ -235,6 +241,14 @@ export function registerStaticRoutes(
     const url = new URL(c.req.url);
     const queryString = url.search;
     return c.redirect(`/inspector${queryString}`);
+  });
+
+  // Redirect /oauth/callback to /inspector/oauth/callback so the React SPA
+  // router (basename="/inspector") can handle the OAuth callback.
+  // This mirrors the Vite dev server plugin in vite.config.ts.
+  app.get("/oauth/callback", (c) => {
+    const url = new URL(c.req.url);
+    return c.redirect(`/inspector/oauth/callback${url.search}`, 302);
   });
 
   const serveIndex = (c: any) => {
