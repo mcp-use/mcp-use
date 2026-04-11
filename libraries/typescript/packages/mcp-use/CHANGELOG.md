@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.24.0-canary.0
+
+### Minor Changes
+
+- c77a998: Add scopes customization to oauth providers
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.5-canary.0
+- @mcp-use/inspector@2.0.0-canary.0
+
 ## 1.23.1
 
 ### Patch Changes

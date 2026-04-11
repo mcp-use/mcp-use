@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "1.0.1",
     "mcp-use": "1.23.1"
   },
-  "changesets": []
+  "changesets": [
+    "full-buses-double"
+  ]
 }
