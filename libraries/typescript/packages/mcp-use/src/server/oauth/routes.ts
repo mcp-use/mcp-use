@@ -172,8 +172,7 @@ export function setupOAuthRoutes(
           redirect_uris: body.redirect_uris || [],
           grant_types: body.grant_types || ["authorization_code"],
           response_types: body.response_types || ["code"],
-          token_endpoint_auth_method:
-            body.token_endpoint_auth_method || "none",
+          token_endpoint_auth_method: body.token_endpoint_auth_method || "none",
         },
         201
       );
@@ -339,7 +338,9 @@ export function setupOAuthRoutes(
       resource: baseUrl,
       // In proxy mode, the MCP server IS the authorization server from the client's
       // perspective. In direct mode, clients talk to the provider directly.
-      authorization_servers: [mode === "proxy" ? baseUrl : provider.getIssuer()],
+      authorization_servers: [
+        mode === "proxy" ? baseUrl : provider.getIssuer(),
+      ],
       scopes_supported: provider.getScopesSupported(),
       bearer_methods_supported: ["header"],
     });
