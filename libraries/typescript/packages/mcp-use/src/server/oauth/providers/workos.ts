@@ -93,7 +93,14 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["email", "offline_access", "openid", "profile"];
+    return (
+      this.config.scopesSupported ?? [
+        "email",
+        "offline_access",
+        "openid",
+        "profile",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {

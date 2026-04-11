@@ -92,6 +92,7 @@ export interface UserInfo {
  */
 export interface BaseOAuthConfig {
   provider: string;
+  scopesSupported?: string[];
 }
 
 /**
@@ -158,7 +159,6 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   jwksUrl: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  scopesSupported?: string[];
   grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;

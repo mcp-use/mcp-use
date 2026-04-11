@@ -86,8 +86,9 @@ const server = new MCPServer({
     // JWT verification (should be true in production)
     verifyJwt: process.env.NODE_ENV === 'production',
     
-    // Custom scopes
-    scopes: ['openid', 'profile', 'email', 'offline_access'],
+    // Override supported scopes (advertised in OAuth metadata)
+    // Default: ['openid', 'profile', 'email', 'offline_access']
+    scopesSupported: ['openid', 'profile', 'email', 'offline_access'],
     
     // Custom user info extraction
     getUserInfo: (payload) => ({
