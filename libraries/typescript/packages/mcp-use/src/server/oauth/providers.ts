@@ -65,10 +65,7 @@ export interface CustomProviderConfig {
   authEndpoint: string;
   tokenEndpoint: string;
   verifyToken: (token: string) => Promise<any>;
-  /** JWKS URL for key discovery (alias: jwksUri) */
   jwksUrl?: string;
-  /** JWKS URI for key discovery (alias: jwksUrl) */
-  jwksUri?: string;
   /** User info endpoint URL */
   userInfoEndpoint?: string;
   /** OAuth client ID */
@@ -451,8 +448,7 @@ export function oauthBetterAuthProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
-  // Resolve aliases: jwksUrl/jwksUri → jwksUrl
-  const jwksUrl = config.jwksUrl ?? config.jwksUri;
+  const jwksUrl = config.jwksUrl;
   const scopesSupported = config.scopesSupported;
 
   return new CustomOAuthProvider({
