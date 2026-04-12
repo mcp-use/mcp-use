@@ -66,16 +66,11 @@ export interface CustomProviderConfig {
   tokenEndpoint: string;
   verifyToken: (token: string) => Promise<any>;
   jwksUrl?: string;
-  /** User info endpoint URL */
   userInfoEndpoint?: string;
-  /** OAuth client ID */
   clientId?: string;
-  /** OAuth client secret */
   clientSecret?: string;
-  /** OAuth mode: 'proxy' or 'direct' */
   mode?: "proxy" | "direct";
   scopesSupported?: string[];
-  /** Audience for JWT verification */
   audience?: string;
   grantTypesSupported?: string[];
   getUserInfo?: (payload: any) => UserInfo;
