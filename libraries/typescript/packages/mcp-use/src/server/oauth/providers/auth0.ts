@@ -126,10 +126,7 @@ export class Auth0OAuthProvider implements OAuthProvider {
     return this.config.clientSecret;
   }
 
-  getExtraAuthorizeParams(): Record<string, string> | undefined {
-    if (this.config.audience) {
-      return { audience: this.config.audience };
-    }
-    return undefined;
+  getExtraAuthorizeParams(): Record<string, string> {
+    return { audience: this.config.audience };
   }
 }
