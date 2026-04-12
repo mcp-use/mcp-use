@@ -448,20 +448,5 @@ export function oauthBetterAuthProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
-  return new CustomOAuthProvider({
-    provider: "custom",
-    issuer: config.issuer,
-    jwksUrl: config.jwksUrl,
-    authEndpoint: config.authEndpoint,
-    tokenEndpoint: config.tokenEndpoint,
-    scopesSupported: config.scopesSupported,
-    grantTypesSupported: config.grantTypesSupported,
-    verifyToken: config.verifyToken,
-    getUserInfo: config.getUserInfo,
-    userInfoEndpoint: config.userInfoEndpoint,
-    clientId: config.clientId,
-    clientSecret: config.clientSecret,
-    mode: config.mode,
-    audience: config.audience,
-  });
+  return new CustomOAuthProvider({ provider: "custom", ...config });
 }
