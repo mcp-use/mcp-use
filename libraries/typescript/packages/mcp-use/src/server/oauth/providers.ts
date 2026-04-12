@@ -62,12 +62,17 @@ export interface WorkOSProviderConfig {
  */
 export interface CustomProviderConfig {
   issuer: string;
-  jwksUrl: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  scopesSupported?: string[];
-  grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<any>;
+  jwksUrl?: string;
+  userInfoEndpoint?: string;
+  clientId?: string;
+  clientSecret?: string;
+  mode?: "proxy" | "direct";
+  scopesSupported?: string[];
+  audience?: string;
+  grantTypesSupported?: string[];
   getUserInfo?: (payload: any) => UserInfo;
 }
 
@@ -438,8 +443,5 @@ export function oauthBetterAuthProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
-  return new CustomOAuthProvider({
-    provider: "custom",
-    ...config,
-  });
+  return new CustomOAuthProvider({ provider: "custom", ...config });
 }

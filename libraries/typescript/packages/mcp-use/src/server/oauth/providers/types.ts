@@ -70,6 +70,24 @@ export interface OAuthProvider {
    * @returns The registration endpoint URL, or undefined if not supported
    */
   getRegistrationEndpoint?(): string | undefined;
+
+  /**
+   * Get the OAuth client ID (for pre-registered client flows)
+   * @returns The client ID, or undefined if using dynamic client registration
+   */
+  getClientId?(): string | undefined;
+
+  /**
+   * Get the user info endpoint URL
+   * @returns The user info endpoint URL, or undefined if not configured
+   */
+  getUserInfoEndpoint?(): string | undefined;
+
+  /**
+   * Get the audience for JWT verification
+   * @returns The audience string, or undefined if not configured
+   */
+  getAudience?(): string | undefined;
 }
 
 /**
@@ -156,12 +174,22 @@ export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
 export interface CustomOAuthConfig extends BaseOAuthConfig {
   provider: "custom";
   issuer: string;
-  jwksUrl: string;
+  jwksUrl?: string;
   authEndpoint: string;
   tokenEndpoint: string;
   grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
+  /** User info endpoint URL */
+  userInfoEndpoint?: string;
+  /** OAuth client ID */
+  clientId?: string;
+  /** OAuth client secret */
+  clientSecret?: string;
+  /** OAuth mode: 'proxy' or 'direct' */
+  mode?: OAuthMode;
+  /** Audience for JWT verification */
+  audience?: string;
 }
 
 /**
