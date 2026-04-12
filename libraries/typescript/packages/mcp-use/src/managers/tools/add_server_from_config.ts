@@ -47,7 +47,7 @@ export class AddMCPServerFromConfigTool extends StructuredTool {
       const numTools = tools.length;
       result += ` Session created and connected. '${serverName}' is now the active server with ${numTools} tools available.`;
       result += `\n\n${tools.map((t) => t.name).join("\n")}`;
-      logger.info(result);
+      logger.debug(result);
       return result;
     } catch (e: any) {
       logger.error(

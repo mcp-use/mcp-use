@@ -75,7 +75,7 @@ export class ServerManager implements IServerManager {
 
   public setManagementTools(tools: StructuredToolInterface[]): void {
     this.overrideManagementTools = tools;
-    logger.info(
+    logger.debug(
       `Overriding default management tools with a new set of ${tools.length} tools.`
     );
   }
@@ -85,7 +85,7 @@ export class ServerManager implements IServerManager {
     const activeSessionNames = Object.keys(this.client.getAllActiveSessions());
 
     if (allServerNames.length === 0) {
-      logger.info("Server Manager State: No servers configured.");
+      logger.debug("Server Manager State: No servers configured.");
       return;
     }
 
@@ -97,7 +97,7 @@ export class ServerManager implements IServerManager {
       Active: this.activeServer === name ? "✅" : "❌",
     }));
 
-    logger.info(`Server Manager State: [${context}]`);
+    logger.debug(`Server Manager State: [${context}]`);
     console.table(tableData);
   }
 
