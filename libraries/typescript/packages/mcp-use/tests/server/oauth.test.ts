@@ -36,7 +36,7 @@ describe("server OAuth integration", () => {
       tokenEndpoint: "https://issuer.example.com/oauth/token",
       jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
       mode: "proxy",
-      scopes: ["openid", "profile"],
+      scopesSupported: ["openid", "profile"],
       verifyToken: async () => ({ payload: { sub: "user-1" } }),
     });
 

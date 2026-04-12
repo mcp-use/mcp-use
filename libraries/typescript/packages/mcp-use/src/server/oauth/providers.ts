@@ -77,9 +77,6 @@ export interface CustomProviderConfig {
   clientSecret?: string;
   /** OAuth mode: 'proxy' or 'direct' */
   mode?: "proxy" | "direct";
-  /** Supported scopes (alias: scopesSupported) */
-  scopes?: string[];
-  /** Supported scopes (alias: scopes) */
   scopesSupported?: string[];
   /** Audience for JWT verification */
   audience?: string;
@@ -454,9 +451,9 @@ export function oauthBetterAuthProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
-  // Resolve aliases: jwksUrl/jwksUri → jwksUrl, scopes/scopesSupported → scopesSupported
+  // Resolve aliases: jwksUrl/jwksUri → jwksUrl
   const jwksUrl = config.jwksUrl ?? config.jwksUri;
-  const scopesSupported = config.scopesSupported ?? config.scopes;
+  const scopesSupported = config.scopesSupported;
 
   return new CustomOAuthProvider({
     provider: "custom",
