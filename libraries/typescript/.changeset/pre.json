@@ -8,6 +8,7 @@
     "mcp-use": "1.23.1"
   },
   "changesets": [
+    "fix-custom-provider-config",
     "full-buses-double"
   ]
 }

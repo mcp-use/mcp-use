@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.24.0-canary.1
+
+### Patch Changes
+
+- 4525a5d: Add missing fields to CustomProviderConfig to match documentation: `userInfoEndpoint`, `jwksUrl`, `clientId`, `clientSecret`, `mode`, `scopesSupported`, and `audience`. Add `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` as optional methods on the `OAuthProvider` interface. Replace unsafe `(provider as any).config?.clientId` cast in routes with type-safe `provider.getClientId?.()`.
+  - @mcp-use/cli@2.21.5-canary.1
+  - @mcp-use/inspector@2.0.0-canary.1
+
 ## 1.24.0-canary.0
 
 ### Minor Changes
