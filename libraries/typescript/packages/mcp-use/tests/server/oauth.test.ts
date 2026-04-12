@@ -53,7 +53,8 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(200);
     expect(metadata.authorization_endpoint).toBe(`${svc.baseUrl}/authorize`);
     expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/token`);
-    expect(metadata.issuer).toBe("https://issuer.example.com");
+    // In proxy mode, the MCP server IS the authorization server from the client's perspective
+    expect(metadata.issuer).toBe(svc.baseUrl);
   });
 
   it("proxies token requests with form body and Authorization header", async () => {
