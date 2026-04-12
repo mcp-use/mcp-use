@@ -448,16 +448,13 @@ export function oauthBetterAuthProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
-  const jwksUrl = config.jwksUrl;
-  const scopesSupported = config.scopesSupported;
-
   return new CustomOAuthProvider({
     provider: "custom",
     issuer: config.issuer,
-    jwksUrl,
+    jwksUrl: config.jwksUrl,
     authEndpoint: config.authEndpoint,
     tokenEndpoint: config.tokenEndpoint,
-    scopesSupported,
+    scopesSupported: config.scopesSupported,
     grantTypesSupported: config.grantTypesSupported,
     verifyToken: config.verifyToken,
     getUserInfo: config.getUserInfo,
