@@ -26,7 +26,12 @@ export {
 
 // Export utilities
 export { createBearerAuthMiddleware } from "./middleware.js";
-export { setupOAuthRoutes } from "./routes.js";
+export {
+  setupOAuthRoutes,
+  // Retained for the forthcoming oauthProxyProvider; see routes.ts jsdoc.
+  createAuthorizeHandler,
+  createTokenHandler,
+} from "./routes.js";
 export {
   getAuth,
   hasAnyScope,

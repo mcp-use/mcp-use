@@ -72,13 +72,6 @@ const server = new MCPServer({
     // Optional: JWKS endpoint (for automatic verification)
     jwksUrl: 'https://auth.example.com/.well-known/jwks.json',
     
-    // OAuth Client Configuration
-    clientId: process.env.OAUTH_CLIENT_ID,
-    clientSecret: process.env.OAUTH_CLIENT_SECRET,
-    
-    // OAuth mode
-    mode: 'proxy', // or 'direct'
-    
     // Override supported scopes (advertised in OAuth metadata)
     // Default: ['openid', 'profile', 'email']
     scopesSupported: ['openid', 'profile', 'email'],
@@ -250,49 +243,13 @@ getUserInfo(payload: any) {
 }
 ```
 
-## OAuth Modes
+## Flow
 
-### Proxy Mode
+Clients authenticate directly with your upstream provider. The MCP server only:
 
-Server proxies OAuth requests (default):
+1. Exposes `.well-known/*` metadata (passed through from the upstream issuer).
+2. Verifies bearer tokens on `/mcp/*` requests.
 
-```typescript
-const server = new MCPServer({
-  oauth: oauthCustomProvider({
-    issuer: 'https://auth.example.com',
-    authEndpoint: 'https://auth.example.com/oauth/authorize',
-    tokenEndpoint: 'https://auth.example.com/oauth/token',
-    mode: 'proxy'
-  })
-})
-```
-
-Clients authenticate through your server:
-```typescript
-const client = new McpClient({
-  auth: {
-    authUrl: 'http://localhost:3000/authorize',
-    tokenUrl: 'http://localhost:3000/token',
-  }
-})
-```
-
-### Direct Mode
-
-Clients authenticate directly with provider:
-
-```typescript
-const server = new MCPServer({
-  oauth: oauthCustomProvider({
-    issuer: 'https://auth.example.com',
-    authEndpoint: 'https://auth.example.com/oauth/authorize',
-    tokenEndpoint: 'https://auth.example.com/oauth/token',
-    mode: 'direct'
-  })
-})
-```
-
-Clients use provider endpoints:
 ```typescript
 const client = new McpClient({
   auth: {
@@ -301,6 +258,8 @@ const client = new McpClient({
   }
 })
 ```
+
+If your upstream provider supports Dynamic Client Registration and advertises `registration_endpoint` in its metadata, clients will register themselves automatically.
 
 ## Examples
 
@@ -358,10 +317,7 @@ const server = new MCPServer({
     issuer: process.env.OKTA_DOMAIN!,
     authEndpoint: `${process.env.OKTA_DOMAIN!}/oauth2/v1/authorize`,
     tokenEndpoint: `${process.env.OKTA_DOMAIN!}/oauth2/v1/token`,
-    
-    clientId: process.env.OKTA_CLIENT_ID!,
-    clientSecret: process.env.OKTA_CLIENT_SECRET,
-    
+
     async verifyToken(token: string) {
       const JWKS = createRemoteJWKSet(
         new URL(`${process.env.OKTA_DOMAIN!}/oauth2/v1/keys`)
@@ -400,10 +356,7 @@ const server = new MCPServer({
     issuer: `https://login.microsoftonline.com/${tenantId}/v2.0`,
     authEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
     tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-    
-    clientId: process.env.AZURE_CLIENT_ID!,
-    clientSecret: process.env.AZURE_CLIENT_SECRET,
-    
+
     scopesSupported: ['openid', 'profile', 'email'],
     
     async verifyToken(token: string) {
@@ -442,10 +395,7 @@ const server = new MCPServer({
     issuer: 'https://accounts.google.com',
     authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenEndpoint: 'https://oauth2.googleapis.com/token',
-    
-    clientId: process.env.GOOGLE_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    
+
     scopesSupported: ['openid', 'profile', 'email'],
     
     async verifyToken(token: string) {

@@ -1,3 +1,9 @@
+// TODO(oauth-refactor): audit this file. Proxy mode has been removed from
+// built-in providers; the tests below still reference the old proxy-mode
+// flow (mode: "proxy", /authorize + /token on the MCP server) and will need
+// to be rewritten against the DCR-direct flow and/or moved to cover the
+// upcoming oauthProxyProvider. Do not delete before that next pass.
+
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { afterEach, describe, expect, it, vi } from "vitest";

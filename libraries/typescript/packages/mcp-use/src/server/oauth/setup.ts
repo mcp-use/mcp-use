@@ -48,17 +48,10 @@ export async function setupOAuthForServer(
   // Setup OAuth routes
   setupOAuthRoutes(app, oauthProvider, baseUrl);
 
-  const mode = oauthProvider.getMode?.() || "proxy";
-  if (mode === "direct") {
-    console.log(
-      "[OAuth] Direct mode: Clients will authenticate with provider directly"
-    );
-    console.log("[OAuth] Metadata endpoints: /.well-known/*");
-  } else {
-    console.log(
-      "[OAuth] Proxy mode: Routes at /authorize, /token, /.well-known/*"
-    );
-  }
+  console.log(
+    "[OAuth] Clients will authenticate with provider directly via DCR"
+  );
+  console.log("[OAuth] Metadata endpoints: /.well-known/*");
 
   // Apply bearer auth to all /mcp routes
   app.use("/mcp/*", middleware);

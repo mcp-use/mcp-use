@@ -51,8 +51,6 @@ export interface KeycloakProviderConfig {
  */
 export interface WorkOSProviderConfig {
   subdomain: string;
-  clientId?: string;
-  apiKey?: string;
   verifyJwt?: boolean;
   scopesSupported?: string[];
 }
@@ -67,9 +65,6 @@ export interface CustomProviderConfig {
   verifyToken: (token: string) => Promise<any>;
   jwksUrl?: string;
   userInfoEndpoint?: string;
-  clientId?: string;
-  clientSecret?: string;
-  mode?: "proxy" | "direct";
   scopesSupported?: string[];
   audience?: string;
   grantTypesSupported?: string[];
@@ -260,27 +255,19 @@ export function oauthKeycloakProvider(
 /**
  * Create a WorkOS OAuth provider
  *
- * Supports two OAuth modes:
- *
- * **1. Dynamic Client Registration (DCR)** - Recommended for MCP
- * - Don't set MCP_USE_OAUTH_WORKOS_CLIENT_ID
- * - MCP clients register themselves automatically with WorkOS
- * - Enable DCR in WorkOS Dashboard under Connect → Configuration
- *
- * **2. Pre-registered OAuth Client** - For custom setups
- * - Set MCP_USE_OAUTH_WORKOS_CLIENT_ID to your OAuth client ID from WorkOS Dashboard
- * - Create the client in WorkOS Dashboard under Connect → OAuth Applications
- * - Configure redirect URIs in the dashboard to match your MCP client
+ * Uses Dynamic Client Registration (DCR). MCP clients register themselves
+ * automatically with WorkOS — enable DCR in the WorkOS Dashboard under
+ * Connect → Configuration. The MCP server only verifies WorkOS-issued
+ * tokens; authorize/token/register are all discovered via `.well-known`
+ * and called directly against WorkOS.
  *
  * Environment variables:
  * - MCP_USE_OAUTH_WORKOS_SUBDOMAIN (required)
- * - MCP_USE_OAUTH_WORKOS_CLIENT_ID (optional, for pre-registered client)
- * - MCP_USE_OAUTH_WORKOS_API_KEY (optional, for WorkOS API calls)
  *
  * @param config - Optional WorkOS configuration (overrides environment variables)
  * @returns OAuthProvider instance
  *
- * @example Dynamic Client Registration (recommended)
+ * @example
  * ```typescript
  * const server = new MCPServer({
  *   name: 'my-server',
@@ -290,26 +277,12 @@ export function oauthKeycloakProvider(
  *   })
  * });
  * ```
- *
- * @example Pre-registered OAuth Client
- * ```typescript
- * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   oauth: oauthWorkOSProvider({
- *     subdomain: 'my-company.authkit.app',
- *     clientId: 'client_01KB5DRXBDDY1VGCBKY108SKJW'
- *   })
- * });
- * ```
  */
 export function oauthWorkOSProvider(
   config: Partial<WorkOSProviderConfig> = {}
 ): OAuthProvider {
   const subdomain =
     config.subdomain ?? getEnv("MCP_USE_OAUTH_WORKOS_SUBDOMAIN");
-  const clientId = config.clientId ?? getEnv("MCP_USE_OAUTH_WORKOS_CLIENT_ID");
-  const apiKey = config.apiKey ?? getEnv("MCP_USE_OAUTH_WORKOS_API_KEY");
 
   if (!subdomain) {
     throw new Error(
@@ -318,31 +291,9 @@ export function oauthWorkOSProvider(
     );
   }
 
-  // Log which OAuth mode is being used
-  if (clientId) {
-    console.log("[WorkOS OAuth] Using pre-registered OAuth client mode");
-    console.log(`[WorkOS OAuth]   - Client ID: ${clientId}`);
-    console.log(
-      "[WorkOS OAuth]   - Make sure this client exists in WorkOS Dashboard"
-    );
-    console.log(
-      "[WorkOS OAuth]   - Configure redirect URIs to match your MCP client"
-    );
-  } else {
-    console.log("[WorkOS OAuth] Using Dynamic Client Registration (DCR) mode");
-    console.log(
-      "[WorkOS OAuth]   - MCP clients will register themselves automatically"
-    );
-    console.log(
-      "[WorkOS OAuth]   - Make sure DCR is enabled in WorkOS Dashboard"
-    );
-  }
-
   return new WorkOSOAuthProvider({
     provider: "workos",
     subdomain,
-    clientId,
-    apiKey,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
   });
@@ -353,7 +304,6 @@ export function oauthWorkOSProvider(
  */
 export interface BetterAuthProviderConfig {
   authURL: string;
-  clientId?: string;
   verifyJwt?: boolean;
   scopesSupported?: string[];
   getUserInfo?: (
@@ -364,8 +314,10 @@ export interface BetterAuthProviderConfig {
 /**
  * Create a Better Auth OAuth provider
  *
- * Uses "direct" mode where MCP clients communicate directly with Better Auth
- * for OAuth flows. The MCP server only verifies tokens and provides metadata.
+ * MCP clients discover Better Auth's OAuth endpoints via `.well-known`
+ * passthrough and communicate directly with Better Auth for registration,
+ * authorization, and token exchange. The MCP server only verifies tokens
+ * and provides metadata.
  *
  * Better Auth's OAuth Provider plugin exposes standard OAuth 2.0 endpoints:
  * - /oauth2/authorize - Authorization endpoint
@@ -375,12 +327,11 @@ export interface BetterAuthProviderConfig {
  *
  * Environment variables:
  * - MCP_USE_OAUTH_BETTER_AUTH_URL (required)
- * - MCP_USE_OAUTH_BETTER_AUTH_CLIENT_ID (optional, for pre-registered client)
  *
  * @param config - Optional Better Auth configuration (overrides environment variables)
  * @returns OAuthProvider instance
  *
- * @example Dynamic Client Registration (recommended)
+ * @example
  * ```typescript
  * const server = new MCPServer({
  *   name: 'my-server',
@@ -396,8 +347,6 @@ export function oauthBetterAuthProvider(
   config: Partial<BetterAuthProviderConfig> = {}
 ): OAuthProvider {
   const authURL = config.authURL ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_URL");
-  const clientId =
-    config.clientId ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_CLIENT_ID");
 
   if (!authURL) {
     throw new Error(
@@ -409,7 +358,6 @@ export function oauthBetterAuthProvider(
   return new BetterAuthOAuthProvider({
     provider: "better-auth",
     authURL,
-    clientId,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
     getUserInfo: config.getUserInfo,

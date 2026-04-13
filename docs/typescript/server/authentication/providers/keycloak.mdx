@@ -88,14 +88,11 @@ const server = new MCPServer({
     // Required
     serverUrl: 'https://keycloak.example.com',
     realm: 'my-realm',
+
+    // Optional: Keycloak client ID — currently used as the JWT audience
+    // when verifying tokens. Leave unset to skip audience validation.
     clientId: 'my-mcp-server',
-    
-    // Optional
-    clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
-    
-    // OAuth mode: 'proxy' (default) or 'direct'
-    mode: 'proxy',
-    
+
     // JWT verification
     verifyJwt: process.env.NODE_ENV === 'production',
     

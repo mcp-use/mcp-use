@@ -75,14 +75,7 @@ const server = new MCPServer({
     // Required
     domain: 'your-tenant.auth0.com',
     audience: 'https://your-api.example.com',
-    
-    // Optional
-    clientId: process.env.AUTH0_CLIENT_ID,
-    clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    
-    // OAuth mode: 'proxy' (default) or 'direct'
-    mode: 'proxy',
-    
+
     // JWT verification (should be true in production)
     verifyJwt: process.env.NODE_ENV === 'production',
     

@@ -41,10 +41,6 @@ const server = new MCPServer({
   version: '1.0.0',
   oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    // Optional: for WorkOS API calls
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
-    // Optional: for pre-registered OAuth client
-    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
   })
 })
 
@@ -56,9 +52,11 @@ await server.listen(3000)
 ```bash
 # .env
 MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app  # Required (full AuthKit domain)
-MCP_USE_OAUTH_WORKOS_API_KEY=sk_live_...       # Optional
-MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_...      # Optional
 ```
+
+<Tip>
+If you need to call the WorkOS Management API from your tool handlers, store your API key in any env var you like (for example `WORKOS_API_KEY`) and read it inside the tool — it isn't part of the OAuth provider config.
+</Tip>
 
 ### Full Configuration Options
 
@@ -67,53 +65,25 @@ const server = new MCPServer({
   oauth: oauthWorkOSProvider({
     // Required
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    
-    // Optional: WorkOS API key for making API calls
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
-    
-    // Optional: Pre-registered OAuth client ID
-    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
-    
+
     // JWT verification (recommended for production)
     verifyJwt: process.env.NODE_ENV === 'production',
-    
+
     // Override supported scopes (advertised in OAuth metadata)
     // Default: ['email', 'offline_access', 'openid', 'profile']
     scopesSupported: ['email', 'offline_access', 'openid', 'profile'],
-    
-    // Custom user info extraction
-    getUserInfo: (payload) => ({
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      organizationId: payload.org_id,
-      roles: payload.roles || [],
-    })
   })
 })
 ```
 
-## OAuth Mode
+## OAuth Flow
 
-WorkOS supports **Dynamic Client Registration (DCR)** where MCP clients register themselves automatically:
+WorkOS uses **Dynamic Client Registration (DCR)**. MCP clients discover WorkOS's OAuth endpoints via `.well-known` passthrough and register themselves automatically — enable DCR in the WorkOS Dashboard under Connect → Configuration.
 
 ```typescript
 const server = new MCPServer({
   oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY, // Optional, for API calls
-  })
-})
-```
-
-Alternatively, use a **pre-registered OAuth client**:
-
-```typescript
-const server = new MCPServer({
-  oauth: oauthWorkOSProvider({
-    subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID!, // Pre-registered client
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
   })
 })
 ```
@@ -141,8 +111,6 @@ Server configuration:
 const server = new MCPServer({
   oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
-    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
   })
 })
 ```
@@ -208,23 +176,13 @@ server.tool({
 const server = new MCPServer({
   oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY,
-    
-    getUserInfo: (payload) => ({
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      firstName: payload.given_name,
-      lastName: payload.family_name,
-      organizationId: payload.org_id,
-      organizationName: payload.org_name,
-      roles: payload.roles || [],
-      idpId: payload.idp_id,
-      connectionId: payload.connection_id,
-    })
   })
 })
 ```
+
+<Note>
+WorkOS user-info extraction is handled internally by the provider using standard OIDC claims (`sub`, `email`, `name`, `org_id`, `roles`, etc.). These are already available on `context.auth`.
+</Note>
 
 ## Directory Sync
 
@@ -235,7 +193,7 @@ WorkOS Directory Sync provides user and group information from identity provider
 ```typescript
 import { WorkOS } from '@workos-inc/node'
 
-const workos = new WorkOS(process.env.MCP_USE_OAUTH_WORKOS_API_KEY!)
+const workos = new WorkOS(process.env.WORKOS_API_KEY!)
 
 server.tool({
   name: 'get-team-members',
@@ -422,27 +380,9 @@ console.log('🔍 Inspector: http://localhost:3000/inspector')
 
 **Problem:** SSO requires organization parameter
 
-**Solution:** Provide organization in auth URL:
+**Solution:** Provide organization in the client-side auth URL:
 ```typescript
 authUrl.searchParams.set('organization', 'org_123')
-```
-
-Or configure in server:
-```typescript
-oauth: oauthWorkOSProvider({
-  organization: process.env.WORKOS_ORGANIZATION
-})
-```
-
-### "Invalid Client" Error
-
-**Problem:** Client ID doesn't match or is invalid
-
-**Solution:** Verify client ID matches WorkOS Dashboard exactly:
-```bash
-# Check environment variable
-echo $MCP_USE_OAUTH_WORKOS_CLIENT_ID
-# Should start with: client_
 ```
 
 ### Directory Sync Not Working
@@ -461,23 +401,13 @@ import { MCPServer, oauthWorkOSProvider, text, error, json } from 'mcp-use/serve
 import { WorkOS } from '@workos-inc/node'
 import { z } from 'zod'
 
-const workosClient = new WorkOS(process.env.MCP_USE_OAUTH_WORKOS_API_KEY!)
+const workosClient = new WorkOS(process.env.WORKOS_API_KEY!)
 
 const server = new MCPServer({
   name: 'workos-example',
   version: '1.0.0',
   oauth: oauthWorkOSProvider({
     subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!,
-    apiKey: process.env.MCP_USE_OAUTH_WORKOS_API_KEY!,
-    clientId: process.env.MCP_USE_OAUTH_WORKOS_CLIENT_ID,
-    
-    getUserInfo: (payload) => ({
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      organizationId: payload.org_id,
-      organizationName: payload.org_name,
-    })
   })
 })
 

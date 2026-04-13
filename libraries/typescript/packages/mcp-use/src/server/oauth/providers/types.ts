@@ -1,15 +1,14 @@
 /**
- * OAuth mode determines how the MCP server handles OAuth requests
- */
-export type OAuthMode =
-  | "direct" // Clients communicate directly with auth server (e.g., WorkOS)
-  | "proxy"; // MCP server proxies OAuth requests (legacy mode)
-
-/**
  * OAuth Provider Interface
  *
  * Defines the contract that all OAuth providers must implement
  * to provide authentication and authorization services.
+ *
+ * Built-in providers support the DCR-direct flow only: the MCP server
+ * proxies metadata discovery (`.well-known/*`) to the upstream authorization
+ * server and verifies bearer tokens. Clients communicate directly with the
+ * upstream for authorize/token/register. A separate `oauthProxyProvider`
+ * will reintroduce proxy-mode behavior in a future change.
  */
 
 export interface OAuthProvider {
@@ -57,25 +56,6 @@ export interface OAuthProvider {
    * @returns Array of supported grant types
    */
   getGrantTypesSupported(): string[];
-
-  /**
-   * Get the OAuth mode for this provider
-   * @returns 'direct' if clients should communicate directly with auth server,
-   *          'proxy' if MCP server should proxy OAuth requests
-   */
-  getMode?(): OAuthMode;
-
-  /**
-   * Get the registration endpoint URL (for direct mode with dynamic client registration)
-   * @returns The registration endpoint URL, or undefined if not supported
-   */
-  getRegistrationEndpoint?(): string | undefined;
-
-  /**
-   * Get the OAuth client ID (for pre-registered client flows)
-   * @returns The client ID, or undefined if using dynamic client registration
-   */
-  getClientId?(): string | undefined;
 
   /**
    * Get the user info endpoint URL
@@ -140,6 +120,9 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
   provider: "keycloak";
   serverUrl: string;
   realm: string;
+  // TODO: audit whether Keycloak really validates audience as clientId.
+  // Currently used as the JWT `audience` claim when verifying tokens in
+  // keycloak.ts. If Keycloak actually sets `azp`/other claim, revisit.
   clientId?: string;
   verifyJwt?: boolean;
 }
@@ -150,8 +133,6 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
 export interface WorkOSOAuthConfig extends BaseOAuthConfig {
   provider: "workos";
   subdomain: string;
-  clientId?: string;
-  apiKey?: string;
   verifyJwt?: boolean;
 }
 
@@ -161,7 +142,6 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
 export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
   provider: "better-auth";
   authURL: string;
-  clientId?: string;
   verifyJwt?: boolean;
   getUserInfo?: (
     payload: Record<string, unknown>
@@ -182,12 +162,6 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
   /** User info endpoint URL */
   userInfoEndpoint?: string;
-  /** OAuth client ID */
-  clientId?: string;
-  /** OAuth client secret */
-  clientSecret?: string;
-  /** OAuth mode: 'proxy' or 'direct' */
-  mode?: OAuthMode;
   /** Audience for JWT verification */
   audience?: string;
 }
