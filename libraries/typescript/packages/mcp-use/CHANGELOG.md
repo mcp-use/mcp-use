@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.24.0-canary.2
+
+### Patch Changes
+
+- 9478920: Fix Google provider rejecting tool schemas with `propertyNames` keyword.
+
+  `z.record()` causes `@langchain/core` to emit a `propertyNames` field in the JSON Schema output for constrained or enum key types, which Google's Generative AI API rejects. Switching to `z.object({}).catchall()` produces identical runtime behavior while serializing cleanly without `propertyNames`.
+
+- Updated dependencies [b0e2492]
+  - @mcp-use/inspector@2.0.0-canary.2
+  - @mcp-use/cli@2.21.5-canary.2
+
 ## 1.24.0-canary.1
 
 ### Patch Changes

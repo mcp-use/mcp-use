@@ -9,6 +9,8 @@
   },
   "changesets": [
     "fix-custom-provider-config",
+    "fix-google-provider-record-schema",
+    "fix-inspector-thinking-indicator",
     "full-buses-double"
   ]
 }

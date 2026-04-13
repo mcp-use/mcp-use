@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 2.0.0-canary.2
+
+### Patch Changes
+
+- b0e2492: Fix thinking indicator persisting after assistant stream completes
+- Updated dependencies [9478920]
+  - mcp-use@1.24.0-canary.2
+
 ## 2.0.0-canary.1
 
 ### Patch Changes
