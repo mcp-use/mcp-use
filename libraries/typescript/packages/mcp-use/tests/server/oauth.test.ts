@@ -1,15 +1,16 @@
-// TODO(oauth-refactor): audit this file. Proxy mode has been removed from
-// built-in providers; the tests below still reference the old proxy-mode
-// flow (mode: "proxy", /authorize + /token on the MCP server) and will need
-// to be rewritten against the DCR-direct flow and/or moved to cover the
-// upcoming oauthProxyProvider. Do not delete before that next pass.
+/**
+ * OAuth integration tests
+ *
+ * Tests both the new oauthProxy() function (for non-DCR providers like Google)
+ * and the bearer auth middleware.
+ */
 
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBearerAuthMiddleware } from "../../src/server/oauth/middleware.js";
 import { setupOAuthRoutes } from "../../src/server/oauth/routes.js";
-import { oauthCustomProvider } from "../../src/server/oauth/providers.js";
+import { oauthProxy } from "../../src/server/oauth/oauth-proxy.js";
 
 async function listenOnRandomPort(
   app: Hono
@@ -36,20 +37,20 @@ describe("server OAuth integration", () => {
   it("advertises proxy endpoints in discovery metadata", async () => {
     const app = new Hono();
 
-    const provider = oauthCustomProvider({
+    // Use oauthProxy() for providers without DCR support
+    const proxy = oauthProxy({
       issuer: "https://issuer.example.com",
       authEndpoint: "https://issuer.example.com/oauth/authorize",
       tokenEndpoint: "https://issuer.example.com/oauth/token",
       jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
-      mode: "proxy",
-      scopesSupported: ["openid", "profile"],
-      verifyToken: async () => ({ payload: { sub: "user-1" } }),
+      clientId: "test-client-id",
+      scopes: ["openid", "profile"],
     });
 
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, provider, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
 
     const response = await fetch(
       `${svc.baseUrl}/.well-known/oauth-authorization-server`
@@ -59,10 +60,12 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(200);
     expect(metadata.authorization_endpoint).toBe(`${svc.baseUrl}/authorize`);
     expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/token`);
-    expect(metadata.issuer).toBe("https://issuer.example.com");
+    expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/register`);
+    // In proxy mode, the issuer is the local server URL
+    expect(metadata.issuer).toBe(svc.baseUrl);
   });
 
-  it("proxies token requests with form body and Authorization header", async () => {
+  it("proxies token requests and injects client credentials", async () => {
     const tokenSpy = vi.fn();
 
     // Upstream token server
@@ -71,7 +74,6 @@ describe("server OAuth integration", () => {
       const body = await c.req.parseBody();
       tokenSpy({
         body,
-        authorization: c.req.header("authorization"),
       });
       return c.json({
         access_token: "abc",
@@ -85,19 +87,20 @@ describe("server OAuth integration", () => {
 
     const app = new Hono();
 
-    const provider = oauthCustomProvider({
+    // Use oauthProxy() with client credentials
+    const proxy = oauthProxy({
       issuer: upstreamSvc.baseUrl,
       authEndpoint: `${upstreamSvc.baseUrl}/oauth/authorize`,
       tokenEndpoint: `${upstreamSvc.baseUrl}/oauth/token`,
       jwksUrl: `${upstreamSvc.baseUrl}/.well-known/jwks.json`,
-      mode: "proxy",
-      verifyToken: async () => ({ payload: { sub: "user-1" } }),
+      clientId: "my-client-id",
+      clientSecret: "my-client-secret",
     });
 
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, provider, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
 
     const form = new URLSearchParams({
       grant_type: "authorization_code",
@@ -109,7 +112,6 @@ describe("server OAuth integration", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: "Basic Y2xpZW50OnNlY3JldA==",
       },
       body: form,
     });
@@ -119,28 +121,35 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(200);
     expect(data.access_token).toBe("abc");
     expect(tokenSpy).toHaveBeenCalledTimes(1);
+    // Verify that client credentials were injected
     expect(tokenSpy.mock.calls[0][0].body).toMatchObject({
       grant_type: "authorization_code",
       code: "code-123",
       redirect_uri: "http://localhost:3000/callback",
+      client_id: "my-client-id",
+      client_secret: "my-client-secret",
     });
   });
 
   it("rejects /mcp requests without bearer token", async () => {
     const app = new Hono();
 
-    const provider = oauthCustomProvider({
+    // oauthProxy can be used with bearer auth middleware
+    // The verifyToken function is called to validate the token
+    const proxy = oauthProxy({
       issuer: "https://issuer.example.com",
       authEndpoint: "https://issuer.example.com/oauth/authorize",
       tokenEndpoint: "https://issuer.example.com/oauth/token",
       jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
-      mode: "proxy",
-      verifyToken: async () => ({
-        payload: { sub: "user-1", scope: "openid profile" },
-      }),
+      clientId: "test-client",
     });
 
-    app.use("/mcp/*", createBearerAuthMiddleware(provider));
+    // Override verifyToken for testing (normally this would use JWKS)
+    proxy.verifyToken = async () => ({
+      payload: { sub: "user-1", scope: "openid profile" },
+    });
+
+    app.use("/mcp/*", createBearerAuthMiddleware(proxy));
     app.get("/mcp/test", (c) => c.json({ ok: true }));
 
     const svc = await listenOnRandomPort(app);
@@ -153,5 +162,39 @@ describe("server OAuth integration", () => {
       headers: { Authorization: "Bearer token-123" },
     });
     expect(authorized.status).toBe(200);
+  });
+
+  it("returns configured clientId from /register endpoint", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
+      clientId: "pre-registered-client-id",
+      clientSecret: "client-secret",
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const response = await fetch(`${svc.baseUrl}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_name: "My MCP Client",
+        redirect_uris: ["http://localhost:3000/callback"],
+      }),
+    });
+
+    expect(response.status).toBe(201);
+
+    const registration = await response.json();
+    expect(registration.client_id).toBe("pre-registered-client-id");
+    expect(registration.client_name).toBe("My MCP Client");
+    expect(registration.token_endpoint_auth_method).toBe("client_secret_post");
   });
 });

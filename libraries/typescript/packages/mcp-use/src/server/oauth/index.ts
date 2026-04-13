@@ -2,11 +2,12 @@
  * OAuth Integration for MCP Use
  *
  * Provides zero-config OAuth authentication for MCP servers with support for
- * Supabase, Auth0, Keycloak, WorkOS, and custom OAuth providers.
+ * Supabase, Auth0, Keycloak, WorkOS, custom OAuth providers, and OAuth proxy
+ * for providers without DCR support (Google, GitHub, etc.).
  */
 
 // Export types
-export type { OAuthProvider, UserInfo } from "./providers/types.js";
+export type { OAuthProvider, OAuthProxy, UserInfo } from "./providers/types.js";
 
 // Export provider factory functions
 export {
@@ -24,11 +25,14 @@ export {
   type WorkOSProviderConfig,
 } from "./providers.js";
 
+// Export OAuth proxy factory for non-DCR providers
+export { oauthProxy, type OAuthProxyConfig } from "./oauth-proxy.js";
+
 // Export utilities
 export { createBearerAuthMiddleware } from "./middleware.js";
 export {
   setupOAuthRoutes,
-  // Retained for the forthcoming oauthProxyProvider; see routes.ts jsdoc.
+  isOAuthProxy,
   createAuthorizeHandler,
   createTokenHandler,
 } from "./routes.js";

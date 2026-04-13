@@ -71,6 +71,41 @@ export interface OAuthProvider {
 }
 
 /**
+ * OAuth Proxy Interface
+ *
+ * Extends OAuthProvider with proxy-specific fields for providers that don't
+ * support Dynamic Client Registration (e.g., Google OAuth, GitHub OAuth).
+ *
+ * OAuthProxy:
+ * - Implements the full OAuthProvider interface (getter methods)
+ * - Adds proxy-specific fields: type, clientId, clientSecret, extraAuthorizeParams
+ * - Exposes /register endpoint returning the configured clientId
+ * - Injects clientId/clientSecret at token exchange
+ * - Passes through upstream JWT tokens (no token minting)
+ */
+export interface OAuthProxy extends OAuthProvider {
+  /**
+   * Discriminator for union type detection
+   */
+  type: "proxy";
+
+  /**
+   * Pre-registered OAuth client ID
+   */
+  clientId: string;
+
+  /**
+   * Pre-registered OAuth client secret (optional for public clients)
+   */
+  clientSecret?: string;
+
+  /**
+   * Extra parameters to include in authorize requests
+   */
+  extraAuthorizeParams?: Record<string, string>;
+}
+
+/**
  * User information extracted from OAuth token
  */
 export interface UserInfo {
