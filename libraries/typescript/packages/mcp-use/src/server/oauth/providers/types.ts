@@ -155,10 +155,8 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
   provider: "keycloak";
   serverUrl: string;
   realm: string;
-  // TODO: audit whether Keycloak really validates audience as clientId.
-  // Currently used as the JWT `audience` claim when verifying tokens in
-  // keycloak.ts. If Keycloak actually sets `azp`/other claim, revisit.
-  clientId?: string;
+  /** MCP server URL used to validate the JWT `aud` claim (set via Keycloak audience mapper on client scopes) */
+  audience?: string;
   verifyJwt?: boolean;
 }
 

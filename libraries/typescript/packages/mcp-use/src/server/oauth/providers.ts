@@ -41,7 +41,8 @@ export interface Auth0ProviderConfig {
 export interface KeycloakProviderConfig {
   serverUrl: string;
   realm: string;
-  clientId?: string;
+  /** MCP server URL used to validate the JWT `aud` claim (set via Keycloak audience mapper on client scopes) */
+  audience?: string;
   verifyJwt?: boolean;
   scopesSupported?: string[];
 }
@@ -214,7 +215,7 @@ export function oauthAuth0Provider(
  *   oauth: oauthKeycloakProvider({
  *     serverUrl: 'https://keycloak.example.com',
  *     realm: 'my-realm',
- *     clientId: 'my-client'
+ *     audience: 'https://my-mcp-server.example.com/mcp'
  *   })
  * });
  * ```
@@ -225,8 +226,8 @@ export function oauthKeycloakProvider(
   const serverUrl =
     config.serverUrl ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
   const realm = config.realm ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_REALM");
-  const clientId =
-    config.clientId ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID");
+  const audience =
+    config.audience ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
 
   if (!serverUrl) {
     throw new Error(
@@ -246,7 +247,7 @@ export function oauthKeycloakProvider(
     provider: "keycloak",
     serverUrl,
     realm,
-    clientId,
+    audience,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
   });
