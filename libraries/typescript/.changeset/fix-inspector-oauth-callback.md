@@ -1,5 +1,5 @@
 ---
-"mcp-use": patch
+"mcp-use": minor
 "@mcp-use/inspector": patch
 ---
 
