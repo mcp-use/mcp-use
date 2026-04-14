@@ -21,7 +21,7 @@ import { getEnv } from "../utils/runtime.js";
 export interface SupabaseProviderConfig {
   projectId: string;
   jwtSecret?: string;
-  skipVerification?: boolean;
+  verifyJwt?: boolean;
   scopesSupported?: string[];
 }
 
@@ -121,7 +121,7 @@ export function oauthSupabaseProvider(
     provider: "supabase",
     projectId,
     jwtSecret,
-    skipVerification: config.skipVerification,
+    verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
   });
 }

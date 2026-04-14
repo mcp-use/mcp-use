@@ -84,7 +84,7 @@ oauthSupabaseProvider({
   jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
 
   // Skip JWT verification — development only
-  skipVerification: process.env.NODE_ENV !== 'production',
+  verifyJwt: process.env.NODE_ENV === 'production',
 
   // Override advertised scopes
   scopesSupported: ['openid', 'profile', 'email'],

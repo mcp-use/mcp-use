@@ -135,7 +135,7 @@ export interface SupabaseOAuthConfig extends BaseOAuthConfig {
   provider: "supabase";
   projectId: string;
   jwtSecret?: string;
-  skipVerification?: boolean;
+  verifyJwt?: boolean;
 }
 
 /**
