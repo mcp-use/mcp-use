@@ -226,8 +226,7 @@ export function oauthKeycloakProvider(
   const serverUrl =
     config.serverUrl ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_SERVER_URL");
   const realm = config.realm ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_REALM");
-  const audience =
-    config.audience ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
+  const audience = config.audience ?? getEnv("MCP_USE_OAUTH_KEYCLOAK_AUDIENCE");
 
   if (!serverUrl) {
     throw new Error(
