@@ -55,10 +55,14 @@ export async function setupOAuthForServer(
   setupOAuthRoutes(app, oauth, baseUrl);
 
   if (proxyMode) {
-    console.log("[OAuth] Proxy mode: clients use local /authorize, /token, /register endpoints");
+    console.log(
+      "[OAuth] Proxy mode: clients use local /authorize, /token, /register endpoints"
+    );
     console.log("[OAuth] Credentials will be injected at token exchange");
   } else {
-    console.log("[OAuth] Clients will authenticate with provider directly via DCR");
+    console.log(
+      "[OAuth] Clients will authenticate with provider directly via DCR"
+    );
   }
   console.log("[OAuth] Metadata endpoints: /.well-known/*");
 

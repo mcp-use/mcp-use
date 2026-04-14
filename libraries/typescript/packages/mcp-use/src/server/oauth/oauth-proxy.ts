@@ -218,7 +218,10 @@ export function oauthProxy(config: OAuthProxyConfig): OAuthProxy {
   }
 
   const scopes = config.scopes ?? ["openid", "email", "profile"];
-  const grantTypes = config.grantTypes ?? ["authorization_code", "refresh_token"];
+  const grantTypes = config.grantTypes ?? [
+    "authorization_code",
+    "refresh_token",
+  ];
   const customGetUserInfo = config.getUserInfo ?? defaultGetUserInfo;
 
   return {

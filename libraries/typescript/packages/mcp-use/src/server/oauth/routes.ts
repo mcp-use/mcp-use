@@ -252,7 +252,9 @@ export function setupOAuthRoutes(
           redirect_uris: body.redirect_uris || [],
           grant_types: oauth.getGrantTypesSupported(),
           response_types: ["code"],
-          token_endpoint_auth_method: proxy.clientSecret ? "client_secret_post" : "none",
+          token_endpoint_auth_method: proxy.clientSecret
+            ? "client_secret_post"
+            : "none",
         },
         201
       );
