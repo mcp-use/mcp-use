@@ -232,7 +232,7 @@ export class MCPAgent {
       this.clientOwnedByAgent = true; // Mark for cleanup
       this.connectors = [];
 
-      logger.info(
+      logger.debug(
         `🎯 Simplified mode enabled: LLM will be created from '${this.llmString}'`
       );
     } else {
@@ -337,31 +337,31 @@ export class MCPAgent {
       return;
     }
 
-    logger.info("🚀 Initializing MCP agent and connecting to services...");
+    logger.debug("🚀 Initializing MCP agent and connecting to services...");
 
     // Handle simplified mode: create client and LLM from configuration
     if (this.isSimplifiedMode) {
-      logger.info(
+      logger.debug(
         "🎯 Simplified mode: Creating client and LLM from configuration..."
       );
 
       // Create MCPClient from mcpServers configuration
       if (this.mcpServersConfig) {
-        logger.info(
+        logger.debug(
           `Creating MCPClient with ${Object.keys(this.mcpServersConfig).length} server(s)...`
         );
         // Dynamically import MCPClient (Node.js version)
         const { MCPClient } = await import("../client.js");
         this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
-        logger.info("✅ MCPClient created successfully");
+        logger.debug("✅ MCPClient created successfully");
       }
 
       // Create LLM from string specification
       if (this.llmString) {
-        logger.info(`Creating LLM from string: ${this.llmString}...`);
+        logger.debug(`Creating LLM from string: ${this.llmString}...`);
         try {
           this.llm = await createLLMFromString(this.llmString, this.llmConfig);
-          logger.info("✅ LLM created successfully");
+          logger.debug("✅ LLM created successfully");
 
           // Update model info for telemetry
           const [provider, name] = extractModelInfo(this.llm as any);
@@ -389,7 +389,7 @@ export class MCPAgent {
     this.callbacks = await this.observabilityManager.getCallbacks();
     const handlerNames = await this.observabilityManager.getHandlerNames();
     if (handlerNames.length > 0) {
-      logger.info(`📊 Observability enabled with: ${handlerNames.join(", ")}`);
+      logger.debug(`📊 Observability enabled with: ${handlerNames.join(", ")}`);
     }
 
     // If using server manager, initialize it
@@ -400,7 +400,7 @@ export class MCPAgent {
       const managementTools = this.serverManager.tools;
       this._tools = managementTools;
       this._tools.push(...this.additionalTools);
-      logger.info(
+      logger.debug(
         `🔧 Server manager mode active with ${managementTools.length} management tools`
       );
 
@@ -411,7 +411,7 @@ export class MCPAgent {
       if (this.client) {
         // First try to get existing sessions
         this.sessions = this.client.getAllActiveSessions();
-        logger.info(
+        logger.debug(
           `🔌 Found ${Object.keys(this.sessions).length} existing sessions`
         );
 
@@ -422,9 +422,9 @@ export class MCPAgent {
 
         // If no active sessions exist (excluding code_mode), create new ones
         if (nonCodeModeSessions.length === 0) {
-          logger.info("🔄 No active sessions found, creating new ones...");
+          logger.debug("🔄 No active sessions found, creating new ones...");
           this.sessions = await this.client.createAllSessions();
-          logger.info(
+          logger.debug(
             `✅ Created ${Object.keys(this.sessions).length} new sessions`
           );
         }
@@ -438,7 +438,7 @@ export class MCPAgent {
             this._tools = await this.adapter.createToolsFromConnectors([
               codeModeSession.connector,
             ]);
-            logger.info(`🛠️ Created ${this._tools.length} code mode tools`);
+            logger.debug(`🛠️ Created ${this._tools.length} code mode tools`);
           } else {
             throw new Error(
               "Code mode enabled but code_mode session not found"
@@ -458,7 +458,7 @@ export class MCPAgent {
             ? await this.adapter.createPromptsFromConnectors(connectors)
             : [];
           this._tools = [...tools, ...resources, ...prompts];
-          logger.info(
+          logger.debug(
             `🛠️ Created ${this._tools.length} LangChain items from client: ` +
               `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
           );
@@ -466,7 +466,7 @@ export class MCPAgent {
         this._tools.push(...this.additionalTools);
       } else {
         // Using direct connector - only establish connection
-        logger.info(
+        logger.debug(
           `🔗 Connecting to ${this.connectors.length} direct connectors...`
         );
         for (const connector of this.connectors) {
@@ -487,14 +487,16 @@ export class MCPAgent {
         );
         this._tools = [...tools, ...resources, ...prompts];
         this._tools.push(...this.additionalTools);
-        logger.info(
+        logger.debug(
           `🛠️ Created ${this._tools.length} LangChain items from connectors: ` +
             `${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
         );
       }
 
       // Get all tools for system message generation
-      logger.info(`🧰 Found ${this._tools.length} tools across all connectors`);
+      logger.debug(
+        `🧰 Found ${this._tools.length} tools across all connectors`
+      );
 
       // Create the system message based on available tools
       await this.createSystemMessageFromTools(this._tools);
@@ -513,7 +515,7 @@ export class MCPAgent {
       );
     }
 
-    logger.info("✨ Agent initialization complete");
+    logger.debug("✨ Agent initialization complete");
   }
 
   private async createSystemMessageFromTools(
@@ -551,7 +553,7 @@ export class MCPAgent {
       (this.systemMessage?.content as string) ?? "You are a helpful assistant.";
 
     const toolNames = this._tools.map((tool) => tool.name);
-    logger.info(`🧠 Agent ready with tools: ${toolNames.join(", ")}`);
+    logger.debug(`🧠 Agent ready with tools: ${toolNames.join(", ")}`);
 
     // Create middleware to enforce max_steps
     // modelCallLimitMiddleware limits the number of model calls, which corresponds to agent steps
@@ -1263,7 +1265,7 @@ export class MCPAgent {
           currentToolNames.size !== existingToolNames.size ||
           [...currentToolNames].some((n) => !existingToolNames.has(n))
         ) {
-          logger.info(
+          logger.debug(
             `🔄 Tools changed before execution, updating agent. New tools: ${[...currentToolNames].join(", ")}`
           );
           this._tools = currentTools;
@@ -1294,8 +1296,8 @@ export class MCPAgent {
         query.length > 50
           ? `${query.slice(0, 50).replace(/\n/g, " ")}...`
           : query.replace(/\n/g, " ");
-      logger.info(`💬 Received query: '${displayQuery}'`);
-      logger.info("🏁 Starting agent execution");
+      logger.debug(`💬 Received query: '${displayQuery}'`);
+      logger.debug("🏁 Starting agent execution");
 
       // 3. Stream using the built-in astream from CompiledStateGraph
       // The agent graph handles the loop internally
@@ -1380,7 +1382,7 @@ export class MCPAgent {
                     if (toolInputStr.length > 100) {
                       toolInputStr = `${toolInputStr.slice(0, 97)}...`;
                     }
-                    logger.info(
+                    logger.debug(
                       `🔧 Tool call: ${toolName} with input: ${toolInputStr}`
                     );
 
@@ -1404,7 +1406,7 @@ export class MCPAgent {
                     observationStr = `${observationStr.slice(0, 97)}...`;
                   }
                   observationStr = observationStr.replace(/\n/g, " ");
-                  logger.info(`📄 Tool result: ${observationStr}`);
+                  logger.debug(`📄 Tool result: ${observationStr}`);
 
                   // --- Check for tool updates after tool results (safe restart point) ---
                   if (this.useServerManager && this.serverManager) {
@@ -1422,7 +1424,7 @@ export class MCPAgent {
                         (n) => !existingToolNames.has(n)
                       )
                     ) {
-                      logger.info(
+                      logger.debug(
                         `🔄 Tools changed during execution. New tools: ${[...currentToolNames].join(", ")}`
                       );
                       this._tools = currentTools;
@@ -1435,7 +1437,7 @@ export class MCPAgent {
                       // Set restart flag - safe to restart now after tool results
                       shouldRestart = true;
                       restartCount++;
-                      logger.info(
+                      logger.debug(
                         `🔃 Restarting execution with updated tools (restart ${restartCount}/${maxRestarts})`
                       );
                       break; // Break out of the message loop
@@ -1451,7 +1453,7 @@ export class MCPAgent {
                   finalOutput = this._normalizeOutput(
                     this._getMessageContent(message)
                   );
-                  logger.info("✅ Agent finished with output");
+                  logger.debug("✅ Agent finished with output");
                 }
               }
 
@@ -1496,7 +1498,7 @@ export class MCPAgent {
       // 5. Handle structured output if requested
       if (schema && finalOutput) {
         try {
-          logger.info("🔧 Attempting structured output...");
+          logger.debug("🔧 Attempting structured output...");
           const structuredResult = await this._attemptStructuredOutput<T>(
             finalOutput,
             this.llm!,
@@ -1511,7 +1513,7 @@ export class MCPAgent {
             );
           }
 
-          logger.info("✅ Structured output successful");
+          logger.debug("✅ Structured output successful");
           success = true;
           return structuredResult;
         } catch (e) {
@@ -1523,7 +1525,7 @@ export class MCPAgent {
       }
 
       // 6. Yield final result
-      logger.info(
+      logger.debug(
         `🎉 Agent execution complete in ${((Date.now() - startTime) / 1000).toFixed(2)} seconds`
       );
       success = true;
@@ -1531,7 +1533,7 @@ export class MCPAgent {
     } catch (e) {
       logger.error(`❌ Error running query: ${e}`);
       if (initializedHere && manage) {
-        logger.info("🧹 Cleaning up resources after error");
+        logger.debug("🧹 Cleaning up resources after error");
         await this.close();
       }
       throw e;
@@ -1582,7 +1584,7 @@ export class MCPAgent {
 
       // Clean up if necessary
       if (manage && !this.client && initializedHere) {
-        logger.info("🧹 Closing agent after stream completion");
+        logger.debug("🧹 Closing agent after stream completion");
         await this.close();
       }
     }
@@ -1609,7 +1611,7 @@ export class MCPAgent {
       return;
     }
 
-    logger.info("🔌 Closing MCPAgent resources…");
+    logger.debug("🔌 Closing MCPAgent resources…");
 
     // Shutdown observability handlers (important for serverless)
     await this.observabilityManager.shutdown();
@@ -1622,20 +1624,20 @@ export class MCPAgent {
         // In simplified mode, we always own the client and should close it
         // In explicit mode, we only close if explicitly requested (current behavior)
         if (this.clientOwnedByAgent) {
-          logger.info(
+          logger.debug(
             "🔄 Closing internally-created client (simplified mode) and cleaning up resources"
           );
           await this.client.close();
           this.sessions = {};
           this.client = undefined;
         } else {
-          logger.info("🔄 Closing client and cleaning up resources");
+          logger.debug("🔄 Closing client and cleaning up resources");
           await this.client.close();
           this.sessions = {};
         }
       } else {
         for (const connector of this.connectors) {
-          logger.info("🔄 Disconnecting connector");
+          logger.debug("🔄 Disconnecting connector");
           await connector.disconnect();
         }
       }
@@ -1651,7 +1653,7 @@ export class MCPAgent {
       }
     } finally {
       this._initialized = false;
-      logger.info("👋 Agent closed successfully");
+      logger.debug("👋 Agent closed successfully");
     }
   }
 
@@ -1798,11 +1800,11 @@ export class MCPAgent {
           : typeof query === "string"
             ? query.replace(/\n/g, " ")
             : String(query);
-      logger.info(`💬 Received query for streamEvents: '${display_query}'`);
+      logger.debug(`💬 Received query for streamEvents: '${display_query}'`);
 
       // Add user message to history if memory enabled
       if (this.memoryEnabled) {
-        logger.info(`🔄 Adding user message to history: ${display_query}`);
+        logger.debug(`🔄 Adding user message to history: ${display_query}`);
         this.addToHistory(new HumanMessage({ content: query }));
       }
 
@@ -1817,7 +1819,7 @@ export class MCPAgent {
         ) {
           langchainHistory.push(msg);
         } else {
-          logger.info(
+          logger.debug(
             `⚠️ Skipped message of type: ${msg.constructor?.name || typeof msg}`
           );
         }
@@ -1829,7 +1831,7 @@ export class MCPAgent {
         new HumanMessage(query),
       ];
 
-      logger.info("callbacks", this.callbacks);
+      logger.debug("callbacks", this.callbacks);
 
       // Stream events from the agent executor with observability support
       const eventStream = agentExecutor.streamEvents(
@@ -1916,7 +1918,7 @@ export class MCPAgent {
 
       // Convert to structured output if requested
       if (schema && finalResponse) {
-        logger.info("🔧 Attempting structured output conversion...");
+        logger.debug("🔧 Attempting structured output conversion...");
 
         try {
           // Start the conversion (non-blocking)
@@ -1976,7 +1978,7 @@ export class MCPAgent {
               );
             }
 
-            logger.info("✅ Structured output successful");
+            logger.debug("✅ Structured output successful");
           }
         } catch (e) {
           logger.warn(`⚠️ Structured output failed: ${e}`);
@@ -1991,12 +1993,12 @@ export class MCPAgent {
         this.addToHistory(new AIMessage(finalResponse));
       }
       console.log("\n\n");
-      logger.info(`🎉 StreamEvents complete - ${eventCount} events emitted`);
+      logger.debug(`🎉 StreamEvents complete - ${eventCount} events emitted`);
       success = true;
     } catch (e) {
       logger.error(`❌ Error during streamEvents: ${e}`);
       if (initializedHere && manage) {
-        logger.info(
+        logger.debug(
           "🧹 Cleaning up resources after initialization error in streamEvents"
         );
         await this.close();
@@ -2043,7 +2045,7 @@ export class MCPAgent {
 
       // Clean up if needed
       if (manage && !this.client && initializedHere) {
-        logger.info("🧹 Closing agent after streamEvents completion");
+        logger.debug("🧹 Closing agent after streamEvents completion");
         await this.close();
       }
     }
@@ -2061,10 +2063,10 @@ export class MCPAgent {
     llm: LanguageModel,
     outputSchema: ZodSchema<T>
   ): Promise<T> {
-    logger.info(
+    logger.debug(
       `🔄 Attempting structured output with schema: ${JSON.stringify(outputSchema, null, 2)}`
     );
-    logger.info(`🔄 Raw result: ${JSON.stringify(rawResult, null, 2)}`);
+    logger.debug(`🔄 Raw result: ${JSON.stringify(rawResult, null, 2)}`);
 
     // Schema-aware setup for structured output
     let structuredLlm: LanguageModel = null;
@@ -2089,7 +2091,7 @@ export class MCPAgent {
     const jsonSchema = toJSONSchema(outputSchema) as any;
     const { $schema, additionalProperties, ...cleanSchema } = jsonSchema;
     schemaDescription = JSON.stringify(cleanSchema, null, 2);
-    logger.info(`🔄 Schema description: ${schemaDescription}`);
+    logger.debug(`🔄 Schema description: ${schemaDescription}`);
 
     // Handle different input formats - rawResult might be an array or object from the agent
     let textContent: string = "";
@@ -2100,7 +2102,7 @@ export class MCPAgent {
       textContent = JSON.stringify(rawResult);
     }
 
-    logger.info("rawResult", rawResult);
+    logger.debug("rawResult", rawResult);
 
     // If we couldn't extract text, use the stringified version
     if (!textContent) {
@@ -2112,7 +2114,7 @@ export class MCPAgent {
     let lastError: string = "";
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      logger.info(`🔄 Structured output attempt ${attempt}/${maxRetries}`);
+      logger.debug(`🔄 Structured output attempt ${attempt}/${maxRetries}`);
 
       let formatPrompt = `
       Please format the following information according to the EXACT schema specified below.
@@ -2143,19 +2145,19 @@ export class MCPAgent {
       }
 
       try {
-        logger.info(
+        logger.debug(
           `🔄 Structured output attempt ${attempt} - using streaming approach`
         );
         const contentPreview =
           textContent.length > 300
             ? `${textContent.slice(0, 300)}...`
             : textContent;
-        logger.info(
+        logger.debug(
           `🔄 Content being formatted (${textContent.length} chars): ${contentPreview}`
         );
 
         // Log the full prompt being sent to LLM
-        logger.info(
+        logger.debug(
           `🔄 Full format prompt (${formatPrompt.length} chars):\n${formatPrompt}`
         );
 
@@ -2199,7 +2201,7 @@ export class MCPAgent {
           }
         }
 
-        logger.info(
+        logger.debug(
           `🔄 Structured result attempt ${attempt}: ${JSON.stringify(structuredResult, null, 2)}`
         );
 
@@ -2213,7 +2215,7 @@ export class MCPAgent {
           structuredResult,
           outputSchema
         );
-        logger.info(`✅ Structured output successful on attempt ${attempt}`);
+        logger.debug(`✅ Structured output successful on attempt ${attempt}`);
         return validatedResult;
       } catch (e) {
         lastError = e instanceof Error ? e.message : String(e);

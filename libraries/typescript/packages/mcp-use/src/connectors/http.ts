@@ -212,10 +212,10 @@ export class HttpConnector extends BaseConnector {
     logger.debug(`Connecting to MCP implementation via HTTP: ${baseUrl}`);
 
     try {
-      // Try streamable HTTP transport first
-      logger.info("🔄 Attempting streamable HTTP transport...");
+      // Try streamable HTTP transport first (debug: routine connection detail, not info-level)
+      logger.debug("🔄 Attempting streamable HTTP transport...");
       await this.connectWithStreamableHttp(baseUrl);
-      logger.info("✅ Successfully connected via streamable HTTP");
+      logger.debug("✅ Successfully connected via streamable HTTP");
     } catch (err: unknown) {
       logger.debug("Streamable HTTP connect failed", err);
       const { fallbackReason, is401Error, httpStatusCode } =
@@ -237,7 +237,7 @@ export class HttpConnector extends BaseConnector {
       }
 
       // Always try SSE fallback for maximum compatibility
-      logger.info("🔄 Falling back to SSE transport...");
+      logger.debug("🔄 Falling back to SSE transport...");
 
       try {
         await this.connectWithSse(baseUrl);
