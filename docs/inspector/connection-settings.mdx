@@ -82,7 +82,6 @@ The inspector supports OAuth 2.0 authentication for MCP servers that require it.
 2. Enter your OAuth credentials:
 
    - **Client ID**: Your OAuth application client ID
-   - **Redirect URL**: The callback URL (defaults to `/inspector/oauth/callback`)
    - **Scope**: Space-separated list of OAuth scopes
 
 3. Click **Save** to store the configuration
@@ -174,7 +173,6 @@ Export your connection configuration as JSON:
   "maxTotalTimeout": 60000,
   "oauth": {
     "clientId": "your-client-id",
-    "redirectUrl": "http://localhost:8080/inspector/oauth/callback",
     "scope": "read write"
   }
 }
