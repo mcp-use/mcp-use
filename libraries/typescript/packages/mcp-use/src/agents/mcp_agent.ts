@@ -494,7 +494,9 @@ export class MCPAgent {
       }
 
       // Get all tools for system message generation
-      logger.debug(`🧰 Found ${this._tools.length} tools across all connectors`);
+      logger.debug(
+        `🧰 Found ${this._tools.length} tools across all connectors`
+      );
 
       // Create the system message based on available tools
       await this.createSystemMessageFromTools(this._tools);
