@@ -2,13 +2,15 @@
   "mode": "pre",
   "tag": "canary",
   "initialVersions": {
-    "@mcp-use/cli": "2.21.2",
-    "create-mcp-use-app": "0.14.7",
-    "@mcp-use/inspector": "0.26.1",
-    "mcp-use": "1.22.3"
+    "@mcp-use/cli": "2.21.4",
+    "create-mcp-use-app": "0.14.8",
+    "@mcp-use/inspector": "1.0.1",
+    "mcp-use": "1.23.1"
   },
   "changesets": [
-    "pretty-cobras-shop",
-    "sharp-rooms-appear"
+    "fix-custom-provider-config",
+    "fix-google-provider-record-schema",
+    "fix-inspector-thinking-indicator",
+    "full-buses-double"
   ]
 }

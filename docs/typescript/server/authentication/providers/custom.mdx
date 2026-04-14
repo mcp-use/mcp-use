@@ -70,7 +70,7 @@ const server = new MCPServer({
     userInfoEndpoint: 'https://auth.example.com/oauth/userinfo',
     
     // Optional: JWKS endpoint (for automatic verification)
-    jwksUri: 'https://auth.example.com/.well-known/jwks.json',
+    jwksUrl: 'https://auth.example.com/.well-known/jwks.json',
     
     // OAuth Client Configuration
     clientId: process.env.OAUTH_CLIENT_ID,
@@ -79,8 +79,9 @@ const server = new MCPServer({
     // OAuth mode
     mode: 'proxy', // or 'direct'
     
-    // Scopes
-    scopes: ['openid', 'profile', 'email'],
+    // Override supported scopes (advertised in OAuth metadata)
+    // Default: ['openid', 'profile', 'email']
+    scopesSupported: ['openid', 'profile', 'email'],
     
     // Audience (for JWT verification)
     audience: 'your-api-identifier',
@@ -318,7 +319,7 @@ const server = new MCPServer({
     clientId: process.env.GITHUB_CLIENT_ID!,
     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
     
-    scopes: ['read:user', 'user:email'],
+    scopesSupported: ['read:user', 'user:email'],
     
     async verifyToken(token: string) {
       // GitHub uses non-JWT tokens, fetch user info instead
@@ -403,7 +404,7 @@ const server = new MCPServer({
     clientId: process.env.AZURE_CLIENT_ID!,
     clientSecret: process.env.AZURE_CLIENT_SECRET,
     
-    scopes: ['openid', 'profile', 'email'],
+    scopesSupported: ['openid', 'profile', 'email'],
     
     async verifyToken(token: string) {
       const JWKS = createRemoteJWKSet(
@@ -445,7 +446,7 @@ const server = new MCPServer({
     clientId: process.env.GOOGLE_CLIENT_ID!,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     
-    scopes: ['openid', 'profile', 'email'],
+    scopesSupported: ['openid', 'profile', 'email'],
     
     async verifyToken(token: string) {
       const JWKS = createRemoteJWKSet(

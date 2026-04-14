@@ -22,6 +22,7 @@ export interface SupabaseProviderConfig {
   projectId: string;
   jwtSecret?: string;
   skipVerification?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -31,6 +32,7 @@ export interface Auth0ProviderConfig {
   domain: string;
   audience: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -41,6 +43,7 @@ export interface KeycloakProviderConfig {
   realm: string;
   clientId?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -51,6 +54,7 @@ export interface WorkOSProviderConfig {
   clientId?: string;
   apiKey?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
 }
 
 /**
@@ -58,12 +62,17 @@ export interface WorkOSProviderConfig {
  */
 export interface CustomProviderConfig {
   issuer: string;
-  jwksUrl: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  scopesSupported?: string[];
-  grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<any>;
+  jwksUrl?: string;
+  userInfoEndpoint?: string;
+  clientId?: string;
+  clientSecret?: string;
+  mode?: "proxy" | "direct";
+  scopesSupported?: string[];
+  audience?: string;
+  grantTypesSupported?: string[];
   getUserInfo?: (payload: any) => UserInfo;
 }
 
@@ -118,6 +127,7 @@ export function oauthSupabaseProvider(
     projectId,
     jwtSecret,
     skipVerification: config.skipVerification,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -177,6 +187,7 @@ export function oauthAuth0Provider(
     domain,
     audience,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -242,6 +253,7 @@ export function oauthKeycloakProvider(
     realm,
     clientId,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -332,6 +344,7 @@ export function oauthWorkOSProvider(
     clientId,
     apiKey,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
   });
 }
 
@@ -342,6 +355,7 @@ export interface BetterAuthProviderConfig {
   authURL: string;
   clientId?: string;
   verifyJwt?: boolean;
+  scopesSupported?: string[];
   getUserInfo?: (
     payload: Record<string, unknown>
   ) => UserInfo | Promise<UserInfo>;
@@ -397,6 +411,7 @@ export function oauthBetterAuthProvider(
     authURL,
     clientId,
     verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
     getUserInfo: config.getUserInfo,
   });
 }
@@ -428,8 +443,5 @@ export function oauthBetterAuthProvider(
 export function oauthCustomProvider(
   config: CustomProviderConfig
 ): OAuthProvider {
-  return new CustomOAuthProvider({
-    provider: "custom",
-    ...config,
-  });
+  return new CustomOAuthProvider({ provider: "custom", ...config });
 }

@@ -1,5 +1,36 @@
 # mcp-use
 
+## 1.24.0-canary.2
+
+### Patch Changes
+
+- 9478920: Fix Google provider rejecting tool schemas with `propertyNames` keyword.
+
+  `z.record()` causes `@langchain/core` to emit a `propertyNames` field in the JSON Schema output for constrained or enum key types, which Google's Generative AI API rejects. Switching to `z.object({}).catchall()` produces identical runtime behavior while serializing cleanly without `propertyNames`.
+
+- Updated dependencies [b0e2492]
+  - @mcp-use/inspector@2.0.0-canary.2
+  - @mcp-use/cli@2.21.5-canary.2
+
+## 1.24.0-canary.1
+
+### Patch Changes
+
+- 4525a5d: Add missing fields to CustomProviderConfig to match documentation: `userInfoEndpoint`, `jwksUrl`, `clientId`, `clientSecret`, `mode`, `scopesSupported`, and `audience`. Add `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` as optional methods on the `OAuthProvider` interface. Replace unsafe `(provider as any).config?.clientId` cast in routes with type-safe `provider.getClientId?.()`.
+  - @mcp-use/cli@2.21.5-canary.1
+  - @mcp-use/inspector@2.0.0-canary.1
+
+## 1.24.0-canary.0
+
+### Minor Changes
+
+- c77a998: Add scopes customization to oauth providers
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.5-canary.0
+- @mcp-use/inspector@2.0.0-canary.0
+
 ## 1.23.1
 
 ### Patch Changes

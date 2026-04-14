@@ -128,7 +128,15 @@ export class KeycloakOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["openid", "profile", "email", "offline_access", "roles"];
+    return (
+      this.config.scopesSupported ?? [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+        "roles",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {
