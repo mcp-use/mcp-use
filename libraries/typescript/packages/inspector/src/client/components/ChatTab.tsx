@@ -742,6 +742,89 @@ export function ChatTab({
     [updatePromptsDropdownState]
   );
 
+  const handleCopyChat = useCallback(() => {
+    const formattedMessages = messages
+      .map((m) => {
+        const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+        const textContent = serializeMessageContent(m);
+
+        const toolInvocations =
+          m.parts
+            ?.filter((p) => p.type === "tool-invocation" && p.toolInvocation)
+            .map((p) => {
+              const ti = p.toolInvocation!;
+              const resultStr =
+                ti.state === "result"
+                  ? typeof ti.result === "string"
+                    ? ti.result
+                    : JSON.stringify(ti.result, null, 2)
+                  : ti.state;
+              return `[Tool Call: ${ti.toolName}(${JSON.stringify(ti.args)}) -> ${resultStr}]`;
+            }) || [];
+
+        const content = [textContent, ...toolInvocations]
+          .filter(Boolean)
+          .join("\n");
+        return `${role}: ${content}`;
+      })
+      .join("\n\n");
+
+    navigator.clipboard.writeText(formattedMessages).then(
+      () => toast.success("Chat copied to clipboard"),
+      () => toast.error("Failed to copy chat")
+    );
+  }, [messages, serializeMessageContent]);
+
+  const handleExportChat = useCallback(
+    (format: "json" | "markdown") => {
+      let content = "";
+      let filename = `chat-export-${new Date().toISOString().split("T")[0]}`;
+      let mimeType = "";
+
+      if (format === "json") {
+        content = JSON.stringify(messages, null, 2);
+        filename += ".json";
+        mimeType = "application/json";
+      } else {
+        content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
+        content += messages
+          .map((m) => {
+            const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+            let text = `## ${role}\n${serializeMessageContent(m)}`;
+
+            const toolInvocations = m.parts?.filter(
+              (p) => p.type === "tool-invocation"
+            );
+            if (toolInvocations?.length) {
+              text +=
+                "\n\n### Tool Calls\n" +
+                toolInvocations
+                  .map((p) => {
+                    const ti = p.toolInvocation;
+                    if (!ti) return "";
+                    return `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n${typeof ti.result === "string" ? ti.result : JSON.stringify(ti.result, null, 2)}`;
+                  })
+                  .join("\n\n");
+            }
+            return text;
+          })
+          .join("\n\n---\n\n");
+        filename += ".md";
+        mimeType = "text/markdown";
+      }
+
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Chat exported as ${format.toUpperCase()}`);
+    },
+    [messages, serializeMessageContent]
+  );
+
   const handleClearConfig = useCallback(() => {
     clearConfig();
     clearMessages();
@@ -857,6 +940,8 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
+        onCopyChat={handleCopyChat}
+        onExportChat={handleExportChat}
         hideConfigButton={isManaged}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}

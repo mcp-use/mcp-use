@@ -7,8 +7,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { SquarePen } from "lucide-react";
+import { ClipboardCopy, Download, SquarePen } from "lucide-react";
 import { ConfigurationDialog } from "./ConfigurationDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/client/components/ui/dropdown-menu";
 
 interface ChatHeaderProps {
   llmConfig: LLMConfig | null;
@@ -16,6 +22,8 @@ interface ChatHeaderProps {
   configDialogOpen: boolean;
   onConfigDialogOpenChange: (open: boolean) => void;
   onClearChat: () => void;
+  onCopyChat?: () => void;
+  onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
   tempProvider: "openai" | "anthropic" | "google";
   tempModel: string;
@@ -62,6 +70,8 @@ export function ChatHeader({
   clearButtonHideShortcut,
   clearButtonVariant,
   hideClearButton,
+  onCopyChat,
+  onExportChat,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
@@ -117,6 +127,54 @@ export function ChatHeader({
         )}
         {/* New Chat / Clear button */}
         {!hideClearButton && hasMessages && (
+          <div className="flex items-center gap-1">
+            {/* Copy Chat */}
+            {onCopyChat && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={onCopyChat}
+                  >
+                    <ClipboardCopy className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Copy Chat</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Export Chat Dropdown */}
+            {onExportChat && (
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-9 w-9">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Export Chat</p>
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onExportChat("json")}>
+                    Export as JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onExportChat("markdown")}>
+                    Export as Markdown
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            <div className="w-[1px] h-4 bg-border mx-1" />
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -142,6 +200,7 @@ export function ChatHeader({
               <p>{clearButtonLabel ?? "New Chat"}</p>
             </TooltipContent>
           </Tooltip>
+          </div>
         )}
         {/* Always render the dialog for when it's opened (hidden when externally managed) */}
         {!hideConfigButton && (
