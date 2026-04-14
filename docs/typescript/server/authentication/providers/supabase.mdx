@@ -1,157 +1,119 @@
 ---
 title: "Supabase Provider"
-description: "Configure Supabase OAuth authentication"
+description: "Configure Supabase OAuth authentication for your MCP server"
 icon: "/images/icons/supabase.svg"
 ---
 
+The Supabase provider verifies Supabase-issued JWTs from your project. New Supabase projects use ES256 tokens with JWKS (no secret needed); older projects may still use HS256.
+
 ## Setup
 
-### 1. Create Supabase Project
+### 1. Create a Supabase project
 
-1. Go to [Supabase Dashboard](https://app.supabase.com/)
-2. Create a new project or select existing one
-3. Note your **Project ID** and **API URL**
+Go to the [Supabase Dashboard](https://app.supabase.com/) and create or select a project.
 
-### 2. Get JWT Secret (HS256 Only)
+### 2. Get your project ID
 
-For HS256 tokens (legacy):
+Find your **Project ID** in **Project Settings → General**.
 
-1. Go to **Project Settings** → **API**
-2. Copy the **JWT Secret** under "JWT Settings"
+### 3. Check your JWT algorithm
 
-For ES256 tokens (new):
-- No JWT secret needed, JWKS is used automatically
+Go to **Project Settings → API → JWT Settings**:
 
-### 3. Configure Authentication
+- **ES256** (new projects) — no secret needed, JWKS is used automatically
+- **HS256** (legacy) — copy the **JWT Secret** and set it as `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`
 
-1. Go to **Authentication** → **Providers**
-2. Enable desired authentication providers (Email, Google, GitHub, etc.)
-3. Configure redirect URLs
+### 4. Configure authentication providers
+
+In **Authentication → Providers**, enable the login methods you want (Email, Google, GitHub, etc.).
+
+### 5. Environment variables
+
+```bash
+MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
+MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret  # Only for HS256 (legacy)
+```
 
 ## Configuration
 
-### Basic Configuration (ES256)
+<Tabs>
+  <Tab title="ES256 (Recommended)">
+    New Supabase projects use ES256 tokens with JWKS — no secret needed:
 
-For new Supabase projects using ES256 tokens:
+    ```typescript
+    import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
 
-```typescript
-import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
-
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-    // ES256 tokens use JWKS automatically
-  })
-})
-
-server.listen(3000)
-```
-
-### Configuration with HS256 (Legacy)
-
-For projects still using HS256 tokens:
-
-```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
-  })
-})
-```
-
-### Environment Variables
-
-```bash
-# .env
-MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=eyJhbGci...
-MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret  # Only for HS256
-```
-
-### Full Configuration Options
-
-```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    // Required
-    projectId: 'your-project-id',
-    
-    // Required for HS256 tokens (legacy)
-    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
-    
-    // Optional: Supabase URL (defaults to supabase.co)
-    supabaseUrl: 'https://your-project-id.supabase.co',
-
-    // JWT verification
-    verifyJwt: process.env.NODE_ENV === 'production',
-    
-    // Override supported scopes (advertised in OAuth metadata)
-    // Default: [] (Supabase does not define default scopes)
-    scopesSupported: ['openid', 'profile', 'email'],
-    
-    // Custom user info extraction
-    getUserInfo: (payload) => ({
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.user_metadata?.name,
-      roles: payload.app_metadata?.roles || [],
-      permissions: payload.app_metadata?.permissions || [],
+    // Zero-config: reads MCP_USE_OAUTH_SUPABASE_PROJECT_ID
+    const server = new MCPServer({
+      name: 'my-server',
+      version: '1.0.0',
+      oauth: oauthSupabaseProvider()
     })
-  })
-})
-```
 
-## Token Types
+    server.listen(3000)
+    ```
+  </Tab>
+  <Tab title="HS256 (Legacy)">
+    Older projects using HS256 require the JWT secret:
 
-### ES256 (Recommended)
+    ```typescript
+    import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
 
-New Supabase projects use ES256 tokens with JWKS:
+    const server = new MCPServer({
+      name: 'my-server',
+      version: '1.0.0',
+      oauth: oauthSupabaseProvider({
+        projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
+        jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!,
+      })
+    })
 
-```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!
-    // No jwtSecret needed - uses JWKS automatically
-  })
-})
-```
+    server.listen(3000)
+    ```
+  </Tab>
+</Tabs>
 
-**Benefits:**
-- More secure (asymmetric encryption)
-- No shared secret to manage
-- Automatic key rotation support
-
-### HS256 (Legacy)
-
-Older projects may still use HS256:
+### All configuration options
 
 ```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
-  })
+oauthSupabaseProvider({
+  // Required (or set MCP_USE_OAUTH_SUPABASE_PROJECT_ID)
+  projectId: 'your-project-id',
+
+  // Required for HS256 tokens (or set MCP_USE_OAUTH_SUPABASE_JWT_SECRET)
+  jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
+
+  // Skip JWT verification — development only
+  skipVerification: process.env.NODE_ENV !== 'production',
+
+  // Override advertised scopes
+  scopesSupported: ['openid', 'profile', 'email'],
 })
 ```
 
-**Check your token type:**
-1. Go to Supabase Dashboard → **Project Settings** → **API**
-2. Look for "JWT Algorithm" in JWT Settings
-3. If it says "HS256", you need the JWT secret
-4. If it says "ES256", omit the JWT secret
+## Accessing user info in tools
+
+```typescript
+server.tool(
+  {
+    name: 'get-user-info',
+    description: 'Get authenticated user info',
+  },
+  async (_args, ctx) => ({
+    userId: ctx.auth.user.userId,
+    email: ctx.auth.user.email,
+    name: ctx.auth.user.name,
+    scopes: ctx.auth.scopes,
+  })
+)
+```
 
 ## Resources
 
 - [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
-- [Supabase Documentation](https://supabase.com/docs)
-- [Supabase Auth](https://supabase.com/docs/guides/auth)
+- [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context) - Access user information
-
+- [User Context](/typescript/server/authentication/user-context) — Access user information in tools

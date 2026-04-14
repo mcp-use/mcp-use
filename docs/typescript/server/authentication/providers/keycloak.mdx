@@ -1,16 +1,15 @@
 ---
 title: "Keycloak Provider"
-description: "Configure Keycloak OAuth"
+description: "Configure Keycloak OAuth for your MCP server"
 icon: "/images/icons/keycloak.svg"
 ---
 
+The Keycloak provider uses Dynamic Client Registration (DCR). MCP clients discover Keycloak's OAuth endpoints via `.well-known` passthrough and register themselves directly with Keycloak. Your server only verifies the resulting tokens.
+
 ## Setup
 
-### 1. Install Keycloak
+### 1. Run Keycloak
 
-Choose your deployment method:
-
-**Docker:**
 ```bash
 docker run -p 8080:8080 \
   -e KEYCLOAK_ADMIN=admin \
@@ -18,108 +17,113 @@ docker run -p 8080:8080 \
   quay.io/keycloak/keycloak:latest start-dev
 ```
 
-**Or use existing Keycloak instance**
+### 2. Create a Realm
 
-### 2. Create Realm
+1. Open the Keycloak Admin Console at `http://localhost:8080`
+2. Click **Add Realm** and set a name (e.g. `my-realm`)
 
-1. Open Keycloak Admin Console (http://localhost:8080)
-2. Click **Add Realm** or select existing realm
-3. Set Realm Name (e.g., "my-realm")
+### 3. Create a Client
 
-### 3. Create Client
-
-1. Go to **Clients** → **Create**
+1. Go to **Clients → Create**
 2. Set **Client ID**: `my-mcp-server`
 3. Set **Client Protocol**: `openid-connect`
-4. Click **Save**
+4. Set **Access Type**: `confidential` (server-side) or `public` (SPA)
+5. Set **Valid Redirect URIs** and **Web Origins** to your server URL
 
-**Configure Client:**
-- **Access Type**: `confidential` (for server-side) or `public` (for SPA)
-- **Valid Redirect URIs**: `http://localhost:3000/callback`, `https://yourdomain.com/callback`
-- **Web Origins**: `http://localhost:3000`, `https://yourdomain.com`
-- Save and note the **Client Secret** from Credentials tab
+### 4. Enable Dynamic Client Registration
 
-### 4. Create Users and Roles
+1. Go to **Realm Settings → Client Registration → Anonymous Access Policies**
+2. Enable **Trusted Hosts** or configure anonymous registration to allow MCP clients to self-register
 
-**Create Realm Roles:**
-1. Go to **Roles** → **Add Role**
-2. Create roles: `admin`, `editor`, `viewer`
+### 5. Environment variables
 
-**Create Users:**
-1. Go to **Users** → **Add User**
-2. Set username, email, enable user
-3. In **Credentials** tab, set password
-4. In **Role Mappings** tab, assign roles
+```bash
+MCP_USE_OAUTH_KEYCLOAK_SERVER_URL=http://localhost:8080
+MCP_USE_OAUTH_KEYCLOAK_REALM=my-realm
+MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID=my-mcp-server  # Optional: used for audience verification
+```
 
 ## Configuration
-
-### Basic Configuration
 
 ```typescript
 import { MCPServer, oauthKeycloakProvider } from 'mcp-use/server'
 
+// Zero-config: reads MCP_USE_OAUTH_KEYCLOAK_* environment variables
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  oauth: oauthKeycloakProvider({
-    serverUrl: process.env.MCP_USE_OAUTH_KEYCLOAK_SERVER_URL!, // 'https://keycloak.example.com'
-    realm: process.env.MCP_USE_OAUTH_KEYCLOAK_REALM!,          // 'my-realm'
-    clientId: process.env.MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID!,   // 'my-mcp-server'
-  })
+  oauth: oauthKeycloakProvider()
 })
 
 await server.listen(3000)
 ```
 
-### Environment Variables
-
-```bash
-# .env
-MCP_USE_OAUTH_KEYCLOAK_SERVER_URL=http://localhost:8080
-MCP_USE_OAUTH_KEYCLOAK_REALM=my-realm
-MCP_USE_OAUTH_KEYCLOAK_CLIENT_ID=my-mcp-server
-```
-
-### Full Configuration Options
+Or pass config explicitly:
 
 ```typescript
-const server = new MCPServer({
-  oauth: oauthKeycloakProvider({
-    // Required
-    serverUrl: 'https://keycloak.example.com',
-    realm: 'my-realm',
+oauth: oauthKeycloakProvider({
+  serverUrl: 'https://keycloak.example.com',
+  realm: 'my-realm',
 
-    // Optional: Keycloak client ID — currently used as the JWT audience
-    // when verifying tokens. Leave unset to skip audience validation.
-    clientId: 'my-mcp-server',
+  // Optional: used as the JWT audience claim during verification
+  clientId: 'my-mcp-server',
 
-    // JWT verification
-    verifyJwt: process.env.NODE_ENV === 'production',
-    
-    // Override supported scopes (advertised in OAuth metadata)
-    // Default: ['openid', 'profile', 'email', 'offline_access', 'roles']
-    scopesSupported: ['openid', 'profile', 'email', 'offline_access', 'roles'],
-    
-    // Custom user info extraction
-    getUserInfo: (payload) => ({
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      username: payload.preferred_username,
-      roles: payload.realm_access?.roles || [],
-      clientRoles: payload.resource_access?.[clientId]?.roles || [],
-    })
-  })
+  // Disable JWT verification during development only
+  verifyJwt: process.env.NODE_ENV === 'production',
+
+  // Override advertised scopes
+  // Default: ['openid', 'profile', 'email', 'offline_access', 'roles']
+  scopesSupported: ['openid', 'profile', 'email', 'offline_access', 'roles'],
 })
+```
+
+## Accessing user info in tools
+
+Keycloak tokens include realm roles in `realm_access.roles`. Access them via `ctx.auth.user`:
+
+```typescript
+server.tool(
+  {
+    name: 'get-user-info',
+    description: 'Get authenticated user info',
+  },
+  async (_args, ctx) => ({
+    userId: ctx.auth.user.userId,
+    email: ctx.auth.user.email,
+    name: ctx.auth.user.name,
+    username: ctx.auth.user.username,
+    roles: ctx.auth.user.roles,
+    scopes: ctx.auth.scopes,
+  })
+)
+```
+
+## Role-based access control
+
+Keycloak realm roles are available on `ctx.auth.user.roles`:
+
+```typescript
+server.tool(
+  {
+    name: 'admin-action',
+    description: 'Admin-only action',
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth.user.roles?.includes('admin')) {
+      return { content: [{ type: 'text', text: 'Forbidden: admin role required' }], isError: true }
+    }
+
+    // ... admin logic
+    return { content: [{ type: 'text', text: 'Done' }] }
+  }
+)
 ```
 
 ## Resources
 
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
 - [Keycloak Authorization Services](https://www.keycloak.org/docs/latest/authorization_services/)
-- [Keycloak Client Roles](https://www.keycloak.org/docs/latest/server_admin/#client-roles)
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context) - Access user information
-
+- [User Context](/typescript/server/authentication/user-context) — Access user information in tools

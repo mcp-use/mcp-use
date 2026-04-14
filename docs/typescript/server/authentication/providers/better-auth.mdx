@@ -5,12 +5,10 @@ icon: "/images/icons/better-auth.svg"
 ---
 
 <Note>
-  This documentation covers the [**Better Auth OAuth Provider**](https://better-auth.com/docs/plugins/oauth-provider) plugin (`@better-auth/oauth-provider`). 
+  This documentation covers the [**Better Auth OAuth Provider**](https://better-auth.com/docs/plugins/oauth-provider) plugin (`@better-auth/oauth-provider`).
 
-  If you are using the older **Better Auth MCP plugin**, note that it is deprecated in favor of the OAuth Provider approach. For legacy MCP adapter users, Better Auth provides a dedicated [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters)
+  If you are using the older **Better Auth MCP plugin**, note that it is deprecated in favor of the OAuth Provider approach. For legacy MCP adapter users, Better Auth provides a dedicated [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters).
 </Note>
-
-## Overview
 
 The Better Auth provider turns your mcp-use server into an OAuth 2.1 authorization server using Better Auth's [OAuth Provider plugin](https://better-auth.com/docs/plugins/oauth-provider). Better Auth handles the full OAuth flow (authorization, token issuance, JWKS) — mcp-use only verifies the resulting JWTs.
 
@@ -37,7 +35,6 @@ export const auth = betterAuth({
   authURL: "http://localhost:3000",
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET!,
-
   database: new Database("./sqlite.db"),
 
   // Social login providers (add your own here)
@@ -68,16 +65,14 @@ export const auth = betterAuth({
 });
 ```
 
-### 2. Generate and Migrate the Database
-
-With your `auth.ts` in place, run the Better Auth CLI to create the required tables:
+### 2. Generate and migrate the database
 
 ```bash
 npx auth@latest generate
 npx auth@latest migrate
 ```
 
-### 3. Configure the MCP Server
+### 3. Configure the MCP server
 
 ```typescript
 // server.ts
@@ -101,7 +96,6 @@ server.app.on(["GET", "POST"], "/api/auth/**", (c) => auth.handler(c.req.raw));
 
 // OAuth authorization server metadata (RFC 8414)
 // CORS headers are required for browser-based MCP clients like MCP Inspector.
-// If you're having trouble connecting from the Inspector or a browser client, make sure these are set.
 const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET" };
 const authServerMetadataHandler = oauthProviderAuthServerMetadata(auth, { headers: corsHeaders });
 server.app.get("/.well-known/oauth-authorization-server", (c) => authServerMetadataHandler(c.req.raw));
@@ -115,9 +109,9 @@ server.app.get("/.well-known/openid-configuration/api/auth", (c) => openIdConfig
 server.listen({ port: 3000 });
 ```
 
-### 4. Add Login and Consent Pages
+### 4. Add login and consent pages
 
-Better Auth requires a login page (where users authenticate) and a consent page (where users approve requested scopes). Mount these on the Hono app:
+Better Auth requires a login page (where users authenticate) and a consent page (where users approve requested scopes):
 
 ```typescript
 // Sign-in page — redirects to your social provider
@@ -150,7 +144,6 @@ server.app.get("/sign-in", (c) => {
 server.app.get("/consent", (c) => {
   const url = new URL(c.req.url);
   const scope = url.searchParams.get("scope") || "openid";
-
   return c.html(`<!DOCTYPE html>
 <html>
 <body>
@@ -175,11 +168,9 @@ server.app.get("/consent", (c) => {
 });
 ```
 
-## Environment Variables
+## Environment variables
 
 ```bash
-# .env
-
 # Better Auth secret (used for signing cookies and tokens)
 BETTER_AUTH_SECRET=your-secret-change-in-production
 
@@ -189,7 +180,7 @@ GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
 ```
 
-## Configuration Options
+## Configuration options
 
 ```typescript
 oauthBetterAuthProvider({
@@ -199,7 +190,7 @@ oauthBetterAuthProvider({
   // Optional: disable JWT verification (development only)
   verifyJwt: process.env.NODE_ENV === "production",
 
-  // Optional: override supported scopes (advertised in OAuth metadata)
+  // Optional: override advertised scopes
   // Default: ['openid', 'profile', 'email', 'offline_access']
   scopesSupported: ['openid', 'profile', 'email', 'offline_access'],
 
@@ -214,9 +205,7 @@ oauthBetterAuthProvider({
 })
 ```
 
-## Accessing User Info in Tools
-
-The authenticated user's claims are available on `ctx.auth`:
+## Accessing user info in tools
 
 ```typescript
 server.tool(
@@ -229,6 +218,7 @@ server.tool(
     email: ctx.auth.user.email,
     name: ctx.auth.user.name,
     scopes: ctx.auth.scopes,
+    permissions: ctx.auth.permissions,
   })
 );
 ```

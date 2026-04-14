@@ -6,64 +6,128 @@ icon: "shield-check"
 
 # Server Authentication
 
-Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server with built-in support for popular identity providers. Secure your tools with bearer token authentication, implement role-based access control (RBAC), and access authenticated user information in your tool callbacks.
+Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server. Secure your tools with bearer token authentication, implement role-based access control (RBAC), and access authenticated user information in your tool callbacks.
 
 ## Quick Start
 
-### Basic OAuth Server
+<Tabs>
+  <Tab title="Remote Auth (WorkOS)">
+    Use a built-in provider when your identity provider supports remote authentication. Clients register and authenticate directly with the upstream provider — your server only verifies the resulting bearer token.
+
+    ```typescript
+    import { MCPServer, oauthWorkOSProvider } from 'mcp-use/server'
+
+    const server = new MCPServer({
+      name: 'my-secure-server',
+      version: '1.0.0',
+      oauth: oauthWorkOSProvider({
+        subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!, // 'your-company.authkit.app'
+      })
+    })
+
+    server.tool({
+      name: 'get-user-profile',
+      description: 'Get the authenticated user profile',
+      cb: async (params, context) => {
+        const user = context.auth.user
+        return { userId: user.userId, email: user.email, name: user.name }
+      }
+    })
+
+    await server.listen(3000)
+    ```
+  </Tab>
+  <Tab title="OAuth Proxy (Google)">
+    Use `oauthProxy` when your provider doesn't support Dynamic Client Registration (Google, GitHub, Okta, Azure AD, etc.). Your server holds pre-registered client credentials and mediates the token exchange.
+
+    ```typescript
+    import { MCPServer, oauthProxy, jwksVerifier } from 'mcp-use/server'
+
+    const server = new MCPServer({
+      name: 'my-secure-server',
+      version: '1.0.0',
+      oauth: oauthProxy({
+        authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+        issuer: 'https://accounts.google.com',
+        clientId: process.env.GOOGLE_CLIENT_ID!,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        scopes: ['openid', 'email', 'profile'],
+        extraAuthorizeParams: { access_type: 'offline' },
+        verifyToken: jwksVerifier({
+          jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
+          issuer: 'https://accounts.google.com',
+          audience: process.env.GOOGLE_CLIENT_ID!,
+        }),
+      })
+    })
+
+    server.tool({
+      name: 'get-user-profile',
+      description: 'Get the authenticated user profile',
+      cb: async (params, context) => {
+        const user = context.auth.user
+        return { userId: user.userId, email: user.email, name: user.name }
+      }
+    })
+
+    await server.listen(3000)
+    ```
+  </Tab>
+</Tabs>
+
+## Providers
+
+<Tip>
+Not sure which to use? Use a remote auth provider if your identity provider supports Dynamic Client Registration. If it doesn't, use `oauthProxy`.
+</Tip>
+
+### Remote Auth (built-in)
+
+Clients register and authenticate directly with the provider. 
+
+- [Auth0](/typescript/server/authentication/providers/auth0) — Full OAuth 2.1 with PKCE and JWKS verification
+- [Better Auth](/typescript/server/authentication/providers/better-auth) — Self-hosted OAuth 2.1 via the Better Auth OAuth Provider plugin
+- [WorkOS](/typescript/server/authentication/providers/workos) — Enterprise SSO via WorkOS AuthKit
+- [Supabase](/typescript/server/authentication/providers/supabase) — Authentication for Supabase projects
+- [Keycloak](/typescript/server/authentication/providers/keycloak) — Enterprise SSO with realm roles
+- [Custom Provider](/typescript/server/authentication/providers/custom) — Any provider with a custom `verifyToken` function
+
+### OAuth Proxy
+
+Use `oauthProxy` for providers that don't support remote client registration: Google, GitHub, Okta, Azure AD, or any provider where you register an application in a dashboard and receive a fixed `clientId`/`clientSecret`.
 
 ```typescript
-import { MCPServer, oauthAuth0Provider } from 'mcp-use/server'
+import { oauthProxy, jwksVerifier } from 'mcp-use/server'
 
-const server = new MCPServer({
-  name: 'my-secure-server',
-  version: '1.0.0',
-  oauth: oauthAuth0Provider({
-    domain: 'your-tenant.auth0.com',
-    audience: 'https://your-api.example.com',
-  })
+oauthProxy({
+  authEndpoint: '...',
+  tokenEndpoint: '...',
+  issuer: '...',
+  clientId: process.env.CLIENT_ID!,
+  clientSecret: process.env.CLIENT_SECRET,
+  verifyToken: jwksVerifier({ jwksUrl: '...', issuer: '...' }),
 })
-
-// Tools now have access to authenticated user context
-server.tool({
-  name: 'get-user-profile',
-  description: 'Get the authenticated user profile',
-  cb: async (params, context) => {
-    // Access authenticated user info
-    const user = context.auth
-    return {
-      userId: user.userId,
-      email: user.email,
-      name: user.name,
-      roles: user.roles
-    }
-  }
-})
-
-await server.listen(3000)
 ```
 
-## OAuth Providers
-
-mcp-use includes built-in support for major identity providers. Each provider is documented in detail:
-
-- [Auth0](/typescript/server/authentication/providers/auth0) - Full OAuth 2.1 with PKCE and JWKS verification
-- [Better Auth](/typescript/server/authentication/providers/better-auth) - Self-hosted OAuth 2.1 authorization server via the Better Auth OAuth Provider plugin
-- [WorkOS](/typescript/server/authentication/providers/workos) - Enterprise SSO via WorkOS AuthKit
-- [Supabase](/typescript/server/authentication/providers/supabase) - Authentication for Supabase projects
-- [Keycloak](/typescript/server/authentication/providers/keycloak) - Enterprise SSO with realm roles
-- [Custom Provider](/typescript/server/authentication/providers/custom) - Use any OAuth provider
-
+The `jwksVerifier` helper handles JWT signature verification, issuer checking, and audience validation against a remote JWKS endpoint. For non-JWT providers (e.g. GitHub opaque tokens), pass a custom `verifyToken` function instead.
 
 ## How it works
 
-Built-in providers use **Dynamic Client Registration (DCR)**. MCP clients:
+### Remote auth flow
 
-1. Fetch OAuth metadata from your server's `.well-known` endpoints — the server passes the upstream provider's metadata through.
-2. Register themselves with the provider's `registration_endpoint` (advertised in that metadata).
-3. Run the authorization and token exchange directly against the provider.
+1. Your server exposes `.well-known/*` endpoints that pass through the upstream provider's OAuth metadata — including its `registration_endpoint`.
+2. MCP clients fetch that metadata, register themselves directly with the upstream provider, then run the full authorization + token exchange against it.
+3. On each `/mcp/*` request, your server verifies the bearer token (JWKS signature check, issuer, audience).
 
-Your server only verifies the resulting bearer token on `/mcp/*` requests.
+### OAuth proxy flow
+
+1. Your server exposes a `/register` endpoint that returns your pre-configured `clientId`. 
+2. MCP clients run PKCE authorization against the upstream using that `clientId`.
+3. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
+4. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
+
+Your server holds the client credentials and mediates every token exchange.
 
 ## OAuth Endpoints
 
@@ -76,7 +140,7 @@ GET /.well-known/oauth-protected-resource
 GET /.well-known/oauth-protected-resource/mcp
 ```
 
-The authorization-server endpoints pass through the upstream provider's metadata so clients can discover the real authorize, token, and registration URLs. The protected-resource endpoints tell clients which authorization server(s) protect this MCP server.
+The authorization-server endpoints pass through the upstream provider's metadata so clients can discover the real authorize, token, and registration URLs.
 
 ## Bearer Token Authentication
 
@@ -86,10 +150,8 @@ All `/mcp/*` endpoints require a valid bearer token when OAuth is configured:
 Authorization: Bearer eyJhbGci...
 ```
 
-
 ## Next Steps
 
-- [Client Authentication](/typescript/client/authentication) - Connect to OAuth servers from clients
-- [useMcp Hook](/typescript/client/usemcp) - React hook with OAuth support
-- [User Context](/typescript/server/authentication/user-context) - Access user information in tools
-
+- [Client Authentication](/typescript/client/authentication) — Connect to OAuth servers from clients
+- [useMcp Hook](/typescript/client/usemcp) — React hook with OAuth support
+- [User Context](/typescript/server/authentication/user-context) — Access user information in tools
