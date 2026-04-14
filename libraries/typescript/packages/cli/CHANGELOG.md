@@ -1,5 +1,20 @@
 # @mcp-use/cli
 
+## 3.0.0-canary.3
+
+### Major Changes
+
+- c51a656: Moved to device flow authentication.
+
+### Patch Changes
+
+- c51a656: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - mcp-use@1.24.0-canary.3
+  - @mcp-use/inspector@2.0.0-canary.3
+
 ## 2.21.5-canary.2
 
 ### Patch Changes

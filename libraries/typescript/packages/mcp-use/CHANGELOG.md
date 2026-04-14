@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.24.0-canary.3
+
+### Patch Changes
+
+- c51a656: chore(mcp-use): switch several logers to debug from info
+- c51a656: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - @mcp-use/cli@3.0.0-canary.3
+  - @mcp-use/inspector@2.0.0-canary.3
+
 ## 1.24.0-canary.2
 
 ### Patch Changes
