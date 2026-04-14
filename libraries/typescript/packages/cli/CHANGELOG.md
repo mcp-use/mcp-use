@@ -1,5 +1,17 @@
 # @mcp-use/cli
 
+## 3.0.0-canary.4
+
+### Major Changes
+
+- 2bfcf48: cli: refactor cli to use new manufact apis
+
+### Patch Changes
+
+- Updated dependencies [1718d68]
+  - mcp-use@1.24.0-canary.4
+  - @mcp-use/inspector@2.0.0-canary.4
+
 ## 3.0.0-canary.3
 
 ### Major Changes

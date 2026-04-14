@@ -10,11 +10,13 @@
   "changesets": [
     "fix-custom-provider-config",
     "fix-google-provider-record-schema",
+    "fix-inspector-oauth-callback",
     "fix-inspector-thinking-indicator",
     "full-buses-double",
     "moody-pigs-post",
     "pretty-cobras-shop-2",
     "pretty-cobras-shop",
-    "sharp-rooms-appear"
+    "sharp-rooms-appear",
+    "ten-kiwis-call"
   ]
 }
