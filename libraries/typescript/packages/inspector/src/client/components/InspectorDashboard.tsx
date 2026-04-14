@@ -241,11 +241,6 @@ export function InspectorDashboard() {
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
-  const [redirectUrl, setRedirectUrl] = useState(
-    typeof window !== "undefined"
-      ? new URL("/inspector/oauth/callback", window.location.origin).toString()
-      : "/inspector/oauth/callback"
-  );
   const [scope, setScope] = useState("");
 
   const connectFormGradientRef = useRef<HTMLDivElement>(null);
@@ -1101,8 +1096,6 @@ export function InspectorDashboard() {
             setProxyAddress={setProxyAddress}
             clientId={clientId}
             setClientId={setClientId}
-            redirectUrl={redirectUrl}
-            setRedirectUrl={setRedirectUrl}
             scope={scope}
             setScope={setScope}
             onConnect={handleAddConnection}
