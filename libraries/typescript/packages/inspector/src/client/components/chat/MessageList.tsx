@@ -7,6 +7,9 @@ import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
 import type { MessageAttachment } from "./types";
 import { detectWidgetProtocol } from "@/client/utils/widget-detection";
+import { InlineElicitationCard } from "./InlineElicitationCard";
+import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
 
 interface Message {
   id: string;
@@ -44,6 +47,12 @@ interface MessageListProps {
   ) => Promise<void>;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
+  /** Pending elicitation requests to render inline in the chat thread. */
+  pendingElicitationRequests?: PendingElicitationRequest[];
+  /** Handler called when the user accepts or declines an elicitation. */
+  onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
+  /** Handler called when the user cancels an elicitation. */
+  onRejectElicitation?: (requestId: string, error?: string) => void;
 }
 
 export const MessageList = memo(
@@ -55,6 +64,9 @@ export const MessageList = memo(
     tools,
     sendMessage,
     serverBaseUrl,
+    pendingElicitationRequests,
+    onApproveElicitation,
+    onRejectElicitation,
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -319,6 +331,23 @@ export const MessageList = memo(
 
           return null;
         })}
+
+        {/* Inline elicitation cards — shown when a tool triggers elicitation during chat */}
+        {pendingElicitationRequests &&
+          pendingElicitationRequests.length > 0 &&
+          onApproveElicitation &&
+          onRejectElicitation && (
+            <div className="space-y-3">
+              {pendingElicitationRequests.map((req) => (
+                <InlineElicitationCard
+                  key={req.id}
+                  request={req}
+                  onApprove={onApproveElicitation}
+                  onReject={onRejectElicitation}
+                />
+              ))}
+            </div>
+          )}
 
         {/* Thinking indicator - only show when actually thinking, not streaming */}
         {isThinking && (
