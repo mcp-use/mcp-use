@@ -7,7 +7,7 @@
  * Built-in providers support the DCR-direct flow only: the MCP server
  * proxies metadata discovery (`.well-known/*`) to the upstream authorization
  * server and verifies bearer tokens. Clients communicate directly with the
- * upstream for authorize/token/register. A separate `oauthProxyProvider`
+ * upstream for authorize/token/register. A separate `oauthProxy`
  * will reintroduce proxy-mode behavior in a future change.
  */
 
