@@ -39,18 +39,22 @@ resources/product-search/
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
 
+const propsSchema = z.object({
+  city: z.string().describe("City name"),
+  temp: z.number().describe("Temperature in Celsius"),
+  conditions: z.string().describe("Weather conditions"),
+  humidity: z.number().describe("Humidity percentage"),
+});
+
 export const widgetMetadata: WidgetMetadata = {
   description: "Display current weather conditions for a city",
-  props: z.object({
-    city: z.string().describe("City name"),
-    temp: z.number().describe("Temperature in Celsius"),
-    conditions: z.string().describe("Weather conditions"),
-    humidity: z.number().describe("Humidity percentage"),
-  }),
+  props: propsSchema,
 };
 
+type Props = z.infer<typeof propsSchema>;
+
 export default function WeatherDisplay() {
-  const { props, isPending } = useWidget();
+  const { props, isPending } = useWidget<Props>();
 
   if (isPending) {
     return (
@@ -72,6 +76,8 @@ export default function WeatherDisplay() {
   );
 }
 ```
+
+**TypeScript:** Always use `useWidget<z.infer<typeof propsSchema>>()` (or a `Props` alias) so `mcp-use build` typechecking passes. For `callTool` / `structuredContent`, narrow `unknown` fields before rendering.
 
 ### Step 2: Register the Tool
 
