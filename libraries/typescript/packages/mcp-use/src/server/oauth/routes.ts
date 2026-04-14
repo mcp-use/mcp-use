@@ -17,6 +17,7 @@
 
 import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 
 /**
@@ -142,7 +143,7 @@ export function createTokenHandler(
       const data = await response.json();
 
       if (!response.ok) {
-        return c.json(data, response.status as any);
+        return c.json(data, response.status as ContentfulStatusCode);
       }
 
       return c.json(data);
@@ -272,8 +273,7 @@ export function setupOAuthRoutes(
     // In proxy mode, synthesize metadata pointing to local endpoints
     if (proxyMode) {
       const proxy = oauth as OAuthProxy;
-      console.log(`[OAuth] Proxy mode: synthesizing local metadata`);
-      console.log(`[OAuth]   - Issuer: ${baseUrl}`);
+      console.log(`[OAuth] Returning proxy mode metadata`);
 
       return c.json({
         issuer: baseUrl,
@@ -311,15 +311,13 @@ export function setupOAuthRoutes(
       }
 
       const metadata = await response.json();
-
       console.log(`[OAuth] Provider metadata retrieved successfully`);
       console.log(`[OAuth]   - Issuer: ${metadata.issuer}`);
       console.log(
-        `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint || "not advertised by provider"}`
+        `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint || "not available (using pre-registered client)"}`
       );
       return c.json(metadata);
     } catch (error) {
-      console.error(`[OAuth] Error fetching provider metadata:`, error);
       return c.json(
         {
           error: "server_error",

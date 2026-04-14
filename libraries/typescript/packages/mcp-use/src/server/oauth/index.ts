@@ -26,7 +26,13 @@ export {
 } from "./providers.js";
 
 // Export OAuth proxy factory for non-DCR providers
-export { oauthProxy, type OAuthProxyConfig } from "./oauth-proxy.js";
+export {
+  oauthProxy,
+  jwksVerifier,
+  type OAuthProxyConfig,
+  type JwksVerifierConfig,
+  type VerifyToken,
+} from "./oauth-proxy.js";
 
 // Export utilities
 export { createBearerAuthMiddleware } from "./middleware.js";

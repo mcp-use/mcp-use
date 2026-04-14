@@ -82,6 +82,7 @@ export {
   getAuth,
   hasAnyScope,
   hasScope,
+  jwksVerifier,
   oauthAuth0Provider,
   oauthBetterAuthProvider,
   oauthCustomProvider,
@@ -95,12 +96,14 @@ export {
   type AuthInfo,
   type BetterAuthProviderConfig,
   type CustomProviderConfig,
+  type JwksVerifierConfig,
   type KeycloakProviderConfig,
   type OAuthProvider,
   type OAuthProxy,
   type OAuthProxyConfig,
   type SupabaseProviderConfig,
   type UserInfo,
+  type VerifyToken,
   type WorkOSProviderConfig,
 } from "./oauth/index.js";
 

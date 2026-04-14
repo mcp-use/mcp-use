@@ -16,7 +16,13 @@
  *   AUTH0_AUDIENCE       (required for JWT tokens) API identifier
  */
 
-import { MCPServer, oauthProxy, object, error } from "mcp-use/server";
+import {
+  MCPServer,
+  oauthProxy,
+  jwksVerifier,
+  object,
+  error,
+} from "mcp-use/server";
 
 const domain = process.env.AUTH0_DOMAIN;
 const clientId = process.env.AUTH0_CLIENT_ID;
@@ -36,11 +42,15 @@ const server = new MCPServer({
     authEndpoint: `https://${domain}/authorize`,
     tokenEndpoint: `https://${domain}/oauth/token`,
     issuer: `https://${domain}/`,
-    jwksUrl: `https://${domain}/.well-known/jwks.json`,
     clientId,
     clientSecret,
     scopes: ["openid", "email", "profile"],
     extraAuthorizeParams: { audience },
+    verifyToken: jwksVerifier({
+      jwksUrl: `https://${domain}/.well-known/jwks.json`,
+      issuer: `https://${domain}/`,
+      audience,
+    }),
   }),
 });
 

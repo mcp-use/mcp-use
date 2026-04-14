@@ -12,6 +12,10 @@ import { createBearerAuthMiddleware } from "../../src/server/oauth/middleware.js
 import { setupOAuthRoutes } from "../../src/server/oauth/routes.js";
 import { oauthProxy } from "../../src/server/oauth/oauth-proxy.js";
 
+// A stub verifier that accepts any token. Used in tests that don't exercise
+// the verification path (routes, metadata, registration).
+const stubVerifyToken = async () => ({ payload: {} });
+
 async function listenOnRandomPort(
   app: Hono
 ): Promise<{ baseUrl: string; close: () => void }> {
@@ -42,9 +46,9 @@ describe("server OAuth integration", () => {
       issuer: "https://issuer.example.com",
       authEndpoint: "https://issuer.example.com/oauth/authorize",
       tokenEndpoint: "https://issuer.example.com/oauth/token",
-      jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
       clientId: "test-client-id",
       scopes: ["openid", "profile"],
+      verifyToken: stubVerifyToken,
     });
 
     const svc = await listenOnRandomPort(app);
@@ -92,9 +96,9 @@ describe("server OAuth integration", () => {
       issuer: upstreamSvc.baseUrl,
       authEndpoint: `${upstreamSvc.baseUrl}/oauth/authorize`,
       tokenEndpoint: `${upstreamSvc.baseUrl}/oauth/token`,
-      jwksUrl: `${upstreamSvc.baseUrl}/.well-known/jwks.json`,
       clientId: "my-client-id",
       clientSecret: "my-client-secret",
+      verifyToken: stubVerifyToken,
     });
 
     const svc = await listenOnRandomPort(app);
@@ -134,19 +138,15 @@ describe("server OAuth integration", () => {
   it("rejects /mcp requests without bearer token", async () => {
     const app = new Hono();
 
-    // oauthProxy can be used with bearer auth middleware
-    // The verifyToken function is called to validate the token
+    // Supply a verifyToken that accepts the stubbed bearer.
     const proxy = oauthProxy({
       issuer: "https://issuer.example.com",
       authEndpoint: "https://issuer.example.com/oauth/authorize",
       tokenEndpoint: "https://issuer.example.com/oauth/token",
-      jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
       clientId: "test-client",
-    });
-
-    // Override verifyToken for testing (normally this would use JWKS)
-    proxy.verifyToken = async () => ({
-      payload: { sub: "user-1", scope: "openid profile" },
+      verifyToken: async () => ({
+        payload: { sub: "user-1", scope: "openid profile" },
+      }),
     });
 
     app.use("/mcp/*", createBearerAuthMiddleware(proxy));
@@ -171,9 +171,9 @@ describe("server OAuth integration", () => {
       issuer: "https://issuer.example.com",
       authEndpoint: "https://issuer.example.com/oauth/authorize",
       tokenEndpoint: "https://issuer.example.com/oauth/token",
-      jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
       clientId: "pre-registered-client-id",
       clientSecret: "client-secret",
+      verifyToken: stubVerifyToken,
     });
 
     const svc = await listenOnRandomPort(app);
