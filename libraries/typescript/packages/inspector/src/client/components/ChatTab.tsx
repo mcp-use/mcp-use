@@ -884,6 +884,9 @@ export function ChatTab({
             tools={connection.tools}
             sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
             serverBaseUrl={connection.url}
+            pendingElicitationRequests={connection.pendingElicitationRequests}
+            onApproveElicitation={connection.approveElicitation}
+            onRejectElicitation={connection.rejectElicitation}
           />
         )}
       </div>
