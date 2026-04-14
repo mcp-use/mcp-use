@@ -58,6 +58,7 @@ function App() {
         <McpClientProvider
           storageProvider={storageProvider}
           enableRpcLogging={true}
+          defaultCallbackUrl={`${window.location.origin}/inspector/oauth/callback`}
           defaultAutoProxyFallback={
             proxyAddress ? { enabled: true, proxyAddress } : false
           }

@@ -66,11 +66,6 @@ export function ServerConnectionModal({
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
-  const [redirectUrl, setRedirectUrl] = useState(
-    typeof window !== "undefined"
-      ? new URL("/inspector/oauth/callback", window.location.origin).toString()
-      : "/inspector/oauth/callback"
-  );
   const [scope, setScope] = useState("");
 
   // Prefill form when connection changes
@@ -236,8 +231,6 @@ export function ServerConnectionModal({
           setProxyAddress={setProxyAddress}
           clientId={clientId}
           setClientId={setClientId}
-          redirectUrl={redirectUrl}
-          setRedirectUrl={setRedirectUrl}
           scope={scope}
           setScope={setScope}
           onConnect={handleConnect}
