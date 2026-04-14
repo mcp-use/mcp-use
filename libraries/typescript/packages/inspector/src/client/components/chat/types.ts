@@ -19,6 +19,7 @@ export interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
+      partialResult?: Record<string, unknown> | null;
       state?: "pending" | "streaming" | "result" | "error";
       /** Best-effort parsed partial arguments while the LLM is still generating */
       partialArgs?: Record<string, unknown>;

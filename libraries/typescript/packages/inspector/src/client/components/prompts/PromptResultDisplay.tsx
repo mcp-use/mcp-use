@@ -99,11 +99,11 @@ function extractErrorMessage(
 export function PromptResultDisplay({
   results,
   copiedResult,
-  previewMode = true,
+  previewMode: _previewMode = true,
   onCopy,
   onDelete,
   onFullscreen,
-  onTogglePreview,
+  onTogglePreview: _onTogglePreview,
   onMaximize,
   isMaximized = false,
 }: PromptResultDisplayProps) {

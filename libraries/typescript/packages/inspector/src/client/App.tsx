@@ -85,7 +85,7 @@ function App() {
           }}
           onSamplingRequest={(
             request,
-            serverId,
+            _serverId,
             serverName,
             approve,
             reject
@@ -116,9 +116,9 @@ function App() {
           }}
           onElicitationRequest={(
             request,
-            serverId,
+            _serverId,
             serverName,
-            approve,
+            _approve,
             reject
           ) => {
             const mode = request.request.mode || "form";

@@ -221,7 +221,7 @@ const levelFilterColors: Record<ConsoleLogEntry["level"], string> = {
 };
 
 export function IframeConsole({
-  iframeId,
+  iframeId: _iframeId,
   enabled = true,
 }: IframeConsoleProps) {
   // Load proxy toggle state from localStorage

@@ -18,6 +18,7 @@ import type {
 import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import { ElicitationValidationError } from "../../errors.js";
 import { generateUUID } from "../utils/runtime.js";
+import { createNotification } from "../utils/jsonrpc-helpers.js";
 import type {
   SampleOptions,
   ElicitOptions,
@@ -872,7 +873,25 @@ function createSendNotificationMethod(
 
   return async (method: string, params?: Record<string, unknown>) => {
     const session = sessions.get(sessionId);
-    if (!session?.sendNotification) {
+    if (!session) {
+      return;
+    }
+
+    if (!session.sendNotification) {
+      if (session.transport?.send) {
+        try {
+          await session.transport.send(
+            createNotification(method, params || {})
+          );
+        } catch (error) {
+          console.error(
+            `[MCP] Error sending transport notification to session ${sessionId}:`,
+            error
+          );
+        }
+        return;
+      }
+
       console.warn(
         `[MCP] Cannot send notification to session ${sessionId} - no sendNotification function`
       );
@@ -972,6 +991,9 @@ export function createEnhancedContext(
   client: ReturnType<typeof createClientCapabilityChecker>;
   session: { id?: string };
   sendNotification: typeof sendNotification;
+  streamWidgetProps: (
+    structuredContent: Record<string, unknown>
+  ) => Promise<void>;
 } {
   const enhancedContext: any = baseContext
     ? extractContextData(baseContext)
@@ -1014,6 +1036,18 @@ export function createEnhancedContext(
   if (sendNotificationMethod) {
     enhancedContext.sendNotification = sendNotificationMethod;
   }
+
+  enhancedContext.streamWidgetProps = async (
+    structuredContent: Record<string, unknown>
+  ): Promise<void> => {
+    if (!sendNotificationMethod) {
+      return;
+    }
+
+    await sendNotificationMethod("ui/notifications/tool-result-partial", {
+      structuredContent,
+    });
+  };
 
   const sendNotificationToSessionMethod =
     createSendNotificationToSessionMethod(sessions);

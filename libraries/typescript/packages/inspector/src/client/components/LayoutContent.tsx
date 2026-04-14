@@ -31,6 +31,21 @@ interface LayoutContentProps {
   children: ReactNode;
 }
 
+function normalizePromptArgs(
+  args?: Record<string, unknown>
+): Record<string, string> | undefined {
+  if (!args) {
+    return undefined;
+  }
+
+  return Object.fromEntries(
+    Object.entries(args).map(([k, v]) => [
+      k,
+      typeof v === "string" ? v : String(v ?? ""),
+    ])
+  ) as Record<string, string>;
+}
+
 export function LayoutContent({
   selectedServer,
   activeTab,
@@ -141,17 +156,7 @@ export function LayoutContent({
             ref={promptsSearchRef}
             prompts={selectedServer.prompts}
             callPrompt={(name, args) =>
-              selectedServer.getPrompt(
-                name,
-                args
-                  ? (Object.fromEntries(
-                      Object.entries(args).map(([k, v]) => [
-                        k,
-                        typeof v === "string" ? v : String(v ?? ""),
-                      ])
-                    ) as Record<string, string>)
-                  : undefined
-              )
+              selectedServer.getPrompt(name, normalizePromptArgs(args))
             }
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
@@ -189,7 +194,9 @@ export function LayoutContent({
             }
             prompts={selectedServer.prompts}
             serverId={selectedServer.id}
-            callPrompt={selectedServer.getPrompt}
+            callPrompt={(name, args) =>
+              selectedServer.getPrompt(name, normalizePromptArgs(args))
+            }
             readResource={selectedServer.readResource}
             useClientSide={!embeddedConfig.chatApiUrl}
             chatApiUrl={embeddedConfig.chatApiUrl}

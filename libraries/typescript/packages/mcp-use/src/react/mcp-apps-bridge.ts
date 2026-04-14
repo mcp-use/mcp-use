@@ -86,6 +86,10 @@ interface ToolResultNotification {
   _meta?: Record<string, unknown>;
 }
 
+interface ToolResultPartialNotification {
+  structuredContent?: Record<string, unknown>;
+}
+
 /**
  * Singleton bridge for MCP Apps postMessage communication
  */
@@ -102,6 +106,7 @@ class McpAppsBridge {
   // State
   private toolInput: Record<string, unknown> | null = null;
   private partialToolInput: Record<string, unknown> | null = null;
+  private partialToolOutput: Record<string, unknown> | null = null;
   private toolOutput: Record<string, unknown> | null = null;
   private toolResponseMetadata: Record<string, unknown> | null = null;
   private hostContext: HostContext | null = null;
@@ -117,6 +122,9 @@ class McpAppsBridge {
     (input: Record<string, unknown>) => void
   >();
   private toolResultHandlers = new Set<
+    (result: Record<string, unknown>) => void
+  >();
+  private toolResultPartialHandlers = new Set<
     (result: Record<string, unknown>) => void
   >();
   private hostContextHandlers = new Set<(context: HostContext) => void>();
@@ -327,6 +335,7 @@ class McpAppsBridge {
         const params = notification.params as unknown as ToolInputNotification;
         console.log("[MCP Apps Bridge] Tool input received:", params.arguments);
         this.toolInput = params.arguments;
+        this.partialToolOutput = null;
         this.toolInputHandlers.forEach((handler) => handler(params.arguments));
         break;
       }
@@ -351,7 +360,15 @@ class McpAppsBridge {
         this.toolOutput = output;
         this.toolResponseMetadata = meta;
         this.partialToolInput = null;
+        this.partialToolOutput = null;
         this.toolResultHandlers.forEach((handler) => handler(output));
+        break;
+      }
+      case "ui/notifications/tool-result-partial": {
+        const params = notification.params as ToolResultPartialNotification;
+        const output = params.structuredContent || {};
+        this.partialToolOutput = output;
+        this.toolResultPartialHandlers.forEach((handler) => handler(output));
         break;
       }
       case "ui/notifications/host-context-changed": {
@@ -539,6 +556,13 @@ class McpAppsBridge {
   }
 
   /**
+   * Get current partial tool output (structuredContent patch).
+   */
+  getPartialToolOutput(): Record<string, unknown> | null {
+    return this.partialToolOutput;
+  }
+
+  /**
    * Get tool response metadata (_meta from tool result)
    */
   getToolResponseMetadata(): Record<string, unknown> | null {
@@ -590,6 +614,16 @@ class McpAppsBridge {
   onToolResult(handler: (result: Record<string, unknown>) => void): () => void {
     this.toolResultHandlers.add(handler);
     return () => this.toolResultHandlers.delete(handler);
+  }
+
+  /**
+   * Subscribe to partial tool result changes.
+   */
+  onToolResultPartial(
+    handler: (result: Record<string, unknown>) => void
+  ): () => void {
+    this.toolResultPartialHandlers.add(handler);
+    return () => this.toolResultPartialHandlers.delete(handler);
   }
 
   /**

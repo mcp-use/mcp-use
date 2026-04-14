@@ -42,6 +42,7 @@ export interface ToolResult {
   toolName: string;
   args: Record<string, unknown>;
   result: any;
+  partialToolOutput?: Record<string, unknown> | null;
   error?: string;
   timestamp: number;
   duration?: number;
@@ -929,6 +930,7 @@ export function ToolResultDisplay({
                         toolName={result.toolName}
                         toolArgs={memoizedArgs}
                         toolResult={memoizedResult}
+                        partialToolOutput={result.partialToolOutput}
                         serverId={serverId}
                         readResource={memoizedReadResource}
                         className="w-full h-full relative p-4"
@@ -996,6 +998,7 @@ export function ToolResultDisplay({
                         toolName={result.toolName}
                         toolInput={memoizedArgs}
                         toolOutput={memoizedResult}
+                        partialToolOutput={result.partialToolOutput}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
                         readResource={memoizedReadResource}

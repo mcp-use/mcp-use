@@ -32,6 +32,7 @@ interface ToolResultRendererProps {
   toolName: string;
   toolArgs: Record<string, unknown>;
   result: any;
+  partialToolOutput?: Record<string, unknown> | null;
   serverId?: string;
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
@@ -51,6 +52,7 @@ export function ToolResultRenderer({
   toolName,
   toolArgs,
   result,
+  partialToolOutput,
   serverId,
   readResource,
   toolMeta,
@@ -243,6 +245,7 @@ export function ToolResultRenderer({
             toolName={toolName}
             toolInput={memoizedToolArgs}
             toolOutput={memoizedResult}
+            partialToolOutput={partialToolOutput}
             toolMetadata={toolMeta}
             invoking={invokingText}
             invoked={invokedText}
@@ -262,6 +265,7 @@ export function ToolResultRenderer({
             toolName={toolName}
             toolArgs={memoizedToolArgs}
             toolResult={memoizedResult}
+            partialToolOutput={partialToolOutput}
             serverId={serverId}
             readResource={readResource}
             noWrapper={true}
@@ -286,6 +290,7 @@ export function ToolResultRenderer({
           toolName={toolName}
           toolInput={memoizedToolArgs}
           toolOutput={memoizedResult}
+          partialToolOutput={partialToolOutput}
           toolMetadata={toolMeta}
           invoking={invokingText}
           invoked={invokedText}
@@ -316,6 +321,7 @@ export function ToolResultRenderer({
         toolName={toolName}
         toolArgs={memoizedToolArgs}
         toolResult={memoizedResult}
+        partialToolOutput={partialToolOutput}
         serverId={serverId}
         readResource={readResource}
         noWrapper={true}

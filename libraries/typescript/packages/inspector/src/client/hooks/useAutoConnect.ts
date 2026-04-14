@@ -227,7 +227,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
 export function useAutoConnect({
   connections,
   addConnection,
-  removeConnection,
+  removeConnection: _removeConnection,
   configLoaded: contextConfigLoaded,
   embedded = false,
 }: UseAutoConnectOptions): AutoConnectState {
