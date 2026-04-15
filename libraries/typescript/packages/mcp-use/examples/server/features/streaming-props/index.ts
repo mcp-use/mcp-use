@@ -56,7 +56,7 @@ function buildCodeSnippet(language: string, description: string): string {
     "};",
     "",
     "function runTask(task: Task): string {",
-    "  return `Running: ${task.description}`;",
+    String.raw`  return \`Running: \${task.description}\`;`,
     "}",
     "",
     `const task: Task = { description: ${JSON.stringify(description)} };`,
