@@ -46,8 +46,6 @@ interface ConnectionSettingsFormProps {
   // OAuth fields
   clientId: string;
   setClientId: (value: string) => void;
-  redirectUrl: string;
-  setRedirectUrl: (value: string) => void;
   scope: string;
   setScope: (value: string) => void;
 
@@ -103,8 +101,6 @@ export function ConnectionSettingsForm({
   setProxyAddress,
   clientId,
   setClientId,
-  redirectUrl,
-  setRedirectUrl,
   scope,
   setScope,
   autoSwitch,
@@ -169,7 +165,6 @@ export function ConnectionSettingsForm({
         clientId || scope
           ? {
               clientId,
-              redirectUrl,
               scope,
             }
           : undefined,
@@ -261,7 +256,6 @@ export function ConnectionSettingsForm({
 
         if (config.oauth) {
           setClientId(config.oauth.clientId || "");
-          setRedirectUrl(config.oauth.redirectUrl || redirectUrl);
           setScope(config.oauth.scope || "");
         }
 
@@ -437,16 +431,6 @@ export function ConnectionSettingsForm({
                   placeholder="Client ID"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                />
-              </div>
-
-              {/* Redirect URL */}
-              <div className="space-y-2">
-                <Label className="text-sm">Redirect URL</Label>
-                <Input
-                  data-testid="auth-dialog-redirect-url-input"
-                  value={redirectUrl}
-                  onChange={(e) => setRedirectUrl(e.target.value)}
                 />
               </div>
 
