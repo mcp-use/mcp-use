@@ -267,7 +267,7 @@ export class McpUseAPI {
 
   // ── Organization ID resolution ──────────────────────────────────
 
-  private async resolveOrganizationId(): Promise<string> {
+  async resolveOrganizationId(): Promise<string> {
     if (this.orgId) return this.orgId;
     const auth = await this.testAuth();
     const id = auth.default_org_id;

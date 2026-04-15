@@ -1142,16 +1142,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         process.exit(1);
       }
 
-      // Resolve org ID for the server creation body
-      const config = await readConfig();
-      const authInfo = await api.testAuth();
-      const orgId = config.orgId || authInfo.default_org_id;
-      if (!orgId) {
-        console.log(
-          chalk.red("✗ No organization set. Run `mcp-use org switch` first.")
-        );
-        process.exit(1);
-      }
+      const orgId = await api.resolveOrganizationId();
 
       console.log(chalk.gray("Creating server and deployment..."));
       const serverResult = await api.createServer({
@@ -1163,8 +1154,6 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         branch: gitInfo.branch || "main",
         rootDir: options.rootDir,
         port,
-        buildCommand,
-        startCommand,
         env: Object.keys(envVars).length > 0 ? envVars : undefined,
       });
 
