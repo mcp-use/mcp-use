@@ -1,5 +1,56 @@
 # @mcp-use/inspector
 
+## 2.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bba147b]
+  - mcp-use@1.24.0-canary.5
+
+## 2.0.0-canary.4
+
+### Patch Changes
+
+- 1718d68: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+- Updated dependencies [1718d68]
+  - mcp-use@1.24.0-canary.4
+
+## 2.0.0-canary.3
+
+### Patch Changes
+
+- c51a656: feat(inspector): persist tabs on refresh
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - mcp-use@1.24.0-canary.3
+
+## 2.0.0-canary.2
+
+### Patch Changes
+
+- b0e2492: Fix thinking indicator persisting after assistant stream completes
+- Updated dependencies [9478920]
+  - mcp-use@1.24.0-canary.2
+
+## 2.0.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4525a5d]
+  - mcp-use@1.24.0-canary.1
+
+## 2.0.0-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c77a998]
+  - mcp-use@1.24.0-canary.0
+
 ## 1.0.1
 
 ### Patch Changes

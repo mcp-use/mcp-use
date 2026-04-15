@@ -47,7 +47,7 @@ export abstract class BaseAdapter<T> {
       !client.activeSessions ||
       Object.keys(client.activeSessions).length === 0
     ) {
-      logger.info("No active sessions found, creating new ones...");
+      logger.debug("No active sessions found, creating new ones...");
       await client.createAllSessions();
     }
 

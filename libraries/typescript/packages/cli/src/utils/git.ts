@@ -148,6 +148,43 @@ export async function getGitInfo(
 }
 
 /**
+ * Initialize a git repo, add all files, and commit.
+ */
+export async function gitInit(
+  cwd: string,
+  message: string = "Initial commit"
+): Promise<void> {
+  await gitCommand("git init", cwd);
+  await gitCommand("git add .", cwd);
+  await gitCommand(`git commit -m "${message}"`, cwd);
+}
+
+/**
+ * Add a remote and push to it.
+ */
+export async function gitAddRemoteAndPush(
+  cwd: string,
+  cloneUrl: string,
+  branch: string = "main"
+): Promise<void> {
+  await gitCommand(`git remote add origin ${cloneUrl}`, cwd);
+  await gitCommand(`git push -u origin ${branch}`, cwd);
+}
+
+/**
+ * Commit all changes and push.
+ */
+export async function gitCommitAndPush(
+  cwd: string,
+  message: string,
+  branch: string = "main"
+): Promise<void> {
+  await gitCommand("git add .", cwd);
+  await gitCommand(`git commit -m "${message}"`, cwd);
+  await gitCommand(`git push origin ${branch}`, cwd);
+}
+
+/**
  * Check if remote is a GitHub URL
  */
 export function isGitHubUrl(url: string): boolean {

@@ -147,7 +147,7 @@ export async function createLLMFromString(
   llmString: string,
   config?: LLMConfig
 ): Promise<LanguageModel> {
-  logger.info(`Creating LLM from string: ${llmString}`);
+  logger.debug(`Creating LLM from string: ${llmString}`);
 
   const { provider, model } = parseLLMString(llmString);
   const providerConfig = PROVIDER_CONFIG[provider];
@@ -217,7 +217,7 @@ export async function createLLMFromString(
   // Instantiate the LLM
   try {
     const llmInstance = new LLMClass(llmConfig);
-    logger.info(`Successfully created ${provider} LLM with model ${model}`);
+    logger.debug(`Successfully created ${provider} LLM with model ${model}`);
     return llmInstance as LanguageModel;
   } catch (error: any) {
     throw new Error(

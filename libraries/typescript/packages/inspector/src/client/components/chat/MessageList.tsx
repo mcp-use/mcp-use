@@ -125,6 +125,12 @@ export const MessageList = memo(
 
         // If last message is from assistant but empty/minimal content, we're thinking
         if (lastMessage.role === "assistant") {
+          // Check parts array first — streaming delivers content via parts
+          // while content may remain "" until after the stream reader closes
+          if (lastMessage.parts && lastMessage.parts.length > 0) {
+            return false;
+          }
+
           const contentStr =
             typeof lastMessage.content === "string"
               ? lastMessage.content

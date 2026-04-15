@@ -2,92 +2,72 @@ import chalk from "chalk";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import open from "open";
-import type { CreateDeploymentRequest, Deployment } from "../utils/api.js";
+import type { OrgInfo } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
-import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
-import { getGitInfo, isGitHubUrl } from "../utils/git.js";
+import {
+  getWebUrl,
+  isLoggedIn,
+  readConfig,
+  writeConfig,
+} from "../utils/config.js";
+import {
+  getGitInfo,
+  gitInit,
+  gitAddRemoteAndPush,
+  gitCommitAndPush,
+  isGitHubUrl,
+} from "../utils/git.js";
+import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
-import { loginCommand } from "./auth.js";
+import { loginCommand, promptOrgSelection } from "./auth.js";
 
-// Gateway domain configuration - single source of truth
-const GATEWAY_DOMAIN = "run.mcp-use.com";
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-function buildGatewayUrl(slugOrId: string): string {
-  return `https://${slugOrId}.${GATEWAY_DOMAIN}/mcp`;
-}
-
-/**
- * Parse environment variables from .env file
- */
 async function parseEnvFile(filePath: string): Promise<Record<string, string>> {
   try {
     const content = await fs.readFile(filePath, "utf-8");
     const envVars: Record<string, string> = {};
     const lines = content.split("\n");
-
     let currentKey: string | null = null;
     let currentValue = "";
 
     for (let line of lines) {
-      // Trim whitespace
       line = line.trim();
-
-      // Skip empty lines and comments
-      if (!line || line.startsWith("#")) {
-        continue;
-      }
-
-      // Check if this is a continuation of a multiline value
+      if (!line || line.startsWith("#")) continue;
       if (currentKey && !line.includes("=")) {
         currentValue += "\n" + line;
         continue;
       }
-
-      // If we have a pending key-value pair, save it
       if (currentKey) {
         envVars[currentKey] = currentValue.replace(/^["']|["']$/g, "");
         currentKey = null;
         currentValue = "";
       }
-
-      // Parse KEY=VALUE
       const equalIndex = line.indexOf("=");
-      if (equalIndex === -1) {
-        continue;
-      }
-
+      if (equalIndex === -1) continue;
       const key = line.substring(0, equalIndex).trim();
-      let value = line.substring(equalIndex + 1).trim();
-
-      // Validate key format (alphanumeric and underscore)
+      const value = line.substring(equalIndex + 1).trim();
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-        console.log(
-          chalk.yellow(`⚠️  Skipping invalid environment variable key: ${key}`)
-        );
+        console.log(chalk.yellow(`⚠️  Skipping invalid env key: ${key}`));
         continue;
       }
-
-      // Handle quoted values
       if (
         (value.startsWith('"') && value.endsWith('"')) ||
         (value.startsWith("'") && value.endsWith("'"))
       ) {
-        value = value.slice(1, -1);
-        envVars[key] = value;
+        envVars[key] = value.slice(1, -1);
       } else if (value.startsWith('"') || value.startsWith("'")) {
-        // Start of multiline value
         currentKey = key;
         currentValue = value.slice(1);
       } else {
         envVars[key] = value;
       }
     }
-
-    // Save any pending multiline value
     if (currentKey) {
       envVars[currentKey] = currentValue.replace(/^["']|["']$/g, "");
     }
-
     return envVars;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -99,39 +79,23 @@ async function parseEnvFile(filePath: string): Promise<Record<string, string>> {
   }
 }
 
-/**
- * Parse environment variable from KEY=VALUE string
- */
 function parseEnvVar(envStr: string): { key: string; value: string } {
   const equalIndex = envStr.indexOf("=");
   if (equalIndex === -1) {
-    throw new Error(
-      `Invalid environment variable format: "${envStr}". Expected KEY=VALUE`
-    );
+    throw new Error(`Invalid env format: "${envStr}". Expected KEY=VALUE`);
   }
-
   const key = envStr.substring(0, equalIndex).trim();
   const value = envStr.substring(equalIndex + 1);
-
-  // Validate key format
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-    throw new Error(
-      `Invalid environment variable key: "${key}". Keys must start with a letter or underscore and contain only letters, numbers, and underscores.`
-    );
+    throw new Error(`Invalid env key: "${key}".`);
   }
-
   return { key, value };
 }
 
-/**
- * Build environment variables from file and flags
- */
 async function buildEnvVars(
   options: DeployOptions
 ): Promise<Record<string, string>> {
   const envVars: Record<string, string> = {};
-
-  // Parse env file if provided
   if (options.envFile) {
     try {
       const fileEnv = await parseEnvFile(options.envFile);
@@ -150,8 +114,6 @@ async function buildEnvVars(
       process.exit(1);
     }
   }
-
-  // Parse individual env flags (these override file values)
   if (options.env && options.env.length > 0) {
     for (const envStr of options.env) {
       try {
@@ -167,7 +129,6 @@ async function buildEnvVars(
       }
     }
   }
-
   return envVars;
 }
 
@@ -181,135 +142,72 @@ interface DeployOptions {
   envFile?: string;
   rootDir?: string;
   org?: string;
-  /** Skip interactive confirmation prompts (non-interactive / CI) */
   yes?: boolean;
+  region?: "US" | "EU" | "APAC";
+  buildCommand?: string;
+  startCommand?: string;
 }
 
-/**
- * Check if directory looks like an MCP server project
- */
 async function isMcpProject(cwd: string = process.cwd()): Promise<boolean> {
   try {
-    const packageJsonPath = path.join(cwd, "package.json");
-    const content = await fs.readFile(packageJsonPath, "utf-8");
-    const packageJson = JSON.parse(content);
-
-    // Check for common MCP indicators
-    const hasMcpDeps =
-      packageJson.dependencies?.["mcp-use"] ||
-      packageJson.dependencies?.["@modelcontextprotocol/sdk"] ||
-      packageJson.devDependencies?.["mcp-use"] ||
-      packageJson.devDependencies?.["@modelcontextprotocol/sdk"];
-
-    const hasMcpScripts =
-      packageJson.scripts?.mcp || packageJson.scripts?.["mcp:dev"];
-
-    return !!(hasMcpDeps || hasMcpScripts);
+    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
+    const pkg = JSON.parse(content);
+    return !!(
+      pkg.dependencies?.["mcp-use"] ||
+      pkg.dependencies?.["@modelcontextprotocol/sdk"] ||
+      pkg.devDependencies?.["mcp-use"] ||
+      pkg.devDependencies?.["@modelcontextprotocol/sdk"]
+    );
   } catch {
     return false;
   }
 }
 
-/**
- * Get project name from package.json or directory name
- */
 async function getProjectName(cwd: string = process.cwd()): Promise<string> {
   try {
-    const packageJsonPath = path.join(cwd, "package.json");
-    const content = await fs.readFile(packageJsonPath, "utf-8");
-    const packageJson = JSON.parse(content);
-    if (packageJson.name) {
-      return packageJson.name;
-    }
+    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
+    const pkg = JSON.parse(content);
+    if (pkg.name) return pkg.name;
   } catch {
-    // Fall through to directory name
+    // fall through
   }
-
   return path.basename(cwd);
 }
 
-/**
- * Detect build command from package.json
- */
-async function detectBuildCommand(
-  cwd: string = process.cwd()
-): Promise<string | undefined> {
+async function detectBuildCommand(cwd: string): Promise<string | undefined> {
   try {
-    const packageJsonPath = path.join(cwd, "package.json");
-    const content = await fs.readFile(packageJsonPath, "utf-8");
-    const packageJson = JSON.parse(content);
-
-    if (packageJson.scripts?.build) {
-      return "npm run build";
-    }
+    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
+    if (JSON.parse(content).scripts?.build) return "npm run build";
   } catch {
-    // No build command found
+    // noop
   }
-
   return undefined;
 }
 
-/**
- * Detect start command from package.json
- */
-async function detectStartCommand(
-  cwd: string = process.cwd()
-): Promise<string | undefined> {
+async function detectStartCommand(cwd: string): Promise<string | undefined> {
   try {
-    const packageJsonPath = path.join(cwd, "package.json");
-    const content = await fs.readFile(packageJsonPath, "utf-8");
-    const packageJson = JSON.parse(content);
-
-    if (packageJson.scripts?.start) {
-      return "npm start";
-    }
-
-    // Look for main entry point
-    if (packageJson.main) {
-      return `node ${packageJson.main}`;
-    }
+    const content = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
+    const pkg = JSON.parse(content);
+    if (pkg.scripts?.start) return "npm start";
+    if (pkg.main) return `node ${pkg.main}`;
   } catch {
-    // No start command found
+    // noop
   }
-
   return undefined;
 }
 
-/**
- * Detect runtime from project files
- */
-async function detectRuntime(
-  cwd: string = process.cwd()
-): Promise<"node" | "python"> {
-  try {
-    // Check for Python indicators
-    const pythonFiles = ["requirements.txt", "pyproject.toml", "setup.py"];
-    for (const file of pythonFiles) {
-      try {
-        await fs.access(path.join(cwd, file));
-        return "python";
-      } catch {
-        continue;
-      }
-    }
-
-    // Check for Node indicators (package.json)
+async function detectRuntime(cwd: string): Promise<"node" | "python"> {
+  for (const f of ["requirements.txt", "pyproject.toml", "setup.py"]) {
     try {
-      await fs.access(path.join(cwd, "package.json"));
-      return "node";
+      await fs.access(path.join(cwd, f));
+      return "python";
     } catch {
-      // Default to node
+      continue;
     }
-  } catch {
-    // Default to node
   }
-
   return "node";
 }
 
-/**
- * Prompt user for confirmation
- */
 async function prompt(
   question: string,
   defaultValue: "y" | "n" = "n"
@@ -319,74 +217,86 @@ async function prompt(
     input: process.stdin,
     output: process.stdout,
   });
-
-  // Show default in the prompt
-  const defaultIndicator = defaultValue === "y" ? "Y/n" : "y/N";
-  const questionWithDefault = question.replace(
-    /(\(y\/n\):)/,
-    `(${defaultIndicator}):`
-  );
-
+  const indicator = defaultValue === "y" ? "Y/n" : "y/N";
+  const q = question.replace(/(\(y\/n\):)/, `(${indicator}):`);
   return new Promise((resolve) => {
-    rl.question(questionWithDefault, (answer) => {
+    rl.question(q, (answer) => {
       rl.close();
-      const trimmedAnswer = answer.trim().toLowerCase();
-      // If empty, use default
-      if (trimmedAnswer === "") {
-        resolve(defaultValue === "y");
-      } else {
-        resolve(trimmedAnswer === "y" || trimmedAnswer === "yes");
-      }
+      const a = answer.trim().toLowerCase();
+      if (a === "") resolve(defaultValue === "y");
+      else resolve(a === "y" || a === "yes");
     });
   });
 }
 
-/**
- * Get the MCP server URL for a deployment
- */
-function getMcpServerUrl(deployment: Deployment): string {
-  if (deployment.customDomain) {
-    // Custom domain takes precedence
-    return `https://${deployment.customDomain}/mcp`;
-  } else if (deployment.serverSlug) {
-    // Gateway URL via haikunator slug
-    return buildGatewayUrl(deployment.serverSlug);
-  } else if (deployment.serverId) {
-    // Gateway URL via serverId (fallback if slug not available yet)
-    return buildGatewayUrl(deployment.serverId);
-  } else {
-    // Direct deployment URL (legacy deployments without server)
-    return `https://${deployment.domain}/mcp`;
+async function promptText(
+  question: string,
+  defaultValue?: string
+): Promise<string> {
+  const readline = await import("node:readline");
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const suffix = defaultValue ? chalk.gray(` [${defaultValue}]`) : "";
+  return new Promise((resolve) => {
+    rl.question(question + suffix + " ", (answer) => {
+      rl.close();
+      resolve(answer.trim() || defaultValue || "");
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// .gitignore management
+// ---------------------------------------------------------------------------
+
+const REQUIRED_IGNORES = [
+  "node_modules",
+  "dist",
+  ".env",
+  ".env.local",
+  ".mcp-use",
+];
+
+async function ensureGitignore(cwd: string): Promise<void> {
+  const gitignorePath = path.join(cwd, ".gitignore");
+  let content = "";
+  try {
+    content = await fs.readFile(gitignorePath, "utf-8");
+  } catch {
+    // file doesn't exist yet
+  }
+  const missing = REQUIRED_IGNORES.filter((entry) => !content.includes(entry));
+  if (missing.length > 0) {
+    const additions = missing.join("\n");
+    const newContent =
+      content + (content.endsWith("\n") ? "" : "\n") + additions + "\n";
+    await fs.writeFile(gitignorePath, newContent, "utf-8");
   }
 }
 
-/**
- * Display deployment progress with spinner
- */
+// ---------------------------------------------------------------------------
+// Deployment progress (poll build-logs)
+// ---------------------------------------------------------------------------
+
 async function displayDeploymentProgress(
   api: McpUseAPI,
-  deployment: Deployment,
+  deploymentId: string,
   progressOptions?: { yes?: boolean }
 ): Promise<void> {
   const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let frameIndex = 0;
   let spinnerInterval: NodeJS.Timeout | null = null;
-  let lastStep = "";
 
   const startSpinner = (message: string) => {
-    if (spinnerInterval) {
-      clearInterval(spinnerInterval);
-    }
-
-    // Clear the line
+    if (spinnerInterval) clearInterval(spinnerInterval);
     process.stdout.write("\r\x1b[K");
-
     spinnerInterval = setInterval(() => {
-      const frame = frames[frameIndex];
-      frameIndex = (frameIndex + 1) % frames.length;
       process.stdout.write(
-        "\r" + chalk.cyan(frame) + " " + chalk.gray(message)
+        "\r" + chalk.cyan(frames[frameIndex]) + " " + chalk.gray(message)
       );
+      frameIndex = (frameIndex + 1) % frames.length;
     }, 80);
   };
 
@@ -401,320 +311,145 @@ async function displayDeploymentProgress(
   console.log();
   startSpinner("Deploying...");
 
-  try {
-    for await (const log of api.streamDeploymentLogs(deployment.id)) {
-      try {
-        const logData = JSON.parse(log);
-        if (logData.step && logData.step !== lastStep) {
-          lastStep = logData.step;
-          const stepMessages: Record<string, string> = {
-            clone: "Preparing source code...",
-            analyze: "Analyzing project...",
-            build: "Building container image...",
-            deploy: "Deploying to cloud...",
-          };
-          const message = stepMessages[logData.step] || "Deploying...";
-          startSpinner(message);
-        }
-
-        // Display the log line
-        if (logData.line) {
-          stopSpinner();
-          const levelColor =
-            logData.level === "error"
-              ? chalk.red
-              : logData.level === "warn"
-                ? chalk.yellow
-                : chalk.gray;
-          const stepPrefix = logData.step
-            ? chalk.cyan(`[${logData.step}]`) + " "
-            : "";
-          console.log(stepPrefix + levelColor(logData.line));
-        }
-      } catch {
-        // Ignore non-JSON logs
-      }
-    }
-  } catch (error) {
-    // Stream ended or error occurred
-    stopSpinner();
-  }
-
-  // Poll for final status with exponential backoff
   let checkCount = 0;
-  const maxChecks = 60; // Max 60 checks
-  let delay = 3000; // Start with 3 seconds
-  const maxDelay = 10000; // Max 10 seconds between checks
-  let lastDisplayedLogLength = 0;
+  const maxChecks = 120;
+  let delay = 2000;
+  const maxDelay = 10000;
+  let buildLogOffset = 0;
 
   while (checkCount < maxChecks) {
-    const currentDelay = delay;
-    await new Promise((resolve) => setTimeout(resolve, currentDelay));
+    const waitMs = delay;
+    await new Promise<void>((r) => setTimeout(r, waitMs));
+    checkCount++;
 
-    const finalDeployment = await api.getDeployment(deployment.id);
-
-    // Display new build logs if available
-    if (
-      finalDeployment.buildLogs &&
-      finalDeployment.buildLogs.length > lastDisplayedLogLength
-    ) {
-      const newLogs = finalDeployment.buildLogs.substring(
-        lastDisplayedLogLength
+    try {
+      const resp = await api.getDeploymentBuildLogs(
+        deploymentId,
+        buildLogOffset
       );
-      const logLines = newLogs.split("\n").filter((l) => l.trim());
-
-      for (const line of logLines) {
-        try {
-          const logData = JSON.parse(line);
-          if (logData.line) {
+      if (resp.logs.length > 0) {
+        for (const line of resp.logs.split("\n").filter((l) => l.trim())) {
+          try {
+            const d = JSON.parse(line);
+            if (d.line) {
+              stopSpinner();
+              const color =
+                d.level === "error"
+                  ? chalk.red
+                  : d.level === "warn"
+                    ? chalk.yellow
+                    : chalk.gray;
+              const prefix = d.step ? chalk.cyan(`[${d.step}]`) + " " : "";
+              console.log(prefix + color(d.line));
+            }
+          } catch {
             stopSpinner();
-            const levelColor =
-              logData.level === "error"
-                ? chalk.red
-                : logData.level === "warn"
-                  ? chalk.yellow
-                  : chalk.gray;
-            const stepPrefix = logData.step
-              ? chalk.cyan(`[${logData.step}]`) + " "
-              : "";
-            console.log(stepPrefix + levelColor(logData.line));
+            console.log(chalk.gray(line));
           }
-        } catch {
-          // Skip invalid JSON
         }
+        buildLogOffset = resp.offset;
       }
-
-      lastDisplayedLogLength = finalDeployment.buildLogs.length;
+    } catch {
+      // not ready yet
     }
 
-    if (finalDeployment.status === "running") {
-      // Determine the MCP Server URL to display
-      const mcpServerUrl = getMcpServerUrl(finalDeployment);
+    const dep = await api.getDeployment(deploymentId);
 
-      // Determine dashboard URL with org slug for direct navigation
-      let dashboardUrl: string | null = null;
+    if (dep.status === "running") {
+      stopSpinner();
+      const mcpUrl = getMcpServerUrl(dep);
       const webUrl = (await getWebUrl()).replace(/\/$/, "");
       const config = await readConfig();
-      const orgSlug = config.profileSlug;
-      const serverRef = finalDeployment.serverSlug || finalDeployment.serverId;
-      if (serverRef) {
-        if (orgSlug) {
-          dashboardUrl = `${webUrl}/cloud/${orgSlug}/servers/${serverRef}`;
-        } else {
-          dashboardUrl = `${webUrl}/cloud/servers/${serverRef}`;
-        }
+      let dashboardUrl: string | null = null;
+      if (dep.serverId) {
+        dashboardUrl = config.orgSlug
+          ? `${webUrl}/cloud/${config.orgSlug}/servers/${dep.serverId}`
+          : `${webUrl}/cloud/servers/${dep.serverId}`;
       }
-
-      const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(
-        mcpServerUrl
-      )}`;
+      const inspectorUrl = `https://inspector.manufact.com/inspector?autoConnect=${encodeURIComponent(mcpUrl)}`;
 
       console.log(chalk.green.bold("✓ Deployment successful!\n"));
-      console.log(chalk.white("🌐 MCP Server URL:"));
-      console.log(chalk.cyan.bold(`   ${mcpServerUrl}\n`));
-
+      if (mcpUrl) {
+        console.log(chalk.white("🌐 MCP Server URL:"));
+        console.log(chalk.cyan.bold(`   ${mcpUrl}\n`));
+      }
       if (dashboardUrl) {
         console.log(chalk.white("📊 Dashboard:"));
         console.log(chalk.cyan.bold(`   ${dashboardUrl}\n`));
       }
-
       console.log(chalk.white("🔍 Inspector URL:"));
       console.log(chalk.cyan.bold(`   ${inspectorUrl}\n`));
-
-      console.log(
-        chalk.gray("Deployment ID: ") + chalk.white(finalDeployment.id)
-      );
+      console.log(chalk.gray("Deployment ID: ") + chalk.white(dep.id));
       return;
-    } else if (finalDeployment.status === "failed") {
+    } else if (dep.status === "failed") {
       stopSpinner();
       console.log(chalk.red.bold("✗ Deployment failed\n"));
-
-      if (finalDeployment.error) {
-        console.log(chalk.red("Error: ") + finalDeployment.error);
-
-        // Check for GitHub access errors and offer to fix
-        if (finalDeployment.error.includes("No GitHub installations found")) {
-          console.log();
-          const retry = await promptGitHubInstallation(
-            api,
-            "not_connected",
-            undefined,
-            { yes: progressOptions?.yes }
+      if (dep.error) {
+        const internalPatterns = [
+          "GraphQL",
+          "authenticated",
+          "INTERNAL",
+          "Fly API",
+          "token validation",
+          "context deadline",
+          "Bad gateway",
+          "502",
+          "503",
+        ];
+        const isInternalError = internalPatterns.some((p) =>
+          dep.error!.includes(p)
+        );
+        if (isInternalError) {
+          console.log(
+            chalk.red("Error: ") +
+              "An internal infrastructure error occurred. Please try again."
           );
-          if (retry) {
-            console.log(chalk.cyan("\n🔄 Retrying deployment...\n"));
-            const newDeployment = await api.redeployDeployment(deployment.id);
-            await displayDeploymentProgress(
-              api,
-              newDeployment,
-              progressOptions
-            );
-            return;
-          }
-        } else if (
-          finalDeployment.error.includes("Authenticated git clone failed")
-        ) {
-          // Extract repo name from error or deployment source
-          let repoName: string | undefined;
-
-          const repoMatch = finalDeployment.error.match(
-            /github\.com\/([^/]+\/[^/\s]+)/
-          );
-          if (repoMatch) {
-            repoName = repoMatch[1].replace(/\.git$/, "");
-          } else if (finalDeployment.source.type === "github") {
-            repoName = finalDeployment.source.repo;
-          }
-
-          console.log();
-          const retry = await promptGitHubInstallation(
-            api,
-            "no_access",
-            repoName,
-            { yes: progressOptions?.yes }
-          );
-          if (retry) {
-            console.log(chalk.cyan("\n🔄 Retrying deployment...\n"));
-            const newDeployment = await api.redeployDeployment(deployment.id);
-            await displayDeploymentProgress(
-              api,
-              newDeployment,
-              progressOptions
-            );
-            return;
-          }
-        }
-      }
-
-      if (finalDeployment.buildLogs) {
-        console.log(chalk.gray("\nBuild logs:"));
-        // Parse and display build logs nicely
-        try {
-          const logs = finalDeployment.buildLogs
-            .split("\n")
-            .filter((l) => l.trim());
-          for (const log of logs) {
-            try {
-              const logData = JSON.parse(log);
-              if (logData.line) {
-                console.log(chalk.gray(`  ${logData.line}`));
-              }
-            } catch {
-              console.log(chalk.gray(`  ${log}`));
-            }
-          }
-        } catch {
-          console.log(chalk.gray(finalDeployment.buildLogs));
+          console.log(chalk.gray("  Details: " + dep.error));
+        } else {
+          console.log(chalk.red("Error: ") + dep.error);
         }
       }
       process.exit(1);
-    } else if (finalDeployment.status === "building") {
-      // Still building, wait and check again with exponential backoff
+    } else if (dep.status === "building" || dep.status === "pending") {
       startSpinner("Building and deploying...");
-      checkCount++;
-      // Exponential backoff: increase delay up to maxDelay
       delay = Math.min(delay * 1.2, maxDelay);
     } else {
-      console.log(
-        chalk.yellow("⚠️  Deployment status: ") + finalDeployment.status
-      );
+      stopSpinner();
+      console.log(chalk.yellow("⚠️  Deployment status: ") + dep.status);
       return;
     }
   }
 
-  // Timeout
   stopSpinner();
   console.log(chalk.yellow("⚠️  Deployment is taking longer than expected."));
   console.log(
     chalk.gray("Check status with: ") +
-      chalk.white(`mcp-use status ${deployment.id}`)
+      chalk.white(`mcp-use deployments get ${deploymentId}`)
   );
 }
 
-/**
- * Check if a specific repository is accessible via GitHub App
- */
+// ---------------------------------------------------------------------------
+// GitHub helpers
+// ---------------------------------------------------------------------------
+
 async function checkRepoAccess(
   api: McpUseAPI,
   owner: string,
   repo: string
 ): Promise<boolean> {
   try {
-    const reposResponse = await api.getGitHubRepos(true); // Force refresh
-    const repoFullName = `${owner}/${repo}`;
-    return reposResponse.repos.some((r) => r.full_name === repoFullName);
-  } catch (error) {
-    console.log(chalk.gray("Could not verify repository access"));
+    const resp = await api.getGitHubRepos(true);
+    return resp.repos.some((r) => r.full_name === `${owner}/${repo}`);
+  } catch {
     return false;
   }
 }
 
-const GITHUB_SETUP_POLL_INTERVAL_MS = 2000;
-const GITHUB_SETUP_POLL_MAX_MS = 120_000;
-
-/**
- * After opening the GitHub App URL, wait for the user to finish setup.
- * In interactive mode, waits for Enter. With `yes`, polls connection/repo access.
- */
-async function waitForGitHubSetupAfterBrowser(
-  api: McpUseAPI,
-  repoName: string | undefined,
-  yes: boolean
-): Promise<void> {
-  if (!yes) {
-    console.log(chalk.gray("Waiting for GitHub configuration..."));
-    await prompt(
-      chalk.white("Press Enter when you've completed the GitHub setup..."),
-      "y"
-    );
-    return;
-  }
-
-  console.log(
-    chalk.gray(
-      "Waiting for GitHub configuration (polling every 2s, up to 2 min)..."
-    )
-  );
-  const deadline = Date.now() + GITHUB_SETUP_POLL_MAX_MS;
-
-  while (Date.now() < deadline) {
-    try {
-      const status = await api.getGitHubConnectionStatus();
-      if (!status.is_connected) {
-        await new Promise((r) => setTimeout(r, GITHUB_SETUP_POLL_INTERVAL_MS));
-        continue;
-      }
-      if (repoName) {
-        const parts = repoName.split("/");
-        const owner = parts[0];
-        const repo = parts[1];
-        if (owner && repo && (await checkRepoAccess(api, owner, repo))) {
-          return;
-        }
-      } else {
-        return;
-      }
-    } catch {
-      // keep polling
-    }
-    await new Promise((r) => setTimeout(r, GITHUB_SETUP_POLL_INTERVAL_MS));
-  }
-
-  console.log(
-    chalk.yellow(
-      "⚠️  Timed out waiting for GitHub setup. Continuing with verification..."
-    )
-  );
-}
-
-/**
- * Prompt user to install/configure GitHub App with repo verification
- */
 async function promptGitHubInstallation(
   api: McpUseAPI,
   reason: "not_connected" | "no_access",
   repoName?: string,
-  opts?: { yes?: boolean }
+  opts?: { yes?: boolean; installationId?: string }
 ): Promise<boolean> {
   const yes = !!opts?.yes;
   console.log();
@@ -743,181 +478,229 @@ async function promptGitHubInstallation(
         ),
         "y"
       );
-
-  if (!shouldInstall) {
-    return false;
-  }
+  if (!shouldInstall) return false;
 
   try {
-    // Get the GitHub App name with fallback
-    const appName = process.env.MCP_GITHUB_APP_NAME || "mcp-use";
+    const appName = await api.getGitHubAppName();
 
-    const installUrl =
-      reason === "not_connected"
-        ? `https://github.com/apps/${appName}/installations/new`
-        : `https://github.com/settings/installations`;
+    const installUrl = `https://github.com/apps/${appName}/installations/new`;
 
-    console.log(
-      chalk.cyan(
-        `\nOpening browser to ${reason === "not_connected" ? "install" : "configure"} GitHub App...`
-      )
-    );
+    console.log(chalk.cyan(`\nOpening browser...`));
     console.log(chalk.gray(`URL: ${installUrl}\n`));
 
     if (reason === "no_access") {
-      console.log(chalk.white("Please:"));
       console.log(
-        chalk.cyan("  1. Find the 'mcp-use' (or similar) GitHub App")
+        chalk.white("Please add ") +
+          chalk.cyan.bold(repoName || "your repository") +
+          chalk.white(" to the app's repository access, then return here.\n")
       );
-      console.log(chalk.cyan("  2. Click 'Configure'"));
-      console.log(
-        chalk.cyan(
-          `  3. Grant access to ${chalk.bold(repoName || "your repository")}`
-        )
-      );
-      console.log(chalk.cyan("  4. Save your changes"));
-      console.log(chalk.cyan("  5. Return here when done\n"));
     } else {
-      console.log(chalk.white("Please:"));
-      console.log(chalk.cyan("  1. Select the repositories to grant access"));
-      if (repoName) {
-        console.log(
-          chalk.cyan(`  2. Make sure to include ${chalk.bold(repoName)}`)
-        );
-        console.log(chalk.cyan("  3. Complete the installation"));
-      } else {
-        console.log(chalk.cyan("  2. Complete the installation"));
-      }
-      console.log();
+      console.log(
+        chalk.white("Complete the GitHub App installation, then return here.\n")
+      );
     }
 
-    // Open the browser
     await open(installUrl);
 
-    await waitForGitHubSetupAfterBrowser(api, repoName, yes);
-
-    // Verify connection (best effort)
-    console.log(chalk.gray("Verifying GitHub connection..."));
-
-    let verified = false;
-    try {
-      const status = await api.getGitHubConnectionStatus();
-
-      if (!status.is_connected) {
-        console.log(chalk.yellow("⚠️  GitHub connection not detected."));
-      } else if (repoName) {
-        // Try to verify specific repo access
-        const [owner, repo] = repoName.split("/");
-        console.log(chalk.gray(`Checking access to ${repoName}...`));
-
-        const hasAccess = await checkRepoAccess(api, owner, repo);
-
-        if (!hasAccess) {
-          console.log(
-            chalk.yellow(
-              `⚠️  The GitHub App may not have access to ${chalk.cyan(repoName)} yet`
-            )
-          );
-        } else {
-          console.log(chalk.green(`✓ Repository ${repoName} is accessible!\n`));
-          verified = true;
+    if (!yes) {
+      await prompt(chalk.white("Press Enter when done..."), "y");
+    } else {
+      console.log(chalk.gray("Waiting for GitHub configuration (polling)..."));
+      const deadline = Date.now() + 120_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const status = await api.getGitHubConnectionStatus();
+          if (status.is_connected) {
+            if (!repoName) return true;
+            const [o, r] = repoName.split("/");
+            if (o && r && (await checkRepoAccess(api, o, r))) return true;
+          }
+        } catch {
+          // keep polling
         }
-      } else {
-        console.log(chalk.green("✓ GitHub connected successfully!\n"));
-        verified = true;
       }
-    } catch (error) {
-      console.log(
-        chalk.yellow("⚠️  Could not verify GitHub connection (API issue)")
-      );
-    }
-
-    // Even if verification failed, the user may have configured it successfully
-    // Offer to retry the deployment
-    if (!verified) {
-      console.log(
-        chalk.gray(
-          "\nNote: If you completed the GitHub setup, the deployment may work now.\n"
-        )
-      );
     }
 
     return true;
-  } catch (error) {
-    console.log(
-      chalk.yellow("\n⚠️  Unable to open GitHub installation automatically")
-    );
+  } catch {
+    console.log(chalk.yellow("\n⚠️  Unable to open browser automatically"));
     console.log(
       chalk.white("Please visit: ") +
         chalk.cyan("https://manufact.com/cloud/settings")
-    );
-    console.log(
-      chalk.gray("Then connect your GitHub account and try again.\n")
     );
     return false;
   }
 }
 
-/**
- * Deploy command - deploys MCP server to Manufact cloud
- */
+// ---------------------------------------------------------------------------
+// Main deploy command
+// ---------------------------------------------------------------------------
+
 export async function deployCommand(options: DeployOptions): Promise<void> {
   try {
     const cwd = process.cwd();
 
-    // Check if logged in
+    // ── Step 1: Auth ──────────────────────────────────────────────
     if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
+      console.log(chalk.cyan.bold("Welcome to Manufact Cloud!\n"));
       if (options.yes) {
         console.log(
-          chalk.gray(
-            "Run " +
+          chalk.red(
+            "✗ Not logged in. Run " +
               chalk.white("npx mcp-use login") +
-              " first. Non-interactive deploy requires an existing session."
+              " first."
           )
         );
         process.exit(1);
       }
 
       const shouldLogin = await prompt(
-        chalk.white("Would you like to login now? (Y/n): "),
+        chalk.white("You need to log in to deploy. Log in now? (Y/n): "),
         "y"
       );
-
-      if (shouldLogin) {
-        try {
-          await loginCommand({ silent: false });
-
-          // Verify login was successful
-          if (!(await isLoggedIn())) {
-            console.log(
-              chalk.red("✗ Login verification failed. Please try again.")
-            );
-            process.exit(1);
-          }
-
-          console.log(chalk.gray("\nContinuing with deployment...\n"));
-        } catch (error) {
-          console.error(
-            chalk.red.bold("✗ Login failed:"),
-            chalk.red(error instanceof Error ? error.message : "Unknown error")
-          );
-          process.exit(1);
-        }
-      } else {
+      if (!shouldLogin) {
         console.log(
           chalk.gray(
             "Run " + chalk.white("npx mcp-use login") + " to get started."
           )
         );
-        console.log(chalk.gray("Deployment cancelled."));
         process.exit(0);
+      }
+
+      try {
+        await loginCommand({ silent: false });
+        if (!(await isLoggedIn())) {
+          console.log(chalk.red("✗ Login failed. Please try again."));
+          process.exit(1);
+        }
+        console.log(chalk.gray("\nContinuing with deployment...\n"));
+      } catch (error) {
+        console.error(
+          chalk.red.bold("✗ Login failed:"),
+          chalk.red(error instanceof Error ? error.message : "Unknown error")
+        );
+        process.exit(1);
       }
     }
 
-    console.log(chalk.cyan.bold("🚀 Deploying to Manufact cloud...\n"));
+    const api = await McpUseAPI.create();
 
-    // Resolve project directory (subfolder support for monorepos)
+    // ── Step 2: Org resolution ────────────────────────────────────
+    if (options.org) {
+      const authInfo = await api.testAuth();
+      const match = (authInfo.orgs ?? []).find(
+        (o) =>
+          o.slug === options.org ||
+          o.id === options.org ||
+          o.name.toLowerCase() === options.org!.toLowerCase()
+      );
+      if (match) {
+        api.setOrgId(match.id);
+        const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
+        console.log(
+          chalk.gray("Organization: ") + chalk.cyan(match.name) + slug
+        );
+      } else {
+        console.error(
+          chalk.red(
+            `✗ Organization "${options.org}" not found. Run ${chalk.white("npx mcp-use org list")} to see available organizations.`
+          )
+        );
+        process.exit(1);
+      }
+    } else {
+      const config = await readConfig();
+      if (!config.orgId) {
+        const authInfo = await api.testAuth();
+        if (authInfo.orgs.length === 0) {
+          console.log(
+            chalk.red(
+              "✗ No organizations found. Please create one at manufact.com/cloud."
+            )
+          );
+          process.exit(1);
+        }
+        let selectedOrg: OrgInfo | null;
+        if (authInfo.orgs.length === 1) {
+          selectedOrg = authInfo.orgs[0];
+        } else {
+          selectedOrg = await promptOrgSelection(
+            authInfo.orgs,
+            authInfo.default_org_id
+          );
+        }
+        if (!selectedOrg) {
+          console.log(chalk.red("✗ No organization selected."));
+          process.exit(1);
+        }
+        api.setOrgId(selectedOrg.id);
+        await writeConfig({
+          ...config,
+          orgId: selectedOrg.id,
+          orgName: selectedOrg.name,
+          orgSlug: selectedOrg.slug ?? undefined,
+        });
+        console.log(
+          chalk.gray("Organization: ") + chalk.cyan(selectedOrg.name)
+        );
+      } else {
+        if (config.orgName) {
+          const slug = config.orgSlug ? chalk.gray(` (${config.orgSlug})`) : "";
+          console.log(
+            chalk.gray("Organization: ") + chalk.cyan(config.orgName) + slug
+          );
+        }
+      }
+    }
+
+    console.log(chalk.cyan.bold("\n🚀 Deploying to Manufact cloud...\n"));
+
+    // ── Step 3: GitHub connection ─────────────────────────────────
+    let connectionStatus = await api
+      .getGitHubConnectionStatus()
+      .catch(() => null);
+    if (!connectionStatus?.is_connected) {
+      const installed = await promptGitHubInstallation(
+        api,
+        "not_connected",
+        undefined,
+        { yes: options.yes }
+      );
+      if (!installed) {
+        console.log(chalk.gray("Deployment cancelled."));
+        process.exit(0);
+      }
+      connectionStatus = await api
+        .getGitHubConnectionStatus()
+        .catch(() => null);
+      if (!connectionStatus?.is_connected) {
+        console.log(chalk.red("\n✗ GitHub connection could not be verified."));
+        console.log(
+          chalk.cyan(
+            "  Visit https://manufact.com/cloud/settings to connect GitHub.\n"
+          )
+        );
+        process.exit(1);
+      }
+    }
+
+    const installations = connectionStatus.installations ?? [];
+    if (installations.length === 0) {
+      console.log(chalk.red("✗ No GitHub installations found."));
+      process.exit(1);
+    }
+
+    // Default to first org-type installation, fallback to first
+    const defaultInstallation =
+      installations.find((i) => i.account_type === "Organization") ??
+      installations[0];
+    const installationDbId = defaultInstallation.id;
+    const githubInstallationId = defaultInstallation.installation_id;
+
+    console.log(chalk.green("✓ GitHub connected\n"));
+
+    // ── Step 4: Project & Git ─────────────────────────────────────
     const projectDir = options.rootDir
       ? path.resolve(cwd, options.rootDir)
       : cwd;
@@ -931,456 +714,439 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         );
         process.exit(1);
       }
-      console.log(chalk.gray(`  Root dir:   `) + chalk.cyan(options.rootDir));
     }
 
-    // Check if this is an MCP project
     const isMcp = await isMcpProject(projectDir);
-    if (!isMcp) {
+    if (!isMcp && !options.yes) {
       console.log(
-        chalk.yellow(
-          "⚠️  This doesn't appear to be an MCP server project (no mcp-use or @modelcontextprotocol/sdk dependency found)."
-        )
+        chalk.yellow("⚠️  This doesn't look like an MCP server project.")
       );
-      if (!options.yes) {
-        const shouldContinue = await prompt(
-          chalk.white("Continue anyway? (y/n): ")
-        );
-        if (!shouldContinue) {
-          console.log(chalk.gray("Deployment cancelled."));
-          process.exit(0);
-        }
+      const shouldContinue = await prompt(
+        chalk.white("Continue anyway? (y/n): ")
+      );
+      if (!shouldContinue) {
+        process.exit(0);
       }
       console.log();
     }
 
-    // Get git info
-    const gitInfo = await getGitInfo(cwd);
+    let gitInfo = await getGitInfo(cwd);
+    let repoFullName: string | undefined;
+    let branch: string = "main";
 
-    // Validate GitHub repository
-    if (!gitInfo.isGitRepo) {
-      console.log(chalk.red("✗ Not a git repository\n"));
-      console.log(chalk.white("To deploy, initialize git and push to GitHub:"));
-      console.log(chalk.gray("  1. Initialize git:"));
-      console.log(chalk.cyan("     git init\n"));
-      console.log(chalk.gray("  2. Create a GitHub repository at:"));
-      console.log(chalk.cyan("     https://github.com/new\n"));
-      console.log(chalk.gray("  3. Add the remote and push:"));
-      console.log(chalk.cyan("     git remote add origin <your-github-url>"));
-      console.log(chalk.cyan("     git add ."));
-      console.log(chalk.cyan("     git commit -m 'Initial commit'"));
-      console.log(chalk.cyan("     git push -u origin main\n"));
-      process.exit(1);
-    }
+    if (!gitInfo.isGitRepo || !gitInfo.remoteUrl) {
+      // No git repo or no remote — offer to create one
+      const projectName = options.name || (await getProjectName(projectDir));
 
-    if (!gitInfo.remoteUrl) {
-      console.log(chalk.red("✗ No git remote configured\n"));
-      console.log(chalk.white("Add a GitHub remote:"));
-      console.log(chalk.cyan("  git remote add origin <your-github-url>\n"));
-      process.exit(1);
-    }
+      console.log(chalk.yellow("⚠️  No GitHub remote found.\n"));
+      if (options.yes) {
+        console.log(chalk.gray("Creating GitHub repository automatically..."));
+      } else {
+        const shouldCreate = await prompt(
+          chalk.white("Create a GitHub repository and push your code? (Y/n): "),
+          "y"
+        );
+        if (!shouldCreate) {
+          console.log(
+            chalk.gray(
+              "Deployment cancelled. Set up a GitHub remote and try again."
+            )
+          );
+          process.exit(0);
+        }
+      }
 
-    if (!isGitHubUrl(gitInfo.remoteUrl)) {
+      // Let the user pick which GitHub account to create the repo under.
+      // Default to the first org-type installation (org accounts support auto-create).
+      const defaultIdx = installations.findIndex(
+        (i) => i.account_type === "Organization"
+      );
+      let selectedIdx = defaultIdx >= 0 ? defaultIdx : 0;
+
+      if (installations.length > 1 && !options.yes) {
+        console.log(
+          chalk.cyan.bold("🐙 Select a GitHub account for the repository:\n")
+        );
+        for (let i = 0; i < installations.length; i++) {
+          const inst = installations[i];
+          const typeLabel =
+            inst.account_type === "Organization"
+              ? chalk.gray(" (org)")
+              : chalk.gray(" (personal)");
+          const marker = i === selectedIdx ? chalk.green(" ← default") : "";
+          console.log(
+            `  ${chalk.white(`${i + 1}.`)} ${inst.account_login}${typeLabel}${marker}`
+          );
+        }
+        console.log();
+
+        const readline = await import("node:readline");
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout,
+        });
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(
+            chalk.gray(`Enter number [${selectedIdx + 1}]: `),
+            (a) => {
+              rl.close();
+              resolve(a.trim());
+            }
+          );
+        });
+        const parsed = answer === "" ? selectedIdx : parseInt(answer, 10) - 1;
+        if (parsed >= 0 && parsed < installations.length) {
+          selectedIdx = parsed;
+        }
+      }
+
+      const repoInstallation = installations[selectedIdx];
+
+      // Personal accounts cannot create repos via GitHub App installation tokens.
+      if (repoInstallation.account_type !== "Organization") {
+        console.log(
+          chalk.yellow(
+            "\n⚠️  GitHub Apps cannot create repos on personal accounts.\n"
+          )
+        );
+        console.log(
+          chalk.white("To deploy from ") +
+            chalk.cyan(repoInstallation.account_login) +
+            chalk.white(", create a repository manually:\n")
+        );
+        console.log(
+          chalk.cyan("  1. ") +
+            chalk.white("Go to ") +
+            chalk.cyan("https://github.com/new")
+        );
+        console.log(
+          chalk.cyan("  2. ") +
+            chalk.white("Create a repository (any name, can be private)")
+        );
+        console.log(chalk.cyan("  3. ") + chalk.white("Add it as a remote:"));
+        console.log(chalk.gray("     git init && git remote add origin <url>"));
+        console.log(chalk.cyan("  4. ") + chalk.white("Push your code:"));
+        console.log(
+          chalk.gray(
+            "     git add . && git commit -m 'Initial commit' && git push -u origin main"
+          )
+        );
+        console.log(
+          chalk.cyan("  5. ") +
+            chalk.white("Grant the GitHub App access to the repo:")
+        );
+        const appName = await api.getGitHubAppName();
+        console.log(
+          chalk.gray(
+            `     https://github.com/apps/${appName}/installations/new`
+          )
+        );
+        console.log(
+          chalk.cyan("  6. ") +
+            chalk.white("Run ") +
+            chalk.cyan("mcp-use deploy") +
+            chalk.white(" again\n")
+        );
+        process.exit(0);
+      }
+
+      const repoName = options.yes
+        ? projectName
+        : await promptText(chalk.gray("Repository name:"), projectName);
+
+      await ensureGitignore(cwd);
+
+      console.log(
+        chalk.gray(
+          `Creating repository on ${repoInstallation.account_login}...`
+        )
+      );
+      const repoResult = await api.createGitHubRepo({
+        installationId: repoInstallation.installation_id,
+        name: repoName,
+        private: true,
+        org: repoInstallation.account_login,
+      });
+      console.log(chalk.green(`✓ Created ${chalk.cyan(repoResult.fullName)}`));
+
+      if (!gitInfo.isGitRepo) {
+        console.log(chalk.gray("Initializing git..."));
+        await gitInit(cwd, "Initial commit");
+        console.log(chalk.gray("Pushing to GitHub..."));
+        await gitAddRemoteAndPush(cwd, repoResult.cloneUrl, "main");
+      } else {
+        console.log(chalk.gray("Adding remote and pushing..."));
+        await gitAddRemoteAndPush(
+          cwd,
+          repoResult.cloneUrl,
+          gitInfo.branch || "main"
+        );
+      }
+
+      console.log(chalk.green("✓ Code pushed to GitHub\n"));
+
+      gitInfo = await getGitInfo(cwd);
+      repoFullName = repoResult.fullName;
+      branch = gitInfo.branch || "main";
+    } else if (!isGitHubUrl(gitInfo.remoteUrl!)) {
       console.log(chalk.red("✗ Remote is not a GitHub repository"));
       console.log(chalk.yellow(`   Current remote: ${gitInfo.remoteUrl}\n`));
-      console.log(chalk.white("Please add a GitHub remote to deploy."));
       process.exit(1);
-    }
-
-    if (!gitInfo.owner || !gitInfo.repo) {
+    } else if (!gitInfo.owner || !gitInfo.repo) {
       console.log(chalk.red("✗ Could not parse GitHub repository information"));
       process.exit(1);
-    }
+    } else {
+      repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
+      branch = gitInfo.branch || "main";
 
-    // Warn about uncommitted changes
-    if (gitInfo.hasUncommittedChanges) {
-      console.log(chalk.yellow("⚠️  You have uncommitted changes\n"));
-      console.log(chalk.white("Deployments use the code pushed to GitHub."));
-      console.log(
-        chalk.white(
-          "Local changes will not be included until you commit and push.\n"
-        )
-      );
-
-      if (!options.yes) {
-        const shouldContinue = await prompt(
-          chalk.white("Continue with deployment from GitHub? (y/n): ")
-        );
-
-        if (!shouldContinue) {
-          console.log(chalk.gray("Deployment cancelled."));
-          process.exit(0);
+      // Check for uncommitted changes and offer to commit+push
+      if (gitInfo.hasUncommittedChanges) {
+        console.log(chalk.yellow("⚠️  You have uncommitted changes.\n"));
+        if (!options.yes) {
+          const shouldCommit = await prompt(
+            chalk.white("Commit and push changes before deploying? (Y/n): "),
+            "y"
+          );
+          if (shouldCommit) {
+            await ensureGitignore(cwd);
+            console.log(chalk.gray("Committing and pushing..."));
+            await gitCommitAndPush(cwd, "Deploy changes", branch);
+            gitInfo = await getGitInfo(cwd);
+            console.log(chalk.green("✓ Changes pushed\n"));
+          } else {
+            console.log(chalk.gray("Deploying from last pushed commit.\n"));
+          }
         }
       }
-      console.log();
+
+      // Check repo access
+      console.log(chalk.gray("Checking repository access..."));
+      const hasAccess = await checkRepoAccess(
+        api,
+        gitInfo.owner!,
+        gitInfo.repo!
+      );
+      if (!hasAccess) {
+        console.log(
+          chalk.yellow(
+            `⚠️  GitHub App doesn't have access to ${chalk.cyan(repoFullName)}`
+          )
+        );
+        const configured = await promptGitHubInstallation(
+          api,
+          "no_access",
+          repoFullName,
+          { yes: options.yes, installationId: githubInstallationId }
+        );
+        if (!configured) {
+          process.exit(0);
+        }
+        const retry = await checkRepoAccess(api, gitInfo.owner!, gitInfo.repo!);
+        if (!retry) {
+          const appName = await api.getGitHubAppName();
+          console.log(
+            chalk.red(
+              `\n✗ Repository ${chalk.cyan(repoFullName)} is still not accessible.`
+            )
+          );
+          console.log(
+            chalk.cyan(
+              `  https://github.com/apps/${appName}/installations/new\n`
+            )
+          );
+          process.exit(1);
+        }
+      }
+      console.log(chalk.green("✓ Repository access confirmed"));
     }
 
-    console.log(chalk.white("GitHub repository detected:"));
-    console.log(
-      chalk.gray(`  Repository: `) +
-        chalk.cyan(`${gitInfo.owner}/${gitInfo.repo}`)
-    );
-    console.log(
-      chalk.gray(`  Branch:     `) + chalk.cyan(gitInfo.branch || "main")
-    );
-    if (gitInfo.commitSha) {
+    // ── Step 5: Display config ────────────────────────────────────
+    const projectName = options.name || (await getProjectName(projectDir));
+    const port = options.port || 3000;
+    const buildCommand = await detectBuildCommand(projectDir);
+    const startCommand = await detectStartCommand(projectDir);
+    const runtime = options.runtime || (await detectRuntime(projectDir));
+    const envVars = await buildEnvVars(options);
+
+    console.log();
+    console.log(chalk.white("Deployment configuration:"));
+    console.log(chalk.gray(`  Repository:    `) + chalk.cyan(repoFullName));
+    console.log(chalk.gray(`  Branch:        `) + chalk.cyan(branch));
+    console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
+    console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
+    console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
+    if (options.region)
+      console.log(chalk.gray(`  Region:        `) + chalk.cyan(options.region));
+    if (options.buildCommand)
       console.log(
-        chalk.gray(`  Commit:     `) +
-          chalk.gray(gitInfo.commitSha.substring(0, 7))
+        chalk.gray(`  Build command: `) + chalk.cyan(options.buildCommand)
       );
-    }
-    if (gitInfo.commitMessage) {
+    else if (buildCommand)
       console.log(
-        chalk.gray(`  Message:    `) +
-          chalk.gray(gitInfo.commitMessage.split("\n")[0])
+        chalk.gray(`  Build command: `) +
+          chalk.gray(buildCommand + " (auto-detected)")
+      );
+    if (options.startCommand)
+      console.log(
+        chalk.gray(`  Start command: `) + chalk.cyan(options.startCommand)
+      );
+    else if (startCommand)
+      console.log(
+        chalk.gray(`  Start command: `) +
+          chalk.gray(startCommand + " (auto-detected)")
+      );
+    if (Object.keys(envVars).length > 0) {
+      console.log(
+        chalk.gray(`  Environment:   `) +
+          chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
       );
     }
     console.log();
 
-    // Confirm deployment
     if (!options.yes) {
-      const shouldDeploy = await prompt(
-        chalk.white(
-          `Deploy from GitHub repository ${gitInfo.owner}/${gitInfo.repo}? (Y/n): `
-        ),
-        "y"
-      );
-
+      const shouldDeploy = await prompt(chalk.white(`Deploy? (Y/n): `), "y");
       if (!shouldDeploy) {
         console.log(chalk.gray("Deployment cancelled."));
         process.exit(0);
       }
     }
 
-    // Detect project settings (use projectDir for subfolder-aware detection)
-    const projectName = options.name || (await getProjectName(projectDir));
-    const runtime = options.runtime || (await detectRuntime(projectDir));
-    const port = options.port || 3000;
-    const buildCommand = await detectBuildCommand(projectDir);
-    const startCommand = await detectStartCommand(projectDir);
-
-    // Build environment variables
-    const envVars = await buildEnvVars(options);
-
-    console.log();
-    console.log(chalk.white("Deployment configuration:"));
-    console.log(chalk.gray(`  Name:          `) + chalk.cyan(projectName));
-    console.log(chalk.gray(`  Runtime:       `) + chalk.cyan(runtime));
-    console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
-    if (options.rootDir) {
-      console.log(
-        chalk.gray(`  Root dir:      `) + chalk.cyan(options.rootDir)
-      );
-    }
-    if (buildCommand) {
-      console.log(chalk.gray(`  Build command: `) + chalk.cyan(buildCommand));
-    }
-    if (startCommand) {
-      console.log(chalk.gray(`  Start command: `) + chalk.cyan(startCommand));
-    }
-    if (envVars && Object.keys(envVars).length > 0) {
-      console.log(
-        chalk.gray(`  Environment:   `) +
-          chalk.cyan(`${Object.keys(envVars).length} variable(s)`)
-      );
-      console.log(
-        chalk.gray(`                 `) +
-          chalk.gray(Object.keys(envVars).join(", "))
-      );
-    }
-    console.log();
-
-    // Check if project is linked to an existing deployment
-    const api = await McpUseAPI.create();
-
-    // Resolve --org flag: match by slug or ID against the user's profiles
-    if (options.org) {
-      try {
-        const authInfo = await api.testAuth();
-        const match = (authInfo.profiles ?? []).find(
-          (p) =>
-            p.slug === options.org ||
-            p.id === options.org ||
-            p.profile_name.toLowerCase() === options.org!.toLowerCase()
-        );
-        if (match) {
-          api.setProfileId(match.id);
-          const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
-          console.log(
-            chalk.gray("Organization: ") + chalk.cyan(match.profile_name) + slug
-          );
-        } else {
-          console.error(
-            chalk.red(
-              `✗ Organization "${options.org}" not found. Run ${chalk.white("npx mcp-use org list")} to see available organizations.`
-            )
-          );
-          process.exit(1);
-        }
-      } catch (error) {
-        console.error(
-          chalk.red("✗ Failed to resolve organization:"),
-          chalk.red(error instanceof Error ? error.message : "Unknown error")
-        );
-        process.exit(1);
-      }
-    }
-
-    // Pre-flight GitHub connection and repo access check (REQUIRED for GitHub repos)
-    let githubVerified = false;
-    try {
-      // Debug: show which API URL is being used
-      console.log(chalk.gray(`[DEBUG] API URL: ${(api as any).baseUrl}`));
-      const connectionStatus = await api.getGitHubConnectionStatus();
-
-      if (!connectionStatus.is_connected) {
-        // No GitHub connection at all
-        const repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
-        const installed = await promptGitHubInstallation(
-          api,
-          "not_connected",
-          repoFullName,
-          { yes: options.yes }
-        );
-        if (!installed) {
-          console.log(chalk.gray("Deployment cancelled."));
-          process.exit(0);
-        }
-        // After installation, verify again
-        const retryStatus = await api.getGitHubConnectionStatus();
-        if (!retryStatus.is_connected) {
-          console.log(
-            chalk.red("\n✗ GitHub connection could not be verified.")
-          );
-          console.log(
-            chalk.gray("Please try connecting GitHub from the web UI:")
-          );
-          console.log(chalk.cyan("  https://manufact.com/cloud/settings\n"));
-          process.exit(1);
-        }
-        githubVerified = true;
-      } else if (gitInfo.owner && gitInfo.repo) {
-        // GitHub is connected, but check if this specific repo is accessible
-        console.log(chalk.gray("Checking repository access..."));
-        const hasAccess = await checkRepoAccess(
-          api,
-          gitInfo.owner,
-          gitInfo.repo
-        );
-
-        if (!hasAccess) {
-          const repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
-          console.log(
-            chalk.yellow(
-              `⚠️  GitHub App doesn't have access to ${chalk.cyan(repoFullName)}`
-            )
-          );
-
-          const configured = await promptGitHubInstallation(
-            api,
-            "no_access",
-            repoFullName,
-            { yes: options.yes }
-          );
-          if (!configured) {
-            console.log(chalk.gray("Deployment cancelled."));
-            process.exit(0);
-          }
-          // After configuration, verify again
-          const hasAccessRetry = await checkRepoAccess(
-            api,
-            gitInfo.owner,
-            gitInfo.repo
-          );
-          if (!hasAccessRetry) {
-            console.log(
-              chalk.red(
-                `\n✗ Repository ${chalk.cyan(repoFullName)} is still not accessible.`
-              )
-            );
-            console.log(
-              chalk.gray(
-                "Please make sure the GitHub App has access to this repository."
-              )
-            );
-            console.log(
-              chalk.cyan("  https://github.com/settings/installations\n")
-            );
-            process.exit(1);
-          }
-          githubVerified = true;
-        } else {
-          console.log(chalk.green("✓ Repository access confirmed"));
-          githubVerified = true;
-        }
-      }
-    } catch (error) {
-      // For GitHub repos, connection check must succeed
-      console.log(chalk.red("✗ Could not verify GitHub connection"));
-      console.log(
-        chalk.gray(
-          "Error: " + (error instanceof Error ? error.message : "Unknown error")
-        )
-      );
-      console.log(chalk.gray("\nPlease ensure:"));
-      console.log(
-        chalk.cyan(
-          "  1. You have connected GitHub at https://manufact.com/cloud/settings"
-        )
-      );
-      console.log(
-        chalk.cyan("  2. The GitHub App has access to your repository")
-      );
-      console.log(chalk.cyan("  3. Your internet connection is stable\n"));
-      process.exit(1);
-    }
-
-    if (!githubVerified) {
-      console.log(
-        chalk.red("\n✗ GitHub verification required for this deployment")
-      );
-      process.exit(1);
-    }
-
+    // ── Step 6: Deploy ────────────────────────────────────────────
     const existingLink = !options.new ? await getProjectLink(cwd) : null;
-    const serverId = existingLink?.serverId;
+    let serverId = existingLink?.serverId;
 
-    if (existingLink) {
+    if (existingLink && serverId) {
       try {
-        // Verify deployment still exists
-        const existingDeployment = await api.getDeployment(
-          existingLink.deploymentId
-        );
-
-        if (existingDeployment && existingDeployment.status !== "failed") {
-          console.log(chalk.green(`✓ Found linked deployment`));
+        const existingDep = await api.getDeployment(existingLink.deploymentId);
+        if (existingDep && existingDep.status !== "failed") {
+          console.log(chalk.green(`✓ Found linked server`));
           console.log(chalk.gray(`  Redeploying to maintain the same URL...`));
-          console.log(
-            chalk.cyan(`  URL: ${getMcpServerUrl(existingDeployment)}\n`)
-          );
+          console.log(chalk.cyan(`  URL: ${getMcpServerUrl(existingDep)}\n`));
 
-          // Build updated deployment config
-          // Only include port if explicitly provided to avoid overriding existing custom ports
-          const redeploymentConfig = {
-            buildCommand,
-            startCommand,
-            ...(options.port !== undefined ? { port: options.port } : {}),
-            env: Object.keys(envVars).length > 0 ? envVars : undefined,
-            rootDir: options.rootDir || undefined,
-          };
+          const newDep = await api.createDeployment({
+            serverId,
+            branch,
+            trigger: "redeploy",
+          });
 
-          // Redeploy
-          const deployment = await api.redeployDeployment(
-            existingLink.deploymentId,
-            redeploymentConfig
-          );
-
-          // Update link timestamp (preserve serverId if it exists)
           await saveProjectLink(cwd, {
             ...existingLink,
             linkedAt: new Date().toISOString(),
+            deploymentId: newDep.id,
           });
 
-          // Display progress
-          await displayDeploymentProgress(api, deployment, {
-            yes: options.yes,
-          });
-
-          // Open in browser if requested
-          if (options.open && deployment.domain) {
-            console.log();
-            console.log(chalk.gray("Opening deployment in browser..."));
-            await open(`https://${deployment.domain}`);
+          console.log(
+            chalk.green("✓ Deployment created: ") + chalk.gray(newDep.id)
+          );
+          await displayDeploymentProgress(api, newDep.id, { yes: options.yes });
+          return;
+        }
+      } catch (err: any) {
+        const is404 =
+          err?.status === 404 || (err?.message ?? "").includes("404");
+        if (is404) {
+          console.log(
+            chalk.yellow("⚠️  Previously linked server no longer exists.\n")
+          );
+          if (!options.yes) {
+            const shouldRecreate = await prompt(
+              chalk.white("Create a new server and deploy? (Y/n): "),
+              "y"
+            );
+            if (!shouldRecreate) {
+              console.log(chalk.gray("Deployment cancelled."));
+              process.exit(0);
+            }
           }
-          return; // Exit early
-        } else {
-          // Deployment failed or not found, but we have a serverId - preserve it
+          serverId = undefined;
+        }
+      }
+    }
+
+    let deploymentId: string | undefined;
+
+    if (serverId) {
+      console.log(chalk.gray("Creating deployment..."));
+      try {
+        const result = await api.createDeployment({
+          serverId,
+          branch,
+          trigger: "manual",
+        });
+        deploymentId = result.id;
+      } catch (err: any) {
+        const is404 =
+          err?.status === 404 || (err?.message ?? "").includes("404");
+        if (is404) {
           console.log(
             chalk.yellow(
-              `⚠️  Linked deployment not found or failed, creating new one...`
+              "⚠️  Linked server no longer exists. Creating a new one...\n"
             )
           );
-          if (serverId) {
-            console.log(
-              chalk.gray(`  Will reuse existing server: ${serverId}`)
-            );
-          }
-        }
-      } catch (error) {
-        // Deployment not found or error - continue to create new
-        console.log(
-          chalk.yellow(`⚠️  Linked deployment not found, creating new one...`)
-        );
-        if (serverId) {
-          console.log(chalk.gray(`  Will reuse existing server: ${serverId}`));
+          serverId = undefined;
+        } else {
+          throw err;
         }
       }
     }
 
-    // Create deployment request (backend will auto-create server or use blue-green if serverId provided)
-    const deploymentRequest: CreateDeploymentRequest = {
-      name: projectName,
-      source: {
+    if (!serverId) {
+      const orgId = await api.resolveOrganizationId();
+
+      console.log(chalk.gray("Creating server and deployment..."));
+      const serverResult = await api.createServer({
         type: "github",
-        repo: `${gitInfo.owner}/${gitInfo.repo}`,
-        branch: gitInfo.branch || "main",
-        rootDir: options.rootDir || undefined,
-        runtime,
+        organizationId: orgId,
+        installationId: installationDbId,
+        name: projectName,
+        repoFullName: repoFullName!,
+        branch,
+        rootDir: options.rootDir,
         port,
-        buildCommand,
-        startCommand,
         env: Object.keys(envVars).length > 0 ? envVars : undefined,
-      },
-      healthCheckPath: "/healthz",
-      serverId,
-    };
+        region: options.region,
+        buildCommand: options.buildCommand,
+        startCommand: options.startCommand,
+      });
 
-    // Show target organization if not already shown by --org flag
-    if (!options.org) {
-      try {
-        const config = await readConfig();
-        if (config.profileName) {
-          const slug = config.profileSlug
-            ? chalk.gray(` (${config.profileSlug})`)
-            : "";
-          console.log(
-            chalk.gray("Organization: ") + chalk.cyan(config.profileName) + slug
-          );
-        }
-      } catch {
-        // Non-fatal
+      deploymentId = serverResult.deploymentId ?? "";
+      if (!deploymentId) {
+        console.log(
+          chalk.green("✓ Server created: ") + chalk.gray(serverResult.server.id)
+        );
+        console.log(chalk.yellow("⚠️  No deployment was triggered."));
+        return;
       }
+
+      await saveProjectLink(cwd, {
+        deploymentId,
+        deploymentName: projectName,
+        linkedAt: new Date().toISOString(),
+        serverId: serverResult.server.id,
+      });
+      console.log(
+        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
+      );
+      console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
     }
 
-    // Create deployment
-    console.log(chalk.gray("Creating deployment..."));
-    const deployment = await api.createDeployment(deploymentRequest);
+    if (!deploymentId) {
+      console.log(chalk.red("✗ No deployment was created."));
+      process.exit(1);
+    }
 
     console.log(
-      chalk.green("✓ Deployment created: ") + chalk.gray(deployment.id)
+      chalk.green("✓ Deployment created: ") + chalk.gray(deploymentId)
     );
+    await displayDeploymentProgress(api, deploymentId, { yes: options.yes });
 
-    // Save project link with serverId from backend
-    await saveProjectLink(cwd, {
-      deploymentId: deployment.id,
-      deploymentName: projectName,
-      deploymentUrl: deployment.domain,
-      linkedAt: new Date().toISOString(),
-      serverId: deployment.serverId,
-    });
-    console.log(
-      chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
-    );
-    console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
-
-    // Display progress
-    await displayDeploymentProgress(api, deployment, { yes: options.yes });
-
-    // Open in browser if requested
-    if (options.open && deployment.domain) {
-      console.log();
-      console.log(chalk.gray("Opening deployment in browser..."));
-      await open(`https://${deployment.domain}`);
+    if (options.open) {
+      const dep = await api.getDeployment(deploymentId);
+      const url = getMcpServerUrl(dep);
+      if (url) {
+        console.log(chalk.gray("\nOpening in browser..."));
+        await open(url);
+      }
     }
   } catch (error) {
     console.error(

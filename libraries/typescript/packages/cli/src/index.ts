@@ -15,6 +15,7 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
+import { createServersCommand } from "./commands/servers.js";
 import {
   orgCurrentCommand,
   orgListCommand,
@@ -2435,10 +2436,14 @@ program
 // Authentication commands
 program
   .command("login")
-  .description("Login to Manufact cloud")
-  .action(async () => {
+  .description("Login to mcp-use cloud")
+  .option(
+    "--api-key <key>",
+    "Login with an API key directly (non-interactive, for CI/CD)"
+  )
+  .action(async (opts: { apiKey?: string }) => {
     try {
-      await loginCommand();
+      await loginCommand({ apiKey: opts.apiKey });
       process.exit(0);
     } catch (error) {
       console.error(
@@ -2513,6 +2518,15 @@ program
     "Deploy to a specific organization (by slug or ID)"
   )
   .option("-y, --yes", "Skip confirmation prompts")
+  .option("--region <region>", "Deploy region: US, EU, or APAC (default: US)")
+  .option(
+    "--build-command <cmd>",
+    "Custom build command (overrides auto-detection)"
+  )
+  .option(
+    "--start-command <cmd>",
+    "Custom start command (overrides auto-detection)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -2525,6 +2539,9 @@ program
       rootDir: options.rootDir,
       org: options.org,
       yes: options.yes,
+      region: options.region,
+      buildCommand: options.buildCommand,
+      startCommand: options.startCommand,
     });
   });
 
@@ -2533,6 +2550,9 @@ program.addCommand(createClientCommand());
 
 // Deployments command
 program.addCommand(createDeploymentsCommand());
+
+// Servers command
+program.addCommand(createServersCommand());
 
 // Skills command
 program.addCommand(createSkillsCommand());

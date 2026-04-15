@@ -117,7 +117,7 @@ export class SupabaseOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return [];
+    return this.config.scopesSupported ?? [];
   }
 
   getGrantTypesSupported(): string[] {

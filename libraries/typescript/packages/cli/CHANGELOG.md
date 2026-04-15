@@ -1,5 +1,65 @@
 # @mcp-use/cli
 
+## 3.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bba147b]
+  - mcp-use@1.24.0-canary.5
+  - @mcp-use/inspector@2.0.0-canary.5
+
+## 3.0.0-canary.4
+
+### Major Changes
+
+- 2bfcf48: cli: refactor cli to use new manufact apis
+
+### Patch Changes
+
+- Updated dependencies [1718d68]
+  - mcp-use@1.24.0-canary.4
+  - @mcp-use/inspector@2.0.0-canary.4
+
+## 3.0.0-canary.3
+
+### Major Changes
+
+- c51a656: Moved to device flow authentication.
+
+### Patch Changes
+
+- c51a656: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - mcp-use@1.24.0-canary.3
+  - @mcp-use/inspector@2.0.0-canary.3
+
+## 2.21.5-canary.2
+
+### Patch Changes
+
+- Updated dependencies [9478920]
+- Updated dependencies [b0e2492]
+  - mcp-use@1.24.0-canary.2
+  - @mcp-use/inspector@2.0.0-canary.2
+
+## 2.21.5-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4525a5d]
+  - mcp-use@1.24.0-canary.1
+  - @mcp-use/inspector@2.0.0-canary.1
+
+## 2.21.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c77a998]
+  - mcp-use@1.24.0-canary.0
+  - @mcp-use/inspector@2.0.0-canary.0
+
 ## 2.21.4
 
 ### Patch Changes

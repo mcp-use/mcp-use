@@ -25,28 +25,26 @@ export async function orgListCommand(): Promise<void> {
     const authInfo = await api.testAuth();
     const config = await readConfig();
 
-    const profiles = authInfo.profiles ?? [];
-    const activeId = config.profileId || authInfo.default_profile_id;
+    const orgs = authInfo.orgs ?? [];
+    const activeId = config.orgId || authInfo.default_org_id;
 
-    if (profiles.length === 0) {
+    if (orgs.length === 0) {
       console.log(chalk.yellow("No organizations found."));
       return;
     }
 
     console.log(chalk.cyan.bold("🏢 Your organizations:\n"));
 
-    for (const p of profiles) {
-      const isActive = p.id === activeId;
+    for (const o of orgs) {
+      const isActive = o.id === activeId;
       const marker = isActive ? chalk.green(" ← active") : "";
-      const slug = p.slug ? chalk.gray(` (${p.slug})`) : "";
-      const role = chalk.gray(` [${p.role}]`);
-      const name = isActive
-        ? chalk.cyan.bold(p.profile_name)
-        : chalk.white(p.profile_name);
+      const slug = o.slug ? chalk.gray(` (${o.slug})`) : "";
+      const role = chalk.gray(` [${o.role}]`);
+      const name = isActive ? chalk.cyan.bold(o.name) : chalk.white(o.name);
       console.log(`  ${name}${slug}${role}${marker}`);
     }
 
-    if (profiles.length > 1) {
+    if (orgs.length > 1) {
       console.log(
         chalk.gray("\nSwitch with " + chalk.white("npx mcp-use org switch"))
       );
@@ -70,43 +68,41 @@ export async function orgSwitchCommand(): Promise<void> {
     const api = await McpUseAPI.create();
     const authInfo = await api.testAuth();
     const config = await readConfig();
-    const profiles = authInfo.profiles ?? [];
+    const orgs = authInfo.orgs ?? [];
 
-    if (profiles.length === 0) {
+    if (orgs.length === 0) {
       console.log(chalk.yellow("No organizations found."));
       return;
     }
 
-    if (profiles.length === 1) {
-      const p = profiles[0];
-      const slug = p.slug ? chalk.gray(` (${p.slug})`) : "";
+    if (orgs.length === 1) {
+      const o = orgs[0];
+      const slug = o.slug ? chalk.gray(` (${o.slug})`) : "";
       console.log(
         chalk.yellow(
-          `You only have one organization: ${chalk.cyan(p.profile_name)}${slug}`
+          `You only have one organization: ${chalk.cyan(o.name)}${slug}`
         )
       );
       return;
     }
 
-    const activeId = config.profileId || authInfo.default_profile_id;
-    const selected = await promptOrgSelection(profiles, activeId);
+    const activeId = config.orgId || authInfo.default_org_id;
+    const selected = await promptOrgSelection(orgs, activeId);
 
     if (!selected) {
       console.log(chalk.yellow("No organization selected."));
       return;
     }
 
-    // Update local config
     await writeConfig({
       ...config,
-      profileId: selected.id,
-      profileName: selected.profile_name,
-      profileSlug: selected.slug ?? undefined,
+      orgId: selected.id,
+      orgName: selected.name,
+      orgSlug: selected.slug ?? undefined,
     });
 
-    // Sync to backend so the web dashboard reflects the same default
     try {
-      await api.setDefaultProfile(selected.id);
+      await api.setDefaultOrg(selected.id);
     } catch {
       // Non-fatal: the local config is what matters for CLI operations
     }
@@ -114,7 +110,7 @@ export async function orgSwitchCommand(): Promise<void> {
     const slug = selected.slug ? chalk.gray(` (${selected.slug})`) : "";
     console.log(
       chalk.green.bold("\n✓ Switched to ") +
-        chalk.cyan.bold(selected.profile_name) +
+        chalk.cyan.bold(selected.name) +
         slug
     );
   } catch (error) {
@@ -135,7 +131,7 @@ export async function orgCurrentCommand(): Promise<void> {
 
     const config = await readConfig();
 
-    if (!config.profileId) {
+    if (!config.orgId) {
       console.log(
         chalk.yellow(
           "No organization selected. Run " +
@@ -146,12 +142,10 @@ export async function orgCurrentCommand(): Promise<void> {
       return;
     }
 
-    const slug = config.profileSlug
-      ? chalk.gray(` (${config.profileSlug})`)
-      : "";
+    const slug = config.orgSlug ? chalk.gray(` (${config.orgSlug})`) : "";
     console.log(
       chalk.cyan.bold("🏢 Active organization: ") +
-        chalk.white(config.profileName || config.profileId) +
+        chalk.white(config.orgName || config.orgId) +
         slug
     );
   } catch (error) {

@@ -119,6 +119,8 @@ export default function WeatherDisplay() {
 4. Wrap root in `<McpUseProvider autoSize>`
 5. **Always check `isPending` before accessing `props`**
 
+**Production builds (`mcp-use build`):** Never use bare `useWidget()` without a props generic — fields default to `unknown` and TypeScript will fail (e.g. TS2322). If you use `callTool` from `useWidget()`, treat `structuredContent` and nested values as `unknown` until you parse with Zod, narrow with `typeof`/`Array.isArray`, or assign to typed variables; do not pass `unknown` directly as JSX children or string props.
+
 ---
 
 ## Widget Metadata

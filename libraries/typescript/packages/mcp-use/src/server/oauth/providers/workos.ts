@@ -93,7 +93,14 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["email", "offline_access", "openid", "profile"];
+    return (
+      this.config.scopesSupported ?? [
+        "email",
+        "offline_access",
+        "openid",
+        "profile",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {
@@ -104,6 +111,10 @@ export class WorkOSOAuthProvider implements OAuthProvider {
     // Always proxy — WorkOS is an external provider, so the MCP server must
     // proxy OAuth metadata and endpoints to avoid browser CORS issues.
     return "proxy";
+  }
+
+  getClientId(): string | undefined {
+    return this.config.clientId;
   }
 
   getRegistrationEndpoint(): string | undefined {

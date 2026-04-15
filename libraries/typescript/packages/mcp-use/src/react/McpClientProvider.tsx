@@ -142,6 +142,7 @@ interface ServerConfig {
 interface McpServerWrapperProps {
   id: string;
   options: McpServerOptions;
+  defaultCallbackUrl?: string;
   defaultProxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
@@ -208,6 +209,7 @@ interface McpServerWrapperProps {
 function McpServerWrapper({
   id,
   options,
+  defaultCallbackUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback,
   clientInfo: providerClientInfo,
@@ -244,6 +246,8 @@ function McpServerWrapper({
     // Server-specific options take precedence over defaults
     return {
       ...rest,
+      // Use server-specific callbackUrl if provided, otherwise use provider default
+      callbackUrl: rest.callbackUrl || defaultCallbackUrl,
       // Use server-specific proxyConfig if provided, otherwise use default
       proxyConfig: rest.proxyConfig || defaultProxyConfig,
       // Use server-specific autoProxyFallback if provided, otherwise use default
@@ -694,6 +698,15 @@ export interface McpClientProviderProps {
   mcpServers?: Record<string, McpServerOptions>;
 
   /**
+   * Default OAuth callback URL for all servers.
+   * Can be overridden per-server via the callbackUrl option in addServer().
+   * Useful when the app is mounted at a sub-path (e.g. /inspector) so the
+   * OAuth redirect lands on the correct route without requiring a server-side
+   * redirect shim.
+   */
+  defaultCallbackUrl?: string;
+
+  /**
    * Default proxy configuration for all servers
    * Can be overridden per-server in addServer() options
    */
@@ -855,6 +868,7 @@ export interface McpClientProviderProps {
 export function McpClientProvider({
   children,
   mcpServers,
+  defaultCallbackUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback = true,
   clientInfo,
@@ -1356,6 +1370,7 @@ export function McpClientProvider({
           key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
           id={config.id}
           options={config.options}
+          defaultCallbackUrl={defaultCallbackUrl}
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
           clientInfo={clientInfoForWrapper}

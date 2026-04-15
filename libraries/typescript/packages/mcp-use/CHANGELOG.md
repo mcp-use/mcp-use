@@ -1,5 +1,73 @@
 # mcp-use
 
+## 1.24.0-canary.5
+
+### Patch Changes
+
+- bba147b: Fix deployment flow through cli and github connection
+  - @mcp-use/cli@3.0.0-canary.5
+  - @mcp-use/inspector@2.0.0-canary.5
+
+## 1.24.0-canary.4
+
+### Minor Changes
+
+- 1718d68: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+### Patch Changes
+
+- Updated dependencies [1718d68]
+- Updated dependencies [2bfcf48]
+  - @mcp-use/inspector@2.0.0-canary.4
+  - @mcp-use/cli@3.0.0-canary.4
+
+## 1.24.0-canary.3
+
+### Patch Changes
+
+- c51a656: chore(mcp-use): switch several logers to debug from info
+- c51a656: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - @mcp-use/cli@3.0.0-canary.3
+  - @mcp-use/inspector@2.0.0-canary.3
+
+## 1.24.0-canary.2
+
+### Patch Changes
+
+- 9478920: Fix Google provider rejecting tool schemas with `propertyNames` keyword.
+
+  `z.record()` causes `@langchain/core` to emit a `propertyNames` field in the JSON Schema output for constrained or enum key types, which Google's Generative AI API rejects. Switching to `z.object({}).catchall()` produces identical runtime behavior while serializing cleanly without `propertyNames`.
+
+- Updated dependencies [b0e2492]
+  - @mcp-use/inspector@2.0.0-canary.2
+  - @mcp-use/cli@2.21.5-canary.2
+
+## 1.24.0-canary.1
+
+### Patch Changes
+
+- 4525a5d: Add missing fields to CustomProviderConfig to match documentation: `userInfoEndpoint`, `jwksUrl`, `clientId`, `clientSecret`, `mode`, `scopesSupported`, and `audience`. Add `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` as optional methods on the `OAuthProvider` interface. Replace unsafe `(provider as any).config?.clientId` cast in routes with type-safe `provider.getClientId?.()`.
+  - @mcp-use/cli@2.21.5-canary.1
+  - @mcp-use/inspector@2.0.0-canary.1
+
+## 1.24.0-canary.0
+
+### Minor Changes
+
+- c77a998: Add scopes customization to oauth providers
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.5-canary.0
+- @mcp-use/inspector@2.0.0-canary.0
+
 ## 1.23.1
 
 ### Patch Changes
