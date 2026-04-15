@@ -8,6 +8,7 @@
     "mcp-use": "1.23.1"
   },
   "changesets": [
+    "cli-2",
     "fix-custom-provider-config",
     "fix-google-provider-record-schema",
     "fix-inspector-oauth-callback",

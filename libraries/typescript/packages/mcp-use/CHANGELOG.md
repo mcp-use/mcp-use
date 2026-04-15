@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.24.0-canary.5
+
+### Patch Changes
+
+- bba147b: Fix deployment flow through cli and github connection
+  - @mcp-use/cli@3.0.0-canary.5
+  - @mcp-use/inspector@2.0.0-canary.5
+
 ## 1.24.0-canary.4
 
 ### Minor Changes
