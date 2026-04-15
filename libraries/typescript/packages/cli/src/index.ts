@@ -22,6 +22,18 @@ import {
   orgSwitchCommand,
 } from "./commands/org.js";
 import { createSkillsCommand } from "./commands/skills.js";
+import {
+  loadProjectConfig,
+  resolveEntryFile,
+  resolveMcpDir,
+  resolveWidgetsDir,
+} from "./utils/project-config.js";
+import {
+  detectNextJsProject,
+  loadNextJsEnvFiles,
+  registerNextShimsInProcess,
+  withNextShimsEnv,
+} from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 const program = new Command();
 
@@ -314,17 +326,14 @@ async function startTunnel(
   });
 }
 
-async function findServerFile(projectPath: string): Promise<string> {
-  const candidates = ["index.ts", "src/index.ts", "server.ts", "src/server.ts"];
-  for (const candidate of candidates) {
-    try {
-      await access(path.join(projectPath, candidate));
-      return candidate;
-    } catch {
-      continue;
-    }
-  }
-  throw new Error("No server file found");
+async function findServerFile(
+  projectPath: string,
+  cliEntry?: string,
+  cliMcpDir?: string,
+): Promise<string> {
+  const config = await loadProjectConfig(projectPath);
+  const mcpDir = resolveMcpDir(cliMcpDir, config);
+  return resolveEntryFile(projectPath, cliEntry, config, mcpDir);
 }
 
 async function generateToolRegistryTypesForServer(
@@ -382,12 +391,19 @@ async function generateToolRegistryTypesForServer(
 
 async function buildWidgets(
   projectPath: string,
-  options: { inline?: boolean } = {}
+  options: {
+    inline?: boolean;
+    widgetsDir?: string;
+  } = {}
 ): Promise<Array<{ name: string; metadata: any }>> {
   const { inline = true } = options; // Default to true for VS Code compatibility
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
-  const resourcesDir = path.join(projectPath, "resources");
+
+  // Resolve the widgets directory. Callers pass a relative path via
+  // `widgetsDir` (from config / --widgets-dir / --mcp-dir); default is "resources".
+  const widgetsDirRelative = options.widgetsDir ?? "resources";
+  const resourcesDir = path.resolve(projectPath, widgetsDirRelative);
 
   // Get base URL from environment or use default
   const mcpUrl = process.env.MCP_URL;
@@ -397,7 +413,9 @@ async function buildWidgets(
     await access(resourcesDir);
   } catch {
     console.log(
-      chalk.gray("No resources/ directory found - skipping widget build")
+      chalk.gray(
+        `No ${widgetsDirRelative}/ directory found - skipping widget build`
+      )
     );
     return [];
   }
@@ -436,12 +454,16 @@ async function buildWidgets(
       }
     }
   } catch (error) {
-    console.log(chalk.gray("No widgets found in resources/ directory"));
+    console.log(
+      chalk.gray(`No widgets found in ${widgetsDirRelative}/ directory`)
+    );
     return [];
   }
 
   if (entries.length === 0) {
-    console.log(chalk.gray("No widgets found in resources/ directory"));
+    console.log(
+      chalk.gray(`No widgets found in ${widgetsDirRelative}/ directory`)
+    );
     return [];
   }
 
@@ -454,6 +476,20 @@ async function buildWidgets(
   const react = (await import("@vitejs/plugin-react")).default;
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
+  const tsconfigPaths = (await import("vite-tsconfig-paths")).default;
+
+  // Check whether the project has a tsconfig.json we can hand to
+  // vite-tsconfig-paths. When present, widgets that `import '@/components/...'`
+  // resolve through the project's own path aliases (e.g. a Next.js app where
+  // `@/*` → `src/*`). When absent, vite-tsconfig-paths is a no-op.
+  const projectTsconfigPath = path.join(projectPath, "tsconfig.json");
+  let hasProjectTsconfig = false;
+  try {
+    await access(projectTsconfigPath);
+    hasProjectTsconfig = true;
+  } catch {
+    // No tsconfig — fall back to the legacy "@" → resourcesDir alias
+  }
 
   // Read favicon config from package.json
   const packageJsonPath = path.join(projectPath, "package.json");
@@ -488,7 +524,23 @@ async function buildWidgets(
       .relative(tempDir, mcpUsePath)
       .replace(/\\/g, "/");
 
-    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory and mcp-use package */\n@source "${relativeResourcesPath}";\n@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";\n`;
+    // When the project has a `src/` tree (typical for Next.js apps), tell
+    // Tailwind to scan it too — otherwise classes used inside shared
+    // components imported via `@/components/...` would be missing from the
+    // widget bundle.
+    const projectSrcDir = path.join(projectPath, "src");
+    let projectSrcSourceLine = "";
+    try {
+      await access(projectSrcDir);
+      const relativeProjectSrcPath = path
+        .relative(tempDir, projectSrcDir)
+        .replace(/\\/g, "/");
+      projectSrcSourceLine = `@source "${relativeProjectSrcPath}";\n`;
+    } catch {
+      // No src/ directory at the project root, skip
+    }
+
+    const cssContent = `@import "tailwindcss";\n\n/* Configure Tailwind to scan the resources directory and mcp-use package */\n@source "${relativeResourcesPath}";\n@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";\n${projectSrcSourceLine}`;
     await fs.writeFile(path.join(tempDir, "styles.css"), cssContent, "utf8");
 
     // Create entry file
@@ -584,12 +636,27 @@ export default PostHog;
       const metadataServer = await createServer({
         root: metadataTempDir,
         cacheDir: path.join(metadataTempDir, ".vite-cache"),
-        plugins: [nodeStubsPlugin, tailwindcss(), react()],
-        resolve: {
-          alias: {
-            "@": resourcesDir,
-          },
-        },
+        plugins: [
+          nodeStubsPlugin,
+          ...(hasProjectTsconfig
+            ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
+            : []),
+          tailwindcss(),
+          react(),
+        ],
+        // When the project has a tsconfig, vite-tsconfig-paths owns `@/*`
+        // resolution (it picks up whatever aliases the project already
+        // defines). We only fall back to the legacy hardcoded alias for
+        // projects without a tsconfig (e.g. JS-only scaffolds).
+        ...(hasProjectTsconfig
+          ? {}
+          : {
+              resolve: {
+                alias: {
+                  "@": resourcesDir,
+                },
+              },
+            }),
         server: {
           middlewareMode: true,
         },
@@ -781,15 +848,28 @@ export default {
         },
       };
 
-      // Build plugins array - add viteSingleFile when inlining for VS Code compatibility
+      // Build plugins array - add viteSingleFile when inlining for VS Code compatibility.
+      // vite-tsconfig-paths wires up the project's own `@/*` aliases (when a
+      // tsconfig.json exists at the project root); this is what lets a widget
+      // inside a Next.js app `import '@/components/ui/card'` and resolve it
+      // through the app's own paths config.
+      const tsconfigPathsPlugins = hasProjectTsconfig
+        ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
+        : [];
       const buildPlugins = inline
         ? [
             buildNodeStubsPlugin,
+            ...tsconfigPathsPlugins,
             tailwindcss(),
             react(),
             viteSingleFile({ removeViteModuleLoader: true }),
           ]
-        : [buildNodeStubsPlugin, tailwindcss(), react()];
+        : [
+            buildNodeStubsPlugin,
+            ...tsconfigPathsPlugins,
+            tailwindcss(),
+            react(),
+          ];
 
       await build({
         root: tempDir,
@@ -814,11 +894,18 @@ export default {
                 },
               },
             }),
-        resolve: {
-          alias: {
-            "@": resourcesDir,
-          },
-        },
+        // Only install the legacy "@" → resourcesDir alias for projects
+        // without a tsconfig. When a tsconfig exists, vite-tsconfig-paths
+        // owns `@/*` resolution (see plugin list above).
+        ...(hasProjectTsconfig
+          ? {}
+          : {
+              resolve: {
+                alias: {
+                  "@": resourcesDir,
+                },
+              },
+            }),
         optimizeDeps: {
           // Exclude Node.js-only packages from browser bundling
           exclude: ["posthog-node"],
@@ -1105,6 +1192,18 @@ program
   .command("build")
   .description("Build TypeScript and MCP UI widgets")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option(
+    "--entry <file>",
+    "Path to MCP server entry file (relative to project)"
+  )
+  .option(
+    "--widgets-dir <dir>",
+    "Path to widgets directory (relative to project)"
+  )
+  .option(
+    "--mcp-dir <dir>",
+    "Folder holding the MCP entry + resources (e.g. 'src/mcp' for Next.js apps)"
+  )
   .option("--with-inspector", "Include inspector in production build")
   .option(
     "--inline",
@@ -1119,16 +1218,30 @@ program
 
       displayPackageVersions(projectPath);
 
+      // Resolve project config + mcpDir for widgets + server entry
+      const projectConfig = await loadProjectConfig(projectPath);
+      const mcpDir = resolveMcpDir(options.mcpDir, projectConfig);
+      const widgetsDir = resolveWidgetsDir(
+        options.widgetsDir,
+        projectConfig,
+        mcpDir
+      );
+
       // Build widgets first (this generates schemas)
       // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
       const builtWidgets = await buildWidgets(projectPath, {
         inline: options.inline ?? false,
+        widgetsDir,
       });
 
       // Find the source server file before building
       let sourceServerFile: string | undefined;
       try {
-        sourceServerFile = await findServerFile(projectPath);
+        sourceServerFile = await findServerFile(
+          projectPath,
+          options.entry,
+          options.mcpDir
+        );
       } catch {
         // No server file found, that's okay for widget-only projects
       }
@@ -1288,6 +1401,18 @@ program
   .command("dev")
   .description("Run development server with auto-reload and inspector")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option(
+    "--entry <file>",
+    "Path to MCP server entry file (relative to project)"
+  )
+  .option(
+    "--widgets-dir <dir>",
+    "Path to widgets directory (relative to project)"
+  )
+  .option(
+    "--mcp-dir <dir>",
+    "Folder holding the MCP entry + resources (e.g. 'src/mcp' for Next.js apps)"
+  )
   .option("--port <port>", "Server port", "3000")
   .option(
     "--host <host>",
@@ -1315,8 +1440,30 @@ program
         port = availablePort;
       }
 
-      // Find the main source file
-      const serverFile = await findServerFile(projectPath);
+      // Find the main source file (honors --entry / --mcp-dir flags and mcp-use.config.json)
+      const serverFile = await findServerFile(
+        projectPath,
+        options.entry,
+        options.mcpDir
+      );
+
+      // Resolve the widgets directory and expose it via an env var so the
+      // running MCPServer (which picks `resources/` by default) discovers
+      // widgets at `<mcpDir>/resources` when the developer used --mcp-dir.
+      // The env var is the contract: mcp-use/server reads it when no
+      // explicit `resourcesDir` is passed to mountWidgets.
+      {
+        const devProjectConfig = await loadProjectConfig(projectPath);
+        const devMcpDir = resolveMcpDir(options.mcpDir, devProjectConfig);
+        const devWidgetsDir = resolveWidgetsDir(
+          options.widgetsDir,
+          devProjectConfig,
+          devMcpDir
+        );
+        if (devWidgetsDir !== "resources") {
+          process.env.MCP_USE_WIDGETS_DIR = devWidgetsDir;
+        }
+      }
 
       // Start tunnel if requested
       let tunnelProcess: any = undefined;
@@ -1414,18 +1561,37 @@ program
       } else if (!process.env.MCP_URL) {
         process.env.MCP_URL = mcpUrl;
       }
+      // Detect Next.js projects so we can install shims for server-only /
+      // next/cache / next/headers / next/navigation / next/server — all of
+      // which throw or misbehave outside a Next.js request context. We also
+      // mirror Next.js's .env cascade so tools imported from the app find
+      // the variables they expect (DB URLs, feature-flag keys, etc.).
+      const isNextJsProject = await detectNextJsProject(projectPath);
+      if (isNextJsProject) {
+        console.log(
+          chalk.gray(
+            "Next.js detected — installing server-runtime shims (server-only, next/cache, next/headers, next/navigation, next/server)"
+          )
+        );
+        await loadNextJsEnvFiles(projectPath);
+      }
+
       if (!useHmr) {
         // Fallback: Use tsx watch (restarts process on changes)
         console.log(chalk.gray("HMR disabled, using tsx watch (full restart)"));
 
         const processes: any[] = [];
-        const env: NodeJS.ProcessEnv = {
+        const baseEnv: NodeJS.ProcessEnv = {
+          // Inherit parent env (PATH, HOME, etc.) — without it, tsx can't
+          // resolve its own tooling in some setups.
+          ...process.env,
           PORT: String(port),
           HOST: host,
           NODE_ENV: "development",
           // Preserve user-provided MCP_URL (e.g., for reverse proxy setups)
           MCP_URL: process.env.MCP_URL || mcpUrl,
         };
+        const env = isNextJsProject ? withNextShimsEnv(baseEnv) : baseEnv;
 
         // Use local tsx if available, otherwise fall back to npx
         const { createRequire } = await import("node:module");
@@ -1546,34 +1712,101 @@ program
         )
       );
 
+      // Register Next.js server-runtime shims in-process. The HMR path calls
+      // `tsImport` in this process (no child) so the loader has to be
+      // registered here, before the first import of the user's server entry.
+      if (isNextJsProject) {
+        const registered = await registerNextShimsInProcess();
+        if (!registered) {
+          console.warn(
+            chalk.yellow(
+              "[HMR] Warning: Next.js shim loader could not be found on disk. " +
+                "Importing server-only / next/cache / etc. will throw. " +
+                "Reinstall @mcp-use/cli to fix."
+            )
+          );
+        }
+      }
+
       const chokidarModule = await import("chokidar");
       const chokidar = (chokidarModule as any).default || chokidarModule;
       const { fileURLToPath } = await import("node:url");
       const { createRequire } = await import("node:module");
 
-      // Try to get tsx's tsImport function for TypeScript support
-      let tsImport:
-        | ((
-            specifier: string,
-            parentUrlOrOptions:
-              | string
-              | {
-                  parentURL: string;
-                  onImport?: (file: string) => void;
-                  tsconfig?: string | false;
-                }
-          ) => Promise<any>)
-        | null = null;
+      // Resolve the user's tsconfig up front — the server load path below
+      // depends on tsx picking it up so `@/*` aliases resolve.
+      const projectTsconfigPath = path.join(projectPath, "tsconfig.json");
+      let tsconfigAvailable = false;
+      try {
+        await access(projectTsconfigPath);
+        tsconfigAvailable = true;
+        // Belt-and-braces: tsx also consults TSX_TSCONFIG_PATH and walks up
+        // from cwd for auto-discovery. Setting both covers every tsx code
+        // path (initialize hook, globalPreload hook, CJS require path).
+        process.env.TSX_TSCONFIG_PATH = projectTsconfigPath;
+        if (process.cwd() !== projectPath) process.chdir(projectPath);
+      } catch {
+        // No tsconfig at the project root — path aliases won't resolve.
+      }
+
+      // Install tsx's loader hooks globally (no namespace). We deliberately
+      // do NOT use tsx's `tsImport` here: tsImport registers tsx with a
+      // generated namespace, which causes tsx's resolver to bail for any
+      // specifier whose URL doesn't carry that namespace — including all
+      // transitive imports like `@/lib/...`. Registering without a namespace
+      // means tsx's resolver runs for every specifier and always consults
+      // the tsconfig paths matcher.
+      //
+      // We also need tsx's CJS register: a Next.js app's package.json has no
+      // `"type": "module"`, so tsx compiles .ts to CJS, and the user entry's
+      // `require()` chain needs tsx's CJS `.ts` compilation + tsconfig-paths
+      // rewriting. Without tsx/cjs, require("@/lib/...") throws.
+      //
+      // After register, we use native dynamic `import()` with a ?t= cache
+      // buster on each reload (same technique tsImport uses internally).
+      let tsxLoaderActive = false;
       try {
         const projectRequire = createRequire(
           path.join(projectPath, "package.json")
         );
-        // Resolve tsx/esm/api from the user's project
-        const tsxApiPath = projectRequire.resolve("tsx/esm/api");
-        const tsxApi = await import(pathToFileURL(tsxApiPath).href);
-        tsImport = tsxApi.tsImport;
+
+        // ESM side — tsx/esm/api.register()
+        const tsxEsmApiPath = projectRequire.resolve("tsx/esm/api");
+        const tsxEsmApi = await import(pathToFileURL(tsxEsmApiPath).href);
+        if (typeof tsxEsmApi.register === "function") {
+          tsxEsmApi.register({
+            tsconfig: tsconfigAvailable ? projectTsconfigPath : undefined,
+            onImport: (url: string) => {
+              const { fileURLToPath } = require(
+                "node:url"
+              ) as typeof import("node:url");
+              const filePath = url.startsWith("file://")
+                ? fileURLToPath(url)
+                : url;
+              if (
+                !filePath.includes("node_modules") &&
+                filePath.startsWith(projectPath)
+              ) {
+                console.debug(`[HMR] Loaded: ${url}`);
+              }
+            },
+          });
+          tsxLoaderActive = true;
+        }
+
+        // CJS side — tsx/cjs/api.register(). Handles require() of .ts files
+        // and tsconfig-paths rewriting inside CJS-compiled modules.
+        try {
+          const tsxCjsApiPath = projectRequire.resolve("tsx/cjs/api");
+          const tsxCjsApi = await import(pathToFileURL(tsxCjsApiPath).href);
+          if (typeof tsxCjsApi.register === "function") {
+            tsxCjsApi.register();
+          }
+        } catch {
+          // tsx/cjs isn't exposed in some tsx minor versions; skipping is OK
+          // as long as the ESM side is up. In practice tsx 4.x ships both.
+        }
       } catch {
-        // tsx not found - continue without it (JS files only, or tsx might be globally available)
         console.log(
           chalk.yellow(
             "Warning: tsx not found in project dependencies. TypeScript HMR may not work.\n" +
@@ -1595,32 +1828,20 @@ program
         const previousServer = (globalThis as any).__mcpUseLastServer;
         (globalThis as any).__mcpUseLastServer = null;
 
-        // Use tsx's tsImport if available for TypeScript support
-        // Otherwise fall back to native import (for JS files or if tsx is globally loaded)
-        if (tsImport) {
-          // tsImport handles TypeScript compilation and does not cache loaded modules,
-          // so the entire dependency tree is re-evaluated on each call.
-          // The ?t= timestamp is kept as a safety measure for edge cases.
-          await tsImport(`${serverFileUrl}?t=${Date.now()}`, {
-            parentURL: import.meta.url,
-            onImport: (file: string) => {
-              const filePath = file.startsWith("file://")
-                ? fileURLToPath(file)
-                : file;
-              if (
-                !filePath.includes("node_modules") &&
-                filePath.startsWith(projectPath)
-              ) {
-                console.debug(`[HMR] Loaded: ${file}`);
-              }
-            },
-          });
-        } else {
-          // Native import - works for JS files or if tsx is already loaded via --import.
-          // WARNING: Native import() caches modules by URL. The ?t= timestamp busts
-          // the cache for the entry file only; sub-imports will use cached versions.
-          await import(`${serverFileUrl}?t=${Date.now()}`);
+        // Native dynamic import is the reload mechanism. tsx's resolver/
+        // loader is registered globally above (no namespace), so TS files
+        // and tsconfig `@/*` paths resolve automatically. The ?t= query
+        // busts Node's module cache on every reload; transitive modules
+        // also re-evaluate because their specifiers include the cache-busted
+        // parent URL in the resolve chain.
+        //
+        // When tsx isn't available we still do native import — it'll only
+        // work for JS files, which matches the old fallback behavior.
+        if (!tsxLoaderActive) {
+          // Unused: log already printed during register. Kept as a guard
+          // so type-checkers can see the branch is intentional.
         }
+        await import(`${serverFileUrl}?t=${Date.now()}`);
 
         // Get the server instance from the global registry
         // No export required - MCPServer tracks itself when created via globalThis
@@ -1644,9 +1865,9 @@ program
             chalk.yellow(
               "[HMR] Warning: Module re-import returned the same server instance. " +
                 "The module may not have been re-evaluated. " +
-                (!tsImport
+                (!tsxLoaderActive
                   ? "Install tsx as a devDependency for reliable TypeScript HMR."
-                  : "This may be a tsx caching issue.")
+                  : "This may be a module cache issue.")
             )
           );
           return null;
@@ -2167,6 +2388,14 @@ program
   .command("start")
   .description("Start production server")
   .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option(
+    "--entry <file>",
+    "Path to MCP server entry file (relative to project)"
+  )
+  .option(
+    "--mcp-dir <dir>",
+    "Folder holding the MCP entry + resources (e.g. 'src/mcp' for Next.js apps)"
+  )
   .option("--port <port>", "Server port", "3000")
   .option("--tunnel", "Expose server through a tunnel")
   .action(async (options) => {
@@ -2303,7 +2532,18 @@ program
 
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
+        // Resolve mcpDir from CLI flag + config so `--mcp-dir src/mcp` finds the
+        // compiled entry at dist/src/mcp/index.js even without a manifest.
+        const startProjectConfig = await loadProjectConfig(projectPath);
+        const startMcpDir = resolveMcpDir(options.mcpDir, startProjectConfig);
+
         const serverCandidates = [
+          ...(startMcpDir
+            ? [
+                `dist/${startMcpDir}/index.js`,
+                `dist/${startMcpDir}/server.js`,
+              ]
+            : []),
           "dist/index.js",
           "dist/server.js",
           "dist/src/index.js",

@@ -72,7 +72,13 @@ export async function mountWidgetsDev(
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
   const baseRoute = options?.baseRoute || "/mcp-use/widgets";
-  const resourcesDir = options?.resourcesDir || "resources";
+  // Resolution order for the widgets directory:
+  //   1. Caller-supplied `options.resourcesDir`
+  //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
+  //      or mcpUseConfig.mcpDir points at e.g. `src/mcp`)
+  //   3. Default `"resources"` at the project root
+  const resourcesDir =
+    options?.resourcesDir || process.env.MCP_USE_WIDGETS_DIR || "resources";
   const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
   // Ensure resources directory exists - create it if missing.
@@ -167,6 +173,12 @@ export async function mountWidgetsDev(
   let createServer: any;
   let react: any;
   let tailwindcss: any;
+  // vite-tsconfig-paths is optional: present in projects with a tsconfig.json
+  // at the root (Next.js apps always have one). When available, widgets can
+  // `import '@/components/...'` and the project's `@/*` paths resolve natively,
+  // instead of forcing the old hardcoded `@` → resources alias.
+  let tsconfigPaths: any = undefined;
+  let projectTsconfigPath: string | undefined;
 
   try {
     // Use createRequire to resolve modules from the user's project directory (getCwd())
@@ -191,6 +203,29 @@ export async function mountWidgetsDev(
     react = reactModule.default;
     const tailwindModule = await import(pathToFileURL(tailwindPath).href);
     tailwindcss = tailwindModule.default;
+
+    // Try to resolve vite-tsconfig-paths from the user's project OR from the
+    // CLI's own node_modules (it's a dep of @mcp-use/cli). Either source is
+    // fine — the plugin only reads the tsconfig path we hand it.
+    const candidateTsconfig = pathHelpers.join(getCwd(), "tsconfig.json");
+    if (await fsHelpers.existsSync(candidateTsconfig)) {
+      projectTsconfigPath = candidateTsconfig;
+      try {
+        const tsconfigPathsPath = userProjectRequire.resolve(
+          "vite-tsconfig-paths"
+        );
+        const tsconfigPathsModule = await import(
+          pathToFileURL(tsconfigPathsPath).href
+        );
+        tsconfigPaths = tsconfigPathsModule.default;
+      } catch {
+        // vite-tsconfig-paths not available in the user's project — widgets
+        // that use `@/*` alias will fall back to the legacy resources-dir
+        // alias below. This is fine for projects scaffolded with
+        // create-mcp-use-app which only use relative imports inside
+        // resources/.
+      }
+    }
   } catch (error) {
     throw new Error(
       "❌ Widget dependencies not installed!\n\n" +
@@ -233,12 +268,24 @@ export async function mountWidgetsDev(
       .relative(widgetTempDir, mcpUsePath)
       .replace(/\\/g, "/");
 
+    // When a project has a `src/` tree (typical for Next.js apps), also
+    // scan it so Tailwind picks up classes from shared components that
+    // widgets import via `@/components/...`. Without this, classes used
+    // only inside a shared component would be stripped from the widget CSS.
+    const projectSrcPath = pathHelpers.join(getCwd(), "src");
+    const projectSrcExists = await fsHelpers.existsSync(projectSrcPath);
+    const projectSrcSource = projectSrcExists
+      ? `@source "${pathHelpers
+          .relative(widgetTempDir, projectSrcPath)
+          .replace(/\\/g, "/")}";\n`
+      : "";
+
     const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
 @source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
-`;
+${projectSrcSource}`;
     await fs.writeFile(
       pathHelpers.join(widgetTempDir, "styles.css"),
       cssContent,
@@ -474,12 +521,24 @@ if (container && Component) {
           .relative(widgetTempDir, mcpUsePath)
           .replace(/\\/g, "/");
 
-        const cssContent = `@import "tailwindcss";
+        // When a project has a `src/` tree (typical for Next.js apps), also
+    // scan it so Tailwind picks up classes from shared components that
+    // widgets import via `@/components/...`. Without this, classes used
+    // only inside a shared component would be stripped from the widget CSS.
+    const projectSrcPath = pathHelpers.join(getCwd(), "src");
+    const projectSrcExists = await fsHelpers.existsSync(projectSrcPath);
+    const projectSrcSource = projectSrcExists
+      ? `@source "${pathHelpers
+          .relative(widgetTempDir, projectSrcPath)
+          .replace(/\\/g, "/")}";\n`
+      : "";
+
+    const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
 @source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
-`;
+${projectSrcSource}`;
         await fs.writeFile(
           pathHelpers.join(widgetTempDir, "styles.css"),
           cssContent,
@@ -1073,14 +1132,28 @@ export default PostHog;
       widgetHmrPlugin,
       suppressFullReloadPlugin,
       watchResourcesPlugin,
+      // When the project has a tsconfig with `paths`, wire them up so a
+      // widget can `import '@/components/ui/card'` and hit the real file in
+      // the user's app. Plugin must run BEFORE other resolvers so it gets
+      // first dibs on specifiers that start with `@/`.
+      ...(tsconfigPaths && projectTsconfigPath
+        ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
+        : []),
       tailwindcss(),
       react(),
     ],
     resolve: {
       dedupe: ["react", "react-dom"],
-      alias: {
-        "@": pathHelpers.join(getCwd(), resourcesDir),
-      },
+      // Legacy behavior — only install the hardcoded `@` → resources alias
+      // when the project has no tsconfig (i.e. vite-tsconfig-paths didn't
+      // register). With a tsconfig, the plugin above owns `@/*`.
+      ...(tsconfigPaths && projectTsconfigPath
+        ? {}
+        : {
+            alias: {
+              "@": pathHelpers.join(getCwd(), resourcesDir),
+            },
+          }),
     },
     build: {
       // Disable source maps to avoid CSP eval violations
