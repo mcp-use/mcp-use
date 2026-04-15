@@ -51,10 +51,20 @@ export function mountInspector(
     sandboxOrigin: config?.sandboxOrigin,
   };
 
-  // If it's already a Hono app, register routes directly
-  if (app instanceof Hono) {
-    registerInspectorRoutes(app, config);
-    registerStaticRoutes(app, clientDistPath, runtimeConfig);
+  // If it's already a Hono app, register routes directly.
+  //
+  // We detect Hono by its `.fetch(Request) => Response` method rather than
+  // `app instanceof Hono`. When this package and the host (e.g. `mcp-use`)
+  // resolve different copies of `hono` from `node_modules` — common when
+  // multiple deps bundle their own Hono — `instanceof` returns false even
+  // for a real Hono app, and the Express-compat path below runs against a
+  // Hono Context, crashing on `req.headers.host`. Express apps don't expose
+  // `.fetch`, so the check is unambiguous in practice.
+  const looksLikeHono =
+    app instanceof Hono || typeof (app as any)?.fetch === "function";
+  if (looksLikeHono) {
+    registerInspectorRoutes(app as Hono, config);
+    registerStaticRoutes(app as Hono, clientDistPath, runtimeConfig);
     return;
   }
 
