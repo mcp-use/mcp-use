@@ -24,13 +24,7 @@ export const widgetMetadata: WidgetMetadata = {
 type CodePreviewProps = z.infer<typeof propSchema>;
 
 const CodePreview: React.FC = () => {
-  const {
-    props,
-    isPending,
-    isOutputStreaming,
-    partialToolOutput,
-    theme,
-  } =
+  const { props, isPending, isOutputStreaming, partialToolOutput, theme } =
     useWidget<CodePreviewProps>();
 
   const isDark = theme === "dark";

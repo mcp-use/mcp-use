@@ -168,9 +168,8 @@ export function useWidget<
     string,
     unknown
   > | null>(null);
-  const [mcpAppsPartialToolOutput, setMcpAppsPartialToolOutput] = useState<
-    Record<string, unknown> | null
-  >(null);
+  const [mcpAppsPartialToolOutput, setMcpAppsPartialToolOutput] =
+    useState<Record<string, unknown> | null>(null);
   const [mcpAppsResponseMetadata, setMcpAppsResponseMetadata] = useState<Record<
     string,
     unknown
@@ -429,8 +428,10 @@ export function useWidget<
       openaiPartialToolOutput &&
       typeof openaiPartialToolOutput === "object"
     ) {
-      partialStructuredContent =
-        openaiPartialToolOutput as Record<string, unknown>;
+      partialStructuredContent = openaiPartialToolOutput as Record<
+        string,
+        unknown
+      >;
     } else if (provider === "mcp-apps" && mcpAppsToolOutput) {
       structuredContent = mcpAppsToolOutput as Record<string, unknown>;
     } else if (
@@ -438,8 +439,10 @@ export function useWidget<
       mcpAppsPartialToolOutput &&
       typeof mcpAppsPartialToolOutput === "object"
     ) {
-      partialStructuredContent =
-        mcpAppsPartialToolOutput as Record<string, unknown>;
+      partialStructuredContent = mcpAppsPartialToolOutput as Record<
+        string,
+        unknown
+      >;
     } else if (provider === "mcp-ui" && urlParams.toolOutput) {
       structuredContent = urlParams.toolOutput as Record<string, unknown>;
     }
