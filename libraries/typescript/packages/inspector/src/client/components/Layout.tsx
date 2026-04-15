@@ -209,7 +209,9 @@ export function Layout({ children }: LayoutProps) {
             })
           )
           .catch(() => {});
-      } catch {}
+      } catch {
+        // ignore telemetry errors
+      }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -227,7 +229,9 @@ export function Layout({ children }: LayoutProps) {
             })
           )
           .catch(() => {});
-      } catch {}
+      } catch {
+        // ignore telemetry errors
+      }
       previousTabRef.current = tab;
       tabsVisitedRef.current.add(tab);
 

@@ -108,7 +108,9 @@ export function AddToClientDropdown({
       Telemetry.getInstance()
         .capture(new MCPAddToClientEvent({ client }))
         .catch(() => {});
-    } catch {}
+    } catch {
+      // ignore telemetry errors
+    }
   };
 
   const handleCursorClick = () => {

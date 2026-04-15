@@ -184,7 +184,9 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
           })
         )
         .catch(() => {});
-    } catch {}
+    } catch {
+      // ignore telemetry errors
+    }
 
     setConfigDialogOpen(false);
   }, [
