@@ -8,8 +8,8 @@
  *   libraries/typescript/packages/cli/src/utils/project-config.ts
  */
 
-import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
 export interface ProjectConfig {
   /** Path to the MCP server entry file, relative to project root. */
@@ -43,21 +43,44 @@ export interface ProjectConfig {
   tsconfigPath?: string;
 }
 
-const CONFIG_FILENAME = 'mcp-use.config.json';
+const CONFIG_FILENAME = "mcp-use.config.json";
 
 /**
  * Load mcp-use.config.json from a project directory.
- * Returns an empty object if not found.
+ *
+ * Returns an empty object when the file is absent. A malformed JSON file is
+ * re-thrown with a clear error message instead of being silently ignored —
+ * a typo in the config would otherwise surface as "entry file not found"
+ * later, which is much harder to debug.
  */
 export async function loadProjectConfig(
-  projectPath: string,
+  projectPath: string
 ): Promise<ProjectConfig> {
   const configPath = path.join(projectPath, CONFIG_FILENAME);
+
+  let content: string;
   try {
-    const content = await fs.readFile(configPath, 'utf-8');
-    return JSON.parse(content);
-  } catch {
-    return {};
+    content = await fs.readFile(configPath, "utf-8");
+  } catch (error: unknown) {
+    // Missing file is the happy path (config file is optional).
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      return {};
+    }
+    throw error;
+  }
+
+  try {
+    return JSON.parse(content) as ProjectConfig;
+  } catch (error: unknown) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`Invalid JSON in ${configPath}: ${error.message}`);
+    }
+    throw error;
   }
 }
 
@@ -67,7 +90,7 @@ export async function loadProjectConfig(
  */
 export function resolveMcpDir(
   cliMcpDir: string | undefined,
-  config: ProjectConfig,
+  config: ProjectConfig
 ): string | undefined {
   return cliMcpDir ?? config.mcpDir;
 }
@@ -80,7 +103,7 @@ export async function resolveEntryFile(
   projectPath: string,
   cliEntry: string | undefined,
   config: ProjectConfig,
-  mcpDir?: string,
+  mcpDir?: string
 ): Promise<string> {
   // 1. CLI --entry flag wins
   if (cliEntry) {
@@ -97,10 +120,10 @@ export async function resolveEntryFile(
   // 3. mcpDir-scoped defaults — drop-in Next.js layout
   if (mcpDir) {
     const mcpCandidates = [
-      path.join(mcpDir, 'index.ts'),
-      path.join(mcpDir, 'index.tsx'),
-      path.join(mcpDir, 'server.ts'),
-      path.join(mcpDir, 'server.tsx'),
+      path.join(mcpDir, "index.ts"),
+      path.join(mcpDir, "index.tsx"),
+      path.join(mcpDir, "server.ts"),
+      path.join(mcpDir, "server.tsx"),
     ];
     for (const candidate of mcpCandidates) {
       try {
@@ -112,16 +135,16 @@ export async function resolveEntryFile(
     }
     throw new Error(
       `No entry file found inside ${mcpDir}.\n\n` +
-        `Expected one of: ${mcpCandidates.map((c) => path.relative(projectPath, path.join(projectPath, c))).join(', ')}\n\n` +
+        `Expected one of: ${mcpCandidates.map((c) => path.relative(projectPath, path.join(projectPath, c))).join(", ")}\n\n` +
         `Fix this by either:\n` +
-        `  1. Creating ${path.join(mcpDir, 'index.ts')}, or\n` +
+        `  1. Creating ${path.join(mcpDir, "index.ts")}, or\n` +
         `  2. Passing --entry <file> on the command line, or\n` +
-        `  3. Adding { "entry": "<file>" } to ${CONFIG_FILENAME}`,
+        `  3. Adding { "entry": "<file>" } to ${CONFIG_FILENAME}`
     );
   }
 
   // 4. Default search — legacy mcp-use convention (top-level)
-  const candidates = ['index.ts', 'src/index.ts', 'server.ts', 'src/server.ts'];
+  const candidates = ["index.ts", "src/index.ts", "server.ts", "src/server.ts"];
   for (const candidate of candidates) {
     try {
       await fs.access(path.join(projectPath, candidate));
@@ -133,11 +156,11 @@ export async function resolveEntryFile(
 
   throw new Error(
     `No entry file found.\n\n` +
-      `Expected one of: ${candidates.join(', ')}\n\n` +
+      `Expected one of: ${candidates.join(", ")}\n\n` +
       `Fix this by either:\n` +
       `  1. Creating one of the default entry files above, or\n` +
       `  2. Passing --entry <file> on the command line, or\n` +
-      `  3. Adding { "entry": "<file>" } or { "mcpDir": "<dir>" } to ${CONFIG_FILENAME}`,
+      `  3. Adding { "entry": "<file>" } or { "mcpDir": "<dir>" } to ${CONFIG_FILENAME}`
   );
 }
 
@@ -148,28 +171,50 @@ export async function resolveEntryFile(
 export function resolveWidgetsDir(
   cliWidgetsDir: string | undefined,
   config: ProjectConfig,
-  mcpDir?: string,
+  mcpDir?: string
 ): string {
   if (cliWidgetsDir) return cliWidgetsDir;
   if (config.widgetsDir) return config.widgetsDir;
-  if (mcpDir) return path.join(mcpDir, 'resources');
-  return 'resources';
+  if (mcpDir) return path.join(mcpDir, "resources");
+  return "resources";
+}
+
+/**
+ * Parse a port value from an arbitrary CLI flag / env var / config value.
+ *
+ * Returns `undefined` for anything that isn't a valid TCP port so callers
+ * can fall through to the next candidate instead of silently advertising
+ * `NaN` or out-of-range values.
+ */
+function parsePortValue(
+  value: string | number | undefined
+): number | undefined {
+  if (value === undefined) return undefined;
+  const port = typeof value === "string" ? parseInt(value, 10) : value;
+  if (!Number.isInteger(port) || port < 0 || port > 65535) return undefined;
+  return port;
 }
 
 /**
  * Resolve the port for dev/start servers.
  * Priority: CLI flag > env var (PORT) > config file > default (3000).
+ * Invalid values at each level (non-numeric, out-of-range) skip that level
+ * and fall through to the next candidate.
  */
 export function resolvePort(
   cliPort: string | number | undefined,
   config: ProjectConfig,
-  defaultPort: number = 3000,
+  defaultPort: number = 3000
 ): number {
-  if (cliPort !== undefined) {
-    return typeof cliPort === 'string' ? parseInt(cliPort, 10) : cliPort;
-  }
-  if (process.env.PORT) return parseInt(process.env.PORT, 10);
-  if (config.port) return config.port;
+  const resolvedCli = parsePortValue(cliPort);
+  if (resolvedCli !== undefined) return resolvedCli;
+
+  const resolvedEnv = parsePortValue(process.env.PORT);
+  if (resolvedEnv !== undefined) return resolvedEnv;
+
+  const resolvedConfig = parsePortValue(config.port);
+  if (resolvedConfig !== undefined) return resolvedConfig;
+
   return defaultPort;
 }
 

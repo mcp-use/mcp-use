@@ -27,6 +27,26 @@ const TMP_MCP_USE_DIR = ".mcp-use";
 
 const DEFAULT_HMR_PORT = 24678;
 
+/**
+ * When a project has a `src/` tree (typical for Next.js apps), emit a
+ * Tailwind `@source` directive so shared components imported via
+ * `@/components/...` contribute their class names to the widget's CSS.
+ * Returns an empty string when the directory is absent.
+ *
+ * Shared by the initial widget CSS generation and the on-the-fly HMR
+ * path so both stay in sync.
+ */
+async function computeProjectSrcSourceLine(
+  widgetTempDir: string
+): Promise<string> {
+  const projectSrcPath = pathHelpers.join(getCwd(), "src");
+  if (!(await fsHelpers.existsSync(projectSrcPath))) return "";
+  const relative = pathHelpers
+    .relative(widgetTempDir, projectSrcPath)
+    .replace(/\\/g, "/");
+  return `@source "${relative}";\n`;
+}
+
 async function findAvailablePort(startPort: number): Promise<number> {
   const net = await import("node:net");
   return new Promise((resolve) => {
@@ -204,29 +224,42 @@ export async function mountWidgetsDev(
     const tailwindModule = await import(pathToFileURL(tailwindPath).href);
     tailwindcss = tailwindModule.default;
 
-    // Try to resolve vite-tsconfig-paths from the user's project OR from the
-    // CLI's own node_modules (it's a dep of @mcp-use/cli). Either source is
-    // fine — the plugin only reads the tsconfig path we hand it.
+    // Try to resolve vite-tsconfig-paths from:
+    //   1. the user's project directly (pnpm/strict resolvers need this), or
+    //   2. @mcp-use/cli's node_modules (the CLI depends on it, so any project
+    //      that ran `mcp-use dev` has it reachable through the CLI package).
+    // Either source is fine — the plugin only reads the tsconfig path we
+    // hand it, and both copies of vite-tsconfig-paths behave identically.
     const candidateTsconfig = pathHelpers.join(getCwd(), "tsconfig.json");
     if (await fsHelpers.existsSync(candidateTsconfig)) {
       projectTsconfigPath = candidateTsconfig;
+      let tsconfigPathsPath: string | undefined;
       try {
-        const tsconfigPathsPath = userProjectRequire.resolve(
-          "vite-tsconfig-paths"
-        );
+        tsconfigPathsPath = userProjectRequire.resolve("vite-tsconfig-paths");
+      } catch {
+        // Fall back to the copy bundled with @mcp-use/cli.
+        try {
+          const cliPkgPath = userProjectRequire.resolve(
+            "@mcp-use/cli/package.json"
+          );
+          const cliRequire = createRequire(cliPkgPath);
+          tsconfigPathsPath = cliRequire.resolve("vite-tsconfig-paths");
+        } catch {
+          // Genuinely unavailable — widgets that use `@/*` fall back to the
+          // legacy resources-dir alias below. That's fine for projects
+          // scaffolded with create-mcp-use-app (relative imports inside
+          // resources/), but Next.js drop-in projects should install
+          // vite-tsconfig-paths directly for reliable `@/components/...`
+          // resolution.
+        }
+      }
+      if (tsconfigPathsPath) {
         const tsconfigPathsModule = await import(
           pathToFileURL(tsconfigPathsPath).href
         );
         tsconfigPaths = tsconfigPathsModule.default;
-      } catch {
-        // vite-tsconfig-paths not available in the user's project — widgets
-        // that use `@/*` alias will fall back to the legacy resources-dir
-        // alias below. This is fine for projects scaffolded with
-        // create-mcp-use-app which only use relative imports inside
-        // resources/.
       }
     }
-
   } catch (error) {
     throw new Error(
       "❌ Widget dependencies not installed!\n\n" +
@@ -269,17 +302,7 @@ export async function mountWidgetsDev(
       .relative(widgetTempDir, mcpUsePath)
       .replace(/\\/g, "/");
 
-    // When a project has a `src/` tree (typical for Next.js apps), also
-    // scan it so Tailwind picks up classes from shared components that
-    // widgets import via `@/components/...`. Without this, classes used
-    // only inside a shared component would be stripped from the widget CSS.
-    const projectSrcPath = pathHelpers.join(getCwd(), "src");
-    const projectSrcExists = await fsHelpers.existsSync(projectSrcPath);
-    const projectSrcSource = projectSrcExists
-      ? `@source "${pathHelpers
-          .relative(widgetTempDir, projectSrcPath)
-          .replace(/\\/g, "/")}";\n`
-      : "";
+    const projectSrcSource = await computeProjectSrcSourceLine(widgetTempDir);
 
     const cssContent = `@import "tailwindcss";
 
@@ -522,19 +545,10 @@ if (container && Component) {
           .relative(widgetTempDir, mcpUsePath)
           .replace(/\\/g, "/");
 
-        // When a project has a `src/` tree (typical for Next.js apps), also
-    // scan it so Tailwind picks up classes from shared components that
-    // widgets import via `@/components/...`. Without this, classes used
-    // only inside a shared component would be stripped from the widget CSS.
-    const projectSrcPath = pathHelpers.join(getCwd(), "src");
-    const projectSrcExists = await fsHelpers.existsSync(projectSrcPath);
-    const projectSrcSource = projectSrcExists
-      ? `@source "${pathHelpers
-          .relative(widgetTempDir, projectSrcPath)
-          .replace(/\\/g, "/")}";\n`
-      : "";
+        const projectSrcSource =
+          await computeProjectSrcSourceLine(widgetTempDir);
 
-    const cssContent = `@import "tailwindcss";
+        const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";

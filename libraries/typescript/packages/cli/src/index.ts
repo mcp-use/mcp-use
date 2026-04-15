@@ -329,7 +329,7 @@ async function startTunnel(
 async function findServerFile(
   projectPath: string,
   cliEntry?: string,
-  cliMcpDir?: string,
+  cliMcpDir?: string
 ): Promise<string> {
   const config = await loadProjectConfig(projectPath);
   const mcpDir = resolveMcpDir(cliMcpDir, config);
@@ -1777,9 +1777,8 @@ program
           tsxEsmApi.register({
             tsconfig: tsconfigAvailable ? projectTsconfigPath : undefined,
             onImport: (url: string) => {
-              const { fileURLToPath } = require(
-                "node:url"
-              ) as typeof import("node:url");
+              const { fileURLToPath } =
+                require("node:url") as typeof import("node:url");
               const filePath = url.startsWith("file://")
                 ? fileURLToPath(url)
                 : url;
@@ -2539,10 +2538,7 @@ program
 
         const serverCandidates = [
           ...(startMcpDir
-            ? [
-                `dist/${startMcpDir}/index.js`,
-                `dist/${startMcpDir}/server.js`,
-              ]
+            ? [`dist/${startMcpDir}/index.js`, `dist/${startMcpDir}/server.js`]
             : []),
           "dist/index.js",
           "dist/server.js",
