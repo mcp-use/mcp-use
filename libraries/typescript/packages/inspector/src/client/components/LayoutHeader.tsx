@@ -376,7 +376,9 @@ function TunnelBadge({
       Telemetry.getInstance()
         .capture(new MCPTunnelActionEvent({ action: "start", success }))
         .catch(() => {});
-    } catch {}
+    } catch {
+      // ignore telemetry errors
+    }
   };
 
   const handleStopTunnel = async () => {
@@ -412,7 +414,9 @@ function TunnelBadge({
           })
         )
         .catch(() => {});
-    } catch {}
+    } catch {
+      // ignore telemetry errors
+    }
   };
 
   if (isTunnelStarting) {
@@ -770,7 +774,9 @@ export function LayoutHeader({
                           })
                         )
                         .catch(() => {});
-                    } catch {}
+                    } catch {
+                      // ignore telemetry errors
+                    }
                   }}
                 >
                   <Rocket className="size-4" />
@@ -1109,7 +1115,9 @@ export function LayoutHeader({
                         })
                       )
                       .catch(() => {});
-                  } catch {}
+                  } catch {
+                    // ignore telemetry errors
+                  }
                 }}
               >
                 <Rocket className="size-4" />

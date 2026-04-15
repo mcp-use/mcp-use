@@ -102,7 +102,9 @@ export function InspectorDashboard() {
               })
             )
             .catch(() => {});
-        } catch {}
+        } catch {
+          // ignore telemetry errors
+        }
       } else if (
         connection.state === "failed" &&
         reportedConnectionsRef.current.has(connection.id)
@@ -119,7 +121,9 @@ export function InspectorDashboard() {
         Telemetry.getInstance()
           .capture(new MCPServerRemovedEvent({ serverId: connectionId }))
           .catch(() => {});
-      } catch {}
+      } catch {
+        // ignore telemetry errors
+      }
       reportedConnectionsRef.current.delete(connectionId);
       removeConnection(connectionId);
     },
