@@ -28,6 +28,12 @@ const CDN_JS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.js`;
 const CDN_CSS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.css`;
 
 /**
+ * Inspector deployment mode. Identifies how the inspector is being served so the
+ * client can distinguish the three supported deployments.
+ */
+export type InspectorMode = "standalone" | "embedded" | "cloud";
+
+/**
  * Runtime configuration injected into the inspector HTML at serve time.
  */
 interface RuntimeConfig {
@@ -37,6 +43,8 @@ interface RuntimeConfig {
   sandboxOrigin?: string | null;
   /** Relative path to the MCP proxy (e.g. "/inspector/api/proxy"). When set, the client uses it for autoProxyFallback. Omit when the proxy is not available (e.g. Python server serving inspector). */
   proxyUrl?: string | null;
+  /** How the inspector is being served (standalone CLI, embedded in mcp-use, or cloud-hosted). Consumed by telemetry. */
+  inspectorMode?: InspectorMode;
 }
 
 /**
@@ -61,6 +69,12 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
   if (config.proxyUrl !== undefined) {
     scripts.push(
       `<script>window.__MCP_PROXY_URL__ = ${JSON.stringify(config.proxyUrl)};</script>`
+    );
+  }
+
+  if (config.inspectorMode) {
+    scripts.push(
+      `<script>window.__MCP_INSPECTOR_MODE__ = ${JSON.stringify(config.inspectorMode)};</script>`
     );
   }
 
@@ -91,6 +105,11 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     if (config.proxyUrl !== undefined) {
       scripts.push(
         `<script>window.__MCP_PROXY_URL__ = ${JSON.stringify(config.proxyUrl)};</script>`
+      );
+    }
+    if (config.inspectorMode) {
+      scripts.push(
+        `<script>window.__MCP_INSPECTOR_MODE__ = ${JSON.stringify(config.inspectorMode)};</script>`
       );
     }
     return scripts.join("\n    ");
