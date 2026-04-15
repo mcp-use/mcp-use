@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 /**
  * Tests for logLevel configuration in useMcp hook
  *

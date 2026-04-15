@@ -41,6 +41,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
   installFetchInterceptor?: () => void;
+  restoreFetch?: () => void;
   serverUrl?: string;
 };
 
@@ -2020,6 +2021,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return () => {
       isMountedRef.current = false;
       addLog("debug", "useMcp unmounting, disconnecting.");
+
+      // Restore window.fetch if a proxy interceptor was installed.
+      // restoreFetch() is a no-op when no interceptor is active.
+      authProviderRef.current?.restoreFetch?.();
 
       // Clear OAuth state ONLY if we're in the middle of an OAuth flow
       // This prevents "code verifier not found" errors in StrictMode double-mounting
