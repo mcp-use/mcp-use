@@ -1,5 +1,27 @@
 # @mcp-use/cli
 
+## 3.0.0
+
+### Major Changes
+
+- 4070f26: Moved to device flow authentication.
+- 4070f26: cli: refactor cli to use new manufact apis
+
+### Patch Changes
+
+- 4070f26: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+  - mcp-use@1.24.0
+  - @mcp-use/inspector@2.0.0
+
 ## 3.0.0-canary.5
 
 ### Patch Changes
