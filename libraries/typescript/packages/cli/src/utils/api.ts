@@ -53,6 +53,48 @@ export interface CreateServerResponse {
   deploymentId: string | null;
 }
 
+/** Connected GitHub repository (subset of OpenAPI server payload). */
+export interface CloudServerConnectedRepository {
+  id: string;
+  repoFullName: string;
+  productionBranch: string;
+  isActive: boolean;
+  userId: string;
+  githubInstallationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Server record from `GET /servers` or `GET /servers/{id}` (fields used by CLI). */
+export interface CloudServer {
+  id: string;
+  slug: string | null;
+  organizationId: string;
+  userId: string | null;
+  connectedRepositoryId: string;
+  connectedRepository?: CloudServerConnectedRepository;
+  name: string | null;
+  description: string | null;
+  tags?: string[];
+  config?: unknown;
+  createdAt: string;
+  updatedAt: string;
+  displayPreferences?: { icon?: string; color?: string };
+  status: string;
+  latestDeploymentStatus: string | null;
+  activeDeploymentId: string | null;
+  previousDeploymentId: string | null;
+  region: string;
+  providerRegion?: string;
+  runProvider?: string;
+  buildProvider?: string;
+  /** Public MCP endpoint when provisioned (preferred over synthesizing from id/slug). */
+  mcpUrl?: string | null;
+  domains?: unknown[];
+  deployments?: unknown[];
+  _count?: { deployments?: number };
+}
+
 // ── Deployments ────────────────────────────────────────────────────
 
 export interface CreateDeploymentInput {
@@ -106,6 +148,8 @@ export interface BuildLogsResponse {
 export interface GitHubInstallation {
   id: string;
   installation_id: string;
+  account_login: string;
+  account_type: string;
 }
 
 export interface GitHubConnectionStatus {
@@ -288,6 +332,43 @@ export class McpUseAPI {
     });
   }
 
+  async listServers(params?: {
+    organizationId?: string;
+    limit?: number;
+    skip?: number;
+    sort?: string;
+  }): Promise<CloudServer[]> {
+    const search = new URLSearchParams();
+    if (params?.organizationId) {
+      search.set("organizationId", params.organizationId);
+    }
+    if (params?.limit != null) {
+      search.set("limit", String(params.limit));
+    }
+    if (params?.skip != null) {
+      search.set("skip", String(params.skip));
+    }
+    if (params?.sort) {
+      search.set("sort", params.sort);
+    }
+    const q = search.toString();
+    return this.request<CloudServer[]>(`/servers${q ? `?${q}` : ""}`);
+  }
+
+  async getServer(idOrSlug: string): Promise<CloudServer> {
+    const path = encodeURIComponent(idOrSlug);
+    return this.request<CloudServer>(`/servers/${path}`);
+  }
+
+  async deleteServer(id: string): Promise<void> {
+    await this.request<{ success: boolean }>(
+      `/servers/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
   // ── Deployments ─────────────────────────────────────────────────
 
   async createDeployment(
@@ -360,6 +441,8 @@ export class McpUseAPI {
       installations: resp.installations.map((i) => ({
         id: i.id,
         installation_id: i.installationId,
+        account_login: i.account?.login ?? "",
+        account_type: i.account?.type ?? "User",
       })),
     };
   }
@@ -411,6 +494,37 @@ export class McpUseAPI {
 
   async getGitHubAppName(): Promise<string> {
     if (process.env.MCP_GITHUB_APP_NAME) return process.env.MCP_GITHUB_APP_NAME;
-    return this.baseUrl.includes(".dev.") ? "mcp-use-dev" : "mcp-use";
+    if (this.baseUrl.includes("localhost")) return "mcp-use-local";
+    if (this.baseUrl.includes(".dev.")) return "mcp-use-dev";
+    return "mcp-use";
+  }
+
+  /**
+   * Returns the GitHub numeric installation ID (not the DB UUID) for the org.
+   * Used for building direct installation settings URLs.
+   */
+  async getGitHubInstallationId(): Promise<string | null> {
+    const status = await this.getGitHubConnectionStatus();
+    return status.installations?.[0]?.installation_id ?? null;
+  }
+
+  async createGitHubRepo(opts: {
+    installationId: string;
+    name: string;
+    private?: boolean;
+    org?: string;
+  }): Promise<{ fullName: string; cloneUrl: string; htmlUrl: string }> {
+    return this.request<{
+      fullName: string;
+      cloneUrl: string;
+      htmlUrl: string;
+    }>(`/github/installations/${opts.installationId}/repos`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: opts.name,
+        private: opts.private ?? true,
+        org: opts.org,
+      }),
+    });
   }
 }

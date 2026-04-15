@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { McpUseAPI } from "../utils/api.js";
+import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { isLoggedIn } from "../utils/config.js";
 import { formatRelativeTime } from "../utils/format.js";
 
@@ -128,10 +129,15 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
       chalk.white("Status:        ") + statusColor(deployment.status)
     );
 
-    if (deployment.mcpUrl) {
+    if (deployment.serverId) {
       console.log(
-        chalk.white("MCP URL:       ") + chalk.cyan(deployment.mcpUrl)
+        chalk.white("Server ID:     ") + chalk.gray(deployment.serverId)
       );
+    }
+
+    const mcpUrl = getMcpServerUrl(deployment);
+    if (mcpUrl) {
+      console.log(chalk.white("MCP URL:       ") + chalk.cyan(mcpUrl));
     }
 
     if (deployment.gitBranch) {
