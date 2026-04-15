@@ -179,6 +179,15 @@ export async function mountWidgetsDev(
   // instead of forcing the old hardcoded `@` → resources alias.
   let tsconfigPaths: any = undefined;
   let projectTsconfigPath: string | undefined;
+  // Pinned React paths — used as Vite resolve.alias entries so every import
+  // (the widget entry, the user's shared components, mcp-use/react) lands on
+  // byte-identical files. Without these, HMR re-optimizing deps can produce
+  // a second React module instance in the iframe and hooks throw
+  // "Cannot read properties of null (reading 'useState')".
+  let reactPath: string | undefined;
+  let reactDomPath: string | undefined;
+  let reactJsxRuntimePath: string | undefined;
+  let reactJsxDevRuntimePath: string | undefined;
 
   try {
     // Use createRequire to resolve modules from the user's project directory (getCwd())
@@ -226,6 +235,30 @@ export async function mountWidgetsDev(
         // resources/.
       }
     }
+
+    // Resolve absolute paths for the four React entrypoints from the user's
+    // project. We feed these as Vite resolve.alias entries below so that the
+    // widget entry, the user's shared components (resolved via tsconfig
+    // paths), and `mcp-use/react` all land on the SAME physical files. This
+    // is what keeps a single React instance alive across HMR cycles —
+    // without it, an edit triggers Vite to re-optimize deps, and the
+    // re-optimized React replaces the running one, breaking the hooks
+    // dispatcher and producing "Cannot read properties of null (reading
+    // 'useState')" on the next render.
+    try {
+      reactPath = userProjectRequire.resolve("react");
+    } catch {}
+    try {
+      reactDomPath = userProjectRequire.resolve("react-dom");
+    } catch {}
+    try {
+      reactJsxRuntimePath = userProjectRequire.resolve("react/jsx-runtime");
+    } catch {}
+    try {
+      reactJsxDevRuntimePath = userProjectRequire.resolve(
+        "react/jsx-dev-runtime"
+      );
+    } catch {}
   } catch (error) {
     throw new Error(
       "❌ Widget dependencies not installed!\n\n" +
@@ -1132,6 +1165,32 @@ export default PostHog;
       widgetHmrPlugin,
       suppressFullReloadPlugin,
       watchResourcesPlugin,
+      // Pin React to the user-project's installed copy for CLIENT (browser)
+      // resolution only. Without this, Vite re-optimizes deps after each
+      // HMR cycle and the new React module replaces the running one,
+      // breaking the hooks dispatcher and producing
+      // "Cannot read properties of null (reading 'useState')" on the next
+      // render. We deliberately skip SSR mode: applying the alias there
+      // makes Vite try to ESM-eval the CJS `react/index.js` and crash with
+      // `module is not defined` during widget metadata extraction.
+      {
+        name: "mcp-use-pin-react-client",
+        enforce: "pre" as const,
+        resolveId(
+          source: string,
+          _importer: string | undefined,
+          options: { ssr?: boolean }
+        ) {
+          if (options?.ssr) return null;
+          if (source === "react" && reactPath) return reactPath;
+          if (source === "react-dom" && reactDomPath) return reactDomPath;
+          if (source === "react/jsx-runtime" && reactJsxRuntimePath)
+            return reactJsxRuntimePath;
+          if (source === "react/jsx-dev-runtime" && reactJsxDevRuntimePath)
+            return reactJsxDevRuntimePath;
+          return null;
+        },
+      },
       // When the project has a tsconfig with `paths`, wire them up so a
       // widget can `import '@/components/ui/card'` and hit the real file in
       // the user's app. Plugin must run BEFORE other resolvers so it gets
@@ -1144,9 +1203,9 @@ export default PostHog;
     ],
     resolve: {
       dedupe: ["react", "react-dom"],
-      // Legacy behavior — only install the hardcoded `@` → resources alias
-      // when the project has no tsconfig (i.e. vite-tsconfig-paths didn't
-      // register). With a tsconfig, the plugin above owns `@/*`.
+      // Legacy `@` alias only when the project has no tsconfig (i.e.
+      // vite-tsconfig-paths didn't register). With a tsconfig, the
+      // plugin at the front of the plugin chain owns `@/*`.
       ...(tsconfigPaths && projectTsconfigPath
         ? {}
         : {
@@ -1217,8 +1276,20 @@ export default PostHog;
     ssr: {
       // Force Vite to transform these packages in SSR instead of using external requires
       noExternal: ["@openai/apps-sdk-ui", "react-router"],
-      // Mark Node.js-only packages as external in SSR mode
-      external: ["posthog-node"],
+      // Mark Node.js-only packages as external in SSR mode.
+      // React must also be external in SSR mode: when we alias `react` to a
+      // specific file path (the user-project's react), Vite's SSR ESM
+      // evaluator tries to ESM-eval the CJS `react/index.js` and crashes
+      // with "module is not defined". Marking react/react-dom external lets
+      // Node's regular require handle CJS naturally during the metadata-
+      // extraction SSR pass. The browser bundle still gets the alias.
+      external: [
+        "posthog-node",
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+      ],
     },
     define: {
       // Define process.env for SSR context
