@@ -49,6 +49,7 @@ export function mountInspector(
   const runtimeConfig = {
     devMode: config?.devMode,
     sandboxOrigin: config?.sandboxOrigin,
+    inspectorMode: "embedded" as const,
   };
 
   // If it's already a Hono app, register routes directly
