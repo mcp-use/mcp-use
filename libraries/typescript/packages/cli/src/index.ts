@@ -1777,8 +1777,7 @@ program
           tsxEsmApi.register({
             tsconfig: tsconfigAvailable ? projectTsconfigPath : undefined,
             onImport: (url: string) => {
-              const { fileURLToPath } =
-                require("node:url") as typeof import("node:url");
+              // `fileURLToPath` is in scope from the outer destructure above.
               const filePath = url.startsWith("file://")
                 ? fileURLToPath(url)
                 : url;
