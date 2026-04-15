@@ -2518,12 +2518,15 @@ program
     "Deploy to a specific organization (by slug or ID)"
   )
   .option("-y, --yes", "Skip confirmation prompts")
+  .option("--region <region>", "Deploy region: US, EU, or APAC (default: US)")
   .option(
-    "--region <region>",
-    "Deploy region: US, EU, or APAC (default: US)"
+    "--build-command <cmd>",
+    "Custom build command (overrides auto-detection)"
   )
-  .option("--build-command <cmd>", "Custom build command (overrides auto-detection)")
-  .option("--start-command <cmd>", "Custom start command (overrides auto-detection)")
+  .option(
+    "--start-command <cmd>",
+    "Custom start command (overrides auto-detection)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,

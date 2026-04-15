@@ -1,6 +1,5 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import type { CloudServer } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrlForCloudServer } from "../utils/cloud-urls.js";
 import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
@@ -173,18 +172,14 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
       chalk.white("Name:          ") + chalk.cyan(server.name ?? "-")
     );
     const statusColor = getStatusColor(server.status);
-    console.log(
-      chalk.white("Status:        ") + statusColor(server.status)
-    );
+    console.log(chalk.white("Status:        ") + statusColor(server.status));
     if (server.latestDeploymentStatus) {
       console.log(
         chalk.white("Last deploy:   ") +
           chalk.gray(server.latestDeploymentStatus)
       );
     }
-    console.log(
-      chalk.white("Region:        ") + chalk.gray(server.region)
-    );
+    console.log(chalk.white("Region:        ") + chalk.gray(server.region));
     console.log(
       chalk.white("MCP URL:       ") +
         chalk.cyan(getMcpServerUrlForCloudServer(server))
@@ -193,9 +188,7 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
     if (server.connectedRepository) {
       const cr = server.connectedRepository;
       console.log(chalk.white("\nRepository"));
-      console.log(
-        chalk.white("  Full name:   ") + chalk.gray(cr.repoFullName)
-      );
+      console.log(chalk.white("  Full name:   ") + chalk.gray(cr.repoFullName));
       console.log(
         chalk.white("  Prod branch: ") + chalk.gray(cr.productionBranch)
       );
@@ -257,8 +250,7 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
         const dname = pickStr(d, "name").substring(0, 23).padEnd(24);
         const dst = pickStr(d, "status").padEnd(12);
         const du = pickStr(d, "updatedAt");
-        const updated =
-          du !== "-" ? formatRelativeTime(du) : chalk.gray("-");
+        const updated = du !== "-" ? formatRelativeTime(du) : chalk.gray("-");
         const sc = getStatusColor(dst.trim());
         console.log(
           `${chalk.gray(did)} ${dname} ${sc(dst)} ${chalk.gray(updated)}`

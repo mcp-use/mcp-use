@@ -1,4 +1,4 @@
-import type { CloudServer, Deployment } from "./api.js";
+import type { Deployment } from "./api.js";
 
 const GATEWAY_DOMAIN = "run.mcp-use.com";
 
