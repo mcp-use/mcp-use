@@ -356,11 +356,71 @@ async function generateToolRegistryTypesForServer(
     (globalThis as any).__mcpUseHmrMode = true;
     (globalThis as any).__mcpUseLastServer = undefined;
 
-    const { tsImport } = await import("tsx/esm/api");
-    await tsImport(pathToFileURL(serverFile).href, {
-      parentURL: import.meta.url,
-      tsconfig: path.join(projectPath, "tsconfig.json"),
-    });
+    // Detect Next.js projects and install the server-runtime shim loaders
+    // BEFORE tsx registers — otherwise transitive imports of `server-only`,
+    // `next/cache`, etc. from the user entry throw during module evaluation.
+    if (await detectNextJsProject(projectPath)) {
+      await loadNextJsEnvFiles(projectPath);
+      await registerNextShimsInProcess();
+    }
+
+    // Register tsx's loader hooks namespace-less + globally. We deliberately
+    // do NOT use `tsImport` here: tsImport wraps tsx in a generated
+    // namespace, and tsx's resolver bails via `return nextResolve(...)` for
+    // any specifier whose parent URL doesn't carry that namespace — which
+    // means transitive `@/lib/...` imports from the user entry never reach
+    // tsx's tsconfig-paths resolver and fail with
+    // `Cannot find package '@/lib'`. Namespace-less registration makes
+    // tsx's resolver run uniformly on every specifier.
+    //
+    // Paired with tsx/cjs/api.register() because tsx compiles `.ts` to CJS
+    // by default in non-`"type": "module"` packages (i.e. every Next.js
+    // app), and the resulting `require()` chain needs the same tsconfig-
+    // paths treatment applied on the CJS side.
+    const projectTsconfigPath = path.join(projectPath, "tsconfig.json");
+    const hasTsconfig = await access(projectTsconfigPath)
+      .then(() => true)
+      .catch(() => false);
+    if (hasTsconfig) {
+      process.env.TSX_TSCONFIG_PATH = projectTsconfigPath;
+    }
+    const previousCwd = process.cwd();
+    if (previousCwd !== projectPath) process.chdir(projectPath);
+
+    try {
+      const projectRequire = createRequire(
+        path.join(projectPath, "package.json")
+      );
+
+      // ESM side
+      const tsxEsmApiPath = projectRequire.resolve("tsx/esm/api");
+      const tsxEsmApi = await import(pathToFileURL(tsxEsmApiPath).href);
+      if (typeof tsxEsmApi.register === "function") {
+        tsxEsmApi.register({
+          tsconfig: hasTsconfig ? projectTsconfigPath : undefined,
+        });
+      }
+
+      // CJS side (optional — tsx 4.x ships both entry points)
+      try {
+        const tsxCjsApiPath = projectRequire.resolve("tsx/cjs/api");
+        const tsxCjsApi = await import(pathToFileURL(tsxCjsApiPath).href);
+        if (typeof tsxCjsApi.register === "function") {
+          tsxCjsApi.register();
+        }
+      } catch {
+        // tsx/cjs unavailable on this tsx version — ESM-only mode is fine
+        // for projects that compile to ESM.
+      }
+
+      // Native dynamic import with a cache-buster. With tsx registered
+      // globally and without a namespace, the whole dependency tree (user
+      // entry + transitive `@/lib/...` imports + `mcp-use/server`) resolves
+      // through tsx's tsconfig-aware resolver.
+      await import(`${pathToFileURL(serverFile).href}?t=${Date.now()}`);
+    } finally {
+      if (process.cwd() !== previousCwd) process.chdir(previousCwd);
+    }
 
     const server = (globalThis as any).__mcpUseLastServer;
     if (!server) {
@@ -1242,8 +1302,16 @@ program
           options.entry,
           options.mcpDir
         );
-      } catch {
-        // No server file found, that's okay for widget-only projects
+      } catch (err) {
+        // No server file found. Widget-only projects hit this on purpose,
+        // but a misconfigured --mcp-dir is a user error worth surfacing so
+        // it doesn't cascade into a manifest without an entryPoint and an
+        // unclear start-time failure.
+        console.log(
+          chalk.yellow(
+            `⚠ Could not locate a server entry file: ${err instanceof Error ? err.message : String(err)}`
+          )
+        );
       }
 
       if (sourceServerFile) {
@@ -1265,14 +1333,33 @@ program
 
       // Transpile TypeScript with esbuild (fast, no OOM on complex types).
       // Type checking is a separate step via tsc --noEmit (skippable with --no-typecheck).
-      console.log(chalk.gray("Building TypeScript..."));
-      await transpileWithEsbuild(projectPath);
-      console.log(chalk.green("✓ TypeScript build complete!"));
+      //
+      // SKIPPED when --mcp-dir is set (drop-in Next.js layout). The host app
+      // (Next.js) owns its own build; trying to transpile every .ts/.tsx in
+      // a Next.js project chokes on files like `tailwind.config.ts` that are
+      // never meant to be runtime-compiled and on RSC-only files that
+      // esbuild doesn't understand. In --mcp-dir mode, `mcp-use start` runs
+      // the TypeScript source directly via tsx (same setup as `mcp-use dev`,
+      // minus HMR), so there's nothing to transpile ahead of time. The
+      // manifest written below still records the .ts source as the entry.
+      if (!mcpDir) {
+        console.log(chalk.gray("Building TypeScript..."));
+        await transpileWithEsbuild(projectPath);
+        console.log(chalk.green("✓ TypeScript build complete!"));
+      } else {
+        console.log(
+          chalk.gray(
+            "Skipping TypeScript transpile (--mcp-dir mode runs source via tsx at start time)"
+          )
+        );
+      }
 
       // Type-check with tsc --noEmit (separate from transpilation).
       // Uses the locally installed typescript binary directly rather than npx to
       // prevent npx from auto-installing the unrelated `tsc@2.0.4` package.
-      if (options.typecheck !== false) {
+      // Also skipped in --mcp-dir mode — the host Next.js app is responsible
+      // for type-checking its own tree during `next build`.
+      if (options.typecheck !== false && !mcpDir) {
         console.log(chalk.gray("Type checking..."));
         try {
           await runCommand(
@@ -1300,25 +1387,33 @@ program
         }
       }
 
-      // Determine where the entry point was compiled to
+      // Determine the entry point `mcp-use start` should run.
+      //   - Legacy layout: the file was transpiled to dist/ above; record
+      //     the compiled .js path.
+      //   - --mcp-dir layout: no transpile step ran, so point the manifest
+      //     at the .ts source. `mcp-use start` loads it via tsx (same setup
+      //     as `mcp-use dev`, minus HMR).
       let entryPoint: string | undefined;
       if (sourceServerFile) {
-        // Check possible output locations based on common tsconfig patterns
-        // tsc may or may not preserve the src/ prefix depending on rootDir setting
-        const baseName = path.basename(sourceServerFile, ".ts") + ".js";
-        const possibleOutputs = [
-          `dist/${baseName}`, // rootDir set to project root or src
-          `dist/src/${baseName}`, // no rootDir, source in src/
-          `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
-        ];
-
-        for (const candidate of possibleOutputs) {
-          try {
-            await access(path.join(projectPath, candidate));
-            entryPoint = candidate;
-            break;
-          } catch {
-            continue;
+        if (mcpDir) {
+          entryPoint = sourceServerFile;
+        } else {
+          // Check possible output locations based on common tsconfig patterns
+          // tsc may or may not preserve the src/ prefix depending on rootDir setting
+          const baseName = path.basename(sourceServerFile, ".ts") + ".js";
+          const possibleOutputs = [
+            `dist/${baseName}`, // rootDir set to project root or src
+            `dist/src/${baseName}`, // no rootDir, source in src/
+            `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+          ];
+          for (const candidate of possibleOutputs) {
+            try {
+              await access(path.join(projectPath, candidate));
+              entryPoint = candidate;
+              break;
+            } catch {
+              continue;
+            }
           }
         }
       }
@@ -2531,13 +2626,20 @@ program
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
         // Resolve mcpDir from CLI flag + config so `--mcp-dir src/mcp` finds the
-        // compiled entry at dist/src/mcp/index.js even without a manifest.
+        // entry at dist/src/mcp/index.js (legacy transpile mode) or the TS
+        // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
+        // and `start` runs the source via tsx).
         const startProjectConfig = await loadProjectConfig(projectPath);
         const startMcpDir = resolveMcpDir(options.mcpDir, startProjectConfig);
 
         const serverCandidates = [
           ...(startMcpDir
-            ? [`dist/${startMcpDir}/index.js`, `dist/${startMcpDir}/server.js`]
+            ? [
+                `${startMcpDir}/index.ts`,
+                `${startMcpDir}/index.tsx`,
+                `dist/${startMcpDir}/index.js`,
+                `dist/${startMcpDir}/server.js`,
+              ]
             : []),
           "dist/index.js",
           "dist/server.js",
@@ -2567,20 +2669,68 @@ program
 
       console.log("Starting production server...");
 
-      const env: NodeJS.ProcessEnv = {
+      // Detect Next.js projects the same way `dev` does: when `next` is in
+      // the user's package.json, install the server-runtime shims so any
+      // transitive `server-only` / `next/cache` / `next/headers` imports
+      // resolve to inert stubs instead of throwing, and load the Next.js
+      // env-file cascade so tools find the env vars they expect.
+      const isNextJsProject = await detectNextJsProject(projectPath);
+      if (isNextJsProject) {
+        console.log(
+          chalk.gray(
+            "Next.js detected — installing server-runtime shims for the production server"
+          )
+        );
+        await loadNextJsEnvFiles(projectPath);
+      }
+
+      const baseEnv: NodeJS.ProcessEnv = {
         ...process.env,
         PORT: String(port),
         NODE_ENV: "production",
       };
 
       if (mcpUrl) {
-        env.MCP_URL = mcpUrl;
+        baseEnv.MCP_URL = mcpUrl;
         console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
-      } else if (!env.MCP_URL) {
-        env.MCP_URL = `http://localhost:${port}`;
+      } else if (!baseEnv.MCP_URL) {
+        baseEnv.MCP_URL = `http://localhost:${port}`;
+      }
+      const env = isNextJsProject ? withNextShimsEnv(baseEnv) : baseEnv;
+
+      // If the recorded entry is a TypeScript source (the --mcp-dir mode,
+      // where `build` deliberately skips full-project transpilation), run
+      // it through tsx. Otherwise the legacy path of `node dist/index.js`.
+      const isTsEntry = /\.(ts|tsx|mts|cts)$/.test(serverFile);
+      let spawnCmd = "node";
+      let spawnArgs: string[] = [serverFile];
+      if (isTsEntry) {
+        try {
+          const projectRequire = createRequire(
+            path.join(projectPath, "package.json")
+          );
+          const tsxPkgPath = projectRequire.resolve("tsx/package.json");
+          const tsxPkg = JSON.parse(await readFile(tsxPkgPath, "utf-8"));
+          const binField =
+            typeof tsxPkg.bin === "string"
+              ? tsxPkg.bin
+              : (tsxPkg.bin?.tsx ?? Object.values(tsxPkg.bin ?? {})[0]);
+          if (!binField) throw new Error("tsx bin entry not found");
+          const tsxBin = path.resolve(path.dirname(tsxPkgPath), binField);
+          spawnCmd = "node";
+          spawnArgs = [tsxBin, serverFile];
+        } catch (error) {
+          console.log(
+            chalk.yellow(
+              `Could not resolve local tsx (${error instanceof Error ? error.message : String(error)}); falling back to npx`
+            )
+          );
+          spawnCmd = "npx";
+          spawnArgs = ["tsx", serverFile];
+        }
       }
 
-      const serverProc = spawn("node", [serverFile], {
+      const serverProc = spawn(spawnCmd, spawnArgs, {
         cwd: projectPath,
         stdio: "inherit",
         env,
