@@ -32,15 +32,24 @@ function isEnumChoice(value: unknown): value is EnumChoice {
 }
 
 function getSingleSelectChoices(field: Record<string, any>): EnumChoice[] {
-  const oneOf = Array.isArray(field.oneOf) ? field.oneOf.filter(isEnumChoice) : [];
-  const anyOf = Array.isArray(field.anyOf) ? field.anyOf.filter(isEnumChoice) : [];
+  const oneOf = Array.isArray(field.oneOf)
+    ? field.oneOf.filter(isEnumChoice)
+    : [];
+  const anyOf = Array.isArray(field.anyOf)
+    ? field.anyOf.filter(isEnumChoice)
+    : [];
   return oneOf.length > 0 ? oneOf : anyOf;
 }
 
 function getMultiSelectChoices(field: Record<string, any>): EnumChoice[] {
-  const items = field.items && typeof field.items === "object" ? field.items : {};
-  const anyOf = Array.isArray(items.anyOf) ? items.anyOf.filter(isEnumChoice) : [];
-  const oneOf = Array.isArray(items.oneOf) ? items.oneOf.filter(isEnumChoice) : [];
+  const items =
+    field.items && typeof field.items === "object" ? field.items : {};
+  const anyOf = Array.isArray(items.anyOf)
+    ? items.anyOf.filter(isEnumChoice)
+    : [];
+  const oneOf = Array.isArray(items.oneOf)
+    ? items.oneOf.filter(isEnumChoice)
+    : [];
   return anyOf.length > 0 ? anyOf : oneOf;
 }
 
@@ -64,7 +73,9 @@ export function InlineElicitationCard({
     const schema = request.request.requestedSchema;
     const initial: Record<string, any> = {};
     if (schema?.type === "object" && schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      for (const [fieldName, fieldSchema] of Object.entries(
+        schema.properties
+      )) {
         const field = fieldSchema as any;
         if (field.default !== undefined) {
           initial[fieldName] = field.default;
@@ -93,7 +104,10 @@ export function InlineElicitationCard({
         const schema = request.request.requestedSchema;
         if (schema?.required) {
           const missing = (schema.required as string[]).filter(
-            (f) => formData[f] === undefined || formData[f] === "" || formData[f] === null
+            (f) =>
+              formData[f] === undefined ||
+              formData[f] === "" ||
+              formData[f] === null
           );
           if (missing.length > 0) {
             toast.error("Missing required fields", {
@@ -132,7 +146,9 @@ export function InlineElicitationCard({
     const schema = request.request.requestedSchema;
     if (!schema || schema.type !== "object" || !schema.properties) {
       return (
-        <p className="text-sm text-muted-foreground">No form schema provided.</p>
+        <p className="text-sm text-muted-foreground">
+          No form schema provided.
+        </p>
       );
     }
     const properties = schema.properties as Record<string, any>;
@@ -167,7 +183,9 @@ export function InlineElicitationCard({
                 </Label>
               )}
               {fieldDescription && (
-                <p className="text-xs text-muted-foreground">{fieldDescription}</p>
+                <p className="text-xs text-muted-foreground">
+                  {fieldDescription}
+                </p>
               )}
               {fieldType === "boolean" ? (
                 <div className="flex items-center space-x-2">
@@ -175,7 +193,9 @@ export function InlineElicitationCard({
                     id={`inline-field-${request.id}-${fieldName}`}
                     data-testid={`inline-elicitation-field-${fieldName}`}
                     checked={formData[fieldName] || false}
-                    onCheckedChange={(checked) => handleFieldChange(fieldName, checked)}
+                    onCheckedChange={(checked) =>
+                      handleFieldChange(fieldName, checked)
+                    }
                   />
                   <Label
                     htmlFor={`inline-field-${request.id}-${fieldName}`}
@@ -250,7 +270,10 @@ export function InlineElicitationCard({
                             handleFieldChange(fieldName, updated);
                           }}
                         />
-                        <Label htmlFor={checkboxId} className="text-sm font-normal cursor-pointer">
+                        <Label
+                          htmlFor={checkboxId}
+                          className="text-sm font-normal cursor-pointer"
+                        >
                           {option}
                         </Label>
                       </div>
@@ -266,18 +289,26 @@ export function InlineElicitationCard({
                     const checkboxId = `inline-field-${request.id}-${fieldName}-${choice.const}`;
                     const checked = selectedMultiValues.includes(choice.const);
                     return (
-                      <div key={choice.const} className="flex items-center space-x-2">
+                      <div
+                        key={choice.const}
+                        className="flex items-center space-x-2"
+                      >
                         <Checkbox
                           id={checkboxId}
                           checked={checked}
                           onCheckedChange={(nextChecked) => {
                             const updated = nextChecked
                               ? [...selectedMultiValues, choice.const]
-                              : selectedMultiValues.filter((v) => v !== choice.const);
+                              : selectedMultiValues.filter(
+                                  (v) => v !== choice.const
+                                );
                             handleFieldChange(fieldName, updated);
                           }}
                         />
-                        <Label htmlFor={checkboxId} className="text-sm font-normal cursor-pointer">
+                        <Label
+                          htmlFor={checkboxId}
+                          className="text-sm font-normal cursor-pointer"
+                        >
                           {choice.title || choice.const}
                         </Label>
                       </div>
@@ -342,7 +373,9 @@ export function InlineElicitationCard({
         >
           {mode}
         </Badge>
-        <span className="text-xs text-muted-foreground">{request.serverName}</span>
+        <span className="text-xs text-muted-foreground">
+          {request.serverName}
+        </span>
       </div>
 
       {/* Server message */}
