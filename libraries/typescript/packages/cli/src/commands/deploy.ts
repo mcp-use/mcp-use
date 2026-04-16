@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import open from "open";
 import type { OrgInfo } from "../utils/api.js";
-import { McpUseAPI } from "../utils/api.js";
+import { McpUseAPI, GitHubAuthRequiredError } from "../utils/api.js";
 import {
   getWebUrl,
   isLoggedIn,
@@ -15,6 +15,7 @@ import {
   gitInit,
   gitAddRemoteAndPush,
   gitCommitAndPush,
+  hasUncommittedChanges,
   isGitHubUrl,
 } from "../utils/git.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
@@ -691,14 +692,11 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       process.exit(1);
     }
 
-    // Default to first org-type installation, fallback to first
-    const defaultInstallation =
-      installations.find((i) => i.account_type === "Organization") ??
-      installations[0];
-    const installationDbId = defaultInstallation.id;
-    const githubInstallationId = defaultInstallation.installation_id;
-
     console.log(chalk.green("✓ GitHub connected\n"));
+
+    // Resolved later based on user selection or repo ownership.
+    let installationDbId: string | undefined;
+    let githubInstallationId: string | undefined;
 
     // ── Step 4: Project & Git ─────────────────────────────────────
     const projectDir = options.rootDir
@@ -801,54 +799,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
 
       const repoInstallation = installations[selectedIdx];
-
-      // Personal accounts cannot create repos via GitHub App installation tokens.
-      if (repoInstallation.account_type !== "Organization") {
-        console.log(
-          chalk.yellow(
-            "\n⚠️  GitHub Apps cannot create repos on personal accounts.\n"
-          )
-        );
-        console.log(
-          chalk.white("To deploy from ") +
-            chalk.cyan(repoInstallation.account_login) +
-            chalk.white(", create a repository manually:\n")
-        );
-        console.log(
-          chalk.cyan("  1. ") +
-            chalk.white("Go to ") +
-            chalk.cyan("https://github.com/new")
-        );
-        console.log(
-          chalk.cyan("  2. ") +
-            chalk.white("Create a repository (any name, can be private)")
-        );
-        console.log(chalk.cyan("  3. ") + chalk.white("Add it as a remote:"));
-        console.log(chalk.gray("     git init && git remote add origin <url>"));
-        console.log(chalk.cyan("  4. ") + chalk.white("Push your code:"));
-        console.log(
-          chalk.gray(
-            "     git add . && git commit -m 'Initial commit' && git push -u origin main"
-          )
-        );
-        console.log(
-          chalk.cyan("  5. ") +
-            chalk.white("Grant the GitHub App access to the repo:")
-        );
-        const appName = await api.getGitHubAppName();
-        console.log(
-          chalk.gray(
-            `     https://github.com/apps/${appName}/installations/new`
-          )
-        );
-        console.log(
-          chalk.cyan("  6. ") +
-            chalk.white("Run ") +
-            chalk.cyan("mcp-use deploy") +
-            chalk.white(" again\n")
-        );
-        process.exit(0);
-      }
+      installationDbId = repoInstallation.id;
+      githubInstallationId = repoInstallation.installation_id;
 
       const repoName = options.yes
         ? projectName
@@ -861,20 +813,76 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           `Creating repository on ${repoInstallation.account_login}...`
         )
       );
-      const repoResult = await api.createGitHubRepo({
-        installationId: repoInstallation.installation_id,
-        name: repoName,
-        private: true,
-        org: repoInstallation.account_login,
-      });
+
+      let repoResult: { fullName: string; cloneUrl: string; htmlUrl: string };
+      try {
+        repoResult = await api.createGitHubRepo({
+          installationId: repoInstallation.installation_id,
+          name: repoName,
+          private: true,
+          org: repoInstallation.account_login,
+        });
+      } catch (err) {
+        if (err instanceof GitHubAuthRequiredError) {
+          console.log(
+            chalk.yellow(
+              `\n  Personal accounts require a one-time GitHub authorization.\n`
+            )
+          );
+          try {
+            await open(err.authorizeUrl);
+            console.log(
+              chalk.gray("  Browser opened. Authorize and return here.\n")
+            );
+          } catch {
+            console.log(
+              chalk.gray(
+                `  Open this URL in your browser:\n  ${err.authorizeUrl}\n`
+              )
+            );
+          }
+          const readline = await import("node:readline");
+          await new Promise<void>((resolve) => {
+            const rl = readline.createInterface({
+              input: process.stdin,
+              output: process.stdout,
+            });
+            rl.question(
+              chalk.gray("  Press Enter after authorizing..."),
+              () => {
+                rl.close();
+                resolve();
+              }
+            );
+          });
+          console.log(chalk.gray("Retrying repository creation..."));
+          repoResult = await api.createGitHubRepo({
+            installationId: repoInstallation.installation_id,
+            name: repoName,
+            private: true,
+            org: repoInstallation.account_login,
+          });
+        } else {
+          throw err;
+        }
+      }
       console.log(chalk.green(`✓ Created ${chalk.cyan(repoResult.fullName)}`));
 
       if (!gitInfo.isGitRepo) {
+        await ensureGitignore(cwd);
         console.log(chalk.gray("Initializing git..."));
         await gitInit(cwd, "Initial commit");
         console.log(chalk.gray("Pushing to GitHub..."));
         await gitAddRemoteAndPush(cwd, repoResult.cloneUrl, "main");
       } else {
+        if (await hasUncommittedChanges(cwd)) {
+          console.log(
+            chalk.red(
+              "✗ You have uncommitted changes. Commit and push before deploying."
+            )
+          );
+          process.exit(1);
+        }
         console.log(chalk.gray("Adding remote and pushing..."));
         await gitAddRemoteAndPush(
           cwd,
@@ -899,23 +907,40 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
       branch = gitInfo.branch || "main";
 
-      // Check for uncommitted changes and offer to commit+push
+      // Resolve installation matching the repo owner
+      const ownerLower = gitInfo.owner!.toLowerCase();
+      const matchingInst =
+        installations.find(
+          (i) => i.account_login.toLowerCase() === ownerLower
+        ) ??
+        installations.find((i) => i.account_type === "Organization") ??
+        installations[0];
+      installationDbId = matchingInst.id;
+      githubInstallationId = matchingInst.installation_id;
+
+      // Check for uncommitted changes
       if (gitInfo.hasUncommittedChanges) {
-        console.log(chalk.yellow("⚠️  You have uncommitted changes.\n"));
-        if (!options.yes) {
-          const shouldCommit = await prompt(
-            chalk.white("Commit and push changes before deploying? (Y/n): "),
-            "y"
+        if (options.yes) {
+          console.log(
+            chalk.red(
+              "✗ You have uncommitted changes. Commit and push before deploying."
+            )
           );
-          if (shouldCommit) {
-            await ensureGitignore(cwd);
-            console.log(chalk.gray("Committing and pushing..."));
-            await gitCommitAndPush(cwd, "Deploy changes", branch);
-            gitInfo = await getGitInfo(cwd);
-            console.log(chalk.green("✓ Changes pushed\n"));
-          } else {
-            console.log(chalk.gray("Deploying from last pushed commit.\n"));
-          }
+          process.exit(1);
+        }
+        console.log(chalk.yellow("⚠️  You have uncommitted changes.\n"));
+        const shouldCommit = await prompt(
+          chalk.white("Commit and push changes before deploying? (Y/n): "),
+          "y"
+        );
+        if (shouldCommit) {
+          await ensureGitignore(cwd);
+          console.log(chalk.gray("Committing and pushing..."));
+          await gitCommitAndPush(cwd, "Deploy changes", branch);
+          gitInfo = await getGitInfo(cwd);
+          console.log(chalk.green("✓ Changes pushed\n"));
+        } else {
+          console.log(chalk.gray("Deploying from last pushed commit.\n"));
         }
       }
 
@@ -1092,6 +1117,15 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     if (!serverId) {
       const orgId = await api.resolveOrganizationId();
+
+      if (!installationDbId) {
+        console.log(
+          chalk.red(
+            "✗ Could not determine GitHub installation for this repository."
+          )
+        );
+        process.exit(1);
+      }
 
       console.log(chalk.gray("Creating server and deployment..."));
       const serverResult = await api.createServer({

@@ -1,5 +1,14 @@
 import { getApiKey, getApiUrl, getAuthBaseUrl, getOrgId } from "./config.js";
 
+export class GitHubAuthRequiredError extends Error {
+  readonly authorizeUrl: string;
+  constructor(message: string, authorizeUrl: string) {
+    super(message);
+    this.name = "GitHubAuthRequiredError";
+    this.authorizeUrl = authorizeUrl;
+  }
+}
+
 export interface OrgInfo {
   id: string;
   name: string;
@@ -245,8 +254,19 @@ export class McpUseAPI {
       }
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`API request failed: ${response.status} ${error}`);
+        const errorText = await response.text();
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed.code === "GITHUB_AUTH_REQUIRED" && parsed.authorizeUrl) {
+            throw new GitHubAuthRequiredError(
+              parsed.error || "GitHub authorization required",
+              parsed.authorizeUrl
+            );
+          }
+        } catch (e) {
+          if (e instanceof GitHubAuthRequiredError) throw e;
+        }
+        throw new Error(`API request failed: ${response.status} ${errorText}`);
       }
 
       return response.json() as Promise<T>;
@@ -526,5 +546,23 @@ export class McpUseAPI {
         org: opts.org,
       }),
     });
+  }
+
+  async getGitHubOAuthUrl(): Promise<{ url: string; state: string }> {
+    return this.request<{ url: string; state: string }>(
+      "/github/oauth/authorize"
+    );
+  }
+
+  async exchangeGitHubOAuthToken(
+    code: string
+  ): Promise<{ success: boolean; installationsUpdated: number }> {
+    return this.request<{ success: boolean; installationsUpdated: number }>(
+      "/github/oauth/token",
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }
+    );
   }
 }
