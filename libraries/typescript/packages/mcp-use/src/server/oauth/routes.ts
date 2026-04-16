@@ -73,7 +73,6 @@ export function createAuthorizeHandler(
 
     // Build provider authorization URL
     const authUrl = new URL(authEndpoint);
-    authUrl.searchParams.set("client_id", clientId as string);
     authUrl.searchParams.set("redirect_uri", redirectUri as string);
     authUrl.searchParams.set("response_type", responseType as string);
     authUrl.searchParams.set("code_challenge", codeChallenge as string);
@@ -86,11 +85,17 @@ export function createAuthorizeHandler(
     if (scope) authUrl.searchParams.set("scope", scope as string);
     if (audience) authUrl.searchParams.set("audience", audience as string);
 
-    // In proxy mode, inject extra authorize params
-    if (isOAuthProxy(oauth) && oauth.extraAuthorizeParams) {
-      for (const [key, value] of Object.entries(oauth.extraAuthorizeParams)) {
-        authUrl.searchParams.set(key, value);
+    if (isOAuthProxy(oauth)) {
+      // Override with the configured upstream client_id; the incoming value
+      // may be stale DCR cache.
+      authUrl.searchParams.set("client_id", oauth.clientId);
+      if (oauth.extraAuthorizeParams) {
+        for (const [key, value] of Object.entries(oauth.extraAuthorizeParams)) {
+          authUrl.searchParams.set(key, value);
+        }
       }
+    } else {
+      authUrl.searchParams.set("client_id", clientId as string);
     }
 
     // Redirect to provider
