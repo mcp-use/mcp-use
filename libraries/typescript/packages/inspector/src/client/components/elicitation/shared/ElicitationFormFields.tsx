@@ -4,10 +4,7 @@ import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
 import { Checkbox } from "@/client/components/ui/checkbox";
-import {
-  getMultiSelectChoices,
-  getSingleSelectChoices,
-} from "./schemaHelpers";
+import { getMultiSelectChoices, getSingleSelectChoices } from "./schemaHelpers";
 
 interface ElicitationFormFieldsProps {
   request: PendingElicitationRequest;
@@ -165,10 +162,7 @@ export function ElicitationFormFields({
                     const checkboxId = `${inputId}-${option}`;
                     const checked = selectedMultiValues.includes(option);
                     return (
-                      <div
-                        key={option}
-                        className="flex items-center space-x-2"
-                      >
+                      <div key={option} className="flex items-center space-x-2">
                         <Checkbox
                           id={checkboxId}
                           checked={checked}

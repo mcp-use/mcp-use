@@ -19,10 +19,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Badge } from "@/client/components/ui/badge";
-import {
-  ElicitationFormFields,
-  useElicitationForm,
-} from "./shared";
+import { ElicitationFormFields, useElicitationForm } from "./shared";
 
 interface ElicitationRequestDisplayProps {
   request: PendingElicitationRequest | null;
