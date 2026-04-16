@@ -11,6 +11,9 @@
  *   ctx.client.extension(id)   — raw settings for an MCP extension (SEP-1724)
  *   ctx.client.supportsApps()  — convenience check for MCP Apps (SEP-1865)
  *
+ * ─── Top-level context (stable for the lifetime of the MCP connection) ───────
+ *   ctx.supportsUI             — high-level flag (true if client supports widgets)
+ *
  * ─── Per-invocation (can differ on every tools/call) ─────────────────────────
  *   ctx.client.user()          — normalized caller context from params._meta
  *     .subject                 — stable opaque user identifier
@@ -67,7 +70,7 @@ server.tool(
       "=== MCP Client (session-level) ===",
       `Client: ${[name, version].filter(Boolean).join(" ") || "unknown"}`,
       `Capabilities: ${capKeys.length ? capKeys.join(", ") : "none advertised"}`,
-      `MCP Apps support (SEP-1865): ${ctx.client.supportsApps() ? "yes ✓" : "no"}`,
+      `Supports UI (ctx.supportsUI): ${ctx.supportsUI ? "yes ✓" : "no"}`,
       `MCP Session ID: ${ctx.session.sessionId}`,
     ];
 
@@ -131,7 +134,7 @@ server.tool(
         version: info.version ?? null,
       },
       capabilities: caps,
-      supportsApps: ctx.client.supportsApps(),
+      supportsUI: ctx.supportsUI,
       mcpAppsExtension:
         ctx.client.extension("io.modelcontextprotocol/ui") ?? null,
       mcpSessionId: ctx.session.sessionId,
@@ -211,7 +214,7 @@ server.tool(
     const city = caller?.location?.city;
     const locationHint = city ? ` from ${city}` : "";
 
-    if (ctx.client.supportsApps()) {
+    if (ctx.supportsUI) {
       const summary = `Hello, ${name}${locationHint}! (rendered as MCP Apps widget via ${clientLabel})`;
       console.log(`[adaptive-greeting] MCP Apps path → widget | ${summary}`);
       return widget({

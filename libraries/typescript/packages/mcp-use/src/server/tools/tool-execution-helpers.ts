@@ -813,6 +813,16 @@ export function createClientCapabilityChecker(
     },
 
     /**
+     * Returns `true` if the client advertises support for MCP Apps
+     * (SEP-1865, extension identifier `io.modelcontextprotocol/ui`).
+     *
+     * Alias for `supportsApps()`.
+     */
+    supportsUI(): boolean {
+      return supportsApps(caps);
+    },
+
+    /**
      * Returns normalized end-user context from `params._meta` sent by the
      * client on this specific tool invocation.
      *
@@ -970,6 +980,7 @@ export function createEnhancedContext(
   }) => Promise<void>;
   log: (level: string, data: unknown, logger?: string) => Promise<void>;
   client: ReturnType<typeof createClientCapabilityChecker>;
+  supportsUI: boolean;
   session: { id?: string };
   sendNotification: typeof sendNotification;
 } {
@@ -998,6 +1009,8 @@ export function createEnhancedContext(
     clientInfo,
     requestMeta
   );
+
+  enhancedContext.supportsUI = enhancedContext.client.supportsUI();
 
   // Add session information
   if (sessionId) {
@@ -1049,6 +1062,12 @@ export function buildHandlerContext(
       session?.clientCapabilities,
       session?.clientInfo
     ),
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(enhancedCtx, "supportsUI", {
+    value: enhancedCtx.client.supportsUI(),
     writable: true,
     enumerable: true,
     configurable: true,

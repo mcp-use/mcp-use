@@ -136,6 +136,14 @@ export interface ElicitUrlParams {
  */
 export interface ToolContext {
   /**
+   * Returns `true` if the connected client supports MCP Apps UI elements
+   * (widgets, rich UI components).
+   *
+   * This is a top-level shorthand for `ctx.client.supportsUI()`.
+   */
+  supportsUI: boolean;
+
+  /**
    * Request sampling from the client's LLM with automatic progress notifications.
    *
    * Supports two calling patterns:

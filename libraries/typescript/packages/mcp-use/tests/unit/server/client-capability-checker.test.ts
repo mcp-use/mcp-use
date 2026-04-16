@@ -146,6 +146,32 @@ describe("createClientCapabilityChecker", () => {
       expect(checker.supportsApps()).toBe(true);
     });
   });
+
+  describe("supportsUI()", () => {
+    it("is an alias for supportsApps()", () => {
+      const cases = [
+        mcpAppsCaps,
+        { sampling: {} },
+        { extensions: { [MCP_UI_EXTENSION]: { mimeTypes: [] } } },
+        undefined,
+        {},
+      ];
+      for (const caps of cases) {
+        const checker = createClientCapabilityChecker(caps);
+        expect(checker.supportsUI()).toBe(checker.supportsApps());
+      }
+    });
+
+    it("returns true when UI support is present", () => {
+      const checker = createClientCapabilityChecker(mcpAppsCaps);
+      expect(checker.supportsUI()).toBe(true);
+    });
+
+    it("returns false when UI support is absent", () => {
+      const checker = createClientCapabilityChecker({ sampling: {} });
+      expect(checker.supportsUI()).toBe(false);
+    });
+  });
 });
 
 describe("supportsApps() — standalone utility", () => {

@@ -26,6 +26,11 @@ export interface ClientCapabilityChecker {
    * (`io.modelcontextprotocol/ui` extension, SEP-1865).
    */
   supportsApps(): boolean;
+  /**
+   * Returns `true` if the client supports MCP Apps / UI rendering.
+   * Shortcut for `supportsApps()`.
+   */
+  supportsUI(): boolean;
 }
 
 /**
