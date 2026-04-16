@@ -1,14 +1,20 @@
 /**
  * Supabase OAuth MCP Server Example
  *
- * This example demonstrates the OAuth integration with mcp-use.
- * Learn more:
- * - Supabase OAuth: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
+ * Uses Supabase's OAuth 2.1 server — Supabase hosts /authorize, /token,
+ * /register and discovery, while this example hosts the consent screen
+ * (which also triggers sign-in for unauthenticated users). Configure the
+ * consent URL in the Supabase Dashboard to point to /auth/consent here.
  *
- * Environment variables (zero-config setup):
+ * Anonymous sign-ins are used for zero-config sign-up — enable them in the
+ * Supabase dashboard under Auth → Providers. See ./auth-routes.ts.
+ *
+ * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
+ *
+ * Environment variables:
  * - MCP_USE_OAUTH_SUPABASE_PROJECT_ID (required)
- * - MCP_USE_OAUTH_SUPABASE_JWT_SECRET (optional, but recommended)
- * - NEXT_PUBLIC_SUPABASE_ANON_KEY (for API calls)
+ * - MCP_USE_OAUTH_SUPABASE_JWT_SECRET (optional, recommended)
+ * - NEXT_PUBLIC_SUPABASE_ANON_KEY (required — used for auth and API calls)
  */
 
 import {
@@ -17,28 +23,35 @@ import {
   error,
   object,
 } from "mcp-use/server";
+import { mountAuthRoutes } from "./auth-routes.js";
 
 declare const process: { env: Record<string, string> };
 
-// Anon key for Supabase API calls (not used for OAuth configuration)
+const SUPABASE_PROJECT_ID = process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+if (!SUPABASE_PROJECT_ID) {
+  throw new Error(
+    "Missing MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable"
+  );
+}
 if (!SUPABASE_ANON_KEY) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable");
 }
 
-// Create MCP server with OAuth auto-configured from environment variables!
 const server = new MCPServer({
   name: "supabase-oauth-example",
   version: "1.0.0",
   description: "MCP server with Supabase OAuth authentication",
-  // 🎉 Zero-config! OAuth is fully configured via MCP_USE_OAUTH_* environment variables
   oauth: oauthSupabaseProvider(),
 });
 
-/**
- * Tool that returns authenticated user information from JWT
- */
+// Mount the consent page that Supabase redirects to after /authorize.
+mountAuthRoutes(server, {
+  projectId: SUPABASE_PROJECT_ID,
+  anonKey: SUPABASE_ANON_KEY,
+});
+
 server.tool(
   {
     name: "get-user-info",
@@ -51,9 +64,6 @@ server.tool(
     })
 );
 
-/**
- * Tool that demonstrates making authenticated API calls to Supabase
- */
 server.tool(
   {
     name: "get-supabase-data",
@@ -62,15 +72,8 @@ server.tool(
   },
   async (_args, ctx) => {
     try {
-      // Extract project ID from the authenticated user context or environment
-      const projectId = process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID;
-
-      if (!projectId) {
-        return error("Project ID not configured");
-      }
-
       const res = await fetch(
-        `https://${projectId}.supabase.co/rest/v1/notes`,
+        `https://${SUPABASE_PROJECT_ID}.supabase.co/rest/v1/notes`,
         {
           headers: {
             Authorization: `Bearer ${ctx.auth.accessToken}`,
