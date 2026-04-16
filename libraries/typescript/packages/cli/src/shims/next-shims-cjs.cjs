@@ -22,16 +22,10 @@ const path = require("node:path");
 // Absolute path to the no-op CJS module that satisfies every shimmed specifier.
 const noopPath = path.join(__dirname, "next-shims-noop.cjs");
 
-// Modules we intercept. Keep this list aligned with
-// `next-shims-loader.mjs` so ESM and CJS behave identically.
-const SHIMMED = new Set([
-  "server-only",
-  "client-only",
-  "next/cache",
-  "next/headers",
-  "next/navigation",
-  "next/server",
-]);
+// Single source of truth — see next-shims-registry.json. The loader.mjs reads
+// the same file so ESM and CJS interception stay in lockstep.
+const { shimmedModules } = require("./next-shims-registry.json");
+const SHIMMED = new Set(shimmedModules);
 
 const originalResolveFilename = Module._resolveFilename;
 

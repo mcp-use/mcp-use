@@ -91,10 +91,7 @@ describe("loadNextJsEnvFiles", () => {
   });
 
   it("later files in the cascade override earlier ones", async () => {
-    await writeFile(
-      path.join(projectDir, ".env"),
-      "TEST_VAR_OVERRIDE=base\n"
-    );
+    await writeFile(path.join(projectDir, ".env"), "TEST_VAR_OVERRIDE=base\n");
     await writeFile(
       path.join(projectDir, ".env.development"),
       "TEST_VAR_OVERRIDE=dev\n"
@@ -108,10 +105,7 @@ describe("loadNextJsEnvFiles", () => {
   });
 
   it(".env.development.local wins over all others", async () => {
-    await writeFile(
-      path.join(projectDir, ".env"),
-      "TEST_VAR_OVERRIDE=base\n"
-    );
+    await writeFile(path.join(projectDir, ".env"), "TEST_VAR_OVERRIDE=base\n");
     await writeFile(
       path.join(projectDir, ".env.local"),
       "TEST_VAR_OVERRIDE=local\n"

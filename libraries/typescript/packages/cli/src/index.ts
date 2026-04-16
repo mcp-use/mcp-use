@@ -383,13 +383,53 @@ async function resolveEntryFile(
  * Resolve the widgets directory.
  * Priority: --widgets-dir flag > <mcpDir>/resources > "resources".
  */
-function resolveWidgetsDir(
-  cliWidgetsDir?: string,
-  mcpDir?: string
-): string {
+function resolveWidgetsDir(cliWidgetsDir?: string, mcpDir?: string): string {
   if (cliWidgetsDir) return cliWidgetsDir;
   if (mcpDir) return path.join(mcpDir, "resources");
   return "resources";
+}
+
+/**
+ * Vite plugin that fails the widget build with a clear, actionable error when
+ * a widget transitively imports a Next.js server-runtime module.
+ *
+ * The MCP server process silently shims these specifiers (see
+ * src/shims/next-shims-*) because server-side code is supposed to work
+ * there. Widgets run in a browser iframe, so the same import is almost
+ * always a mistake — fetch server data through a tool call instead.
+ *
+ * Keep the rejection list aligned with src/shims/next-shims-registry.json;
+ * we duplicate the array here (rather than reading the JSON) so this file
+ * stays import-free for the source-mode tests that load it via tsx.
+ */
+function makeWidgetServerOnlyGuard(widgetName: string) {
+  const rejected = new Set([
+    "server-only",
+    "client-only",
+    "next/cache",
+    "next/headers",
+    "next/navigation",
+    "next/server",
+  ]);
+  return {
+    name: "mcp-use-widget-server-only-guard",
+    enforce: "pre" as const,
+    resolveId(id: string, importer: string | undefined) {
+      if (!rejected.has(id)) return null;
+      const from = importer ? ` (imported from ${importer})` : "";
+      throw new Error(
+        `Widget "${widgetName}" imports "${id}"${from}, which is a Next.js ` +
+          `server-only module. Widgets run in a browser iframe and cannot ` +
+          `use server APIs.\n\n` +
+          `To fix:\n` +
+          `  • Remove the import from the widget (or from any module the ` +
+          `widget transitively imports)\n` +
+          `  • If the widget needs data from ${id}, read it inside an MCP ` +
+          `tool in your server and pass the result through the widget's ` +
+          `props`
+      );
+    },
+  };
 }
 
 async function findServerFile(
@@ -757,10 +797,13 @@ export default PostHog;
         },
       };
 
+      const serverOnlyGuard = makeWidgetServerOnlyGuard(widgetName);
+
       const metadataServer = await createServer({
         root: metadataTempDir,
         cacheDir: path.join(metadataTempDir, ".vite-cache"),
         plugins: [
+          serverOnlyGuard,
           nodeStubsPlugin,
           ...(hasProjectTsconfig
             ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
@@ -980,8 +1023,10 @@ export default {
       const tsconfigPathsPlugins = hasProjectTsconfig
         ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
         : [];
+      const buildServerOnlyGuard = makeWidgetServerOnlyGuard(widgetName);
       const buildPlugins = inline
         ? [
+            buildServerOnlyGuard,
             buildNodeStubsPlugin,
             ...tsconfigPathsPlugins,
             tailwindcss(),
@@ -989,6 +1034,7 @@ export default {
             viteSingleFile({ removeViteModuleLoader: true }),
           ]
         : [
+            buildServerOnlyGuard,
             buildNodeStubsPlugin,
             ...tsconfigPathsPlugins,
             tailwindcss(),

@@ -45,9 +45,7 @@ async function resolveEntryFile(
         continue;
       }
     }
-    throw new Error(
-      `No entry file found inside ${mcpDir}.`
-    );
+    throw new Error(`No entry file found inside ${mcpDir}.`);
   }
 
   const candidates = ["index.ts", "src/index.ts", "server.ts", "src/server.ts"];
@@ -63,10 +61,7 @@ async function resolveEntryFile(
   throw new Error(`No entry file found.`);
 }
 
-function resolveWidgetsDir(
-  cliWidgetsDir?: string,
-  mcpDir?: string
-): string {
+function resolveWidgetsDir(cliWidgetsDir?: string, mcpDir?: string): string {
   if (cliWidgetsDir) return cliWidgetsDir;
   if (mcpDir) return path.join(mcpDir, "resources");
   return "resources";

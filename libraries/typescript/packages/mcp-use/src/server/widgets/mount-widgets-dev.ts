@@ -995,6 +995,38 @@ export default PostHog;
     },
   };
 
+  // Fail the dev build with a clear error if a widget transitively imports a
+  // Next.js server-runtime module. These are shimmed in the MCP server
+  // process (see @mcp-use/cli next-shims-*) but have no browser equivalent,
+  // so the right move in a widget is to fetch the data through a tool call.
+  // Keep in sync with `@mcp-use/cli`'s next-shims-registry.json.
+  const serverOnlyGuard = {
+    name: "mcp-use-widget-server-only-guard",
+    enforce: "pre" as const,
+    resolveId(id: string, importer: string | undefined) {
+      const rejected = new Set([
+        "server-only",
+        "client-only",
+        "next/cache",
+        "next/headers",
+        "next/navigation",
+        "next/server",
+      ]);
+      if (!rejected.has(id)) return null;
+      const from = importer ? ` (imported from ${importer})` : "";
+      throw new Error(
+        `Widget imports "${id}"${from}, which is a Next.js server-only ` +
+          `module. Widgets run in a browser iframe and cannot use server ` +
+          `APIs.\n\n` +
+          `To fix:\n` +
+          `  • Remove the import from the widget (or from any module the ` +
+          `widget transitively imports)\n` +
+          `  • If the widget needs data from ${id}, read it inside an MCP ` +
+          `tool and pass the result through the widget's props`
+      );
+    },
+  };
+
   // Plugin to patch Zod's JIT compilation to prevent CSP eval violations
   // This is needed because Zod 4.x uses new Function() for JIT compilation
   // which violates strict CSP in sandboxed iframes (MCP Apps hosts)
@@ -1141,6 +1173,7 @@ export default PostHog;
     root: tempDir,
     base: baseRoute + "/",
     plugins: [
+      serverOnlyGuard,
       zodJitlessPlugin,
       nodeStubsPlugin,
       ssrCssPlugin,

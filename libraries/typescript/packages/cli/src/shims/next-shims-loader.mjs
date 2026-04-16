@@ -8,7 +8,14 @@
  * The mapping covers modules that exist inside a Next.js runtime but have
  * no meaningful behavior outside of it. Each shim is a data: URL so the
  * loader has zero on-disk footprint.
+ *
+ * The list of specifiers we intercept lives in `next-shims-registry.json`
+ * so this file and `next-shims-cjs.cjs` can't drift out of sync. The
+ * per-module stub bodies (below) still live here because each one has its
+ * own export surface.
  */
+
+import registry from "./next-shims-registry.json" with { type: "json" };
 
 const SHIMS = new Map([
   // `import "server-only"` — throws hard at import time in the real package.
@@ -75,6 +82,28 @@ const SHIMS = new Map([
       ),
   ],
 ]);
+
+// Sanity check: every entry in the registry must have a stub body in SHIMS,
+// and every stub body must correspond to a registered specifier. Drift here
+// means ESM imports succeed while CJS requires fall through (or vice versa),
+// which is the exact invariant the registry exists to prevent.
+{
+  const registered = new Set(registry.shimmedModules);
+  for (const key of SHIMS.keys()) {
+    if (!registered.has(key)) {
+      throw new Error(
+        `next-shims-loader: "${key}" has a stub body but is not in next-shims-registry.json`
+      );
+    }
+  }
+  for (const key of registered) {
+    if (!SHIMS.has(key)) {
+      throw new Error(
+        `next-shims-loader: "${key}" is in next-shims-registry.json but has no stub body in next-shims-loader.mjs`
+      );
+    }
+  }
+}
 
 /**
  * @param {string} specifier
