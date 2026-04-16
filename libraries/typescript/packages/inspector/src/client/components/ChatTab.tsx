@@ -814,11 +814,18 @@ export function ChatTab({
       content += messages
         .map((m) => {
           const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
-          let text = `## ${role}\n${serializeMessageContent(m)}`;
+          const messageContent = serializeMessageContent(m).trim();
 
           const toolInvocations = options.includeToolCalls
             ? m.parts?.filter((p) => p.type === "tool-invocation")
             : [];
+
+          // Skip messages that have no text content and no tool calls
+          if (!messageContent && (!toolInvocations || toolInvocations.length === 0)) {
+            return "";
+          }
+
+          let text = `## ${role}\n${messageContent}`;
 
           if (toolInvocations?.length) {
             text +=
@@ -836,6 +843,7 @@ export function ChatTab({
           }
           return text;
         })
+        .filter((text) => text !== "")
         .join("\n\n---\n\n");
       return content;
     },
