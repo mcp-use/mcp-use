@@ -234,13 +234,76 @@ export function ChatTab({
   }, []);
 
   const serializeMessageContent = useCallback((message: ChatMessage) => {
-    if (typeof message.content === "string") return message.content;
-    if (Array.isArray(message.content)) {
+
+    if (typeof message.content === "string" && message.content.trim()) {
+      return message.content;
+    }
+
+    if (Array.isArray(message.content) && message.content.length > 0) {
       return message.content
         .map((item) => (typeof item === "string" ? item : (item.text ?? "")))
         .join("");
     }
+
+    if (message.parts && message.parts.length > 0) {
+      const textParts = message.parts
+        .filter((p) => p.type === "text" && p.text)
+        .map((p) => p.text);
+
+      if (textParts.length > 0) {
+        return textParts.join("\n");
+      }
+    }
+
     return "";
+  }, []);
+
+  const serializeToolResult = useCallback((result: any) => {
+    if (result === null || result === undefined) return "No result";
+
+    if (typeof result === "string") {
+      try {
+        const parsed = JSON.parse(result);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return result;
+      }
+    }
+
+    // Handle MCP CallToolResult format: { content: [], isError: boolean }
+    if (typeof result === "object" && Array.isArray(result.content)) {
+      if (result.content.length === 0) return "Empty result";
+
+      return result.content
+        .map((item: any) => {
+          if (item.type === "text") {
+            const text = item.text || "";
+            // Try to prettify nested JSON in text parts
+            if (
+              (text.startsWith("{") || text.startsWith("[")) &&
+              text.length > 2
+            ) {
+              try {
+                const parsed = JSON.parse(text);
+                return JSON.stringify(parsed, null, 2);
+              } catch {
+                return text;
+              }
+            }
+            return text;
+          }
+          if (item.type === "image") {
+            return `[Image: ${item.mimeType}]`;
+          }
+          if (item.type === "resource") {
+            return `[Resource: ${item.resource?.uri || "unknown"}]`;
+          }
+          return JSON.stringify(item, null, 2);
+        })
+        .join("\n\n");
+    }
+
+    return JSON.stringify(result, null, 2);
   }, []);
 
   const getSerializedMessages = useCallback(() => {
@@ -743,16 +806,20 @@ export function ChatTab({
   );
 
   const formatMessagesAsMarkdown = useCallback(
-    (messages: ChatMessage[]) => {
+    (
+      messages: ChatMessage[],
+      options: { includeToolCalls?: boolean } = { includeToolCalls: true }
+    ) => {
       let content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
       content += messages
         .map((m) => {
           const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
           let text = `## ${role}\n${serializeMessageContent(m)}`;
 
-          const toolInvocations = m.parts?.filter(
-            (p) => p.type === "tool-invocation"
-          );
+          const toolInvocations = options.includeToolCalls
+            ? m.parts?.filter((p) => p.type === "tool-invocation")
+            : [];
+
           if (toolInvocations?.length) {
             text +=
               "\n\n### Tool Calls\n" +
@@ -760,11 +827,10 @@ export function ChatTab({
                 .map((p) => {
                   const ti = p.toolInvocation;
                   if (!ti) return "";
-                  const resultStr =
-                    typeof ti.result === "string"
-                      ? ti.result
-                      : JSON.stringify(ti.result, null, 2);
-                  return `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n${resultStr}`;
+
+                  const resultStr = serializeToolResult(ti.result);
+
+                  return `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n\n<details>\n<summary>View Result</summary>\n\n${resultStr}\n\n</details>\n`;
                 })
                 .join("\n\n");
           }
@@ -773,14 +839,16 @@ export function ChatTab({
         .join("\n\n---\n\n");
       return content;
     },
-    [serializeMessageContent]
+    [serializeMessageContent, serializeToolResult]
   );
 
   const handleCopyChat = useCallback(() => {
-    const formattedMessages = formatMessagesAsMarkdown(messages);
+    const formattedMessages = formatMessagesAsMarkdown(messages, {
+      includeToolCalls: false,
+    });
 
     navigator.clipboard.writeText(formattedMessages).then(
-      () => toast.success("Chat copied to clipboard as Markdown"),
+      () => toast.success("Chat copied to clipboard"),
       () => toast.error("Failed to copy chat")
     );
   }, [messages, formatMessagesAsMarkdown]);
@@ -792,7 +860,15 @@ export function ChatTab({
       let mimeType = "";
 
       if (format === "json") {
-        content = JSON.stringify(messages, null, 2);
+        // Normalize messages for a consistent export schema
+        const normalizedMessages = messages.map((m) => ({
+          ...m,
+          // Ensure content is always the flattened string representation for easy parsing
+          content: serializeMessageContent(m),
+          // If the original was a complex structure, it will still be in message.content
+          // but now overwritten by the normalized string at the top level for consistency.
+        }));
+        content = JSON.stringify(normalizedMessages, null, 2);
         filename += ".json";
         mimeType = "application/json";
       } else {

@@ -8,7 +8,7 @@ export interface MessageAttachment {
 
 export interface Message {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "error";
   content: string | Array<{ index: number; type: string; text: string }>;
   timestamp: number;
   attachments?: MessageAttachment[];
