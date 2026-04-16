@@ -6,6 +6,28 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.24.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.24.0&title=OAuth%20scopes%2C%20telemetry%2C%20CLI%203%20%26%20device%20flow&date=2026-04&lang=typescript" alt="Release 1.24.0" />
+  </Frame>
+  ## OAuth scopes, telemetry & CLI 3
+  Minor release for `mcp-use` with OAuth scope customization, telemetry, sub-path OAuth routing, and a Generative-AI JSON Schema fix; major `@mcp-use/cli` release with device-flow auth and manufact API alignment; Inspector 2.0 (see inspector changelog).
+
+- **New**: Configurable OAuth scopes — `scopesSupported` on shared OAuth config and built-in providers
+- **Fix**: `CustomProviderConfig` matches documented fields (`jwksUrl`, `scopesSupported`, `userInfoEndpoint`, `clientId`, `clientSecret`, `mode`, `audience`); optional `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` on `OAuthProvider`; OAuth routes use those accessors instead of unsafe casts
+- **New**: Telemetry support with browser and Node implementations and related dependency updates
+- **New**: `defaultCallbackUrl` on `McpClientProvider` so OAuth redirect URLs stay correct when the UI is mounted under a path basename (for example embedded inspector at `/inspector`)
+- **Fix**: Google provider tool schemas — use `z.object({}).catchall()` instead of `z.record()` so emitted JSON Schema omits `propertyNames`, which Google's API rejects
+- **Fix**: Windows path handling in server and tooling code paths
+- **Enhancement**: Several internal log lines moved from info to debug to reduce noise in normal operation
+- **Fix** (@mcp-use/inspector): OAuth callback URL when the inspector basename is `/inspector`; thinking indicator after streamed assistant messages; tab persistence across refresh (see inspector changelog)
+- **New** (@mcp-use/cli): Device-flow authentication for login and session refresh against the cloud
+- **Update** (@mcp-use/cli): CLI refactored to new manufact cloud APIs across deploy, auth, organization, and server commands
+- **Fix** (@mcp-use/cli): Deployment flow when linking GitHub repositories (`#1331`)
+- **Update**: Updated @mcp-use/inspector to v2.0.0
+- **Update**: Updated @mcp-use/cli to v3.0.0
+</Update>
+
 <Update label="v1.23.1" description="April 2026">
   ## Embedded inspector without LangChain
   Patch release fixing embedded inspector when the agent graph is not installed, and clearer diagnostics when mounting the inspector UI fails.

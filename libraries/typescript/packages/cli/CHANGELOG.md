@@ -1,5 +1,51 @@
 # @mcp-use/cli
 
+## 3.0.1-canary.2
+
+### Patch Changes
+
+- 744db4d: refactor(cli): enhance deploy command with GitHub authorization handling
+  - mcp-use@1.24.1-canary.2
+  - @mcp-use/inspector@2.1.0-canary.2
+
+## 3.0.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9fed740]
+  - mcp-use@1.24.1-canary.1
+  - @mcp-use/inspector@2.1.0-canary.1
+
+## 3.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [27bd31c]
+  - @mcp-use/inspector@2.1.0-canary.0
+  - mcp-use@1.24.1-canary.0
+
+## 3.0.0
+
+### Major Changes
+
+- 4070f26: Moved to device flow authentication.
+- 4070f26: cli: refactor cli to use new manufact apis
+
+### Patch Changes
+
+- 4070f26: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+  - mcp-use@1.24.0
+  - @mcp-use/inspector@2.0.0
+
 ## 3.0.0-canary.5
 
 ### Patch Changes

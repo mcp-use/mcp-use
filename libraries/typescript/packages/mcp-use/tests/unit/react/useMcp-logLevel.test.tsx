@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+
 /**
  * Tests for logLevel configuration in useMcp hook
  *
@@ -281,17 +283,38 @@ describe("useMcp logLevel configuration", () => {
         create(<TestComponent1 />);
       });
 
-      const silentLogs = (console.log as any).mock.calls.length;
+      // Snapshot all console methods after the silent instance runs.
+      // Debug-level output routes to console.debug, not console.log, so we
+      // must track all relevant channels.
+      const callsAfterSilent = {
+        log: (console.log as any).mock.calls.length,
+        info: (console.info as any).mock.calls.length,
+        debug: (console.debug as any).mock.calls.length,
+        warn: (console.warn as any).mock.calls.length,
+      };
+
+      // Silent instance should produce no console output at all
+      expect(
+        callsAfterSilent.log +
+          callsAfterSilent.info +
+          callsAfterSilent.debug +
+          callsAfterSilent.warn
+      ).toBe(0);
 
       // Second instance: debug (different URL so different logger name)
       act(() => {
         create(<TestComponent2 />);
       });
 
-      const debugLogs = (console.log as any).mock.calls.length;
+      // Count only the new calls produced by the debug instance (delta, not cumulative)
+      const newCallsFromDebug =
+        (console.log as any).mock.calls.length -
+        callsAfterSilent.log +
+        ((console.info as any).mock.calls.length - callsAfterSilent.info) +
+        ((console.debug as any).mock.calls.length - callsAfterSilent.debug);
 
-      // The debug instance should log, silent shouldn't
-      expect(debugLogs).toBeGreaterThan(silentLogs);
+      // The debug instance should have produced at least one log entry
+      expect(newCallsFromDebug).toBeGreaterThan(0);
 
       // Both should have their own state
       expect(hookResult1.state).toBeDefined();

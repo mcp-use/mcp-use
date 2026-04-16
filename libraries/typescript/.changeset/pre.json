@@ -2,22 +2,14 @@
   "mode": "pre",
   "tag": "canary",
   "initialVersions": {
-    "@mcp-use/cli": "2.21.4",
+    "@mcp-use/cli": "3.0.0",
     "create-mcp-use-app": "0.14.8",
-    "@mcp-use/inspector": "1.0.1",
-    "mcp-use": "1.23.1"
+    "@mcp-use/inspector": "2.0.0",
+    "mcp-use": "1.24.0"
   },
   "changesets": [
-    "cli-2",
-    "fix-custom-provider-config",
-    "fix-google-provider-record-schema",
-    "fix-inspector-oauth-callback",
-    "fix-inspector-thinking-indicator",
-    "full-buses-double",
-    "moody-pigs-post",
-    "pretty-cobras-shop-2",
-    "pretty-cobras-shop",
-    "sharp-rooms-appear",
-    "ten-kiwis-call"
+    "fix-proxy-fetch-interceptor-teardown",
+    "inspector-ui-improvements",
+    "late-lies-tan"
   ]
 }

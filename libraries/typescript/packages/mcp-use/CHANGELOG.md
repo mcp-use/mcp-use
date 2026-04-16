@@ -1,5 +1,60 @@
 # mcp-use
 
+## 1.24.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [744db4d]
+  - @mcp-use/cli@3.0.1-canary.2
+  - @mcp-use/inspector@2.1.0-canary.2
+
+## 1.24.1-canary.1
+
+### Patch Changes
+
+- 9fed740: Fix inspector "Protected resource does not match" error when switching from Via Proxy to Direct connection. The `window.fetch` interceptor installed by `BrowserOAuthClientProvider` is now correctly restored when `useMcp` unmounts, preventing the stale proxy interceptor from interfering with subsequent direct OAuth flows.
+  - @mcp-use/cli@3.0.1-canary.1
+  - @mcp-use/inspector@2.1.0-canary.1
+
+## 1.24.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [27bd31c]
+  - @mcp-use/inspector@2.1.0-canary.0
+  - @mcp-use/cli@3.0.1-canary.0
+
+## 1.24.0
+
+### Minor Changes
+
+- 4070f26: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+- 4070f26: Add scopes customization to oauth providers
+
+### Patch Changes
+
+- 4070f26: Fix deployment flow through cli and github connection
+- 4070f26: Add missing fields to CustomProviderConfig to match documentation: `userInfoEndpoint`, `jwksUrl`, `clientId`, `clientSecret`, `mode`, `scopesSupported`, and `audience`. Add `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` as optional methods on the `OAuthProvider` interface. Replace unsafe `(provider as any).config?.clientId` cast in routes with type-safe `provider.getClientId?.()`.
+- 4070f26: Fix Google provider rejecting tool schemas with `propertyNames` keyword.
+
+  `z.record()` causes `@langchain/core` to emit a `propertyNames` field in the JSON Schema output for constrained or enum key types, which Google's Generative AI API rejects. Switching to `z.object({}).catchall()` produces identical runtime behavior while serializing cleanly without `propertyNames`.
+
+- 4070f26: chore(mcp-use): switch several logers to debug from info
+- 4070f26: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+  - @mcp-use/inspector@2.0.0
+  - @mcp-use/cli@3.0.0
+
 ## 1.24.0-canary.5
 
 ### Patch Changes
