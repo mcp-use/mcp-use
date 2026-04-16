@@ -1175,10 +1175,14 @@ export default {
       }
 
       console.log(chalk.green(`    ✓ Built ${widgetName}`));
-      return { name: widgetName, metadata: widgetMetadata };
+      return {
+        status: "built" as const,
+        name: widgetName,
+        metadata: widgetMetadata,
+      };
     } catch (error) {
       console.error(chalk.red(`    ✗ Failed to build ${widgetName}:`), error);
-      return null;
+      return { status: "failed" as const, name: widgetName };
     }
   };
 
@@ -1187,12 +1191,21 @@ export default {
     entries.map((entry) => buildSingleWidget(entry))
   );
 
-  // Filter out failed builds (null results)
-  const builtWidgets = buildResults.filter(
-    (result): result is { name: string; metadata: any } => result !== null
-  );
+  const failed = buildResults.filter((r) => r.status === "failed");
+  if (failed.length > 0) {
+    // A failed widget build must fail the whole `mcp-use build`. Silently
+    // dropping failures produced a manifest that looked healthy but shipped
+    // zero widgets at runtime — indistinguishable from a project that
+    // intentionally has none. Throw so the outer try/catch exits non-zero.
+    const names = failed.map((f) => f.name).join(", ");
+    throw new Error(
+      `${failed.length} widget(s) failed to build: ${names}. See errors above.`
+    );
+  }
 
-  return builtWidgets;
+  return buildResults.flatMap((r) =>
+    r.status === "built" ? [{ name: r.name, metadata: r.metadata }] : []
+  );
 }
 
 /**
