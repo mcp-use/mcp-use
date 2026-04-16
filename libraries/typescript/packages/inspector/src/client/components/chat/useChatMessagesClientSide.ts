@@ -734,7 +734,7 @@ export function useChatMessagesClientSide({
 
         const errorMessage: Message = {
           id: `error-${Date.now()}`,
-          role: "error",
+          role: "assistant",
           content: `Error: ${errorDetail}`,
           timestamp: Date.now(),
         };
