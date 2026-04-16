@@ -640,12 +640,12 @@ async function buildWidgets(
   const react = (await import("@vitejs/plugin-react")).default;
   // @ts-ignore - @tailwindcss/vite may not have type declarations
   const tailwindcss = (await import("@tailwindcss/vite")).default;
-  const tsconfigPaths = (await import("vite-tsconfig-paths")).default;
 
-  // Check whether the project has a tsconfig.json we can hand to
-  // vite-tsconfig-paths. When present, widgets that `import '@/components/...'`
+  // Check whether the project has a tsconfig.json. When present, we enable
+  // Vite's native `resolve.tsconfigPaths` so widgets that `import '@/components/...'`
   // resolve through the project's own path aliases (e.g. a Next.js app where
-  // `@/*` → `src/*`). When absent, vite-tsconfig-paths is a no-op.
+  // `@/*` → `src/*`). When absent, we fall back to a hardcoded `@` → resourcesDir
+  // alias below.
   const projectTsconfigPath = path.join(projectPath, "tsconfig.json");
   let hasProjectTsconfig = false;
   try {
@@ -802,28 +802,14 @@ export default PostHog;
       const metadataServer = await createServer({
         root: metadataTempDir,
         cacheDir: path.join(metadataTempDir, ".vite-cache"),
-        plugins: [
-          serverOnlyGuard,
-          nodeStubsPlugin,
-          ...(hasProjectTsconfig
-            ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
-            : []),
-          tailwindcss(),
-          react(),
-        ],
-        // When the project has a tsconfig, vite-tsconfig-paths owns `@/*`
-        // resolution (it picks up whatever aliases the project already
-        // defines). We only fall back to the legacy hardcoded alias for
-        // projects without a tsconfig (e.g. JS-only scaffolds).
-        ...(hasProjectTsconfig
-          ? {}
-          : {
-              resolve: {
-                alias: {
-                  "@": resourcesDir,
-                },
-              },
-            }),
+        plugins: [serverOnlyGuard, nodeStubsPlugin, tailwindcss(), react()],
+        // When the project has a tsconfig, enable Vite's native tsconfig-paths
+        // resolver so `@/*` (or any custom alias) resolves through the
+        // project's own paths config. Without a tsconfig, fall back to the
+        // legacy hardcoded alias.
+        resolve: hasProjectTsconfig
+          ? { tsconfigPaths: true }
+          : { alias: { "@": resourcesDir } },
         server: {
           middlewareMode: true,
         },
@@ -1016,30 +1002,20 @@ export default {
       };
 
       // Build plugins array - add viteSingleFile when inlining for VS Code compatibility.
-      // vite-tsconfig-paths wires up the project's own `@/*` aliases (when a
-      // tsconfig.json exists at the project root); this is what lets a widget
-      // inside a Next.js app `import '@/components/ui/card'` and resolve it
-      // through the app's own paths config.
-      const tsconfigPathsPlugins = hasProjectTsconfig
-        ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
-        : [];
+      // `@/*` aliases are resolved via Vite's native `resolve.tsconfigPaths`
+      // below (when the project has a tsconfig.json at the root); this is what
+      // lets a widget inside a Next.js app `import '@/components/ui/card'`
+      // and resolve it through the app's own paths config.
       const buildServerOnlyGuard = makeWidgetServerOnlyGuard(widgetName);
       const buildPlugins = inline
         ? [
             buildServerOnlyGuard,
             buildNodeStubsPlugin,
-            ...tsconfigPathsPlugins,
             tailwindcss(),
             react(),
             viteSingleFile({ removeViteModuleLoader: true }),
           ]
-        : [
-            buildServerOnlyGuard,
-            buildNodeStubsPlugin,
-            ...tsconfigPathsPlugins,
-            tailwindcss(),
-            react(),
-          ];
+        : [buildServerOnlyGuard, buildNodeStubsPlugin, tailwindcss(), react()];
 
       await build({
         root: tempDir,
@@ -1064,18 +1040,12 @@ export default {
                 },
               },
             }),
-        // Only install the legacy "@" → resourcesDir alias for projects
-        // without a tsconfig. When a tsconfig exists, vite-tsconfig-paths
-        // owns `@/*` resolution (see plugin list above).
-        ...(hasProjectTsconfig
-          ? {}
-          : {
-              resolve: {
-                alias: {
-                  "@": resourcesDir,
-                },
-              },
-            }),
+        // When a tsconfig exists, enable Vite's native `resolve.tsconfigPaths`
+        // so the project's path aliases resolve naturally. Otherwise fall
+        // back to the legacy `@` → resourcesDir alias.
+        resolve: hasProjectTsconfig
+          ? { tsconfigPaths: true }
+          : { alias: { "@": resourcesDir } },
         optimizeDeps: {
           // Exclude Node.js-only packages from browser bundling
           exclude: ["posthog-node"],

@@ -193,12 +193,11 @@ export async function mountWidgetsDev(
   let createServer: any;
   let react: any;
   let tailwindcss: any;
-  // vite-tsconfig-paths is optional: present in projects with a tsconfig.json
-  // at the root (Next.js apps always have one). When available, widgets can
-  // `import '@/components/...'` and the project's `@/*` paths resolve natively,
-  // instead of forcing the old hardcoded `@` → resources alias.
-  let tsconfigPaths: any = undefined;
-  let projectTsconfigPath: string | undefined;
+  // When the project has a tsconfig.json, we enable Vite's native
+  // `resolve.tsconfigPaths` option so a widget can `import '@/components/...'`
+  // and the project's `@/*` paths resolve natively. Without a tsconfig, we
+  // fall back to a hardcoded `@` → resources alias below.
+  let hasProjectTsconfig = false;
 
   try {
     // Use createRequire to resolve modules from the user's project directory (getCwd())
@@ -224,41 +223,9 @@ export async function mountWidgetsDev(
     const tailwindModule = await import(pathToFileURL(tailwindPath).href);
     tailwindcss = tailwindModule.default;
 
-    // Try to resolve vite-tsconfig-paths from:
-    //   1. the user's project directly (pnpm/strict resolvers need this), or
-    //   2. @mcp-use/cli's node_modules (the CLI depends on it, so any project
-    //      that ran `mcp-use dev` has it reachable through the CLI package).
-    // Either source is fine — the plugin only reads the tsconfig path we
-    // hand it, and both copies of vite-tsconfig-paths behave identically.
     const candidateTsconfig = pathHelpers.join(getCwd(), "tsconfig.json");
     if (await fsHelpers.existsSync(candidateTsconfig)) {
-      projectTsconfigPath = candidateTsconfig;
-      let tsconfigPathsPath: string | undefined;
-      try {
-        tsconfigPathsPath = userProjectRequire.resolve("vite-tsconfig-paths");
-      } catch {
-        // Fall back to the copy bundled with @mcp-use/cli.
-        try {
-          const cliPkgPath = userProjectRequire.resolve(
-            "@mcp-use/cli/package.json"
-          );
-          const cliRequire = createRequire(cliPkgPath);
-          tsconfigPathsPath = cliRequire.resolve("vite-tsconfig-paths");
-        } catch {
-          // Genuinely unavailable — widgets that use `@/*` fall back to the
-          // legacy resources-dir alias below. That's fine for projects
-          // scaffolded with create-mcp-use-app (relative imports inside
-          // resources/), but Next.js drop-in projects should install
-          // vite-tsconfig-paths directly for reliable `@/components/...`
-          // resolution.
-        }
-      }
-      if (tsconfigPathsPath) {
-        const tsconfigPathsModule = await import(
-          pathToFileURL(tsconfigPathsPath).href
-        );
-        tsconfigPaths = tsconfigPathsModule.default;
-      }
+      hasProjectTsconfig = true;
     }
   } catch (error) {
     throw new Error(
@@ -1180,13 +1147,6 @@ export default PostHog;
       widgetHmrPlugin,
       suppressFullReloadPlugin,
       watchResourcesPlugin,
-      // When the project has a tsconfig with `paths`, wire them up so a
-      // widget can `import '@/components/ui/card'` and hit the real file in
-      // the user's app. Plugin must run BEFORE other resolvers so it gets
-      // first dibs on specifiers that start with `@/`.
-      ...(tsconfigPaths && projectTsconfigPath
-        ? [tsconfigPaths({ projects: [projectTsconfigPath] })]
-        : []),
       tailwindcss(),
       react(),
     ],
@@ -1202,16 +1162,12 @@ export default PostHog;
         "react/jsx-dev-runtime",
         "react-dom/client",
       ],
-      // Legacy `@` alias only when the project has no tsconfig (i.e.
-      // vite-tsconfig-paths didn't register). With a tsconfig, the
-      // plugin at the front of the plugin chain owns `@/*`.
-      ...(tsconfigPaths && projectTsconfigPath
-        ? {}
-        : {
-            alias: {
-              "@": pathHelpers.join(getCwd(), resourcesDir),
-            },
-          }),
+      // With a tsconfig, Vite's native tsconfigPaths resolver owns `@/*`
+      // (it picks up whatever aliases the project already defines).
+      // Without one, fall back to the legacy hardcoded `@` → resourcesDir.
+      ...(hasProjectTsconfig
+        ? { tsconfigPaths: true }
+        : { alias: { "@": pathHelpers.join(getCwd(), resourcesDir) } }),
     },
     build: {
       // Disable source maps to avoid CSP eval violations
