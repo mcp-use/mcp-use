@@ -9,6 +9,7 @@
   },
   "changesets": [
     "fix-proxy-fetch-interceptor-teardown",
+    "inspector-theme-toggle",
     "inspector-ui-improvements",
     "late-lies-tan"
   ]
