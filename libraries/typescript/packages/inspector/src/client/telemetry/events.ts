@@ -206,3 +206,105 @@ export class MCPToolSavedEvent implements BaseTelemetryEvent {
     };
   }
 }
+
+export interface MCPTunnelActionEventData {
+  action: "start" | "stop";
+  success: boolean;
+  tunnelUrl?: string | null;
+}
+
+export class MCPTunnelActionEvent implements BaseTelemetryEvent {
+  name = "mcp_tunnel_action";
+  properties: Record<string, any>;
+
+  constructor(data: MCPTunnelActionEventData) {
+    this.properties = {
+      action: data.action,
+      success: data.success,
+      tunnel_url: data.tunnelUrl,
+    };
+  }
+}
+
+export interface MCPDeployClickEventData {
+  referrer: string;
+}
+
+export class MCPDeployClickEvent implements BaseTelemetryEvent {
+  name = "mcp_deploy_click";
+  properties: Record<string, any>;
+
+  constructor(data: MCPDeployClickEventData) {
+    this.properties = {
+      referrer: data.referrer,
+    };
+  }
+}
+
+export interface MCPChatConfiguredEventData {
+  provider: string;
+  model: string;
+}
+
+export class MCPChatConfiguredEvent implements BaseTelemetryEvent {
+  name = "mcp_chat_configured";
+  properties: Record<string, any>;
+
+  constructor(data: MCPChatConfiguredEventData) {
+    this.properties = {
+      provider: data.provider,
+      model: data.model,
+    };
+  }
+}
+
+export interface MCPTabNavigationEventData {
+  tab: string;
+  previousTab: string | null;
+}
+
+export class MCPTabNavigationEvent implements BaseTelemetryEvent {
+  name = "mcp_tab_navigation";
+  properties: Record<string, any>;
+
+  constructor(data: MCPTabNavigationEventData) {
+    this.properties = {
+      tab: data.tab,
+      previous_tab: data.previousTab,
+    };
+  }
+}
+
+export interface MCPAddToClientEventData {
+  client: string;
+}
+
+export class MCPAddToClientEvent implements BaseTelemetryEvent {
+  name = "mcp_add_to_client";
+  properties: Record<string, any>;
+
+  constructor(data: MCPAddToClientEventData) {
+    this.properties = {
+      client: data.client,
+    };
+  }
+}
+
+export interface MCPSessionDurationEventData {
+  durationSeconds: number;
+  tabsVisited: number;
+  toolsExecuted: number;
+}
+
+export class MCPSessionDurationEvent implements BaseTelemetryEvent {
+  name = "mcp_session_duration";
+  properties: Record<string, any>;
+
+  constructor(data: MCPSessionDurationEventData) {
+    this.properties = {
+      duration_seconds: data.durationSeconds,
+      tabs_visited: data.tabsVisited,
+      tools_executed: data.toolsExecuted,
+    };
+  }
+}

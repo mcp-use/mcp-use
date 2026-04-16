@@ -8,7 +8,12 @@ import {
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
-import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
+import {
+  MCPCommandPaletteOpenEvent,
+  MCPTabNavigationEvent,
+  MCPSessionDurationEvent,
+  Telemetry,
+} from "@/client/telemetry";
 import {
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
@@ -173,9 +178,63 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [location.search, setActiveTab]);
 
+  // Tab navigation telemetry
+  const previousTabRef = useRef<string | null>(null);
+
+  // Session duration tracking
+  const sessionStartRef = useRef<number>(Date.now());
+  const tabsVisitedRef = useRef<Set<string>>(new Set());
+  const toolsExecutedRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handler = () => {
+      toolsExecutedRef.current++;
+    };
+    window.addEventListener("mcp-tool-executed", handler);
+    return () => window.removeEventListener("mcp-tool-executed", handler);
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        const durationSeconds = Math.round(
+          (Date.now() - sessionStartRef.current) / 1000
+        );
+        Telemetry.getInstance()
+          .capture(
+            new MCPSessionDurationEvent({
+              durationSeconds,
+              tabsVisited: tabsVisitedRef.current.size,
+              toolsExecuted: toolsExecutedRef.current,
+            })
+          )
+          .catch(() => {});
+      } catch {
+        // ignore telemetry errors
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
   // Sync the URL ?tab= param whenever the active tab changes
   const handleTabChange = useCallback(
     (tab: TabType) => {
+      try {
+        Telemetry.getInstance()
+          .capture(
+            new MCPTabNavigationEvent({
+              tab,
+              previousTab: previousTabRef.current,
+            })
+          )
+          .catch(() => {});
+      } catch {
+        // ignore telemetry errors
+      }
+      previousTabRef.current = tab;
+      tabsVisitedRef.current.add(tab);
+
       setActiveTab(tab);
       const params = new URLSearchParams(location.search);
       params.set("tab", tab);

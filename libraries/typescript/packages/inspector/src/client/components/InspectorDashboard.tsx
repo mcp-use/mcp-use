@@ -14,7 +14,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
+import {
+  MCPServerAddedEvent,
+  MCPServerConnectionEvent,
+  MCPServerRemovedEvent,
+  Telemetry,
+} from "@/client/telemetry";
 import {
   CircleMinus,
   Copy,
@@ -74,6 +79,56 @@ export function InspectorDashboard() {
     updateServerMetadata,
     updateServer,
   } = useMcpClient();
+
+  // Track which server connections have been reported to telemetry (dedup)
+  const reportedConnectionsRef = useRef<Set<string>>(new Set());
+
+  // Track server connection state transitions for telemetry
+  useEffect(() => {
+    connections.forEach((connection) => {
+      if (
+        connection.state === "ready" &&
+        !reportedConnectionsRef.current.has(connection.id)
+      ) {
+        reportedConnectionsRef.current.add(connection.id);
+        try {
+          Telemetry.getInstance()
+            .capture(
+              new MCPServerConnectionEvent({
+                serverId: connection.id,
+                serverUrl: connection.url,
+                success: true,
+                connectionType: "http",
+              })
+            )
+            .catch(() => {});
+        } catch {
+          // ignore telemetry errors
+        }
+      } else if (
+        connection.state === "failed" &&
+        reportedConnectionsRef.current.has(connection.id)
+      ) {
+        reportedConnectionsRef.current.delete(connection.id);
+      }
+    });
+  }, [connections]);
+
+  // Wrapper to track server removal in telemetry
+  const handleRemoveConnection = useCallback(
+    (connectionId: string) => {
+      try {
+        Telemetry.getInstance()
+          .capture(new MCPServerRemovedEvent({ serverId: connectionId }))
+          .catch(() => {});
+      } catch {
+        // ignore telemetry errors
+      }
+      reportedConnectionsRef.current.delete(connectionId);
+      removeConnection(connectionId);
+    },
+    [removeConnection]
+  );
 
   // Track concurrent updates to prevent race conditions
   const [updatingConnections, setUpdatingConnections] = useState<Set<string>>(
@@ -412,7 +467,7 @@ export function InspectorDashboard() {
   const handleClearAllConnections = () => {
     // Remove all connections
     connections.forEach((connection) => {
-      removeConnection(connection.id);
+      handleRemoveConnection(connection.id);
     });
   };
 
@@ -856,7 +911,7 @@ export function InspectorDashboard() {
                             size="sm"
                             onClick={(e) =>
                               handleActionClick(e, () =>
-                                removeConnection(connection.id)
+                                handleRemoveConnection(connection.id)
                               )
                             }
                             className="h-8 w-8 p-0"
@@ -961,7 +1016,7 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeConnection(connection.id);
+                              handleRemoveConnection(connection.id);
                             }}
                             className="text-destructive focus:text-destructive"
                           >
