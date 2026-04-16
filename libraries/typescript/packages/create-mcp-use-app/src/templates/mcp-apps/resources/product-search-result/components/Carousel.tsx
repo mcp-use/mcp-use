@@ -1,7 +1,7 @@
 import { Animate } from "@openai/apps-sdk-ui/components/Transition";
 import React, { useRef } from "react";
-import { CarouselItem } from "./CarouselItem";
-import { useCarouselAnimation } from "../hooks/useCarouselAnimation";
+import { CarouselItem } from "./CarouselItem.js";
+import { useCarouselAnimation } from "../hooks/useCarouselAnimation.js";
 
 interface CarouselProps {
   results: Array<{ fruit: string; color: string }>;

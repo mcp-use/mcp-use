@@ -1,6 +1,6 @@
 import { Animate } from "@openai/apps-sdk-ui/components/Transition";
 import React from "react";
-import type { AccordionItemProps } from "../types";
+import type { AccordionItemProps } from "../types.js";
 
 export const AccordionItem: React.FC<AccordionItemProps> = ({
   question,

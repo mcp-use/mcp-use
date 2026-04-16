@@ -9,11 +9,11 @@ import {
 import React, { useCallback } from "react";
 import { Link } from "react-router";
 import "../styles.css";
-import { Carousel } from "./components/Carousel";
-import { CarouselSkeleton } from "./components/CarouselSkeleton";
-import { Accordion } from "./components/Accordion";
-import type { ProductSearchResultProps } from "./types";
-import { propSchema } from "./types";
+import { Carousel } from "./components/Carousel.js";
+import { CarouselSkeleton } from "./components/CarouselSkeleton.js";
+import { Accordion } from "./components/Accordion.js";
+import type { ProductSearchResultProps } from "./types.js";
+import { propSchema } from "./types.js";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
 import {
   Expand,
