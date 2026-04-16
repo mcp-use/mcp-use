@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # Architecture
 
 Design UX flows and API shape for your ChatGPT app.

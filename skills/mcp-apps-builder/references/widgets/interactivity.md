@@ -7,9 +7,20 @@ Widgets interact with the outside world using hooks from `mcp-use/react`. `useCa
 
 ---
 
-## useCallTool() Basics
+## useCallTool() basics
 
-`useCallTool()` provides a TanStack Query-like state machine for calling MCP tools:
+`useCallTool()` provides a TanStack Query-like state machine for calling MCP tools.
+
+**Typed (preferred):** pass a **`ToolRef`** from `server.tool()`:
+
+```tsx
+import { useCallTool } from "mcp-use/react";
+import { toggleTodo } from "../server";
+
+const { callTool, data, isPending } = useCallTool(toggleTodo);
+```
+
+**String name:** still supported; optional codegen can augment types.
 
 ```tsx
 import { useCallTool } from "mcp-use/react";
@@ -39,30 +50,19 @@ const result = await callToolAsync({ param: "value" });
 | `callTool` | Fire-and-forget; optional `onSuccess`/`onError`/`onSettled` callbacks |
 | `callToolAsync` | Returns `Promise<CallToolResult>` |
 
-**Type inference:** When using `mcp-use dev`, types for tool names, inputs, and outputs are auto-generated to `.mcp-use/tool-registry.d.ts`. The hook is fully typed with autocomplete.
+**Type inference:** `ToolRef` / `createTypedHooks()` infer types without codegen. Optional `mcp-use dev` codegen can still augment string-based `useCallTool("name")`.
 
 ---
 
 ## Simple Button Action
 
 ```tsx
-import { McpUseProvider, useWidget, useCallTool, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 
-export const widgetMetadata: WidgetMetadata = {
-  description: "Todo list with actions",
-  props: z.object({
-    todos: z.array(z.object({
-      id: z.string(),
-      title: z.string(),
-      completed: z.boolean()
-    }))
-  }),
-  exposeAsTool: false
-};
+type Todo = { id: string; title: string; completed: boolean };
 
 export default function TodoList() {
-  const { props, isPending: isLoading } = useWidget();
+  const { props, isPending: isLoading } = useWidget<{ todos: Todo[] }>();
   const { callTool, isPending } = useCallTool("toggle-todo");
 
   if (isLoading) {
@@ -699,7 +699,7 @@ export default function TodoWidget() {
 
 ```tsx
 import { useState } from "react";
-import { McpUseProvider, useWidget, useCallTool, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useWidget, useCallTool } from "mcp-use/react";
 import { z } from "zod";
 
 const propsSchema = z.object({
@@ -711,12 +711,6 @@ const propsSchema = z.object({
 });
 
 type Props = z.infer<typeof propsSchema>;
-
-export const widgetMetadata: WidgetMetadata = {
-  description: "Interactive todo list",
-  props: propsSchema,
-  exposeAsTool: false
-};
 
 export default function InteractiveTodoList() {
   const { props, isPending: isLoading } = useWidget<Props>();

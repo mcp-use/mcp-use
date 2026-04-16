@@ -1,0 +1,22 @@
+[
+  {
+    "query": "Create a weather widget that shows temperature and conditions",
+    "expected_behavior": "Uses /** @jsxImportSource mcp-use/jsx */, imports a plain React component (e.g. components/WeatherCard.tsx), returns <WeatherCard ... _output={text(...)} _invoking _invoked _csp as needed />. No widget: { name }, no resources/ folder requirement, no widgetMetadata export."
+  },
+  {
+    "query": "My widget shows undefined for the city name",
+    "expected_behavior": "Diagnoses missing isPending check. Widget renders before tool completes; props empty until then. Guard on isPending before reading useWidget().props."
+  },
+  {
+    "query": "I want the widget to call another tool when a button is clicked",
+    "expected_behavior": "Uses useCallTool(toolRef) with a ToolRef from server.tool(), or useCallTool('name'). Shows callTool({ ... }) with typed args when using ToolRef."
+  },
+  {
+    "query": "How do I stream partial results into the widget UI?",
+    "expected_behavior": "Mentions streamable() on the server as a prop and useStreamableProps() or streaming notifications in the widget; links to response helpers / MCP Apps docs pattern."
+  },
+  {
+    "query": "Duplicate tool or legacy exposeAsTool confusion",
+    "expected_behavior": "Explains primary pattern is server.tool returning JSX; avoid legacy exposeAsTool + separate auto tool unless migrating old code."
+  }
+]

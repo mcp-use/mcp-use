@@ -85,7 +85,7 @@ const result = await ctx.elicit({
 ```
 
 The full conformance implementation for SEP-1330 lives in:
-`examples/server/features/conformance/src/server.ts` via `test_elicitation_sep1330_enums`.
+`examples/server/features/conformance/src/server.tsx` via `test_elicitation_sep1330_enums`.
 
 ## Running the Server
 
@@ -104,7 +104,7 @@ The server will start on port 3000 by default.
 4. **test-required-validation** - Demonstrates required field validation
 
 For expanded conformance coverage (including `test_elicitation_sep1034_defaults` and `test_elicitation_sep1330_enums`), see the conformance feature server at:
-`examples/server/features/conformance/src/server.ts`.
+`examples/server/features/conformance/src/server.tsx`.
 
 ## Testing
 

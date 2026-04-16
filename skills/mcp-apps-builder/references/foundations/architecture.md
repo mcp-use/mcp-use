@@ -270,6 +270,14 @@ server.app.get('/api/status', (c) => {
 
 ---
 
+## Widget bundling (inline JSX)
+
+Tools can return **JSX** when the server file sets **`/** @jsxImportSource mcp-use/jsx */`**. The dev and build pipelines bundle imported React components, generate the iframe entry, and register **MCP Apps** + **ChatGPT** metadata. Inline widget definitions also integrate with **`tools/list`** middleware so hosts see `resourceUri`, CSP, and invocation strings before the first call.
+
+Details: [../widgets/basics.md](../widgets/basics.md).
+
+---
+
 ## Common Patterns
 
 ### Logging Middleware

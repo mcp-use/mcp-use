@@ -25,6 +25,72 @@ import { createSkillsCommand } from "./commands/skills.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 const program = new Command();
 
+/**
+ * Ensure the user's `tsconfig.json` has the JSX settings required for inline
+ * JSX widget returns (`return <Widget ... />`) to compile and type-check.
+ *
+ * This mirrors Next.js's approach (`next dev` writes `jsx: "preserve"`,
+ * `plugins`, etc. into the project's tsconfig on first run): we set
+ * `compilerOptions.jsx = "react-jsx"` and `jsxImportSource = "mcp-use/jsx"`
+ * only if they are missing. Pre-existing values are never overwritten.
+ *
+ * Effects:
+ * - Runtime: `tsx` / esbuild read the patched tsconfig and route JSX through
+ *   our custom runtime — so `<Widget _csp={...} />` becomes a `widget()` call.
+ * - Type-check: the user's IDE/`tsc` also picks up `mcp-use/jsx`'s JSX
+ *   namespace, so `_`-prefixed props and `Streamable<T>` values type-check.
+ *
+ * If no `tsconfig.json` exists we leave the project alone — users without
+ * TypeScript don't need the patch.
+ */
+async function ensureUserTsconfigJsx(projectPath: string): Promise<void> {
+  const userTsconfigPath = path.join(projectPath, "tsconfig.json");
+  let raw: string;
+  try {
+    raw = await readFile(userTsconfigPath, "utf-8");
+  } catch {
+    return;
+  }
+
+  // Use a tolerant parser since tsconfigs often contain comments/trailing commas.
+  const { parse, modify, applyEdits } = await import("jsonc-parser");
+  const errors: any[] = [];
+  const parsed = parse(raw, errors, { allowTrailingComma: true });
+  if (!parsed || typeof parsed !== "object") return;
+
+  const compilerOptions = parsed.compilerOptions ?? {};
+  let patched = raw;
+  let changed = false;
+  const formatting = { insertSpaces: true, tabSize: 2 } as const;
+
+  if (compilerOptions.jsx === undefined) {
+    const edits = modify(patched, ["compilerOptions", "jsx"], "react-jsx", {
+      formattingOptions: formatting,
+    });
+    patched = applyEdits(patched, edits);
+    changed = true;
+  }
+  if (compilerOptions.jsxImportSource === undefined) {
+    const edits = modify(
+      patched,
+      ["compilerOptions", "jsxImportSource"],
+      "mcp-use/jsx",
+      { formattingOptions: formatting }
+    );
+    patched = applyEdits(patched, edits);
+    changed = true;
+  }
+
+  if (changed) {
+    await writeFile(userTsconfigPath, patched, "utf-8");
+    console.log(
+      chalk.gray(
+        "  Patched tsconfig.json with jsx: \"react-jsx\" and jsxImportSource: \"mcp-use/jsx\""
+      )
+    );
+  }
+}
+
 const packageContent = readFileSync(
   path.join(__dirname, "../package.json"),
   "utf-8"
@@ -348,6 +414,7 @@ async function generateToolRegistryTypesForServer(
     (globalThis as any).__mcpUseLastServer = undefined;
 
     const { tsImport } = await import("tsx/esm/api");
+    await ensureUserTsconfigJsx(projectPath);
     await tsImport(pathToFileURL(serverFile).href, {
       parentURL: import.meta.url,
       tsconfig: path.join(projectPath, "tsconfig.json"),
@@ -584,7 +651,16 @@ export default PostHog;
       const metadataServer = await createServer({
         root: metadataTempDir,
         cacheDir: path.join(metadataTempDir, ".vite-cache"),
-        plugins: [nodeStubsPlugin, tailwindcss(), react()],
+        plugins: [
+          nodeStubsPlugin,
+          tailwindcss(),
+          // Force React's own JSX runtime. User's tsconfig may set
+          // `jsxImportSource: "mcp-use/jsx"` (auto-injected by the CLI) so
+          // server-side inline JSX widget returns compile; without this
+          // override, the widget's React components would inherit that and
+          // compile against our server runtime, producing non-ReactElements.
+          react({ jsxImportSource: "react" }),
+        ],
         resolve: {
           alias: {
             "@": resourcesDir,
@@ -782,14 +858,20 @@ export default {
       };
 
       // Build plugins array - add viteSingleFile when inlining for VS Code compatibility
+      // See note above: force React's own JSX runtime for widget bundles
+      // regardless of the project's tsconfig jsxImportSource.
       const buildPlugins = inline
         ? [
             buildNodeStubsPlugin,
             tailwindcss(),
-            react(),
+            react({ jsxImportSource: "react" }),
             viteSingleFile({ removeViteModuleLoader: true }),
           ]
-        : [buildNodeStubsPlugin, tailwindcss(), react()];
+        : [
+            buildNodeStubsPlugin,
+            tailwindcss(),
+            react({ jsxImportSource: "react" }),
+          ];
 
       await build({
         root: tempDir,
@@ -1041,6 +1123,7 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
   const esbuild = await import("esbuild");
   const { promises: fs } = await import("node:fs");
 
+  await ensureUserTsconfigJsx(projectPath);
   const tsconfigPath = path.join(projectPath, "tsconfig.json");
   let tsconfig: any = {};
   try {
@@ -1066,14 +1149,22 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
     return;
   }
 
-  // Map tsconfig jsx setting to esbuild equivalent
+  // Map tsconfig jsx setting to esbuild equivalent. We default to
+  // "automatic" so inline JSX widget returns in server files compile
+  // correctly against the auto-injected `jsxImportSource` below, even
+  // when the user hasn't set `jsx` in their tsconfig.
   const jsxMap: Record<string, "automatic" | "transform" | "preserve"> = {
     "react-jsx": "automatic",
     "react-jsxdev": "automatic",
     react: "transform",
     preserve: "preserve",
   };
-  const jsx = jsxMap[compilerOptions.jsx] || undefined;
+  const jsx = jsxMap[compilerOptions.jsx] || "automatic";
+  // Force mcp-use's JSX runtime for server-side files so inline `<Widget ... />`
+  // returns are transformed into widget() calls via our custom jsx() factory.
+  // Users don't need to add a per-file pragma or set this in their tsconfig.
+  const jsxImportSource =
+    compilerOptions.jsxImportSource || "mcp-use/jsx";
 
   const target = (compilerOptions.target || "ES2022").toLowerCase();
 
@@ -1094,6 +1185,7 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
     format,
     target,
     jsx,
+    jsxImportSource,
     sourcemap: compilerOptions.sourceMap ?? true,
     tsconfig: tsconfigPath,
     platform: "node",
@@ -1601,6 +1693,7 @@ program
           // tsImport handles TypeScript compilation and does not cache loaded modules,
           // so the entire dependency tree is re-evaluated on each call.
           // The ?t= timestamp is kept as a safety measure for edge cases.
+          await ensureUserTsconfigJsx(projectPath);
           await tsImport(`${serverFileUrl}?t=${Date.now()}`, {
             parentURL: import.meta.url,
             onImport: (file: string) => {

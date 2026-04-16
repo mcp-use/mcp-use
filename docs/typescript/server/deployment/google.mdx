@@ -20,7 +20,7 @@ We will use **mcp-use TypeScript** to create a **zoo MCP server** that has two t
 - Deploy the MCP server to Cloud Run
 - Secure your server's endpoint by requiring authentication for all requests, ensuring only authorized clients and agents can communicate with it
 - Connect to your secure MCP server endpoint from Gemini CLI
-- Build ChatGPT Apps with interactive widgets
+- Build interactive widgets (MCP Apps + ChatGPT) with inline JSX
 
 ## 2. Project Setup
 
@@ -278,69 +278,53 @@ await server.listen(port);
 
    The `create-mcp-use-app` template already includes the necessary imports and server setup. We've replaced the example code with our zoo server implementation.
 
-## 6. Building ChatGPT Apps with Your MCP Server
+## 6. Adding an interactive widget (inline JSX)
 
-One of the powerful features of mcp-use is its built-in support for building **ChatGPT Apps** with interactive widgets. This allows you to create rich, interactive user interfaces that go beyond simple text responses.
+mcp-use builds **MCP Apps** widgets that also work in **ChatGPT**. Tools return **JSX** from the server file using **`/** @jsxImportSource mcp-use/jsx */`** — no `resources/` folder or `widget: { name }` is required for this pattern.
 
-### What are ChatGPT Apps?
+### Add a widget component
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces using the **OpenAI Apps SDK**. Widgets can:
-- Display data in tables, carousels, or custom layouts
-- Allow users to filter, sort, or manipulate results
-- Persist state across conversations
-- Call MCP tools directly from the UI
+1. Create `components/AnimalCard.tsx` (for example next to your server entry):
 
-### Adding a Widget to Your Zoo Server
-
-Let's add an interactive widget to display animal information in a beautiful card format.
-
-1. The `resources` directory should already exist from `create-mcp-use-app`. Create a widget component `resources/animal-card.tsx`:
    ```bash
-   cloudshell edit ~/mcp-on-cloudrun/resources/animal-card.tsx
+   cloudshell edit ~/mcp-on-cloudrun/components/AnimalCard.tsx
    ```
 
-2. Add the following widget code:
+2. Use a plain React component with `useWidget()`:
 
 ```tsx
-import React from 'react';
-import { McpUseProvider, useWidget, type WidgetMetadata } from 'mcp-use/react';
-import { z } from 'zod';
+import { McpUseProvider, useWidget } from "mcp-use/react";
 
-const propsSchema = z.object({
-    name: z.string(),
-    species: z.string(),
-    age: z.number(),
-    enclosure: z.string(),
-    trail: z.string(),
-})
-// Define widget metadata - this auto-generates a tool!
-export const widgetMetadata: WidgetMetadata = {
-  description: 'Display detailed information about a zoo animal',
-  props: propsSchema
+type AnimalCardProps = {
+  name: string;
+  species: string;
+  age: number;
+  enclosure: string;
+  trail: string;
 };
 
-type AnimalCardProps = z.infer<typeof propsSchema>;
-
-const AnimalCard: React.FC = () => {
+export default function AnimalCard() {
   const { props } = useWidget<AnimalCardProps>();
 
   return (
     <McpUseProvider autoSize>
-      <div style={{
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #e0e0e0',
-        backgroundColor: '#f9f9f9',
-        fontFamily: 'system-ui, sans-serif'
-      }}>
-        <h2 style={{ marginTop: 0, color: '#333' }}>{props.name}</h2>
-        <div style={{ marginBottom: '10px' }}>
+      <div
+        style={{
+          padding: "20px",
+          borderRadius: "8px",
+          border: "1px solid #e0e0e0",
+          backgroundColor: "#f9f9f9",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <h2 style={{ marginTop: 0, color: "#333" }}>{props.name}</h2>
+        <div style={{ marginBottom: "10px" }}>
           <strong>Species:</strong> {props.species}
         </div>
-        <div style={{ marginBottom: '10px' }}>
+        <div style={{ marginBottom: "10px" }}>
           <strong>Age:</strong> {props.age} years old
         </div>
-        <div style={{ marginBottom: '10px' }}>
+        <div style={{ marginBottom: "10px" }}>
           <strong>Enclosure:</strong> {props.enclosure}
         </div>
         <div>
@@ -349,64 +333,55 @@ const AnimalCard: React.FC = () => {
       </div>
     </McpUseProvider>
   );
-};
-
-export default AnimalCard;
+}
 ```
 
-3. Update your `src/index.ts` to return widgets from tools. Add this new tool that returns a widget:
+3. In your **server entry** (rename to `index.tsx` if needed), add the pragma and return JSX from a tool:
 
-```typescript
-import { widget, text } from 'mcp-use/server';
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+import { text } from "mcp-use/server";
+import AnimalCard from "./components/AnimalCard";
 
-// Tool: Get animal details with widget
 server.tool(
   {
-    name: 'get_animal_details_widget',
-    description: 'Retrieves the details of a specific animal by its name and displays it in an interactive widget.',
+    name: "get_animal_details_widget",
+    description:
+      "Retrieves the details of a specific animal by its name and displays it in an interactive widget.",
     schema: z.object({
-      name: z.string().describe('The name of the animal'),
+      name: z.string().describe("The name of the animal"),
     }),
-    widget: {
-      name: 'animal-card',
-      invoking: 'Loading animal details...',
-      invoked: 'Animal details loaded',
-    },
   },
   async ({ name }) => {
-    console.log(`>>> 🛠️ Tool: 'get_animal_details_widget' called for '${name}'`);
     const animal = ZOO_ANIMALS.find(
       (a) => a.name.toLowerCase() === name.toLowerCase()
     );
-    
-    if (animal) {
-      return widget({
-        props: {
-          name: animal.name,
-          species: animal.species,
-          age: animal.age,
-          enclosure: animal.enclosure,
-          trail: animal.trail,
-        },
-        output: text(`Found ${animal.name}, a ${animal.age}-year-old ${animal.species} in ${animal.enclosure}.`),
-      });
+
+    if (!animal) {
+      return text(`Animal "${name}" not found in the zoo.`);
     }
-    
-    return text(`Animal "${name}" not found in the zoo.`);
+
+    return (
+      <AnimalCard
+        name={animal.name}
+        species={animal.species}
+        age={animal.age}
+        enclosure={animal.enclosure}
+        trail={animal.trail}
+        _output={text(
+          `Found ${animal.name}, a ${animal.age}-year-old ${animal.species} in ${animal.enclosure}.`
+        )}
+        _invoking="Loading animal details..."
+        _invoked="Animal details loaded"
+      />
+    );
   }
 );
 ```
 
-### Widget Features
+The bundler registers the widget and emits metadata for MCP Apps and ChatGPT. See [MCP Apps](/typescript/server/mcp-apps) and [Migrating from resources/ and widgetMetadata](/typescript/server/migration-from-resources).
 
-With mcp-use widgets, you get:
-- **Automatic Registration**: Widgets in the `resources/` folder are automatically discovered
-- **Type Safety**: Full TypeScript support with Zod schema validation
-- **State Management**: Built-in state persistence with `useWidget()` hook
-- **Tool Calls**: Widgets can call other MCP tools directly
-- **Hot Reload**: Changes reflect immediately during development
-
-For more information on building ChatGPT Apps, see the [Building ChatGPT Apps Guide](/guides/chatgpt-apps-flow).
+For more context, see [Building ChatGPT Apps](/guides/chatgpt-apps-flow) (overview) and [Creating an MCP Apps server](/typescript/server/creating-mcp-apps-server).
 
 Your code is complete! It is time to deploy the MCP server to Cloud Run.
 

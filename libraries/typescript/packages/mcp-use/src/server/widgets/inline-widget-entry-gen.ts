@@ -4,9 +4,9 @@
  * Generates the bridge entry files that connect a plain React component
  * to the MCP widget protocol. The entry wrapper:
  * - Imports the user's component
- * - Uses useWidget() to get structuredContent, toolInput, and theme
- * - Uses useStreamableProps() to receive incremental prop updates
- * - Spreads everything as typed props to the component
+ * - Uses useWidget() for `props` (structured tool output) and useStreamableProps() for streamed updates
+ * - Always mounts the component with `<Component {...mergedProps} />` (no isPending gate)
+ * - Does not pass host/runtime fields (isPending, toolInput, theme, etc.) as props — use useWidget() in the component
  * - Mounts into the #widget-root div
  */
 
@@ -32,14 +32,10 @@ import './styles.css';
 import Component from '${componentImportPath}';
 
 function Wrapper() {
-  const { props, toolInput, isPending } = useWidget();
+  const { props } = useWidget();
   const mergedProps = useStreamableProps(props);
 
-  if (isPending) {
-    return null;
-  }
-
-  return <Component {...mergedProps} toolInput={toolInput} />;
+  return <Component {...mergedProps} />;
 }
 
 const container = document.getElementById('widget-root');

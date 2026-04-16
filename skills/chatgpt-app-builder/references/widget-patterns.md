@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # Widget Patterns
 
 Advanced widget patterns and examples for ChatGPT apps.

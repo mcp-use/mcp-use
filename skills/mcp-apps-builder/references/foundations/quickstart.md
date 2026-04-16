@@ -47,7 +47,7 @@ npx create-mcp-use-app --list-templates
 ```
 my-server/
 ├── index.ts              # Server with example tool, resource, and prompt
-├── resources/            # Widget directory (display-weather.tsx example)
+├── components/           # Often used for React UI imported by the server
 ├── public/               # Static assets (favicon, icon)
 ├── package.json          # Pre-configured scripts: dev, build, start, deploy
 └── tsconfig.json
@@ -56,11 +56,8 @@ my-server/
 **mcp-apps:**
 ```
 my-server/
-├── index.ts              # Server with widget-returning tools
-├── resources/            # Widget directory (product-search-result/ example)
-│   └── product-search-result/
-│       ├── widget.tsx    # React widget with carousel UI
-│       └── components/   # Reusable widget components
+├── index.tsx             # Server with inline JSX widget returns (@jsxImportSource mcp-use/jsx)
+├── components/           # React components imported into the server file
 ├── public/
 ├── package.json
 └── tsconfig.json
@@ -80,8 +77,8 @@ my-server/
 After scaffolding:
 
 1. `npm run dev` — starts server with hot reload + inspector
-2. Edit `index.ts` to add tools, resources, prompts
-3. Add widgets as `.tsx` files in `resources/`
+2. Edit `index.ts` / `index.tsx` to add tools, resources, prompts
+3. Add or import widget components (for example under `components/`) and return JSX from tools
 4. Test everything at `http://localhost:3000/inspector`
 5. `npm run build` — production build
 6. `npm run deploy` — deploy to production

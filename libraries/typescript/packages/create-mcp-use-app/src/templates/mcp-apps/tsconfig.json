@@ -19,6 +19,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/**/*.d.ts"],
+  "include": ["index.tsx", "components/**/*", "styles.css", ".mcp-use/**/*.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

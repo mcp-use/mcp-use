@@ -4,10 +4,12 @@ description: "Build ChatGPT-compatible widgets using React with the Apps SDK pro
 icon: "openai"
 ---
 
-<Info>
-**Looking for the MCP Standard?** This page covers the **ChatGPT Apps SDK** protocol specifically. For the official MCP Apps protocol (recommended), see [MCP Apps](/typescript/server/mcp-apps).
+<Warning>
+**Deprecated for new projects.** The recommended approach is [MCP Apps](/typescript/server/mcp-apps) with **inline JSX** tool returns (`/** @jsxImportSource mcp-use/jsx */`). To move off `resources/`, `widgetMetadata`, `widget: { name }`, or manual `openai/` metadata, follow [Migrating from resources/ and widgetMetadata](/typescript/server/migration-from-resources). **This page** stays available for **legacy `server.uiResource()`**, **`type: "appsSdk"`**, and ChatGPT-specific edge cases.
+</Warning>
 
-**Cross-Compatibility**: mcp-use uniquely allows you to write widgets once using `type: "mcpApps"` that work with **both** ChatGPT (Apps SDK) and MCP Apps clients automatically.
+<Info>
+This page covers **ChatGPT Apps SDK** details and legacy registration APIs. For the standard **MCP Apps** flow (recommended), see [MCP Apps](/typescript/server/mcp-apps). mcp-use can still expose **`type: "mcpApps"`** `uiResource` definitions when you need explicit HTML templates; new projects should prefer **inline JSX** first.
 
 </Info>
 

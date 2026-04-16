@@ -8,7 +8,7 @@
  * - onNotification: log server notifications
  *
  * Prerequisites: Conformance server running on port 3000, e.g.:
- *   cd examples/server/features/conformance && PORT=3000 npx tsx src/server.ts
+ *   cd examples/server/features/conformance && PORT=3000 npx tsx src/server.tsx
  *
  * Run: npx tsx examples/client/node/full-features-example.ts
  * Or:  MCP_SERVER_URL=http://localhost:3000/mcp npx tsx examples/client/node/full-features-example.ts

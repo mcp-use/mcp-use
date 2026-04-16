@@ -200,7 +200,7 @@ interface WidgetMetaProps {
 }
 
 type StreamableProps<P> = {
-  [K in keyof P]: P[K] | Streamable<P[K]>;
+  [K in keyof P]: P[K] | Streamable<Exclude<P[K], undefined>>;
 };
 
 export namespace JSX {

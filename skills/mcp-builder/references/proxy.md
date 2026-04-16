@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # Server Proxying & Composition
 
 The `mcp-use` TypeScript SDK allows you to easily proxy and compose multiple MCP servers into a single unified "Aggregator" server.

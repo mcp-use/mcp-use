@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # UI Guidelines
 
 Display modes, theme, layout constraints, and adapting to host and user context.

@@ -1,5 +1,3 @@
-/** @jsxImportSource mcp-use/jsx */
-
 /**
  * Inline JSX Widgets Example
  *
@@ -87,27 +85,49 @@ server.tool(
 server.tool(
   {
     name: "analyze-text",
-    description: "Analyze text with streaming progress.",
-    schema: z.object({ text: z.string() }),
+    description:
+      "Analyze text. Demonstrates 4 data-flow patterns: server streamable, model-provided props, direct JSX prop, and useWidget().toolInput.",
+    schema: z.object({
+      text: z.string(),
+      // Both of these are part of the tool's input schema, so the model fills
+      // them in when calling the tool. They're used to contrast two consumption
+      // patterns inside the widget (see below).
+      streamedProp1: z
+        .string()
+        .describe("Forwarded by the handler as a JSX prop (structuredContent)."),
+      streamedProp2: z
+        .string()
+        .describe("Read by the widget from useWidget().toolInput — not passed as a prop."),
+    }),
   },
-  async ({ text: inputText }, ctx) => {
+  async ({ text: inputText, streamedProp1, streamedProp2 }, ctx) => {
+    // (a) Server-driven streamable: the handler pushes incremental updates
+    //     that arrive in the widget via mcp-use notifications.
     const analysis = streamable("");
-
     (async () => {
       const words = inputText.split(" ");
       for (let i = 0; i < words.length; i++) {
         await new Promise((r) => setTimeout(r, 300));
-        analysis.update((prev) => prev + (prev ? " " : "") + words[i].toUpperCase());
+        analysis.update(
+          (prev) => prev + (prev ? " " : "") + words[i].toUpperCase()
+        );
       }
       analysis.done();
     })();
+
+    // (b) Simulate a slow tool so the pending state is visible. During this
+    //     delay the widget already has `toolInput` and can render
+    //     `streamedProp2`, while `streamedProp1` only shows up once the
+    //     structuredContent arrives below.
+    await new Promise((r) => setTimeout(r, 3000));
 
     if (ctx.client.supportsApps()) {
       return (
         <AnalysisView
           text={inputText}
           analysis={analysis}
-          _output={text("Analysis in progress...")}
+          streamedProp1={streamedProp1}
+          _output={text("Analysis complete")}
           _invoking="Analyzing..."
           _invoked="Analysis complete"
           _prefersBorder={true}
@@ -116,7 +136,9 @@ server.tool(
     }
 
     const finalAnalysis = await analysis.value;
-    return text(`Analysis: ${finalAnalysis}`);
+    return text(
+      `Analysis: ${finalAnalysis}\nstreamedProp1=${streamedProp1}\nstreamedProp2=${streamedProp2}`
+    );
   }
 );
 

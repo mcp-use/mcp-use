@@ -351,13 +351,34 @@ export function useWidget<
   const openaiUserAgent = useOpenAiGlobal("userAgent") as UserAgent | undefined;
   const openaiLocale = useOpenAiGlobal("locale") as string | undefined;
 
-  // Select data source based on provider
+  // Select data source based on provider.
+  // For MCP Apps we merge the partial tool-input stream beneath the full
+  // tool-input so consumers can read arguments progressively as the model
+  // streams them. Once the full tool-input notification arrives it takes
+  // precedence; until then the partial view is authoritative.
   const toolInput = useMemo(() => {
     if (provider === "openai") return openaiToolInput;
-    if (provider === "mcp-apps")
-      return mcpAppsToolInput as TToolInput | undefined;
+    if (provider === "mcp-apps") {
+      const partial = (mcpAppsPartialToolInput || {}) as Record<
+        string,
+        unknown
+      >;
+      const full = (mcpAppsToolInput || {}) as Record<string, unknown>;
+      const hasPartial = Object.keys(partial).length > 0;
+      const hasFull = Object.keys(full).length > 0;
+      if (!hasPartial && !hasFull) {
+        return mcpAppsToolInput as TToolInput | undefined;
+      }
+      return { ...partial, ...full } as TToolInput;
+    }
     return urlParams.toolInput as TToolInput | undefined;
-  }, [provider, openaiToolInput, mcpAppsToolInput, urlParams.toolInput]);
+  }, [
+    provider,
+    openaiToolInput,
+    mcpAppsToolInput,
+    mcpAppsPartialToolInput,
+    urlParams.toolInput,
+  ]);
 
   const toolOutput = useMemo(() => {
     if (provider === "openai") {

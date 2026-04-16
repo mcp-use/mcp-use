@@ -451,7 +451,7 @@ export function useChatMessagesClientSide({
             }
 
             // Extract args from event data - check multiple possible locations
-            let args = {};
+            let args: Record<string, unknown> | unknown = {};
             if (event.data?.input) {
               args = event.data.input;
             } else if (event.data?.tool_input) {
@@ -459,6 +459,31 @@ export function useChatMessagesClientSide({
             } else if (event.data) {
               // Sometimes the args are directly in data
               args = event.data;
+            }
+
+            // Unwrap LangChain-style `{ input: "<json string>" }` args.
+            // Some LangChain tool events emit the tool arguments as a single
+            // stringified JSON blob under an `input` key. Widgets and the
+            // MCP Apps bridge expect args as a plain object keyed by
+            // parameter name (e.g. `{ streamedProp1, streamedProp2 }`),
+            // so normalize before anything downstream consumes them.
+            if (
+              args &&
+              typeof args === "object" &&
+              !Array.isArray(args) &&
+              typeof (args as Record<string, unknown>).input === "string" &&
+              Object.keys(args as Record<string, unknown>).length === 1
+            ) {
+              try {
+                const parsed = JSON.parse(
+                  (args as Record<string, unknown>).input as string
+                );
+                if (parsed && typeof parsed === "object") {
+                  args = parsed as Record<string, unknown>;
+                }
+              } catch {
+                /* keep original */
+              }
             }
 
             console.log("[useChatMessagesClientSide] on_tool_start:", {
@@ -477,9 +502,10 @@ export function useChatMessagesClientSide({
                 p.toolInvocation?.toolName === (event.name || "unknown")
             );
 
+            const normalizedArgs = (args ?? {}) as Record<string, unknown>;
             if (streamingPart && streamingPart.toolInvocation) {
               // Transition from streaming to pending with complete args
-              streamingPart.toolInvocation.args = args;
+              streamingPart.toolInvocation.args = normalizedArgs;
               streamingPart.toolInvocation.state = "pending";
               // Keep partialArgs around - the widget iframe may still be loading
               // and needs them when it becomes ready. They'll be ignored once
@@ -489,7 +515,7 @@ export function useChatMessagesClientSide({
                 type: "tool-invocation",
                 toolInvocation: {
                   toolName: event.name || "unknown",
-                  args,
+                  args: normalizedArgs,
                   state: "pending",
                 },
               });

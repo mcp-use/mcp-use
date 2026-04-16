@@ -14,7 +14,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting conformance server on port 3000..."
-(cd examples/server/features/conformance && PORT=3000 npx tsx src/server.ts) &
+(cd examples/server/features/conformance && PORT=3000 npx tsx src/server.tsx) &
 
 echo "Waiting for http://localhost:3000/mcp ..."
 for i in $(seq 1 30); do

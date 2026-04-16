@@ -65,7 +65,7 @@
 | [notifications/src/server.ts](server/features/notifications/src/server.ts) | Bidirectional notifications |
 | [streaming-props/index.ts](server/features/streaming-props/index.ts) | Streaming tool props to widgets |
 | [completion/src/server.ts](server/features/completion/src/server.ts) | Completion for prompt and resource arguments |
-| [conformance/src/server.ts](server/features/conformance/src/server.ts) | MCP conformance test server |
+| [conformance/src/server.tsx](server/features/conformance/src/server.tsx) | MCP conformance test server |
 | [dns-rebinding/src/server.ts](server/features/dns-rebinding/src/server.ts) | DNS rebinding protection |
 | [express-middleware/index.ts](server/features/express-middleware/index.ts) | Express and Hono middleware integration |
 | [proxy/src/server.ts](server/features/proxy/src/server.ts) | Proxy server setup |

@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # Widget State and LLM Context
 
 Manage persistent state, ephemeral UI state, and LLM interaction from widgets.

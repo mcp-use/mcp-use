@@ -3,17 +3,28 @@ import { useCallTool, useWidget } from "mcp-use/react";
 import type { ToolRef } from "mcp-use/react";
 
 interface WeatherCardProps {
-  city: string;
-  temperature: number;
-  conditions: string;
-  humidity: number;
+  city?: string;
+  temperature?: number;
+  conditions?: string;
+  humidity?: number;
 }
 
 export default function WeatherCard({ city, temperature, conditions, humidity }: WeatherCardProps) {
-  const { theme, displayMode, requestDisplayMode, sendFollowUpMessage, openExternal } = useWidget();
+  const { theme, displayMode, requestDisplayMode, sendFollowUpMessage, openExternal, isPending } =
+    useWidget();
   const echoRef = { name: "echo" } as ToolRef<"echo", { message: string }>;
   const { callTool: callEcho, data: echoData, isPending: echoLoading } = useCallTool(echoRef);
   const isDark = theme === "dark";
+
+  if (isPending || city === undefined || temperature === undefined) {
+    return (
+      <div
+        className={`rounded-xl overflow-hidden shadow-lg max-w-sm min-h-[220px] animate-pulse ${
+          isDark ? "bg-gray-700" : "bg-blue-200"
+        }`}
+      />
+    );
+  }
 
   return (
     <div className={`rounded-xl overflow-hidden shadow-lg max-w-sm text-white`}>

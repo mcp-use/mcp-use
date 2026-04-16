@@ -171,85 +171,78 @@ server.tool({
 
 ## Returning Widgets from Tools
 
-This is the recommended way to expose widgets to a model. Since `exposeAsTool` defaults to `false`, widgets are registered as MCP resources only — defining a custom tool that calls `widget()` gives you full control over the tool's name, description, schema, and business logic.
+The recommended way to expose MCP Apps widgets is to **return JSX** from the tool handler: import a React component and render it with `_`-prefixed props for model output, status text, CSP, and other metadata.
 
-<Note>
-You must include the `widget: { name, ... }` config in your tool definition when returning widgets. This sets up all the registration-time metadata needed for proper widget rendering. The widget file must exist in your `resources/` folder, but does **not** need `exposeAsTool: true` — leaving it unset (or `false`) is the correct setup for this pattern.
-</Note>
+Add **`/** @jsxImportSource mcp-use/jsx */`** to the server file that contains JSX. See [MCP Apps](./mcp-apps) for the full protocol overview.
 
-```typescript
-import { widget, text } from 'mcp-use/server';
-import { z } from 'zod';
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+import WeatherCard from "./components/WeatherCard";
 
-server.tool({
-  name: 'get-weather',
-  description: 'Get current weather for a city',
-  schema: z.object({
-    city: z.string().describe('City name')
-  }),
-  // Widget config sets all registration-time metadata
-  widget: {
-    name: 'weather-display',  // Must match a widget in resources/
-    invoking: 'Fetching weather...',
-    invoked: 'Weather loaded'
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({ city: z.string().describe("City name") }),
+  },
+  async ({ city }) => {
+    const weatherData = await fetchWeather(city);
+
+    return (
+      <WeatherCard
+        {...weatherData}
+        city={city}
+        _output={text(
+          `Weather in ${city}: ${weatherData.temp}°C, ${weatherData.conditions}`
+        )}
+        _invoking="Fetching weather..."
+        _invoked="Weather loaded"
+        _csp={{
+          connectDomains: ["https://api.weather.com"],
+          resourceDomains: ["https://cdn.weather.com"],
+        }}
+      />
+    );
   }
-}, async ({ city }) => {
-  // Fetch weather data
-  const weatherData = await fetchWeather(city);
-  
-  // Return widget with runtime data only
-  return widget({
-    props: weatherData,
-    output: text(`Weather in ${city}: ${weatherData.temp}°C`),
-    message: `Current weather in ${city}`
-  });
+);
+```
+
+**How it works**
+
+- **JSX runtime** — Builds the same structured result as the internal `widget()` helper and registers inline widget metadata for `tools/list` and `resources/read`.
+- **Props** — Regular props (`city`, `temp`, …) become `structuredContent` for `useWidget().props`. The model does not see them unless you also put them in `_output`.
+- **`_output`** — What the model sees (use `text()`, `object()`, etc.).
+- **`_invoking` / `_invoked`** — Host status strings.
+- **`ToolRef`** — `server.tool()` returns a `ToolRef`; pass it to `useCallTool(ref)` in widgets for typed calls.
+
+**Batch registration**
+
+```tsx
+export const tools = server.defineTools({
+  echo: {
+    description: "Echo",
+    schema: z.object({ message: z.string() }),
+    handler: async ({ message }) => text(message),
+  },
 });
 ```
 
-**How it works:**
-- `widget: { name, invoking, invoked, ... }` on tool definition - Configures all widget metadata at registration time
-- `widget({ props, output, message })` helper - Returns runtime data only:
-  - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
-  - `output` - Optional response helper (text(), object(), etc.) that the model sees
-  - `message` - Optional text message override
-- The widget must exist in your `resources/` folder as a `.tsx` file or folder
+**Conditional clients**
 
-See [UI Widgets](./ui-widgets) for complete widget creation and registration documentation.
-
-## OpenAI Apps SDK Integration
-
-For ChatGPT and OpenAI compatible clients:
-
-<Tip>
-**Recommended Approach**: The recommended way to expose widgets to a model is to use the [widget helper in a custom tool](./ui-widgets#custom-tools-with-widgets) as shown above. Alternatively, you can set `exposeAsTool: true` in your widget's metadata to [auto-register it as a tool](./ui-widgets#automatic-widget-registration). The manual approach below is shown for reference.
-</Tip>
-
-```typescript
-server.tool({
-  name: 'show_chart',
-  description: 'Display a chart',
-  schema: z.object({
-    data: z.array(z.any()).describe('The chart data')
-  }),
-  _meta: {
-    'openai/outputTemplate': 'ui://widgets/chart',
-    'openai/toolInvocation/invoking': 'Generating chart...',
-    'openai/toolInvocation/invoked': 'Chart generated',
-    'openai/widgetAccessible': true
+```tsx
+async (params, ctx) => {
+  if (ctx.client.supportsApps()) {
+    return <WeatherCard {...} _output={text("...")} />;
   }
-}, async ({ data }) => {
-  return {
-    _meta: {
-      'openai/outputTemplate': 'ui://widgets/chart'
-    },
-    content: [{
-      type: 'text',
-      text: 'Chart displayed'
-    }],
-    structuredContent: { data }
-  }
-})
+  return text("Fallback for clients without Apps support.");
+};
 ```
+
+For migrating from `resources/`, `widget: { name }`, or `widget()`, see **[Migrating from resources/ and widgetMetadata](./migration-from-resources)**.
+
+Legacy **`exposeAsTool`**, manual **`openai/outputTemplate`** wiring, and **`server.uiResource()`**-first flows are documented only under [UI widgets](./ui-widgets) (deprecated reference).
 
 ## Error Handling with error()
 
@@ -462,7 +455,8 @@ Use the built-in inspector for interactive testing:
 
 ## Next Steps
 
-- [Response Helpers](./response-helpers) - Utility functions for creating responses
-- [Resources Guide](./resources) - Managing static and dynamic content
-- [UI Widgets](./ui-widgets) - Creating interactive UI components
-- [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) - Real-world tool implementations
+- [Response Helpers](./response-helpers) — Utility functions for creating responses
+- [MCP Apps](./mcp-apps) — Inline JSX widgets and `_` props
+- [Migrating from resources/ and widgetMetadata](./migration-from-resources)
+- [Resources Guide](./resources) — Managing static and dynamic content
+- [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) — Real-world tool implementations
