@@ -1,5 +1,37 @@
 # mcp-use
 
+## 1.24.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d85fb4f]
+  - @mcp-use/inspector@2.1.0-canary.3
+  - @mcp-use/cli@3.0.1-canary.3
+
+## 1.24.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [744db4d]
+  - @mcp-use/cli@3.0.1-canary.2
+  - @mcp-use/inspector@2.1.0-canary.2
+
+## 1.24.1-canary.1
+
+### Patch Changes
+
+- 9fed740: Fix inspector "Protected resource does not match" error when switching from Via Proxy to Direct connection. The `window.fetch` interceptor installed by `BrowserOAuthClientProvider` is now correctly restored when `useMcp` unmounts, preventing the stale proxy interceptor from interfering with subsequent direct OAuth flows.
+  - @mcp-use/cli@3.0.1-canary.1
+  - @mcp-use/inspector@2.1.0-canary.1
+
+## 1.24.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [27bd31c]
+  - @mcp-use/inspector@2.1.0-canary.0
+  - @mcp-use/cli@3.0.1-canary.0
+
 ## 1.24.0
 
 ### Minor Changes

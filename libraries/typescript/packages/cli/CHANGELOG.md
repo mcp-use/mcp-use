@@ -1,5 +1,37 @@
 # @mcp-use/cli
 
+## 3.0.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d85fb4f]
+  - @mcp-use/inspector@2.1.0-canary.3
+  - mcp-use@1.24.1-canary.3
+
+## 3.0.1-canary.2
+
+### Patch Changes
+
+- 744db4d: refactor(cli): enhance deploy command with GitHub authorization handling
+  - mcp-use@1.24.1-canary.2
+  - @mcp-use/inspector@2.1.0-canary.2
+
+## 3.0.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9fed740]
+  - mcp-use@1.24.1-canary.1
+  - @mcp-use/inspector@2.1.0-canary.1
+
+## 3.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [27bd31c]
+  - @mcp-use/inspector@2.1.0-canary.0
+  - mcp-use@1.24.1-canary.0
+
 ## 3.0.0
 
 ### Major Changes

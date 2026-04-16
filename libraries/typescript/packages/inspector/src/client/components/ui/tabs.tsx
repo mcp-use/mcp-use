@@ -277,6 +277,8 @@ interface TabsTriggerProps {
   icon?: LucideIcon;
   title?: string;
   showDot?: boolean;
+  /** When true, the label stays visible even when the tab bar is collapsed */
+  alwaysExpanded?: boolean;
 }
 
 // conditional tooltip wrapper if collapsed
@@ -325,6 +327,7 @@ const TabsTrigger = React.forwardRef<
       icon: Icon,
       title: titleProp,
       showDot = false,
+      alwaysExpanded = false,
       ...props
     },
     ref
@@ -334,11 +337,17 @@ const TabsTrigger = React.forwardRef<
     const variant = tabsListContext?.variant || "default";
     const isActive = activeValue === value;
 
+    // A tab's label is visible when: not collapsed, or it's the active tab, or alwaysExpanded
+    const showLabel = !collapsed || isActive || alwaysExpanded;
+
     // Use title prop when provided (for collapsed mode tooltips)
-    const title = collapsed && titleProp ? titleProp : undefined;
+    const title = collapsed && !showLabel && titleProp ? titleProp : undefined;
 
     return (
-      <ConditionalTooltip title={titleProp as string} collapsed={collapsed}>
+      <ConditionalTooltip
+        title={titleProp as string}
+        collapsed={collapsed && !showLabel}
+      >
         <button
           ref={ref}
           disabled={disabled}
@@ -352,7 +361,6 @@ const TabsTrigger = React.forwardRef<
             "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
             variant === "default" && "py-2.5",
             variant === "default" && "rounded-md px-4",
-            // variant === "default" && collapsed && "rounded-md px-1.5 aspect-square",
             variant === "underline" &&
               "px-6 py-3 border-b-2 border-transparent",
             isActive && "text-foreground",
@@ -365,8 +373,8 @@ const TabsTrigger = React.forwardRef<
             <Icon
               className={cn(
                 "h-4 w-4 transition-all duration-500 ease-in-out",
-                !collapsed && "mr-2",
-                collapsed && "mr-0!"
+                showLabel && "mr-2",
+                !showLabel && "mr-0!"
               )}
             />
           )}
@@ -376,7 +384,7 @@ const TabsTrigger = React.forwardRef<
           <span
             className={cn(
               "transition-all duration-500 ease-in-out overflow-hidden",
-              collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+              showLabel ? "w-auto opacity-100" : "w-0 opacity-0"
             )}
           >
             {children}

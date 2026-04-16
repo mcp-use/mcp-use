@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.0.0",
+    "create-mcp-use-app": "0.14.8",
+    "@mcp-use/inspector": "2.0.0",
+    "mcp-use": "1.24.0"
+  },
+  "changesets": [
+    "fix-proxy-fetch-interceptor-teardown",
+    "inspector-theme-toggle",
+    "inspector-ui-improvements",
+    "late-lies-tan"
+  ]
+}
