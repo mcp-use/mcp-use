@@ -1,6 +1,5 @@
 ---
 "mcp-use": major
-"@mcp-use/inspector": patch
 ---
 
 Refactor OAuth providers to use DCR-direct flow by default
@@ -15,6 +14,3 @@ Refactor OAuth providers to use DCR-direct flow by default
 - Added `oauthProxy` helper for creating proxy-mode OAuth providers (useful for Google, GitHub, etc.)
 - Added `jwksVerifier` helper function for easy JWKS-based token verification in custom providers
 - Added Auth0 OAuth proxy example demonstrating the new proxy pattern
-
-**Fixes (inspector):**
-- Fixed OAuth callback redirect to properly route `/oauth/callback` to `/inspector/oauth/callback`
