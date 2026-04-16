@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { ClipboardCopy, Download, SquarePen } from "lucide-react";
+import { Copy, Download, SquarePen } from "lucide-react";
 import { ConfigurationDialog } from "./ConfigurationDialog";
 import {
   DropdownMenu,
@@ -130,38 +130,30 @@ export function ChatHeader({
           <div className="flex items-center gap-1">
             {/* Copy Chat */}
             {onCopyChat && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onCopyChat}
-                  >
-                    <ClipboardCopy className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Copy Chat</p>
-                </TooltipContent>
-              </Tooltip>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-1.5 px-3"
+                onClick={onCopyChat}
+              >
+                <Copy className="h-4 w-4" />
+                <span className="hidden sm:inline">Copy</span>
+              </Button>
             )}
 
             {/* Export Chat Dropdown */}
             {onExportChat && (
               <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-9 w-9">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Export Chat</p>
-                  </TooltipContent>
-                </Tooltip>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 gap-1.5 px-3"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Export</span>
+                  </Button>
+                </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => onExportChat("json")}>
                     Export as JSON

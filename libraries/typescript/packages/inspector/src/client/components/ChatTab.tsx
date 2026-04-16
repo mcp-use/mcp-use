@@ -742,38 +742,48 @@ export function ChatTab({
     [updatePromptsDropdownState]
   );
 
+  const formatMessagesAsMarkdown = useCallback(
+    (messages: ChatMessage[]) => {
+      let content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
+      content += messages
+        .map((m) => {
+          const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+          let text = `## ${role}\n${serializeMessageContent(m)}`;
+
+          const toolInvocations = m.parts?.filter(
+            (p) => p.type === "tool-invocation"
+          );
+          if (toolInvocations?.length) {
+            text +=
+              "\n\n### Tool Calls\n" +
+              toolInvocations
+                .map((p) => {
+                  const ti = p.toolInvocation;
+                  if (!ti) return "";
+                  const resultStr =
+                    typeof ti.result === "string"
+                      ? ti.result
+                      : JSON.stringify(ti.result, null, 2);
+                  return `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n${resultStr}`;
+                })
+                .join("\n\n");
+          }
+          return text;
+        })
+        .join("\n\n---\n\n");
+      return content;
+    },
+    [serializeMessageContent]
+  );
+
   const handleCopyChat = useCallback(() => {
-    const formattedMessages = messages
-      .map((m) => {
-        const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
-        const textContent = serializeMessageContent(m);
-
-        const toolInvocations =
-          m.parts
-            ?.filter((p) => p.type === "tool-invocation" && p.toolInvocation)
-            .map((p) => {
-              const ti = p.toolInvocation!;
-              const resultStr =
-                ti.state === "result"
-                  ? typeof ti.result === "string"
-                    ? ti.result
-                    : JSON.stringify(ti.result, null, 2)
-                  : ti.state;
-              return `[Tool Call: ${ti.toolName}(${JSON.stringify(ti.args)}) -> ${resultStr}]`;
-            }) || [];
-
-        const content = [textContent, ...toolInvocations]
-          .filter(Boolean)
-          .join("\n");
-        return `${role}: ${content}`;
-      })
-      .join("\n\n");
+    const formattedMessages = formatMessagesAsMarkdown(messages);
 
     navigator.clipboard.writeText(formattedMessages).then(
-      () => toast.success("Chat copied to clipboard"),
+      () => toast.success("Chat copied to clipboard as Markdown"),
       () => toast.error("Failed to copy chat")
     );
-  }, [messages, serializeMessageContent]);
+  }, [messages, formatMessagesAsMarkdown]);
 
   const handleExportChat = useCallback(
     (format: "json" | "markdown") => {
@@ -786,29 +796,7 @@ export function ChatTab({
         filename += ".json";
         mimeType = "application/json";
       } else {
-        content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
-        content += messages
-          .map((m) => {
-            const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
-            let text = `## ${role}\n${serializeMessageContent(m)}`;
-
-            const toolInvocations = m.parts?.filter(
-              (p) => p.type === "tool-invocation"
-            );
-            if (toolInvocations?.length) {
-              text +=
-                "\n\n### Tool Calls\n" +
-                toolInvocations
-                  .map((p) => {
-                    const ti = p.toolInvocation;
-                    if (!ti) return "";
-                    return `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n${typeof ti.result === "string" ? ti.result : JSON.stringify(ti.result, null, 2)}`;
-                  })
-                  .join("\n\n");
-            }
-            return text;
-          })
-          .join("\n\n---\n\n");
+        content = formatMessagesAsMarkdown(messages);
         filename += ".md";
         mimeType = "text/markdown";
       }
@@ -818,11 +806,13 @@ export function ChatTab({
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success(`Chat exported as ${format.toUpperCase()}`);
     },
-    [messages, serializeMessageContent]
+    [messages, formatMessagesAsMarkdown]
   );
 
   const handleClearConfig = useCallback(() => {
