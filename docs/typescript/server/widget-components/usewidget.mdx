@@ -15,6 +15,12 @@ Your widget code stays identical across both protocols!
 
 </Info>
 
+## Where `props` come from
+
+When your tool handler returns **inline JSX** (`/** @jsxImportSource mcp-use/jsx */`), every non-`_` prop on the element is sent as **`structuredContent`** and appears here as **`props`**. The model sees the separate **`_output`** field on the server (for example `text(...)`), not the full prop bag. See [MCP Apps](/typescript/server/mcp-apps).
+
+If a prop is a server-side **`streamable()`** value, subscribe with **`useStreamableProps()`** from `mcp-use/react` so the UI updates as chunks arrive. See [Response helpers — `streamable()`](/typescript/server/response-helpers#streamable).
+
 ## Import
 
 ```typescript

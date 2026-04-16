@@ -30,46 +30,37 @@ Widgets manage their own UI state (selections, filters, tabs, pagination). Never
 
 ## Using React useState
 
-Standard React state management works in widgets:
+**Server data → component props.** The generated inline widget entry **always mounts** your root component and spreads only tool **`structuredContent`** (with streamed prop updates): `<YourWidget {...mergedProps} />`. **Read lists and fields from the function parameters** (same object as `useWidget().props`), or call `useWidget()` if you prefer a single source.
+
+**Host / protocol state from `useWidget()`** — not passed as props: `toolInput`, `isPending`, `theme`, `metadata`, `callTool`, etc. If a model argument should appear as a named prop, include it in **`structuredContent`** in the tool response (or read it from `useWidget().toolInput`).
+
+Use **`useWidget()`** when you need host APIs: `setState` (persisted UI state), `metadata`, `theme`, `sendFollowUpMessage`, `isPending` (loading chrome while the tool has not finished), `toolInput`, etc.
+
+Standard React state management for **UI-only** state:
 
 ```tsx
 import { useState } from "react";
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
+import { McpUseProvider } from "mcp-use/react";
 
-export const widgetMetadata: WidgetMetadata = {
-  description: "Product list with filtering",
-  props: z.object({
-    products: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      category: z.string(),
-      price: z.number()
-    }))
-  }),
-  exposeAsTool: false
-};
+type Product = { id: string; name: string; category: string; price: number };
 
-export default function ProductList() {
-  const { props, isPending } = useWidget();
+type ProductListProps = { products: Product[] };
+
+export default function ProductList({ products }: ProductListProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"name" | "price">("name");
 
-  if (isPending) {
-    return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
-  }
-
-  // Filter and sort based on state
+  // Filter and sort based on UI state
   const filtered = selectedCategory === "all"
-    ? props.products
-    : props.products.filter(p => p.category === selectedCategory);
+    ? products
+    : products.filter(p => p.category === selectedCategory);
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "name") return a.name.localeCompare(b.name);
     return a.price - b.price;
   });
 
-  const categories = ["all", ...new Set(props.products.map(p => p.category))];
+  const categories = ["all", ...new Set(products.map(p => p.category))];
 
   return (
     <McpUseProvider autoSize>
@@ -122,8 +113,8 @@ export default function ProductList() {
 ```
 
 **Pattern:**
-- Tool provides data (products)
-- Widget manages UI state (selectedCategory, sortBy)
+- Tool provides data as props (`products` from the server JSX return)
+- Widget manages UI state (`selectedCategory`, `sortBy`) with `useState`
 - Widget renders filtered/sorted view
 - No additional tool calls needed
 
@@ -145,17 +136,17 @@ Track which item(s) are selected:
 
 ```tsx
 import { useState } from "react";
+import { McpUseProvider } from "mcp-use/react";
 
-export default function ItemSelector() {
-  const { props, isPending } = useWidget();
+type Item = { id: string; name: string };
+
+export default function ItemSelector({ items }: { items: Item[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  if (isPending) return <McpUseProvider autoSize><div>Loading...</div></McpUseProvider>;
 
   return (
     <McpUseProvider autoSize>
       <div>
-        {props.items.map(item => (
+        {items.map(item => (
           <div
             key={item.id}
             onClick={() => setSelectedId(item.id)}
@@ -177,6 +168,8 @@ export default function ItemSelector() {
 
 ### Multi-Select
 
+Inside the same component that receives `items` from props:
+
 ```tsx
 const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -193,7 +186,7 @@ const toggleSelection = (id: string) => {
 return (
   <McpUseProvider autoSize>
     <div>
-      {props.items.map(item => (
+      {items.map(item => (
         <div
           key={item.id}
           onClick={() => toggleSelection(item.id)}
@@ -223,37 +216,41 @@ return (
 Manage tabs without additional tool calls:
 
 ```tsx
-const [activeTab, setActiveTab] = useState<"overview" | "details" | "history">("overview");
+import { useState } from "react";
+import { McpUseProvider } from "mcp-use/react";
 
-return (
-  <McpUseProvider autoSize>
-    <div>
-      {/* Tab buttons */}
-      <div style={{ borderBottom: "1px solid #ddd", marginBottom: 16 }}>
-        {["overview", "details", "history"].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
-            style={{
-              padding: "8px 16px",
-              border: "none",
-              borderBottom: activeTab === tab ? "2px solid #007bff" : "none",
-              background: "none",
-              cursor: "pointer"
-            }}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
+export default function TabbedPanel() {
+  const [activeTab, setActiveTab] = useState<"overview" | "details" | "history">("overview");
+
+  return (
+    <McpUseProvider autoSize>
+      <div>
+        <div style={{ borderBottom: "1px solid #ddd", marginBottom: 16 }}>
+          {["overview", "details", "history"].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab as "overview" | "details" | "history")}
+              style={{
+                padding: "8px 16px",
+                border: "none",
+                borderBottom: activeTab === tab ? "2px solid #007bff" : "none",
+                background: "none",
+                cursor: "pointer"
+              }}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === "overview" && <div>{/* Overview content */}</div>}
+        {activeTab === "details" && <div>{/* Details content */}</div>}
+        {activeTab === "history" && <div>{/* History content */}</div>}
       </div>
-
-      {/* Tab content */}
-      {activeTab === "overview" && <div>{/* Overview content */}</div>}
-      {activeTab === "details" && <div>{/* Details content */}</div>}
-      {activeTab === "history" && <div>{/* History content */}</div>}
-    </div>
-  </McpUseProvider>
-);
+    </McpUseProvider>
+  );
+}
 ```
 
 ---
@@ -263,46 +260,51 @@ return (
 Paginate large lists client-side:
 
 ```tsx
-const [currentPage, setCurrentPage] = useState(1);
-const itemsPerPage = 10;
+import { useState } from "react";
+import { McpUseProvider } from "mcp-use/react";
 
-const totalPages = Math.ceil(props.items.length / itemsPerPage);
-const startIndex = (currentPage - 1) * itemsPerPage;
-const currentItems = props.items.slice(startIndex, startIndex + itemsPerPage);
+type Item = { id: string; name: string };
 
-return (
-  <McpUseProvider autoSize>
-    <div>
-      {/* Items */}
+export default function PaginatedList({ items }: { items: Item[] }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const totalPages = Math.ceil(items.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentItems = items.slice(startIndex, startIndex + itemsPerPage);
+
+  return (
+    <McpUseProvider autoSize>
       <div>
-        {currentItems.map(item => (
-          <div key={item.id}>{item.name}</div>
-        ))}
+        <div>
+          {currentItems.map((item) => (
+            <div key={item.id}>{item.name}</div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </button>
+
+          <span>
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </button>
+        </div>
       </div>
-
-      {/* Pagination controls */}
-      <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
-        <button
-          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-          disabled={currentPage === 1}
-        >
-          Previous
-        </button>
-
-        <span>
-          Page {currentPage} of {totalPages}
-        </span>
-
-        <button
-          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-          disabled={currentPage === totalPages}
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  </McpUseProvider>
-);
+    </McpUseProvider>
+  );
+}
 ```
 
 ---
@@ -312,6 +314,11 @@ return (
 Complex filtering:
 
 ```tsx
+import { useState } from "react";
+import { McpUseProvider } from "mcp-use/react";
+
+type Item = { id: string; name: string; category: string; price: number };
+
 interface Filters {
   search: string;
   category: string;
@@ -319,29 +326,30 @@ interface Filters {
   priceMax: number;
 }
 
-const [filters, setFilters] = useState<Filters>({
-  search: "",
-  category: "all",
-  priceMin: 0,
-  priceMax: 1000
-});
+export default function FilterableList({ items }: { items: Item[] }) {
+  const [filters, setFilters] = useState<Filters>({
+    search: "",
+    category: "all",
+    priceMin: 0,
+    priceMax: 1000
+  });
 
-const filteredItems = props.items.filter(item => {
-  if (filters.search && !item.name.toLowerCase().includes(filters.search.toLowerCase())) {
-    return false;
-  }
-  if (filters.category !== "all" && item.category !== filters.category) {
-    return false;
-  }
-  if (item.price < filters.priceMin || item.price > filters.priceMax) {
-    return false;
-  }
-  return true;
-});
+  const filteredItems = items.filter((item) => {
+    if (filters.search && !item.name.toLowerCase().includes(filters.search.toLowerCase())) {
+      return false;
+    }
+    if (filters.category !== "all" && item.category !== filters.category) {
+      return false;
+    }
+    if (item.price < filters.priceMin || item.price > filters.priceMax) {
+      return false;
+    }
+    return true;
+  });
 
-return (
-  <McpUseProvider autoSize>
-    <div>
+  return (
+    <McpUseProvider autoSize>
+      <div>
       {/* Filter controls */}
       <div style={{ marginBottom: 16 }}>
         <input
@@ -387,6 +395,7 @@ return (
     </div>
   </McpUseProvider>
 );
+}
 ```
 
 ---
@@ -396,47 +405,54 @@ return (
 Accordion or expandable sections:
 
 ```tsx
-const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+import { useState } from "react";
+import { McpUseProvider } from "mcp-use/react";
 
-const toggleExpand = (id: string) => {
-  const newExpanded = new Set(expandedIds);
-  if (newExpanded.has(id)) {
-    newExpanded.delete(id);
-  } else {
-    newExpanded.add(id);
-  }
-  setExpandedIds(newExpanded);
-};
+type Item = { id: string; title: string; details: string };
 
-return (
-  <McpUseProvider autoSize>
-    <div>
-      {props.items.map(item => (
-        <div key={item.id} style={{ marginBottom: 8 }}>
-          <div
-            onClick={() => toggleExpand(item.id)}
-            style={{
-              padding: 12,
-              backgroundColor: "#f5f5f5",
-              cursor: "pointer",
-              display: "flex",
-              justifyContent: "space-between"
-            }}
-          >
-            <span>{item.title}</span>
-            <span>{expandedIds.has(item.id) ? "▼" : "▶"}</span>
-          </div>
+export default function AccordionList({ items }: { items: Item[] }) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-          {expandedIds.has(item.id) && (
-            <div style={{ padding: 12, border: "1px solid #ddd" }}>
-              {item.details}
+  const toggleExpand = (id: string) => {
+    const newExpanded = new Set(expandedIds);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedIds(newExpanded);
+  };
+
+  return (
+    <McpUseProvider autoSize>
+      <div>
+        {items.map((item) => (
+          <div key={item.id} style={{ marginBottom: 8 }}>
+            <div
+              onClick={() => toggleExpand(item.id)}
+              style={{
+                padding: 12,
+                backgroundColor: "#f5f5f5",
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between"
+              }}
+            >
+              <span>{item.title}</span>
+              <span>{expandedIds.has(item.id) ? "▼" : "▶"}</span>
             </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </McpUseProvider>
-);
+
+            {expandedIds.has(item.id) && (
+              <div style={{ padding: 12, border: "1px solid #ddd" }}>
+                {item.details}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </McpUseProvider>
+  );
+}
 ```
 
 ---
@@ -446,66 +462,77 @@ return (
 Track form inputs before submission:
 
 ```tsx
-const [formData, setFormData] = useState({
-  name: "",
-  email: "",
-  message: ""
-});
+import { useState } from "react";
+import { McpUseProvider } from "mcp-use/react";
 
-const handleChange = (field: string, value: string) => {
-  setFormData(prev => ({ ...prev, [field]: value }));
-};
+export default function ContactForm() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: ""
+  });
 
-return (
-  <McpUseProvider autoSize>
-    <form onSubmit={(e) => {
-      e.preventDefault();
-      // Handle submission (see interactivity.md)
-    }}>
-      <input
-        type="text"
-        value={formData.name}
-        onChange={(e) => handleChange("name", e.target.value)}
-        placeholder="Name"
-      />
+  const handleChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
 
-      <input
-        type="email"
-        value={formData.email}
-        onChange={(e) => handleChange("email", e.target.value)}
-        placeholder="Email"
-      />
+  return (
+    <McpUseProvider autoSize>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          // Handle submission (see interactivity.md)
+        }}
+      >
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => handleChange("name", e.target.value)}
+          placeholder="Name"
+        />
 
-      <textarea
-        value={formData.message}
-        onChange={(e) => handleChange("message", e.target.value)}
-        placeholder="Message"
-      />
+        <input
+          type="email"
+          value={formData.email}
+          onChange={(e) => handleChange("email", e.target.value)}
+          placeholder="Email"
+        />
 
-      <button type="submit">Send</button>
-    </form>
-  </McpUseProvider>
-);
+        <textarea
+          value={formData.message}
+          onChange={(e) => handleChange("message", e.target.value)}
+          placeholder="Message"
+        />
+
+        <button type="submit">Send</button>
+      </form>
+    </McpUseProvider>
+  );
+}
 ```
 
 ---
 
 ## State Initialization
 
-Initialize state based on props:
+Initialize UI state when server-provided props change:
 
 ```tsx
-const [selectedCategory, setSelectedCategory] = useState<string>("");
+import { useEffect, useState } from "react";
 
-// Initialize when props load
-useEffect(() => {
-  if (props.categories && props.categories.length > 0 && !selectedCategory) {
-    setSelectedCategory(props.categories[0]);
-  }
-}, [props.categories, selectedCategory]);
+export default function CategoryPicker({ categories }: { categories: string[] }) {
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+
+  useEffect(() => {
+    if (categories.length > 0 && !selectedCategory) {
+      setSelectedCategory(categories[0]);
+    }
+  }, [categories, selectedCategory]);
+  // ...
+}
 ```
 
-**Note:** Lazy initialization like `useState(() => props.categories?.[0] || "all")` won't work here — on the first render `isPending` is `true` and `props` is `{}`, so the initializer always resolves to `"all"`. The `useEffect` pattern above is the correct approach for props that arrive asynchronously.
+**Note:** If a value is optional on first paint (streaming or progressive updates), `useEffect` that depends on that prop is safer than reading it only inside `useState(() => …)`.
 
 ---
 
@@ -513,11 +540,13 @@ useEffect(() => {
 
 ### Search + Filter + Sort
 ```tsx
+// `items` from component props: function MyWidget({ items }: { items: Item[] }) { ... }
+
 const [search, setSearch] = useState("");
 const [category, setCategory] = useState("all");
 const [sortBy, setSortBy] = useState("name");
 
-let filtered = props.items;
+let filtered = items;
 
 // Apply search
 if (search) {
@@ -541,17 +570,19 @@ filtered.sort((a, b) => {
 
 ### Master-Detail View
 ```tsx
+// items: Item[] from props
+
 const [selectedId, setSelectedId] = useState<string | null>(null);
 
 const selectedItem = selectedId
-  ? props.items.find(item => item.id === selectedId)
+  ? items.find(item => item.id === selectedId)
   : null;
 
 return (
   <div style={{ display: "flex", gap: 16 }}>
     {/* Master list */}
     <div style={{ flex: 1 }}>
-      {props.items.map(item => (
+      {items.map(item => (
         <div
           key={item.id}
           onClick={() => setSelectedId(item.id)}
@@ -614,10 +645,12 @@ const { callTool: filterItems } = useCallTool("filter-items");
 
 ### ❌ Don't Store UI State in Props
 ```typescript
-// ❌ Bad - Trying to mutate props
-props.selectedId = "123";  // Error! Props are read-only
+// ❌ Bad — mutating data received as props
+function Bad({ items }: { items: Item[] }) {
+  items.push({ id: "new", name: "..." }); // mutates the same array reference
+}
 
-// ✅ Good - Use state
+// ✅ Good — copy or derive; keep selection in useState
 const [selectedId, setSelectedId] = useState<string | null>(null);
 ```
 
@@ -626,10 +659,11 @@ const [selectedId, setSelectedId] = useState<string | null>(null);
 ## Best Practices
 
 1. **Keep state local** - Don't lift state unless necessary
-2. **Initialize from props** - Use props as initial data, state for UI
-3. **Use descriptive names** - `selectedCategory` not `filter`
-4. **Reset state appropriately** - When props change, update dependent state
-5. **Avoid unnecessary re-renders** - Use `useMemo` for expensive computations
+2. **Server fields on the signature** - Destructure `products`, `items`, etc. from component props; use `useWidget()` for host behavior, not for reading structured content
+3. **Initialize from props** - Use props as initial data, `useState` for UI
+4. **Use descriptive names** - `selectedCategory` not `filter`
+5. **Reset state appropriately** - When props change, update dependent state
+6. **Avoid unnecessary re-renders** - Use `useMemo` for expensive computations
 
 ---
 

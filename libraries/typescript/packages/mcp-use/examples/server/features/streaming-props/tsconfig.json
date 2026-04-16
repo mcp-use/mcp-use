@@ -19,6 +19,6 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*", "resources/**/*"],
+  "include": ["index.tsx", "components/**/*"],
   "exclude": ["node_modules", "dist"]
 }

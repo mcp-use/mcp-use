@@ -41,7 +41,7 @@ server.tool(
 - First argument: tool configuration (name, description, schema)
 - Second argument: async handler function
 - Handler receives validated input matching schema
-- Must return a response helper (`text()`, `object()`, `widget()`, etc.)
+- Must return a response helper (`text()`, `object()`, `image()`, etc.) **or JSX** (with `@jsxImportSource mcp-use/jsx`)
 
 ---
 
@@ -256,48 +256,49 @@ server.tool(
 
 ---
 
-## Tool with Widget
+## Tool with widget (inline JSX)
 
-When your tool returns visual UI:
+Return a React element from the handler. Add **`/** @jsxImportSource mcp-use/jsx */`** to the server file.
 
-```typescript
-import { widget, text } from "mcp-use/server";
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+import { text } from "mcp-use/server";
+import ProductList from "./components/ProductList";
 
 server.tool(
   {
     name: "search-products",
     description: "Search products by keyword",
-    schema: z.object({
-      query: z.string().describe("Search query")
-    }),
-    widget: {
-      name: "product-list",           // Must match resources/product-list.tsx
-      invoking: "Searching products...",
-      invoked: "Products loaded"
-    }
+    schema: z.object({ query: z.string().describe("Search query") }),
   },
   async ({ query }) => {
     const products = await searchProducts(query);
-
-    return widget({
-      props: {
-        products,
-        query,
-        totalCount: products.length
-      },
-      output: text(`Found ${products.length} products matching "${query}"`)
-    });
+    return (
+      <ProductList
+        products={products}
+        query={query}
+        totalCount={products.length}
+        _output={text(`Found ${products.length} products matching "${query}"`)}
+        _invoking="Searching products..."
+        _invoked="Products loaded"
+      />
+    );
   }
 );
 ```
 
-**Widget tool requirements:**
-- Add `widget: { name }` to tool config
-- Return `widget({ props, output })` from handler
-- Create matching widget file: `resources/{name}.tsx`
-- `exposeAsTool` defaults to `false` — omitting it is correct for this pattern
+Do **not** add `widget: { name }` for this pattern. See [../widgets/basics.md](../widgets/basics.md).
 
-See [../widgets/basics.md](../widgets/basics.md) for widget implementation.
+### `defineTools` batch
+
+```typescript
+export const tools = server.defineTools({
+  echo: {
+    schema: z.object({ message: z.string() }),
+    handler: async ({ message }) => text(message),
+  },
+});
+```
 
 ---
 

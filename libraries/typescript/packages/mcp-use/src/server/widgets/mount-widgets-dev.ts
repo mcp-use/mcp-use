@@ -1074,7 +1074,14 @@ export default PostHog;
       suppressFullReloadPlugin,
       watchResourcesPlugin,
       tailwindcss(),
-      react(),
+      // Force React's own JSX runtime for browser bundles. Users may set
+      // `jsxImportSource: "mcp-use/jsx"` in their tsconfig (auto-injected by
+      // `mcp-use dev`/`build`) so inline JSX widget returns compile on the
+      // server. Without this override, @vitejs/plugin-react would inherit
+      // that setting and compile React components against our server runtime,
+      // producing widget-helper objects instead of ReactElements — which
+      // triggers "A React Element from an older version of React was rendered".
+      react({ jsxImportSource: "react" }),
     ],
     resolve: {
       dedupe: ["react", "react-dom"],

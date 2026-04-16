@@ -11,19 +11,10 @@ Build widgets that adapt to themes, look professional, and provide great user ex
 Widgets should adapt to the user's theme (light/dark mode):
 
 ```tsx
-import { McpUseProvider, useWidget, useWidgetTheme, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
-
-export const widgetMetadata: WidgetMetadata = {
-  description: "Theme-aware widget",
-  props: z.object({
-    message: z.string()
-  }),
-  exposeAsTool: false
-};
+import { McpUseProvider, useWidget, useWidgetTheme } from "mcp-use/react";
 
 export default function ThemedWidget() {
-  const { props, isPending } = useWidget();
+  const { props, isPending } = useWidget<{ message: string }>();
   const theme = useWidgetTheme();
 
   if (isPending) {
@@ -626,8 +617,7 @@ const spacing = {
 
 ```tsx
 import { useState } from "react";
-import { McpUseProvider, useWidget, useWidgetTheme, type WidgetMetadata } from "mcp-use/react";
-import { z } from "zod";
+import { McpUseProvider, useWidget, useWidgetTheme } from "mcp-use/react";
 
 function useColors() {
   const theme = useWidgetTheme();
@@ -642,21 +632,10 @@ function useColors() {
   };
 }
 
-export const widgetMetadata: WidgetMetadata = {
-  description: "Fully themed product list",
-  props: z.object({
-    products: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
-      category: z.string()
-    }))
-  }),
-  exposeAsTool: false
-};
+type Product = { id: string; name: string; price: number; category: string };
 
 export default function ThemedProductList() {
-  const { props, isPending } = useWidget();
+  const { props, isPending } = useWidget<{ products: Product[] }>();
   const colors = useColors();
   const [selectedCategory, setSelectedCategory] = useState("all");
 

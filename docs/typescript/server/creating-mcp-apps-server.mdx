@@ -1,6 +1,6 @@
 ---
 title: "Creating an MCP Server with Widgets"
-description: "Complete guide to building an MCP server with interactive widget support for both ChatGPT and Claude"
+description: "Complete guide to building an MCP server with interactive widget support for both ChatGPT and MCP Apps clients"
 icon: "rocket"
 ---
 
@@ -13,111 +13,120 @@ icon: "rocket"
   allowFullScreen
 ></iframe>
 
-This guide walks you through creating a complete MCP server with interactive widget support.
+This guide walks you through creating an MCP server whose tools return **inline JSX** — plain React components — with dual MCP Apps and ChatGPT metadata.
 
 ## What You'll Build
 
 By the end of this guide, you'll have:
 
-- A fully functional MCP server
-- Tools that return widgets (using the `widget()` helper)
-- React widget components that receive props from tool handlers
-- Production-ready configuration
+- A working MCP server (`MCPServer` + `server.listen()`)
+- Tools that return JSX (`<MyWidget ... />`) with `_output`, `_csp`, and related `_` props
+- React components that receive data through `useWidget()` inside the widget iframe
+- A dev workflow with the Inspector and HMR
 
 ## Prerequisites
 
-- Node.js 18+ installed
-- Basic knowledge of TypeScript and React
-- Familiarity with MCP concepts (see [MCP 101](/home/mcp101))
+- Node.js 18+
+- TypeScript and React basics
+- Optional: [MCP 101](/home/mcp101)
 
 ## Step 1: Create Your Project
-
-The easiest way to start is using the mcp-apps template:
 
 ```bash
 npx create-mcp-use-app my-widget-server --template mcp-apps
 cd my-widget-server
+npm install
 ```
 
-This creates a project structure:
+Typical layout (names may vary by template version):
 
 ```
 my-widget-server/
-├── resources/                    # React widgets go here
-│   ├── product-search-result/   # Example widget (folder name = widget.name)
-│   │   ├── widget.tsx            # Main widget component
-│   │   ├── components/           # Optional subcomponents
-│   │   └── hooks/                # Optional hooks
-│   └── styles.css
+├── components/           # React widget UI (any structure you want)
+│   └── ProductSearch.tsx
 ├── public/
-│   ├── icon.svg
-│   └── favicon.ico
-├── index.ts                      # Server entry point
+├── index.tsx             # Server entry (TSX with @jsxImportSource)
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
 
+There is **no required `resources/` folder** for the primary pattern. Put components anywhere and import them into your server file.
+
 <Tip>
-**Type Generation**: When you run `mcp-use dev`, TypeScript types are automatically generated from your tool definitions. This gives your widgets full IntelliSense for tool calls.
+Use **`/** @jsxImportSource mcp-use/jsx */`** at the top of the server file that returns JSX from tools so the compiler uses the mcp-use JSX runtime.
 </Tip>
 
-## Step 2: Understand the Tool That Returns a Widget
+## Step 2: Tool that returns a widget (inline JSX)
 
-The template already has a widget-returning tool. Open `index.ts` and find the `search-tools` tool. Here's what each part does:
+Open your server entry (often `index.tsx`). A widget tool returns a React element; `_output` is what the model sees.
 
-```typescript
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+import ProductSearch from "./components/ProductSearch";
+
+const server = new MCPServer({
+  name: "my-widget-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+});
+
 server.tool(
   {
     name: "search-tools",
-    description: "Search for fruits and display the results in a visual widget",
+    description: "Search fruits and show results in a widget",
     schema: z.object({
-      query: z.string().optional().describe("Search query to filter fruits"),
+      query: z.string().optional().describe("Filter fruits"),
     }),
-    // Widget config — sets up metadata at registration time for Inspector and ChatGPT
-    widget: {
-      name: "product-search-result",  // Must match resources/product-search-result/ folder
-      invoking: "Searching...",        // Status text shown while the tool is running
-      invoked: "Results loaded",      // Status text shown after the tool completes
-    },
   },
   async ({ query }) => {
     const results = fruits.filter(
       (f) => !query || f.fruit.toLowerCase().includes(query.toLowerCase())
     );
 
-    // widget() — returns runtime data for the widget
-    return widget({
-      props: { query: query ?? "", results },  // Widget-only data (useWidget().props); not added to model context
-      output: text(`Found ${results.length} fruits matching "${query ?? "all"}"`),  // What the model sees in the conversation
-      // metadata: { ... } — optional; extra data for useWidget().metadata (cursors, timestamps, etc.)
-    });
+    return (
+      <ProductSearch
+        query={query ?? ""}
+        results={results}
+        _output={text(
+          `Found ${results.length} fruits matching "${query ?? "all"}"`
+        )}
+        _invoking="Searching..."
+        _invoked="Results loaded"
+        _prefersBorder={true}
+      />
+    );
   }
 );
 ```
 
-**Summary:**
-- `widget: { name, invoking, invoked }` — Configures which widget to render and status messages
-- `widget({ props, output })` — `props` go to the widget via `useWidget().props`; `output` is shown to the model
+**Summary**
 
-## Step 3: Understand the Widget Component
+- **Return value**: JSX — the runtime builds `structuredContent`, `content`, and widget resource metadata.
+- **`_output`**: Model-visible summary (e.g. `text(...)`).
+- **`_invoking` / `_invoked`**: Status strings for hosts.
+- **`_csp`**, **`_prefersBorder`**, etc.: Optional per-call metadata; see [MCP Apps](./mcp-apps) and [Content Security Policy](./content-security-policy).
 
-The template already includes `resources/product-search-result/widget.tsx`. It receives `props` from the tool's `widget({ props })` return via `useWidget()`:
+You **do not** add `widget: { name: "..." }` for this pattern.
+
+## Step 3: Widget component (plain React)
+
+`ProductSearch` is a normal component. It reads server-supplied data with **`useWidget()`** (not React props from the parent — the host injects structured content).
 
 ```tsx
-// resources/product-search-result/widget.tsx (simplified — template has full implementation)
-import React from "react";
-import { useWidget } from "mcp-use/react";
+// components/ProductSearch.tsx
+import { useWidget, McpUseProvider } from "mcp-use/react";
 
-type ProductSearchResultProps = {
+type ProductSearchProps = {
   query: string;
   results: { fruit: string; color: string }[];
 };
 
-const ProductSearchResult: React.FC = () => {
-  const { props, isPending } = useWidget<ProductSearchResultProps>();
+export default function ProductSearch() {
+  const { props, isPending } = useWidget<ProductSearchProps>();
 
-  // Widget renders before tool completes — always check isPending first
   if (isPending) {
     return <div className="animate-pulse p-4">Loading...</div>;
   }
@@ -125,33 +134,33 @@ const ProductSearchResult: React.FC = () => {
   const { query, results } = props;
 
   return (
-    <div className="p-4 rounded-lg border">
-      <h3 className="font-semibold mb-2">
-        Results for "{query}" ({results.length} fruits)
-      </h3>
-      <ul className="space-y-2">
-        {results.map((r, i) => (
-          <li key={i}>{r.fruit}</li>
-        ))}
-      </ul>
-    </div>
+    <McpUseProvider autoSize>
+      <div className="p-4 rounded-lg border">
+        <h3 className="font-semibold mb-2">
+          Results for "{query}" ({results.length} fruits)
+        </h3>
+        <ul className="space-y-2">
+          {results.map((r, i) => (
+            <li key={i}>{r.fruit}</li>
+          ))}
+        </ul>
+      </div>
+    </McpUseProvider>
   );
-};
-
-export default ProductSearchResult;
+}
 ```
 
 <Warning>
-**Handle loading state**: The widget renders before the tool completes. On first render, `props` is empty and `isPending` is `true`. Always check `isPending` before accessing props.
+**Loading state**: The iframe can render before the tool finishes. When `isPending` is `true`, treat `props` as not yet available.
 </Warning>
 
 <Tip>
-See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete patterns, and [Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for live previews while the model streams.
+See [Widget lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) and [Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments).
 </Tip>
 
-## Step 4: Add Traditional MCP Tools
+## Step 4: Non-widget tools
 
-You can mix widget-returning tools with traditional tools that return text or structured data. See [Response Helpers](./response-helpers) for `text()`, `object()`, and other utilities:
+Mix widget tools with tools that return `text()`, `object()`, etc.
 
 ```typescript
 import { object } from "mcp-use/server";
@@ -160,317 +169,140 @@ server.tool(
   {
     name: "get-product-details",
     description: "Get detailed information about a product",
-    schema: z.object({
-      productId: z.string().describe("The product ID"),
-    }),
+    schema: z.object({ productId: z.string() }),
   },
-  async ({ productId }) => {
-    // Your API call here
-    return object({
+  async ({ productId }) =>
+    object({
       id: productId,
       name: "Example Product",
       price: 29,
       description: "A great product",
-    });
-  }
+    })
 );
 ```
 
-## Step 5: Widgets Calling Other Tools (useCallTool)
+See [Response helpers](./response-helpers).
 
-Widgets can call other MCP tools. The `useCallTool` hook provides type-safe tool calling:
+## Step 5: Typed `useCallTool` with `ToolRef`
+
+Export tools you need to call from widgets:
 
 ```tsx
-// Inside a widget component
-const { callTool, data, isPending, isError } = useCallTool("get-product-details");
-
-const handleViewDetails = () => {
-  callTool({ productId: "123" });
-};
-
-return (
-  <div>
-    <button onClick={handleViewDetails}>View details</button>
-    {isPending && <p>Loading...</p>}
-    {data && <p>{JSON.stringify(data.structuredContent)}</p>}
-  </div>
+export const getProductDetails = server.tool(
+  {
+    name: "get-product-details",
+    schema: z.object({ productId: z.string() }),
+  },
+  async ({ productId }) => object({ id: productId, name: "Widget", price: 29 })
 );
 ```
 
-<Info>
-**Type Safety**: `mcp-use dev` generates types from your tool definitions. The `callTool` function gets autocomplete for tool names and parameters.
-</Info>
+In the widget:
 
-See [useCallTool()](/typescript/server/widget-components/usecalltool) for more patterns.
+```tsx
+import { useCallTool } from "mcp-use/react";
+import { getProductDetails } from "../index"; // server module export — adjust path
 
-## Step 6: Widget Metadata (Advanced)
+const { callTool, data, isPending } = useCallTool(getProductDetails);
 
-The `widget` config on your tool handles metadata for Inspector and ChatGPT. For custom CSP, borders, or other options, see [Content Security Policy](./content-security-policy), [MCP Apps](/typescript/server/mcp-apps), and [UI Widgets](./ui-widgets).
+<button onClick={() => callTool({ productId: "123" })}>Details</button>
+```
 
-## Step 7: Testing Your Server
+`useCallTool` accepts a **string** tool name for untyped calls, or a **`ToolRef`** for full typing. See [useCallTool](./widget-components/usecalltool).
 
-### Start the Development Server
+## Step 6: Optional batch registration
+
+```tsx
+export const tools = server.defineTools({
+  echo: {
+    description: "Echo input.",
+    schema: z.object({ message: z.string() }),
+    handler: async ({ message }) => text(message),
+  },
+});
+```
+
+## Step 7: Run and test
 
 ```bash
 npm run dev
 ```
 
-This starts:
+- MCP server (default port from template, often 3000)
+- Inspector at `http://localhost:3000/inspector`
+- Widget HMR in development
 
-- MCP server on port 3000
-- Widget development server with Hot Module Replacement (HMR)
-- Inspector UI at `http://localhost:3000/inspector`
+In the Inspector: **Tools** → run `search-tools` with `{ "query": "apple" }` and confirm the widget renders.
 
-### Test in Inspector
+## Step 8: Production configuration
 
-1. Open `http://localhost:3000/inspector`
-2. Navigate to the **Tools** tab
-3. Find your `search-tools` tool
-4. Enter test parameters: `{ "query": "Widget" }` or `{}`
-5. Click **Execute** to see the widget render
-
-### Deploy on Manufact
-
-To test in ChatGPT, deploy your server first. See the [Deployment Guide](./deployment/mcp-use) for one-command deployment to Manufact cloud.
-
-### Test in ChatGPT
-
-1. Configure your MCP server in ChatGPT settings (use your deployed URL)
-2. Ask: "Search for products" or "Show me product search results for Widget"
-3. ChatGPT will call `search-tools` and display the widget
-
-## Step 8: Advanced Widget Features
-
-### Accessing Tool Output
-
-Widgets can access the output of their own tool execution:
-
-```tsx
-const MyWidget: React.FC = () => {
-  const { props, output } = useWidget<MyProps, MyOutput>();
-
-  // props = tool input parameters
-  // output = additional data returned by the tool
-  return <div>{/* Use both props and output */}</div>;
-};
-```
-
-### Calling Other Tools
-
-Widgets can call other MCP tools:
-
-```tsx
-const MyWidget: React.FC = () => {
-  const { callTool } = useWidget();
-
-  const handleAction = async () => {
-    const result = await callTool("get-user-data", {
-      userId: "123",
-    });
-    console.log(result);
-  };
-
-  return <button onClick={handleAction}>Fetch Data</button>;
-};
-```
-
-### Persistent State
-
-Widgets can maintain state across interactions:
-
-```tsx
-const MyWidget: React.FC = () => {
-  const { state, setState } = useWidget();
-
-  const savePreference = async () => {
-    await setState({ theme: "dark", language: "en" });
-  };
-
-  return <div>{/* Use state */}</div>;
-};
-```
-
-## Step 9: Production Configuration
-
-### Environment Variables
-
-Create a `.env` file:
+### Environment variables
 
 ```env
-# Server port (default: 3000)
 PORT=3000
-# Production base URL; used for CSP and widget asset URLs — required for production
 MCP_URL=https://your-server.com
-# Environment mode (development | production)
 NODE_ENV=production
 ```
 
-See the [CLI Reference](./cli-reference#environment-variables) for the full list of environment variables.
+See [CLI](./cli-reference#environment-variables).
 
-### Build for Production
+### Build
 
 ```bash
 npm run build
 npm start
 ```
 
-The build process:
+The build bundles inline widgets and produces production assets. See [Content Security Policy](./content-security-policy) for CSP and `baseUrl`.
 
-- Compiles TypeScript
-- Bundles React widgets for Apps SDK
-- Optimizes assets
-- Generates production-ready HTML templates
-
-### Content Security Policy
-
-When `baseUrl` is set, CSP is automatically configured so widget URLs use the correct domain and your server domain is whitelisted. See [Content Security Policy](./content-security-policy) for per-widget configuration, environment variables, and troubleshooting.
-
-## Step 10: Deployment
-
-### Deploy to Manufact
-
-The easiest deployment option:
+## Step 9: Deploy
 
 ```bash
-# One command deployment
 npx @mcp-use/cli deploy
 ```
 
-See the [Deployment Guide](./deployment/mcp-use) for details.
+Or build and deploy to your host; set `MCP_URL` to the public origin. See [Deployment](./deployment/mcp-use).
 
-### Manual Deployment
+## Best practices
 
-1. Build your server: `npm run build`
-2. Set environment variables
-3. Deploy to your hosting platform (Railway, Render, etc.)
-4. Update `MCP_URL` to your production domain
+**Schemas**: Use `.describe()` on Zod fields so models pick correct arguments.
 
-## Best Practices
+**Themes**: Use `theme` from `useWidget()` for light/dark.
 
-### 1. Schema Design
-
-Use descriptive Zod schemas on your tools to help LLMs understand parameters:
-
-```typescript
-// ✅ Good: Clear descriptions
-schema: z.object({
-  city: z.string().describe("The city name (e.g., 'New York', 'Tokyo')"),
-  units: z.enum(["celsius", "fahrenheit"]).describe("Temperature units"),
-})
-
-// ❌ Bad: No descriptions
-schema: z.object({
-  city: z.string(),
-  u: z.string(),
-})
-```
-
-### 2. Theme Support
-
-Always support both light and dark themes:
+**Conditional UI**: If a client does not support Apps, return text:
 
 ```tsx
-const { theme } = useWidget();
-const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white";
-const textColor = theme === "dark" ? "text-white" : "text-gray-900";
+async (params, ctx) => {
+  if (ctx.client.supportsApps()) {
+    return <ProductSearch {...} _output={text("...")} />;
+  }
+  return text("Plain summary for this client.");
+};
 ```
 
 ## Troubleshooting
 
-### Widget Not Appearing
+**Widget does not appear**
 
-**Problem**: Tool runs but widget doesn't render
+- Confirm the handler returns JSX (with `@jsxImportSource mcp-use/jsx` on that file).
+- Check server logs and Inspector tool errors.
 
-**Solutions**:
+**Empty props**
 
-- Ensure `widget.name` in the tool config matches the folder name: `resources/<widget.name>/widget.tsx`
-- Ensure the tool has `widget: { name, invoking, invoked }` config
-- Ensure the handler returns `widget({ props, output })`, not `text()` or `object()` directly
-- Check server logs for errors
+- Guard on `isPending` before reading `props`.
 
-### Props Not Received
+**CSP errors**
 
-**Problem**: Component receives empty props
+- Add domains via `_csp` on the JSX or `defineWidget` / `.config`. See [Content Security Policy](./content-security-policy).
 
-**Solutions**:
+## Migrating older projects
 
-- **Check `isPending` first**: Widgets render before the tool completes. Props are empty when `isPending` is `true`
-- Ensure the handler passes data via `widget({ props: { ... } })`
-- Use `useWidget()` hook (not React props)
+If you previously used `resources/`, `widget: { name }`, or `widget()`, see **[Migrating from resources/ and widgetMetadata](./migration-from-resources)**.
 
-```tsx
-const { props, isPending } = useWidget<MyProps>();
-if (isPending) return <div>Loading...</div>;
-// Now props are available
-```
+## Next steps
 
-### CSP Errors
-
-**Problem**: Widget loads but assets fail with CSP errors
-
-**Solutions**: Set `baseUrl` in server config, add external domains to CSP (per-widget or via `CSP_URLS`), and use HTTPS for all resources. See [Content Security Policy](./content-security-policy) for details.
-
-## Next Steps
-
-- [MCP Apps](./mcp-apps) - Learn about the standard MCP Apps protocol
-- [ChatGPT Apps SDK](./ui-widgets) - Deep dive into ChatGPT-specific features
-- [Widget Components](./widget-components/usewidget) - Explore React hooks and components
-- [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test with the Inspector
-- [Content Security Policy](./content-security-policy) - CSP configuration for widgets
-- [Deployment Guide](./deployment/mcp-use) - Deploy your server to production
-
-## Example: Complete Server
-
-```typescript
-import { MCPServer, object, text, widget } from "mcp-use/server";
-import { z } from "zod";
-
-const server = new MCPServer({
-  name: "my-widget-server",
-  version: "1.0.0",
-  description: "MCP server with widget support",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
-});
-
-// Tool that returns a widget
-server.tool(
-  {
-    name: "search-tools",
-    description: "Search and display results",
-    schema: z.object({ query: z.string().optional() }),
-    widget: {
-      name: "product-search-result",
-      invoking: "Searching...",
-      invoked: "Results loaded",
-    },
-  },
-  async ({ query }) => {
-    const results = [/* fetch data */];
-    return widget({
-      props: { query: query ?? "", results },
-      output: text(`Found ${results.length} results`),
-    });
-  }
-);
-
-// Traditional tool (no widget)
-server.tool(
-  {
-    name: "get-product-details",
-    description: "Get product details",
-    schema: z.object({ productId: z.string() }),
-  },
-  async ({ productId }) => object({ id: productId, name: "Widget", price: 29 })
-);
-
-server.listen().then(() => console.log("Server running"));
-```
-
-## Summary
-
-You've learned how to build MCP servers with widgets:
-
-- ✅ Define tools with `widget: { name, invoking, invoked }` and return `widget({ props, output })`
-- ✅ Create widget components in `resources/<widget.name>/widget.tsx`
-- ✅ Use `useWidget()` for props, theme, and loading state
-- ✅ Use `useCallTool()` for widgets that call other tools
+- [MCP Apps](./mcp-apps) — Protocol overview and `_` props
+- [Migrating from resources/ and widgetMetadata](./migration-from-resources)
+- [Widget components](./widget-components/usewidget)
+- [Debugging widgets](/inspector/debugging-chatgpt-apps)
+- [Deployment](./deployment/mcp-use)

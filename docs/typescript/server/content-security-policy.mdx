@@ -4,9 +4,9 @@ description: "Configure CSP for MCP Apps and ChatGPT Apps SDK widgets"
 icon: "shield"
 ---
 
-Content Security Policy (CSP) controls which domains your widgets can fetch from, load scripts/styles from, and embed. Widgets run in sandboxed iframes, so CSP must explicitly allow any external resources.
+Content Security Policy (CSP) controls which domains your widgets can fetch from, load scripts and styles from, and embed. Widgets run in sandboxed iframes, so CSP must explicitly allow any external resources.
 
-## Automatic Configuration
+## Automatic configuration
 
 When `baseUrl` is set (via `MCPServer` constructor or `MCP_URL` environment variable), mcp-use automatically configures CSP:
 
@@ -18,113 +18,96 @@ const server = new MCPServer({
 });
 ```
 
-This ensures:
+This ensures widget URLs use the correct domain, CSP includes your server origin, and deployments behind proxies keep working.
 
-- Widget URLs use the correct domain
-- CSP includes your server domain
-- Works behind proxies and custom domains
+The **server origin** is auto-injected into each widget’s effective `connectDomains`, `resourceDomains`, and `baseUriDomains` — you do not add it manually for your own API host in the common case.
 
-The server origin is auto-injected into each widget's `connectDomains`, `resourceDomains`, and `baseUriDomains`—you don't need to add it manually.
+## Inline JSX: `_csp` and component `.config`
 
-## Per-Widget Configuration
+For the **primary** pattern, set CSP on the JSX returned from the tool with **`_csp`**, and/or attach static CSP to the component with **`defineWidget`** / **`.config`** (see [MCP Apps](./mcp-apps)).
 
-For widgets that need additional domains (APIs, CDNs, etc.), configure CSP in your widget metadata.
+**Per tool call (JSX props)**
 
-### MCP Apps (all compatible clients, ChatGPT, Claude etc..)
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+import { text } from "mcp-use/server";
+import ChartView from "./components/ChartView";
 
-With `type: "mcpApps"`, use camelCase in `metadata.csp`:
-
-```typescript
-export const widgetMetadata: WidgetMetadata = {
-  description: "Display weather",
-  props: propSchema,
-  metadata: {
-    csp: {
-      connectDomains: ["https://api.weather.com"],
-      resourceDomains: ["https://cdn.weather.com"],
-      baseUriDomains: ["https://myserver.com"],
+return (
+  <ChartView
+    data={series}
+    _output={text("Chart ready")}
+    _csp={{
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
       frameDomains: ["https://trusted-embed.com"],
+      baseUriDomains: ["https://myserver.com"],
       redirectDomains: ["https://oauth.provider.com"],
-    },
-  },
-};
+    }}
+  />
+);
 ```
 
-### Apps SDK Format (ChatGPT only - DEPRECATED)
+**Per component (static)**
 
-With `type: "appsSdk"`, use snake_case in `appsSdkMetadata["openai/widgetCSP"]`:
+```tsx
+import { defineWidget } from "mcp-use/react";
 
-```typescript
-export const appsSdkMetadata = {
-  "openai/widgetCSP": {
-    connect_domains: ["https://api.weather.com"],
-    resource_domains: ["https://cdn.weather.com"],
-    frame_domains: ["https://trusted-embed.com"],
-    redirect_domains: ["https://oauth.provider.com"],
-  },
-};
+export default defineWidget(ChartViewInner, {
+  csp: { connectDomains: ["https://api.example.com"] },
+});
 ```
 
-### Field Reference
+Merge order: **defaults → component `.config` → `_csp` on the JSX** for that invocation.
+
+## Development mode enrichment
+
+In development, mcp-use may **extend** CSP so local workflows work (for example WebSocket or eval used by the dev server). Treat production CSP as authoritative; use the Inspector’s **Widget-Declared** CSP mode to validate what you declare.
+
+## Field reference
 
 | MCP Apps (camelCase) | Apps SDK (snake_case) | Description |
 | -------------------- | --------------------- | ----------- |
 | `connectDomains` | `connect_domains` | Domains for fetch, XHR, WebSocket |
-| `resourceDomains` | `resource_domains` | Domains for scripts, styles, images |
-| `baseUriDomains` | `base_uri_domains` | Domains for base URI (MCP Apps) |
-| `frameDomains` | `frame_domains` | Domains for iframe embeds |
-| `redirectDomains` | `redirect_domains` | Domains for redirects (ChatGPT-specific) |
-| `scriptDirectives` | `script_directives` | Custom script CSP directives, not all clients support this (e.g. ChatGPT) |
-| `styleDirectives` | `style_directives` | Custom style CSP directives |
+| `resourceDomains` | `resource_domains` | Scripts, styles, images, fonts |
+| `baseUriDomains` | `base_uri_domains` | Base URI allowlist |
+| `frameDomains` | `frame_domains` | Nested iframes |
+| `redirectDomains` | `redirect_domains` | Redirects (ChatGPT / `openExternal`) |
+| `scriptDirectives` | `script_directives` | Extra script CSP directives |
+| `styleDirectives` | `style_directives` | Extra style CSP directives |
 
-<Note>
-Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used.
-</Note>
+mcp-use maps unified camelCase config to MCP Apps **`_meta.ui.csp`** and to ChatGPT **`openai/widgetCSP`** automatically.
 
-## Environment Variables
+## Environment variables
 
 ```env
-# Base URL — auto-included in widget CSP
 MCP_URL=https://myserver.com
-
-# Additional domains (comma-separated) — appended to widget CSP
 CSP_URLS=https://api.example.com,https://cdn.example.com
 ```
 
-- **MCP_URL**: Base URL for widget assets and public files. Also used by the server to configure CSP.
-- **CSP_URLS**: (Optional) Additional domains to whitelist. Supports comma-separated list. Required for static deployments where widget assets are served from different domains.
+- **`MCP_URL`** — Public origin for assets and CSP base configuration.
+- **`CSP_URLS`** — Optional comma-separated extra domains merged into widget CSP (useful when static assets live on another origin).
 
-## Static Deployments
+## Static deployments
 
-When widgets are served from static storage (e.g., Supabase Storage) while the MCP server runs elsewhere, set:
+When widgets are served from static storage while the MCP server runs elsewhere, set **`MCP_URL`**, **`MCP_SERVER_URL`**, and **`CSP_URLS`** as described in [Supabase deployment](./deployment/supabase).
 
-- **MCP_URL**: Where widget assets are stored
-- **MCP_SERVER_URL**: Where the MCP server runs (for API calls)
-- **CSP_URLS**: Domains for storage and API access (e.g., `https://YOUR_PROJECT.supabase.co`)
+## Inspector debugging
 
-See [Supabase deployment](./deployment/supabase) for a complete setup.
+The Inspector provides a **CSP mode** toggle:
 
-<Tip>
-**Alternative**: Instead of the global `CSP_URLS` environment variable, configure CSP per-widget in `metadata.csp`
-</Tip>
+- **Permissive** — Relaxed CSP for debugging.
+- **Widget-Declared** — Enforces declared CSP (closer to production).
 
-## Inspector Debugging
+CSP violations appear in the browser console. See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps).
 
-The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
+## Legacy: `widgetMetadata` and `server.uiResource`
 
-- **Permissive** — Relaxed CSP for debugging
-- **Widget-Declared** — Enforces the widget's declared CSP (production-like)
+Older docs used `widgetMetadata.metadata.csp` or `server.uiResource({ metadata: { csp } })`. The modern equivalents are **`_csp`** / **`.config`** above. For side-by-side migration steps, see **[Migrating from resources/ and widgetMetadata](./migration-from-resources)**.
 
-<Warning>
-CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
-</Warning>
+## Next steps
 
-See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for details.
-
-
-## Next Steps
-
-- [MCP Apps](./mcp-apps) — Unified metadata format for both protocols
-- [ChatGPT Apps SDK](./ui-widgets) — Widget metadata and registration
-- [Supabase Deployment](./deployment/supabase) — Static deployment with CSP
-- [Debugging Widgets](/inspector/debugging-chatgpt-apps) — Test CSP in the Inspector
+- [MCP Apps](./mcp-apps)
+- [Migrating from resources/ and widgetMetadata](./migration-from-resources)
+- [Supabase deployment](./deployment/supabase)
+- [Debugging widgets](/inspector/debugging-chatgpt-apps)

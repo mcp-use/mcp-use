@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # Server Handlers and Widget Components
 
 How to define server tools that render widgets, and how the data flows between server and UI.

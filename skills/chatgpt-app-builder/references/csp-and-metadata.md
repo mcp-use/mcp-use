@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # CSP and Metadata Configuration
 
 Content Security Policy and metadata configuration for ChatGPT widgets.

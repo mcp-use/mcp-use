@@ -1,0 +1,213 @@
+---
+title: "Migrating from resources/ and widgetMetadata"
+description: "Move from the resources folder, widget tool config, and widgetMetadata to inline JSX, ToolRef, and defineWidget"
+icon: "arrow-right-arrow-left"
+---
+
+The recommended pattern for MCP Apps widgets is **inline JSX** returned from `server.tool()`: import a plain React component and return a JSX element (for example `WeatherCard` with props) using `_`-prefixed metadata props. The build system bundles the widget and registers protocol metadata for you.
+
+This page maps **every** common legacy pattern to its modern equivalent.
+
+<Info>
+If you are new to widgets, start with [MCP Apps](./mcp-apps) and [Creating an MCP Apps server](./creating-mcp-apps-server) instead of reading this page first.
+</Info>
+
+## 1. Server entry and JSX runtime
+
+**Before:** Server file was often `index.ts` and used `widget()` plus `widget: { name }`.
+
+**After:** Use **`/** @jsxImportSource mcp-use/jsx */`** at the top of the file that returns JSX (often `index.tsx`).
+
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+import { MCPServer, text } from "mcp-use/server";
+```
+
+## 2. Folder layout: `resources/` vs `components/`
+
+**Before:**
+
+```
+resources/
+  weather-display/
+    widget.tsx
+```
+
+The folder name matched `widget: { name: "weather-display" }`.
+
+**After:** Put UI anywhere (for example `components/WeatherCard.tsx`). There is **no** required `resources/` convention for the primary pattern. Import the component in your server file.
+
+## 3. Tool definition: `widget: { name }` removed
+
+**Before:**
+
+```typescript
+server.tool(
+  {
+    name: "get-weather",
+    schema: z.object({ city: z.string() }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching...",
+      invoked: "Done",
+    },
+  },
+  async ({ city }) =>
+    widget({
+      props: { city, temp: 22 },
+      output: text(`Weather in ${city}`),
+    })
+);
+```
+
+**After:** Return JSX. Put per-call metadata on the element with `_` props.
+
+```tsx
+import WeatherCard from "./components/WeatherCard";
+
+server.tool(
+  {
+    name: "get-weather",
+    schema: z.object({ city: z.string() }),
+  },
+  async ({ city }) => (
+    <WeatherCard
+      city={city}
+      temp={22}
+      _output={text(`Weather in ${city}`)}
+      _invoking="Fetching..."
+      _invoked="Done"
+    />
+  )
+);
+```
+
+## 4. Return value: `widget()` vs JSX
+
+**Before:**
+
+```typescript
+return widget({
+  props: { query, results },
+  output: text(`Found ${results.length} matches`),
+  metadata: { totalCount: 1000 },
+});
+```
+
+**After:**
+
+```tsx
+return (
+  <ProductSearch
+    query={query}
+    results={results}
+    _output={text(`Found ${results.length} matches`)}
+    _meta={{ totalCount: 1000 }}
+  />
+);
+```
+
+The internal `widget()` helper is still what the JSX runtime uses; **you** return JSX instead of calling `widget()` directly.
+
+## 5. `widgetMetadata` export
+
+**Before (`resources/.../widget.tsx`):**
+
+```tsx
+export const widgetMetadata: WidgetMetadata = {
+  description: "Weather",
+  props: propSchema,
+  metadata: {
+    csp: { connectDomains: ["https://api.example.com"] },
+  },
+};
+```
+
+**After:** Use **`defineWidget`** from `mcp-use/react` or a **`.config`** static on the component.
+
+```tsx
+import { defineWidget } from "mcp-use/react";
+
+export default defineWidget(
+  function WeatherCard(props: Props) {
+    return <div>...</div>;
+  },
+  {
+    csp: { connectDomains: ["https://api.example.com"] },
+    description: "Weather",
+  }
+);
+```
+
+Per-call overrides still use **`_csp`**, **`_prefersBorder`**, etc. on the JSX in the server file. Merge order: defaults → `.config` → `_` props.
+
+## 6. `exposeAsTool` and auto-registered widget tools
+
+**Before:** Some setups used `exposeAsTool: true` so a resource registered a generated tool.
+
+**After:** Define a normal **`server.tool()`** and return JSX. Do not rely on `exposeAsTool` for the primary flow.
+
+## 7. `server.uiResource()` for HTML templates
+
+**Before:** Dual-protocol widgets were registered with `server.uiResource({ type: "mcpApps", name, htmlTemplate, metadata })`.
+
+**After:** Prefer **inline JSX** for new projects so you do not hand-author `htmlTemplate` or wire script URLs. The framework generates the widget bundle and resource metadata.
+
+If you maintain legacy `uiResource` servers, see the archived pages [UI widgets](./ui-widgets) and [MCP UI resources](./mcp-ui-resources) — still listed under **Deprecated** in the docs nav.
+
+## 8. Typed tool calls from widgets
+
+**Before:** `useCallTool("tool-name")` with string names; some setups used codegen registries.
+
+**After:** Export **`ToolRef`** values from `server.tool()` and pass them to **`useCallTool(toolRef)`**, or use **`createTypedHooks()`** with a map of tools.
+
+```tsx
+export const getWeather = server.tool({ ... }, async ...);
+
+// In widget:
+const { callTool } = useCallTool(getWeather);
+```
+
+## 9. Streaming updates to the widget
+
+**Before:** Manual `notifications` wiring for prop updates.
+
+**After:** Use **`streamable()`** for a prop value and **`useStreamableProps()`** in the widget. See [MCP Apps](./mcp-apps#streaming-props-with-streamable) and [Response helpers](./response-helpers#streamable).
+
+## 10. Clients without MCP Apps
+
+**Before:** Often returned only text or only widgets.
+
+**After:** Branch with **`ctx.client.supportsApps()`** for a widget vs text fallback.
+
+```tsx
+async (params, ctx) => {
+  if (ctx.client.supportsApps()) {
+    return <MyWidget {...params} _output={text("...")} />;
+  }
+  return text("Plain summary for this client.");
+}
+```
+
+## 11. Apps SDK metadata (`openai/` keys)
+
+**Before:** Manual `_meta` on tools with `openai/outputTemplate`, etc.
+
+**After:** Inline JSX + mcp-use metadata generation covers MCP Apps and ChatGPT for the standard widget flow. For low-level Apps SDK-only customization, see [UI widgets](./ui-widgets) (deprecated reference).
+
+## 12. Migration checklist
+
+1. Rename or add **`index.tsx`** with **`@jsxImportSource mcp-use/jsx`** if needed.
+2. Move React UI out of **`resources/`** into a normal folder (e.g. `components/`).
+3. Remove **`widget: { name, ... }`** from tool configs.
+4. Replace **`return widget({ ... })`** with **`return <Component ... />`** and **`_output`**, **`_meta`**, **`_invoking`**, **`_invoked`**, **`_csp`** as needed.
+5. Replace **`widgetMetadata`** with **`defineWidget`** or **`.config`**.
+6. Switch **`useCallTool("name")`** to **`useCallTool(toolRef)`** where you want types.
+7. Run **`npm run dev`** and verify **`tools/list`** and the Inspector.
+
+## Next steps
+
+- [MCP Apps](./mcp-apps)
+- [Tools](./tools#returning-widgets-from-tools)
+- [Content Security Policy](./content-security-policy)
+- [Creating an MCP Apps server](./creating-mcp-apps-server)

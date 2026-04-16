@@ -943,6 +943,45 @@ function MCPAppsRendererBase({
     bridge.sendToolCancelled({ reason: "Cancelled by user" });
   }, [cancelled, initCount]);
 
+  // Forward mcp-use server notifications to the widget.
+  // When the server sends custom notifications (e.g., mcp-use/notifications/props-update
+  // for streamable prop updates), relay them to the widget iframe via postMessage.
+  const serverForNotifications = servers.find((s) => s.id === serverId);
+  const lastSeenNotifCountRef = useRef(0);
+
+  // Notifications array is prepended (newest first). Track by length to detect new ones.
+  const currentNotifications = serverForNotifications?.notifications;
+  useEffect(() => {
+    if (!currentNotifications || initCount === 0) return;
+    const prevCount = lastSeenNotifCountRef.current;
+    const newCount = currentNotifications.length;
+    if (newCount <= prevCount) {
+      lastSeenNotifCountRef.current = newCount;
+      return;
+    }
+
+    // New notifications are at indices 0..(newCount-prevCount-1) (prepended)
+    const numNew = newCount - prevCount;
+    lastSeenNotifCountRef.current = newCount;
+
+    const sandbox = sandboxRef.current;
+    if (!sandbox) return;
+
+    for (let i = numNew - 1; i >= 0; i--) {
+      const notif = currentNotifications[i];
+      if (
+        notif.method?.startsWith("mcp-use/") ||
+        notif.method?.startsWith("notifications/progress")
+      ) {
+        sandbox.postMessage({
+          jsonrpc: "2.0",
+          method: notif.method,
+          params: notif.params,
+        });
+      }
+    }
+  }, [currentNotifications, initCount]);
+
   // Handle CSP violations
   const handleSandboxMessage = useCallback(
     (event: MessageEvent) => {

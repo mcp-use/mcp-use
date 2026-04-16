@@ -38,18 +38,16 @@ npx create-mcp-use-app --help
 
 ## Available Templates
 
-### 🚀 Starter Template (Default)
+### Starter template (default)
 
-The **starter** template is the most comprehensive option, showcasing all MCP features including tools, resources, prompts, and automatic UI widget registration for MCP-UI and OpenAI Apps SDK.
+The **starter** template showcases MCP server features: tools, resources, prompts, and widgets. Widgets follow the **inline JSX** pattern (or MCP-UI resources where applicable); see the generated repo for exact paths.
 
-**What's Included:**
+**What's included:**
 - Full MCP server setup with all primitive types:
-  - **Tools**: `fetch-weather` - fetches weather data for any city
-  - **Resources**: `config://settings` - server configuration example
-  - **Prompts**: `review-code` - code review prompt template
-- **Automatic UI Widget Registration** from `resources/` folder:
-  - `display-weather` - Weather visualization widget (OpenAI Apps SDK)
-  - `kanban-board` - Task management board (MCP-UI)
+  - **Tools**: `fetch-weather` — fetches weather data for any city
+  - **Resources**: `config://settings` — server configuration example
+  - **Prompts**: `review-code` — code review prompt template
+- Example widgets and MCP-UI samples as shipped in the template
 - Hot reload development environment
 - Production build configuration
 
@@ -77,67 +75,41 @@ const widget = await client.callTool('display-weather', {
 
 ---
 
-### ⚡ Apps SDK Template
+### MCP Apps template (`mcp-apps`)
 
-The **mcp-apps** template demonstrates how to build OpenAI Apps SDK compatible widgets for ChatGPT with official UI components integration.
+The **mcp-apps** template is the starting point for **MCP Apps** widgets that also work in **ChatGPT**. Tools return **inline JSX** (`/** @jsxImportSource mcp-use/jsx */`) — import plain React components and pass `_output`, `_csp`, and other `_` props.
 
-**What's Included:**
-- Lightweight MCP server setup
-- **Automatic UI Widget Registration** from `resources/` folder:
-  - `product-search-result` - Complete ecommerce widget example with carousel, accordion, and filtering
-- **Official UI Components**: Integrated [OpenAI Apps SDK UI components](https://openai.github.io/apps-sdk-ui/) for consistent, accessible widgets
-- **Fruits API**: Example API endpoint (`/api/fruits`) demonstrating data fetching
-- **React Query**: Integrated `@tanstack/react-query` for data fetching and caching
-- Example tool: `get-brand-info` - Returns brand information
-- **Public Assets**: 16 fruit product images in `public/fruits/` directory
-- **McpUseProvider**: Pre-configured with auto-sizing, debug controls, and view controls
-- Minimal configuration for fast development
+**What's included (typical):**
 
-**Best For:** Quick prototypes, widget-focused apps, learning OpenAI Apps SDK patterns, ecommerce widgets
+- MCP server with example tools that return JSX
+- **`components/`** — React UI imported by the server (no required `resources/` layout)
+- [OpenAI Apps SDK UI components](https://openai.github.io/apps-sdk-ui/) where the template uses them
+- Example API routes (for example `/api/fruits`) and static assets under `public/`
+- **`McpUseProvider`** and widget hooks pre-wired in the generated widget bundle
 
-**Quick Start:**
+**Best for:** ChatGPT + MCP Apps widgets, ecommerce-style demos, learning the current recommended pattern
+
+**Quick start:**
 ```bash
 npx create-mcp-use-app my-server --template mcp-apps
 cd my-server
 npm run dev
 ```
 
-**Example Usage:**
+**Example usage (client):**
+
 ```typescript
-// All React components in resources/ folder are automatically registered!
-// Just export widgetMetadata and mcp-use handles the rest
-
-// Call the brand info tool
-const brandInfo = await client.callTool('get-brand-info', {});
-
-// Display product search results widget
-const widget = await client.callTool('product-search-result', { 
-  query: 'fruits',
-  filters: { priceRange: [0, 50] }
-})
+const brandInfo = await client.callTool("get-brand-info", {});
+const search = await client.callTool("search-tools", { query: "fruits" });
 ```
 
-**Template Structure:**
+**Typical layout:**
+
 ```
-apps-sdk/
-├── resources/
-│   └── product-search-result/    # Folder-based widget
-│       ├── widget.tsx             # Entry point
-│       ├── components/            # Sub-components
-│       │   ├── Accordion.tsx
-│       │   ├── AccordionItem.tsx
-│       │   ├── Carousel.tsx
-│       │   └── CarouselItem.tsx
-│       ├── hooks/
-│       │   └── useCarouselAnimation.ts
-│       ├── constants.ts
-│       └── types.ts
+my-server/
+├── components/           # React components imported by the server
 ├── public/
-│   └── fruits/                    # Static assets
-│       ├── apple.png
-│       ├── banana.png
-│       └── ... (16 fruit images)
-├── index.ts                       # Server entry point
+├── index.tsx             # Server entry — @jsxImportSource mcp-use/jsx
 └── package.json
 ```
 
@@ -190,9 +162,10 @@ await client.callTool('quick-poll', {
 ```
 ---
 
-## Next Steps
+## Next steps
 
-- [UI Widgets](./ui-widgets) - Deep dive into automatic UI widget registration
-- [Tools](./tools) - Learn about MCP tools
-- [Resources](./resources) - Understand MCP resources
-- [Prompts](./prompts) - Work with prompt templates
+- [MCP Apps](./mcp-apps) — Inline JSX widgets (recommended)
+- [Migrating from resources/ and widgetMetadata](./migration-from-resources)
+- [Tools](./tools) — MCP tools
+- [Resources](./resources) — MCP resources
+- [Prompts](./prompts) — Prompt templates

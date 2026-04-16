@@ -78,6 +78,9 @@ export type {
   UseCallToolReturn,
 } from "./useCallTool.js";
 
+// Export createTypedHooks factory (tRPC-style zero-codegen typed hooks)
+export { createTypedHooks } from "./createTypedHooks.js";
+
 // Export generateHelpers factory and related types
 export { generateHelpers } from "./generateHelpers.js";
 export type {
@@ -122,5 +125,20 @@ export {
   type RpcLogEntry,
 } from "./rpc-logger.js";
 
+// Export ToolRef for typed useCallTool (zero codegen)
+export type { ToolRef } from "../server/types/tool-ref.js";
+
 // Export WidgetMetadata type for widget developers
 export type { WidgetMetadata } from "../server/types/widget.js";
+
+// Export streamable props hook for inline widget entry wrappers
+export { useStreamableProps } from "./useStreamableProps.js";
+
+// Export inline widget config types and helpers
+export { defineWidget } from "./widget-config.js";
+export type {
+  ComponentWidgetConfig,
+  WidgetCSPConfig,
+  WidgetComponent,
+  WidgetPermissions,
+} from "./widget-config.js";

@@ -44,16 +44,14 @@ server.prompt({ name, description, schema }, async (input) => {
 
 → **Detailed guide:** [../server/prompts.md](../server/prompts.md)
 
-### 4. Widget (Tool + UI)
-A **tool that returns visual UI**. Same as a tool but renders a React component.
+### 4. Widget (tool + UI)
+A **tool that returns JSX**: import a React component and return it from the handler with `_output` and other `_` props. The mcp-use JSX runtime registers the widget bundle and protocol metadata.
 
 **Use for:** Browsing data, interactive selection, visual feedback
 
-```typescript
-server.tool(
-  { name, schema, widget: { name: "widget-name" } },
-  async (input) => widget({ props: { data }, output: text("...") })
-);
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+// return <MyWidget data={...} _output={text("...")} />;
 ```
 
 → **Detailed guide:** [../widgets/basics.md](../widgets/basics.md)
@@ -105,16 +103,8 @@ UI state (selections, filters) lives in the widget via `useState` or `setState`.
 ❌ `select-item` tool, `set-filter` tool
 ✅ Widget manages internally
 
-### 4. `exposeAsTool` defaults to `false`
-Widgets are not auto-registered as tools by default. When defining a custom tool with `widget: { name }`, omitting `exposeAsTool` (or leaving it `false`) is correct — the custom tool handles registration:
-
-```typescript
-export const widgetMetadata: WidgetMetadata = {
-  description: "...",
-  props: z.object({...}),
-  // exposeAsTool defaults to false — correct for custom-tool pattern
-};
-```
+### 4. One tool registration for widgets
+Expose UI by returning JSX from **`server.tool()`**. You do not register a separate auto-generated tool for the same UI in the primary pattern.
 
 ---
 

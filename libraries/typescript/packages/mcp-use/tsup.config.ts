@@ -78,6 +78,8 @@ export default defineConfig([
       "src/telemetry/tel-fetch.ts",
       "src/utils/index.ts",
       "src/client/prompts.ts",
+      "src/jsx/jsx-runtime.ts",
+      "src/jsx/jsx-dev-runtime.ts",
     ],
     esbuildOptions(options) {
       // Preserve node: prefix for Deno compatibility

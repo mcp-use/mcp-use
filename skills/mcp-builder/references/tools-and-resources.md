@@ -1,3 +1,5 @@
+> **Deprecated:** Use the **`mcp-apps-builder`** skill (`skills/mcp-apps-builder/`). Inline JSX widgets are the primary pattern.
+
 # Tools, Resources, and Prompts
 
 Server-side implementation patterns for `server.tool()`, `server.resource()`, and `server.prompt()`.

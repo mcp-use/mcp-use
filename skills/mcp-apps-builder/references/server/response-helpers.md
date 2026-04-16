@@ -2,7 +2,7 @@
 
 Response helpers format output from tools, resources, and prompts. Always use helpers instead of returning raw values.
 
-**Available helpers:** `text()`, `object()`, `markdown()`, `image()`, `error()`, `widget()`, `mix()`, `resource()`
+**Available helpers:** `text()`, `object()`, `markdown()`, `image()`, `error()`, `mix()`, `resource()`, `streamable()`, plus **JSX** returns for widgets (see [../widgets/basics.md](../widgets/basics.md)). The internal `widget()` helper is used by the JSX runtime.
 
 ---
 
@@ -292,52 +292,28 @@ server.tool(
 
 ---
 
-## widget()
+## Widgets: JSX (recommended)
 
-Return visual UI alongside data. Tool must have `widget: { name }` config.
+Return a React element from the tool handler with **`/** @jsxImportSource mcp-use/jsx */`**. Use **`_output`** for the model-visible summary. See [../widgets/basics.md](../widgets/basics.md).
+
+## streamable()
+
+Incremental prop updates after the tool returns:
 
 ```typescript
-import { widget, text } from "mcp-use/server";
+import { streamable, text } from "mcp-use/server";
 
-server.tool(
-  {
-    name: "search-products",
-    description: "Search products by query",
-    schema: z.object({
-      query: z.string().describe("Search query")
-    }),
-    widget: {
-      name: "product-list",  // Must match resources/product-list.tsx
-      invoking: "Searching...",
-      invoked: "Products loaded"
-    }
-  },
-  async ({ query }) => {
-    const products = await searchProducts(query);
-
-    return widget({
-      props: {
-        products,
-        query,
-        totalCount: products.length
-      },
-      output: text(`Found ${products.length} products matching "${query}"`)
-    });
-  }
-);
+const s = streamable("");
+s.update((prev) => prev + "chunk");
+s.done();
+await s.value;
 ```
 
-**Widget response structure:**
-- `props` - Data sent to widget component
-- `output` - Text/object the AI model sees
+Pass a `Streamable` as a JSX prop; the widget uses **`useStreamableProps()`** on the client.
 
-**Use for:**
-- Browsing lists
-- Comparing items
-- Interactive selection
-- Visual data representation
+## widget() (internal)
 
-See [../widgets/basics.md](../widgets/basics.md) for widget implementation.
+`widget({ props, output, metadata })` still exists and is invoked by the **JSX runtime**. Prefer returning JSX from tools instead of calling `widget()` directly unless you have a custom integration.
 
 ---
 
@@ -460,7 +436,6 @@ import {
   markdown,
   image,
   error,
-  widget,
   mix
 } from "mcp-use/server";
 import { z } from "zod";
@@ -537,22 +512,8 @@ server.tool(
   }
 );
 
-// Widget response
-server.tool(
-  {
-    name: "browse-items",
-    schema: z.object({ category: z.string() }),
-    widget: { name: "item-browser" }
-  },
-  async ({ category }) => {
-    const items = await getItems(category);
-
-    return widget({
-      props: { items, category },
-      output: text(`Found ${items.length} items in ${category}`)
-    });
-  }
-);
+// Visual UI: return JSX from tools (`/** @jsxImportSource mcp-use/jsx */`)
+// See ../widgets/basics.md — omitted here for brevity.
 
 server.listen();
 ```
@@ -594,13 +555,8 @@ server.listen();
 ❌ text("Title\nPoint 1\nPoint 2");  // No formatting
 ```
 
-### 6. Widget Output is for AI
-```typescript
-return widget({
-  props: { /* visual data */ },
-  output: text("Concise summary for AI")  // AI only sees this
-});
-```
+### 6. Model output vs widget props (JSX)
+Use **`_output`** on the JSX element for what the model sees; non-`_` props are for the widget only.
 
 ---
 
@@ -613,7 +569,8 @@ return widget({
 | `markdown(string)` | Formatted text | Documentation, reports | `markdown("# Title")` |
 | `image(url, mime?)` | Image | Charts, diagrams | `image(url)` |
 | `error(msg)` | Error | Failures | `error("Not found")` |
-| `widget(config)` | UI + data | Visual interfaces | `widget({ props, output })` |
+| JSX + `_output` | UI + data | Visual interfaces | See [../widgets/basics.md](../widgets/basics.md) |
+| `streamable()` | Live prop updates | Streaming UI | Pass as JSX prop |
 | `mix(...results)` | Multiple | Rich responses | `mix(text(), image())` |
 | `resource(uri, mime)` | Resource ref | Embed resources | `resource("docs://guide", "text/markdown")` |
 

@@ -4,10 +4,10 @@ description: "Type-safe React hook for calling MCP tools from widgets"
 icon: "wrench"
 ---
 
-The `useCallTool` hook provides a type-safe way to call MCP tools from within your widgets. When paired with automatic type generation, it gives you full TypeScript IntelliSense for tool inputs and outputs.
+The `useCallTool` hook calls MCP tools from widgets. Pass either a **tool name** (`string`) or a **`ToolRef`** returned from `server.tool()` / `defineTools()` for **full input and output typing** without codegen.
 
 <Info>
-**Automatic Type Inference**: When using `mcp-use dev`, types are automatically generated from your tool schemas. The `useCallTool` hook uses these types to provide IntelliSense for tool names, inputs, and outputs.
+**Preferred typing**: Export a tool with `export const myTool = server.tool(...)` and use `useCallTool(myTool)`, or use `createTypedHooks()` with your `defineTools()` map. Optional codegen (`.mcp-use/tool-registry.d.ts`) still works for string-based names if you use it.
 </Info>
 
 ## Import
@@ -16,14 +16,13 @@ The `useCallTool` hook provides a type-safe way to call MCP tools from within yo
 import { useCallTool } from "mcp-use/react";
 ```
 
-## Basic Usage
+## Basic usage (string name)
 
 ```tsx
 import { useCallTool } from "mcp-use/react";
 
 const MyWidget = () => {
-  // Tool name is type-checked, input/output are fully typed
-  const { callTool, data, isPending, isSuccess, isError, error } = 
+  const { callTool, data, isPending, isSuccess, isError, error } =
     useCallTool("search-flights");
 
   return (
@@ -45,12 +44,62 @@ const MyWidget = () => {
 };
 ```
 
+## `ToolRef` (typed, zero-codegen)
+
+Export the tool from your server module and pass the reference:
+
+```tsx
+// server.tsx — export the tool
+/** @jsxImportSource mcp-use/jsx */
+import { MCPServer, object } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "demo", version: "1.0.0" });
+
+export const searchFlights = server.tool(
+  {
+    name: "search-flights",
+    schema: z.object({
+      destination: z.string(),
+      date: z.string().optional(),
+    }),
+  },
+  async () =>
+    object({ flights: [{ id: "1", price: 99 }] })
+);
+
+// Widget — import type/value as your bundler allows
+import { useCallTool } from "mcp-use/react";
+import { searchFlights } from "../server";
+
+const { callTool, data } = useCallTool(searchFlights);
+
+callTool({ destination: "NYC" }); // input typed
+// data.structuredContent typed when success
+```
+
+## `createTypedHooks()` with `defineTools()`
+
+```tsx
+// server
+export const tools = server.defineTools({
+  echo: {
+    schema: z.object({ message: z.string() }),
+    handler: async ({ message }) => text(message),
+  },
+});
+
+// widget
+import type { tools } from "../server";
+import { createTypedHooks } from "mcp-use/react";
+
+const { useCallTool } = createTypedHooks<typeof tools>();
+const { callTool } = useCallTool("echo");
+callTool({ message: "hi" });
+```
+
 <Note>
-**Type Safety**: The hook automatically infers types from your tool definitions. You get autocomplete for:
-- Available tool names
-- Tool input parameters
-- Tool output structure
-- Error types
+With string-based `useCallTool("name")`, optional **codegen** from `mcp-use dev` can still augment the `ToolRegistry` interface for autocomplete.
 </Note>
 
 ## State Management
@@ -176,64 +225,9 @@ if (data) {
 }
 ```
 
-## Type Generation Integration
+## Optional: codegen + string names
 
-The hook automatically uses types from `.mcp-use/tool-registry.d.ts`:
-
-**Server tool definition:**
-
-```typescript
-// index.ts
-server.tool({
-  name: "search-flights",
-  description: "Search for flights",
-  schema: z.object({
-    destination: z.string(),
-    date: z.string().optional(),
-  }),
-  execute: async ({ destination, date }) => {
-    // ... implementation
-    return object({
-      flights: array(object({
-        id: string(),
-        price: number(),
-      })),
-    });
-  }
-});
-```
-
-**Generated types:**
-
-```typescript
-// .mcp-use/tool-registry.d.ts (auto-generated)
-declare module "mcp-use/react" {
-  interface ToolRegistry {
-    "search-flights": {
-      input: { destination: string; date?: string };
-      output: { flights: Array<{ id: string; price: number }> };
-    };
-  }
-}
-```
-
-**Widget with full type safety:**
-
-```tsx
-const { callTool, data } = useCallTool("search-flights");
-//                                      ^ Autocomplete for tool names
-
-// Autocomplete for input parameters
-callTool({ destination: "NYC", date: "2024-12-01" });
-
-// Strongly typed output
-if (data) {
-  data.structuredContent.flights.forEach(flight => {
-    //                   ^ Autocomplete for output structure
-    console.log(flight.id, flight.price);
-  });
-}
-```
+If you use **`useCallTool("tool-name")`** instead of a `ToolRef`, running **`mcp-use dev`** can generate **`.mcp-use/tool-registry.d.ts`** so string names stay typed. This is optional when you use **`ToolRef`** or **`createTypedHooks()`** inference.
 
 ## Advanced: Manual Type Generation
 
@@ -354,8 +348,8 @@ const FlightSearchWidget = () => {
 };
 ```
 
-## See Also
+## See also
 
-- [useWidget()](/typescript/server/widget-components/usewidget) - For accessing widget props and context
-- [Type Generation CLI](/typescript/server/cli-reference#generate-types-type-generation) - Manual type generation command
-- [Building UI Widgets](/typescript/server/ui-widgets) - Complete widget development guide
+- [useWidget()](/typescript/server/widget-components/usewidget) — Widget props and context
+- [MCP Apps](/typescript/server/mcp-apps) — Inline JSX widget pattern
+- [Type generation CLI](/typescript/server/cli-reference#generate-types-type-generation) — Manual codegen command

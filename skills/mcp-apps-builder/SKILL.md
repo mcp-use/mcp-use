@@ -230,7 +230,7 @@ Avoid these anti-patterns found in production MCP servers:
 
 ### Tool Definition
 - ❌ Returning raw objects instead of using response helpers
-  - ✅ Use `text()`, `object()`, `widget()`, `error()` helpers
+  - ✅ Use `text()`, `object()`, `error()` helpers, or **JSX** for widgets (`@jsxImportSource mcp-use/jsx`)
 - ❌ Skipping Zod schema `.describe()` on every field
   - ✅ Add descriptions to all schema fields for better AI understanding
 - ❌ No input validation or sanitization
@@ -279,36 +279,23 @@ UI state lives in the widget, not in separate tools:
 - ❌ `select-item` tool, `set-filter` tool
 - ✅ Widget manages with `useState` or `setState`
 
-### 4. `exposeAsTool` Defaults to `false`
-Widgets are registered as resources only by default. Use a custom tool (recommended) or set `exposeAsTool: true` to expose a widget to the model:
+### 4. Widgets: inline JSX + typed `useWidget`
+Return JSX from `server.tool()` and type the client with `useWidget<YourProps>()`:
 
-```typescript
-// ✅ ALL 4 STEPS REQUIRED for proper type inference:
+```tsx
+/** @jsxImportSource mcp-use/jsx */
+// return <MyWidget title="..." items={...} _output={text("...")} />;
+```
 
-// Step 1: Define schema separately
-const propsSchema = z.object({
-  title: z.string(),
-  items: z.array(z.string())
-});
-
-// Step 2: Reference schema variable in metadata
-export const widgetMetadata: WidgetMetadata = {
-  description: "...",
-  props: propsSchema,  // ← NOT inline z.object()
-  exposeAsTool: false
-};
-
-// Step 3: Infer Props type from schema variable
-type Props = z.infer<typeof propsSchema>;
-
-// Step 4: Use typed Props with useWidget
+```tsx
+type Props = { title: string; items: string[] };
 export default function MyWidget() {
-  const { props, isPending } = useWidget<Props>();  // ← Add <Props>
+  const { props, isPending } = useWidget<Props>();
   // ...
 }
 ```
 
-⚠️ **Common mistake:** Only doing steps 1-2 but skipping 3-4 (loses type safety)
+Use **`ToolRef`** with **`useCallTool(ref)`** for typed tool calls from widgets.
 
 ### 5. Validate at Boundaries Only
 - Trust internal code and framework guarantees
@@ -357,7 +344,8 @@ server.listen();
 | `text()` | Simple string response | `text("Success!")` |
 | `object()` | Structured data | `object({ status: "ok" })` |
 | `markdown()` | Formatted text | `markdown("# Title\nContent")` |
-| `widget()` | Visual UI | `widget({ props: {...}, output: text(...) })` |
+| JSX + `_output` | Visual UI | `/** @jsxImportSource mcp-use/jsx */` + `<Component ... />` |
+| `streamable()` | Live prop updates | See [response-helpers.md](references/server/response-helpers.md) |
 | `mix()` | Multiple contents | `mix(text("Hi"), image(url))` |
 | `error()` | Error responses | `error("Failed to fetch data")` |
 | `resource()` | Embed resource refs | `resource("docs://guide", "text/markdown")` |
@@ -368,7 +356,7 @@ server.listen();
 - `server.resourceTemplate()` - Define parameterized resource
 - `server.prompt()` - Define prompt template
 - `server.proxy()` - Compose/Proxy multiple MCP servers
-- `server.uiResource()` - Define widget resource
+- `server.uiResource()` - Legacy/advanced HTML template widgets (prefer inline JSX)
 - `server.listen()` - Start server
 - `server.use('mcp:tools/call', fn)` - MCP middleware (tools, resources, prompts, list ops)
 - `server.use('mcp:*', fn)` - Catch-all MCP middleware

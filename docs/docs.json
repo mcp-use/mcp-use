@@ -513,6 +513,8 @@
                     "icon": "app-window-mac",
                     "pages": [
                       "typescript/server/mcp-apps",
+                      "typescript/server/creating-mcp-apps-server",
+                      "typescript/server/migration-from-resources",
                       "typescript/server/content-security-policy",
                       "typescript/server/widget-components/usewidget",
                       "typescript/server/widget-components/usecalltool",
