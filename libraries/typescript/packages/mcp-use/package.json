@@ -81,6 +81,16 @@
       "types": "./dist/src/utils/index.d.ts",
       "import": "./dist/src/utils/index.js",
       "require": "./dist/src/utils/index.cjs"
+    },
+    "./jsx/jsx-runtime": {
+      "types": "./dist/src/jsx/jsx-runtime.d.ts",
+      "import": "./dist/src/jsx/jsx-runtime.js",
+      "require": "./dist/src/jsx/jsx-runtime.cjs"
+    },
+    "./jsx/jsx-dev-runtime": {
+      "types": "./dist/src/jsx/jsx-dev-runtime.d.ts",
+      "import": "./dist/src/jsx/jsx-dev-runtime.js",
+      "require": "./dist/src/jsx/jsx-dev-runtime.cjs"
     }
   },
   "main": "./dist/index.js",

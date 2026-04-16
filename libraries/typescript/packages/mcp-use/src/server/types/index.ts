@@ -66,6 +66,9 @@ export {
   ToolAnnotations,
 } from "./tool.js";
 
+// Tool reference types (for zero-codegen typed useCallTool)
+export { ToolRef, createToolRef } from "./tool-ref.js";
+
 // Prompt types
 export {
   PromptCallback,

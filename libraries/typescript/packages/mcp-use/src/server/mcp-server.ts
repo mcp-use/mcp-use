@@ -37,6 +37,7 @@ import {
 } from "./widgets/index.js";
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
 import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
+import { extractInlineJsxMetadata } from "./widgets/extract-inline-jsx-metadata.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
 // Import and re-export tool context types for public API
@@ -127,6 +128,13 @@ import { composeMiddleware } from "./middleware/mcp-middleware.js";
  * @param key - The property key to validate
  * @returns true if the key is safe to use, false otherwise
  */
+function toKebabCase(str: string): string {
+  return str
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
+}
+
 function isSafePropertyKey(key: string): boolean {
   return key !== "__proto__" && key !== "constructor" && key !== "prototype";
 }
@@ -404,6 +412,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * when using the widget() helper with returnsWidget option
    */
   public widgetDefinitions = new Map<string, Record<string, unknown>>();
+
+  /** @internal Inline widget registry populated by auto-detection from mcp-use/jsx runtime */
+  public _inlineWidgetRegistry = new Map<
+    string,
+    import("./widgets/inline-widget-middleware.js").InlineWidgetManifestEntry
+  >();
+  /** @internal Whether the inline widget middleware has been registered */
+  private _inlineWidgetMiddlewareRegistered = false;
 
   /**
    * Storage for SDK-registered tool/prompt/resource references per session.
@@ -1407,7 +1423,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const meta = (reg.config as any)?._meta;
         const hasWidgetConfig = !!(reg.config as any)?.widget;
         const hasUiResourceUri = !!(meta?.ui as any)?.resourceUri;
-        return !hasWidgetConfig && !hasUiResourceUri;
+        const isInlineWidget = !!(reg.config as any)?.__inlineWidget;
+        return !hasWidgetConfig && !hasUiResourceUri && !isInlineWidget;
       },
       sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
         sessionId,
@@ -2553,13 +2570,88 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }) as typeof actualCallback;
       }
 
+      // Auto-detect inline widget JSX at registration time by inspecting the
+      // handler source. When the mcp-use/jsx runtime compiles JSX, handler.toString()
+      // contains patterns like `jsx(ComponentName, { ..., _output: ... })`.
+      // We extract component names and metadata to populate tools/list _meta.
+      if (actualCallback && !widgetConfig) {
+        try {
+          const meta = extractInlineJsxMetadata(actualCallback.toString());
+          if (meta) {
+            const entry: import("./widgets/inline-widget-middleware.js").InlineWidgetManifestEntry = {
+              toolName: toolDefinition.name,
+              widgetName: toKebabCase(meta.componentNames[0]),
+              componentPath: "",
+              invoking: meta.invoking,
+              invoked: meta.invoked,
+              prefersBorder: meta.prefersBorder,
+              csp: meta.csp,
+              fileParams: meta.fileParams,
+            };
+            self._inlineWidgetRegistry.set(toolDefinition.name, entry);
+            self._ensureInlineWidgetMiddleware();
+          }
+        } catch {
+          // toString() inspection is best-effort
+        }
+      }
+
+      // Wrap callback to auto-wire streamable prop notifications.
+      // When the JSX runtime returns a result with STREAMABLE_PROPS_MARKER,
+      // the wrapper subscribes to each streamable and sends notifications
+      // to the widget automatically — no manual ctx.sendNotification() needed.
+      if (actualCallback) {
+        const preStreamableWrap = actualCallback;
+        actualCallback = (async (params: any, ctx: any) => {
+          const result = await preStreamableWrap(params, ctx);
+          if (result && typeof result === "object") {
+            const MARKER = Symbol.for("mcp-use:streamable-props");
+            const refs = (result as any)[MARKER] as
+              | Array<{ key: string; streamable: any }>
+              | undefined;
+            if (refs && refs.length > 0) {
+              // Capture session ID for sending notifications after the tool
+              // handler returns. ctx.sendNotification may not work because the
+              // per-request sendNotification function is cleaned up, so we use
+              // the server-level sendNotificationToSession instead.
+              const sid = ctx.session?.sessionId;
+              for (const ref of refs) {
+                ref.streamable._subscribe((newValue: any) => {
+                  if (sid) {
+                    self.sendNotificationToSession(
+                      sid,
+                      "mcp-use/notifications/props-update",
+                      { key: ref.key, value: newValue }
+                    ).catch(() => {});
+                  }
+                });
+              }
+              const allDone = refs.map((r: any) => r.streamable.value);
+              Promise.all(allDone).then(() => {
+                refs.forEach((r: any) => r.streamable._unsubscribeAll());
+              });
+            }
+            // Wire _closeWidget to tool result _meta if present
+            const widgetMarker = (result as any)[Symbol.for("mcp-use:inline-widget")];
+            if (widgetMarker?.closeWidget) {
+              if (!result._meta) result._meta = {};
+              result._meta["openai/closeWidget"] = true;
+            }
+            delete (result as any)[MARKER];
+            delete (result as any)[Symbol.for("mcp-use:inline-widget")];
+          }
+          return result;
+        }) as typeof actualCallback;
+      }
+
       if (actualCallback) {
         self.registrations.tools.set(toolDefinition.name, {
           config: toolDefinition as any,
           handler: actualCallback as any,
         });
       }
-      return originalTool.call(self, toolDefinition, actualCallback as any);
+      originalTool.call(self, toolDefinition, actualCallback as any);
+      return { name: toolDefinition.name } as any;
     }) as any;
 
     this.prompt = (<
@@ -3366,7 +3458,128 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
     toolDefinition: T & ToolDefinition<any, any, HasOAuth>,
     callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
-  ) => this;
+  ) => import("./types/tool-ref.js").ToolRef<
+    T["name"] extends string ? T["name"] : string,
+    InferToolInput<T>,
+    InferToolOutput<T>
+  >;
+
+  /**
+   * Register multiple tools at once and return a typed map for use with `createTypedHooks`.
+   *
+   * Each key is the tool name, and the value contains the tool definition fields
+   * (`schema`, `description`, `outputSchema`, etc.) plus a `handler` function.
+   *
+   * @returns The same definitions object, preserving full Zod schema types for compile-time inference.
+   *
+   * @example
+   * ```ts
+   * export const tools = server.defineTools({
+   *   "analyze-text": {
+   *     schema: z.object({ text: z.string() }),
+   *     description: "Analyze text",
+   *     handler: async ({ text }) => text(`Analysis of: ${text}`),
+   *   },
+   * });
+   *
+   * // In widget code:
+   * import type { tools } from "../server";
+   * const { useCallTool } = createTypedHooks<typeof tools>();
+   * ```
+   */
+  /**
+   * Lazily register the inline widget tools/list middleware.
+   * Called on first detection of an inline widget JSX return.
+   * @internal
+   */
+  public _ensureInlineWidgetMiddleware(): void {
+    if (this._inlineWidgetMiddlewareRegistered) return;
+    this._inlineWidgetMiddlewareRegistered = true;
+
+    const registry = this._inlineWidgetRegistry;
+    const buildId = this.buildId;
+
+    this._registerMcpMiddleware("tools/list", async (ctx: any, next: any) => {
+      const result = await next();
+      if (registry.size === 0) return result;
+
+      const tools: any[] = Array.isArray(result)
+        ? result
+        : (result?.tools ?? []);
+
+      for (const tool of tools) {
+        const entry = registry.get(tool.name);
+        if (!entry) continue;
+
+        const buildIdPart = buildId ? `-${buildId}` : "";
+        const resourceUri = `ui://widget/${entry.widgetName}${buildIdPart}.html`;
+
+        if (!tool._meta) tool._meta = {};
+        if (!tool._meta.ui) tool._meta.ui = {};
+        tool._meta.ui.resourceUri = resourceUri;
+        tool._meta["openai/outputTemplate"] = resourceUri;
+        tool._meta["openai/toolInvocation/invoking"] =
+          entry.invoking ?? `Loading ${entry.widgetName}...`;
+        tool._meta["openai/toolInvocation/invoked"] =
+          entry.invoked ?? `${entry.widgetName} ready`;
+
+        // CSP (MCP Apps: _meta.ui.csp, Apps SDK: openai/widgetCSP)
+        if (entry.csp) {
+          tool._meta.ui.csp = entry.csp;
+          // Apps SDK uses snake_case
+          const sdkCsp: Record<string, any> = {};
+          if (entry.csp.connectDomains) sdkCsp.connect_domains = entry.csp.connectDomains;
+          if (entry.csp.resourceDomains) sdkCsp.resource_domains = entry.csp.resourceDomains;
+          if (entry.csp.frameDomains) sdkCsp.frame_domains = entry.csp.frameDomains;
+          if (entry.csp.redirectDomains) sdkCsp.redirect_domains = entry.csp.redirectDomains;
+          tool._meta["openai/widgetCSP"] = sdkCsp;
+        }
+        // prefersBorder (MCP Apps: _meta.ui.prefersBorder, Apps SDK: openai/widgetPrefersBorder)
+        if (entry.prefersBorder !== undefined) {
+          tool._meta.ui.prefersBorder = entry.prefersBorder;
+          tool._meta["openai/widgetPrefersBorder"] = entry.prefersBorder;
+        }
+        // Visibility (MCP Apps: _meta.ui.visibility)
+        if (entry.visibility) {
+          tool._meta.ui.visibility = entry.visibility;
+        }
+        // File params (Apps SDK: openai/fileParams)
+        if (entry.fileParams) {
+          tool._meta["openai/fileParams"] = entry.fileParams;
+        }
+        // Permissions (MCP Apps: _meta.ui.permissions)
+        if (entry.permissions) {
+          tool._meta.ui.permissions = entry.permissions;
+        }
+        // Domain (MCP Apps: _meta.ui.domain, Apps SDK: openai/widgetDomain)
+        if (entry.domain) {
+          tool._meta.ui.domain = entry.domain;
+          tool._meta["openai/widgetDomain"] = entry.domain;
+        }
+      }
+
+      return result;
+    });
+  }
+
+  public defineTools<
+    T extends Record<
+      string,
+      {
+        schema?: any;
+        outputSchema?: any;
+        description?: string;
+        handler: (...args: any[]) => any;
+        [key: string]: any;
+      }
+    >,
+  >(definitions: T): T {
+    for (const [name, def] of Object.entries(definitions)) {
+      const { handler, ...toolDef } = def;
+      this.tool({ name, ...toolDef } as any, handler);
+    }
+    return definitions;
+  }
 
   /**
    * Converts a Zod schema to MCP parameter format.

@@ -315,7 +315,7 @@ async function startTunnel(
 }
 
 async function findServerFile(projectPath: string): Promise<string> {
-  const candidates = ["index.ts", "src/index.ts", "server.ts", "src/server.ts"];
+  const candidates = ["index.ts", "index.tsx", "src/index.ts", "src/index.tsx", "server.ts", "server.tsx", "src/server.ts", "src/server.tsx"];
   for (const candidate of candidates) {
     try {
       await access(path.join(projectPath, candidate));

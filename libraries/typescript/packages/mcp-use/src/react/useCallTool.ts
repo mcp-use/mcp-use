@@ -10,6 +10,7 @@ import type {
   UnknownObject,
   ToolRegistry,
 } from "./widget-types.js";
+import type { ToolRef } from "../server/types/tool-ref.js";
 
 // Discriminated union state machine (4 states)
 type CallToolIdleState = {
@@ -171,9 +172,24 @@ export function useCallTool<
   TResponse extends Partial<CallToolResponse> = CallToolResponse,
 >(name: string): UseCallToolReturn<TArgs, TResponse>;
 
+// Overload 3: ToolRef-based (zero codegen, types from server.tool() return)
+// eslint-disable-next-line no-redeclare
+export function useCallTool<
+  R extends ToolRef<string, any, Record<string, unknown>>,
+>(
+  ref: R
+): UseCallToolReturn<
+  R["_types"]["input"],
+  R["_types"]["output"] extends Record<string, unknown>
+    ? CallToolResponse & { structuredContent: R["_types"]["output"] }
+    : CallToolResponse
+>;
+
 // Implementation
 // eslint-disable-next-line no-redeclare
-export function useCallTool(name: string): any {
+export function useCallTool(nameOrRef: string | ToolRef): any {
+  const name =
+    typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
   const [{ status, data, error }, setCallToolState] = useState<
     Omit<
       CallToolState<CallToolResponse>,

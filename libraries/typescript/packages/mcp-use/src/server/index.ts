@@ -53,6 +53,9 @@ export {
   type WidgetResponseConfig,
 } from "./utils/response-helpers.js";
 
+// Streamable value primitive for incremental widget prop updates
+export { streamable, isStreamable, type Streamable } from "./utils/streamable.js";
+
 // Completion utilities for prompt arguments
 export {
   completable,
@@ -189,6 +192,8 @@ export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
 export type {
   AppsSdkUIResource,
   ClientCapabilityChecker,
+  // Tool reference types
+  ToolRef,
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
   GetPromptResult,
