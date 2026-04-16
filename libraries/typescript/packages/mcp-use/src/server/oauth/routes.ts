@@ -131,16 +131,24 @@ export function createTokenHandler(
         }
       }
 
-      // Forward the request to provider
+      // Forward the request to provider. `Accept: application/json` is
+      // required for providers that default to form-encoded responses
+      // (GitHub's /login/oauth/access_token returns `access_token=...&...`
+      // unless JSON is explicitly requested).
       const response = await fetch(tokenEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
         },
         body: requestBody.toString(),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get("content-type") ?? "";
+      const rawBody = await response.text();
+      const data = contentType.includes("application/x-www-form-urlencoded")
+        ? Object.fromEntries(new URLSearchParams(rawBody))
+        : JSON.parse(rawBody);
 
       if (!response.ok) {
         return c.json(data, response.status as ContentfulStatusCode);
