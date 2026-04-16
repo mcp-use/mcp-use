@@ -23,12 +23,6 @@ import {
 } from "./commands/org.js";
 import { createSkillsCommand } from "./commands/skills.js";
 import {
-  loadProjectConfig,
-  resolveEntryFile,
-  resolveMcpDir,
-  resolveWidgetsDir,
-} from "./utils/project-config.js";
-import {
   detectNextJsProject,
   loadNextJsEnvFiles,
   registerNextShimsInProcess,
@@ -326,14 +320,84 @@ async function startTunnel(
   });
 }
 
+/**
+ * Resolve the entry file for an MCP server.
+ * Priority: --entry flag > <mcpDir>/{index,server}.{ts,tsx} > top-level defaults.
+ */
+async function resolveEntryFile(
+  projectPath: string,
+  cliEntry?: string,
+  mcpDir?: string
+): Promise<string> {
+  if (cliEntry) {
+    await access(path.join(projectPath, cliEntry)).catch(() => {
+      throw new Error(`File not found: ${cliEntry}`);
+    });
+    return cliEntry;
+  }
+
+  if (mcpDir) {
+    const mcpCandidates = [
+      path.join(mcpDir, "index.ts"),
+      path.join(mcpDir, "index.tsx"),
+      path.join(mcpDir, "server.ts"),
+      path.join(mcpDir, "server.tsx"),
+    ];
+    for (const candidate of mcpCandidates) {
+      try {
+        await access(path.join(projectPath, candidate));
+        return candidate;
+      } catch {
+        continue;
+      }
+    }
+    throw new Error(
+      `No entry file found inside ${mcpDir}.\n\n` +
+        `Expected one of: ${mcpCandidates.map((c) => path.relative(projectPath, path.join(projectPath, c))).join(", ")}\n\n` +
+        `Fix this by either:\n` +
+        `  1. Creating ${path.join(mcpDir, "index.ts")}, or\n` +
+        `  2. Passing --entry <file> on the command line`
+    );
+  }
+
+  const candidates = ["index.ts", "src/index.ts", "server.ts", "src/server.ts"];
+  for (const candidate of candidates) {
+    try {
+      await access(path.join(projectPath, candidate));
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error(
+    `No entry file found.\n\n` +
+      `Expected one of: ${candidates.join(", ")}\n\n` +
+      `Fix this by either:\n` +
+      `  1. Creating one of the default entry files above, or\n` +
+      `  2. Passing --entry <file> or --mcp-dir <dir> on the command line`
+  );
+}
+
+/**
+ * Resolve the widgets directory.
+ * Priority: --widgets-dir flag > <mcpDir>/resources > "resources".
+ */
+function resolveWidgetsDir(
+  cliWidgetsDir?: string,
+  mcpDir?: string
+): string {
+  if (cliWidgetsDir) return cliWidgetsDir;
+  if (mcpDir) return path.join(mcpDir, "resources");
+  return "resources";
+}
+
 async function findServerFile(
   projectPath: string,
   cliEntry?: string,
   cliMcpDir?: string
 ): Promise<string> {
-  const config = await loadProjectConfig(projectPath);
-  const mcpDir = resolveMcpDir(cliMcpDir, config);
-  return resolveEntryFile(projectPath, cliEntry, config, mcpDir);
+  return resolveEntryFile(projectPath, cliEntry, cliMcpDir);
 }
 
 async function generateToolRegistryTypesForServer(
@@ -1278,14 +1342,9 @@ program
 
       displayPackageVersions(projectPath);
 
-      // Resolve project config + mcpDir for widgets + server entry
-      const projectConfig = await loadProjectConfig(projectPath);
-      const mcpDir = resolveMcpDir(options.mcpDir, projectConfig);
-      const widgetsDir = resolveWidgetsDir(
-        options.widgetsDir,
-        projectConfig,
-        mcpDir
-      );
+      // Resolve mcpDir for widgets + server entry
+      const mcpDir = options.mcpDir as string | undefined;
+      const widgetsDir = resolveWidgetsDir(options.widgetsDir, mcpDir);
 
       // Build widgets first (this generates schemas)
       // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
@@ -1548,13 +1607,8 @@ program
       // The env var is the contract: mcp-use/server reads it when no
       // explicit `resourcesDir` is passed to mountWidgets.
       {
-        const devProjectConfig = await loadProjectConfig(projectPath);
-        const devMcpDir = resolveMcpDir(options.mcpDir, devProjectConfig);
-        const devWidgetsDir = resolveWidgetsDir(
-          options.widgetsDir,
-          devProjectConfig,
-          devMcpDir
-        );
+        const devMcpDir = options.mcpDir as string | undefined;
+        const devWidgetsDir = resolveWidgetsDir(options.widgetsDir, devMcpDir);
         if (devWidgetsDir !== "resources") {
           process.env.MCP_USE_WIDGETS_DIR = devWidgetsDir;
         }
@@ -2625,12 +2679,11 @@ program
 
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
-        // Resolve mcpDir from CLI flag + config so `--mcp-dir src/mcp` finds the
+        // Resolve mcpDir from CLI flag so `--mcp-dir src/mcp` finds the
         // entry at dist/src/mcp/index.js (legacy transpile mode) or the TS
         // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
         // and `start` runs the source via tsx).
-        const startProjectConfig = await loadProjectConfig(projectPath);
-        const startMcpDir = resolveMcpDir(options.mcpDir, startProjectConfig);
+        const startMcpDir = options.mcpDir as string | undefined;
 
         const serverCandidates = [
           ...(startMcpDir
