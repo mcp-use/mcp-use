@@ -2,8 +2,12 @@ import chalk from "chalk";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import open from "open";
-import type { OrgInfo } from "../utils/api.js";
-import { McpUseAPI, GitHubAuthRequiredError } from "../utils/api.js";
+import type { GitHubConnectionStatus, OrgInfo } from "../utils/api.js";
+import {
+  ApiUnauthorizedError,
+  GitHubAuthRequiredError,
+  McpUseAPI,
+} from "../utils/api.js";
 import {
   getWebUrl,
   isLoggedIn,
@@ -434,6 +438,72 @@ async function displayDeploymentProgress(
 // GitHub helpers
 // ---------------------------------------------------------------------------
 
+async function promptReauthenticateOn401(
+  options: DeployOptions,
+  orgIdToRestore: string | undefined
+): Promise<McpUseAPI> {
+  console.log(chalk.red("\n✗ Session expired or API key invalid."));
+  if (options.yes) {
+    console.log(
+      chalk.gray("  Run mcp-use login to re-authenticate, then retry.")
+    );
+    process.exit(1);
+  }
+  const should = await prompt(chalk.white("Log in again? (Y/n): "), "y");
+  if (!should) {
+    process.exit(1);
+  }
+  await loginCommand({ silent: false });
+  if (!(await isLoggedIn())) {
+    console.log(chalk.red("✗ Login failed. Please try again."));
+    process.exit(1);
+  }
+  const fresh = await McpUseAPI.create();
+  if (orgIdToRestore) {
+    fresh.setOrgId(orgIdToRestore);
+  }
+  return fresh;
+}
+
+async function ensureApiSessionForDeploy(
+  api: McpUseAPI,
+  options: DeployOptions,
+  orgIdToRestore: string | undefined
+): Promise<McpUseAPI> {
+  let client = api;
+  for (;;) {
+    try {
+      await client.testAuth();
+      return client;
+    } catch (e) {
+      if (!(e instanceof ApiUnauthorizedError)) throw e;
+      client = await promptReauthenticateOn401(options, orgIdToRestore);
+    }
+  }
+}
+
+async function getGitHubConnectionStatusWith401Retry(
+  api: McpUseAPI,
+  options: DeployOptions,
+  orgIdToRestore: string | undefined
+): Promise<{ api: McpUseAPI; status: GitHubConnectionStatus }> {
+  let client = api;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const status = await client.getGitHubConnectionStatus();
+      return { api: client, status };
+    } catch (e) {
+      if (e instanceof ApiUnauthorizedError && attempt === 0) {
+        client = await promptReauthenticateOn401(options, orgIdToRestore);
+        await client.testAuth();
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error("Unreachable");
+}
+
 async function checkRepoAccess(
   api: McpUseAPI,
   owner: string,
@@ -451,9 +521,14 @@ async function promptGitHubInstallation(
   api: McpUseAPI,
   reason: "not_connected" | "no_access",
   repoName?: string,
-  opts?: { yes?: boolean; installationId?: string }
-): Promise<boolean> {
+  opts?: {
+    yes?: boolean;
+    installationId?: string;
+    reauth: () => Promise<McpUseAPI>;
+  }
+): Promise<{ ok: boolean; api: McpUseAPI }> {
   const yes = !!opts?.yes;
+  const reauth = opts?.reauth;
   console.log();
 
   if (reason === "not_connected") {
@@ -480,10 +555,25 @@ async function promptGitHubInstallation(
         ),
         "y"
       );
-  if (!shouldInstall) return false;
+  if (!shouldInstall) return { ok: false, api };
+
+  let client = api;
 
   try {
-    const appName = await api.getGitHubAppName();
+    let appName: string;
+    for (;;) {
+      try {
+        appName = await client.getGitHubAppName();
+        break;
+      } catch (e) {
+        if (e instanceof ApiUnauthorizedError && reauth) {
+          client = await reauth();
+          await client.testAuth();
+          continue;
+        }
+        throw e;
+      }
+    }
 
     const installUrl = `https://github.com/apps/${appName}/installations/new`;
 
@@ -512,26 +602,36 @@ async function promptGitHubInstallation(
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 2000));
         try {
-          const status = await api.getGitHubConnectionStatus();
+          const status = await client.getGitHubConnectionStatus();
           if (status.is_connected) {
-            if (!repoName) return true;
+            if (!repoName) return { ok: true, api: client };
             const [o, r] = repoName.split("/");
-            if (o && r && (await checkRepoAccess(api, o, r))) return true;
+            if (o && r && (await checkRepoAccess(client, o, r))) {
+              return { ok: true, api: client };
+            }
           }
-        } catch {
-          // keep polling
+        } catch (e) {
+          if (e instanceof ApiUnauthorizedError && reauth) {
+            client = await reauth();
+            await client.testAuth();
+            continue;
+          }
         }
       }
     }
 
-    return true;
-  } catch {
+    return { ok: true, api: client };
+  } catch (e) {
+    if (e instanceof ApiUnauthorizedError) {
+      console.log(chalk.red("\n✗ Session expired or API key invalid."));
+      process.exit(1);
+    }
     console.log(chalk.yellow("\n⚠️  Unable to open browser automatically"));
     console.log(
       chalk.white("Please visit: ") +
         chalk.cyan("https://manufact.com/cloud/settings")
     );
-    return false;
+    return { ok: false, api: client };
   }
 }
 
@@ -586,9 +686,11 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
     }
 
-    const api = await McpUseAPI.create();
+    let api = await McpUseAPI.create();
 
     // ── Step 2: Org resolution ────────────────────────────────────
+    let resolvedOrgId: string | undefined;
+
     if (options.org) {
       const authInfo = await api.testAuth();
       const match = (authInfo.orgs ?? []).find(
@@ -599,6 +701,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       );
       if (match) {
         api.setOrgId(match.id);
+        resolvedOrgId = match.id;
         const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
         console.log(
           chalk.gray("Organization: ") + chalk.cyan(match.name) + slug
@@ -637,6 +740,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           process.exit(1);
         }
         api.setOrgId(selectedOrg.id);
+        resolvedOrgId = selectedOrg.id;
         await writeConfig({
           ...config,
           orgId: selectedOrg.id,
@@ -647,6 +751,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           chalk.gray("Organization: ") + chalk.cyan(selectedOrg.name)
         );
       } else {
+        resolvedOrgId = config.orgId;
+        api.setOrgId(config.orgId);
         if (config.orgName) {
           const slug = config.orgSlug ? chalk.gray(` (${config.orgSlug})`) : "";
           console.log(
@@ -656,27 +762,44 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
     }
 
+    api = await ensureApiSessionForDeploy(api, options, resolvedOrgId);
+
     console.log(chalk.cyan.bold("\n🚀 Deploying to Manufact cloud...\n"));
 
     // ── Step 3: GitHub connection ─────────────────────────────────
-    let connectionStatus = await api
-      .getGitHubConnectionStatus()
-      .catch(() => null);
-    if (!connectionStatus?.is_connected) {
+    const reauth = () => promptReauthenticateOn401(options, resolvedOrgId);
+
+    let ghConn = await getGitHubConnectionStatusWith401Retry(
+      api,
+      options,
+      resolvedOrgId
+    );
+    api = ghConn.api;
+    let connectionStatus = ghConn.status;
+
+    if (!connectionStatus.is_connected) {
       const installed = await promptGitHubInstallation(
         api,
         "not_connected",
         undefined,
-        { yes: options.yes }
+        {
+          yes: options.yes,
+          reauth,
+        }
       );
-      if (!installed) {
+      if (!installed.ok) {
         console.log(chalk.gray("Deployment cancelled."));
         process.exit(0);
       }
-      connectionStatus = await api
-        .getGitHubConnectionStatus()
-        .catch(() => null);
-      if (!connectionStatus?.is_connected) {
+      api = installed.api;
+      ghConn = await getGitHubConnectionStatusWith401Retry(
+        api,
+        options,
+        resolvedOrgId
+      );
+      api = ghConn.api;
+      connectionStatus = ghConn.status;
+      if (!connectionStatus.is_connected) {
         console.log(chalk.red("\n✗ GitHub connection could not be verified."));
         console.log(
           chalk.cyan(
@@ -995,11 +1118,16 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           api,
           "no_access",
           repoFullName,
-          { yes: options.yes, installationId: githubInstallationId }
+          {
+            yes: options.yes,
+            installationId: githubInstallationId,
+            reauth: () => promptReauthenticateOn401(options, resolvedOrgId),
+          }
         );
-        if (!configured) {
+        if (!configured.ok) {
           process.exit(0);
         }
+        api = configured.api;
         const retry = await checkRepoAccess(api, gitInfo.owner!, gitInfo.repo!);
         if (!retry) {
           const appName = await api.getGitHubAppName();
