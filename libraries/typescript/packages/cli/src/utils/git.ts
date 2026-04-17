@@ -1,7 +1,7 @@
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export interface GitInfo {
   isGitRepo: boolean;
@@ -22,11 +22,11 @@ export interface GitInfo {
  * Use `gitCommandOrThrow` instead so failures surface to the user.
  */
 async function gitCommand(
-  command: string,
+  args: string[],
   cwd: string = process.cwd()
 ): Promise<string | null> {
   try {
-    const { stdout } = await execAsync(command, { cwd });
+    const { stdout } = await execFileAsync("git", args, { cwd });
     return stdout.trim();
   } catch (error) {
     return null;
@@ -65,11 +65,12 @@ export class GitCommandError extends Error {
  * errors instead of silently continuing.
  */
 async function gitCommandOrThrow(
-  command: string,
+  args: string[],
   cwd: string = process.cwd()
 ): Promise<string> {
+  const command = `git ${args.join(" ")}`;
   try {
-    const { stdout } = await execAsync(command, { cwd });
+    const { stdout } = await execFileAsync("git", args, { cwd });
     return stdout.trim();
   } catch (error) {
     const e = error as {
@@ -224,14 +225,14 @@ export async function gitInit(
   cwd: string,
   message: string = "Initial commit"
 ): Promise<void> {
-  await gitCommandOrThrow("git init", cwd);
-  await gitCommandOrThrow("git add .", cwd);
-  await gitCommandOrThrow(`git commit -m ${shellQuote(message)}`, cwd);
+  await gitCommandOrThrow(["init"], cwd);
+  await gitCommandOrThrow(["add", "."], cwd);
+  await gitCommandOrThrow(["commit", "-m", message], cwd);
   // Normalize branch name so a subsequent `git push -u origin main` always
   // matches, regardless of the user's `init.defaultBranch` config.
-  await gitCommandOrThrow("git branch -M main", cwd);
+  await gitCommandOrThrow(["branch", "-M", "main"], cwd);
   // Guard: commit must exist before we try to push.
-  await gitCommandOrThrow("git rev-parse HEAD", cwd);
+  await gitCommandOrThrow(["rev-parse", "HEAD"], cwd);
 }
 
 /**
@@ -242,8 +243,8 @@ export async function gitAddRemoteAndPush(
   cloneUrl: string,
   branch: string = "main"
 ): Promise<void> {
-  await gitCommandOrThrow(`git remote add origin ${cloneUrl}`, cwd);
-  await gitCommandOrThrow(`git push -u origin ${branch}`, cwd);
+  await gitCommandOrThrow(["remote", "add", "origin", cloneUrl], cwd);
+  await gitCommandOrThrow(["push", "-u", "origin", branch], cwd);
 }
 
 /**
@@ -254,9 +255,9 @@ export async function gitCommitAndPush(
   message: string,
   branch: string = "main"
 ): Promise<void> {
-  await gitCommandOrThrow("git add .", cwd);
-  await gitCommandOrThrow(`git commit -m ${shellQuote(message)}`, cwd);
-  await gitCommandOrThrow(`git push origin ${branch}`, cwd);
+  await gitCommandOrThrow(["add", "."], cwd);
+  await gitCommandOrThrow(["commit", "-m", message], cwd);
+  await gitCommandOrThrow(["push", "origin", branch], cwd);
 }
 
 /**
