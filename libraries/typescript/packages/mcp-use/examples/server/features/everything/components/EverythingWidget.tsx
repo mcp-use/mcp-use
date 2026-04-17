@@ -254,7 +254,7 @@ class CustomErrorBoundary extends Component<
 // ============================================================================
 
 export default function EverythingWidget(_p: Partial<Props>) {
-  // Core hook with generic type parameter — UseWidgetResult<Props> validates return type
+  // Core hook — UseWidgetResult; type structured props on this component, toolInput via useWidget<TToolInput>()
   // Structured props also arrive via useWidget().props (inline JSX server return).
   const {
     props,
@@ -272,7 +272,7 @@ export default function EverythingWidget(_p: Partial<Props>) {
     locale,
     mcp_url,
     isAvailable,
-  }: UseWidgetResult<Props> = useWidget<Props>();
+  }: UseWidgetResult = useWidget();
 
   // Standalone hooks — exercises their type signatures
   const standaloneProps = useWidgetProps<Props>();
@@ -289,13 +289,13 @@ export default function EverythingWidget(_p: Partial<Props>) {
     );
   }
 
-  // After guard: props is fully typed as Props (not Partial<Props>)
+  // After guard: narrow structured props on the component; hook exposes loose `props`
   return (
     <McpUseProvider autoSize>
       <ErrorBoundary>
         <CustomErrorBoundary>
           <WidgetContent
-            props={props}
+            props={props as Props}
             callTool={callTool}
             state={state}
             setState={setState}

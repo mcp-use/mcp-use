@@ -503,26 +503,22 @@ interface UseWidgetResultBase<
 }
 
 /**
- * Result type for the useWidget hook.
+ * Result type for the `useWidget` hook.
  *
- * Uses a discriminated union on `isPending`:
- * - When `isPending` is `true`, `props` is `Partial<TProps>` (fields may be undefined).
- * - When `isPending` is `false`, `props` is `TProps` (all fields are present).
+ * **Generics (tool-input first):**
+ * - `TToolInput` — shape of `toolInput` / `partialToolInput` (arguments the model passed to the tool).
+ * - `TState` — persisted widget state for `state` / `setState`.
  *
- * This allows TypeScript to narrow the type after an `if (isPending)` guard:
- * ```tsx
- * const { props, isPending } = useWidget<{ city: string }>();
- * if (isPending) return <Loading />;
- * // props.city is `string` here, not `string | undefined`
- * ```
+ * Structured widget props from the host are typed loosely as `UnknownObject` on `props`, `output`, and
+ * `metadata`. With **inline JSX** widgets, prefer typing your component’s **function props** and using
+ * `useWidget<TToolInput>()` when you need typed access to **tool arguments**.
+ *
+ * Uses a discriminated union on `isPending` for `props` (partial vs full record).
  */
 export type UseWidgetResult<
-  TProps = UnknownObject,
-  TState = UnknownObject,
-  TOutput = UnknownObject,
-  TMetadata = UnknownObject,
   TToolInput = UnknownObject,
-> = UseWidgetResultBase<TState, TOutput, TMetadata, TToolInput> &
+  TState = UnknownObject,
+> = UseWidgetResultBase<TState, UnknownObject, UnknownObject, TToolInput> &
   (
     | {
         /**
@@ -531,35 +527,22 @@ export type UseWidgetResult<
          * On MCP Apps, becomes `false` once `ui/notifications/tool-result` is
          * received (SEP-1865). On ChatGPT Apps SDK, becomes `false` once
          * `toolResponseMetadata` is non-null. While `true`, `props` is typed as
-         * `Partial<TProps>` — guard on this value before accessing required fields.
+         * a partial record — narrow with `isPending` before assuming fields exist.
          */
         isPending: true;
         /**
-         * Widget props — partial while the tool is still executing.
-         *
-         * Populated from `structuredContent` in the tool result (delivered via
-         * `ui/notifications/tool-result` / `window.openai.toolOutput`). Fields
-         * may be `undefined` until the tool completes. Guard on `isPending` to
-         * narrow the type to the full `TProps` shape.
+         * Merged structured content + tool input (loosely typed). Prefer typing your component’s props.
          */
-        props: Partial<TProps>;
+        props: Partial<UnknownObject>;
       }
     | {
         /**
-         * `false` once the tool result has been received and props are fully
-         * populated.
-         *
-         * After this point, `props` is guaranteed to be `TProps` (not partial),
-         * so field access is safe without optional chaining.
+         * `false` once the tool result has been received.
          */
         isPending: false;
         /**
-         * Fully populated widget props from `structuredContent` in the tool result.
-         *
-         * Widget-only data: the LLM only sees the plain-text `content` array and
-         * never `structuredContent`. All required fields of `TProps` are present
-         * when `isPending` is `false`.
+         * Merged structured content + tool input (loosely typed).
          */
-        props: TProps;
+        props: UnknownObject;
       }
   );

@@ -28,7 +28,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
     maxHeight,
     userAgent,
     safeArea,
-  } = useWidget<WeatherDisplayProps>();
+  } = useWidget();
 
   const isDark = theme === "dark";
 

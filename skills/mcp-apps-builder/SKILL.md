@@ -279,8 +279,8 @@ UI state lives in the widget, not in separate tools:
 - ❌ `select-item` tool, `set-filter` tool
 - ✅ Widget manages with `useState` or `setState`
 
-### 4. Widgets: inline JSX + typed `useWidget`
-Return JSX from `server.tool()` and type the client with `useWidget<YourProps>()`:
+### 4. Widgets: inline JSX + `useWidget<TToolInput>()`
+Return JSX from `server.tool()` and type **structured fields on the component**. Use **`useWidget<TToolInput>()`** for typed **tool arguments** (`toolInput` / `partialToolInput`).
 
 ```tsx
 /** @jsxImportSource mcp-use/jsx */
@@ -289,8 +289,10 @@ Return JSX from `server.tool()` and type the client with `useWidget<YourProps>()
 
 ```tsx
 type Props = { title: string; items: string[] };
-export default function MyWidget() {
-  const { props, isPending } = useWidget<Props>();
+type ToolInput = { title: string };
+
+export default function MyWidget({ title, items }: Props) {
+  const { isPending, toolInput } = useWidget<ToolInput>();
   // ...
 }
 ```

@@ -67,8 +67,13 @@ export type WeatherCardProps = {
   icon: string;
 };
 
-export default function WeatherCard() {
-  const { props, isPending } = useWidget<WeatherCardProps>();
+export default function WeatherCard({
+  city,
+  temp,
+  conditions,
+  icon,
+}: WeatherCardProps) {
+  const { isPending } = useWidget();
 
   if (isPending) {
     return (
@@ -81,10 +86,10 @@ export default function WeatherCard() {
   return (
     <McpUseProvider autoSize>
       <div style={{ padding: 20 }}>
-        <h2>{props.city}</h2>
-        <img src={props.icon} alt={props.conditions} width={64} />
-        <div style={{ fontSize: 48 }}>{props.temp}°C</div>
-        <p>{props.conditions}</p>
+        <h2>{city}</h2>
+        <img src={icon} alt={conditions} width={64} />
+        <div style={{ fontSize: 48 }}>{temp}°C</div>
+        <p>{conditions}</p>
       </div>
     </McpUseProvider>
   );

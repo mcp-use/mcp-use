@@ -292,7 +292,7 @@ Your widget **UI** is a normal React component. Hooks like `useWidget`, `useCall
 import { useWidget, McpUseProvider } from "mcp-use/react";
 
 export default function WeatherCard({ city, temperature, conditions }: Props) {
-  const { isPending } = useWidget<Props>();
+  const { isPending } = useWidget();
 
   if (isPending) return <div>Loading...</div>;
 
@@ -346,7 +346,7 @@ See [useCallTool()](/typescript/server/widget-components/usecalltool).
 ### UI state (`setState`)
 
 ```tsx
-const { props, state, setState } = useWidget<Props, Output, Meta, MyState>();
+const { state, setState } = useWidget<Record<string, unknown>, MyState>();
 
 setState({ favorites: next });
 ```

@@ -8,7 +8,7 @@
  * @example
  * ```tsx
  * function Wrapper() {
- *   const { props } = useWidget<MyProps>();
+ *   const { props } = useWidget();
  *   const mergedProps = useStreamableProps(props);
  *   return <MyComponent {...mergedProps} />;
  * }

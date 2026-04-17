@@ -22,7 +22,7 @@ export default function AnalysisView({
   analysis,
   streamedProp1,
 }: AnalysisViewProps) {
-  const { isPending, toolInput } = useWidget();
+  const { isPending, toolInput } = useWidget<AnalysisToolInput>();
 
   // streamedProp2 is never passed as a JSX prop — the widget pulls it
   // straight out of the tool arguments the model supplied. Just like

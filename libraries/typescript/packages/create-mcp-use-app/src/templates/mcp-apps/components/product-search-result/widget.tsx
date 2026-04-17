@@ -4,6 +4,7 @@ import {
   McpUseProvider,
   useCallTool,
   useWidget,
+  type UnknownObject,
 } from "mcp-use/react";
 import React, { useCallback } from "react";
 import { Link } from "react-router";
@@ -31,7 +32,7 @@ const ProductSearchResult: React.FC<Partial<ProductSearchResultProps>> = () => {
     locale,
     state,
     setState,
-  } = useWidget<ProductSearchResultProps, FavoritesState>();
+  } = useWidget<UnknownObject, FavoritesState>();
 
   const {
     callTool: getFruitDetails,
@@ -78,7 +79,7 @@ const ProductSearchResult: React.FC<Partial<ProductSearchResultProps>> = () => {
     );
   }
 
-  const { query, results } = props;
+  const { query, results } = props as ProductSearchResultProps;
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
   const lang = locale?.split("-")[0] ?? "en";

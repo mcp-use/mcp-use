@@ -23,14 +23,15 @@ type Product = { id: string; name: string; price: number; category: string };
 type Props = z.infer<typeof propSchema>;
 
 const ContextDemo: React.FC<Partial<Props>> = () => {
-  const { props, isPending, theme } = useWidget<Props>();
+  const { props, isPending, theme } = useWidget();
   const isDark = theme === "dark";
 
-  const products: Product[] = props.products ?? [];
+  const hostProps = props as Partial<Props>;
+  const products: Product[] = hostProps.products ?? [];
   const categories = Array.from(new Set(products.map((p) => p.category)));
 
   const [activeTab, setActiveTab] = useState<string>(
-    () => (props.initialCategory as string) ?? categories[0] ?? ""
+    () => hostProps.initialCategory ?? categories[0] ?? ""
   );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);

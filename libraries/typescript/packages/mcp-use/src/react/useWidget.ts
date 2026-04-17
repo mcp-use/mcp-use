@@ -110,33 +110,26 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  *
  * ### Key fields
  *
- * - `isPending` — `true` until the tool result arrives; `props` is `Partial<TProps>` while pending.
- * - `props` — merged from toolInput (base) and structuredContent (overlay). When the widget is
- *   exposed as a tool, props = toolInput during pending and structuredContent when done. When
- *   the widget is returned by another tool, props = structuredContent (toolInput = parent's args).
- * - `toolInput` — the arguments the model passed to the tool.
+ * - `isPending` — `true` until the tool result arrives; `props` is partial while pending.
+ * - `props` — merged from toolInput (base) and structuredContent (overlay), loosely typed. With
+ *   **inline JSX**, type structured data on your **component props** instead.
+ * - `toolInput` — the arguments the model passed to the tool (use `TToolInput` to type this).
  * - `partialToolInput` / `isStreaming` — real-time argument streaming (MCP Apps only).
  * - `theme`, `displayMode`, `locale`, `timeZone`, `safeArea`, `maxHeight` — host context.
  * - `callTool`, `sendFollowUpMessage`, `openExternal`, `requestDisplayMode` — host actions.
- * - `state` / `setState` — persisted state visible to the model on future turns.
+ * - `state` / `setState` — persisted state visible to the model on future turns (`TState`).
  *
  * @example
  * ```tsx
+ * type MyToolInput = { city: string };
+ *
  * const MyWidget: React.FC = () => {
- *   const { props, isPending, toolInput, theme } = useWidget<
- *     { city: string; temperature: number },  // Props (from structuredContent)
- *     {},                                      // State
- *     { city: string; temperature: number },  // Output type
- *     {},                                      // Metadata
- *     { city: string }                         // ToolInput (tool call args)
- *   >();
+ *   const { isPending, toolInput, theme } = useWidget<MyToolInput>();
  *
  *   if (isPending) return <p>Loading…</p>;
  *
  *   return (
  *     <div data-theme={theme}>
- *       <h1>{props.city}</h1>
- *       <p>{props.temperature}°C</p>
  *       <p>Requested: {toolInput.city}</p>
  *     </div>
  *   );
@@ -144,14 +137,9 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  * ```
  */
 export function useWidget<
-  TProps = UnknownObject,
-  TState = UnknownObject,
-  TOutput = UnknownObject,
-  TMetadata = UnknownObject,
   TToolInput = UnknownObject,
->(
-  defaultProps?: TProps
-): UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput> {
+  TState = UnknownObject,
+>(defaultProps?: UnknownObject): UseWidgetResult<TToolInput, TState> {
   // Check if window.openai is available - use state to allow re-checking after async injection
   const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
     () => typeof window !== "undefined" && !!window.openai
@@ -314,14 +302,14 @@ export function useWidget<
     const urlParams = new URLSearchParams(searchString);
     if (urlParams.has("mcpUseParams")) {
       return JSON.parse(urlParams.get("mcpUseParams") as string) as {
-        toolInput: TProps;
-        toolOutput: TOutput;
+        toolInput: UnknownObject;
+        toolOutput: UnknownObject;
         toolId: string;
       };
     }
     return {
-      toolInput: {} as TProps,
-      toolOutput: {} as TOutput,
+      toolInput: {} as UnknownObject,
+      toolOutput: {} as UnknownObject,
       toolId: "",
     };
   }, [searchString]);
@@ -331,11 +319,11 @@ export function useWidget<
     | TToolInput
     | undefined;
   const openaiToolOutput = useOpenAiGlobal("toolOutput") as
-    | TOutput
+    | UnknownObject
     | null
     | undefined;
   const toolResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as
-    | TMetadata
+    | UnknownObject
     | null
     | undefined;
   const widgetState = useOpenAiGlobal("widgetState") as
@@ -392,13 +380,13 @@ export function useWidget<
         raw.structuredContent &&
         typeof raw.structuredContent === "object"
       ) {
-        return raw.structuredContent as TOutput | null | undefined;
+        return raw.structuredContent as UnknownObject | null | undefined;
       }
       return openaiToolOutput;
     }
     if (provider === "mcp-apps")
-      return mcpAppsToolOutput as TOutput | null | undefined;
-    return urlParams.toolOutput as TOutput | null | undefined;
+      return mcpAppsToolOutput as UnknownObject | null | undefined;
+    return urlParams.toolOutput as UnknownObject | null | undefined;
   }, [provider, openaiToolOutput, mcpAppsToolOutput, urlParams.toolOutput]);
 
   // Props semantics:
@@ -407,7 +395,7 @@ export function useWidget<
   // Merge: use toolInput as base, structuredContent overrides. This handles both cases: during pending we show toolInput; when done, structuredContent wins.
   const widgetProps = useMemo(() => {
     const ti = (toolInput || {}) as Record<string, unknown>;
-    const base = (defaultProps || {}) as Record<string, unknown> as TProps;
+    const base = (defaultProps || {}) as Record<string, unknown>;
 
     // Extract structuredContent from provider-specific toolOutput.
     // Some hosts (e.g. compat runtimes bridging MCP Apps → window.openai) pass the
@@ -428,7 +416,7 @@ export function useWidget<
     }
 
     // Base: toolInput (for exposed-as-tool) or defaultProps; overlay: structuredContent
-    const merged = { ...base, ...ti, ...(structuredContent || {}) } as TProps;
+    const merged = { ...base, ...ti, ...(structuredContent || {}) } as UnknownObject;
     return merged;
   }, [
     provider,
@@ -816,10 +804,10 @@ export function useWidget<
     // Props and state (with defaults)
     props: widgetProps,
     toolInput: (toolInput || {}) as TToolInput,
-    output: (toolOutput ?? null) as TOutput | null,
+    output: (toolOutput ?? null) as UnknownObject | null,
     metadata: (provider === "mcp-apps"
       ? (mcpAppsResponseMetadata ?? null)
-      : (toolResponseMetadata ?? null)) as TMetadata | null,
+      : (toolResponseMetadata ?? null)) as UnknownObject | null,
     state: localWidgetState
       ? (Object.fromEntries(
           Object.entries(localWidgetState as Record<string, unknown>).filter(
@@ -864,7 +852,7 @@ export function useWidget<
     // Host identity (MCP Apps only)
     hostInfo: mcpAppsHostInfo ?? undefined,
     hostCapabilities: mcpAppsHostCapabilities ?? undefined,
-  } as UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>;
+  } as UseWidgetResult<TToolInput, TState>;
 }
 
 /**
@@ -877,8 +865,8 @@ export function useWidget<
 export function useWidgetProps<TProps = UnknownObject>(
   defaultProps?: TProps
 ): Partial<TProps> {
-  const { props } = useWidget<TProps>(defaultProps);
-  return props;
+  const { props } = useWidget(defaultProps as UnknownObject);
+  return props as Partial<TProps>;
 }
 
 /**

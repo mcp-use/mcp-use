@@ -789,9 +789,9 @@ See [ThemeProvider documentation](./widget-components/themeprovider) for details
 
 ### Hooks
 
-#### `useWidget<TProps, TOutput, TMetadata, TState>`
+#### `useWidget<TToolInput, TState>`
 
-Main hook providing type-safe access to all widget capabilities.
+Main hook for MCP Apps / ChatGPT Apps SDK widgets. **`TToolInput`** (first) types **`toolInput`** / **`partialToolInput`**; **`TState`** (second) types persisted **`state`**. **`props`**, **`output`**, and **`metadata`** are loosely typed — prefer typing structured data on your **component** when using inline JSX.
 
 ```typescript
 import { useWidget } from 'mcp-use/react';
@@ -810,7 +810,7 @@ const {
   requestDisplayMode,
   notifyIntrinsicHeight,
   isAvailable,
-} = useWidget<TProps, TOutput, TMetadata, TState>();
+} = useWidget<TToolInput, TState>();
 ```
 
 See [useWidget documentation](./widget-components/usewidget) for complete API reference.

@@ -16,22 +16,24 @@ const CodePreview: React.FC<CodePreviewProps> = ({
   code: codeIn,
 }) => {
   const { props, isPending, isStreaming, partialToolInput, theme } =
-    useWidget<CodePreviewProps>();
+    useWidget();
 
   const isDark = theme === "dark";
 
+  const hostProps = props as Partial<CodePreviewProps>;
+
   const displayLanguage =
-    props.language ??
+    hostProps.language ??
     langIn ??
     (partialToolInput as Partial<CodePreviewProps> | null)?.language ??
     "";
   const displayDescription =
-    props.description ??
+    hostProps.description ??
     descIn ??
     (partialToolInput as Partial<CodePreviewProps> | null)?.description ??
     "";
   const displayCode =
-    props.code ??
+    hostProps.code ??
     codeIn ??
     (partialToolInput as Partial<CodePreviewProps> | null)?.code ??
     "";

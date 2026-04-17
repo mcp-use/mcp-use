@@ -29,6 +29,8 @@ import { useWidget } from "mcp-use/react";
 
 ## Basic Usage
 
+With **inline JSX**, type structured data on your **component**; use `useWidget` for **host/runtime** and typed **`toolInput`** (tool call arguments).
+
 ```tsx
 import { useWidget } from "mcp-use/react";
 
@@ -37,18 +39,22 @@ interface MyWidgetProps {
   temperature: number;
 }
 
-const MyWidget: React.FC = () => {
-  // Works identically in both MCP Apps and ChatGPT
-  const { props, theme, callTool } = useWidget<MyWidgetProps>();
+type MyToolInput = { city: string };
+
+const MyWidget: React.FC<MyWidgetProps> = ({ city, temperature }) => {
+  const { theme, callTool, toolInput } = useWidget<MyToolInput>();
 
   return (
     <div data-theme={theme}>
-      <h1>{props.city}</h1>
-      <p>{props.temperature}°C</p>
+      <h1>{city}</h1>
+      <p>{temperature}°C</p>
+      <p className="text-sm opacity-70">Requested: {toolInput.city}</p>
     </div>
   );
 };
 ```
+
+To read merged **`props`** from the hook (loosely typed), cast after an `isPending` guard or use **`useWidgetProps<MyWidgetProps>()`**.
 
 <Note>
 **Cross-Protocol Compatibility**: This exact code works without modifications in:
@@ -60,18 +66,19 @@ The hook handles all protocol-specific communication behind the scenes.
 
 </Note>
 
-## Type Parameters
-
-The hook accepts four optional type parameters:
+## Type parameters
 
 ```typescript
-useWidget<
-  TProps, // Props type (from toolInput)
-  TOutput, // Output type (from toolOutput/structuredContent)
-  TMetadata, // Metadata type (from toolResponseMetadata)
-  TState // State type (for widgetState)
->();
+useWidget<TToolInput = UnknownObject, TState = UnknownObject>(defaultProps?: UnknownObject);
 ```
+
+| Parameter      | Meaning |
+| -------------- | ------- |
+| `TToolInput`   | Shape of **`toolInput`** / **`partialToolInput`** (arguments the model passed to the tool). **First** type argument. |
+| `TState`       | Persisted widget **`state`** / **`setState`**. Second type argument. |
+| `defaultProps` | Optional seed merged into **`props`** at runtime (rare); does not type `props` on the result. |
+
+**`props`**, **`output`**, and **`metadata`** on the return value are **`UnknownObject`** (loosely typed). Type structured widget data on your **component props** instead, or cast `props` after `!isPending` / use **`useWidgetProps<T>()`**.
 
 ## Return Values
 
@@ -79,11 +86,12 @@ useWidget<
 
 | Property   | Type                                                                     | Description                                                                      |
 | ---------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| `props`    | `Partial<TProps>`                                                        | Widget props (mapped from widget-only data). Empty `{}` when `isPending` is true |
-| `output`   | `TOutput \| null`                                                        | Tool output from the last execution                                              |
-| `metadata` | `TMetadata \| null`                                                      | Response metadata from the tool                                                  |
+| `props`    | `Partial<UnknownObject>` or `UnknownObject` (via `isPending`)             | Merged structured content; **loosely typed** — prefer component props + cast if needed |
+| `output`   | `UnknownObject \| null`                                                  | Structured tool output mirror (loosely typed)                                     |
+| `metadata` | `UnknownObject \| null`                                                  | Tool response metadata (loosely typed)                                            |
 | `state`    | `TState \| null`                                                         | Persisted widget state                                                           |
 | `setState` | `(state: TState \| ((prev: TState \| null) => TState)) => Promise<void>` | Update widget state (persisted and shown to model)                               |
+| `toolInput`| `TToolInput`                                                             | Arguments the model passed to the tool (use **`useWidget<TToolInput>()`**)        |
 
 ### Layout and Theme
 
@@ -113,7 +121,7 @@ useWidget<
 | ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `isAvailable`       | `boolean`            | Whether the `window.openai` API is available                                                                                                |
 | `isPending`         | `boolean`            | Whether the tool is currently executing. When `true`, props will be empty `{}`                                                             |
-| `partialToolInput`  | `Partial<TProps> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
+| `partialToolInput`  | `Partial<TToolInput> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
 | `isStreaming`       | `boolean`            | Whether tool arguments are currently being streamed (partial input received but complete input not yet available). `false` in ChatGPT Apps SDK or when the host does not stream. |
 
 ### Host Identity (MCP Apps only)
@@ -151,10 +159,6 @@ interface ProductProps {
   price: number;
 }
 
-interface ProductOutput {
-  reviews: Array<{ rating: number; comment: string }>;
-}
-
 interface ProductState {
   favorites: string[];
 }
@@ -181,24 +185,26 @@ const ProductWidget: React.FC = () => {
 
     // Availability
     isAvailable,
-  } = useWidget<ProductProps, ProductOutput, {}, ProductState>();
+  } = useWidget<Record<string, unknown>, ProductState>();
+
+  const p = props as ProductProps;
 
   const handleAddToFavorites = async () => {
-    const newFavorites = [...(state?.favorites || []), props.productId];
+    const newFavorites = [...(state?.favorites || []), p.productId];
     await setState({ favorites: newFavorites });
   };
 
   const handleGetReviews = async () => {
     const result = await callTool("get-product-reviews", {
-      productId: props.productId,
+      productId: p.productId,
     });
     // Handle result
   };
 
   return (
     <div data-theme={theme}>
-      <h1>{props.name}</h1>
-      <p>${props.price}</p>
+      <h1>{p.name}</h1>
+      <p>${p.price}</p>
       <button onClick={handleAddToFavorites}>Add to Favorites</button>
       <button onClick={handleGetReviews}>Get Reviews</button>
     </div>
@@ -226,37 +232,35 @@ When the host supports **streaming tool arguments** (e.g. MCP Inspector, MCP App
 **Example:**
 
 ```tsx
-const MyWidget: React.FC = () => {
-  const { props, isPending } = useWidget<MyWidgetProps>();
+const MyWidget: React.FC<MyWidgetProps> = ({ city, temperature }) => {
+  const { isPending } = useWidget();
 
   if (isPending) {
     return <LoadingSpinner />;
   }
 
-  // Safe to access props now
   return (
     <div>
-      {props.city} - {props.temperature}°C
+      {city} - {temperature}°C
     </div>
   );
 };
 ```
 
-**Alternative: Using optional chaining**
+**Alternative: `props` from the hook (cast after guard)**
 
 ```tsx
 const MyWidget: React.FC = () => {
-  const { props, isPending } = useWidget<MyWidgetProps>();
+  const { props, isPending } = useWidget();
 
+  if (isPending) {
+    return <LoadingSpinner />;
+  }
+
+  const p = props as MyWidgetProps;
   return (
     <div>
-      {isPending ? (
-        <LoadingSpinner />
-      ) : (
-        <div>
-          {props.city} - {props.temperature}°C
-        </div>
-      )}
+      {p.city} - {p.temperature}°C
     </div>
   );
 };
@@ -275,18 +279,21 @@ This is only available when the host supports it; in ChatGPT Apps SDK or when us
 **Example: live preview while streaming**
 
 ```tsx
+type CodeToolInput = { code?: string; language?: string };
+
 const CodePreviewWidget: React.FC = () => {
-  const { props, isPending, isStreaming, partialToolInput } = useWidget<{ code: string; language: string }>();
+  const { props, isPending, isStreaming, partialToolInput } = useWidget<CodeToolInput>();
 
   if (isPending && !partialToolInput) {
     return <LoadingSpinner />;
   }
 
+  const hostProps = props as Partial<{ code: string; language: string }>;
   // Show live preview during streaming, then final props when complete
   const displayCode = isStreaming && partialToolInput?.code != null
     ? partialToolInput.code
-    : props.code ?? "";
-  const displayLang = (isStreaming ? partialToolInput?.language : props.language) ?? "text";
+    : hostProps.code ?? "";
+  const displayLang = (isStreaming ? partialToolInput?.language : hostProps.language) ?? "text";
 
   return (
     <pre data-language={displayLang}>
@@ -343,20 +350,16 @@ await setFavorites((prev) => [...prev, "newItem"]);
 
 ## Key Features
 
-### 1. Props Without Props
+### 1. Inline JSX: prefer component props
 
-Components don't accept props via React props. Instead, props come from the hook:
+With **inline JSX** tool returns, structured fields are passed into your component — type them on **`React.FC<MyProps>`**. Use **`useWidget<TToolInput>()`** for typed **`toolInput`**, and **`useWidget()`** / **`useWidgetProps<MyProps>()`** if you still read **`props`** from the hook.
 
 ```tsx
-// ❌ Don't do this
-const MyWidget: React.FC<MyProps> = ({ city, temperature }) => { ... }
-
-// ✅ Do this
-const MyWidget: React.FC = () => {
-  const { props } = useWidget<MyProps>();
-  const { city, temperature } = props;
-  // ...
-}
+// Preferred with inline JSX
+const MyWidget: React.FC<MyProps> = ({ city, temperature }) => {
+  const { theme } = useWidget();
+  return <div data-theme={theme}>{city}</div>;
+};
 ```
 
 ### 2. Automatic Provider Detection
@@ -396,7 +399,7 @@ Or use `McpUseProvider` with `autoSize={true}` for automatic height notification
 Widget state persists across widget interactions and is shown to the model:
 
 ```tsx
-const { state, setState } = useWidget<{}, {}, {}, { favorites: string[] }>();
+const { state, setState } = useWidget<Record<string, unknown>, { favorites: string[] }>();
 
 // Update state
 await setState({ favorites: ["item1", "item2"] });

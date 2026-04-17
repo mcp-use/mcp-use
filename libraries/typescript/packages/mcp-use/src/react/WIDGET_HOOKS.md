@@ -23,7 +23,7 @@ interface MyWidgetProps {
 }
 
 const MyWidget: React.FC = () => {
-  const { props, theme, callTool } = useWidget<MyWidgetProps>();
+  const { theme, callTool, toolInput } = useWidget<MyToolInput>();
   
   return (
     <div data-theme={theme}>
@@ -36,7 +36,7 @@ const MyWidget: React.FC = () => {
 
 ## API Reference
 
-### `useWidget<TProps, TOutput, TMetadata, TState>(defaultProps?)`
+### `useWidget<TToolInput, TState>(defaultProps?)`
 
 Main hook that provides access to all widget functionality.
 
@@ -141,9 +141,8 @@ export const widgetMetadata: WidgetMetadata = {
 
 type WeatherProps = z.infer<typeof propSchema>;
 
-const WeatherWidget: React.FC = () => {
-  const { props, theme, sendFollowUpMessage } = useWidget<WeatherProps>();
-  const { city, weather, temperature } = props;
+const WeatherWidget: React.FC<WeatherProps> = ({ city, weather, temperature }) => {
+  const { theme, sendFollowUpMessage } = useWidget();
   
   // Theme-aware styling
   const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
@@ -246,7 +245,7 @@ const MyWidget: React.FC = () => {
 
 ## Type Safety
 
-The hook provides full TypeScript support:
+Type **structured widget fields** on your **component props**. Use **`useWidget<TToolInput, TState>()`** for tool arguments and persisted state:
 
 ```tsx
 interface WeatherProps {
@@ -255,44 +254,32 @@ interface WeatherProps {
   conditions: 'sunny' | 'cloudy' | 'rainy';
 }
 
-interface WeatherOutput {
-  forecast: string[];
-  alerts: string[];
-}
+type WeatherToolInput = { city: string };
 
 interface WeatherState {
   favoriteLocations: string[];
   unit: 'celsius' | 'fahrenheit';
 }
 
-const WeatherWidget: React.FC = () => {
+const WeatherWidget: React.FC<WeatherProps> = ({ city, temperature, conditions }) => {
   const {
-    props,      // Type: WeatherProps
-    output,     // Type: WeatherOutput | null
-    state,      // Type: WeatherState | null
-    setState,   // Type: (state: WeatherState) => Promise<void>
-  } = useWidget<WeatherProps, WeatherOutput, unknown, WeatherState>();
-  
-  // All properties are fully typed!
-  const { city, temperature, conditions } = props;
-  const forecast = output?.forecast;
+    toolInput,
+    output,
+    state,
+    setState,
+  } = useWidget<WeatherToolInput, WeatherState>();
+
+  const forecast = (output as { forecast?: string[] } | null)?.forecast;
   const favorites = state?.favoriteLocations || [];
 };
 ```
 
 ## Best Practices
 
-1. **Always provide default props** when possible:
-   ```tsx
-   const { props } = useWidget<MyProps>({ title: 'Default', count: 0 });
-   ```
+1. **Default merged props** (optional): `useWidget({ title: 'Default', count: 0 })` — still use **`useWidgetProps<MyProps>()`** or cast **`props`** for strong typing.
 
 2. **Use helper hooks** for simpler use cases:
    ```tsx
-   // Instead of:
-   const { props } = useWidget<MyProps>();
-   
-   // Use:
    const props = useWidgetProps<MyProps>();
    ```
 
