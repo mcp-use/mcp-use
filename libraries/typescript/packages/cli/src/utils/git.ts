@@ -92,7 +92,7 @@ async function gitCommandOrThrow(
  * Check if directory is a git repository
  */
 export async function isGitRepo(cwd: string = process.cwd()): Promise<boolean> {
-  const result = await gitCommand("git rev-parse --is-inside-work-tree", cwd);
+  const result = await gitCommand(["rev-parse", "--is-inside-work-tree"], cwd);
   return result === "true";
 }
 
@@ -102,7 +102,7 @@ export async function isGitRepo(cwd: string = process.cwd()): Promise<boolean> {
 export async function getRemoteUrl(
   cwd: string = process.cwd()
 ): Promise<string | null> {
-  return gitCommand("git config --get remote.origin.url", cwd);
+  return gitCommand(["config", "--get", "remote.origin.url"], cwd);
 }
 
 /**
@@ -134,7 +134,7 @@ export function parseGitHubUrl(
 export async function getCurrentBranch(
   cwd: string = process.cwd()
 ): Promise<string | null> {
-  return gitCommand("git rev-parse --abbrev-ref HEAD", cwd);
+  return gitCommand(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
 }
 
 /**
@@ -143,7 +143,7 @@ export async function getCurrentBranch(
 export async function getCommitSha(
   cwd: string = process.cwd()
 ): Promise<string | null> {
-  return gitCommand("git rev-parse HEAD", cwd);
+  return gitCommand(["rev-parse", "HEAD"], cwd);
 }
 
 /**
@@ -152,7 +152,7 @@ export async function getCommitSha(
 export async function getCommitMessage(
   cwd: string = process.cwd()
 ): Promise<string | null> {
-  return gitCommand("git log -1 --pretty=%B", cwd);
+  return gitCommand(["log", "-1", "--pretty=%B"], cwd);
 }
 
 /**
@@ -161,7 +161,7 @@ export async function getCommitMessage(
 export async function hasUncommittedChanges(
   cwd: string = process.cwd()
 ): Promise<boolean> {
-  const result = await gitCommand("git status --porcelain", cwd);
+  const result = await gitCommand(["status", "--porcelain"], cwd);
   return result !== null && result.length > 0;
 }
 
@@ -204,14 +204,6 @@ export async function getGitInfo(
     commitMessage: commitMessage || undefined,
     hasUncommittedChanges: uncommittedChanges,
   };
-}
-
-/**
- * Escape a commit message for safe inclusion in a shell-quoted `git commit -m`.
- * Double quotes are handled by escaping `"` and `\` and wrapping in `"..."`.
- */
-function shellQuote(message: string): string {
-  return `"${message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 /**

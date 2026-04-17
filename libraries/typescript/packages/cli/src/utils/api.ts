@@ -9,6 +9,17 @@ export class GitHubAuthRequiredError extends Error {
   }
 }
 
+/** Thrown when the API returns 401 (invalid or expired API key for this backend). */
+export class ApiUnauthorizedError extends Error {
+  readonly status = 401 as const;
+  constructor(
+    message = "Your session has expired or your API key is invalid."
+  ) {
+    super(message);
+    this.name = "ApiUnauthorizedError";
+  }
+}
+
 export interface OrgInfo {
   id: string;
   name: string;
@@ -246,11 +257,7 @@ export class McpUseAPI {
       clearTimeout(timeoutId);
 
       if (response.status === 401) {
-        const err = new Error(
-          "Your session has expired or your API key is invalid."
-        );
-        (err as any).status = 401;
-        throw err;
+        throw new ApiUnauthorizedError();
       }
 
       if (!response.ok) {
