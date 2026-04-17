@@ -1,4 +1,8 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ContentBlock,
+  Prompt,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
 import React, {
   useCallback,
@@ -8,6 +12,8 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { copyToClipboard } from "../utils/clipboard";
+import { downloadJSON } from "../utils/jsonUtils";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
@@ -234,13 +240,70 @@ export function ChatTab({
   }, []);
 
   const serializeMessageContent = useCallback((message: ChatMessage) => {
-    if (typeof message.content === "string") return message.content;
-    if (Array.isArray(message.content)) {
+    if (typeof message.content === "string" && message.content.trim()) {
+      return message.content;
+    }
+
+    if (Array.isArray(message.content) && message.content.length > 0) {
       return message.content
         .map((item) => (typeof item === "string" ? item : (item.text ?? "")))
         .join("");
     }
+
+    if (message.parts && message.parts.length > 0) {
+      const textParts = message.parts
+        .filter((p) => p.type === "text" && p.text)
+        .map((p) => p.text);
+
+      if (textParts.length > 0) {
+        return textParts.join("\n");
+      }
+    }
+
     return "";
+  }, []);
+
+  const serializeToolResult = useCallback((result: unknown) => {
+    if (result === null || result === undefined) return "No result";
+
+    if (typeof result === "string") {
+      try {
+        const parsed = JSON.parse(result);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return result;
+      }
+    }
+
+    if (
+      typeof result === "object" &&
+      Array.isArray((result as CallToolResult).content)
+    ) {
+      const content = (result as CallToolResult).content;
+      if (content.length === 0) return "Empty result";
+
+      return content
+        .map((item: ContentBlock) => {
+          if (item.type === "text") {
+            const text = item.text || "";
+            try {
+              return JSON.stringify(JSON.parse(text), null, 2);
+            } catch {
+              return text;
+            }
+          }
+          if (item.type === "image") {
+            return `[Image: ${item.mimeType}]`;
+          }
+          if (item.type === "resource") {
+            return `[Resource: ${item.resource?.uri || "unknown"}]`;
+          }
+          return JSON.stringify(item, null, 2);
+        })
+        .join("\n\n");
+    }
+
+    return JSON.stringify(result, null, 2);
   }, []);
 
   const getSerializedMessages = useCallback(() => {
@@ -742,6 +805,87 @@ export function ChatTab({
     [updatePromptsDropdownState]
   );
 
+  const formatMessagesAsMarkdown = useCallback(
+    (messages: ChatMessage[]) => {
+      let content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
+      content += messages
+        .map((m) => {
+          const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+
+          if (!m.parts || m.parts.length === 0) {
+            const messageContent = serializeMessageContent(m).trim();
+            return messageContent ? `## ${role}\n${messageContent}` : "";
+          }
+
+          const sections: string[] = [];
+          for (const part of m.parts) {
+            if (part.type === "text" && part.text?.trim()) {
+              sections.push(part.text.trim());
+            } else if (part.type === "tool-invocation" && part.toolInvocation) {
+              const ti = part.toolInvocation;
+              const resultStr = serializeToolResult(ti.result);
+              sections.push(
+                `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n\n${resultStr}`
+              );
+            }
+          }
+
+          if (sections.length === 0) return "";
+          return `## ${role}\n\n${sections.join("\n\n")}`;
+        })
+        .filter((text) => text !== "")
+        .join("\n\n---\n\n");
+      return content;
+    },
+    [serializeMessageContent, serializeToolResult]
+  );
+
+  const handleCopyChat = useCallback(() => {
+    const formattedMessages = formatMessagesAsMarkdown(messages);
+
+    copyToClipboard(formattedMessages).then(
+      () => toast.success("Chat copied to clipboard"),
+      () => toast.error("Failed to copy chat")
+    );
+  }, [messages, formatMessagesAsMarkdown]);
+
+  const handleExportChat = useCallback(
+    (format: "json" | "markdown") => {
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filename = `chat-export-${dateStr}`;
+
+      if (format === "json") {
+        const exportedMessages = messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: serializeMessageContent(m),
+          timestamp: m.timestamp,
+          toolInvocations: m.parts
+            ?.filter((p) => p.type === "tool-invocation" && p.toolInvocation)
+            .map((p) => ({
+              toolName: p.toolInvocation!.toolName,
+              args: p.toolInvocation!.args,
+              result: p.toolInvocation!.result,
+            })),
+        }));
+        downloadJSON(exportedMessages, filename + ".json");
+      } else {
+        const content = formatMessagesAsMarkdown(messages);
+        const blob = new Blob([content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename + ".md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+      }
+      toast.success(`Chat exported as ${format.toUpperCase()}`);
+    },
+    [messages, formatMessagesAsMarkdown, serializeMessageContent]
+  );
+
   const handleClearConfig = useCallback(() => {
     clearConfig();
     clearMessages();
@@ -857,6 +1001,8 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
+        onCopyChat={handleCopyChat}
+        onExportChat={handleExportChat}
         hideConfigButton={isManaged}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}
