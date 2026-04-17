@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.0.2-canary.0
+
+### Patch Changes
+
+- 5f0c888: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+  - mcp-use@1.24.2-canary.0
+  - @mcp-use/inspector@2.1.1-canary.0
+
 ## 3.0.1
 
 ### Patch Changes
