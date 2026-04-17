@@ -130,6 +130,7 @@ export function ChatHeader({
           <div className="flex items-center gap-1">
             {onCopyChat && (
               <Button
+                data-testid="chat-copy-button"
                 variant="ghost"
                 size="sm"
                 className="h-9 gap-1.5 px-3"
@@ -144,6 +145,7 @@ export function ChatHeader({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    data-testid="chat-export-button"
                     variant="ghost"
                     size="sm"
                     className="h-9 gap-1.5 px-3"
@@ -153,10 +155,16 @@ export function ChatHeader({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => onExportChat("json")}>
+                  <DropdownMenuItem
+                    data-testid="chat-export-json"
+                    onClick={() => onExportChat("json")}
+                  >
                     Export as JSON
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onExportChat("markdown")}>
+                  <DropdownMenuItem
+                    data-testid="chat-export-markdown"
+                    onClick={() => onExportChat("markdown")}
+                  >
                     Export as Markdown
                   </DropdownMenuItem>
                 </DropdownMenuContent>
