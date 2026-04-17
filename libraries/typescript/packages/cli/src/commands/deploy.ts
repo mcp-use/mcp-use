@@ -894,9 +894,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         }
       } catch (err) {
         if (err instanceof GitCommandError) {
-          console.log(
-            chalk.red(`\n✗ Git step failed: \`${err.command}\``)
-          );
+          console.log(chalk.red(`\n✗ Git step failed: \`${err.command}\``));
           const stderrTrimmed = (err.stderr || err.stdout).trim();
           if (stderrTrimmed) {
             console.log(chalk.gray(stderrTrimmed));
@@ -910,7 +908,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
                   `    git -C ${JSON.stringify(cwd)} config user.name  "Your Name"`
               )
             );
-          } else if (/non-fast-forward|rejected|unrelated histories/i.test(err.stderr)) {
+          } else if (
+            /non-fast-forward|rejected|unrelated histories/i.test(err.stderr)
+          ) {
             console.log(
               chalk.yellow(
                 "\n  The remote branch already has commits. Either delete the empty GitHub repo and retry, " +
