@@ -15,6 +15,7 @@ import {
   gitInit,
   gitAddRemoteAndPush,
   gitCommitAndPush,
+  GitCommandError,
   hasUncommittedChanges,
   isGitHubUrl,
 } from "../utils/git.js";
@@ -868,27 +869,60 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       }
       console.log(chalk.green(`✓ Created ${chalk.cyan(repoResult.fullName)}`));
 
-      if (!gitInfo.isGitRepo) {
-        await ensureGitignore(cwd);
-        console.log(chalk.gray("Initializing git..."));
-        await gitInit(cwd, "Initial commit");
-        console.log(chalk.gray("Pushing to GitHub..."));
-        await gitAddRemoteAndPush(cwd, repoResult.cloneUrl, "main");
-      } else {
-        if (await hasUncommittedChanges(cwd)) {
-          console.log(
-            chalk.red(
-              "✗ You have uncommitted changes. Commit and push before deploying."
-            )
+      try {
+        if (!gitInfo.isGitRepo) {
+          await ensureGitignore(cwd);
+          console.log(chalk.gray("Initializing git..."));
+          await gitInit(cwd, "Initial commit");
+          console.log(chalk.gray("Pushing to GitHub..."));
+          await gitAddRemoteAndPush(cwd, repoResult.cloneUrl, "main");
+        } else {
+          if (await hasUncommittedChanges(cwd)) {
+            console.log(
+              chalk.red(
+                "✗ You have uncommitted changes. Commit and push before deploying."
+              )
+            );
+            process.exit(1);
+          }
+          console.log(chalk.gray("Adding remote and pushing..."));
+          await gitAddRemoteAndPush(
+            cwd,
+            repoResult.cloneUrl,
+            gitInfo.branch || "main"
           );
+        }
+      } catch (err) {
+        if (err instanceof GitCommandError) {
+          console.log(chalk.red(`\n✗ Git step failed: \`${err.command}\``));
+          const stderrTrimmed = (err.stderr || err.stdout).trim();
+          if (stderrTrimmed) {
+            console.log(chalk.gray(stderrTrimmed));
+          }
+          // Actionable hint for the most common failure: missing identity.
+          if (/tell me who you are|user\.email|user\.name/i.test(err.stderr)) {
+            console.log(
+              chalk.yellow(
+                "\n  Set your git identity for this project and retry:\n" +
+                  `    git -C ${JSON.stringify(cwd)} config user.email "you@example.com"\n` +
+                  `    git -C ${JSON.stringify(cwd)} config user.name  "Your Name"`
+              )
+            );
+          } else if (
+            /non-fast-forward|rejected|unrelated histories/i.test(err.stderr)
+          ) {
+            console.log(
+              chalk.yellow(
+                "\n  The remote branch already has commits. Either delete the empty GitHub repo and retry, " +
+                  "or reconcile manually:\n" +
+                  "    git pull --rebase origin main --allow-unrelated-histories\n" +
+                  "    git push -u origin main"
+              )
+            );
+          }
           process.exit(1);
         }
-        console.log(chalk.gray("Adding remote and pushing..."));
-        await gitAddRemoteAndPush(
-          cwd,
-          repoResult.cloneUrl,
-          gitInfo.branch || "main"
-        );
+        throw err;
       }
 
       console.log(chalk.green("✓ Code pushed to GitHub\n"));

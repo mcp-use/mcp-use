@@ -15,7 +15,11 @@ export interface GitInfo {
 }
 
 /**
- * Execute git command
+ * Read-only git probe. Swallows errors and returns `null` so callers can treat
+ * "command failed" identically to "empty output" (e.g. not a repo, no remote).
+ *
+ * DO NOT use this for state-mutating commands (init/add/commit/push/remote add).
+ * Use `gitCommandOrThrow` instead so failures surface to the user.
  */
 async function gitCommand(
   command: string,
@@ -26,6 +30,60 @@ async function gitCommand(
     return stdout.trim();
   } catch (error) {
     return null;
+  }
+}
+
+/**
+ * Error thrown by `gitCommandOrThrow` when a git command exits non-zero.
+ * Carries the command string plus captured stderr/stdout for actionable errors.
+ */
+export class GitCommandError extends Error {
+  readonly command: string;
+  readonly stderr: string;
+  readonly stdout: string;
+  readonly exitCode: number | null;
+
+  constructor(opts: {
+    command: string;
+    stderr: string;
+    stdout: string;
+    exitCode: number | null;
+  }) {
+    const trimmed = opts.stderr.trim() || opts.stdout.trim() || "unknown error";
+    super(`git command failed: \`${opts.command}\`\n${trimmed}`);
+    this.name = "GitCommandError";
+    this.command = opts.command;
+    this.stderr = opts.stderr;
+    this.stdout = opts.stdout;
+    this.exitCode = opts.exitCode;
+  }
+}
+
+/**
+ * Execute a git command that MUST succeed. On non-zero exit, throws
+ * `GitCommandError` with captured stderr so the caller can show actionable
+ * errors instead of silently continuing.
+ */
+async function gitCommandOrThrow(
+  command: string,
+  cwd: string = process.cwd()
+): Promise<string> {
+  try {
+    const { stdout } = await execAsync(command, { cwd });
+    return stdout.trim();
+  } catch (error) {
+    const e = error as {
+      stderr?: string;
+      stdout?: string;
+      code?: number | null;
+      message?: string;
+    };
+    throw new GitCommandError({
+      command,
+      stderr: (e.stderr ?? "").toString(),
+      stdout: (e.stdout ?? "").toString(),
+      exitCode: typeof e.code === "number" ? e.code : null,
+    });
   }
 }
 
@@ -148,40 +206,57 @@ export async function getGitInfo(
 }
 
 /**
- * Initialize a git repo, add all files, and commit.
+ * Escape a commit message for safe inclusion in a shell-quoted `git commit -m`.
+ * Double quotes are handled by escaping `"` and `\` and wrapping in `"..."`.
+ */
+function shellQuote(message: string): string {
+  return `"${message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * Initialize a git repo, add all files, commit, and normalize branch to `main`.
+ *
+ * Throws `GitCommandError` (typed Error) on any failure so callers can surface
+ * the real stderr instead of silently continuing (previous behavior left the
+ * repo in a half-baked state and the CLI still printed "Code pushed").
  */
 export async function gitInit(
   cwd: string,
   message: string = "Initial commit"
 ): Promise<void> {
-  await gitCommand("git init", cwd);
-  await gitCommand("git add .", cwd);
-  await gitCommand(`git commit -m "${message}"`, cwd);
+  await gitCommandOrThrow("git init", cwd);
+  await gitCommandOrThrow("git add .", cwd);
+  await gitCommandOrThrow(`git commit -m ${shellQuote(message)}`, cwd);
+  // Normalize branch name so a subsequent `git push -u origin main` always
+  // matches, regardless of the user's `init.defaultBranch` config.
+  await gitCommandOrThrow("git branch -M main", cwd);
+  // Guard: commit must exist before we try to push.
+  await gitCommandOrThrow("git rev-parse HEAD", cwd);
 }
 
 /**
- * Add a remote and push to it.
+ * Add a remote and push to it. Throws `GitCommandError` on failure.
  */
 export async function gitAddRemoteAndPush(
   cwd: string,
   cloneUrl: string,
   branch: string = "main"
 ): Promise<void> {
-  await gitCommand(`git remote add origin ${cloneUrl}`, cwd);
-  await gitCommand(`git push -u origin ${branch}`, cwd);
+  await gitCommandOrThrow(`git remote add origin ${cloneUrl}`, cwd);
+  await gitCommandOrThrow(`git push -u origin ${branch}`, cwd);
 }
 
 /**
- * Commit all changes and push.
+ * Commit all changes and push. Throws `GitCommandError` on failure.
  */
 export async function gitCommitAndPush(
   cwd: string,
   message: string,
   branch: string = "main"
 ): Promise<void> {
-  await gitCommand("git add .", cwd);
-  await gitCommand(`git commit -m "${message}"`, cwd);
-  await gitCommand(`git push origin ${branch}`, cwd);
+  await gitCommandOrThrow("git add .", cwd);
+  await gitCommandOrThrow(`git commit -m ${shellQuote(message)}`, cwd);
+  await gitCommandOrThrow(`git push origin ${branch}`, cwd);
 }
 
 /**
