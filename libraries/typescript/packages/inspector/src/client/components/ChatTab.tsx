@@ -1,4 +1,8 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ContentBlock,
+  Prompt,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
 import React, {
   useCallback,
@@ -8,6 +12,8 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { copyToClipboard } from "../utils/clipboard";
+import { downloadJSON } from "../utils/jsonUtils";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
@@ -234,7 +240,6 @@ export function ChatTab({
   }, []);
 
   const serializeMessageContent = useCallback((message: ChatMessage) => {
-
     if (typeof message.content === "string" && message.content.trim()) {
       return message.content;
     }
@@ -258,7 +263,7 @@ export function ChatTab({
     return "";
   }, []);
 
-  const serializeToolResult = useCallback((result: any) => {
+  const serializeToolResult = useCallback((result: unknown) => {
     if (result === null || result === undefined) return "No result";
 
     if (typeof result === "string") {
@@ -270,27 +275,22 @@ export function ChatTab({
       }
     }
 
-    // Handle MCP CallToolResult format: { content: [], isError: boolean }
-    if (typeof result === "object" && Array.isArray(result.content)) {
-      if (result.content.length === 0) return "Empty result";
+    if (
+      typeof result === "object" &&
+      Array.isArray((result as CallToolResult).content)
+    ) {
+      const content = (result as CallToolResult).content;
+      if (content.length === 0) return "Empty result";
 
-      return result.content
-        .map((item: any) => {
+      return content
+        .map((item: ContentBlock) => {
           if (item.type === "text") {
             const text = item.text || "";
-            // Try to prettify nested JSON in text parts
-            if (
-              (text.startsWith("{") || text.startsWith("[")) &&
-              text.length > 2
-            ) {
-              try {
-                const parsed = JSON.parse(text);
-                return JSON.stringify(parsed, null, 2);
-              } catch {
-                return text;
-              }
+            try {
+              return JSON.stringify(JSON.parse(text), null, 2);
+            } catch {
+              return text;
             }
-            return text;
           }
           if (item.type === "image") {
             return `[Image: ${item.mimeType}]`;
@@ -806,42 +806,32 @@ export function ChatTab({
   );
 
   const formatMessagesAsMarkdown = useCallback(
-    (
-      messages: ChatMessage[],
-      options: { includeToolCalls?: boolean } = { includeToolCalls: true }
-    ) => {
+    (messages: ChatMessage[]) => {
       let content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
       content += messages
         .map((m) => {
           const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
-          const messageContent = serializeMessageContent(m).trim();
 
-          const toolInvocations = options.includeToolCalls
-            ? m.parts?.filter((p) => p.type === "tool-invocation")
-            : [];
-
-          // Skip messages that have no text content and no tool calls
-          if (!messageContent && (!toolInvocations || toolInvocations.length === 0)) {
-            return "";
+          if (!m.parts || m.parts.length === 0) {
+            const messageContent = serializeMessageContent(m).trim();
+            return messageContent ? `## ${role}\n${messageContent}` : "";
           }
 
-          let text = `## ${role}\n${messageContent}`;
-
-          if (toolInvocations?.length) {
-            text +=
-              "\n\n### Tool Calls\n" +
-              toolInvocations
-                .map((p) => {
-                  const ti = p.toolInvocation;
-                  if (!ti) return "";
-
-                  const resultStr = serializeToolResult(ti.result);
-
-                  return `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n\n<details>\n<summary>View Result</summary>\n\n${resultStr}\n\n</details>\n`;
-                })
-                .join("\n\n");
+          const sections: string[] = [];
+          for (const part of m.parts) {
+            if (part.type === "text" && part.text?.trim()) {
+              sections.push(part.text.trim());
+            } else if (part.type === "tool-invocation" && part.toolInvocation) {
+              const ti = part.toolInvocation;
+              const resultStr = serializeToolResult(ti.result);
+              sections.push(
+                `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n\n${resultStr}`
+              );
+            }
           }
-          return text;
+
+          if (sections.length === 0) return "";
+          return `## ${role}\n\n${sections.join("\n\n")}`;
         })
         .filter((text) => text !== "")
         .join("\n\n---\n\n");
@@ -851,11 +841,9 @@ export function ChatTab({
   );
 
   const handleCopyChat = useCallback(() => {
-    const formattedMessages = formatMessagesAsMarkdown(messages, {
-      includeToolCalls: false,
-    });
+    const formattedMessages = formatMessagesAsMarkdown(messages);
 
-    navigator.clipboard.writeText(formattedMessages).then(
+    copyToClipboard(formattedMessages).then(
       () => toast.success("Chat copied to clipboard"),
       () => toast.error("Failed to copy chat")
     );
@@ -863,40 +851,39 @@ export function ChatTab({
 
   const handleExportChat = useCallback(
     (format: "json" | "markdown") => {
-      let content = "";
-      let filename = `chat-export-${new Date().toISOString().split("T")[0]}`;
-      let mimeType = "";
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filename = `chat-export-${dateStr}`;
 
       if (format === "json") {
-        // Normalize messages for a consistent export schema
-        const normalizedMessages = messages.map((m) => ({
-          ...m,
-          // Ensure content is always the flattened string representation for easy parsing
+        const exportedMessages = messages.map((m) => ({
+          id: m.id,
+          role: m.role,
           content: serializeMessageContent(m),
-          // If the original was a complex structure, it will still be in message.content
-          // but now overwritten by the normalized string at the top level for consistency.
+          timestamp: m.timestamp,
+          toolInvocations: m.parts
+            ?.filter((p) => p.type === "tool-invocation" && p.toolInvocation)
+            .map((p) => ({
+              toolName: p.toolInvocation!.toolName,
+              args: p.toolInvocation!.args,
+              result: p.toolInvocation!.result,
+            })),
         }));
-        content = JSON.stringify(normalizedMessages, null, 2);
-        filename += ".json";
-        mimeType = "application/json";
+        downloadJSON(exportedMessages, filename + ".json");
       } else {
-        content = formatMessagesAsMarkdown(messages);
-        filename += ".md";
-        mimeType = "text/markdown";
+        const content = formatMessagesAsMarkdown(messages);
+        const blob = new Blob([content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename + ".md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
       }
-
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       toast.success(`Chat exported as ${format.toUpperCase()}`);
     },
-    [messages, formatMessagesAsMarkdown]
+    [messages, formatMessagesAsMarkdown, serializeMessageContent]
   );
 
   const handleClearConfig = useCallback(() => {

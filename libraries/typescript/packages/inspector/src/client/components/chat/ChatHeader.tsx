@@ -128,7 +128,6 @@ export function ChatHeader({
         {/* New Chat / Clear button */}
         {!hideClearButton && hasMessages && (
           <div className="flex items-center gap-1">
-            {/* Copy Chat */}
             {onCopyChat && (
               <Button
                 variant="ghost"
@@ -141,7 +140,6 @@ export function ChatHeader({
               </Button>
             )}
 
-            {/* Export Chat Dropdown */}
             {onExportChat && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
