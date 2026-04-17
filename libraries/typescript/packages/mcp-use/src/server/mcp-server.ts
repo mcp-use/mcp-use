@@ -108,6 +108,7 @@ import {
   isDeno,
   isProductionMode as isProductionModeHelper,
   logRegisteredItems as logRegisteredItemsHelper,
+  OriginResolver,
   parseTemplateUri as parseTemplateUriHelper,
   rewriteSupabaseRequest,
   startServer,
@@ -332,6 +333,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * Used for generating widget URLs and OAuth callbacks.
    */
   public serverBaseUrl?: string;
+
+  /**
+   * Resolver backing `allowedOrigins`. Provides Host validation and the
+   * per-request base URL / CSP allow-list for widget output. Always
+   * instantiated; when `allowedOrigins` is not configured the resolver
+   * simply reports `isEnabled() === false` and the middleware short-circuits.
+   */
+  public originResolver!: OriginResolver;
 
   /**
    * Optional favicon URL to display in inspector and documentation.
@@ -2368,6 +2377,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
 
+    // Build the origin resolver. Always instantiated so middleware + widgets
+    // have a stable handle; when allowedOrigins is unset, the resolver is a
+    // no-op (isEnabled() === false). Fallback origin is refined in listen()
+    // once MCP_URL / host:port is known.
+    this.originResolver = new OriginResolver(config.allowedOrigins, {
+      fallbackOrigin: config.baseUrl ?? null,
+    });
+
     // Auto-select favicon from icons array if not explicitly provided
     if (config.favicon) {
       this.favicon = config.favicon;
@@ -2421,7 +2438,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Create and configure Hono app with default middleware
     this.app = createHonoApp(requestLogger, {
       cors: this.config.cors,
-      allowedOrigins: this.config.allowedOrigins,
+      originResolver: this.originResolver,
     });
 
     // Install the custom routes middleware FIRST (before any other routes).
@@ -3716,6 +3733,33 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Mount the HMAC-signed origins-refresh webhook. Only mounted when the
+   * resolver was configured with a `webhookSecret` (or the
+   * `MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET` env var is set).
+   *
+   * @internal
+   */
+  private mountOriginsWebhook(): void {
+    if (!this.originResolver.hasWebhook()) return;
+
+    this.app.post(OriginResolver.WEBHOOK_PATH, async (c) => {
+      const rawBody = await c.req.text();
+      const signatureHeader = c.req.header("x-mcp-signature") ?? null;
+      const result = await this.originResolver.handleWebhook({
+        rawBody,
+        signatureHeader,
+      });
+      if (result.status === 204) {
+        return new Response(null, { status: 204 });
+      }
+      return new Response(result.body ?? "", { status: result.status });
+    });
+    console.log(
+      `[OriginResolver] webhook mounted at ${OriginResolver.WEBHOOK_PATH}`
+    );
+  }
+
+  /**
    * Starts the HTTP server and begins listening for connections.
    *
    * This method is the primary way to run an MCP server as a standalone HTTP service.
@@ -3888,6 +3932,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverPort
     );
 
+    // Refine the resolver's fallback origin now that MCP_URL / host:port has
+    // been resolved, then run the initial provider fetch. For static
+    // `allowedOrigins: string[]` this is a no-op; for the dynamic object form
+    // it awaits the first fetch with a 5-second timeout and populates the
+    // last-known-good list before any /mcp request is served.
+    this.originResolver.setFallbackOrigin(this.serverBaseUrl ?? null);
+    await this.originResolver.init();
+    this.mountOriginsWebhook();
+
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
@@ -4010,6 +4063,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
+    // Refine fallback origin + initialize the resolver for the serverless
+    // path too (listen() normally does this).
+    this.originResolver.setFallbackOrigin(this.serverBaseUrl ?? null);
+    await this.originResolver.init();
+    this.mountOriginsWebhook();
+
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(

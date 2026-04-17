@@ -46,30 +46,59 @@ export const widgetMetadata: WidgetMetadata = {
 
 ### Security Best Practices
 
-1. **Specify exact domains**: `https://api.weather.com` (not wildcards)
-2. **Avoid wildcards**: `https://*.weather.com` is less secure
-3. **Never use `'unsafe-eval'`** unless absolutely necessary
-4. **Test CSP in development** before deploying
-5. **Use HTTPS** for all resources
+1. **Prefer exact domains** for third-party APIs (`https://api.weather.com`).
+2. **Use wildcards deliberately** (`https://*.weather.com`) — mcp-use supports them for one subdomain label, matching CSP host-source semantics.
+3. **Never use `'unsafe-eval'`** unless absolutely necessary.
+4. **Test CSP in development** before deploying (Inspector → Widget-Declared mode).
+5. **Use HTTPS** for all resources.
+
+### Hosting the server on multiple domains (Vercel-style, previews, canary)
+
+When the same MCP server is reachable from multiple public URLs (preview deploys, custom domains), don't hardcode a single `baseUrl` — configure `allowedOrigins` on `MCPServer`. A single option drives both DNS-rebinding Host validation AND widget `<base>` + CSP per request:
+
+```typescript
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL,
+  allowedOrigins: [
+    "https://app.example.com",
+    "https://*.preview.example.com", // all preview URLs for this repo
+  ],
+});
+```
+
+For remote-managed allow-lists, use the object form with `providerUrl` (honors `Cache-Control` / `ETag` / `stale-while-revalidate`) and an HMAC-signed push webhook for instant updates:
+
+```typescript
+allowedOrigins: {
+  origins: ["https://app.example.com"],
+  providerUrl: process.env.MCP_ALLOWED_ORIGINS_URL,
+  token: process.env.MCP_ALLOWED_ORIGINS_TOKEN,
+  webhookSecret: process.env.MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET,
+}
+```
+
+See `docs/typescript/server/content-security-policy.mdx` for the full provider contract.
 
 ### Troubleshooting CSP Errors
 
 **Problem:** Widget loads but assets fail
 
 **Solutions:**
-1. Check browser console for CSP violation messages
-2. Add missing domains to CSP:
+1. Check browser console for CSP violation messages.
+2. Add missing third-party domains to the widget's CSP:
    ```typescript
    metadata: {
      csp: {
-       connectDomains: ['https://api.example.com'], // Add missing API
-       resourceDomains: ['https://cdn.example.com'], // Add missing CDN
+       connectDomains: ['https://api.example.com'], // third-party API
+       resourceDomains: ['https://cdn.example.com'], // third-party CDN
      }
    }
    ```
-3. Use exact domains - avoid wildcards in production
-4. Test in Inspector before deploying
-5. Set `CSP_URLS` environment variable for additional domains
+3. If the MCP server is reachable under multiple domains, add them to `allowedOrigins` on `MCPServer` so widget `<base>` and CSP track the incoming request.
+4. Test in Inspector's Widget-Declared CSP mode before deploying.
+5. `CSP_URLS` env var still works for additional static entries (legacy).
 
 ## Metadata Configuration
 

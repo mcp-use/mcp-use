@@ -100,7 +100,12 @@ const server = new MCPServer({
   name: "my-server",
   title: "My Server",
   version: "1.0.0",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000"
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+  // Multi-domain? Uncomment and list the public origins this server is
+  // reachable from. Widget <base>, asset paths and CSP are then computed
+  // per-request. Wildcards (https://*.preview.example.com) are supported.
+  // See `skills/chatgpt-app-builder/references/csp-and-metadata.md`.
+  // allowedOrigins: ["https://app.example.com", "https://*.preview.example.com"],
 });
 
 // Add this tool

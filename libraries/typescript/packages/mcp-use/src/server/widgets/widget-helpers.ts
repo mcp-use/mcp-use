@@ -13,6 +13,7 @@ import type {
   WidgetProps,
 } from "../types/index.js";
 import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import type { OriginResolver } from "../utils/origin-resolver.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -716,16 +717,28 @@ export async function registerWidgetFromTemplate(
   isDev: boolean = false
 ): Promise<void> {
   // Read and process HTML template
-  let html = await readWidgetHtml(htmlPath, widgetName);
-  if (!html) {
+  const rawHtml = await readWidgetHtml(htmlPath, widgetName);
+  if (!rawHtml) {
     return; // readWidgetHtml already logged the error
   }
 
   // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  const html = processWidgetHtml(
+    rawHtml,
+    widgetName,
+    serverConfig.serverBaseUrl
+  );
 
-  // Ensure metadata has proper fallbacks
+  // Ensure metadata has proper fallbacks; propagate raw HTML via _meta so that
+  // the dynamic origin resolver can re-process it at resources/read time with
+  // the current request's effective origin.
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
+  const existingMeta =
+    (processedMetadata._meta as Record<string, unknown>) || {};
+  processedMetadata._meta = {
+    ...existingMeta,
+    "mcp-use/rawHtml": rawHtml,
+  };
 
   // Create and register the widget
   const widgetRegistration = createWidgetRegistration(
@@ -831,4 +844,138 @@ export function setupFaviconRoute(
       return c.notFound();
     }
   });
+}
+
+/**
+ * Request-scoped clone of a widget definition used when the origin resolver
+ * is active. Re-processes HTML with the effective base URL for the incoming
+ * request and extends every CSP array with the union of:
+ *
+ *   - the effective request origin (request Host if allow-listed, else fallback),
+ *   - every currently-known allow-listed origin (static + provider, wildcards preserved).
+ *
+ * This is a no-op in static mode — the caller in `ui-resource-registration.ts`
+ * guards on `resolver.isEnabled()`.
+ */
+export function augmentDefinitionForRequest(opts: {
+  definition: UIResourceDefinition;
+  request: { headers: { get(name: string): string | null }; url?: string };
+  resolver: OriginResolver;
+  rawHtml?: string;
+  fallbackBaseUrl?: string;
+  serverHost: string;
+  serverPort: number | string;
+}): UIResourceDefinition {
+  const { definition, request, resolver, rawHtml } = opts;
+  const resolved = resolver.resolveRequest(request);
+  const effectiveBase =
+    resolved.origin ||
+    opts.fallbackBaseUrl ||
+    `http://${opts.serverHost}:${opts.serverPort}`;
+
+  const allowList = resolver.getAllowedOriginStringsSync();
+
+  // Build the union (dedupe, preserve wildcards). Effective base always first
+  // so clients that inspect CSP get a predictable primary origin.
+  const unionSet = new Set<string>();
+  const union: string[] = [];
+  const push = (v: string | undefined | null) => {
+    if (!v) return;
+    const trimmed = v.trim();
+    if (!trimmed || unionSet.has(trimmed)) return;
+    unionSet.add(trimmed);
+    union.push(trimmed);
+  };
+  push(effectiveBase);
+  for (const origin of allowList) push(origin);
+
+  // Clone with re-processed HTML when the underlying widget was authored via
+  // processWidgetHtml (raw HTML available). Programmatic `htmlTemplate` widgets
+  // pass through unchanged.
+  const cloned: UIResourceDefinition = {
+    ...definition,
+  } as UIResourceDefinition;
+  if (
+    (definition.type === "appsSdk" || definition.type === "mcpApps") &&
+    rawHtml
+  ) {
+    (cloned as { htmlTemplate: string }).htmlTemplate = processWidgetHtml(
+      rawHtml,
+      definition.name,
+      effectiveBase
+    );
+  }
+
+  if (definition.type === "appsSdk" || definition.type === "mcpApps") {
+    const appsSdkMeta =
+      "appsSdkMetadata" in definition ? definition.appsSdkMetadata : undefined;
+    const existingWidgetCSP =
+      (appsSdkMeta as any)?.["openai/widgetCSP"] ?? undefined;
+
+    const mergedWidgetCSP: Record<string, string[] | undefined> = {
+      connect_domains: mergeCspArray(existingWidgetCSP?.connect_domains, union),
+      resource_domains: mergeCspArray(
+        existingWidgetCSP?.resource_domains,
+        union
+      ),
+      base_uri_domains: mergeCspArray(
+        existingWidgetCSP?.base_uri_domains,
+        union
+      ),
+    };
+    if (existingWidgetCSP?.frame_domains)
+      mergedWidgetCSP.frame_domains = existingWidgetCSP.frame_domains;
+    if (existingWidgetCSP?.redirect_domains)
+      mergedWidgetCSP.redirect_domains = existingWidgetCSP.redirect_domains;
+
+    (cloned as any).appsSdkMetadata = {
+      ...(appsSdkMeta as Record<string, unknown> | undefined),
+      "openai/widgetCSP": mergedWidgetCSP,
+    };
+  }
+
+  if (definition.type === "mcpApps") {
+    const existingMetadata =
+      "metadata" in definition ? definition.metadata : undefined;
+    const existingCsp = (existingMetadata as any)?.csp ?? undefined;
+    const mergedCsp = {
+      ...(existingCsp || {}),
+      resourceDomains: mergeCspArray(existingCsp?.resourceDomains, union),
+      connectDomains: mergeCspArray(existingCsp?.connectDomains, union),
+      baseUriDomains: mergeCspArray(existingCsp?.baseUriDomains, union),
+    };
+    (cloned as any).metadata = {
+      ...(existingMetadata as Record<string, unknown> | undefined),
+      csp: mergedCsp,
+    };
+  }
+
+  return cloned;
+}
+
+/**
+ * Merge an existing CSP array with new entries, deduping exact string matches
+ * while preserving order (existing entries first, then new).
+ */
+function mergeCspArray(
+  existing: string[] | undefined,
+  additions: string[]
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  if (existing) {
+    for (const v of existing) {
+      if (!seen.has(v)) {
+        seen.add(v);
+        out.push(v);
+      }
+    }
+  }
+  for (const v of additions) {
+    if (!seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+    }
+  }
+  return out;
 }

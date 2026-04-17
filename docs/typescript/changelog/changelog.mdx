@@ -6,6 +6,18 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.25.0" description="April 2026">
+  ## Dynamic `allowedOrigins` for multi-domain deployments
+  Minor release extending `allowedOrigins` from a static `string[]` to a dynamic allow-list that drives both DNS-rebinding Host validation and widget `<base>` / CSP per request.
+
+- **New**: `allowedOrigins` accepts an object form (`{ origins, provider, providerUrl, token, headers, webhookSecret, fallbackRevalidateSeconds }`) with wildcard support (`https://*.preview.example.com`), async provider callback, remote JSON provider URL honoring `Cache-Control` / `ETag` / `If-None-Match` / `stale-while-revalidate`, and an optional HMAC-signed push webhook at `POST /mcp-use/internal/origins/refresh`
+- **New**: Widget `<base>`, `window.__getFile`, `window.__mcpPublicUrl`, and CSP (`connect_domains` / `resource_domains` / `base_uri_domains`) are computed per-request from the allow-list when any `allowedOrigins` is set — unknown `Host` falls back to `baseUrl` / `MCP_URL`
+- **New**: Env vars `MCP_ALLOWED_ORIGINS`, `MCP_ALLOWED_ORIGINS_URL`, `MCP_ALLOWED_ORIGINS_TOKEN`, `MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET`
+- **New**: Fail-closed cold start — when a provider is configured but the initial fetch fails AND no static origins are set, `/mcp` returns `503 origin allow-list unavailable` until the resolver recovers (no silent bypass of Host validation)
+- **Backwards-compatible**: `allowedOrigins: string[]` keeps today's hostname-level Host validation semantics; unset `allowedOrigins` keeps today's static `baseUrl`-only widgets
+- **Docs**: Rewritten [Content Security Policy](/typescript/server/content-security-policy) and [Configuration](/typescript/server/configuration) pages; new [dynamic-origins example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/dynamic-origins)
+</Update>
+
 <Update label="v1.24.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.24.0&title=OAuth%20scopes%2C%20telemetry%2C%20CLI%203%20%26%20device%20flow&date=2026-04&lang=typescript" alt="Release 1.24.0" />

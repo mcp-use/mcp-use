@@ -32,7 +32,7 @@ The app is consumed by **two users at once**: the **human** and the **ChatGPT LL
 - **Widget state and LLM context** → [state-and-context.md](references/state-and-context.md): when persisting state, triggering LLM from widget, managing ephemeral vs persistent data
 - **Display modes, theme, layout** → [ui-guidelines.md](references/ui-guidelines.md): when adapting to inline/fullscreen/PiP, handling theme, device, locale
 - **Component API** → [components-api.md](references/components-api.md): when using McpUseProvider, Image, ErrorBoundary, useWidget
-- **CSP and metadata** → [csp-and-metadata.md](references/csp-and-metadata.md): when configuring external domains, dual-protocol metadata
+- **CSP and metadata** → [csp-and-metadata.md](references/csp-and-metadata.md): when configuring external domains, dual-protocol metadata, **multi-domain deployments (Vercel previews, canary) via `allowedOrigins`**
 - **Advanced patterns** → [widget-patterns.md](references/widget-patterns.md): when building complex widgets with tool calls, state, theming
 
 ## Quick Reference

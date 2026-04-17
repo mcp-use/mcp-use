@@ -7,6 +7,7 @@
 import { Hono, type Hono as HonoType } from "hono";
 import { cors } from "hono/cors";
 import { hostHeaderValidation } from "../middleware/host-validation.js";
+import type { OriginResolver, ResolveResult } from "./origin-resolver.js";
 import { getEnv } from "./runtime.js";
 
 /**
@@ -35,43 +36,18 @@ export function getDefaultCorsOptions(): Parameters<typeof cors>[0] {
 /**
  * Create and configure a new Hono app instance with default middleware
  *
- * Sets up CORS and request logging middleware for the MCP server.
+ * Sets up CORS and request logging middleware for the MCP server. When an
+ * `originResolver` is provided AND the user actually configured
+ * `allowedOrigins`, Host validation middleware is installed globally.
  *
  * @param requestLogger - Request logging middleware function
+ * @param options.originResolver - Resolver driving Host validation
+ * @param options.cors - Custom CORS options
  * @returns Configured Hono app instance
  */
 interface CreateHonoAppOptions {
-  allowedOrigins?: string[];
+  originResolver?: OriginResolver;
   cors?: Partial<Parameters<typeof cors>[0]>;
-}
-
-function parseAllowedHostname(value: string): string | null {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) {
-    return null;
-  }
-
-  try {
-    return new URL(trimmedValue).hostname.toLowerCase();
-  } catch {
-    try {
-      return new URL(`http://${trimmedValue}`).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-}
-
-function getAllowedHostnames(allowedOrigins?: string[]): string[] {
-  if (!allowedOrigins || allowedOrigins.length === 0) {
-    return [];
-  }
-
-  const hostnames = allowedOrigins
-    .map((origin) => parseAllowedHostname(origin))
-    .filter((hostname): hostname is string => Boolean(hostname));
-
-  return [...new Set(hostnames)];
 }
 
 export function createHonoApp(
@@ -80,10 +56,10 @@ export function createHonoApp(
 ): HonoType {
   const app = new Hono();
 
-  const allowedHostnames = getAllowedHostnames(options.allowedOrigins);
-
-  if (allowedHostnames.length > 0) {
-    app.use("*", hostHeaderValidation(allowedHostnames));
+  // Only enable Host validation when the user actually configured
+  // `allowedOrigins`. Resolvers built from an empty/absent config are no-ops.
+  if (options.originResolver && options.originResolver.isEnabled()) {
+    app.use("*", hostHeaderValidation(options.originResolver));
   }
 
   // Enable CORS by default, with optional config overrides
@@ -166,7 +142,6 @@ export function getServerBaseUrl(
 export function getCSPUrls(): string[] {
   const cspUrlsEnv = getEnv("CSP_URLS");
   if (!cspUrlsEnv) {
-    console.log("[CSP] No CSP_URLS environment variable found");
     return [];
   }
 
@@ -176,8 +151,41 @@ export function getCSPUrls(): string[] {
     .map((url) => url.trim())
     .filter((url) => url.length > 0);
 
-  console.log("[CSP] Parsed CSP URLs:", urls);
   return urls;
+}
+
+/**
+ * Resolve the effective base URL + allow-list for a given request using
+ * the optional `OriginResolver`. When no resolver is configured (or the
+ * request Host isn't allow-listed), falls back to the static `baseUrl`.
+ *
+ * Designed for use inside widget read callbacks via `getRequestContext()`.
+ *
+ * @param req - Incoming request (Web `Request` or Hono-compatible object)
+ * @param resolver - Optional OriginResolver; when absent, always uses fallback
+ * @param fallback - Fallback base URL (typically the configured baseUrl)
+ * @returns Resolved origin and whether the request Host was allow-listed
+ */
+export function resolveBaseUrlForRequest(
+  req:
+    | { headers: { get(name: string): string | null }; url?: string }
+    | undefined,
+  resolver: OriginResolver | undefined,
+  fallback: string | null | undefined
+): ResolveResult {
+  if (!resolver || !resolver.isEnabled() || !req) {
+    return {
+      origin: fallback ?? "",
+      isAllowed: false,
+      requestHostname: null,
+    };
+  }
+
+  const result = resolver.resolveRequest(req);
+  if (!result.isAllowed && !result.origin && fallback) {
+    return { ...result, origin: fallback };
+  }
+  return result;
 }
 
 /**

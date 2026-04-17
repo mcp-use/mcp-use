@@ -158,6 +158,10 @@ export const widgetMetadata: WidgetMetadata = {
   metadata: {
     invoking: "Fetching weather...", // Shimmer text while tool runs
     invoked: "Weather loaded",       // Static text when complete
+    // Third-party origins your widget fetches from belong here.
+    // The MCP server's own origin(s) are added automatically at read time
+    // from the server's `allowedOrigins` / `baseUrl` configuration — you
+    // don't need to list them in `metadata.csp`.
     csp: { connectDomains: ["https://api.weather.com"] },
   },
 };

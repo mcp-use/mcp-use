@@ -44,8 +44,15 @@ const server = new MCPServer({
     allowMethods: ['GET', 'POST', 'OPTIONS'],
   },
 
-  // ── DNS Rebinding Protection ───────────────────────────────
-  allowedOrigins: ['https://myapp.com'],  // Enables Host header validation
+  // ── Allowed origins (Host validation + widget CSP) ─────────
+  // Plain array form (hostname-level Host validation, static CSP).
+  allowedOrigins: ['https://myapp.com', 'https://*.preview.myapp.com'],
+  // Or object form for async providers + HMAC webhook:
+  // allowedOrigins: {
+  //   origins: ['https://myapp.com'],
+  //   providerUrl: process.env.MCP_ALLOWED_ORIGINS_URL,
+  //   webhookSecret: process.env.MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET,
+  // },
 
   // ── Transport ─────────────────────────────────────────────
   stateless: false,                     // See "Stateless Mode" below
@@ -341,43 +348,74 @@ MCP protocol routes (`/mcp`, `/mcp-use/widgets/*`, `/inspector`) are registered 
 
 ## Security Configuration
 
-### DNS Rebinding Protection
+### Allowed origins (Host validation + widget CSP)
 
-Use `allowedOrigins` to enable Host header validation and protect against DNS rebinding attacks.
+`allowedOrigins` is one option with two roles:
+
+1. **DNS-rebinding protection** — rejects requests with an unknown `Host` header (`403`).
+2. **Dynamic widget hosting** — when set, widget `<base>`, `window.__getFile`, `window.__mcpPublicUrl`, and CSP are computed per request from the allow-list so the same server can serve multiple domains.
 
 **Behavior:**
-- `allowedOrigins` not set (default) → no host validation, all `Host` values accepted
-- `allowedOrigins: []` → no host validation (same as not set)
-- `allowedOrigins: ['https://myapp.com']` → Host header must match one of the configured hostnames; applies globally to all routes
+
+- Not set (default) → no Host validation, widgets use the single static `baseUrl`.
+- `string[]` form → static allow-list; supports wildcards like `"https://*.preview.example.com"`. Matches one subdomain label (CSP host-source semantics).
+- Object form → adds async providers and an HMAC push webhook.
 
 ```typescript
-// Default: no host validation (development)
-const devServer = new MCPServer({
-  name: 'dev-server',
-  version: '1.0.0',
-})
-
-// Production: restrict to known hostnames
-const prodServer = new MCPServer({
-  name: 'prod-server',
-  version: '1.0.0',
-  allowedOrigins: [
-    'https://myapp.com',
-    'https://app.myapp.com',
-  ],
-})
-
-// Load from environment
+// Single-domain production deployment
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  allowedOrigins: process.env.ALLOWED_ORIGINS?.split(','),
-})
+  name: "prod-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL,
+  allowedOrigins: ["https://myapp.com", "https://app.myapp.com"],
+});
+
+// Multi-domain with wildcards
+const previewServer = new MCPServer({
+  name: "preview-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL,
+  allowedOrigins: [
+    "https://app.example.com",
+    "https://*.preview.example.com", // matches pr-42.preview.example.com
+  ],
+});
+
+// Dynamic: remote provider + instant updates via webhook
+const dynamicServer = new MCPServer({
+  name: "dynamic-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL,
+  allowedOrigins: {
+    origins: ["https://app.example.com"],
+    providerUrl: process.env.MCP_ALLOWED_ORIGINS_URL,
+    token: process.env.MCP_ALLOWED_ORIGINS_TOKEN,
+    webhookSecret: process.env.MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET,
+  },
+});
 ```
 
+Environment variables:
+
+```env
+MCP_ALLOWED_ORIGINS=https://app.example.com,https://*.b.com
+MCP_ALLOWED_ORIGINS_URL=https://config.example.com/origins.json
+MCP_ALLOWED_ORIGINS_TOKEN=sk_...
+MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET=whsec_...
+```
+
+`MCP_ALLOWED_ORIGINS_URL` is fetched with standard HTTP cache validators
+(`Cache-Control`, `ETag`, `If-None-Match`, `stale-while-revalidate`). See
+[Content Security Policy](./content-security-policy) for the provider
+contract and webhook format.
+
 <Tip>
-`allowedOrigins` accepts full URLs (e.g. `"https://myapp.com"`) and normalizes them to hostnames for validation.
+Entries accept full URLs (`"https://myapp.com"`) or hostnames (`"myapp.com"`). Wildcards match exactly one subdomain label and must include at least two suffix labels (`*.example.com` is accepted; `*.com` is not).
 </Tip>
+
+<Warning>
+When an object-form provider is configured but the initial fetch fails and no static `origins` are set, `/mcp` returns `503 origin allow-list unavailable` until the resolver recovers. This prevents silently disabling Host validation when the upstream is down at boot.
+</Warning>
 
 ### Session Timeout
 

@@ -16,8 +16,11 @@ import type {
   ToolDefinition,
   UIResourceDefinition,
 } from "../types/index.js";
+import { getRequestContext } from "../context-storage.js";
+import type { OriginResolver } from "../utils/origin-resolver.js";
 import {
   applyDefaultProps,
+  augmentDefinitionForRequest,
   convertPropsToInputs,
   createWidgetUIResource,
   generateWidgetUri,
@@ -42,6 +45,8 @@ export interface UIResourceServer {
   readonly serverHost: string;
   readonly serverPort?: number;
   readonly serverBaseUrl?: string;
+  /** Resolver used to make widget <base> / CSP dynamic per request. Optional. */
+  readonly originResolver?: OriginResolver;
   /** Storage for widget definitions, used to inject metadata into tool responses */
   widgetDefinitions: Map<string, Record<string, unknown>>;
   /** Registrations storage for checking existing registrations (for HMR updates) */
@@ -190,17 +195,22 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   // Only store what's needed to build protocol metadata at tool-call time:
   // - widgetType: to decide mcpApps vs appsSdk code path
   // - metadata: CSP/domain config needed by protocol adapters
-  // No mcp-use/* keys are stored — they don't belong on the wire.
+  // - mcp-use/rawHtml: unprocessed HTML preserved for per-request re-processing
+  //   when the origin resolver is in dynamic mode. Null-safe (may be undefined
+  //   for programmatic widgets that didn't go through processWidgetHtml).
+  // No mcp-use/* keys are surfaced on the wire.
   if (
     enrichedDefinition.type === "appsSdk" ||
     enrichedDefinition.type === "mcpApps"
   ) {
+    const rawHtml = (enrichedDefinition._meta as any)?.["mcp-use/rawHtml"];
     server.widgetDefinitions.set(enrichedDefinition.name, {
       widgetType: enrichedDefinition.type,
       metadata:
         enrichedDefinition.type === "mcpApps"
           ? enrichedDefinition.metadata
           : undefined,
+      "mcp-use/rawHtml": typeof rawHtml === "string" ? rawHtml : undefined,
     } as Record<string, unknown>);
 
     // Update any existing tools that reference this widget
@@ -315,8 +325,46 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     return (full as UIResourceDefinition) ?? enrichedDefinition;
   };
 
+  /**
+   * When the origin resolver is enabled, clone the definition and re-process
+   * HTML + CSP for the current request. When it isn't, fall through with the
+   * definition as-registered (zero per-request overhead = today's behavior).
+   */
+  const buildRequestScopedDefinition = (
+    def: UIResourceDefinition
+  ): UIResourceDefinition => {
+    const resolver = server.originResolver;
+    // Any `allowedOrigins` form activates per-request widget resolution:
+    // the resolver becomes the single source of truth for Host validation
+    // AND widget <base>/CSP. When unset, the resolver reports !isEnabled()
+    // and we fall through unchanged (zero per-request overhead = today).
+    if (!resolver || !resolver.isEnabled()) return def;
+    const ctx = getRequestContext();
+    const req = ctx?.req.raw;
+    if (!req) return def;
+
+    const stored = server.widgetDefinitions.get(def.name) as
+      | Record<string, unknown>
+      | undefined;
+    const rawHtml =
+      (stored?.["mcp-use/rawHtml"] as string | undefined) ?? undefined;
+
+    // Fire-and-forget background refresh if the resolver's cache is stale.
+    resolver.refreshIfStale();
+
+    return augmentDefinitionForRequest({
+      definition: def,
+      request: req,
+      resolver,
+      rawHtml,
+      fallbackBaseUrl: server.serverBaseUrl,
+      serverHost: server.serverHost,
+      serverPort: server.serverPort || 3000,
+    });
+  };
+
   const resourceReadCallback = async () => {
-    const latestDef = getLatestDefinition();
+    const latestDef = buildRequestScopedDefinition(getLatestDefinition());
     const params =
       latestDef.type === "externalUrl"
         ? applyDefaultProps(latestDef.props)
@@ -339,7 +387,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     uri: URL,
     _params: Record<string, string>
   ) => {
-    const latestDef = getLatestDefinition();
+    const latestDef = buildRequestScopedDefinition(getLatestDefinition());
     const uiResource = await createWidgetUIResource(
       latestDef,
       {},

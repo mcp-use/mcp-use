@@ -116,6 +116,8 @@ MCP_URL=https://my-tunnel.trycloudflare.com npx @mcp-use/cli dev
 
 <Tip>
 When using a reverse proxy, set `MCP_URL` to the public-facing URL. This ensures widget hot-reload (HMR) and asset loading work correctly through the proxy.
+
+For multi-domain or preview deployments (several public URLs pointing at the same server), use [`allowedOrigins`](/typescript/server/content-security-policy) in `MCPServer` config instead. Widget `<base>` and CSP are then computed per request.
 </Tip>
 
 ## Automatic Port Selection

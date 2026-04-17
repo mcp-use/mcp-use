@@ -143,6 +143,8 @@ Load these before diving into tools/resources/widgets sections.
   - When: Creating your first widget or adding UI to an existing tool
   - Covers: Widget setup, `useWidget()` hook, `isPending` checks, props handling
 
+**Multi-domain / preview deployments** — when the same server is reachable from several public URLs (Vercel previews, custom domains, canary), set `allowedOrigins` on `MCPServer` (supports wildcards and dynamic providers with an HMAC webhook). Widget `<base>`, asset paths, and CSP then adapt per request. See [csp-and-metadata.md](../chatgpt-app-builder/references/csp-and-metadata.md) and `docs/typescript/server/content-security-policy`.
+
 - **[state.md](references/widgets/state.md)**
   - When: Managing UI state (selections, filters, tabs) within widgets
   - Covers: `useState`, `setState`, state persistence, when to use tool vs widget state

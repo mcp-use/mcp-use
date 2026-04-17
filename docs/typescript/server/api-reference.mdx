@@ -112,45 +112,72 @@ interface ServerConfig {
     maxAge?: number
     credentials?: boolean
   }
-  allowedOrigins?: string[] // Allowed origin values (normalized to hostnames for global Host validation)
+  allowedOrigins?: string[] | AllowedOriginsConfig // Drives DNS-rebinding Host validation AND dynamic widget base-URL / CSP
   sessionIdleTimeoutMs?: number     // Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
   autoCreateSessionOnInvalidId?: boolean // @deprecated Will be removed in a future version. Use sessionStore for persistent sessions.
+}
+
+interface AllowedOriginsConfig {
+  origins?: string[]
+  provider?: () => string[] | Promise<string[]>
+  providerUrl?: string
+  token?: string
+  headers?: Record<string, string>
+  webhookSecret?: string
+  fallbackRevalidateSeconds?: number // default 60s
 }
 ```
 
 **`allowedOrigins` Configuration:**
 
-The `allowedOrigins` option controls DNS rebinding host validation:
+Single option with two roles:
+- **DNS-rebinding host validation** — unknown `Host` → `403`.
+- **Dynamic widget hosting** — per request, widget `<base>`, asset URLs and CSP (`connect_domains`, `resource_domains`, `base_uri_domains`) use the incoming request's origin when it matches the allow-list.
 
-- **Default behavior** (`allowedOrigins` not set):
-  - Host validation is disabled
-  - All `Host` values are accepted
+Behavior summary:
 
-- **When `allowedOrigins` is set**:
-  - Values are normalized to hostnames and used as the Host allow list
-  - Validation applies across the whole server
+- Unset → no Host validation, widgets use the single static `baseUrl`.
+- `string[]` form → static allow-list with wildcard support (`"https://*.preview.example.com"`).
+- Object form → adds async provider, remote `providerUrl` with HTTP cache validators, and the optional HMAC push webhook at `POST /mcp-use/internal/origins/refresh`.
 
-- **When `allowedOrigins` is empty**:
-  - Host validation remains disabled
+Environment variables:
+
+- `MCP_ALLOWED_ORIGINS` — comma-separated list (merged with constructor `origins`).
+- `MCP_ALLOWED_ORIGINS_URL` — remote provider URL (merged with `providerUrl`).
+- `MCP_ALLOWED_ORIGINS_TOKEN` — Bearer token for the provider.
+- `MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET` — enables the push webhook.
 
 **Example:**
 ```typescript
-// Default behavior: host validation disabled
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0'
+// Default: no host validation
+const dev = new MCPServer({ name: 'dev', version: '1.0.0' })
+
+// Static multi-domain with wildcards
+const app = new MCPServer({
+  name: 'app',
+  version: '1.0.0',
+  baseUrl: process.env.MCP_URL,
+  allowedOrigins: [
+    'https://app.example.com',
+    'https://*.preview.example.com',
+  ],
 })
 
-// Production: explicit allow list
-const server = new MCPServer({
-  name: 'my-server',
+// Dynamic provider + webhook for instant invalidation
+const dynamic = new MCPServer({
+  name: 'dynamic',
   version: '1.0.0',
-  allowedOrigins: [
-    'https://myapp.com',
-    'https://app.myapp.com'
-  ]
+  baseUrl: process.env.MCP_URL,
+  allowedOrigins: {
+    origins: ['https://app.example.com'],
+    providerUrl: process.env.MCP_ALLOWED_ORIGINS_URL,
+    token: process.env.MCP_ALLOWED_ORIGINS_TOKEN,
+    webhookSecret: process.env.MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET,
+  },
 })
 ```
+
+See [Content Security Policy](./content-security-policy) for the provider contract and webhook signature format.
 
 ## Core Server Methods
 

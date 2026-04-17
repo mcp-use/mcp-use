@@ -1,38 +1,141 @@
 ---
 title: "Content Security Policy"
-description: "Configure CSP for MCP Apps and ChatGPT Apps SDK widgets"
+description: "Configure CSP and multi-domain hosting for MCP Apps and ChatGPT Apps SDK widgets"
 icon: "shield"
 ---
 
 Content Security Policy (CSP) controls which domains your widgets can fetch from, load scripts/styles from, and embed. Widgets run in sandboxed iframes, so CSP must explicitly allow any external resources.
 
-## Automatic Configuration
+Since `mcp-use` v3.0, CSP and widget base URLs can be driven by a single
+dynamic allow-list via `allowedOrigins` — useful when the same server is
+reachable from multiple domains (preview deployments, canary, custom domains).
 
-When `baseUrl` is set (via `MCPServer` constructor or `MCP_URL` environment variable), mcp-use automatically configures CSP:
+## Automatic configuration
+
+When `baseUrl` is set (via `MCPServer` constructor or `MCP_URL` env var),
+mcp-use automatically configures CSP for that one origin. This is fine for
+single-domain deployments:
 
 ```typescript
 const server = new MCPServer({
   name: "my-server",
   version: "1.0.0",
-  baseUrl: process.env.MCP_URL, // Required for production
+  baseUrl: process.env.MCP_URL, // Single public URL
 });
 ```
 
-This ensures:
+CSP includes the server origin, widget `<base>` and asset URLs resolve to it,
+and everything works out of the box.
 
-- Widget URLs use the correct domain
-- CSP includes your server domain
-- Works behind proxies and custom domains
+## Multi-domain / dynamic origins
 
-The server origin is auto-injected into each widget's `connectDomains`, `resourceDomains`, and `baseUriDomains`—you don't need to add it manually.
+To serve the same MCP server from multiple domains (`app.example.com`,
+`preview-42.example.com`, etc.) use the object form of `allowedOrigins`.
+One option drives both DNS-rebinding Host validation and per-request widget
+`<base>` + CSP rewriting:
 
-## Per-Widget Configuration
+```typescript
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL, // Fallback when Host isn't allow-listed
+  allowedOrigins: {
+    origins: [
+      "https://app.example.com",
+      "https://*.preview.example.com", // wildcards: one label
+    ],
+    providerUrl: process.env.MCP_ALLOWED_ORIGINS_URL, // optional
+    token: process.env.MCP_ALLOWED_ORIGINS_TOKEN, // optional
+    webhookSecret: process.env.MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET, // optional
+  },
+});
+```
 
-For widgets that need additional domains (APIs, CDNs, etc.), configure CSP in your widget metadata.
+Per request, mcp-use:
 
-### MCP Apps (all compatible clients, ChatGPT, Claude etc..)
+1. Validates the `Host` header against the allow-list. Unknown hosts → `403`.
+2. If matched, sets the widget `<base>`, `window.__getFile`,
+   `window.__mcpPublicUrl`, and CSP (`connect_domains`, `resource_domains`,
+   `base_uri_domains`) to the request's own origin, unioned with every
+   allow-list entry (wildcards passed through verbatim).
+3. If not matched but routed past Host validation (edge case), falls back to
+   `baseUrl`.
 
-With `type: "mcpApps"`, use camelCase in `metadata.csp`:
+### Static vs dynamic forms
+
+| Form | Host validation | Wildcards | Widget `<base>` | Widget CSP |
+| --- | --- | --- | --- | --- |
+| `allowedOrigins` unset | off | n/a | `baseUrl` | `baseUrl` + `CSP_URLS` + widget `metadata.csp` |
+| `allowedOrigins: string[]` | on | yes | Request origin if matched, else `baseUrl` | Same as dynamic: union |
+| `allowedOrigins: { … }` | on | yes | Same | Same |
+
+The object form additionally unlocks async providers, remote provider URL,
+and the HMAC push webhook.
+
+## Provider endpoint
+
+For lists you want to update without redeploying, point `providerUrl` at a
+JSON endpoint you control. mcp-use honors standard HTTP cache validators:
+
+```http
+GET /origins.json
+Authorization: Bearer <token>
+If-None-Match: "v42"
+```
+
+```http
+200 OK
+Cache-Control: public, max-age=10, stale-while-revalidate=60
+ETag: "v42"
+
+["https://app.example.com", "https://*.preview.example.com"]
+```
+
+- `max-age` / `s-maxage` controls how often the server revalidates.
+- `stale-while-revalidate` lets mcp-use serve the cached list while a
+  background refresh runs (zero added latency).
+- `ETag` / `Last-Modified` trigger conditional `304 Not Modified` responses,
+  keeping steady-state cost near zero.
+- 5xx / network failures are non-fatal: last-known-good list is kept and
+  retried per `Cache-Control`.
+- On cold start, if the provider fails AND no static `origins` are set,
+  /mcp returns `503 origin allow-list unavailable` — **fail-closed**.
+
+## Push webhook
+
+For instant invalidation (no need to wait for revalidation), set
+`webhookSecret` and POST to `/mcp-use/internal/origins/refresh` with an
+HMAC-signed body. Stripe-style:
+
+```http
+POST /mcp-use/internal/origins/refresh
+X-MCP-Signature: t=1734567890,v1=<hex hmac-sha256(secret, "<t>.<body>")>
+Content-Type: application/json
+
+{ "origins": ["https://app.example.com", "https://*.preview.example.com"] }
+```
+
+- Valid signature + inline `origins` → list is swapped in-memory, `204 No Content`.
+- Valid signature + empty body → cache is invalidated, next read refetches `providerUrl`.
+- Invalid signature → `401`.
+- Timestamp >5 minutes off → `401` (replay protection).
+
+## Environment variables
+
+```env
+MCP_URL=https://myserver.com                               # fallback baseUrl
+MCP_ALLOWED_ORIGINS=https://app.example.com,https://*.b.com # static list
+MCP_ALLOWED_ORIGINS_URL=https://config.example.com/origins.json
+MCP_ALLOWED_ORIGINS_TOKEN=sk_...                            # Authorization: Bearer
+MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET=whsec_...                # enables webhook
+CSP_URLS=https://extra.example.com                          # legacy — appended to CSP
+```
+
+## Per-widget CSP (CDN, auth providers, analytics)
+
+`allowedOrigins` is about **where this server lives**. Origins your widget
+itself fetches from (CDNs, analytics, third-party APIs) go inline in the
+widget's `metadata.csp` just like before:
 
 ```typescript
 export const widgetMetadata: WidgetMetadata = {
@@ -42,15 +145,15 @@ export const widgetMetadata: WidgetMetadata = {
     csp: {
       connectDomains: ["https://api.weather.com"],
       resourceDomains: ["https://cdn.weather.com"],
-      baseUriDomains: ["https://myserver.com"],
-      frameDomains: ["https://trusted-embed.com"],
-      redirectDomains: ["https://oauth.provider.com"],
     },
   },
 };
 ```
 
-### Apps SDK Format (ChatGPT only - DEPRECATED)
+These entries are merged with whatever `allowedOrigins` resolves to at read
+time, so widgets "just work" across multiple domains.
+
+### Apps SDK (ChatGPT-only, deprecated)
 
 With `type: "appsSdk"`, use snake_case in `appsSdkMetadata["openai/widgetCSP"]`:
 
@@ -59,72 +162,55 @@ export const appsSdkMetadata = {
   "openai/widgetCSP": {
     connect_domains: ["https://api.weather.com"],
     resource_domains: ["https://cdn.weather.com"],
-    frame_domains: ["https://trusted-embed.com"],
-    redirect_domains: ["https://oauth.provider.com"],
   },
 };
 ```
 
-### Field Reference
+### Field reference
 
 | MCP Apps (camelCase) | Apps SDK (snake_case) | Description |
 | -------------------- | --------------------- | ----------- |
 | `connectDomains` | `connect_domains` | Domains for fetch, XHR, WebSocket |
 | `resourceDomains` | `resource_domains` | Domains for scripts, styles, images |
-| `baseUriDomains` | `base_uri_domains` | Domains for base URI (MCP Apps) |
+| `baseUriDomains` | `base_uri_domains` | Domains for `<base>` (MCP Apps) |
 | `frameDomains` | `frame_domains` | Domains for iframe embeds |
 | `redirectDomains` | `redirect_domains` | Domains for redirects (ChatGPT-specific) |
-| `scriptDirectives` | `script_directives` | Custom script CSP directives, not all clients support this (e.g. ChatGPT) |
-| `styleDirectives` | `style_directives` | Custom style CSP directives |
+| `scriptDirectives` | `script_directives` | Custom script directives (not all clients support this) |
+| `styleDirectives` | `style_directives` | Custom style directives |
 
 <Note>
-Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used.
+mcp-use always adds the current allow-list (static + provider + effective request origin) to `connect_domains`, `resource_domains`, and `base_uri_domains`. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. You only need to list additional domains your widget talks to.
 </Note>
 
-## Environment Variables
+## Static (CDN) deployments
+
+When widget assets live on a CDN while the MCP server runs elsewhere, list
+both origins in `allowedOrigins` (or leave them in the widget's own
+`metadata.csp.resourceDomains`):
 
 ```env
-# Base URL — auto-included in widget CSP
-MCP_URL=https://myserver.com
-
-# Additional domains (comma-separated) — appended to widget CSP
-CSP_URLS=https://api.example.com,https://cdn.example.com
+MCP_URL=https://api.example.com
+MCP_ALLOWED_ORIGINS=https://api.example.com,https://cdn.example.com
 ```
-
-- **MCP_URL**: Base URL for widget assets and public files. Also used by the server to configure CSP.
-- **CSP_URLS**: (Optional) Additional domains to whitelist. Supports comma-separated list. Required for static deployments where widget assets are served from different domains.
-
-## Static Deployments
-
-When widgets are served from static storage (e.g., Supabase Storage) while the MCP server runs elsewhere, set:
-
-- **MCP_URL**: Where widget assets are stored
-- **MCP_SERVER_URL**: Where the MCP server runs (for API calls)
-- **CSP_URLS**: Domains for storage and API access (e.g., `https://YOUR_PROJECT.supabase.co`)
 
 See [Supabase deployment](./deployment/supabase) for a complete setup.
 
-<Tip>
-**Alternative**: Instead of the global `CSP_URLS` environment variable, configure CSP per-widget in `metadata.csp`
-</Tip>
+## Inspector debugging
 
-## Inspector Debugging
+The mcp-use Inspector provides a **CSP Mode Toggle**:
 
-The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
-
-- **Permissive** — Relaxed CSP for debugging
-- **Widget-Declared** — Enforces the widget's declared CSP (production-like)
+- **Permissive** — relaxed CSP for debugging
+- **Widget-Declared** — enforces the widget's declared CSP (production-like)
 
 <Warning>
-CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
+CSP violations are logged in the browser console. Use Widget-Declared mode
+before shipping to catch issues early.
 </Warning>
 
 See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for details.
 
+## Next steps
 
-## Next Steps
-
-- [MCP Apps](./mcp-apps) — Unified metadata format for both protocols
-- [ChatGPT Apps SDK](./ui-widgets) — Widget metadata and registration
-- [Supabase Deployment](./deployment/supabase) — Static deployment with CSP
-- [Debugging Widgets](/inspector/debugging-chatgpt-apps) — Test CSP in the Inspector
+- [MCP Apps](./mcp-apps) — unified metadata format for both protocols
+- [Configuration](./configuration) — every `MCPServer` option
+- [API reference](./api-reference) — `AllowedOriginsConfig` shape

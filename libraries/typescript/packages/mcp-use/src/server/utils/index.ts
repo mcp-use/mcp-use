@@ -10,3 +10,4 @@ export * from "./hono-proxy.js";
 export * from "./completion-helpers.js";
 export * from "./elicitation-helpers.js";
 export * from "./proxy-client.js";
+export * from "./origin-resolver.js";

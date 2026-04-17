@@ -85,6 +85,10 @@ const server = new MCPServer({
   name: "my-server",
   version: "1.0.0",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
+  // Serve from multiple domains? Set `allowedOrigins` — widget CSP and
+  // asset URLs will be computed per-request. See
+  // [Content Security Policy](./content-security-policy).
+  // allowedOrigins: ["https://app.example.com", "https://*.preview.example.com"],
 });
 
 // Register a dual-protocol widget

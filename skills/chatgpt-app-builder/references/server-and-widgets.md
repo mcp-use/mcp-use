@@ -27,6 +27,10 @@ const server = new MCPServer({
   name: "my-app",
   version: "1.0.0",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
+  // For multi-domain deployments (Vercel previews, custom domains) list the
+  // public origins in `allowedOrigins` — widget CSP and asset URLs adapt
+  // per-request. See `references/csp-and-metadata.md`.
+  // allowedOrigins: ["https://app.example.com", "https://*.preview.example.com"],
 });
 
 server.tool(

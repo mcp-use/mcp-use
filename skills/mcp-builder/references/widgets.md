@@ -90,6 +90,9 @@ const server = new MCPServer({
   name: "weather-server",
   version: "1.0.0",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
+  // Serving from multiple domains? List them in `allowedOrigins` — widget
+  // CSP + `<base>` adapt per request. Wildcards supported:
+  //   allowedOrigins: ["https://*.preview.example.com"],
 });
 
 server.tool(

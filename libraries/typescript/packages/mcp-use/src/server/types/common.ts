@@ -5,6 +5,9 @@
 import type { OAuthProvider } from "../oauth/providers/types.js";
 import type { cors } from "hono/cors";
 import type { z } from "zod";
+import type { AllowedOriginsConfig } from "../utils/origin-resolver.js";
+
+export type { AllowedOriginsConfig } from "../utils/origin-resolver.js";
 
 /**
  * Converts Zod optional fields to TypeScript optional properties.
@@ -92,32 +95,61 @@ export interface ServerConfig {
    */
   cors?: Partial<Parameters<typeof cors>[0]>;
   /**
-   * Allowed origins for DNS rebinding protection
+   * Allowed origins for the server.
    *
-   * - If not set: DNS rebinding protection is disabled (all Host values accepted)
-   * - If set to empty array: DNS rebinding protection is disabled
-   * - If set with origins: Host validation is enabled globally for the server
+   * One option, two roles:
+   *
+   * 1. **DNS-rebinding protection (Host validation)** — requests whose `Host`
+   *    header doesn't match the allow-list are rejected with 403.
+   * 2. **Widget hosting origins** — when the object form is used, widget
+   *    `<base>`, `window.__getFile`, `window.__mcpPublicUrl`, and CSP
+   *    (`connect_domains`, `resource_domains`, `base_uri_domains`) are
+   *    computed per-request from the allow-list instead of being baked to
+   *    the single static `baseUrl` / `MCP_URL`.
+   *
+   * Accepts two shapes:
+   *
+   * - `string[]` — static list; fully backward-compatible with earlier versions
+   *   (hostname-level Host validation only, no widget CSP expansion).
+   * - {@link AllowedOriginsConfig} — unlocks wildcard hostnames (e.g.
+   *   `"https://*.preview.example.com"`), dynamic provider callback / URL
+   *   with HTTP cache-validator semantics, and an optional HMAC push
+   *   webhook for instant invalidation. In this mode widget output is
+   *   per-request: the request's origin is used when allow-listed, otherwise
+   *   the static fallback (`baseUrl` / `MCP_URL`) is used. Widget CSP
+   *   includes the union of allow-listed origins.
    *
    * @example
    * ```typescript
-   * // Default behavior (no host validation)
-   * const server = new MCPServer({
-   *   name: 'my-server',
-   *   version: '1.0.0'
-   * });
+   * // Default behavior (no Host validation, static widget baseUrl)
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
    *
-   * // Explicit protection (applies to all routes)
+   * // Static form (hostname-level Host validation, unchanged behavior)
    * const server = new MCPServer({
    *   name: 'my-server',
    *   version: '1.0.0',
-   *   allowedOrigins: [
-   *     'https://myapp.com',
-   *     'https://app.myapp.com'
-   *   ]
+   *   allowedOrigins: ['https://myapp.com', 'https://app.myapp.com'],
+   * });
+   *
+   * // Dynamic form (wildcards + remote provider + webhook)
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   allowedOrigins: {
+   *     origins: [
+   *       'https://app.example.com',
+   *       'https://*.preview.example.com',
+   *     ],
+   *     providerUrl: process.env.MCP_ALLOWED_ORIGINS_URL,
+   *     token: process.env.MCP_ALLOWED_ORIGINS_TOKEN,
+   *     webhookSecret: process.env.MCP_ALLOWED_ORIGINS_WEBHOOK_SECRET,
+   *   },
    * });
    * ```
+   *
+   * @see {@link AllowedOriginsConfig}
    */
-  allowedOrigins?: string[];
+  allowedOrigins?: string[] | AllowedOriginsConfig;
   sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
   /**
    * @deprecated This option is deprecated and will be removed in a future version.

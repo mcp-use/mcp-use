@@ -336,7 +336,9 @@ supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-r
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
 
-**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/ui-widgets#apps-sdk-metadata) for examples.
+**Multi-domain / preview deployments**: if your edge function is reachable from multiple public domains, set `allowedOrigins` on `MCPServer` (or `MCP_ALLOWED_ORIGINS` env var) instead of a single static `MCP_URL`. Widget CSP adapts per-request. See [Content Security Policy](../content-security-policy).
+
+**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` or `metadata.csp` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/ui-widgets#apps-sdk-metadata) for examples.
 </Note>
 
 ### 9. Deploy the Function

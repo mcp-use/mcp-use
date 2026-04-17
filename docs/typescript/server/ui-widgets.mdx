@@ -817,6 +817,10 @@ This ensures:
 Preferably set the variable at build time to have statically generated widget assets paths.
 If you don't set it at build time you must set it at runtime either by passing the `baseUrl` option to the `MCPServer` constructor or by setting the `MCP_URL` environment variable.
 
+<Tip>
+**Multi-domain / preview deployments**: if the same server is reachable from multiple domains (canary, preview URLs, custom domains), set [`allowedOrigins`](./configuration#allowed-origins-host-validation--widget-csp) instead of a single `baseUrl`. Widget `<base>`, asset paths, and CSP will be computed per request against the allow-list (wildcards supported, async providers + push webhook available). See [Content Security Policy](./content-security-policy).
+</Tip>
+
 ### Environment Variables
 
 ```env

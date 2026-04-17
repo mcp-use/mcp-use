@@ -299,7 +299,9 @@ Create a `.env` file:
 ```env
 # Server port (default: 3000)
 PORT=3000
-# Production base URL; used for CSP and widget asset URLs — required for production
+# Production base URL; used for CSP and widget asset URLs — required for production.
+# For multi-domain deployments set `allowedOrigins` in MCPServer config instead of
+# relying on a single static MCP_URL. See docs/typescript/server/content-security-policy.
 MCP_URL=https://your-server.com
 # Environment mode (development | production)
 NODE_ENV=production
