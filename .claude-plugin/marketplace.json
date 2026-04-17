@@ -15,17 +15,7 @@
       "source": "./",
       "strict": false,
       "skills": [
-        "./skills/mcp-builder",
         "./skills/chatgpt-app-builder"
-      ]
-    },
-    {
-      "name": "mcp-builder",
-      "description": "Build Model Context Protocol (MCP) servers with mcp-use framework. Includes quick start, tools, resources, prompts, testing, and deployment guidance.",
-      "source": "./",
-      "strict": false,
-      "skills": [
-        "./skills/mcp-builder"
       ]
     },
     {
