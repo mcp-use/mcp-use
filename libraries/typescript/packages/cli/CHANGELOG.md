@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.0.2-canary.1
+
+### Patch Changes
+
+- 8f8a8e0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+  - mcp-use@1.24.2-canary.1
+  - @mcp-use/inspector@2.1.1-canary.1
+
 ## 3.0.2-canary.0
 
 ### Patch Changes

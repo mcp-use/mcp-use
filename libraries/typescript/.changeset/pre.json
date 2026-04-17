@@ -8,6 +8,7 @@
     "mcp-use": "1.24.1"
   },
   "changesets": [
+    "fix-cli-deploy-401-github",
     "fix-deploy-github-init-push"
   ]
 }
