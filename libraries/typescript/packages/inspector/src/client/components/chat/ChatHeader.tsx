@@ -173,31 +173,31 @@ export function ChatHeader({
 
             <div className="w-[1px] h-4 bg-border mx-1" />
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={clearButtonVariant ?? "default"}
-                size="default"
-                className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
-                onClick={onClearChat}
-              >
-                {!clearButtonHideIcon && (
-                  <SquarePen className="h-4 w-4 sm:mr-2" />
-                )}
-                <span className="hidden sm:inline">
-                  {clearButtonLabel ?? "New Chat"}
-                </span>
-                {!clearButtonHideShortcut && (
-                  <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                    ⌘O
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={clearButtonVariant ?? "default"}
+                  size="default"
+                  className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
+                  onClick={onClearChat}
+                >
+                  {!clearButtonHideIcon && (
+                    <SquarePen className="h-4 w-4 sm:mr-2" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {clearButtonLabel ?? "New Chat"}
                   </span>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{clearButtonLabel ?? "New Chat"}</p>
-            </TooltipContent>
-          </Tooltip>
+                  {!clearButtonHideShortcut && (
+                    <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                      ⌘O
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{clearButtonLabel ?? "New Chat"}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
         {/* Always render the dialog for when it's opened (hidden when externally managed) */}
