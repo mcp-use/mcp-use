@@ -77,11 +77,6 @@ class BaseConnector(ABC):
                 If not provided, the connector will use an internal callback that returns
                 the roots set via the `roots` parameter or `set_roots()` method.
         """
-        self.sampling_callback = sampling_callback
-        self.elicitation_callback = elicitation_callback
-        self.message_handler = message_handler
-        self.logging_callback = logging_callback
-
         self.client_session: ClientSession | None = None
         self._connection_manager: ConnectionManager | None = None
         self._tools: list[Tool] | None = None
@@ -90,6 +85,10 @@ class BaseConnector(ABC):
         self._connected = False
         self._initialized = False  # Track if client_session.initialize() has been called
         self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
+        self.sampling_callback = sampling_callback
+        self.elicitation_callback = elicitation_callback
+        self.message_handler = message_handler
+        self.logging_callback = logging_callback
         self.capabilities: ServerCapabilities | None = None
         self._record_telemetry = True
 
