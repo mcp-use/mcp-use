@@ -77,6 +77,11 @@ class BaseConnector(ABC):
                 If not provided, the connector will use an internal callback that returns
                 the roots set via the `roots` parameter or `set_roots()` method.
         """
+        self.sampling_callback = sampling_callback
+        self.elicitation_callback = elicitation_callback
+        self.message_handler = message_handler
+        self.logging_callback = logging_callback
+
         self.client_session: ClientSession | None = None
         self._connection_manager: ConnectionManager | None = None
         self._tools: list[Tool] | None = None
@@ -85,10 +90,6 @@ class BaseConnector(ABC):
         self._connected = False
         self._initialized = False  # Track if client_session.initialize() has been called
         self.auto_reconnect = True  # Whether to automatically reconnect on connection loss (not configurable for now)
-        self.sampling_callback = sampling_callback
-        self.elicitation_callback = elicitation_callback
-        self.message_handler = message_handler
-        self.logging_callback = logging_callback
         self.capabilities: ServerCapabilities | None = None
         self._record_telemetry = True
 
@@ -553,3 +554,59 @@ class BaseConnector(ABC):
         logger.debug(f"Getting prompt: {name}")
         result = await self.client_session.get_prompt(name, arguments)
         return result
+
+    # --- Transformation Methods ---
+
+    def with_prefix(self, prefix: str, separator: str = "_") -> "TransformedConnector":
+        """Wrap this connector with a tool name prefix.
+
+        Args:
+            prefix: The prefix to apply to all tool names.
+            separator: The separator between prefix and tool name (default: "_").
+
+        Returns:
+            A TransformedConnector wrapping this connector.
+        """
+        from mcp_use.client.connectors.transformed import (
+            TransformedConnector,
+            Transforms,
+        )
+
+        return TransformedConnector(self, Transforms(prefix=prefix, separator=separator))
+
+    def with_tools(
+        self, allowed: list[str] | None = None, disallowed: list[str] | None = None
+    ) -> "TransformedConnector":
+        """Wrap this connector with tool name filtering.
+
+        Args:
+            allowed: Optional list of allowed tool names (everything else is hidden).
+            disallowed: Optional list of forbidden tool names (everything else is shown).
+
+        Returns:
+            A TransformedConnector wrapping this connector.
+        """
+        from mcp_use.client.connectors.transformed import (
+            TransformedConnector,
+            Transforms,
+        )
+
+        return TransformedConnector(self, Transforms(allowed_tools=allowed, disallowed_tools=disallowed))
+
+    def with_middleware(self, middleware: list[Middleware]) -> "TransformedConnector":
+        """Wrap this connector with additional middleware.
+
+        Note: These middlewares are executed when calling tools via the wrapper.
+
+        Args:
+            middleware: List of Middleware to apply.
+
+        Returns:
+            A TransformedConnector wrapping this connector.
+        """
+        from mcp_use.client.connectors.transformed import (
+            TransformedConnector,
+            Transforms,
+        )
+
+        return TransformedConnector(self, Transforms(middleware=middleware))
