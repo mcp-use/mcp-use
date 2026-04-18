@@ -6,14 +6,12 @@ from mcp.types import (
     CallToolResult,
     GetPromptResult,
     InitializeResult,
-    ReadResourceResult,
     Tool,
 )
 from pydantic import AnyUrl
 
 from mcp_use.client.connectors.base import BaseConnector
-from mcp_use.client.middleware import Middleware, MiddlewareManager, MiddlewareContext
-from mcp_use.logging import logger
+from mcp_use.client.middleware import Middleware, MiddlewareContext, MiddlewareManager
 
 T = TypeVar("T")
 
@@ -144,10 +142,8 @@ class TransformedConnector(BaseConnector):
         if self._transforms.prefix:
             prefix_full = f"{self._transforms.prefix}{self._transforms.separator}"
             if not name.startswith(prefix_full):
-                raise ValueError(
-                    f"Tool '{name}' must be called with prefix '{prefix_full}'"
-                )
-            original_name = name[len(prefix_full):]
+                raise ValueError(f"Tool '{name}' must be called with prefix '{prefix_full}'")
+            original_name = name[len(prefix_full) :]
         else:
             original_name = name
 
@@ -160,8 +156,8 @@ class TransformedConnector(BaseConnector):
 
         # If we have transformation-specific middleware, run it
         if self._transforms.middleware:
-            import uuid
             import time
+            import uuid
 
             context = MiddlewareContext(
                 id=str(uuid.uuid4()),
@@ -170,7 +166,7 @@ class TransformedConnector(BaseConnector):
                 connection_id=self.public_identifier,
                 timestamp=time.time(),
             )
-            
+
             # Use process_request which returns MCPResponseContext
             response_context = await self._middleware_manager.process_request(context, do_call)
             if response_context.error:

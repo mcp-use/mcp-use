@@ -8,7 +8,7 @@ must implement.
 import warnings
 from abc import ABC, abstractmethod
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp import ClientSession, Implementation
 from mcp.client.session import (
@@ -44,6 +44,9 @@ from mcp_use.client.middleware import Middleware, MiddlewareManager
 from mcp_use.client.task_managers import ConnectionManager
 from mcp_use.logging import logger
 from mcp_use.telemetry.telemetry import telemetry
+
+if TYPE_CHECKING:
+    from mcp_use.client.connectors.transformed import TransformedConnector
 
 
 class BaseConnector(ABC):
