@@ -36,6 +36,17 @@ interface McpUseProviderProps {
    * @default false
    */
   autoSize?: boolean;
+  /**
+   * Set color-scheme on the document root to match the active theme.
+   * Enables native dark scrollbars and CSS light-dark() function.
+   *
+   * Leave disabled (default) when you want a transparent iframe background.
+   * Setting color-scheme to an explicit value ("dark"/"light") causes browsers
+   * to paint an opaque canvas behind iframes when the widget and host documents
+   * use different schemes, making background-color: transparent ineffective.
+   * @default false
+   */
+  colorScheme?: boolean;
 }
 
 /**
@@ -62,6 +73,7 @@ export function McpUseProvider({
   debugger: enableDebugger = false,
   viewControls = false,
   autoSize = true,
+  colorScheme = false,
 }: McpUseProviderProps) {
   const [containerElement, setContainerElement] =
     useState<HTMLDivElement | null>(null);
@@ -209,7 +221,7 @@ export function McpUseProvider({
   }
 
   // ThemeProvider wraps WidgetControls
-  content = <ThemeProvider>{content}</ThemeProvider>;
+  content = <ThemeProvider colorScheme={colorScheme}>{content}</ThemeProvider>;
 
   // Wrap in container div for auto-sizing if enabled
   if (autoSize) {
