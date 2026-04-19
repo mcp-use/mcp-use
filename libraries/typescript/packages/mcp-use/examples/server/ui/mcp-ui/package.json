@@ -1,20 +1,18 @@
 {
-  "name": "mcp-use server",
+  "name": "mcp-apps-gallery",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server with MCP-UI integration",
+  "description": "Programmatic MCP Apps widget gallery — three widgets built with server.uiResource({ type: 'mcpApps' })",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
+    "mcp-apps",
     "server",
-    "uiresource",
-    "ui",
-    "react",
     "widgets",
+    "ui",
     "ai",
-    "tools",
-    "mcp-ui"
+    "tools"
   ],
   "main": "dist/index.js",
   "scripts": {

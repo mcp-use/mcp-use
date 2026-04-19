@@ -11,12 +11,9 @@ icon: "openai"
 # Building ChatGPT Apps with Widgets
 
 <Info>
-**Widget Protocol Options**: This guide focuses on **ChatGPT Apps SDK** specifically. For the broader picture:
-- [MCP Apps](/typescript/server/mcp-apps) - Standard MCP protocol with dual-protocol support (recommended)
-- [ChatGPT Apps SDK](/typescript/server/ui-widgets) - This guide's focus
-- [MCP UI](/typescript/server/mcp-ui-resources) - Alternative framework for simpler UIs
+This guide focuses on shipping an MCP App to ChatGPT specifically. For the general reference on widgets, props, CSP, and auto-discovery across clients, see [MCP Apps](/typescript/server/mcp-apps).
 
-**Best Practice**: Use `type: "mcpApps"` to build widgets that work with **both** ChatGPT and MCP Apps clients from a single codebase.
+**Best Practice**: Build widgets once with the MCP Apps stack — they run in ChatGPT, Claude, and any MCP-compatible client from a single codebase.
 
 </Info>
 
@@ -850,7 +847,7 @@ Now that you understand how ChatGPT Apps work and how mcp-use simplifies widget 
   <Card
     title="UI Widgets Guide"
     icon="paintbrush"
-    href="/typescript/server/ui-widgets"
+    href="/typescript/server/mcp-apps"
   >
     Complete guide to building widgets with mcp-use, including advanced patterns
     and best practices

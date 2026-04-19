@@ -50,11 +50,19 @@
             ]
           },
           {
-            "group": "Libraries",
-            "icon": "library",
+            "group": "MCP Apps",
+            "icon": "app-window-mac",
             "pages": [
-              "home/redirects/python",
-              "home/redirects/typescript"
+              "typescript/server/mcp-apps",
+              "typescript/server/creating-mcp-apps-server",
+              "guides/chatgpt-apps-flow"
+            ]
+          },
+          {
+            "group": "Templates",
+            "icon": "layout-template",
+            "pages": [
+              "home/templates"
             ]
           },
           {
@@ -80,16 +88,31 @@
                   "inspector/changelog"
                 ]
               },
+              "typescript/server/cli-reference",
               "tunneling/index"
             ]
           },
           {
-            "group": "Guides",
-            "icon": "",
+            "group": "Concepts",
+            "icon": "brain",
             "pages": [
-              "home/mcp101",
-              "typescript/server/creating-mcp-apps-server",
-              "guides/chatgpt-apps-flow"
+              "home/mcp101"
+            ]
+          },
+          {
+            "group": "Libraries",
+            "icon": "library",
+            "pages": [
+              "home/redirects/python",
+              "home/redirects/typescript"
+            ]
+          },
+          {
+            "group": "Misc",
+            "icon": "bookmark",
+            "pages": [
+              "typescript/blog/client_side",
+              "typescript/blog/client-vs-sdk"
             ]
           }
         ]
@@ -122,7 +145,8 @@
                     "pages": [
                       "python/server/compatibility",
                       "python/server/running",
-                      "python/server/sessions"
+                      "python/server/sessions",
+                      "python/server/fastapi_mount"
                     ]
                   },
                   {
@@ -223,19 +247,19 @@
                       "python/agent/interactive-chat-patterns"
                     ]
                   },
+                  {
+                    "group": "LLM Adapters",
+                    "icon": "plug-2",
+                    "pages": [
+                      "python/integration/langchain",
+                      "python/integration/openai",
+                      "python/integration/anthropic",
+                      "python/integration/google"
+                    ]
+                  },
                   "python/agent/server-manager",
                   "python/agent/building-custom-agents",
                   "python/agent/observability"
-                ]
-              },
-              {
-                "group": "Integrations",
-                "icon": "plug-2",
-                "pages": [
-                  "python/integration/langchain",
-                  "python/integration/openai",
-                  "python/integration/anthropic",
-                  "python/integration/google"
                 ]
               },
               {
@@ -513,6 +537,7 @@
                     "icon": "app-window-mac",
                     "pages": [
                       "typescript/server/mcp-apps",
+                      "typescript/server/creating-mcp-apps-server",
                       "typescript/server/content-security-policy",
                       "typescript/server/widget-components/usewidget",
                       "typescript/server/widget-components/usecalltool",
@@ -522,15 +547,7 @@
                       "typescript/server/widget-components/image",
                       "typescript/server/widget-components/themeprovider",
                       "typescript/server/widget-components/modelcontext",
-                      "typescript/server/widget-components/usefiles",
-                      {
-                        "group": "Deprecated",
-                        "icon": "archive",
-                        "pages": [
-                          "typescript/server/ui-widgets",
-                          "typescript/server/mcp-ui-resources"
-                        ]
-                      }
+                      "typescript/server/widget-components/usefiles"
                     ]
                   },
                   {
@@ -568,8 +585,10 @@
                         "pages": [
                           "typescript/server/authentication/providers/auth0",
                           "typescript/server/authentication/providers/better-auth",
+                          "typescript/server/authentication/providers/keycloak",
                           "typescript/server/authentication/providers/supabase",
-                          "typescript/server/authentication/providers/workos"
+                          "typescript/server/authentication/providers/workos",
+                          "typescript/server/authentication/providers/custom"
                         ]
                       }
                     ]
@@ -650,11 +669,6 @@
             ]
           },
           {
-            "tab": "API Reference",
-            "icon": "terminal",
-            "groups": []
-          },
-          {
             "tab": "Changelog",
             "icon": "history",
             "groups": [
@@ -662,31 +676,6 @@
                 "group": "Changelog",
                 "pages": [
                   "typescript/changelog/changelog"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Community",
-            "icon": "users",
-            "groups": [
-              {
-                "group": "Community",
-                "pages": [
-                  "python/community/showcase"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Blog",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Blog",
-                "pages": [
-                  "typescript/blog/client_side",
-                  "typescript/blog/client-vs-sdk"
                 ]
               }
             ]
@@ -726,6 +715,34 @@
     {
       "source": "/changelog",
       "destination": "/python/changelog/changelog"
+    },
+    {
+      "source": "/typescript/server/ui-widgets",
+      "destination": "/typescript/server/mcp-apps"
+    },
+    {
+      "source": "/typescript/server/mcp-ui-resources",
+      "destination": "/typescript/server/mcp-apps"
+    },
+    {
+      "source": "/typescript/server/comparison-with-other-implementations",
+      "destination": "/typescript/server/index"
+    },
+    {
+      "source": "/typescript/server/api-reference",
+      "destination": "/typescript/server/index"
+    },
+    {
+      "source": "/typescript/development/security",
+      "destination": "/python/development/security"
+    },
+    {
+      "source": "/python/blog/middleware",
+      "destination": "/python/server/middleware"
+    },
+    {
+      "source": "/python/server/auth",
+      "destination": "/python/server/auth/bearer"
     }
   ],
   "logo": {

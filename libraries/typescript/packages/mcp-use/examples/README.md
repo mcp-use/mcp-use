@@ -1,5 +1,9 @@
 # TypeScript Examples
 
+> Looking for **ready-to-deploy example apps** (Chart Builder, Diagram Builder, Slide Deck, Maps Explorer, Widget Gallery, and more)? Those live in standalone repos with demo URLs and one-click deploy buttons — see **[Templates](https://github.com/mcp-use/mcp-use#templates)** in the main README, or the [Templates page in the docs](https://mcp-use.com/docs/home/templates).
+>
+> The examples on this page are **in-repo code samples** meant to illustrate specific APIs and patterns.
+
 ## Agent Examples
 
 ### Basic
@@ -68,14 +72,17 @@
 | [conformance/src/server.ts](server/features/conformance/src/server.ts) | MCP conformance test server |
 | [dns-rebinding/src/server.ts](server/features/dns-rebinding/src/server.ts) | DNS rebinding protection |
 | [express-middleware/index.ts](server/features/express-middleware/index.ts) | Express and Hono middleware integration |
+| [middleware/src/server.ts](server/features/middleware/src/server.ts) | Built-in middleware pipeline |
 | [proxy/src/server.ts](server/features/proxy/src/server.ts) | Proxy server setup |
 | [client-info/src/server.ts](server/features/client-info/src/server.ts) | Client info and capability access |
+| [session-management/src/server.ts](server/features/session-management/src/server.ts) | Memory, filesystem, and Redis session storage |
 
 ### OAuth
 
 | Example | Description |
 |---------|-------------|
 | [auth0/src/server.ts](server/oauth/auth0/src/server.ts) | Auth0 OAuth integration |
+| [better-auth/src/server.ts](server/oauth/better-auth/src/server.ts) | Better Auth OAuth integration |
 | [supabase/src/server.ts](server/oauth/supabase/src/server.ts) | Supabase OAuth integration |
 | [workos/src/server.ts](server/oauth/workos/src/server.ts) | WorkOS AuthKit OAuth integration |
 
@@ -89,8 +96,11 @@
 
 | Example | Description |
 |---------|-------------|
-| [mcp-ui/index.ts](server/ui/mcp-ui/index.ts) | All UIResource types |
-| [mcp-apps/apps-sdk/index.ts](server/ui/mcp-apps/apps-sdk/index.ts) | Automatic UI widget registration |
+| [mcp-apps/index.ts](server/ui/mcp-apps/index.ts) | **Recommended** — Dual-protocol MCP Apps with React auto-discovery (`resources/*.tsx`) |
+| [mcp-ui/index.ts](server/ui/mcp-ui/index.ts) | Programmatic widget gallery — three widgets via `server.uiResource({ type: "mcpApps", htmlTemplate })` (no build step) |
+| [files/index.ts](server/ui/files/index.ts) | File-manager widget using the `useFiles` hook |
+| [model-context/index.ts](server/ui/model-context/index.ts) | Widgets reading host context (theme, locale, user agent, safe area) |
+| [mcp-apps/apps-sdk/index.ts](server/ui/mcp-apps/apps-sdk/index.ts) | ChatGPT Apps SDK only (for backwards compatibility — prefer `mcp-apps/` for new projects) |
 
 ## Client Examples
 

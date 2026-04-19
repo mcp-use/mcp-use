@@ -6,6 +6,23 @@ icon: "terminal"
 
 The `@mcp-use/cli` is a build and development tool for creating MCP servers with integrated UI widgets. It provides commands for development, building, deployment, and authentication.
 
+## What's New
+
+<CardGroup cols={2}>
+  <Card title="Hot Module Reload" icon="flame" href="#hot-module-reloading-hmr">
+    `mcp-use dev` hot-reloads tools, prompts, and resources without dropping connected clients.
+  </Card>
+  <Card title="--tunnel flag" icon="train-front-tunnel" href="/tunneling/index">
+    `mcp-use start --tunnel` exposes your local server through a public URL for ChatGPT, Claude, and other remote clients.
+  </Card>
+  <Card title="skills add" icon="wand" href="#skills-add-install-ai-agent-skills">
+    Install mcp-use agent skills into Cursor, Claude Code, and Codex presets with one command.
+  </Card>
+  <Card title="generate-types" icon="type" href="#generate-types-type-generation">
+    Auto-derive TypeScript types from your Zod tool schemas for fully-typed widget code.
+  </Card>
+</CardGroup>
+
 ## Installation
 
 <Tip>
@@ -174,6 +191,10 @@ mcp-use start -p ./my-server
   (`dist/mcp-use.json`). If not found, it falls back to checking
   `dist/index.js`, `dist/server.js`, etc.
 </Note>
+
+<Tip>
+  `--tunnel` creates a public URL via Manufact Cloud — ideal for testing with ChatGPT, Claude, or any remote MCP client before you deploy. The subdomain persists across restarts (stored in `dist/mcp-use.json`). See the [Tunneling guide](/tunneling/index) for rate limits, expiry, and the standalone `npx @mcp-use/tunnel` command.
+</Tip>
 
 ---
 
@@ -592,5 +613,5 @@ The CLI introspects your server's tool registrations and converts Zod schemas to
 
 - [Server Configuration](/typescript/server/configuration) - Advanced server configuration
 - [Deployment Guide](/typescript/server/deployment/mcp-use) - Deploy to Manufact Cloud
-- [UI Widgets](/typescript/server/ui-widgets) - Build interactive widgets
+- [UI Widgets](/typescript/server/mcp-apps) - Build interactive widgets
 - [Session Management](/typescript/server/session-management) - Configure session storage
