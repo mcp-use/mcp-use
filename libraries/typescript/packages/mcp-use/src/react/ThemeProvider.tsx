@@ -8,11 +8,15 @@ import { useWidget } from "./useWidget.js";
  * 1. useWidget theme (from OpenAI Apps SDK)
  * 2. System preference (prefers-color-scheme: dark)
  *
- * Sets the "dark" class on document.documentElement when dark mode is active
+ * Sets the "dark" class and data-theme attribute on document.documentElement.
+ * color-scheme is only set when the colorScheme prop is true — setting it to an
+ * explicit value causes browsers to paint an opaque canvas behind iframes when
+ * the widget and host documents use different schemes.
  */
-export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const ThemeProvider: React.FC<{
+  children: React.ReactNode;
+  colorScheme?: boolean;
+}> = ({ children, colorScheme = false }) => {
   const { theme, isAvailable } = useWidget();
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
@@ -40,8 +44,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   const effectiveTheme = isAvailable ? theme : systemPreference;
 
   // Apply theme synchronously before browser paint to prevent flash
-  // Sets both CSS class (for Tailwind dark mode) and data-theme attribute
-  // (for OpenAI Apps SDK UI design tokens)
+  // Sets CSS class (for Tailwind dark mode) and data-theme attribute
+  // (for OpenAI Apps SDK UI design tokens).
   useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
@@ -57,9 +61,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       effectiveTheme === "dark" ? "dark" : "light"
     );
 
-    // Set color-scheme for CSS light-dark() function
-    root.style.colorScheme = effectiveTheme === "dark" ? "dark" : "light";
-  }, [effectiveTheme]);
+    // Only set color-scheme when explicitly opted in via the colorScheme prop.
+    // Setting it to "dark"/"light" triggers browsers to paint an opaque canvas
+    // behind iframes when the widget scheme differs from the host scheme, which
+    // makes background-color: transparent ineffective.
+    if (colorScheme) {
+      root.style.colorScheme = effectiveTheme === "dark" ? "dark" : "light";
+    } else {
+      root.style.colorScheme = "";
+    }
+  }, [effectiveTheme, colorScheme]);
 
   return <>{children}</>;
 };
