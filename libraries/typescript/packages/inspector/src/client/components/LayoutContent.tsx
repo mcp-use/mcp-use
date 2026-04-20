@@ -71,7 +71,7 @@ export function LayoutContent({
         managedLlmConfig={
           embeddedConfig.managedLlmConfig ?? {
             provider: "anthropic",
-            model: "server-managed",
+            model: "claude-haiku-4-5",
             apiKey: "server-managed",
           }
         }
@@ -197,8 +197,11 @@ export function LayoutContent({
               embeddedConfig.managedLlmConfig ??
               (embeddedConfig.chatApiUrl
                 ? {
+                    // Stub surfaced on the chat badge. Mirrors the model the
+                    // hosted `/inspector/chat/stream` backend uses by default
+                    // (see cloud.mcp-use/src/lib/mcp-chat-stream.ts).
                     provider: "anthropic",
-                    model: "server-managed",
+                    model: "claude-haiku-4-5",
                     apiKey: "server-managed",
                   }
                 : undefined)
@@ -218,6 +221,8 @@ export function LayoutContent({
             chatFollowups={embeddedConfig.chatFollowups}
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
+            streamProtocol={embeddedConfig.chatStreamProtocol}
+            credentials={embeddedConfig.chatCredentials}
           />
         </div>
       )}

@@ -70,7 +70,21 @@ export function useChatMessages({
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    loginUrl: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // #region agent log
+  if (typeof window !== "undefined" && !(window as unknown as { __ucmLogged?: boolean }).__ucmLogged) {
+    (window as unknown as { __ucmLogged?: boolean }).__ucmLogged = true;
+    let localLlmConfig: unknown = null;
+    let localApiKeys: unknown = null;
+    try { localLlmConfig = JSON.parse(localStorage.getItem("mcp-inspector-llm-config") ?? "null"); } catch { /* ignore */ }
+    try { localApiKeys = JSON.parse(localStorage.getItem("mcp-inspector-api-keys") ?? "null"); } catch { /* ignore */ }
+    fetch('http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0606c0'},body:JSON.stringify({sessionId:'0606c0',location:'useChatMessages.ts:mount',message:'hook mounted — localStorage snapshot',data:{chatApiUrl,hasLocalLlmConfig:!!localLlmConfig,localProviderKeys:localApiKeys?Object.keys(localApiKeys as Record<string, unknown>):null,hasLlmConfigProp:!!llmConfig,llmConfigProvider:(llmConfig as {provider?:string}|null)?.provider??null,cookiePresent:document.cookie.includes("=")},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
 
   const sendMessage = useCallback(
     async (
@@ -185,6 +199,10 @@ export function useChatMessages({
           ...widgetContextMessages,
         ];
 
+        // #region agent log
+        fetch('http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0606c0'},body:JSON.stringify({sessionId:'0606c0',location:'useChatMessages.ts:preFetch',message:'about to POST chat stream',data:{resolvedUrl,credentialsMode:credentials ?? null,messageCount:serialisedMessages.length,hasBodyBuilder:!!bodyBuilder,hasExtraHeaders:!!extraHeaders&&Object.keys(extraHeaders).length>0},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
         const response = await fetch(resolvedUrl, {
           method: "POST",
           headers: {
@@ -209,6 +227,23 @@ export function useChatMessages({
         });
 
         if (!response.ok) {
+          // #region agent log
+          const dbgCloned = response.clone();
+          const dbgBody = await dbgCloned.text().catch(() => "<unreadable>");
+          fetch('http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0606c0'},body:JSON.stringify({sessionId:'0606c0',location:'useChatMessages.ts:nonOkResponse',message:'received non-ok response',data:{status:response.status,url:response.url,body:dbgBody.slice(0,400)},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+
+          if (response.status === 429) {
+            const errBody = await response.json().catch(() => null);
+            if (errBody?.loginRequired && errBody?.loginUrl) {
+              setRateLimitInfo({ loginUrl: errBody.loginUrl as string });
+            }
+            // Remove the empty assistant message added optimistically
+            setMessages((prev) =>
+              prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+            );
+            return;
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -533,6 +568,11 @@ export function useChatMessages({
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setRateLimitInfo(null);
+  }, []);
+
+  const clearRateLimitInfo = useCallback(() => {
+    setRateLimitInfo(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -577,8 +617,10 @@ export function useChatMessages({
     messages,
     isLoading,
     attachments,
+    rateLimitInfo,
     sendMessage,
     clearMessages,
+    clearRateLimitInfo,
     setMessages,
     stop,
     addAttachment,
