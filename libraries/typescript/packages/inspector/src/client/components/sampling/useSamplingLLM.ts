@@ -33,7 +33,6 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
       const params = request.params || {};
       const maxTokens = params.maxTokens;
       const temperature = params.temperature;
-      const _modelPreferences = params.modelPreferences;
 
       // Convert MCP messages to LangChain format
       const messages = params.messages || [];

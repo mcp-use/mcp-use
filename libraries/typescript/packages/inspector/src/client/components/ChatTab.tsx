@@ -1084,7 +1084,6 @@ export function ChatTab({
         freeTierInfo={freeTierInfo}
         onCopyChat={handleCopyChat}
         onExportChat={handleExportChat}
-        hideConfigButton={isManaged}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}
         clearButtonHideIcon={clearButtonHideIcon}

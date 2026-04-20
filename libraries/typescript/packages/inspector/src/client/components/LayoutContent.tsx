@@ -189,7 +189,19 @@ export function LayoutContent({
             }
             prompts={selectedServer.prompts}
             serverId={selectedServer.id}
-            callPrompt={selectedServer.getPrompt}
+            callPrompt={(name, args) =>
+              selectedServer.getPrompt(
+                name,
+                args
+                  ? (Object.fromEntries(
+                      Object.entries(args).map(([k, v]) => [
+                        k,
+                        typeof v === "string" ? v : String(v ?? ""),
+                      ])
+                    ) as Record<string, string>)
+                  : undefined
+              )
+            }
             readResource={selectedServer.readResource}
             useClientSide={!embeddedConfig.chatApiUrl}
             chatApiUrl={embeddedConfig.chatApiUrl}
