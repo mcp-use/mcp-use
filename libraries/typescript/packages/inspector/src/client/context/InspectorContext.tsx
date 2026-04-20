@@ -151,14 +151,22 @@ const InspectorContext = createContext<InspectorContextType | undefined>(
  * @returns A context provider element that supplies inspector state and mutator functions to its children
  */
 export function InspectorProvider({ children }: { children: ReactNode }) {
-  // Seed chat config from build-time env var so the hosted inspector
-  // (inspector.manufact.com) uses the Manufact Claude API automatically.
-  const hostedChatUrl = (
-    typeof import.meta !== "undefined"
+  // Seed chat config so the hosted inspector (inspector.manufact.com, Railway
+  // deploy, etc.) uses the Manufact Claude API automatically. Read from:
+  //   1. `window.__MANUFACT_CHAT_URL__` — runtime, injected by the inspector
+  //      server from `MANUFACT_CHAT_URL` env var. This is the preferred path
+  //      so a single pre-built npm tarball can be configured at deploy time.
+  //   2. `VITE_MANUFACT_CHAT_URL` — build-time Vite env, for local dev builds
+  //      where you rebuild the client anyway.
+  const hostedChatUrl =
+    (typeof window !== "undefined"
+      ? (window as Window & { __MANUFACT_CHAT_URL__?: string })
+          .__MANUFACT_CHAT_URL__
+      : undefined) ??
+    ((typeof import.meta !== "undefined"
       ? (import.meta as unknown as Record<string, Record<string, string>>).env
           ?.VITE_MANUFACT_CHAT_URL
-      : undefined
-  ) as string | undefined;
+      : undefined) as string | undefined);
 
   const [state, setState] = useState<InspectorState>({
     selectedServerId: null,
