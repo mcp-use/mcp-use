@@ -8,10 +8,12 @@
     "mcp-use": "1.24.1"
   },
   "changesets": [
+    "all-pumas-like",
     "easy-candles-brake",
     "export-chat-button",
     "fix-cli-deploy-401-github",
     "fix-deploy-github-init-push",
-    "fix-theme-provider-color-scheme-transparency"
+    "fix-theme-provider-color-scheme-transparency",
+    "hosted-chat-runtime-config"
   ]
 }
