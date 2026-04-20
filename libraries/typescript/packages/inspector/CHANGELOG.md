@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 2.2.0-canary.4
+
+### Minor Changes
+
+- d9ac208: feat(inspector): allow free tier chat on hosted inspector
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.4
+
 ## 2.2.0-canary.3
 
 ### Patch Changes
