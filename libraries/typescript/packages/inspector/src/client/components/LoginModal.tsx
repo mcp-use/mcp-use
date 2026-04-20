@@ -182,7 +182,11 @@ export function LoginModal({
           window.removeEventListener("message", onMessage);
           clearInterval(poll);
           setLoading(null);
-          try { popup?.close(); } catch { /* ignore */ }
+          try {
+            popup?.close();
+          } catch {
+            /* ignore */
+          }
           handleSuccess();
         };
         window.addEventListener("message", onMessage);
@@ -200,7 +204,11 @@ export function LoginModal({
               window.removeEventListener("message", onMessage);
               setLoading(null);
               if (!closed) {
-                try { popup?.close(); } catch { /* ignore */ }
+                try {
+                  popup?.close();
+                } catch {
+                  /* ignore */
+                }
               }
               handleSuccess();
               return;

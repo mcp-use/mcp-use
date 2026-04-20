@@ -260,7 +260,9 @@ export function ChatTab({
   }, [setConfigDialogOpen]);
 
   // Free-tier info is shown whenever the chat is in hosted-managed mode.
-  const freeTierInfo = isManaged ? { onLoginClick: handleOpenLogin } : undefined;
+  const freeTierInfo = isManaged
+    ? { onLoginClick: handleOpenLogin }
+    : undefined;
 
   const {
     filteredPrompts,

@@ -94,7 +94,9 @@ export function ChatHeader({
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{freeTierInfo ? "Change model / upgrade" : "Change API Key"}</p>
+              <p>
+                {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
+              </p>
             </TooltipContent>
           </Tooltip>
         )}

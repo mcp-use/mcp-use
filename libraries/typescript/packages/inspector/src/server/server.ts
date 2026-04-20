@@ -64,7 +64,7 @@ const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
 <script>try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"manufact:oauth-complete"},"*")}catch(e){}try{window.close()}catch(e){}</script>
 </body></html>`;
 app.get("/inspector/oauth-popup-closed.html", (c) =>
-  c.html(OAUTH_POPUP_CLOSED_HTML),
+  c.html(OAUTH_POPUP_CLOSED_HTML)
 );
 
 // Register static file serving with dev proxy support (must be last as it includes catch-all route)

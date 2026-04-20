@@ -76,13 +76,52 @@ export function useChatMessages({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // #region agent log
-  if (typeof window !== "undefined" && !(window as unknown as { __ucmLogged?: boolean }).__ucmLogged) {
+  if (
+    typeof window !== "undefined" &&
+    !(window as unknown as { __ucmLogged?: boolean }).__ucmLogged
+  ) {
     (window as unknown as { __ucmLogged?: boolean }).__ucmLogged = true;
     let localLlmConfig: unknown = null;
     let localApiKeys: unknown = null;
-    try { localLlmConfig = JSON.parse(localStorage.getItem("mcp-inspector-llm-config") ?? "null"); } catch { /* ignore */ }
-    try { localApiKeys = JSON.parse(localStorage.getItem("mcp-inspector-api-keys") ?? "null"); } catch { /* ignore */ }
-    fetch('http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0606c0'},body:JSON.stringify({sessionId:'0606c0',location:'useChatMessages.ts:mount',message:'hook mounted — localStorage snapshot',data:{chatApiUrl,hasLocalLlmConfig:!!localLlmConfig,localProviderKeys:localApiKeys?Object.keys(localApiKeys as Record<string, unknown>):null,hasLlmConfigProp:!!llmConfig,llmConfigProvider:(llmConfig as {provider?:string}|null)?.provider??null,cookiePresent:document.cookie.includes("=")},hypothesisId:'H1',timestamp:Date.now()})}).catch(()=>{});
+    try {
+      localLlmConfig = JSON.parse(
+        localStorage.getItem("mcp-inspector-llm-config") ?? "null"
+      );
+    } catch {
+      /* ignore */
+    }
+    try {
+      localApiKeys = JSON.parse(
+        localStorage.getItem("mcp-inspector-api-keys") ?? "null"
+      );
+    } catch {
+      /* ignore */
+    }
+    fetch("http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "0606c0",
+      },
+      body: JSON.stringify({
+        sessionId: "0606c0",
+        location: "useChatMessages.ts:mount",
+        message: "hook mounted — localStorage snapshot",
+        data: {
+          chatApiUrl,
+          hasLocalLlmConfig: !!localLlmConfig,
+          localProviderKeys: localApiKeys
+            ? Object.keys(localApiKeys as Record<string, unknown>)
+            : null,
+          hasLlmConfigProp: !!llmConfig,
+          llmConfigProvider:
+            (llmConfig as { provider?: string } | null)?.provider ?? null,
+          cookiePresent: document.cookie.includes("="),
+        },
+        hypothesisId: "H1",
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
   }
   // #endregion
 
@@ -200,7 +239,31 @@ export function useChatMessages({
         ];
 
         // #region agent log
-        fetch('http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0606c0'},body:JSON.stringify({sessionId:'0606c0',location:'useChatMessages.ts:preFetch',message:'about to POST chat stream',data:{resolvedUrl,credentialsMode:credentials ?? null,messageCount:serialisedMessages.length,hasBodyBuilder:!!bodyBuilder,hasExtraHeaders:!!extraHeaders&&Object.keys(extraHeaders).length>0},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+        fetch(
+          "http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Debug-Session-Id": "0606c0",
+            },
+            body: JSON.stringify({
+              sessionId: "0606c0",
+              location: "useChatMessages.ts:preFetch",
+              message: "about to POST chat stream",
+              data: {
+                resolvedUrl,
+                credentialsMode: credentials ?? null,
+                messageCount: serialisedMessages.length,
+                hasBodyBuilder: !!bodyBuilder,
+                hasExtraHeaders:
+                  !!extraHeaders && Object.keys(extraHeaders).length > 0,
+              },
+              hypothesisId: "H2",
+              timestamp: Date.now(),
+            }),
+          }
+        ).catch(() => {});
         // #endregion
 
         const response = await fetch(resolvedUrl, {
@@ -230,7 +293,28 @@ export function useChatMessages({
           // #region agent log
           const dbgCloned = response.clone();
           const dbgBody = await dbgCloned.text().catch(() => "<unreadable>");
-          fetch('http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0606c0'},body:JSON.stringify({sessionId:'0606c0',location:'useChatMessages.ts:nonOkResponse',message:'received non-ok response',data:{status:response.status,url:response.url,body:dbgBody.slice(0,400)},hypothesisId:'H2',timestamp:Date.now()})}).catch(()=>{});
+          fetch(
+            "http://127.0.0.1:7513/ingest/9d8546f9-345d-4188-961c-54566dc5eca8",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Debug-Session-Id": "0606c0",
+              },
+              body: JSON.stringify({
+                sessionId: "0606c0",
+                location: "useChatMessages.ts:nonOkResponse",
+                message: "received non-ok response",
+                data: {
+                  status: response.status,
+                  url: response.url,
+                  body: dbgBody.slice(0, 400),
+                },
+                hypothesisId: "H2",
+                timestamp: Date.now(),
+              }),
+            }
+          ).catch(() => {});
           // #endregion
 
           if (response.status === 429) {
