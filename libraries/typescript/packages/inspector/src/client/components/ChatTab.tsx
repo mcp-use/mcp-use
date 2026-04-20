@@ -27,6 +27,7 @@ import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { LoginModal } from "./LoginModal";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -168,9 +169,35 @@ export function ChatTab({
     clearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
 
-  // If a managed LLM config is provided externally, use it instead of localStorage config
-  const llmConfig = managedLlmConfig ?? localLlmConfig;
-  const isManaged = !!managedLlmConfig;
+  // ── Hosted-mode / client-side override ──────────────────────────────────
+  // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
+  // to the Manufact backend (inspector.manufact.com/api/v1/inspector/chat/stream).
+  // We *still* want client-side mode in two situations:
+  //
+  //  a) User already has their own API key stored in localStorage → auto-detect
+  //     on mount via `localLlmConfig`. The model selector is then naturally
+  //     visible (ChatLandingForm / ConfigurationDialog take over).
+  //
+  //  b) User clicks "Use your own API key" in LoginModal (shown on 429) →
+  //     `handleUseApiKey` sets forceClientSide=true and opens ConfigurationDialog.
+  //
+  // `effectiveClientSide` is the single source of truth used everywhere below
+  // instead of the raw `useClientSide` prop.
+  const [forceClientSide, setForceClientSide] = useState(
+    () => !!localLlmConfig
+  );
+  const effectiveClientSide =
+    useClientSide || forceClientSide || !!localLlmConfig;
+
+  // When the user has opted into client-side mode (own API key), ignore the
+  // externally-provided managed config — we want the config dialog, model
+  // selector, and local llmConfig to take over. Without this, clicking "Use
+  // your own API key" in the LoginModal would leave `isManaged=true`, hiding
+  // the ConfigurationDialog and config button.
+  const llmConfig = effectiveClientSide
+    ? localLlmConfig
+    : (managedLlmConfig ?? localLlmConfig);
+  const isManaged = !effectiveClientSide && !!managedLlmConfig;
 
   const { getAllModelContexts } = useWidgetDebug();
 
@@ -213,7 +240,35 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
-  } = useClientSide ? clientSideChat : serverSideChat;
+  } = effectiveClientSide ? clientSideChat : serverSideChat;
+
+  const rateLimitInfo = effectiveClientSide
+    ? null
+    : (serverSideChat.rateLimitInfo ?? null);
+
+  const clearRateLimitInfo = effectiveClientSide
+    ? undefined
+    : serverSideChat.clearRateLimitInfo;
+
+  // Called when user clicks "Use your own API key" in the rate-limit modal.
+  const handleUseApiKey = useCallback(() => {
+    clearRateLimitInfo?.();
+    setForceClientSide(true);
+    setConfigDialogOpen(true);
+  }, [clearRateLimitInfo, setConfigDialogOpen]);
+
+  // User-initiated login (from the free-tier badge / ConfigurationDialog CTA).
+  // Separate from `rateLimitInfo` which is reactive to a 429 response.
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const handleOpenLogin = useCallback(() => {
+    setConfigDialogOpen(false);
+    setShowLoginModal(true);
+  }, [setConfigDialogOpen]);
+
+  // Free-tier info is shown whenever the chat is in hosted-managed mode.
+  const freeTierInfo = isManaged
+    ? { onLoginClick: handleOpenLogin }
+    : undefined;
 
   const {
     filteredPrompts,
@@ -919,29 +974,44 @@ export function ChatTab({
     [postBridgeEvent, sendMessage, llmConfig, isConnected]
   );
 
+  // Login modal — shown on 429 rate-limit OR when the user clicks "Sign in"
+  // from the free-tier ConfigurationDialog. Rendered in both the landing and
+  // main-chat branches so it works before any message is sent too.
+  const loginModalNode =
+    (rateLimitInfo || showLoginModal) && chatApiUrl ? (
+      <LoginModal
+        authOrigin={new URL(chatApiUrl).origin}
+        onDismiss={() => {
+          clearRateLimitInfo?.();
+          setShowLoginModal(false);
+        }}
+        onUseApiKey={handleUseApiKey}
+      />
+    ) : null;
+
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        {/* Header with config dialog (hidden when externally managed) */}
-        {!isManaged && (
-          <div className="absolute top-4 right-4 z-10">
-            <ConfigurationDialog
-              open={configDialogOpen}
-              onOpenChange={setConfigDialogOpen}
-              tempProvider={tempProvider}
-              tempModel={tempModel}
-              tempApiKey={tempApiKey}
-              onProviderChange={setTempProvider}
-              onModelChange={setTempModel}
-              onApiKeyChange={setTempApiKey}
-              onSave={saveLLMConfig}
-              onClear={handleClearConfig}
-              showClearButton
-              buttonLabel="Change API Key"
-            />
-          </div>
-        )}
+        {/* Header with config dialog. In hosted-managed mode the dialog shows
+            a "free tier" banner + Sign-in CTA above the bring-your-own-key form. */}
+        <div className="absolute top-4 right-4 z-10">
+          <ConfigurationDialog
+            open={configDialogOpen}
+            onOpenChange={setConfigDialogOpen}
+            tempProvider={tempProvider}
+            tempModel={tempModel}
+            tempApiKey={tempApiKey}
+            onProviderChange={setTempProvider}
+            onModelChange={setTempModel}
+            onApiKeyChange={setTempApiKey}
+            onSave={saveLLMConfig}
+            onClear={handleClearConfig}
+            showClearButton={!isManaged}
+            buttonLabel="Change API Key"
+            freeTierInfo={freeTierInfo}
+          />
+        </div>
 
         {/* Landing Form */}
         <ChatLandingForm
@@ -975,23 +1045,32 @@ export function ChatTab({
           onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
-          hideModelBadge={hideModelBadge}
+          hideModelBadge={
+            // In hosted mode the host default is `hideModelBadge=true`, but
+            // once the user has supplied their own API key (client-side mode)
+            // we want the provider/model badge back so they can see and
+            // change what they're using.
+            hideModelBadge && !effectiveClientSide
+          }
           hideServerUrl={hideServerUrl}
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
+          freeTierInfo={freeTierInfo}
         />
+        {loginModalNode}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header (hide config controls when externally managed) */}
+      {/* Header. In hosted-managed mode (`freeTierInfo`), the dialog always
+          renders and the badge switches to a "Free tier" pill. */}
       <ChatHeader
         llmConfig={llmConfig}
         hasMessages={messages.length > 0}
-        configDialogOpen={isManaged ? false : configDialogOpen}
-        onConfigDialogOpenChange={isManaged ? () => {} : setConfigDialogOpen}
+        configDialogOpen={configDialogOpen}
+        onConfigDialogOpenChange={setConfigDialogOpen}
         onClearChat={clearMessages}
         tempProvider={tempProvider}
         tempModel={tempModel}
@@ -1001,9 +1080,10 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
+        hideConfigButton={isManaged && !freeTierInfo}
+        freeTierInfo={freeTierInfo}
         onCopyChat={handleCopyChat}
         onExportChat={handleExportChat}
-        hideConfigButton={isManaged}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}
         clearButtonHideIcon={clearButtonHideIcon}
@@ -1034,11 +1114,13 @@ export function ChatTab({
         )}
       </div>
 
+      {loginModalNode}
+
       {/* Input Area */}
       {llmConfig && (
         <ChatInputArea
           inputValue={inputValue}
-          isConnected={isConnected}
+          isConnected={isConnected && !rateLimitInfo}
           isLoading={isLoading}
           textareaRef={textareaRef}
           promptsDropdownOpen={promptsDropdownOpen}

@@ -107,6 +107,16 @@ interface ConfigurationDialogProps {
   onClear?: () => void;
   showClearButton?: boolean;
   buttonLabel?: string;
+  /**
+   * When present, the dialog renders a "Manufact free tier" banner above the
+   * provider/api-key form, with a Login button that increases the tier.
+   * Used in hosted inspector mode (inspector.manufact.com) where the default
+   * LLM is provided server-side. Below the banner the user can still paste
+   * their own API key to switch to client-side mode + pick another model.
+   */
+  freeTierInfo?: {
+    onLoginClick: () => void;
+  };
 }
 
 async function fetchOpenAIModels(apiKey: string): Promise<ModelOption[]> {
@@ -177,6 +187,7 @@ export function ConfigurationDialog({
   onClear,
   showClearButton = false,
   buttonLabel: _buttonLabel = "Configure API Key",
+  freeTierInfo,
 }: ConfigurationDialogProps) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -250,13 +261,38 @@ export function ConfigurationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" data-testid="chat-config-dialog">
         <DialogHeader>
-          <DialogTitle>LLM Provider Configuration</DialogTitle>
+          <DialogTitle>
+            {freeTierInfo ? "Model & usage" : "LLM Provider Configuration"}
+          </DialogTitle>
           <DialogDescription>
-            Configure your LLM provider and API key to start chatting with the
-            MCP server
+            {freeTierInfo
+              ? "You're using Manufact's free tier. Sign in to increase your limits, or bring your own key to pick any model."
+              : "Configure your LLM provider and API key to start chatting with the MCP server"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {freeTierInfo && (
+            <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <div className="font-medium">Manufact free tier</div>
+                  <div className="text-xs text-muted-foreground">
+                    Sign in for increased generous limits.
+                  </div>
+                </div>
+                <Button size="sm" onClick={freeTierInfo.onLoginClick}>
+                  Sign in
+                </Button>
+              </div>
+            </div>
+          )}
+          {freeTierInfo && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="h-px flex-1 bg-border" />
+              <span>or use your own API key</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          )}
           <div className="space-y-2">
             <Label>Provider</Label>
             <Select
