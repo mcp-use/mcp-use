@@ -4,6 +4,7 @@ import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrlForCloudServer } from "../utils/cloud-urls.js";
 import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
 import { formatRelativeTime } from "../utils/format.js";
+import { createEnvCommand } from "./env.js";
 
 async function prompt(question: string): Promise<boolean> {
   const readline = await import("node:readline");
@@ -361,6 +362,8 @@ export function createServersCommand(): Command {
     .option("--org <slug-or-id>", "Target organization")
     .description("Delete a server and all its deployments")
     .action(deleteServerCommand);
+
+  serversCommand.addCommand(createEnvCommand());
 
   return serversCommand;
 }

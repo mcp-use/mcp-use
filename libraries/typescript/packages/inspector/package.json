@@ -91,10 +91,6 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.13",
-    "@langchain/anthropic": "^1.3.18",
-    "@langchain/core": "^1.1.26",
-    "@langchain/google-genai": "^2.1.19",
-    "@langchain/openai": "^1.2.8",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@paper-design/shaders-react": "^0.0.72",
