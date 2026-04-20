@@ -253,9 +253,7 @@ export async function* streamChat(
   yield { type: "done" };
 }
 
-export async function chat(
-  params: ChatParams
-): Promise<{
+export async function chat(params: ChatParams): Promise<{
   text: string;
   toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
 }> {
