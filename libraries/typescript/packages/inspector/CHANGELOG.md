@@ -1,5 +1,34 @@
 # @mcp-use/inspector
 
+## 2.2.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa86071]
+  - mcp-use@1.24.2-canary.3
+
+## 2.2.0-canary.2
+
+### Minor Changes
+
+- ee5abf8: Added "Copy Chat" and "Export Chat" buttons to the MCP Inspector chat header. Both actions include tool calls inline in the order they occurred. Copy writes markdown to the clipboard; Export downloads as JSON or Markdown.
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.2
+
+## 2.1.1-canary.1
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.1
+
+## 2.1.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.0
+
 ## 2.1.0
 
 ### Minor Changes
