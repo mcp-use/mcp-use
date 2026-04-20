@@ -14,6 +14,7 @@
     "fix-cli-deploy-401-github",
     "fix-deploy-github-init-push",
     "fix-theme-provider-color-scheme-transparency",
-    "hosted-chat-runtime-config"
+    "hosted-chat-runtime-config",
+    "inspector-remove-langchain"
   ]
 }
