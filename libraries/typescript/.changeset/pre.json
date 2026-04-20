@@ -8,7 +8,9 @@
     "mcp-use": "1.24.1"
   },
   "changesets": [
+    "export-chat-button",
     "fix-cli-deploy-401-github",
-    "fix-deploy-github-init-push"
+    "fix-deploy-github-init-push",
+    "fix-theme-provider-color-scheme-transparency"
   ]
 }
