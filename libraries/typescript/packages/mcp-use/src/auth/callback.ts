@@ -29,10 +29,51 @@ export async function onMcpAuthorization() {
   try {
     // --- Basic Error Handling ---
     if (error) {
-      throw new Error(
-        `OAuth error: ${error} - ${errorDescription || "No description provided."}`
-      );
-    }
+      // Handle OAuth errors with user-friendly messages and appropriate actions
+      const errorMessage = errorDescription || "No description provided.";
+
+      if (error === "access_denied") {
+        // User cancelled the authorization - close popup or redirect with soft notice
+        console.log(`${logPrefix} Authorization denied by user.`);
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { type: "mcp_auth_callback", success: false, error: "Authorization denied. You cancelled the sign-in." },
+            window.location.origin
+          );
+          window.close();
+        } else if (storedStateData?.returnUrl) {
+          // Redirect back with a soft notice
+          const returnUrl = new URL(storedStateData.returnUrl);
+          returnUrl.searchParams.set("auth_error", "Access denied");
+          window.location.href = returnUrl.toString();
+        } else {
+          // Fallback: redirect to root with notice
+          window.location.href = "/?auth_error=Access+denied";
+        }
+        return; // Exit early, no error thrown
+      }
+
+      if (error === "server_error" || error === "temporarily_unavailable") {
+        // Transient errors - suggest retry
+        console.warn(`${logPrefix} Transient OAuth error: ${error}`);
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { type: "mcp_auth_callback", success: false, error: `Service temporarily unavailable (${error}). Please try again.` },
+            window.location.origin
+          );
+          window.close();
+        } else if (storedStateData?.returnUrl) {
+          const returnUrl = new URL(storedStateData.returnUrl);
+          returnUrl.searchParams.set("auth_error", `Service unavailable (${error}). Please try again.`);
+          window.location.href = returnUrl.toString();
+        } else {
+          window.location.href = `/?auth_error=Service+unavailable+${encodeURIComponent(error)}`;
+        }
+        return; // Exit early, no error thrown
+      }
+
+      // Other errors - display user-friendly message without stack trace
+      throw new Error(`OAuth error: ${error} - ${errorMessage}`);
     if (!code) {
       throw new Error(
         "Authorization code not found in callback query parameters."
@@ -330,6 +371,14 @@ export async function onMcpAuthorization() {
       errorPara.style.borderRadius = "4px";
       errorPara.textContent = errorMessage; // Safely set as text content
       container.appendChild(errorPara);
+
+      // Create retry paragraph for transient errors
+      if (errorMessage.includes("temporarily_unavailable") || errorMessage.includes("server_error")) {
+        const retryPara = document.createElement("p");
+        retryPara.style.color = "#666";
+        retryPara.textContent = "This error may resolve on its own. Please wait a moment and try again.";
+        container.appendChild(retryPara);
+      }
 
       // Create close instruction paragraph
       const closePara = document.createElement("p");
