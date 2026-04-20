@@ -67,8 +67,12 @@ app.get("/inspector/oauth-popup-closed.html", (c) =>
   c.html(OAUTH_POPUP_CLOSED_HTML)
 );
 
-// Register static file serving with dev proxy support (must be last as it includes catch-all route)
-registerStaticRoutesWithDevProxy(app);
+// Register static file serving with dev proxy support (must be last as it includes catch-all route).
+// `MANUFACT_CHAT_URL` is read at runtime so the hosted-chat URL can be set on
+// the deploy environment (Railway, etc.) without rebuilding the npm package.
+registerStaticRoutesWithDevProxy(app, undefined, {
+  manufactChatUrl: process.env.MANUFACT_CHAT_URL,
+});
 
 /**
  * Start the MCP Inspector HTTP server and return its listening port and fetch handler.
