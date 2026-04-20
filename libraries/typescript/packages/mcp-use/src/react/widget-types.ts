@@ -106,6 +106,7 @@ export interface OpenAiGlobals<
   // state
   toolInput: ToolInput;
   toolOutput: ToolOutput | null;
+  partialToolOutput?: Partial<ToolOutput> | null;
   toolResponseMetadata: ToolResponseMetadata | null;
   widgetState: WidgetState | null;
 }
@@ -452,6 +453,14 @@ interface UseWidgetResultBase<
   partialToolInput: Partial<TToolInput> | null;
 
   /**
+   * Partial widget props streamed from inside the tool execution.
+   *
+   * Delivered via `ui/notifications/tool-result-partial` (SEP-1865) or an
+   * equivalent host update in Apps SDK-compatible inspector hosts.
+   */
+  partialToolOutput: Partial<TOutput> | null;
+
+  /**
    * Whether the LLM is currently streaming tool arguments.
    *
    * `true` while `partialToolInput` is non-null and the complete `toolInput`
@@ -465,6 +474,12 @@ interface UseWidgetResultBase<
    * @see partialToolInput
    */
   isStreaming: boolean;
+
+  /**
+   * `true` while the tool is streaming partial widget output and no final
+   * `tool-result` has been delivered yet.
+   */
+  isOutputStreaming: boolean;
 
   /**
    * Name and version of the MCP Apps host as reported during the

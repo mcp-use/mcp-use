@@ -1,6 +1,6 @@
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import type { McpServer } from "mcp-use/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
   convertMessagesToLangChain,
@@ -41,6 +41,66 @@ export function useChatMessagesClientSide({
   const agentRef = useRef<any>(null);
   const llmRef = useRef<any>(null);
   const lastDisabledToolsRef = useRef<string>("");
+  const lastWidgetPartialNotificationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const latestNotification = connection.notifications?.[0];
+    if (!latestNotification) {
+      return;
+    }
+
+    if (lastWidgetPartialNotificationIdRef.current === latestNotification.id) {
+      return;
+    }
+    lastWidgetPartialNotificationIdRef.current = latestNotification.id;
+
+    if (latestNotification.method !== "ui/notifications/tool-result-partial") {
+      return;
+    }
+
+    const structuredContent = latestNotification.params?.structuredContent;
+    if (!structuredContent || typeof structuredContent !== "object") {
+      return;
+    }
+
+    setMessages((prev) =>
+      prev.map((message) => {
+        if (message.role !== "assistant" || !message.parts) {
+          return message;
+        }
+
+        let updated = false;
+        const nextParts = [...message.parts];
+        for (let i = nextParts.length - 1; i >= 0; i -= 1) {
+          const part = nextParts[i];
+          const toolInvocation = part.toolInvocation;
+          if (!toolInvocation) {
+            continue;
+          }
+
+          if (
+            toolInvocation.result !== undefined ||
+            (toolInvocation.state !== "pending" &&
+              toolInvocation.state !== "streaming")
+          ) {
+            continue;
+          }
+
+          nextParts[i] = {
+            ...part,
+            toolInvocation: {
+              ...toolInvocation,
+              partialResult: structuredContent as Record<string, unknown>,
+            },
+          };
+          updated = true;
+          break;
+        }
+
+        return updated ? { ...message, parts: nextParts } : message;
+      })
+    );
+  }, [connection.notifications]);
 
   const sendMessage = useCallback(
     async (
@@ -101,6 +161,7 @@ export function useChatMessagesClientSide({
             toolName: string;
             args: Record<string, unknown>;
             result?: any;
+            partialResult?: Record<string, unknown> | null;
             state?: "pending" | "streaming" | "result" | "error";
             partialArgs?: Record<string, unknown>;
           };
@@ -424,6 +485,7 @@ export function useChatMessagesClientSide({
                       toolInvocation: {
                         toolName: buffer.name,
                         args: {},
+                        partialResult: null,
                         state: "streaming",
                         partialArgs,
                       },
@@ -490,6 +552,7 @@ export function useChatMessagesClientSide({
                 toolInvocation: {
                   toolName: event.name || "unknown",
                   args,
+                  partialResult: null,
                   state: "pending",
                 },
               });
@@ -550,6 +613,7 @@ export function useChatMessagesClientSide({
 
               // Store the unwrapped result
               toolPart.toolInvocation.result = result;
+              toolPart.toolInvocation.partialResult = null;
               // Check if result indicates an error
               toolPart.toolInvocation.state = result?.isError
                 ? "error"

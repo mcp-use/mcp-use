@@ -89,7 +89,8 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
  *    loaded in any SEP-1865-compliant host (e.g. Claude, Cursor) that is not
  *    ChatGPT. The hook connects via `ui/initialize` and listens for
  *    `ui/notifications/tool-input`, `ui/notifications/tool-input-partial`,
- *    `ui/notifications/tool-result`, and `ui/notifications/host-context-changed`.
+ *    `ui/notifications/tool-result`, `ui/notifications/tool-result-partial`,
+ *    and `ui/notifications/host-context-changed`.
  *
  * 3. **URL params fallback** (`mcpUseParams`) — used during local development
  *    (`mcp-use dev` inspector) where `toolInput` and `toolOutput` are injected
@@ -167,6 +168,8 @@ export function useWidget<
     string,
     unknown
   > | null>(null);
+  const [mcpAppsPartialToolOutput, setMcpAppsPartialToolOutput] =
+    useState<Record<string, unknown> | null>(null);
   const [mcpAppsResponseMetadata, setMcpAppsResponseMetadata] = useState<Record<
     string,
     unknown
@@ -255,11 +258,13 @@ export function useWidget<
         const responseMeta = bridge.getToolResponseMetadata();
         const hostContext = bridge.getHostContext();
         const partialToolInput = bridge.getPartialToolInput();
+        const partialToolOutput = bridge.getPartialToolOutput();
 
         if (toolInput) setMcpAppsToolInput(toolInput);
         if (toolOutput) setMcpAppsToolOutput(toolOutput);
         if (responseMeta) setMcpAppsResponseMetadata(responseMeta);
         if (partialToolInput) setMcpAppsPartialToolInput(partialToolInput);
+        if (partialToolOutput) setMcpAppsPartialToolOutput(partialToolOutput);
         if (hostContext) setMcpAppsHostContext(hostContext);
 
         const hostInfo = bridge.getHostInfo();
@@ -284,6 +289,11 @@ export function useWidget<
       setMcpAppsToolOutput(result);
       setMcpAppsResponseMetadata(bridge.getToolResponseMetadata());
       setMcpAppsPartialToolInput(null);
+      setMcpAppsPartialToolOutput(null);
+    });
+
+    const unsubToolResultPartial = bridge.onToolResultPartial((result) => {
+      setMcpAppsPartialToolOutput(result);
     });
 
     const unsubHostContext = bridge.onHostContextChange((context) => {
@@ -295,6 +305,7 @@ export function useWidget<
       unsubToolInput();
       unsubToolInputPartial();
       unsubToolResult();
+      unsubToolResultPartial();
       unsubHostContext();
     };
   }, []);
@@ -332,6 +343,10 @@ export function useWidget<
     | undefined;
   const openaiToolOutput = useOpenAiGlobal("toolOutput") as
     | TOutput
+    | null
+    | undefined;
+  const openaiPartialToolOutput = useOpenAiGlobal("partialToolOutput") as
+    | Partial<TOutput>
     | null
     | undefined;
   const toolResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as
@@ -380,6 +395,13 @@ export function useWidget<
     return urlParams.toolOutput as TOutput | null | undefined;
   }, [provider, openaiToolOutput, mcpAppsToolOutput, urlParams.toolOutput]);
 
+  const partialToolOutput = useMemo(() => {
+    if (provider === "openai") return openaiPartialToolOutput;
+    if (provider === "mcp-apps")
+      return mcpAppsPartialToolOutput as Partial<TOutput> | null | undefined;
+    return null;
+  }, [provider, openaiPartialToolOutput, mcpAppsPartialToolOutput]);
+
   // Props semantics:
   // - Widget exposed as tool: props = toolInput (args to the tool); when result arrives, props = structuredContent (tool can echo/override).
   // - Widget returned by another tool: props = structuredContent from that tool's result; toolInput = args to the parent tool.
@@ -393,6 +415,7 @@ export function useWidget<
     // full CallToolResult envelope { content, structuredContent, _meta } as toolOutput
     // instead of pre-extracting structuredContent. Detect and unwrap when needed.
     let structuredContent: Record<string, unknown> | undefined;
+    let partialStructuredContent: Record<string, unknown> | undefined;
     if (provider === "openai" && openaiToolOutput) {
       const raw = openaiToolOutput as Record<string, unknown>;
       if (raw.structuredContent && typeof raw.structuredContent === "object") {
@@ -400,20 +423,45 @@ export function useWidget<
       } else {
         structuredContent = raw;
       }
+    } else if (
+      provider === "openai" &&
+      openaiPartialToolOutput &&
+      typeof openaiPartialToolOutput === "object"
+    ) {
+      partialStructuredContent = openaiPartialToolOutput as Record<
+        string,
+        unknown
+      >;
     } else if (provider === "mcp-apps" && mcpAppsToolOutput) {
       structuredContent = mcpAppsToolOutput as Record<string, unknown>;
+    } else if (
+      provider === "mcp-apps" &&
+      mcpAppsPartialToolOutput &&
+      typeof mcpAppsPartialToolOutput === "object"
+    ) {
+      partialStructuredContent = mcpAppsPartialToolOutput as Record<
+        string,
+        unknown
+      >;
     } else if (provider === "mcp-ui" && urlParams.toolOutput) {
       structuredContent = urlParams.toolOutput as Record<string, unknown>;
     }
 
     // Base: toolInput (for exposed-as-tool) or defaultProps; overlay: structuredContent
-    const merged = { ...base, ...ti, ...(structuredContent || {}) } as TProps;
+    const merged = {
+      ...base,
+      ...ti,
+      ...(partialStructuredContent || {}),
+      ...(structuredContent || {}),
+    } as TProps;
     return merged;
   }, [
     provider,
     toolInput,
     openaiToolOutput,
+    openaiPartialToolOutput,
     mcpAppsToolOutput,
+    mcpAppsPartialToolOutput,
     urlParams.toolOutput,
     defaultProps,
   ]);
@@ -791,6 +839,14 @@ export function useWidget<
     return false;
   }, [provider, mcpAppsPartialToolInput]);
 
+  const isOutputStreaming = useMemo(() => {
+    return (
+      partialToolOutput !== null &&
+      partialToolOutput !== undefined &&
+      (toolOutput === null || toolOutput === undefined)
+    );
+  }, [partialToolOutput, toolOutput]);
+
   return {
     // Props and state (with defaults)
     props: widgetProps,
@@ -838,7 +894,9 @@ export function useWidget<
 
     // Streaming
     partialToolInput,
+    partialToolOutput: (partialToolOutput ?? null) as Partial<TOutput> | null,
     isStreaming,
+    isOutputStreaming,
 
     // Host identity (MCP Apps only)
     hostInfo: mcpAppsHostInfo ?? undefined,

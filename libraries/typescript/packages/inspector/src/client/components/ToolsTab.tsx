@@ -22,6 +22,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useMcpClient } from "mcp-use/react";
 import { RpcPanel } from "./shared";
 import type { SavedRequest, ToolResult } from "./tools";
 import {
@@ -147,6 +148,12 @@ export function ToolsTab({
   });
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(
     new Set()
+  );
+  const lastWidgetPartialNotificationIdRef = useRef<string | null>(null);
+  const { servers } = useMcpClient();
+  const server = useMemo(
+    () => servers.find((candidate) => candidate.id === serverId),
+    [servers, serverId]
   );
 
   const leftPanelRef = usePanelRef();
@@ -320,6 +327,45 @@ export function ToolsTab({
   useEffect(() => {
     setFocusedIndex(-1);
   }, [searchQuery, activeTab]);
+
+  useEffect(() => {
+    const latestNotification = server?.notifications?.[0];
+    if (!latestNotification) {
+      return;
+    }
+
+    if (lastWidgetPartialNotificationIdRef.current === latestNotification.id) {
+      return;
+    }
+    lastWidgetPartialNotificationIdRef.current = latestNotification.id;
+
+    if (latestNotification.method !== "ui/notifications/tool-result-partial") {
+      return;
+    }
+
+    const structuredContent = latestNotification.params?.structuredContent;
+    if (!structuredContent || typeof structuredContent !== "object") {
+      return;
+    }
+
+    setResults((prev) => {
+      if (prev.length === 0) {
+        return prev;
+      }
+
+      const [first, ...rest] = prev;
+      if (first.result !== null) {
+        return prev;
+      }
+      return [
+        {
+          ...first,
+          partialToolOutput: structuredContent as Record<string, unknown>,
+        },
+        ...rest,
+      ];
+    });
+  }, [server?.notifications]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -716,6 +762,7 @@ export function ToolsTab({
           toolName: selectedTool.name,
           args: parsedArgs,
           result: null, // No result yet
+          partialToolOutput: null,
           timestamp: startTime,
           duration: 0,
           toolMeta,
@@ -827,6 +874,7 @@ export function ToolsTab({
               ? {
                   ...r,
                   result,
+                  partialToolOutput: null,
                   duration,
                   appsSdkResource,
                   toolMeta: updatedToolMeta, // Include updated tool metadata for dual-protocol widget detection
@@ -841,6 +889,7 @@ export function ToolsTab({
             toolName: selectedTool.name,
             args: toolArgs,
             result,
+            partialToolOutput: null,
             timestamp: startTime,
             duration,
             toolMeta: updatedToolMeta,
@@ -876,6 +925,7 @@ export function ToolsTab({
         toolName: selectedTool.name,
         args: toolArgs,
         result: null,
+        partialToolOutput: null,
         error: error instanceof Error ? error.message : String(error),
         timestamp: startTime,
         duration,

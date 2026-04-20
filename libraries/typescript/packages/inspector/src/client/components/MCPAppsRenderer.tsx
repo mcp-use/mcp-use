@@ -97,6 +97,7 @@ interface MCPAppsRendererProps {
   toolName: string;
   toolInput?: Record<string, unknown>;
   toolOutput?: unknown;
+  partialToolOutput?: Record<string, unknown> | null;
   toolMetadata?: Record<string, unknown>;
   invoking?: string;
   invoked?: string;
@@ -124,6 +125,7 @@ function MCPAppsRendererBase({
   toolName,
   toolInput,
   toolOutput,
+  partialToolOutput,
   toolMetadata,
   invoking,
   invoked,
@@ -831,6 +833,18 @@ function MCPAppsRendererBase({
     bridge.sendToolInputPartial({ arguments: partialToolInput });
   }, [initCount, partialToolInput]);
 
+  useEffect(() => {
+    if (initCount === 0 || !partialToolOutput) return;
+
+    sandboxRef.current?.postMessage({
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result-partial",
+      params: {
+        structuredContent: partialToolOutput,
+      },
+    });
+  }, [initCount, partialToolOutput]);
+
   // Send tool input when ready. Re-send when toolCallId changes (re-execution)
   // or when customProps changes (user selects/creates preset with different props).
   useEffect(() => {
@@ -1205,6 +1219,7 @@ function mcpAppsRendererAreEqual(
   }
   if (prev.toolInput !== next.toolInput) return false;
   if (prev.toolOutput !== next.toolOutput) return false;
+  if (prev.partialToolOutput !== next.partialToolOutput) return false;
   if (prev.toolMetadata !== next.toolMetadata) return false;
   if (prev.partialToolInput !== next.partialToolInput) return false;
   if (prev.customProps !== next.customProps) return false;

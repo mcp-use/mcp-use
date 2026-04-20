@@ -504,6 +504,17 @@ export interface ToolContext {
   ) => Promise<void>;
 
   /**
+   * Stream partial widget props to the current session while the tool is running.
+   *
+   * This uses the standard `ui/notifications/tool-result-partial` channel so
+   * widget hosts can merge progressive `structuredContent` updates before the
+   * final tool result arrives.
+   */
+  streamWidgetProps: (
+    structuredContent: Record<string, unknown>
+  ) => Promise<void>;
+
+  /**
    * Send a notification to a specific session by ID
    *
    * This allows sending notifications to any connected session, not just the

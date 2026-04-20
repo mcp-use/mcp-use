@@ -6,6 +6,7 @@ const propSchema = z.object({
   language: z.string().describe("Programming language"),
   description: z.string().describe("Description of the code"),
   code: z.string().describe("The code snippet"),
+  generatedLines: z.number().optional().describe("How many lines are ready"),
 });
 
 export const widgetMetadata: WidgetMetadata = {
@@ -23,7 +24,7 @@ export const widgetMetadata: WidgetMetadata = {
 type CodePreviewProps = z.infer<typeof propSchema>;
 
 const CodePreview: React.FC = () => {
-  const { props, isPending, isStreaming, partialToolInput, theme } =
+  const { props, isPending, isOutputStreaming, partialToolOutput, theme } =
     useWidget<CodePreviewProps>();
 
   const isDark = theme === "dark";
@@ -31,19 +32,23 @@ const CodePreview: React.FC = () => {
   // Determine what to display based on streaming state
   const displayLanguage =
     props.language ||
-    (partialToolInput as Partial<CodePreviewProps> | null)?.language ||
+    (partialToolOutput as Partial<CodePreviewProps> | null)?.language ||
     "";
   const displayDescription =
     props.description ||
-    (partialToolInput as Partial<CodePreviewProps> | null)?.description ||
+    (partialToolOutput as Partial<CodePreviewProps> | null)?.description ||
     "";
   const displayCode =
     props.code ||
-    (partialToolInput as Partial<CodePreviewProps> | null)?.code ||
+    (partialToolOutput as Partial<CodePreviewProps> | null)?.code ||
     "";
+  const displayGeneratedLines =
+    props.generatedLines ||
+    (partialToolOutput as Partial<CodePreviewProps> | null)?.generatedLines ||
+    0;
 
   // Loading state - no data at all yet
-  if (isPending && !isStreaming) {
+  if (isPending && !isOutputStreaming) {
     return (
       <McpUseProvider autoSize>
         <div
@@ -109,7 +114,7 @@ const CodePreview: React.FC = () => {
           </div>
 
           {/* Streaming indicator */}
-          {isStreaming && (
+          {isOutputStreaming && (
             <div className="flex items-center gap-2">
               <div className="flex gap-1">
                 <div
@@ -140,7 +145,7 @@ const CodePreview: React.FC = () => {
           )}
 
           {/* Complete indicator */}
-          {!isStreaming && !isPending && (
+          {!isOutputStreaming && !isPending && (
             <span
               className={`text-xs ${isDark ? "text-gray-500" : "text-gray-400"}`}
             >
@@ -170,7 +175,7 @@ const CodePreview: React.FC = () => {
               )}
             </code>
             {/* Blinking cursor when streaming */}
-            {isStreaming && (
+            {isOutputStreaming && (
               <span
                 className={`inline-block w-2 h-4 ml-0.5 animate-pulse ${
                   isDark ? "bg-green-400" : "bg-green-500"
@@ -190,9 +195,10 @@ const CodePreview: React.FC = () => {
           }`}
         >
           <span>
-            isStreaming: {String(isStreaming)} | isPending: {String(isPending)}{" "}
-            | partialToolInput: {partialToolInput ? "present" : "null"} | code
-            length: {displayCode.length}
+            isOutputStreaming: {String(isOutputStreaming)} | isPending:{" "}
+            {String(isPending)} | partialToolOutput:{" "}
+            {partialToolOutput ? "present" : "null"} | lines ready:{" "}
+            {displayGeneratedLines} | code length: {displayCode.length}
           </span>
         </div>
       </div>

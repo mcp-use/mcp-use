@@ -17,6 +17,7 @@ interface OpenAIComponentRendererProps {
   toolName: string;
   toolArgs: Record<string, unknown>;
   toolResult: any;
+  partialToolOutput?: Record<string, unknown> | null;
   serverId: string;
   readResource: (uri: string) => Promise<any>;
   className?: string;
@@ -52,6 +53,7 @@ type IframeGlobalUpdates = {
   };
   userAgent?: any;
   toolOutput?: any;
+  partialToolOutput?: any;
   toolResponseMetadata?: any;
 };
 
@@ -97,6 +99,7 @@ function OpenAIComponentRendererBase({
   toolName,
   toolArgs,
   toolResult,
+  partialToolOutput,
   serverId,
   readResource,
   className,
@@ -421,6 +424,8 @@ function OpenAIComponentRendererBase({
               iframeWindow.openai.userAgent = merged.userAgent;
             if (merged.toolOutput !== undefined)
               iframeWindow.openai.toolOutput = merged.toolOutput;
+            if (merged.partialToolOutput !== undefined)
+              iframeWindow.openai.partialToolOutput = merged.partialToolOutput;
             if (merged.toolResponseMetadata !== undefined)
               iframeWindow.openai.toolResponseMetadata =
                 merged.toolResponseMetadata;
@@ -488,6 +493,14 @@ function OpenAIComponentRendererBase({
       toolResponseMetadata: metadata,
     });
   }, [toolResult, isReady, updateIframeGlobals]);
+
+  useEffect(() => {
+    if (!isReady || !iframeRef.current?.contentWindow) return;
+
+    updateIframeGlobals({
+      partialToolOutput: partialToolOutput ?? null,
+    });
+  }, [partialToolOutput, isReady, updateIframeGlobals]);
 
   // Handle display mode changes with native Fullscreen API
   const handleDisplayModeChange = useCallback(
@@ -1184,6 +1197,7 @@ function openAIComponentRendererAreEqual(
     "serverId",
     "toolArgs",
     "toolResult",
+    "partialToolOutput",
     "readResource",
     "className",
   ] as const;

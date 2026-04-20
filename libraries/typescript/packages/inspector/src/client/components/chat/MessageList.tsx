@@ -21,6 +21,7 @@ interface Message {
       toolName: string;
       args: Record<string, unknown>;
       result?: any;
+      partialResult?: Record<string, unknown> | null;
       state?: "pending" | "streaming" | "result" | "error";
       partialArgs?: Record<string, unknown>;
     };
@@ -244,6 +245,9 @@ export const MessageList = memo(
                                 toolName={part.toolInvocation.toolName}
                                 toolArgs={part.toolInvocation.args}
                                 result={part.toolInvocation.result || null}
+                                partialToolOutput={
+                                  part.toolInvocation.partialResult
+                                }
                                 serverId={serverId}
                                 readResource={readResource}
                                 serverBaseUrl={serverBaseUrl}
