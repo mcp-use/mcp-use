@@ -13,6 +13,7 @@
     "export-chat-button",
     "fix-cli-deploy-401-github",
     "fix-deploy-github-init-push",
+    "fix-server-manufact-chat-url-parity",
     "fix-theme-provider-color-scheme-transparency",
     "hosted-chat-runtime-config",
     "inspector-remove-langchain"
