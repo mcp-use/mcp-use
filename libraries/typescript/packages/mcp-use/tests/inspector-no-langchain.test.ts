@@ -17,12 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Resolve to the inspector package inside the mcp-use workspace.
-const inspectorPkgDir = join(
-  __dirname,
-  "..",
-  "..",
-  "inspector"
-);
+const inspectorPkgDir = join(__dirname, "..", "..", "inspector");
 
 describe("@mcp-use/inspector must not require langchain", () => {
   it("package.json declares no @langchain/* or langchain dependency", () => {
@@ -35,9 +30,7 @@ describe("@mcp-use/inspector must not require langchain", () => {
       "@langchain/google-genai",
       "langchain",
     ];
-    const buckets: Array<
-      [string, Record<string, string> | undefined]
-    > = [
+    const buckets: Array<[string, Record<string, string> | undefined]> = [
       ["dependencies", pkgJson.dependencies],
       ["peerDependencies", pkgJson.peerDependencies],
       ["optionalDependencies", pkgJson.optionalDependencies],
@@ -53,62 +46,59 @@ describe("@mcp-use/inspector must not require langchain", () => {
     }
   });
 
-  it(
-    "built dist/ has no static langchain or MCPAgent references",
-    () => {
-      const distDir = join(inspectorPkgDir, "dist");
-      let files: string[] = [];
-      try {
-        files = collectJsFiles(distDir);
-      } catch {
-        // No dist yet (fresh checkout) — nothing to check.
-        return;
-      }
-      if (files.length === 0) return;
+  it("built dist/ has no static langchain or MCPAgent references", () => {
+    const distDir = join(inspectorPkgDir, "dist");
+    let files: string[] = [];
+    try {
+      files = collectJsFiles(distDir);
+    } catch {
+      // No dist yet (fresh checkout) — nothing to check.
+      return;
+    }
+    if (files.length === 0) return;
 
-      const forbiddenPatterns: Array<{ name: string; re: RegExp }> = [
-        {
-          name: "static @langchain/* import",
-          re: /(?:^|[^a-zA-Z0-9_])from\s*["']@langchain\//m,
-        },
-        {
-          name: "static langchain import",
-          re: /(?:^|[^a-zA-Z0-9_])from\s*["']langchain["']/m,
-        },
-        {
-          name: "@langchain/* require",
-          re: /require\(\s*["']@langchain\//,
-        },
-        {
-          name: "langchain require",
-          re: /require\(\s*["']langchain["']\)/,
-        },
-        {
-          name: "dynamic import('@langchain/*')",
-          re: /import\(\s*["']@langchain\//,
-        },
-        {
-          name: "dynamic import('langchain')",
-          re: /import\(\s*["']langchain["']\)/,
-        },
-        {
-          name: "MCPAgent reference",
-          re: /\bMCPAgent\b/,
-        },
-      ];
+    const forbiddenPatterns: Array<{ name: string; re: RegExp }> = [
+      {
+        name: "static @langchain/* import",
+        re: /(?:^|[^a-zA-Z0-9_])from\s*["']@langchain\//m,
+      },
+      {
+        name: "static langchain import",
+        re: /(?:^|[^a-zA-Z0-9_])from\s*["']langchain["']/m,
+      },
+      {
+        name: "@langchain/* require",
+        re: /require\(\s*["']@langchain\//,
+      },
+      {
+        name: "langchain require",
+        re: /require\(\s*["']langchain["']\)/,
+      },
+      {
+        name: "dynamic import('@langchain/*')",
+        re: /import\(\s*["']@langchain\//,
+      },
+      {
+        name: "dynamic import('langchain')",
+        re: /import\(\s*["']langchain["']\)/,
+      },
+      {
+        name: "MCPAgent reference",
+        re: /\bMCPAgent\b/,
+      },
+    ];
 
-      const failures: string[] = [];
-      for (const file of files) {
-        const content = readFileSync(file, "utf-8");
-        for (const { name, re } of forbiddenPatterns) {
-          if (re.test(content)) {
-            failures.push(`${name} found in ${relative(file)}`);
-          }
+    const failures: string[] = [];
+    for (const file of files) {
+      const content = readFileSync(file, "utf-8");
+      for (const { name, re } of forbiddenPatterns) {
+        if (re.test(content)) {
+          failures.push(`${name} found in ${relative(file)}`);
         }
       }
-      expect(failures, failures.join("\n")).toEqual([]);
     }
-  );
+    expect(failures, failures.join("\n")).toEqual([]);
+  });
 });
 
 function collectJsFiles(dir: string): string[] {

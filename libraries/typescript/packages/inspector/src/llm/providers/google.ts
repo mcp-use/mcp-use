@@ -24,7 +24,9 @@ interface ChatParams {
  */
 function normalizeModelId(model: string): string {
   const trimmed = model.trim();
-  return trimmed.startsWith("models/") ? trimmed.slice("models/".length) : trimmed;
+  return trimmed.startsWith("models/")
+    ? trimmed.slice("models/".length)
+    : trimmed;
 }
 
 function endpointFor(model: string, mode: "stream" | "single"): string {
@@ -75,7 +77,9 @@ function toGeminiContents(messages: ProviderMessage[]): unknown[] {
         response =
           typeof m.content === "string" ? JSON.parse(m.content) : m.toolResult;
       } catch {
-        response = { result: typeof m.content === "string" ? m.content : m.toolResult };
+        response = {
+          result: typeof m.content === "string" ? m.content : m.toolResult,
+        };
       }
       if (!response || typeof response !== "object") {
         response = { result: response };
@@ -129,8 +133,10 @@ function buildBody(params: ChatParams) {
     body.systemInstruction = { parts: [{ text: system }] };
   }
   const genConfig: Record<string, unknown> = {};
-  if (config.temperature !== undefined) genConfig.temperature = config.temperature;
-  if (config.maxTokens !== undefined) genConfig.maxOutputTokens = config.maxTokens;
+  if (config.temperature !== undefined)
+    genConfig.temperature = config.temperature;
+  if (config.maxTokens !== undefined)
+    genConfig.maxOutputTokens = config.maxTokens;
   if (Object.keys(genConfig).length > 0) body.generationConfig = genConfig;
   if (tools && tools.length > 0) {
     body.tools = [
@@ -220,7 +226,10 @@ export async function* streamChat(
 
 export async function chat(
   params: ChatParams
-): Promise<{ text: string; toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }> {
+): Promise<{
+  text: string;
+  toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+}> {
   const { config, signal } = params;
   const url = `${endpointFor(config.model, "single")}?key=${encodeURIComponent(
     config.apiKey
@@ -239,7 +248,11 @@ export async function chat(
   }
   const json = await res.json();
   let text = "";
-  const toolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [];
+  const toolCalls: {
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+  }[] = [];
   const parts = json?.candidates?.[0]?.content?.parts ?? [];
   for (const p of parts) {
     if (typeof p.text === "string") text += p.text;

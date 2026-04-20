@@ -132,9 +132,10 @@ export function convertMessagesToProvider(
  * Anthropic and Google do not accept a `system` role inside their `messages`
  * array; they take it as a top-level field instead.
  */
-export function extractSystem(
-  messages: ProviderMessage[]
-): { system?: string; rest: ProviderMessage[] } {
+export function extractSystem(messages: ProviderMessage[]): {
+  system?: string;
+  rest: ProviderMessage[];
+} {
   const sys: string[] = [];
   const rest: ProviderMessage[] = [];
   for (const m of messages) {

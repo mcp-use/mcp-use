@@ -4,10 +4,7 @@
  */
 
 import { convertMessagesToProvider } from "../llm/messageFormat";
-import {
-  runToolLoop,
-  runToolLoopNonStreaming,
-} from "../llm/toolLoop";
+import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
 import type { ProviderMessage, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
@@ -156,8 +153,9 @@ export async function* handleChatRequestStream(requestBody: {
     const tools: ProviderTool[] = mcpTools.map((t: any) => ({
       name: t.name,
       description: t.description,
-      inputSchema:
-        (t.inputSchema as Record<string, unknown>) ?? { type: "object" },
+      inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
+        type: "object",
+      },
     }));
 
     const providerMessages: ProviderMessage[] = [
@@ -324,8 +322,9 @@ export async function handleChatRequest(requestBody: {
     const tools: ProviderTool[] = mcpTools.map((t: any) => ({
       name: t.name,
       description: t.description,
-      inputSchema:
-        (t.inputSchema as Record<string, unknown>) ?? { type: "object" },
+      inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
+        type: "object",
+      },
     }));
 
     const providerMessages: ProviderMessage[] = [

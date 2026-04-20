@@ -133,8 +133,9 @@ export function useChatMessagesClientSide({
           .map((t) => ({
             name: t.name,
             description: t.description,
-            inputSchema:
-              (t.inputSchema as Record<string, unknown>) ?? { type: "object" },
+            inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
+              type: "object",
+            },
           }));
 
         // Build the provider-neutral message stream (system + history + widget

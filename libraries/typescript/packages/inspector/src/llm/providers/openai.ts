@@ -190,7 +190,10 @@ export async function* streamChat(
 
 export async function chat(
   params: ChatParams
-): Promise<{ text: string; toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }> {
+): Promise<{
+  text: string;
+  toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+}> {
   const { config, messages, tools, signal } = params;
   const body: Record<string, unknown> = {
     model: config.model,
@@ -225,22 +228,22 @@ export async function chat(
   }
   const json = await res.json();
   const choice = json?.choices?.[0]?.message;
-  const text: string = typeof choice?.content === "string" ? choice.content : "";
-  const toolCalls =
-    Array.isArray(choice?.tool_calls)
-      ? choice.tool_calls.map((tc: any) => {
-          let args: Record<string, unknown> = {};
-          try {
-            args = JSON.parse(tc?.function?.arguments ?? "{}");
-          } catch {
-            args = {};
-          }
-          return {
-            id: tc.id,
-            name: tc.function?.name ?? "",
-            args,
-          };
-        })
-      : [];
+  const text: string =
+    typeof choice?.content === "string" ? choice.content : "";
+  const toolCalls = Array.isArray(choice?.tool_calls)
+    ? choice.tool_calls.map((tc: any) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(tc?.function?.arguments ?? "{}");
+        } catch {
+          args = {};
+        }
+        return {
+          id: tc.id,
+          name: tc.function?.name ?? "",
+          args,
+        };
+      })
+    : [];
   return { text, toolCalls };
 }

@@ -141,11 +141,13 @@ function stripMeta(value: unknown): unknown {
  * Runs the same tool loop but collects the final assistant text and tool
  * invocations into a result object.
  */
-export async function runToolLoopNonStreaming(
-  params: ToolLoopParams
-): Promise<{
+export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
   content: string;
-  toolCalls: { toolName: string; args: Record<string, unknown>; result: unknown }[];
+  toolCalls: {
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }[];
 }> {
   const { config, tools, callTool, signal } = params;
   const maxSteps = params.maxSteps ?? 10;

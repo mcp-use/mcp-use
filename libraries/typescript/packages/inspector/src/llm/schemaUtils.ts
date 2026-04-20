@@ -27,7 +27,9 @@ const ALLOWED_KEYS = new Set([
   "pattern",
 ]);
 
-export function sanitizeSchemaForGemini(schema: unknown): Record<string, unknown> {
+export function sanitizeSchemaForGemini(
+  schema: unknown
+): Record<string, unknown> {
   if (!schema || typeof schema !== "object") {
     return { type: "object" };
   }

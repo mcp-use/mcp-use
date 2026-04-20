@@ -255,7 +255,10 @@ export async function* streamChat(
 
 export async function chat(
   params: ChatParams
-): Promise<{ text: string; toolCalls: { id: string; name: string; args: Record<string, unknown> }[] }> {
+): Promise<{
+  text: string;
+  toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+}> {
   const { config, signal } = params;
   const res = await fetch(DEFAULT_ENDPOINT, {
     method: "POST",
@@ -276,7 +279,11 @@ export async function chat(
   }
   const json = await res.json();
   let text = "";
-  const toolCalls: { id: string; name: string; args: Record<string, unknown> }[] = [];
+  const toolCalls: {
+    id: string;
+    name: string;
+    args: Record<string, unknown>;
+  }[] = [];
   for (const block of json?.content ?? []) {
     if (block.type === "text" && typeof block.text === "string") {
       text += block.text;

@@ -10,7 +10,9 @@ import type { Message } from "./types";
  * Supports multimodal messages with image attachments and preserves tool
  * call / tool result context across conversation turns.
  */
-export function convertMessagesToProvider(messages: Message[]): ProviderMessage[] {
+export function convertMessagesToProvider(
+  messages: Message[]
+): ProviderMessage[] {
   return convertMessagesToProviderImpl(messages);
 }
 

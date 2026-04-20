@@ -48,31 +48,34 @@ function printEnvVar(v: EnvVariable, showValue = false): void {
       ? chalk.cyan(v.value)
       : chalk.gray("(hidden — use --show-values to reveal)");
   console.log(`  ${chalk.white.bold(v.key.padEnd(32))} ${val}`);
-  console.log(`    ${chalk.gray("id:")} ${chalk.gray(v.id)}  ${envs}${v.sensitive ? "  " + chalk.yellow("🔒 sensitive") : ""}`);
+  console.log(
+    `    ${chalk.gray("id:")} ${chalk.gray(v.id)}  ${envs}${v.sensitive ? "  " + chalk.yellow("🔒 sensitive") : ""}`
+  );
 }
 
 async function requireLogin(): Promise<void> {
   if (!(await isLoggedIn())) {
     console.log(chalk.red("✗ You are not logged in."));
     console.log(
-      chalk.gray(
-        "Run " + chalk.white("npx mcp-use login") + " to get started."
-      )
+      chalk.gray("Run " + chalk.white("npx mcp-use login") + " to get started.")
     );
     process.exit(1);
   }
 }
 
-async function listEnvCommand(
-  options: { server: string; showValues?: boolean }
-): Promise<void> {
+async function listEnvCommand(options: {
+  server: string;
+  showValues?: boolean;
+}): Promise<void> {
   await requireLogin();
 
   const api = await McpUseAPI.create();
   const vars = await api.listEnvVariables(options.server);
 
   if (vars.length === 0) {
-    console.log(chalk.yellow("\nNo environment variables set for this server.\n"));
+    console.log(
+      chalk.yellow("\nNo environment variables set for this server.\n")
+    );
     return;
   }
 
@@ -92,7 +95,9 @@ async function addEnvCommand(
   const eqIdx = assignment.indexOf("=");
   if (eqIdx === -1) {
     console.error(
-      chalk.red('✗ Expected KEY=VALUE format, e.g. mcp-use servers env add API_KEY=abc123')
+      chalk.red(
+        "✗ Expected KEY=VALUE format, e.g. mcp-use servers env add API_KEY=abc123"
+      )
     );
     process.exit(1);
   }
@@ -115,7 +120,9 @@ async function addEnvCommand(
     sensitive: options.sensitive ?? false,
   });
 
-  console.log(chalk.green(`\n✓ Environment variable "${created.key}" added.\n`));
+  console.log(
+    chalk.green(`\n✓ Environment variable "${created.key}" added.\n`)
+  );
   printEnvVar(created, true);
   console.log();
 }
@@ -128,12 +135,18 @@ async function updateEnvCommand(
 
   if (!options.value && !options.env && options.sensitive === undefined) {
     console.error(
-      chalk.red("✗ Nothing to update. Provide at least one of --value, --env, --sensitive.")
+      chalk.red(
+        "✗ Nothing to update. Provide at least one of --value, --env, --sensitive."
+      )
     );
     process.exit(1);
   }
 
-  const body: { value?: string; environments?: EnvEnvironment[]; sensitive?: boolean } = {};
+  const body: {
+    value?: string;
+    environments?: EnvEnvironment[];
+    sensitive?: boolean;
+  } = {};
   if (options.value !== undefined) body.value = options.value;
   if (options.env) body.environments = parseEnvironments(options.env);
   if (options.sensitive !== undefined) body.sensitive = options.sensitive;
@@ -141,7 +154,9 @@ async function updateEnvCommand(
   const api = await McpUseAPI.create();
   const updated = await api.updateEnvVariable(options.server, varId, body);
 
-  console.log(chalk.green(`\n✓ Environment variable "${updated.key}" updated.\n`));
+  console.log(
+    chalk.green(`\n✓ Environment variable "${updated.key}" updated.\n`)
+  );
   printEnvVar(updated, !!options.value);
   console.log();
 }
@@ -178,9 +193,12 @@ export function createEnvCommand(): Command {
     .requiredOption("--server <id>", "Server UUID")
     .option(
       "--env <environments>",
-      "Comma-separated environments: production,preview,development (default: all)",
+      "Comma-separated environments: production,preview,development (default: all)"
     )
-    .option("--sensitive", "Mark the variable as sensitive (value masked in UI)")
+    .option(
+      "--sensitive",
+      "Mark the variable as sensitive (value masked in UI)"
+    )
     .action(addEnvCommand);
 
   envCommand
@@ -191,7 +209,7 @@ export function createEnvCommand(): Command {
     .option("--value <value>", "New value")
     .option(
       "--env <environments>",
-      "New environments (comma-separated: production,preview,development)",
+      "New environments (comma-separated: production,preview,development)"
     )
     .option("--sensitive", "Mark as sensitive")
     .option("--no-sensitive", "Unmark as sensitive")
