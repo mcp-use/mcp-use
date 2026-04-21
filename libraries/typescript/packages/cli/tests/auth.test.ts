@@ -54,8 +54,7 @@ describe("resolveOrgFromOption", () => {
     expect(resolveOrgFromOption([], "anything")).toBeNull();
   });
 
-  it("does not match a null slug when given an empty-ish value", () => {
-    // Regression guard: an org with slug=null must not be selected by accident.
+  it("does not coerce the literal string 'null' to match a null slug", () => {
     expect(resolveOrgFromOption(orgs, "null")).toBeNull();
   });
 

@@ -25,7 +25,11 @@ import {
 } from "../utils/git.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
-import { loginCommand, promptOrgSelection } from "./auth.js";
+import {
+  loginCommand,
+  promptOrgSelection,
+  resolveOrgFromOption,
+} from "./auth.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -693,12 +697,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     if (options.org) {
       const authInfo = await api.testAuth();
-      const match = (authInfo.orgs ?? []).find(
-        (o) =>
-          o.slug === options.org ||
-          o.id === options.org ||
-          o.name.toLowerCase() === options.org!.toLowerCase()
-      );
+      const match = resolveOrgFromOption(authInfo.orgs ?? [], options.org);
       if (match) {
         api.setOrgId(match.id);
         resolvedOrgId = match.id;

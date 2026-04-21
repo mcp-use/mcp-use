@@ -105,7 +105,7 @@ async function pollForDeviceToken(
 
 /**
  * Resolve an org identifier (slug, id, or case-insensitive name) against a list.
- * Returns null if no match. Pure function — safe to unit test.
+ * Returns null if no match.
  */
 export function resolveOrgFromOption(
   orgs: OrgInfo[],
