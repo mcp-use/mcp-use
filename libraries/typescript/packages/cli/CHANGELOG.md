@@ -1,5 +1,21 @@
 # @mcp-use/cli
 
+## 3.0.2
+
+### Patch Changes
+
+- e9c4bd0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+- e9c4bd0: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - mcp-use@1.24.2
+  - @mcp-use/inspector@2.2.0
+
 ## 3.0.2-canary.7
 
 ### Patch Changes

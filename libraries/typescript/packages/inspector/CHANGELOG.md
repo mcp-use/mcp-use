@@ -1,5 +1,46 @@
 # @mcp-use/inspector
 
+## 2.2.0
+
+### Minor Changes
+
+- e9c4bd0: feat(inspector): allow free tier chat on hosted inspector
+- e9c4bd0: Added "Copy Chat" and "Export Chat" buttons to the MCP Inspector chat header. Both actions include tool calls inline in the order they occurred. Copy writes markdown to the clipboard; Export downloads as JSON or Markdown.
+- e9c4bd0: fix(inspector): remove `@langchain/*` hard dependencies and drop `MCPAgent` usage
+
+  Closes [mcp-use/mcp-use#1371](https://github.com/mcp-use/mcp-use/issues/1371).
+
+  `@mcp-use/inspector` no longer depends on `@langchain/core`, `@langchain/openai`, `@langchain/anthropic`, or `@langchain/google-genai`. The chat, sampling, and props-generation paths now call the OpenAI, Anthropic, and Google REST APIs directly and run their own MCP tool-calling loop instead of going through `MCPAgent`. Consumers of `mcp-use` (which transitively installs the inspector) no longer need langchain in their `node_modules` and Next.js / Vite / other bundlers no longer fail at runtime with `Cannot find package 'langchain'`.
+
+  Preserved behavior:
+  - SSE wire format of the inspector's `/inspector/api/chat/stream` endpoint is unchanged (`message` / `text` / `tool-call` / `tool-result` / `done` / `error` events with identical field shapes), so existing clients — including remote consumers and the Vercel AI SDK `data-stream` parser in `useChatMessages` — keep working.
+  - Tool execution, multimodal image attachments, streaming partial-args rendering, OpenAI Apps SDK `openai/outputTemplate` resource hydration, cancellation via `AbortSignal`, prompts, elicitation, and widget `ui/update-model-context` injection all behave the same as before.
+
+  Provider notes:
+  - Gemini does not stream partial tool-call arguments incrementally (the provider only emits fully-formed `functionCall.args`), so the progressive partial-args animation only updates once per tool call for the `google` provider. Final behavior is identical.
+  - MCP tool schemas are automatically sanitized before being sent to Gemini to strip keywords it rejects (`$schema`, `additionalProperties`, `$ref`, etc.).
+  - A new regression test in `mcp-use/tests/inspector-no-langchain.test.ts` fails if any `@langchain/*`, `langchain`, or `MCPAgent` reference re-enters the inspector's `package.json` or built `dist/**`.
+
+### Patch Changes
+
+- e9c4bd0: fix(inspector): read `MANUFACT_CHAT_URL` in the standalone server entrypoint
+
+  The runtime hosted-chat URL injection was wired up in `cli.ts` (used by the published `mcp-inspect` bin and by Railway) but the same plumbing in `server.ts` (used by `pnpm start` / the dev server) was dropped during a merge. As a result, running the inspector via `node dist/server/server.js` with `MANUFACT_CHAT_URL` set did not inject `window.__MANUFACT_CHAT_URL__` into the served HTML.
+
+  This change restores parity between the two entrypoints so both honour the env var at process start.
+
+- e9c4bd0: feat(inspector): configure hosted chat URL at runtime via `MANUFACT_CHAT_URL`
+
+  The hosted chat endpoint (`chatApiUrl`) previously had to be baked into the client bundle at `vite build` time via `VITE_MANUFACT_CHAT_URL`. This prevented the same pre-built npm tarball from being configured per deploy (Railway, CDN, self-hosted) without a rebuild.
+
+  The inspector server now reads `MANUFACT_CHAT_URL` at runtime and injects `window.__MANUFACT_CHAT_URL__` into the served HTML. `InspectorProvider` prefers the runtime value and falls back to `VITE_MANUFACT_CHAT_URL` for local Vite dev, so existing build-time flows keep working.
+
+  Also drops `noopener` from the LoginModal OAuth popup and redirects the OAuth `callbackURL` to a new `/inspector/oauth-popup-closed.html` page so the popup self-closes cleanly instead of briefly loading the full inspector inside it.
+
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - mcp-use@1.24.2
+
 ## 2.2.0-canary.7
 
 ### Patch Changes
