@@ -9,6 +9,17 @@ export class GitHubAuthRequiredError extends Error {
   }
 }
 
+/** Thrown when the API returns 401 (invalid or expired API key for this backend). */
+export class ApiUnauthorizedError extends Error {
+  readonly status = 401 as const;
+  constructor(
+    message = "Your session has expired or your API key is invalid."
+  ) {
+    super(message);
+    this.name = "ApiUnauthorizedError";
+  }
+}
+
 export interface OrgInfo {
   id: string;
   name: string;
@@ -185,6 +196,34 @@ export interface GitHubReposResponse {
   repos: GitHubRepo[];
 }
 
+// ── Env Variables ───────────────────────────────────────────────────
+
+export type EnvEnvironment = "production" | "preview" | "development";
+
+export interface EnvVariable {
+  id: string;
+  serverId: string;
+  key: string;
+  value: string;
+  environments: EnvEnvironment[];
+  sensitive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEnvVariableBody {
+  key: string;
+  value: string;
+  environments?: EnvEnvironment[];
+  sensitive?: boolean;
+}
+
+export interface UpdateEnvVariableBody {
+  value?: string;
+  environments?: EnvEnvironment[];
+  sensitive?: boolean;
+}
+
 // ── API client ─────────────────────────────────────────────────────
 
 export class McpUseAPI {
@@ -246,11 +285,7 @@ export class McpUseAPI {
       clearTimeout(timeoutId);
 
       if (response.status === 401) {
-        const err = new Error(
-          "Your session has expired or your API key is invalid."
-        );
-        (err as any).status = 401;
-        throw err;
+        throw new ApiUnauthorizedError();
       }
 
       if (!response.ok) {
@@ -386,6 +421,48 @@ export class McpUseAPI {
       {
         method: "DELETE",
       }
+    );
+  }
+
+  // ── Env Variables ────────────────────────────────────────────────
+
+  async listEnvVariables(serverId: string): Promise<EnvVariable[]> {
+    return this.request<EnvVariable[]>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables`
+    );
+  }
+
+  async createEnvVariable(
+    serverId: string,
+    body: CreateEnvVariableBody
+  ): Promise<EnvVariable> {
+    return this.request<EnvVariable>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  async updateEnvVariable(
+    serverId: string,
+    varId: string,
+    body: UpdateEnvVariableBody
+  ): Promise<EnvVariable> {
+    return this.request<EnvVariable>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(varId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  async deleteEnvVariable(serverId: string, varId: string): Promise<void> {
+    await this.request<{ success: boolean }>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(varId)}`,
+      { method: "DELETE" }
     );
   }
 

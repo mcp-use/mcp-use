@@ -44,6 +44,8 @@ export default defineConfig({
     },
   ],
   resolve: {
+    // Ensure a single React instance even when deps resolve to different minor versions.
+    dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
       // Use require.resolve to get the actual module path from node_modules

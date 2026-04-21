@@ -1,5 +1,70 @@
 # @mcp-use/cli
 
+## 3.0.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies [028cd3c]
+  - @mcp-use/inspector@2.2.0-canary.7
+  - mcp-use@1.24.2-canary.7
+
+## 3.0.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies [baa93e6]
+  - @mcp-use/inspector@2.2.0-canary.6
+  - mcp-use@1.24.2-canary.6
+
+## 3.0.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bd58d95]
+- Updated dependencies [1b64075]
+  - mcp-use@1.24.2-canary.5
+  - @mcp-use/inspector@2.2.0-canary.5
+
+## 3.0.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [d9ac208]
+  - @mcp-use/inspector@2.2.0-canary.4
+  - mcp-use@1.24.2-canary.4
+
+## 3.0.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa86071]
+  - mcp-use@1.24.2-canary.3
+  - @mcp-use/inspector@2.2.0-canary.3
+
+## 3.0.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [ee5abf8]
+  - @mcp-use/inspector@2.2.0-canary.2
+  - mcp-use@1.24.2-canary.2
+
+## 3.0.2-canary.1
+
+### Patch Changes
+
+- 8f8a8e0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+  - mcp-use@1.24.2-canary.1
+  - @mcp-use/inspector@2.1.1-canary.1
+
+## 3.0.2-canary.0
+
+### Patch Changes
+
+- 5f0c888: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+  - mcp-use@1.24.2-canary.0
+  - @mcp-use/inspector@2.1.1-canary.0
+
 ## 3.0.1
 
 ### Patch Changes

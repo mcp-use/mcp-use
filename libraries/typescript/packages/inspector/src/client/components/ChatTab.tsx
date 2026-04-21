@@ -1,4 +1,8 @@
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ContentBlock,
+  Prompt,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "mcp-use/react";
 import React, {
   useCallback,
@@ -8,6 +12,8 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { copyToClipboard } from "../utils/clipboard";
+import { downloadJSON } from "../utils/jsonUtils";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
@@ -21,6 +27,7 @@ import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { LoginModal } from "./LoginModal";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -162,9 +169,35 @@ export function ChatTab({
     clearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
 
-  // If a managed LLM config is provided externally, use it instead of localStorage config
-  const llmConfig = managedLlmConfig ?? localLlmConfig;
-  const isManaged = !!managedLlmConfig;
+  // ── Hosted-mode / client-side override ──────────────────────────────────
+  // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
+  // to the Manufact backend (inspector.manufact.com/api/v1/inspector/chat/stream).
+  // We *still* want client-side mode in two situations:
+  //
+  //  a) User already has their own API key stored in localStorage → auto-detect
+  //     on mount via `localLlmConfig`. The model selector is then naturally
+  //     visible (ChatLandingForm / ConfigurationDialog take over).
+  //
+  //  b) User clicks "Use your own API key" in LoginModal (shown on 429) →
+  //     `handleUseApiKey` sets forceClientSide=true and opens ConfigurationDialog.
+  //
+  // `effectiveClientSide` is the single source of truth used everywhere below
+  // instead of the raw `useClientSide` prop.
+  const [forceClientSide, setForceClientSide] = useState(
+    () => !!localLlmConfig
+  );
+  const effectiveClientSide =
+    useClientSide || forceClientSide || !!localLlmConfig;
+
+  // When the user has opted into client-side mode (own API key), ignore the
+  // externally-provided managed config — we want the config dialog, model
+  // selector, and local llmConfig to take over. Without this, clicking "Use
+  // your own API key" in the LoginModal would leave `isManaged=true`, hiding
+  // the ConfigurationDialog and config button.
+  const llmConfig = effectiveClientSide
+    ? localLlmConfig
+    : (managedLlmConfig ?? localLlmConfig);
+  const isManaged = !effectiveClientSide && !!managedLlmConfig;
 
   const { getAllModelContexts } = useWidgetDebug();
 
@@ -207,7 +240,35 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
-  } = useClientSide ? clientSideChat : serverSideChat;
+  } = effectiveClientSide ? clientSideChat : serverSideChat;
+
+  const rateLimitInfo = effectiveClientSide
+    ? null
+    : (serverSideChat.rateLimitInfo ?? null);
+
+  const clearRateLimitInfo = effectiveClientSide
+    ? undefined
+    : serverSideChat.clearRateLimitInfo;
+
+  // Called when user clicks "Use your own API key" in the rate-limit modal.
+  const handleUseApiKey = useCallback(() => {
+    clearRateLimitInfo?.();
+    setForceClientSide(true);
+    setConfigDialogOpen(true);
+  }, [clearRateLimitInfo, setConfigDialogOpen]);
+
+  // User-initiated login (from the free-tier badge / ConfigurationDialog CTA).
+  // Separate from `rateLimitInfo` which is reactive to a 429 response.
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const handleOpenLogin = useCallback(() => {
+    setConfigDialogOpen(false);
+    setShowLoginModal(true);
+  }, [setConfigDialogOpen]);
+
+  // Free-tier info is shown whenever the chat is in hosted-managed mode.
+  const freeTierInfo = isManaged
+    ? { onLoginClick: handleOpenLogin }
+    : undefined;
 
   const {
     filteredPrompts,
@@ -234,13 +295,70 @@ export function ChatTab({
   }, []);
 
   const serializeMessageContent = useCallback((message: ChatMessage) => {
-    if (typeof message.content === "string") return message.content;
-    if (Array.isArray(message.content)) {
+    if (typeof message.content === "string" && message.content.trim()) {
+      return message.content;
+    }
+
+    if (Array.isArray(message.content) && message.content.length > 0) {
       return message.content
         .map((item) => (typeof item === "string" ? item : (item.text ?? "")))
         .join("");
     }
+
+    if (message.parts && message.parts.length > 0) {
+      const textParts = message.parts
+        .filter((p) => p.type === "text" && p.text)
+        .map((p) => p.text);
+
+      if (textParts.length > 0) {
+        return textParts.join("\n");
+      }
+    }
+
     return "";
+  }, []);
+
+  const serializeToolResult = useCallback((result: unknown) => {
+    if (result === null || result === undefined) return "No result";
+
+    if (typeof result === "string") {
+      try {
+        const parsed = JSON.parse(result);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return result;
+      }
+    }
+
+    if (
+      typeof result === "object" &&
+      Array.isArray((result as CallToolResult).content)
+    ) {
+      const content = (result as CallToolResult).content;
+      if (content.length === 0) return "Empty result";
+
+      return content
+        .map((item: ContentBlock) => {
+          if (item.type === "text") {
+            const text = item.text || "";
+            try {
+              return JSON.stringify(JSON.parse(text), null, 2);
+            } catch {
+              return text;
+            }
+          }
+          if (item.type === "image") {
+            return `[Image: ${item.mimeType}]`;
+          }
+          if (item.type === "resource") {
+            return `[Resource: ${item.resource?.uri || "unknown"}]`;
+          }
+          return JSON.stringify(item, null, 2);
+        })
+        .join("\n\n");
+    }
+
+    return JSON.stringify(result, null, 2);
   }, []);
 
   const getSerializedMessages = useCallback(() => {
@@ -742,6 +860,87 @@ export function ChatTab({
     [updatePromptsDropdownState]
   );
 
+  const formatMessagesAsMarkdown = useCallback(
+    (messages: ChatMessage[]) => {
+      let content = `# Chat Export - ${new Date().toLocaleString()}\n\n`;
+      content += messages
+        .map((m) => {
+          const role = m.role.charAt(0).toUpperCase() + m.role.slice(1);
+
+          if (!m.parts || m.parts.length === 0) {
+            const messageContent = serializeMessageContent(m).trim();
+            return messageContent ? `## ${role}\n${messageContent}` : "";
+          }
+
+          const sections: string[] = [];
+          for (const part of m.parts) {
+            if (part.type === "text" && part.text?.trim()) {
+              sections.push(part.text.trim());
+            } else if (part.type === "tool-invocation" && part.toolInvocation) {
+              const ti = part.toolInvocation;
+              const resultStr = serializeToolResult(ti.result);
+              sections.push(
+                `#### ${ti.toolName}\n**Arguments:**\n\`\`\`json\n${JSON.stringify(ti.args, null, 2)}\n\`\`\`\n**Result:**\n\n${resultStr}`
+              );
+            }
+          }
+
+          if (sections.length === 0) return "";
+          return `## ${role}\n\n${sections.join("\n\n")}`;
+        })
+        .filter((text) => text !== "")
+        .join("\n\n---\n\n");
+      return content;
+    },
+    [serializeMessageContent, serializeToolResult]
+  );
+
+  const handleCopyChat = useCallback(() => {
+    const formattedMessages = formatMessagesAsMarkdown(messages);
+
+    copyToClipboard(formattedMessages).then(
+      () => toast.success("Chat copied to clipboard"),
+      () => toast.error("Failed to copy chat")
+    );
+  }, [messages, formatMessagesAsMarkdown]);
+
+  const handleExportChat = useCallback(
+    (format: "json" | "markdown") => {
+      const dateStr = new Date().toISOString().split("T")[0];
+      const filename = `chat-export-${dateStr}`;
+
+      if (format === "json") {
+        const exportedMessages = messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: serializeMessageContent(m),
+          timestamp: m.timestamp,
+          toolInvocations: m.parts
+            ?.filter((p) => p.type === "tool-invocation" && p.toolInvocation)
+            .map((p) => ({
+              toolName: p.toolInvocation!.toolName,
+              args: p.toolInvocation!.args,
+              result: p.toolInvocation!.result,
+            })),
+        }));
+        downloadJSON(exportedMessages, filename + ".json");
+      } else {
+        const content = formatMessagesAsMarkdown(messages);
+        const blob = new Blob([content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename + ".md";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+      }
+      toast.success(`Chat exported as ${format.toUpperCase()}`);
+    },
+    [messages, formatMessagesAsMarkdown, serializeMessageContent]
+  );
+
   const handleClearConfig = useCallback(() => {
     clearConfig();
     clearMessages();
@@ -775,29 +974,44 @@ export function ChatTab({
     [postBridgeEvent, sendMessage, llmConfig, isConnected]
   );
 
+  // Login modal — shown on 429 rate-limit OR when the user clicks "Sign in"
+  // from the free-tier ConfigurationDialog. Rendered in both the landing and
+  // main-chat branches so it works before any message is sent too.
+  const loginModalNode =
+    (rateLimitInfo || showLoginModal) && chatApiUrl ? (
+      <LoginModal
+        authOrigin={new URL(chatApiUrl).origin}
+        onDismiss={() => {
+          clearRateLimitInfo?.();
+          setShowLoginModal(false);
+        }}
+        onUseApiKey={handleUseApiKey}
+      />
+    ) : null;
+
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
     return (
       <div className="flex flex-col h-full">
-        {/* Header with config dialog (hidden when externally managed) */}
-        {!isManaged && (
-          <div className="absolute top-4 right-4 z-10">
-            <ConfigurationDialog
-              open={configDialogOpen}
-              onOpenChange={setConfigDialogOpen}
-              tempProvider={tempProvider}
-              tempModel={tempModel}
-              tempApiKey={tempApiKey}
-              onProviderChange={setTempProvider}
-              onModelChange={setTempModel}
-              onApiKeyChange={setTempApiKey}
-              onSave={saveLLMConfig}
-              onClear={handleClearConfig}
-              showClearButton
-              buttonLabel="Change API Key"
-            />
-          </div>
-        )}
+        {/* Header with config dialog. In hosted-managed mode the dialog shows
+            a "free tier" banner + Sign-in CTA above the bring-your-own-key form. */}
+        <div className="absolute top-4 right-4 z-10">
+          <ConfigurationDialog
+            open={configDialogOpen}
+            onOpenChange={setConfigDialogOpen}
+            tempProvider={tempProvider}
+            tempModel={tempModel}
+            tempApiKey={tempApiKey}
+            onProviderChange={setTempProvider}
+            onModelChange={setTempModel}
+            onApiKeyChange={setTempApiKey}
+            onSave={saveLLMConfig}
+            onClear={handleClearConfig}
+            showClearButton={!isManaged}
+            buttonLabel="Change API Key"
+            freeTierInfo={freeTierInfo}
+          />
+        </div>
 
         {/* Landing Form */}
         <ChatLandingForm
@@ -831,23 +1045,32 @@ export function ChatTab({
           onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
-          hideModelBadge={hideModelBadge}
+          hideModelBadge={
+            // In hosted mode the host default is `hideModelBadge=true`, but
+            // once the user has supplied their own API key (client-side mode)
+            // we want the provider/model badge back so they can see and
+            // change what they're using.
+            hideModelBadge && !effectiveClientSide
+          }
           hideServerUrl={hideServerUrl}
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
+          freeTierInfo={freeTierInfo}
         />
+        {loginModalNode}
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Header (hide config controls when externally managed) */}
+      {/* Header. In hosted-managed mode (`freeTierInfo`), the dialog always
+          renders and the badge switches to a "Free tier" pill. */}
       <ChatHeader
         llmConfig={llmConfig}
         hasMessages={messages.length > 0}
-        configDialogOpen={isManaged ? false : configDialogOpen}
-        onConfigDialogOpenChange={isManaged ? () => {} : setConfigDialogOpen}
+        configDialogOpen={configDialogOpen}
+        onConfigDialogOpenChange={setConfigDialogOpen}
         onClearChat={clearMessages}
         tempProvider={tempProvider}
         tempModel={tempModel}
@@ -857,7 +1080,10 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
-        hideConfigButton={isManaged}
+        hideConfigButton={isManaged && !freeTierInfo}
+        freeTierInfo={freeTierInfo}
+        onCopyChat={handleCopyChat}
+        onExportChat={handleExportChat}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}
         clearButtonHideIcon={clearButtonHideIcon}
@@ -888,11 +1114,13 @@ export function ChatTab({
         )}
       </div>
 
+      {loginModalNode}
+
       {/* Input Area */}
       {llmConfig && (
         <ChatInputArea
           inputValue={inputValue}
-          isConnected={isConnected}
+          isConnected={isConnected && !rateLimitInfo}
           isLoading={isLoading}
           textareaRef={textareaRef}
           promptsDropdownOpen={promptsDropdownOpen}

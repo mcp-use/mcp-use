@@ -45,6 +45,16 @@ interface RuntimeConfig {
   proxyUrl?: string | null;
   /** How the inspector is being served (standalone CLI, embedded in mcp-use, or cloud-hosted). Consumed by telemetry. */
   inspectorMode?: InspectorMode;
+  /**
+   * Full URL of the Manufact hosted chat stream endpoint
+   * (e.g. `https://manufact.com/api/v1/inspector/chat/stream`). When set, the
+   * client switches the Chat tab to hosted mode: uses this endpoint with
+   * `credentials: "include"` and shows the free-tier banner / login modal.
+   *
+   * Prefer this over the build-time `VITE_MANUFACT_CHAT_URL` so a single
+   * pre-built npm tarball can be configured at deploy time.
+   */
+  manufactChatUrl?: string | null;
 }
 
 /**
@@ -75,6 +85,12 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
   if (config.inspectorMode) {
     scripts.push(
       `<script>window.__MCP_INSPECTOR_MODE__ = ${JSON.stringify(config.inspectorMode)};</script>`
+    );
+  }
+
+  if (config.manufactChatUrl) {
+    scripts.push(
+      `<script>window.__MANUFACT_CHAT_URL__ = ${JSON.stringify(config.manufactChatUrl)};</script>`
     );
   }
 
@@ -110,6 +126,11 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     if (config.inspectorMode) {
       scripts.push(
         `<script>window.__MCP_INSPECTOR_MODE__ = ${JSON.stringify(config.inspectorMode)};</script>`
+      );
+    }
+    if (config.manufactChatUrl) {
+      scripts.push(
+        `<script>window.__MANUFACT_CHAT_URL__ = ${JSON.stringify(config.manufactChatUrl)};</script>`
       );
     }
     return scripts.join("\n    ");
@@ -316,7 +337,8 @@ export function registerStaticRoutes(
  */
 export function registerStaticRoutesWithDevProxy(
   app: Hono,
-  clientDistPath?: string
+  clientDistPath?: string,
+  runtimeConfig?: RuntimeConfig
 ) {
   const distPath = clientDistPath || getClientDistPath();
   const isDev =
@@ -371,6 +393,6 @@ export function registerStaticRoutesWithDevProxy(
       `);
     });
   } else {
-    registerStaticRoutes(app, distPath);
+    registerStaticRoutes(app, distPath, runtimeConfig);
   }
 }

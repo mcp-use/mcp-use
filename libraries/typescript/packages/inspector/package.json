@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "2.1.0",
+  "version": "2.2.0-canary.7",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -79,7 +79,7 @@
   },
   "peerDependencies": {
     "express": "^4.21.2 || ^5.0.0",
-    "mcp-use": ">=1.24.1",
+    "mcp-use": ">=1.24.2-canary.7",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
     "react-router": "^7.12.0"
@@ -91,14 +91,11 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.13",
-    "@langchain/anthropic": "^1.3.18",
-    "@langchain/core": "^1.1.26",
-    "@langchain/google-genai": "^2.1.19",
-    "@langchain/openai": "^1.2.8",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@paper-design/shaders-react": "^0.0.72",
     "@radix-ui/react-alert-dialog": "^1.1.15",
+    "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

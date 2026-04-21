@@ -70,6 +70,9 @@ export function useChatMessages({
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    loginUrl: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
@@ -209,6 +212,17 @@ export function useChatMessages({
         });
 
         if (!response.ok) {
+          if (response.status === 429) {
+            const errBody = await response.json().catch(() => null);
+            if (errBody?.loginRequired && errBody?.loginUrl) {
+              setRateLimitInfo({ loginUrl: errBody.loginUrl as string });
+            }
+            // Remove the empty assistant message added optimistically
+            setMessages((prev) =>
+              prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+            );
+            return;
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -533,6 +547,11 @@ export function useChatMessages({
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setRateLimitInfo(null);
+  }, []);
+
+  const clearRateLimitInfo = useCallback(() => {
+    setRateLimitInfo(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -577,8 +596,10 @@ export function useChatMessages({
     messages,
     isLoading,
     attachments,
+    rateLimitInfo,
     sendMessage,
     clearMessages,
+    clearRateLimitInfo,
     setMessages,
     stop,
     addAttachment,
