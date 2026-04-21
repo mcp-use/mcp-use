@@ -2180,9 +2180,17 @@ program
         process.argv.some((arg) => arg.startsWith("--port=")) ||
         process.argv.some((arg) => arg.startsWith("-p="));
 
-      const port = portFlagProvided
+      let port = portFlagProvided
         ? parseInt(options.port, 10) // Flag explicitly provided, use it
         : parseInt(process.env.PORT || options.port || "3000", 10); // Check env, then default
+
+      // Check if port is available, find alternative if needed
+      if (!(await isPortAvailable(port))) {
+        console.log(chalk.yellow.bold(`⚠️  Port ${port} is already in use`));
+        const availablePort = await findAvailablePort(port);
+        console.log(chalk.green.bold(`✓ Using port ${availablePort} instead`));
+        port = availablePort;
+      }
 
       console.log(
         `\x1b[36m\x1b[1mmcp-use\x1b[0m \x1b[90mVersion: ${packageJson.version}\x1b[0m\n`
