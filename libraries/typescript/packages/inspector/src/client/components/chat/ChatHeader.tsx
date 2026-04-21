@@ -35,6 +35,15 @@ interface ChatHeaderProps {
   onClearConfig: () => void;
   /** When true, hides the API key config badge/button and dialog. */
   hideConfigButton?: boolean;
+  /**
+   * When set, the header shows a "Free tier" badge (instead of the local
+   * provider/model badge) and passes this info down to the ConfigurationDialog
+   * so it renders a Sign-in CTA above the bring-your-own-key form.
+   * Used in hosted inspector mode where the LLM is managed server-side.
+   */
+  freeTierInfo?: {
+    onLoginClick: () => void;
+  };
   /** Label for the clear/new-chat button. Default: "New Chat". */
   clearButtonLabel?: string;
   /** When true, hides the "Chat" title in the header. */
@@ -64,6 +73,7 @@ export function ChatHeader({
   onSaveConfig,
   onClearConfig,
   hideConfigButton,
+  freeTierInfo,
   clearButtonLabel,
   hideTitle,
   clearButtonHideIcon,
@@ -77,34 +87,33 @@ export function ChatHeader({
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
       <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4">
         {!hideTitle && <h3 className="text-xl sm:text-3xl font-base">Chat</h3>}
-        {llmConfig && !hideConfigButton && (
-          <>
-            {/* Desktop: Show badge with text */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge
-                  variant="secondary"
-                  className="hidden sm:flex ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
-                  onClick={() => onConfigDialogOpenChange(true)}
-                >
-                  <img
-                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
-                    alt={llmConfig.provider}
-                    className="w-4 h-4 mr-0"
-                  />
-                  {llmConfig.provider}/{llmConfig.model}
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Change API Key</p>
-              </TooltipContent>
-            </Tooltip>
-          </>
+        {llmConfig && (!hideConfigButton || freeTierInfo) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="secondary"
+                className="hidden sm:flex ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
+                onClick={() => onConfigDialogOpenChange(true)}
+              >
+                <img
+                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                  alt={llmConfig.provider}
+                  className="w-4 h-4 mr-0"
+                />
+                {llmConfig.provider}/{llmConfig.model}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
+              </p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
       <div className="flex items-center gap-2 pr-2 sm:pr-3 pt-0 sm:pt-2 shrink-0">
         {/* Mobile: Show provider icon button when config exists (leftmost on mobile) */}
-        {llmConfig && !hideConfigButton && (
+        {llmConfig && (!hideConfigButton || freeTierInfo) && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -200,8 +209,10 @@ export function ChatHeader({
             </Tooltip>
           </div>
         )}
-        {/* Always render the dialog for when it's opened (hidden when externally managed) */}
-        {!hideConfigButton && (
+        {/* Always render the dialog for when it's opened. In hosted-managed mode
+            `freeTierInfo` is set and the dialog renders a Sign-in CTA above the
+            bring-your-own-key form. */}
+        {(!hideConfigButton || freeTierInfo) && (
           <ConfigurationDialog
             open={configDialogOpen}
             onOpenChange={onConfigDialogOpenChange}
@@ -213,8 +224,9 @@ export function ChatHeader({
             onApiKeyChange={onApiKeyChange}
             onSave={onSaveConfig}
             onClear={onClearConfig}
-            showClearButton={!!llmConfig}
+            showClearButton={!!llmConfig && !freeTierInfo}
             buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
+            freeTierInfo={freeTierInfo}
           />
         )}
       </div>

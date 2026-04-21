@@ -57,6 +57,7 @@ import type { McpServer } from "mcp-use/react";
 import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
+import { HostedUserMenu } from "@/client/components/HostedUserMenu";
 import { getServerDisplayName } from "@/client/utils/serverNames";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { useTheme } from "@/client/context/ThemeContext";
@@ -598,6 +599,7 @@ export function LayoutHeader({
   const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
 
   const [collapsed, setCollapsed] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // In single-tab mode, hide the entire header
   if (embeddedConfig.singleTab) {
@@ -762,7 +764,11 @@ export function LayoutHeader({
                 className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3"
               >
                 <a
-                  href="https://manufact.com/signup?ref=mcp-use-inspector"
+                  href={
+                    isLoggedIn
+                      ? "https://manufact.com/cloud?ref=mcp-use-inspector"
+                      : "https://manufact.com/signup?ref=mcp-use-inspector"
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => {
@@ -1103,7 +1109,11 @@ export function LayoutHeader({
               className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4"
             >
               <a
-                href="https://manufact.com/signup?ref=mcp-use-inspector"
+                href={
+                  isLoggedIn
+                    ? "https://manufact.com/cloud?ref=mcp-use-inspector"
+                    : "https://manufact.com/signup?ref=mcp-use-inspector"
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => {
@@ -1203,7 +1213,30 @@ export function LayoutHeader({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <LogoAnimated state="expanded" />
+            {/* In hosted mode: avatar left, logo right.
+                Logo is always visible at ≥1400px; at narrower widths it falls
+                back as a placeholder only when the user is unauthenticated. */}
+            {embeddedConfig.chatApiUrl ? (
+              <div className="flex items-center gap-2">
+                {/* Avatar (or nothing when unauthenticated — logo handles branding) */}
+                <HostedUserMenu
+                  chatApiUrl={embeddedConfig.chatApiUrl}
+                  onUserResolved={(u) => setIsLoggedIn(!!u)}
+                  fallback={
+                    /* Narrow screens only: show logo as fallback when not authed */
+                    <span className="[@media(min-width:1400px)]:hidden">
+                      <LogoAnimated state="expanded" />
+                    </span>
+                  }
+                />
+                {/* Logo: always visible at ≥1400px (rightmost) */}
+                <span className="hidden [@media(min-width:1400px)]:block">
+                  <LogoAnimated state="expanded" />
+                </span>
+              </div>
+            ) : (
+              <LogoAnimated state="expanded" />
+            )}
           </div>
         )}
       </div>

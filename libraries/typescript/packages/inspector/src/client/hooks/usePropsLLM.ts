@@ -1,5 +1,7 @@
+import { chat } from "@/llm/providers";
+import type { ProviderMessage } from "@/llm/types";
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import type { LLMConfig } from "../components/chat/types";
 
 interface UsePropsLLMProps {
@@ -9,7 +11,7 @@ interface UsePropsLLMProps {
 interface GeneratePropsParams {
   resource: Resource;
   resourceAnnotations?: Record<string, unknown>;
-  propsSchema?: any; // JSON Schema for the props (if available)
+  propsSchema?: any;
 }
 
 export interface GeneratedProp {
@@ -46,13 +48,6 @@ function extractOutermostJsonObject(
 }
 
 export function usePropsLLM({ llmConfig }: UsePropsLLMProps) {
-  const llmRef = useRef<{
-    instance: any;
-    provider: string;
-    model: string;
-    apiKey: string;
-  } | null>(null);
-
   const generateProps = useCallback(
     async ({
       resource,
@@ -63,13 +58,11 @@ export function usePropsLLM({ llmConfig }: UsePropsLLMProps) {
         throw new Error("LLM config is not available");
       }
 
-      // Build context about the resource
       const resourceType =
         resource.mimeType || resourceAnnotations?.mimeType || "unknown";
       const resourceDescription =
         resource.description || resourceAnnotations?.description || "N/A";
 
-      // If we have a schema, use it to guide generation
       if (propsSchema?.properties) {
         const propNames = Object.keys(propsSchema.properties);
         const propDescriptions = propNames
@@ -91,7 +84,6 @@ export function usePropsLLM({ llmConfig }: UsePropsLLMProps) {
           .join("\n");
 
         const systemPrompt = `You are helping a developer configure props for a UI widget. The widget has a defined schema with specific props. Generate appropriate values for ONLY the props listed in the schema. Return ONLY a JSON object with these exact keys. For array props, each item must match the specified structure.`;
-
         const userPrompt = `Widget: ${resource.name || resource.uri}
 Description: ${resourceDescription}
 
@@ -101,75 +93,34 @@ ${propDescriptions}
 Generate appropriate default/example values for these props. Return ONLY a JSON object with the exact prop names as keys.
 Example: {"query": "example search term", "results": [{"fruit": "Apple", "color": "red"}]}`;
 
-        const { SystemMessage, HumanMessage } =
-          await import("@langchain/core/messages");
-
-        const messages = [
-          new SystemMessage(systemPrompt),
-          new HumanMessage(userPrompt),
+        const messages: ProviderMessage[] = [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ];
-
-        // Create or reuse LLM instance
-        if (
-          !llmRef.current ||
-          llmRef.current.provider !== llmConfig.provider ||
-          llmRef.current.model !== llmConfig.model ||
-          llmRef.current.apiKey !== llmConfig.apiKey
-        ) {
-          let llm: any;
-          const llmOptions: any = {
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-          };
-
-          // Only add temperature if explicitly configured to avoid model-specific issues
-          if (llmConfig.temperature !== undefined) {
-            llmOptions.temperature = llmConfig.temperature;
-          }
-
-          if (llmConfig.provider === "openai") {
-            const { ChatOpenAI } = await import("@langchain/openai");
-            llm = new ChatOpenAI(llmOptions);
-          } else if (llmConfig.provider === "anthropic") {
-            const { ChatAnthropic } = await import("@langchain/anthropic");
-            llm = new ChatAnthropic(llmOptions);
-          } else if (llmConfig.provider === "google") {
-            const { ChatGoogleGenerativeAI } =
-              await import("@langchain/google-genai");
-            llm = new ChatGoogleGenerativeAI(llmOptions);
-          } else {
-            throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
-          }
-
-          llmRef.current = {
-            instance: llm,
+        const { text } = await chat({
+          config: {
             provider: llmConfig.provider,
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-          };
-        }
+            temperature: llmConfig.temperature,
+          },
+          messages,
+        });
 
-        const response = await llmRef.current.instance.invoke(messages);
-        const responseText = response.content || response.text || "";
-
-        const parsed = extractOutermostJsonObject(responseText);
+        const parsed = extractOutermostJsonObject(text);
         if (parsed) {
-          const entries: GeneratedProp[] = Object.entries(parsed).map(
-            ([key, value]) => ({
-              key,
-              value:
-                typeof value === "object" && value !== null
-                  ? JSON.stringify(value)
-                  : String(value),
-            })
-          );
-          return entries;
+          return Object.entries(parsed).map(([key, value]) => ({
+            key,
+            value:
+              typeof value === "object" && value !== null
+                ? JSON.stringify(value)
+                : String(value),
+          }));
         }
-
         throw new Error("Could not parse props from LLM response");
       }
 
-      // Fallback: generic prop generation without schema
+      // Fallback: generic prop generation without schema.
       const isOpenAIWidget = !!(
         resourceAnnotations &&
         Object.keys(resourceAnnotations).some((key) =>
@@ -182,12 +133,10 @@ Example: {"query": "example search term", "results": [{"fruit": "Apple", "color"
           resourceType.toLowerCase().includes("html") ||
           resourceType.toLowerCase().includes("remote-dom"));
 
-      // Construct prompt with rich context
       const systemPrompt = `You are helping a developer configure props for a UI widget/resource. 
 Analyze the provided information and suggest appropriate props in key-value format.
 Return ONLY a JSON object with key-value pairs, where both keys and values are strings.
 Example format: {"theme": "dark", "width": "400", "title": "My Widget"}`;
-
       const userPrompt = `Resource Information:
 - URI: ${resource.uri}
 - Name: ${resource.name || "N/A"}
@@ -198,75 +147,33 @@ Example format: {"theme": "dark", "width": "400", "title": "My Widget"}`;
 
 Based on this information, suggest 3-5 common customizable properties like theme, dimensions, colors, titles, or configuration options that would be useful for this type of resource. Keep it simple and practical.`;
 
-      // Create or reuse LLM instance
-      if (
-        !llmRef.current ||
-        llmRef.current.provider !== llmConfig.provider ||
-        llmRef.current.model !== llmConfig.model ||
-        llmRef.current.apiKey !== llmConfig.apiKey
-      ) {
-        let llm: any;
-        const llmOptions: any = {
-          model: llmConfig.model,
-          apiKey: llmConfig.apiKey,
-        };
-
-        // Only add temperature if explicitly configured to avoid model-specific issues
-        if (llmConfig.temperature !== undefined) {
-          llmOptions.temperature = llmConfig.temperature;
-        }
-
-        if (llmConfig.provider === "openai") {
-          const { ChatOpenAI } = await import("@langchain/openai");
-          llm = new ChatOpenAI(llmOptions);
-        } else if (llmConfig.provider === "anthropic") {
-          const { ChatAnthropic } = await import("@langchain/anthropic");
-          llm = new ChatAnthropic(llmOptions);
-        } else if (llmConfig.provider === "google") {
-          const { ChatGoogleGenerativeAI } =
-            await import("@langchain/google-genai");
-          llm = new ChatGoogleGenerativeAI(llmOptions);
-        } else {
-          throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
-        }
-
-        llmRef.current = {
-          instance: llm,
+      const messages: ProviderMessage[] = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ];
+      const { text } = await chat({
+        config: {
           provider: llmConfig.provider,
           model: llmConfig.model,
           apiKey: llmConfig.apiKey,
-        };
-      }
+          temperature: llmConfig.temperature,
+        },
+        messages,
+      });
 
-      // Import message classes
-      const { SystemMessage, HumanMessage } =
-        await import("@langchain/core/messages");
-
-      const messages = [
-        new SystemMessage(systemPrompt),
-        new HumanMessage(userPrompt),
-      ];
-
-      // Call LLM
-      const response = await llmRef.current.instance.invoke(messages);
-      const responseText = response.content || response.text || "";
-
-      // Parse the response to extract key-value pairs
       try {
-        const parsed = extractOutermostJsonObject(responseText);
+        const parsed = extractOutermostJsonObject(text);
         if (parsed) {
-          const entries = Object.entries(parsed).map(([key, value]) => ({
+          return Object.entries(parsed).map(([key, value]) => ({
             key,
             value:
               typeof value === "object" && value !== null
                 ? JSON.stringify(value)
                 : String(value),
           }));
-          return entries;
         }
 
-        // Fallback: try to parse lines like "key: value" or "key = value"
-        const lines = responseText.split("\n");
+        const lines = text.split("\n");
         const props: GeneratedProp[] = [];
         for (const line of lines) {
           const match = line.match(
@@ -279,11 +186,7 @@ Based on this information, suggest 3-5 common customizable properties like theme
             });
           }
         }
-
-        if (props.length > 0) {
-          return props;
-        }
-
+        if (props.length > 0) return props;
         throw new Error("Could not parse props from LLM response");
       } catch (parseError) {
         console.error(
@@ -291,7 +194,7 @@ Based on this information, suggest 3-5 common customizable properties like theme
           parseError
         );
         throw new Error(
-          `Failed to parse props from LLM response: ${responseText.slice(0, 100)}...`
+          `Failed to parse props from LLM response: ${text.slice(0, 100)}...`
         );
       }
     },

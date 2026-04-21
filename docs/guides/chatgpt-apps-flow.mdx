@@ -4,9 +4,9 @@ description: "Understanding ChatGPT widget flows and how mcp-use simplifies widg
 icon: "openai"
 ---
 
-<Warning>
-**Apps SDK is deprecated**: ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Server](/typescript/server/creating-mcp-apps-server) to build widgets that work with both ChatGPT and MCP Apps clients.
-</Warning>
+<Info>
+ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Server](/typescript/server/creating-mcp-apps-server) to build widgets that work with both ChatGPT and MCP Apps clients.
+</Info>
 
 # Building ChatGPT Apps with Widgets
 
@@ -31,7 +31,7 @@ Widgets transform static responses into interactive experiences:
 - Persist state across conversations
 - Call MCP tools directly from the UI
 
-However, building widgets with the official OpenAI Apps SDK involves significant manual setup: configuring build tools, managing React mounting, implementing custom state hooks, and handling Content Security Policy (CSP) configurations.
+However, building widgets with the official OpenAI Apps SDK involves manual setup: configuring build tools, managing React mounting, implementing custom state hooks, and handling Content Security Policy (CSP) configurations.
 
 **mcp-use simplifies this entire process** by providing:
 
@@ -242,7 +242,7 @@ async def get_weather(city: str):
     }
 ```
 
-As you can see, the official approach requires significant boilerplate and manual configuration at every step.
+As you can see, the official approach requires boilerplate and manual configuration at every step.
 
 ## The mcp-use Simplified Approach
 

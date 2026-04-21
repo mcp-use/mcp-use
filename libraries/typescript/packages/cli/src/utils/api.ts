@@ -196,6 +196,34 @@ export interface GitHubReposResponse {
   repos: GitHubRepo[];
 }
 
+// ── Env Variables ───────────────────────────────────────────────────
+
+export type EnvEnvironment = "production" | "preview" | "development";
+
+export interface EnvVariable {
+  id: string;
+  serverId: string;
+  key: string;
+  value: string;
+  environments: EnvEnvironment[];
+  sensitive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEnvVariableBody {
+  key: string;
+  value: string;
+  environments?: EnvEnvironment[];
+  sensitive?: boolean;
+}
+
+export interface UpdateEnvVariableBody {
+  value?: string;
+  environments?: EnvEnvironment[];
+  sensitive?: boolean;
+}
+
 // ── API client ─────────────────────────────────────────────────────
 
 export class McpUseAPI {
@@ -393,6 +421,48 @@ export class McpUseAPI {
       {
         method: "DELETE",
       }
+    );
+  }
+
+  // ── Env Variables ────────────────────────────────────────────────
+
+  async listEnvVariables(serverId: string): Promise<EnvVariable[]> {
+    return this.request<EnvVariable[]>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables`
+    );
+  }
+
+  async createEnvVariable(
+    serverId: string,
+    body: CreateEnvVariableBody
+  ): Promise<EnvVariable> {
+    return this.request<EnvVariable>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  async updateEnvVariable(
+    serverId: string,
+    varId: string,
+    body: UpdateEnvVariableBody
+  ): Promise<EnvVariable> {
+    return this.request<EnvVariable>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(varId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  async deleteEnvVariable(serverId: string, varId: string): Promise<void> {
+    await this.request<{ success: boolean }>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(varId)}`,
+      { method: "DELETE" }
     );
   }
 

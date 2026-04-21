@@ -6,6 +6,30 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v2.2.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.2.0&title=Hosted%20chat%2C%20LLM%20providers%20%26%20chat%20export&date=2026-04&lang=inspector" alt="Release 2.2.0" />
+  </Frame>
+  ## Hosted chat runtime, LLM providers & chat export
+  Minor release paired with `mcp-use` v1.24.2: first-party inspector LLM streaming (no LangChain on the chat path), copy/export chat, runtime hosted-chat URL, hosted free-tier chat, and cloud env tooling via the CLI (`#1372`).
+
+- **New**: First-party LLM providers for inspector chat (Anthropic, OpenAI, Google) with shared message formatting, SSE streaming, and tool loops — the inspector no longer depends on LangChain for chat (`#1372`)
+- **New**: "Copy Chat" and "Export Chat" in the chat header — markdown to clipboard; download as JSON or Markdown with tool calls in order (`#1324`)
+- **New**: Free tier chat on the hosted inspector (`#1368`)
+- **New**: Hosted chat URL from runtime config — inspector server reads `MANUFACT_CHAT_URL` and injects `window.__MANUFACT_CHAT_URL__`; `InspectorProvider` prefers that value and falls back to `VITE_MANUFACT_CHAT_URL` for local dev (`#1370`)
+- **Fix**: OAuth login popup — drop `noopener` and redirect `callbackURL` to `/inspector/oauth-popup-closed.html` so the popup self-closes instead of loading the full inspector (`#1370`)
+- **Update**: Updated mcp-use to v1.24.2
+</Update>
+
+<Update label="v2.1.0" description="April 2026">
+  ## Navbar, theme & debug controls
+  Minor release with MCP Apps debug theme toggle and navbar/settings UX improvements; dependency bump to `mcp-use` v1.24.1.
+
+- **New**: Theme toggle button in MCP Apps debug controls toolbar
+- **Enhancement**: Navbar — chat tab first with label and separator; `alwaysExpanded` on tab triggers so the active label stays visible when collapsed; Deploy links to manufact.com/signup with inspector referrer; tunnel control between Add to Client and Deploy with updated styling and mobile visibility; theme toggle, command palette, and GitHub under a settings dropdown; "Report a Bug" prefills a GitHub issue with the inspector label
+- **Update**: Updated mcp-use to v1.24.1
+</Update>
+
 <Update label="v2.0.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.0.0&title=Subpath%20OAuth%2C%20chat%20UX%20%26%20tab%20persistence&date=2026-04&lang=inspector" alt="Release 2.0.0" />
