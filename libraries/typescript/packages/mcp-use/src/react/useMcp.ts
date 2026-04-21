@@ -1405,7 +1405,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             "Using provided authProvider for manual authentication"
           );
           const parsedUrl = new URL(url);
-          const baseUrl = parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
+          const baseUrl =
+            parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
           await auth(authProviderRef.current, {
             serverUrl: baseUrl,
           });
@@ -1455,7 +1456,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
         const parsedUrl = new URL(url);
-        const baseUrl = parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
+        const baseUrl =
+          parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
         try {
           await auth(freshAuthProvider, {
             serverUrl: baseUrl,
