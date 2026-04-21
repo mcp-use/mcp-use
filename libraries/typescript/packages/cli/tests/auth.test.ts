@@ -5,8 +5,8 @@ import type { OrgInfo } from "../src/utils/api.js";
 const orgs: OrgInfo[] = [
   {
     id: "default-profile-45e7bb29",
-    name: "Pietro",
-    slug: "pietro-personal",
+    name: "Personal",
+    slug: "personal",
     role: "owner",
   },
   {
