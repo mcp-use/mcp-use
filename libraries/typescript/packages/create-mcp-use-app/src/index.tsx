@@ -192,7 +192,7 @@ async function addSkillsToProject(projectPath: string): Promise<void> {
       Readable.fromWeb(response.body as any),
       extract({
         cwd: tempDir,
-        filter: (path) => path.includes("/skills/"),
+        filter: (path) => path.includes("/skills/mcp-apps-builder/"),
         strip: 1, // Removes 'mcp-use-{commit}/' prefix
       })
     );
