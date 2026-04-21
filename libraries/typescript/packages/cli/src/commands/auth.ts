@@ -117,9 +117,7 @@ export function resolveOrgFromOption(
   return (
     orgs.find(
       (o) =>
-        o.slug === needle ||
-        o.id === needle ||
-        o.name.toLowerCase() === lower
+        o.slug === needle || o.id === needle || o.name.toLowerCase() === lower
     ) ?? null
   );
 }
