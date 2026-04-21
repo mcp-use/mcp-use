@@ -1,5 +1,28 @@
 # mcp-use
 
+## 1.24.2
+
+### Patch Changes
+
+- e9c4bd0: fix(landing): add deeplink to manufact inspector
+- e9c4bd0: ThemeProvider: gate color-scheme on opt-in prop to fix transparent iframe backgrounds.
+
+  Setting `color-scheme` to an explicit value ("dark"/"light") on the iframe document root causes browsers to paint an opaque canvas behind the iframe when the widget and host documents use different schemes, making `background-color: transparent` ineffective.
+
+  `McpUseProvider` now accepts a `colorScheme?: boolean` prop (default `false`). When `false`, `ThemeProvider` clears any previously set `color-scheme` inline style, preserving iframe transparency. When `true`, the previous behavior is restored (useful for widgets that need native dark scrollbars or CSS `light-dark()`).
+
+  Theme class (`dark`/`light`) and `data-theme` attribute are unaffected.
+
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - @mcp-use/inspector@2.2.0
+  - @mcp-use/cli@3.0.2
+
 ## 1.24.2-canary.7
 
 ### Patch Changes
