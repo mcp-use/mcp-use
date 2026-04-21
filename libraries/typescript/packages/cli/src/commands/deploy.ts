@@ -1201,6 +1201,24 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     const existingLink = !options.new ? await getProjectLink(cwd) : null;
     let serverId = existingLink?.serverId;
 
+    // When --org is specified, verify the linked server belongs to that org.
+    // If not, ignore the link and create a new server in the specified org.
+    if (serverId && resolvedOrgId) {
+      try {
+        const linkedServer = await api.getServer(serverId);
+        if (linkedServer.organizationId !== resolvedOrgId) {
+          console.log(
+            chalk.yellow(
+              `⚠️  Linked server belongs to a different organization. Creating a new server in the specified org...\n`
+            )
+          );
+          serverId = undefined;
+        }
+      } catch {
+        // If we can't fetch the server, let the existing flow handle it
+      }
+    }
+
     if (existingLink && serverId) {
       try {
         const existingDep = await api.getDeployment(existingLink.deploymentId);
