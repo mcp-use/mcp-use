@@ -5,13 +5,16 @@ An MCP server that delegates authentication to a Keycloak realm using **Dynamic 
 ## Prerequisites
 
 - Node 20+
-- A running Keycloak instance with a realm that has DCR enabled. The companion [`keycloak-auth-server`](https://github.com/andrewkhadder/keycloak-auth-server) repo provides exactly this: Keycloak 26 in Docker with a pre-seeded `demo` realm, a `testuser` account, and anonymous DCR allowed for `localhost` redirect URIs.
+- A running Keycloak realm you can reach from this process, with:
+  - **Dynamic Client Registration** enabled (Keycloak's OIDC client registration service is on by default on every realm at `/realms/{realm}/clients-registrations/openid-connect`).
+  - An anonymous DCR policy that permits the `redirect_uris` your MCP client will send. The default `Trusted Hosts` policy only allows `localhost` / `127.0.0.1` — loosen or tighten to match your deployment.
+  - If the MCP client runs in a browser (e.g. a web-based inspector), the realm also needs the `Allowed Registration Web Origins` policy (Keycloak 26.6+) configured with the client's origin, otherwise Keycloak returns `403 Invalid origin` on the DCR POST.
+- A test user in the realm so you can log in during the PKCE flow.
+
+Confirm the realm is reachable:
 
 ```bash
-# In the keycloak-auth-server repo
-docker compose up -d
-# Wait ~60s, then confirm:
-curl -s http://localhost:8080/realms/demo/.well-known/oauth-authorization-server | jq .issuer
+curl -s http://localhost:8080/realms/YOUR_REALM/.well-known/oauth-authorization-server | jq .issuer
 ```
 
 ## Setup
@@ -23,21 +26,11 @@ pnpm install
 pnpm --filter mcp-use build
 ```
 
+Copy `.env.example` to `.env` and point the vars at your Keycloak.
+
 ## Run
 
 ```bash
-# Defaults point at http://localhost:8080 and realm `demo`
-pnpm --filter keycloak-oauth-example dev
-```
-
-Override via environment:
-
-```bash
-export MCP_USE_OAUTH_KEYCLOAK_SERVER_URL=http://localhost:8080
-export MCP_USE_OAUTH_KEYCLOAK_REALM=demo
-# Optional — if set, the JWT `aud` claim must match
-# (requires a Keycloak audience mapper on the client scope)
-export MCP_USE_OAUTH_KEYCLOAK_AUDIENCE=http://localhost:3000
 pnpm --filter keycloak-oauth-example dev
 ```
 
@@ -48,12 +41,10 @@ The server starts on port **3000** with the inspector at http://localhost:3000/i
 1. Open http://localhost:3000/inspector
 2. Connect to `http://localhost:3000/mcp`
 3. The inspector discovers Keycloak via `/.well-known/oauth-authorization-server`, registers itself via DCR, and redirects you to the Keycloak login page
-4. Log in with **`testuser` / `testpassword`**
+4. Log in with a user from your realm
 5. Back in the inspector, call:
    - `get-user-info` — returns claims lifted from the JWT (`sub`, `preferred_username`, realm roles, scopes…)
    - `get-keycloak-userinfo` — fetches the full OIDC userinfo document from Keycloak using the access token
-
-You can also run the standalone end-to-end test in the `keycloak-auth-server` repo (`./scripts/test-mcp-auth-dcr.sh`) to confirm DCR + PKCE work independently of mcp-use.
 
 ## Flow
 
@@ -71,5 +62,6 @@ Step 2 is a passthrough from the MCP server back to Keycloak's metadata — it's
 ## Notes
 
 - **Audience**: Keycloak doesn't set `aud` to the resource server by default. If you want the provider to enforce `aud`, add an *Audience* protocol mapper to the client scope in Keycloak and set `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE` to the matching value.
-- **DCR trust**: The pre-seeded `demo` realm only accepts anonymous DCR when the requested `redirect_uris` point at `localhost` / `127.0.0.1`. For other hosts, mint an Initial Access Token (see the `keycloak-auth-server` README) and pass it on the registration request.
+- **Anonymous DCR**: The default `Trusted Hosts` policy enforces that the `redirect_uris` in the registration request use an allowed hostname. For non-localhost redirect URIs, either extend that policy's trusted hosts list or mint an Initial Access Token and have the client pass it on the registration request.
+- **Browser clients**: On Keycloak 26.6+, add the `Allowed Registration Web Origins` client-registration policy (provider id `registration-web-origins`, config key `web-origins`) listing every origin your inspector/client will run from. Without it, browser DCR is blocked by CORS.
 - **Production**: Turn off anonymous DCR, require initial access tokens, serve everything over HTTPS, and set `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE`.
