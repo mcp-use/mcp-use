@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v3.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=3.0.0&title=Inline%20elicitation%20%26%20social%20meta%20tags&date=2026-04&lang=inspector" alt="Release 3.0.0" />
+  </Frame>
+  ## Inline elicitation & social meta tags
+  Major release paired with `mcp-use` v1.25.0: chat-initiated elicitation requests render inline in the chat thread, hosted inspector links get rich previews, and the peer dependency on `mcp-use` tracks the 1.25 OAuth refactor.
+
+- **New**: Elicitation requests triggered from the Chat tab render inline in the chat thread instead of routing users through a toast to the Elicitation tab; Tools-tab triggers keep the existing toast flow, and the Elicitation tab remains available as an audit view (`#1336`)
+- **New**: Links to the hosted inspector now render rich previews on Slack, X/Twitter, LinkedIn, Discord, and other platforms (`#1376`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.25.0-canary.9` to pick up the OAuth DCR-direct refactor
+- **Update**: Updated mcp-use to v1.25.0
+</Update>
+
 <Update label="v2.2.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=2.2.0&title=Hosted%20chat%2C%20LLM%20providers%20%26%20chat%20export&date=2026-04&lang=inspector" alt="Release 2.2.0" />
