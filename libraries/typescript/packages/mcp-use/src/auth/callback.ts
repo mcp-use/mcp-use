@@ -28,16 +28,6 @@ export async function onMcpAuthorization() {
 
   try {
     // --- Basic Error Handling ---
-    if (error) {
-      throw new Error(
-        `OAuth error: ${error} - ${errorDescription || "No description provided."}`
-      );
-    }
-    if (!code) {
-      throw new Error(
-        "Authorization code not found in callback query parameters."
-      );
-    }
     if (!state) {
       throw new Error(
         "State parameter not found or invalid in callback query parameters."
@@ -102,6 +92,67 @@ export async function onMcpAuthorization() {
       localStorage.removeItem(stateKey); // Clean up expired state
       throw new Error(
         "OAuth state has expired. Please try initiating authentication again."
+      );
+    }
+
+    // --- Handle OAuth Errors (after state lookup so we can redirect properly) ---
+    if (error) {
+      console.log(
+        `${logPrefix} OAuth error received: ${error} - ${errorDescription || "No description"}`
+      );
+      const isRedirectFlow = storedStateData.flowType === "redirect";
+
+      if (isRedirectFlow && storedStateData.returnUrl) {
+        // Redirect flow: navigate back with error parameters
+        console.log(
+          `${logPrefix} Redirect flow error. Returning to: ${storedStateData.returnUrl}`
+        );
+        localStorage.removeItem(stateKey);
+        const returnUrl = new URL(storedStateData.returnUrl);
+        returnUrl.searchParams.set("auth_error", error);
+        if (errorDescription) {
+          returnUrl.searchParams.set("auth_error_description", errorDescription);
+        }
+        window.location.href = returnUrl.toString();
+        return; // Exit early, redirect is in progress
+      } else if (window.opener && !window.opener.closed) {
+        // Popup flow: notify opener and close
+        console.log(`${logPrefix} Popup flow error. Notifying opener...`);
+        window.opener.postMessage(
+          {
+            type: "mcp_auth_callback",
+            success: false,
+            error: `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
+          },
+          window.location.origin
+        );
+        localStorage.removeItem(stateKey);
+        window.close();
+        return; // Exit early
+      } else if (storedStateData.returnUrl) {
+        // Fallback: use returnUrl even for popup flow
+        console.log(
+          `${logPrefix} Error without opener. Returning to: ${storedStateData.returnUrl}`
+        );
+        localStorage.removeItem(stateKey);
+        const returnUrl = new URL(storedStateData.returnUrl);
+        returnUrl.searchParams.set("auth_error", error);
+        if (errorDescription) {
+          returnUrl.searchParams.set("auth_error_description", errorDescription);
+        }
+        window.location.href = returnUrl.toString();
+        return; // Exit early
+      } else {
+        // No way to redirect, throw error to display it
+        throw new Error(
+          `OAuth error: ${error}${errorDescription ? ` - ${errorDescription}` : ""}`
+        );
+      }
+    }
+
+    if (!code) {
+      throw new Error(
+        "Authorization code not found in callback query parameters."
       );
     }
 
