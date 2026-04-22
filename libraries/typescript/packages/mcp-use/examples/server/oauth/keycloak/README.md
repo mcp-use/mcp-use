@@ -11,12 +11,6 @@ An MCP server that delegates authentication to a Keycloak realm using **Dynamic 
   - If the MCP client runs in a browser (e.g. a web-based inspector), the realm also needs the `Allowed Registration Web Origins` policy (Keycloak 26.6+) configured with the client's origin, otherwise Keycloak returns `403 Invalid origin` on the DCR POST.
 - A test user in the realm so you can log in during the PKCE flow.
 
-Confirm the realm is reachable:
-
-```bash
-curl -s http://localhost:8080/realms/YOUR_REALM/.well-known/oauth-authorization-server | jq .issuer
-```
-
 ## Setup
 
 From the TypeScript workspace root:
