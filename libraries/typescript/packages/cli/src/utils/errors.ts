@@ -10,7 +10,7 @@ export function handleCommandError(error: unknown, context: string): never {
     console.error(
       chalk.red("\n✗ Your session has expired or your API key is invalid.")
     );
-    console.log(
+    console.error(
       chalk.gray(
         `Run ${chalk.white("npx mcp-use login")} to re-authenticate.\n`
       )

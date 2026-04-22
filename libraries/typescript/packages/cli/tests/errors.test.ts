@@ -51,8 +51,8 @@ describe("handleCommandError", () => {
     expect(consoleErr.join("\n")).toContain(
       "Your session has expired or your API key is invalid."
     );
-    expect(consoleLog.join("\n")).toContain("npx mcp-use login");
-    expect(consoleLog.join("\n")).toContain("re-authenticate");
+    expect(consoleErr.join("\n")).toContain("npx mcp-use login");
+    expect(consoleErr.join("\n")).toContain("re-authenticate");
     // Should NOT show the generic "Failed to list servers" label for 401s.
     expect(consoleErr.join("\n")).not.toContain("Failed to list servers");
     expect(process.exit).toHaveBeenCalledWith(1);
