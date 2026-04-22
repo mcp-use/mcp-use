@@ -127,12 +127,12 @@ function resolveShimPath(filename: string): string | undefined {
 }
 
 /** Absolute path to the `--import=<path>` ESM registration script. */
-export function getShimRegisterPath(): string | undefined {
+function getShimRegisterPath(): string | undefined {
   return resolveShimPath("next-shims-register.mjs");
 }
 
 /** Absolute path to the ESM loader module itself. */
-export function getShimLoaderPath(): string | undefined {
+function getShimLoaderPath(): string | undefined {
   return resolveShimPath("next-shims-loader.mjs");
 }
 
@@ -142,7 +142,7 @@ export function getShimLoaderPath(): string | undefined {
  * throwing. tsx compiles TypeScript to CJS by default, so this covers the
  * path the ESM loader hook cannot reach.
  */
-export function getShimCjsPreloadPath(): string | undefined {
+function getShimCjsPreloadPath(): string | undefined {
   return resolveShimPath("next-shims-cjs.cjs");
 }
 
