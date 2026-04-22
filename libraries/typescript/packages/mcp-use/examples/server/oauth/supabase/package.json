@@ -20,6 +20,7 @@
     "start": "mcp-use start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
     "mcp-use": "workspace:*"
   },
   "devDependencies": {

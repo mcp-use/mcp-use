@@ -2,56 +2,53 @@
  * Custom authorization UI for Supabase's OAuth 2.1 server.
  *
  * Supabase hosts /authorize, /token, /register, and .well-known discovery on
- * its own infrastructure. Supabase lets you configure a consent-screen URL in
- * the dashboard — when a user needs to approve an OAuth client, Supabase
- * redirects their browser there with `?authorization_id=<uuid>`. We look up
- * the authorization details, show a consent page, and POST the decision
- * back to Supabase, which returns a `redirect_url` that completes the flow.
+ * its own infrastructure. You configure a consent-screen URL in the dashboard
+ * (Authentication → OAuth Server) — when a user needs to approve an OAuth
+ * client, Supabase redirects their browser there with `?authorization_id=<uuid>`.
  *
- * For this example we use **anonymous sign-in** to keep setup to zero:
- * one click creates a throwaway user, no email, no password. You must enable
- * anonymous sign-ins in the dashboard (Auth → Sign In / Providers → Enable
- * anonymous sign-ins). For real apps, swap this for email+password, OAuth
- * providers, or magic links.
+ * This module uses the official `@supabase/supabase-js` SDK to:
+ *   - sign users in (anonymously, for zero-setup demos)
+ *   - fetch authorization details (`auth.oauth.getAuthorizationDetails`)
+ *   - submit approve/deny (`auth.oauth.approveAuthorization|denyAuthorization`)
  *
- * Endpoints called on Supabase:
- * - POST /auth/v1/signup (with empty body)                         → anon sign-up
- * - GET  /auth/v1/oauth/authorizations/{id}                        → fetch auth details
- * - POST /auth/v1/oauth/authorizations/{id}/consent                → approve/deny
+ * Anonymous sign-ins must be enabled in the dashboard (Auth → Providers →
+ * Anonymous). For real apps, swap this for email+password, magic links, or
+ * OAuth providers.
  *
  * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
  */
 
 import type { MCPServer } from "mcp-use/server";
+import {
+  createClient,
+  type OAuthAuthorizationDetails,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 
 export interface MountAuthRoutesOptions {
   projectId: string;
-  anonKey: string;
+  publishableKey: string;
 }
 
 const SESSION_COOKIE = "sb-mcp-session";
 
-function supabaseAuthUrl(projectId: string): string {
-  return `https://${projectId}.supabase.co/auth/v1`;
+interface StoredSession {
+  access_token: string;
+  refresh_token: string;
 }
 
-interface OAuthAuthorizationClient {
-  id: string;
-  name: string;
-  uri: string;
-  logo_uri: string;
+function supabaseUrl(projectId: string): string {
+  return `https://${projectId}.supabase.co`;
 }
 
-interface OAuthAuthorizationDetails {
-  authorization_id: string;
-  redirect_uri: string;
-  client: OAuthAuthorizationClient;
-  user: { id: string; email: string };
-  scope: string;
-}
-
-interface OAuthRedirect {
-  redirect_url: string;
+function createServerClient(url: string, key: string): SupabaseClient {
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
 }
 
 function escapeHtml(s: string): string {
@@ -68,96 +65,95 @@ function escapeHtml(s: string): string {
   );
 }
 
-function parseSessionCookie(cookieHeader: string | undefined): string | null {
+function parseSessionCookie(
+  cookieHeader: string | undefined
+): StoredSession | null {
   if (!cookieHeader) return null;
   const match = cookieHeader.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`));
-  return match?.[1] ?? null;
+  if (!match?.[1]) return null;
+  try {
+    return JSON.parse(decodeURIComponent(match[1])) as StoredSession;
+  } catch {
+    return null;
+  }
+}
+
+function serializeSessionCookie(session: StoredSession): string {
+  const value = encodeURIComponent(JSON.stringify(session));
+  return `${SESSION_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600`;
 }
 
 export function mountAuthRoutes(
   server: MCPServer,
-  { projectId, anonKey }: MountAuthRoutesOptions
+  { projectId, publishableKey }: MountAuthRoutesOptions
 ): void {
-  const authUrl = supabaseAuthUrl(projectId);
+  const url = supabaseUrl(projectId);
 
   // -------------------------------------------------------------------------
   // GET /auth/consent?authorization_id=<id>
   //
   // This is the URL to configure as the consent screen in the Supabase
   // dashboard. Supabase redirects the browser here with only
-  // `authorization_id`; we fetch client/scope details from Supabase before
-  // rendering.
+  // `authorization_id`; we load the authorization details from Supabase
+  // before rendering the consent page.
   // -------------------------------------------------------------------------
   server.app.get("/auth/consent", async (c) => {
-    const url = new URL(c.req.url);
-    const authorizationId = url.searchParams.get("authorization_id");
+    const authorizationId = new URL(c.req.url).searchParams.get(
+      "authorization_id"
+    );
     if (!authorizationId) {
       return c.text("Missing authorization_id", 400);
     }
 
-    const accessToken = parseSessionCookie(c.req.header("Cookie"));
+    const session = parseSessionCookie(c.req.header("Cookie"));
 
     // Not signed in yet — show the sign-in prompt. After sign-in the page
     // reloads and falls through to the authenticated branch below.
-    if (!accessToken) {
+    if (!session) {
       return c.html(renderSignInPage(authorizationId));
     }
 
-    // Fetch authorization details (client name, requested scopes, …).
-    const detailsRes = await fetch(
-      `${authUrl}/oauth/authorizations/${authorizationId}`,
-      {
-        headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const supabase = createServerClient(url, publishableKey);
+    await supabase.auth.setSession(session);
 
-    if (!detailsRes.ok) {
+    const { data, error } =
+      await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+
+    if (error || !data) {
       return c.text(
-        `Failed to fetch authorization details: ${await detailsRes.text()}`,
-        detailsRes.status as 400 | 401 | 403 | 404 | 500
+        `Failed to fetch authorization details: ${error?.message ?? "unknown error"}`,
+        500
       );
     }
 
-    const details = (await detailsRes.json()) as
-      | OAuthAuthorizationDetails
-      | OAuthRedirect;
-
     // If the user has already consented to these scopes, Supabase short-
     // circuits and returns a redirect URL — honor it immediately.
-    if ("redirect_url" in details) {
-      return c.redirect(details.redirect_url, 302);
+    if ("redirect_url" in data) {
+      return c.redirect(data.redirect_url, 302);
     }
 
-    return c.html(renderConsentPage(authorizationId, details));
+    return c.html(renderConsentPage(authorizationId, data));
   });
 
   // -------------------------------------------------------------------------
-  // POST /auth/signin — create an anonymous Supabase user and store the token
+  // POST /auth/signin — anonymous sign-in, stash session in cookie
   // -------------------------------------------------------------------------
   server.app.post("/auth/signin", async (c) => {
-    const res = await fetch(`${authUrl}/signup`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: anonKey,
-      },
-      body: JSON.stringify({}),
-    });
+    const supabase = createServerClient(url, publishableKey);
+    const { data, error } = await supabase.auth.signInAnonymously();
 
-    if (!res.ok) {
-      return c.json({ error: await res.text() }, 500);
+    if (error || !data.session) {
+      return c.json({ error: error?.message ?? "Sign-in failed" }, 500);
     }
-
-    const { access_token } = (await res.json()) as { access_token: string };
 
     // Short-lived cookie carries the Supabase session to the consent POST.
     // Production: replace with signed/encrypted session storage.
     c.header(
       "Set-Cookie",
-      `${SESSION_COOKIE}=${access_token}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600`
+      serializeSessionCookie({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
     );
     return c.json({ ok: true });
   });
@@ -169,40 +165,38 @@ export function mountAuthRoutes(
   // pointing back to the MCP client (with `code` & `state`, or an error).
   // -------------------------------------------------------------------------
   server.app.post("/auth/consent", async (c) => {
-    const url = new URL(c.req.url);
-    const authorizationId = url.searchParams.get("authorization_id");
+    const authorizationId = new URL(c.req.url).searchParams.get(
+      "authorization_id"
+    );
     if (!authorizationId) {
       return c.json({ error: "Missing authorization_id" }, 400);
     }
 
     const { approve } = await c.req.json<{ approve: boolean }>();
-    const accessToken = parseSessionCookie(c.req.header("Cookie"));
-    if (!accessToken) {
+    const session = parseSessionCookie(c.req.header("Cookie"));
+    if (!session) {
       return c.json({ error: "not_authenticated" }, 401);
     }
 
-    const res = await fetch(
-      `${authUrl}/oauth/authorizations/${authorizationId}/consent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: anonKey,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ action: approve ? "approve" : "deny" }),
-      }
-    );
+    const supabase = createServerClient(url, publishableKey);
+    await supabase.auth.setSession(session);
 
-    if (!res.ok) {
-      return c.json(
-        { error: await res.text() },
-        res.status as 400 | 401 | 403 | 500
-      );
+    // `skipBrowserRedirect: true` keeps the SDK from trying to redirect the
+    // (nonexistent) browser window on the server — we hand the URL back to
+    // the client-side consent page, which performs the navigation.
+    const { data, error } = approve
+      ? await supabase.auth.oauth.approveAuthorization(authorizationId, {
+          skipBrowserRedirect: true,
+        })
+      : await supabase.auth.oauth.denyAuthorization(authorizationId, {
+          skipBrowserRedirect: true,
+        });
+
+    if (error || !data) {
+      return c.json({ error: error?.message ?? "Consent failed" }, 500);
     }
 
-    const { redirect_url } = (await res.json()) as OAuthRedirect;
-    return c.json({ redirect_url });
+    return c.json({ redirect_url: data.redirect_url });
   });
 }
 

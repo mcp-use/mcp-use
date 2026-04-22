@@ -1,117 +1,263 @@
 ---
 title: "Supabase Provider"
-description: "Configure Supabase OAuth authentication for your MCP server"
+description: "Configure Supabase OAuth 2.1 server authentication for your MCP server"
 icon: "/images/icons/supabase.svg"
 ---
 
-The Supabase provider verifies Supabase-issued JWTs from your project. New Supabase projects use ES256 tokens with JWKS (no secret needed); older projects may still use HS256.
+Supabase's [OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server/getting-started) hosts `/authorize`, `/token`, `/register`, and `.well-known` discovery on your Supabase project — the MCP server only verifies the resulting JWTs. **You host the consent UI**: Supabase redirects the browser to a URL you configure, and your route uses the Supabase JS SDK to load the authorization details, render sign-in + consent, and submit the decision back to Supabase.
+
+<Note>
+  This provider targets Supabase's OAuth 2.1 server (see [MCP authentication guide](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)). It's a different feature than Supabase Auth's social logins — enable it explicitly in the dashboard under **Authentication → OAuth Server**.
+</Note>
 
 ## Setup
 
 ### 1. Create a Supabase project
 
-Go to the [Supabase Dashboard](https://app.supabase.com/) and create or select a project.
+Go to the [Supabase Dashboard](https://app.supabase.com/) and create or select a project. Copy the **Project ID** from **Project Settings → General**.
 
-### 2. Get your project ID
+### 2. Enable the OAuth Server
 
-Find your **Project ID** in **Project Settings → General**.
+In **Authentication → OAuth Server**, enable the OAuth 2.1 server and set the **consent screen URL** to the route your MCP server will host:
 
-### 3. Check your JWT algorithm
+```
+http://localhost:3000/auth/consent
+```
 
-Go to **Project Settings → API → JWT Settings**:
+Supabase will redirect users here with `?authorization_id=<uuid>` after `/authorize`.
 
-- **ES256** (new projects) — no secret needed, JWKS is used automatically
-- **HS256** (legacy) — copy the **JWT Secret** and set it as `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`
+### 3. Enable a sign-in method
 
-### 4. Configure authentication providers
+Users must be signed in before they can consent. Pick one in **Authentication → Sign In / Providers**:
 
-In **Authentication → Providers**, enable the login methods you want (Email, Google, GitHub, etc.).
+- **Anonymous sign-ins** — one-click guest sessions, ideal for demos
+- **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.) — for real apps
 
-### 5. Environment variables
+### 4. Environment variables
 
 ```bash
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
-MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret  # Only for HS256 (legacy)
+
+# Publishable key (sb_publishable_...) from Project Settings → API Keys.
+# Used by the consent UI and by tools calling Supabase REST/APIs.
+MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-## Configuration
+<Note>
+  New Supabase projects issue `sb_publishable_...` keys. If your project still uses the legacy `anon` JWT key, it will continue to work here — but prefer publishable keys going forward.
+</Note>
 
-<Tabs>
-  <Tab title="ES256 (Recommended)">
-    New Supabase projects use ES256 tokens with JWKS — no secret needed:
+## Configure the MCP server
 
-    ```typescript
-    import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
+```typescript
+// server.ts
+import { MCPServer, oauthSupabaseProvider } from "mcp-use/server";
+import { mountAuthRoutes } from "./auth-routes.js";
 
-    // Zero-config: reads MCP_USE_OAUTH_SUPABASE_PROJECT_ID
-    const server = new MCPServer({
-      name: 'my-server',
-      version: '1.0.0',
-      oauth: oauthSupabaseProvider()
-    })
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  oauth: oauthSupabaseProvider(), // reads MCP_USE_OAUTH_SUPABASE_PROJECT_ID
+});
 
-    server.listen(3000)
-    ```
-  </Tab>
-  <Tab title="HS256 (Legacy)">
-    Older projects using HS256 require the JWT secret:
+// Mount the consent UI that Supabase redirects to
+mountAuthRoutes(server, {
+  projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
+  publishableKey: process.env.MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY!,
+});
 
-    ```typescript
-    import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
+server.listen(3000);
+```
 
-    const server = new MCPServer({
-      name: 'my-server',
-      version: '1.0.0',
-      oauth: oauthSupabaseProvider({
-        projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-        jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!,
-      })
-    })
+## Build the consent UI
 
-    server.listen(3000)
-    ```
-  </Tab>
-</Tabs>
+The `@supabase/supabase-js` SDK exposes the methods you need under `supabase.auth.oauth`:
 
-### All configuration options
+| Method | Purpose |
+| --- | --- |
+| `supabase.auth.signInAnonymously()` (or email/password / magic link / OAuth) | Sign the user in and obtain a session |
+| `supabase.auth.oauth.getAuthorizationDetails(id)` | Fetch client name + requested scopes for the consent screen |
+| `supabase.auth.oauth.approveAuthorization(id, { skipBrowserRedirect: true })` | Approve; returns the `redirect_url` back to the MCP client |
+| `supabase.auth.oauth.denyAuthorization(id, { skipBrowserRedirect: true })` | Deny; returns the `redirect_url` with an `access_denied` error |
+
+Below is a trimmed consent flow using anonymous sign-in. For the full, styled implementation see the [GitHub example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase).
+
+```typescript
+// auth-routes.ts
+import type { MCPServer } from "mcp-use/server";
+import { createClient } from "@supabase/supabase-js";
+
+const SESSION_COOKIE = "sb-mcp-session";
+
+export function mountAuthRoutes(
+  server: MCPServer,
+  { projectId, publishableKey }: { projectId: string; publishableKey: string },
+): void {
+  const url = `https://${projectId}.supabase.co`;
+  const newClient = () =>
+    createClient(url, publishableKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
+  // Supabase redirects here after /authorize with ?authorization_id=<uuid>
+  server.app.get("/auth/consent", async (c) => {
+    const authorizationId = new URL(c.req.url).searchParams.get("authorization_id");
+    if (!authorizationId) return c.text("Missing authorization_id", 400);
+
+    const raw = c.req.header("Cookie")?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1];
+    const session = raw ? JSON.parse(decodeURIComponent(raw)) : null;
+
+    // Not signed in yet — render sign-in (reloads back here on success)
+    if (!session) {
+      return c.html(`
+        <button onclick="signIn()">Continue as guest</button>
+        <script>
+          async function signIn() {
+            const r = await fetch('/auth/signin', { method: 'POST' });
+            if (r.ok) location.reload();
+          }
+        </script>
+      `);
+    }
+
+    const supabase = newClient();
+    await supabase.auth.setSession(session);
+
+    const { data, error } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
+    if (error || !data) return c.text(error?.message ?? "failed", 500);
+
+    // Already consented → Supabase short-circuits with a redirect
+    if ("redirect_url" in data) return c.redirect(data.redirect_url, 302);
+
+    return c.html(`
+      <p>${data.client.name} is requesting: ${data.scope}</p>
+      <button onclick="decide(true)">Allow</button>
+      <button onclick="decide(false)">Deny</button>
+      <script>
+        async function decide(approve) {
+          const r = await fetch('/auth/consent?authorization_id=${authorizationId}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ approve }),
+          });
+          const { redirect_url } = await r.json();
+          if (redirect_url) location.href = redirect_url;
+        }
+      </script>
+    `);
+  });
+
+  // Anonymous sign-in — swap for email/password, magic link, or OAuth in production
+  server.app.post("/auth/signin", async (c) => {
+    const supabase = newClient();
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error || !data.session) return c.json({ error: error?.message }, 500);
+
+    const value = encodeURIComponent(
+      JSON.stringify({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      }),
+    );
+    c.header("Set-Cookie", `${SESSION_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600`);
+    return c.json({ ok: true });
+  });
+
+  // Forward approve/deny to Supabase; it returns the redirect back to the MCP client
+  server.app.post("/auth/consent", async (c) => {
+    const authorizationId = new URL(c.req.url).searchParams.get("authorization_id")!;
+    const { approve } = await c.req.json<{ approve: boolean }>();
+    const raw = c.req.header("Cookie")?.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`))?.[1];
+    const session = raw ? JSON.parse(decodeURIComponent(raw)) : null;
+    if (!session) return c.json({ error: "not_authenticated" }, 401);
+
+    const supabase = newClient();
+    await supabase.auth.setSession(session);
+
+    const { data, error } = approve
+      ? await supabase.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
+      : await supabase.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
+
+    if (error || !data) return c.json({ error: error?.message }, 500);
+    return c.json({ redirect_url: data.redirect_url });
+  });
+}
+```
+
+<Warning>
+  The cookie shown here is a short-lived demo session. In production, use signed or encrypted session storage and replace anonymous sign-in with a real auth method.
+</Warning>
+
+## Configuration options
 
 ```typescript
 oauthSupabaseProvider({
   // Required (or set MCP_USE_OAUTH_SUPABASE_PROJECT_ID)
-  projectId: 'your-project-id',
-
-  // Required for HS256 tokens (or set MCP_USE_OAUTH_SUPABASE_JWT_SECRET)
-  jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
+  projectId: "your-project-id",
 
   // Skip JWT verification — development only
-  verifyJwt: process.env.NODE_ENV === 'production',
+  verifyJwt: process.env.NODE_ENV === "production",
 
   // Override advertised scopes
-  scopesSupported: ['openid', 'profile', 'email'],
-})
+  scopesSupported: ["openid", "profile", "email"],
+});
 ```
+
+<Tip>
+  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint — the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
+</Tip>
 
 ## Accessing user info in tools
 
 ```typescript
 server.tool(
   {
-    name: 'get-user-info',
-    description: 'Get authenticated user info',
+    name: "get-user-info",
+    description: "Get authenticated user info",
   },
   async (_args, ctx) => ({
     userId: ctx.auth.user.userId,
     email: ctx.auth.user.email,
     name: ctx.auth.user.name,
     scopes: ctx.auth.scopes,
-  })
-)
+  }),
+);
+```
+
+You can also call Supabase from within a tool using the user's access token. Create a Supabase client scoped to the request so RLS policies see the caller as the authenticated user:
+
+```typescript
+import { createClient } from "@supabase/supabase-js";
+
+server.tool(
+  {
+    name: "list-notes",
+    description: "Fetch the user's notes",
+  },
+  async (_args, ctx) => {
+    const supabase = createClient(
+      `https://${process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID}.supabase.co`,
+      process.env.MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: { headers: { Authorization: `Bearer ${ctx.auth.accessToken}` } },
+      },
+    );
+
+    const { data, error } = await supabase.from("notes").select();
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+
+    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+  },
+);
 ```
 
 ## Resources
 
 - [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
-- [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
+- [Supabase OAuth Server — Getting Started](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
+- [Supabase OAuth Server — MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
 
 ## Next Steps
