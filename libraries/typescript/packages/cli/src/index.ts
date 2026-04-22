@@ -2449,9 +2449,10 @@ program
     "--api-key <key>",
     "Login with an API key directly (non-interactive, for CI/CD)"
   )
-  .action(async (opts: { apiKey?: string }) => {
+  .option("--org <slug|id|name>", "Select an organization non-interactively")
+  .action(async (opts: { apiKey?: string; org?: string }) => {
     try {
-      await loginCommand({ apiKey: opts.apiKey });
+      await loginCommand({ apiKey: opts.apiKey, org: opts.org });
       process.exit(0);
     } catch (error) {
       console.error(

@@ -4,6 +4,7 @@ import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrlForCloudServer } from "../utils/cloud-urls.js";
 import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
 import { formatRelativeTime } from "../utils/format.js";
+import { resolveOrgFromOption } from "./auth.js";
 import { createEnvCommand } from "./env.js";
 
 async function prompt(question: string): Promise<boolean> {
@@ -37,12 +38,7 @@ function pickStr(obj: unknown, key: string): string {
 async function applyOrgOption(api: McpUseAPI, org?: string): Promise<void> {
   if (!org) return;
   const authInfo = await api.testAuth();
-  const match = (authInfo.orgs ?? []).find(
-    (o) =>
-      o.slug === org ||
-      o.id === org ||
-      o.name.toLowerCase() === org.toLowerCase()
-  );
+  const match = resolveOrgFromOption(authInfo.orgs ?? [], org);
   if (!match) {
     console.error(
       chalk.red(
