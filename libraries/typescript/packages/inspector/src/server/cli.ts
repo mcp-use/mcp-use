@@ -90,8 +90,13 @@ const inspectorMode: InspectorMode =
   (process.env.MCP_INSPECTOR_MODE as InspectorMode | undefined) ??
   (process.env.RAILWAY_ENVIRONMENT_NAME ? "cloud" : "standalone");
 
-// Register static file serving (must be last as it includes catch-all route)
-registerStaticRoutes(app, undefined, { inspectorMode });
+// Register static file serving (must be last as it includes catch-all route).
+// Runtime env vars here override what was baked in at `vite build` time — this
+// lets a single pre-built npm tarball be configured per deploy.
+registerStaticRoutes(app, undefined, {
+  inspectorMode,
+  manufactChatUrl: process.env.MANUFACT_CHAT_URL,
+});
 
 // Start the server with automatic port selection
 async function startServer() {

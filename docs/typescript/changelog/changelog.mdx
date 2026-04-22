@@ -6,6 +6,30 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.24.2" description="April 2026">
+  ## Landing deeplinks, `colorScheme` & Inspector 2.2
+  Patch release adding optional `colorScheme` on `McpUseProvider`, a server landing deeplink to the hosted inspector, stronger deploy behavior in `@mcp-use/cli`, cloud server environment-variable commands, and Inspector 2.2 (see inspector changelog).
+
+- **New**: `colorScheme` on `McpUseProvider` (default `false`) — when `false`, `ThemeProvider` does not set `color-scheme` on the document root so transparent iframe backgrounds stay transparent; opt in with `true` for native scrollbars / `light-dark()` in widgets
+- **Fix**: Server landing routes include a deeplink to open the MCP server in the hosted manufact inspector
+- **New** (@mcp-use/cli): `mcp-use servers env` subcommands to list, create, update, and delete environment variables on cloud servers (`#1372`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy` surfaces failures from mutating git commands (init, commit, push), normalizes the default branch to `main` before push, verifies a commit exists, and shell-quotes commit messages (`#1354`)
+- **Update** (@mcp-use/cli): Deploy treats HTTP 401 as an invalid or expired API session and prompts re-authentication instead of misreporting GitHub App connection state (`#1356`)
+- **Enhancement** (@mcp-use/inspector): Hosted chat configuration, copy/export chat, inspector LLM stack without LangChain, OAuth popup close page, and related UX (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v2.2.0
+- **Update**: Updated @mcp-use/cli to v3.0.2
+</Update>
+
+<Update label="v1.24.1" description="April 2026">
+  ## OAuth fetch cleanup when switching transports
+  Patch release fixing OAuth in the embedded inspector when switching from Via Proxy to Direct — `BrowserOAuthClientProvider` restores `window.fetch` when `useMcp` unmounts so a stale proxy interceptor cannot break direct flows.
+
+- **Fix**: Restore the `window.fetch` interceptor installed by `BrowserOAuthClientProvider` when `useMcp` unmounts — resolves "Protected resource does not match" after switching from Via Proxy to Direct
+- **Fix** (@mcp-use/inspector): Same fetch lifecycle in the inspector client (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v2.1.0
+- **Update**: Updated @mcp-use/cli to v3.0.1
+</Update>
+
 <Update label="v1.24.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.24.0&title=OAuth%20scopes%2C%20telemetry%2C%20CLI%203%20%26%20device%20flow&date=2026-04&lang=typescript" alt="Release 1.24.0" />

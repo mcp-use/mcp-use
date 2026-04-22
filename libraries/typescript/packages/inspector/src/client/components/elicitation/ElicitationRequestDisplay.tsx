@@ -1,8 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/client/components/ui/button";
-import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
-import { Textarea } from "@/client/components/ui/textarea";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
@@ -22,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Badge } from "@/client/components/ui/badge";
+import { ElicitationFormFields, useElicitationForm } from "./shared";
 
 interface ElicitationRequestDisplayProps {
   request: PendingElicitationRequest | null;
@@ -36,44 +34,6 @@ interface ElicitationRequestDisplayProps {
   onFullscreen: () => void;
 }
 
-interface EnumChoice {
-  const: string;
-  title?: string;
-}
-
-function isEnumChoice(value: unknown): value is EnumChoice {
-  if (!value || typeof value !== "object") return false;
-  const maybeChoice = value as { const?: unknown; title?: unknown };
-  return (
-    typeof maybeChoice.const === "string" &&
-    (maybeChoice.title === undefined || typeof maybeChoice.title === "string")
-  );
-}
-
-function getSingleSelectChoices(field: Record<string, any>): EnumChoice[] {
-  const oneOf = Array.isArray(field.oneOf)
-    ? field.oneOf.filter(isEnumChoice)
-    : [];
-  const anyOf = Array.isArray(field.anyOf)
-    ? field.anyOf.filter(isEnumChoice)
-    : [];
-
-  return oneOf.length > 0 ? oneOf : anyOf;
-}
-
-function getMultiSelectChoices(field: Record<string, any>): EnumChoice[] {
-  const items =
-    field.items && typeof field.items === "object" ? field.items : {};
-  const anyOf = Array.isArray(items.anyOf)
-    ? items.anyOf.filter(isEnumChoice)
-    : [];
-  const oneOf = Array.isArray(items.oneOf)
-    ? items.oneOf.filter(isEnumChoice)
-    : [];
-
-  return anyOf.length > 0 ? anyOf : oneOf;
-}
-
 export function ElicitationRequestDisplay({
   request,
   onApprove,
@@ -86,68 +46,27 @@ export function ElicitationRequestDisplay({
   onDownload,
   onFullscreen,
 }: ElicitationRequestDisplayProps) {
-  const [formData, setFormData] = useState<Record<string, any>>({});
-  const [urlCompleted, setUrlCompleted] = useState(false);
-
-  const mode = request?.request.mode || "form";
-  const isFormMode = mode === "form";
-  const isUrlMode = mode === "url";
-
-  // Reset form data when request changes
-  useEffect(() => {
-    if (request && isFormMode && "requestedSchema" in request.request) {
-      const schema = request.request.requestedSchema;
-      const initialData: Record<string, any> = {};
-
-      if (schema?.type === "object" && schema.properties) {
-        for (const [fieldName, fieldSchema] of Object.entries(
-          schema.properties
-        )) {
-          const field = fieldSchema as any;
-          // Set default values if available
-          if (field.default !== undefined) {
-            initialData[fieldName] = field.default;
-          } else if (field.type === "array") {
-            initialData[fieldName] = [];
-          } else if (field.type === "boolean") {
-            initialData[fieldName] = false;
-          } else if (field.type === "number" || field.type === "integer") {
-            initialData[fieldName] = 0;
-          } else {
-            initialData[fieldName] = "";
-          }
-        }
-      }
-      setFormData(initialData);
-    }
-    setUrlCompleted(false);
-  }, [request?.id, isFormMode]);
-
-  const handleFieldChange = (fieldName: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }));
-  };
+  const {
+    formData,
+    setFieldValue,
+    getMissingRequiredFields,
+    urlCompleted,
+    setUrlCompleted,
+    mode,
+    isFormMode,
+    isUrlMode,
+  } = useElicitationForm(request);
 
   const handleAccept = () => {
     if (!request) return;
 
     if (isFormMode) {
-      // Validate required fields if schema is available
-      if ("requestedSchema" in request.request) {
-        const schema = request.request.requestedSchema;
-        if (schema?.required) {
-          const missingFields = schema.required.filter(
-            (field: string) =>
-              formData[field] === undefined ||
-              formData[field] === "" ||
-              formData[field] === null
-          );
-          if (missingFields.length > 0) {
-            toast.error("Missing required fields", {
-              description: `Please fill in: ${missingFields.join(", ")}`,
-            });
-            return;
-          }
-        }
+      const missingFields = getMissingRequiredFields();
+      if (missingFields.length > 0) {
+        toast.error("Missing required fields", {
+          description: `Please fill in: ${missingFields.join(", ")}`,
+        });
+        return;
       }
 
       onApprove(request.id, {
@@ -228,213 +147,6 @@ export function ElicitationRequestDisplay({
       setUrlCompleted(true);
     }
   };
-
-  const renderFormFields = useMemo(() => {
-    if (!request || !isFormMode || !("requestedSchema" in request.request))
-      return null;
-
-    const schema = request.request.requestedSchema;
-    if (!schema || schema.type !== "object" || !schema.properties) {
-      return (
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          No form schema available
-        </div>
-      );
-    }
-
-    const properties = schema.properties as Record<string, any>;
-    const required = (schema.required as string[]) || [];
-
-    return (
-      <div className="space-y-4">
-        {Object.entries(properties).map(([fieldName, fieldSchema]) => {
-          const field = fieldSchema as any;
-          const isRequired = required.includes(fieldName);
-          const fieldType = field.type || "string";
-          const fieldLabel = field.title || fieldName;
-          const fieldDescription = field.description;
-          const singleSelectChoices = getSingleSelectChoices(field);
-          const isSingleSelectChoiceField = singleSelectChoices.length > 0;
-          const isEnumField = Array.isArray(field.enum);
-          const isUntitledMultiSelectField =
-            fieldType === "array" && Array.isArray(field.items?.enum);
-          const multiSelectChoices = getMultiSelectChoices(field);
-          const isTitledMultiSelectField =
-            fieldType === "array" && multiSelectChoices.length > 0;
-          const selectedMultiValues = Array.isArray(formData[fieldName])
-            ? (formData[fieldName] as string[])
-            : [];
-
-          return (
-            <div key={fieldName} className="space-y-2">
-              <Label htmlFor={`field-${fieldName}`}>
-                {fieldLabel}
-                {isRequired && <span className="text-red-500 ml-1">*</span>}
-              </Label>
-              {fieldDescription && (
-                <p className="text-xs text-muted-foreground">
-                  {fieldDescription}
-                </p>
-              )}
-
-              {fieldType === "boolean" ? (
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`field-${fieldName}`}
-                    data-testid={`elicitation-field-${fieldName}`}
-                    checked={formData[fieldName] || false}
-                    onCheckedChange={(checked) =>
-                      handleFieldChange(fieldName, checked)
-                    }
-                  />
-                  <Label
-                    htmlFor={`field-${fieldName}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {field.title || fieldName}
-                  </Label>
-                </div>
-              ) : fieldType === "number" || fieldType === "integer" ? (
-                <Input
-                  id={`field-${fieldName}`}
-                  data-testid={`elicitation-field-${fieldName}`}
-                  type="number"
-                  value={formData[fieldName] || ""}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      fieldName,
-                      fieldType === "integer"
-                        ? parseInt(e.target.value, 10)
-                        : parseFloat(e.target.value)
-                    )
-                  }
-                  placeholder={field.default?.toString() || ""}
-                />
-              ) : isSingleSelectChoiceField ? (
-                <select
-                  id={`field-${fieldName}`}
-                  data-testid={`elicitation-field-${fieldName}`}
-                  value={formData[fieldName] || ""}
-                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">Select...</option>
-                  {singleSelectChoices.map((choice) => (
-                    <option key={choice.const} value={choice.const}>
-                      {choice.title || choice.const}
-                    </option>
-                  ))}
-                </select>
-              ) : isEnumField ? (
-                <select
-                  id={`field-${fieldName}`}
-                  data-testid={`elicitation-field-${fieldName}`}
-                  value={formData[fieldName] || ""}
-                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">Select...</option>
-                  {field.enum.map((option: string, index: number) => (
-                    <option key={option} value={option}>
-                      {field.enumNames?.[index] || option}
-                    </option>
-                  ))}
-                </select>
-              ) : isUntitledMultiSelectField ? (
-                <div
-                  className="space-y-2"
-                  data-testid={`elicitation-field-${fieldName}`}
-                >
-                  {field.items.enum.map((option: string) => {
-                    const checkboxId = `field-${fieldName}-${option}`;
-                    const checked = selectedMultiValues.includes(option);
-
-                    return (
-                      <div key={option} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={checkboxId}
-                          checked={checked}
-                          onCheckedChange={(nextChecked) => {
-                            const updatedValues = nextChecked
-                              ? [...selectedMultiValues, option]
-                              : selectedMultiValues.filter(
-                                  (value) => value !== option
-                                );
-                            handleFieldChange(fieldName, updatedValues);
-                          }}
-                        />
-                        <Label
-                          htmlFor={checkboxId}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {option}
-                        </Label>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : isTitledMultiSelectField ? (
-                <div
-                  className="space-y-2"
-                  data-testid={`elicitation-field-${fieldName}`}
-                >
-                  {multiSelectChoices.map((choice) => {
-                    const checkboxId = `field-${fieldName}-${choice.const}`;
-                    const checked = selectedMultiValues.includes(choice.const);
-
-                    return (
-                      <div
-                        key={choice.const}
-                        className="flex items-center space-x-2"
-                      >
-                        <Checkbox
-                          id={checkboxId}
-                          checked={checked}
-                          onCheckedChange={(nextChecked) => {
-                            const updatedValues = nextChecked
-                              ? [...selectedMultiValues, choice.const]
-                              : selectedMultiValues.filter(
-                                  (value) => value !== choice.const
-                                );
-                            handleFieldChange(fieldName, updatedValues);
-                          }}
-                        />
-                        <Label
-                          htmlFor={checkboxId}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {choice.title || choice.const}
-                        </Label>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : fieldType === "string" &&
-                (field.format === "textarea" || field.maxLength > 100) ? (
-                <Textarea
-                  id={`field-${fieldName}`}
-                  data-testid={`elicitation-field-${fieldName}`}
-                  value={formData[fieldName] || ""}
-                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                  placeholder={field.default || ""}
-                  rows={4}
-                />
-              ) : (
-                <Input
-                  id={`field-${fieldName}`}
-                  data-testid={`elicitation-field-${fieldName}`}
-                  type="text"
-                  value={formData[fieldName] || ""}
-                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
-                  placeholder={field.default || ""}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }, [request, formData, isFormMode]);
 
   if (!request) {
     return (
@@ -583,7 +295,18 @@ export function ElicitationRequestDisplay({
             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               Form Data
             </h4>
-            {renderFormFields}
+            <ElicitationFormFields
+              request={request}
+              formData={formData}
+              onFieldChange={setFieldValue}
+              idPrefix="field"
+              testIdPrefix="elicitation-field"
+              emptyFallback={
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  No form schema available
+                </div>
+              }
+            />
           </div>
         )}
 

@@ -86,7 +86,7 @@ The server needs three things beyond the standard `MCPServer` setup:
 2. Mount OAuth discovery endpoints with CORS headers (required for browser clients)
 3. Mount login and consent pages
 
-See the [GitHub example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth) or the [docs](https://mcp-use.dev/docs/typescript/server/authentication/providers/better-auth) for the full server.ts code. The key parts:
+See the [GitHub example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth) or the [docs](https://mcp-use.com/docs/typescript/server/authentication/providers/better-auth) for the full server.ts code. The key parts:
 
 ```typescript
 import { MCPServer, oauthBetterAuthProvider } from "mcp-use/server";

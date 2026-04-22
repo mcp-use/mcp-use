@@ -3,6 +3,10 @@
  * Works in both Node.js and browser environments without Node.js-specific APIs
  */
 
+import { convertMessagesToProvider } from "../llm/messageFormat";
+import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
+import type { ProviderMessage, ProviderTool } from "../llm/types";
+
 interface LLMConfig {
   provider: "openai" | "anthropic" | "google";
   model: string;
@@ -48,9 +52,6 @@ interface ToolCall {
   result?: unknown;
 }
 
-// Type for LangChain LLM models - using any for flexibility with dynamic imports
-type BaseLLM = any;
-
 interface ServerConfig {
   url: string;
   headers?: Record<string, string>;
@@ -90,54 +91,18 @@ export async function* handleChatRequestStream(requestBody: {
     );
   }
 
-  // Dynamically import mcp-use and LLM providers
-  // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  // Import from main entry (not browser) since this runs server-side.
-  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
-  const { MCPAgent, MCPClient } = await import("mcp-use");
+  const { MCPClient } = await import("mcp-use");
 
-  // Create LLM instance based on provider
-  let llm: BaseLLM;
-  if (llmConfig.provider === "openai") {
-    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
-    const { ChatOpenAI } = await import("@langchain/openai");
-    llm = new ChatOpenAI({
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-    });
-  } else if (llmConfig.provider === "anthropic") {
-    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
-    const { ChatAnthropic } = await import("@langchain/anthropic");
-    llm = new ChatAnthropic({
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-    });
-  } else if (llmConfig.provider === "google") {
-    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
-    const { ChatGoogleGenerativeAI } = await import("@langchain/google-genai");
-    llm = new ChatGoogleGenerativeAI({
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-    });
-  } else {
-    throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
-  }
-
-  // Create MCP client and connect to server
-  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
   const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
-  // Add server with potential authentication headers
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
-    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
+    preventAutoAuth: true,
   };
 
-  // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== "none") {
     serverConfig.headers = {};
-
     if (
       authConfig.type === "basic" &&
       authConfig.username &&
@@ -148,7 +113,6 @@ export async function* handleChatRequestStream(requestBody: {
     } else if (authConfig.type === "bearer" && authConfig.token) {
       serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
     } else if (authConfig.type === "oauth") {
-      // For OAuth, use the tokens passed from the frontend
       if (authConfig.oauthTokens?.access_token) {
         const tokenType = authConfig.oauthTokens.token_type
           ? authConfig.oauthTokens.token_type.charAt(0).toUpperCase() +
@@ -159,7 +123,6 @@ export async function* handleChatRequestStream(requestBody: {
     }
   }
 
-  // If the URL contains authentication info, extract it (fallback)
   try {
     const url = new URL(mcpServerUrl);
     if (
@@ -178,135 +141,97 @@ export async function* handleChatRequestStream(requestBody: {
 
   client.addServer(serverName, serverConfig);
 
-  // Create agent with user's LLM
-  const agent = new MCPAgent({
-    llm,
-    client,
-    maxSteps: 10,
-    memoryEnabled: false, // Use externalHistory instead
-    exposeResourcesAsTools: false,
-    exposePromptsAsTools: false,
-    systemPrompt:
-      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
-  });
-
-  // Import LangChain message types for history conversion
-  const { HumanMessage, AIMessage } = await import("@langchain/core/messages");
-
-  // Extract last user message as the query, and build history from all prior messages
-  const lastUserMessageIndex = messages
-    .map((msg: any, i: number) => ({ msg, i }))
-    .filter(({ msg }: any) => msg.role === "user")
-    .pop()?.i;
-
-  if (lastUserMessageIndex === undefined) {
-    throw new Error("No user message found");
-  }
-
-  const lastUserMessage = messages[lastUserMessageIndex];
-  const priorMessages = messages.slice(0, lastUserMessageIndex);
-
-  // Convert prior messages to LangChain format as externalHistory
-  const externalHistory = priorMessages.map((msg: any) => {
-    if (msg.role === "user") {
-      if (msg.attachments && msg.attachments.length > 0) {
-        const content: Array<any> = [
-          { type: "text", text: msg.content || "[no content]" },
-        ];
-        for (const attachment of msg.attachments) {
-          if (attachment.type === "image") {
-            content.push({
-              type: "image_url",
-              image_url: {
-                url: `data:${attachment.mimeType};base64,${attachment.data}`,
-              },
-            });
-          }
-        }
-        return new HumanMessage({ content });
-      }
-      return new HumanMessage(msg.content || "[no content]");
+  try {
+    // Open a session to the MCP server so we can enumerate + call tools.
+    await client.createAllSessions();
+    const session = client.getAllActiveSessions()[serverName];
+    if (!session) {
+      throw new Error(`Failed to create MCP session for ${serverName}`);
     }
-    return new AIMessage(msg.content || "[no content]");
-  });
 
-  // Convert last user message to LangChain format (supporting multimodal)
-  let messageInput: any;
-  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
-    // Multimodal message with attachments
-    const content: Array<any> = [
-      {
-        type: "text",
-        text: lastUserMessage.content || "[no content]",
+    const mcpTools = session.connector.tools ?? [];
+    const tools: ProviderTool[] = mcpTools.map((t: any) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
+        type: "object",
       },
+    }));
+
+    const providerMessages: ProviderMessage[] = [
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
+      },
+      ...convertMessagesToProvider(messages as any),
     ];
 
-    // Add image attachments
-    for (const attachment of lastUserMessage.attachments) {
-      if (attachment.type === "image") {
-        content.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${attachment.mimeType};base64,${attachment.data}`,
-          },
-        });
-      }
-    }
-
-    messageInput = new HumanMessage({ content });
-  } else {
-    // Regular text message
-    messageInput = lastUserMessage.content;
-  }
-
-  try {
-    // Generate a unique message ID
     const messageId = `msg-${Date.now()}`;
-
-    // Send initial assistant message event (AI SDK format)
     yield `data: ${JSON.stringify({ type: "message", id: messageId, role: "assistant" })}\n\n`;
 
-    // Use streamEvents to get real-time updates, passing conversation history
-    for await (const event of agent.streamEvents(
-      messageInput,
-      10,
-      true,
-      externalHistory
-    )) {
-      // Emit text content as it streams
-      if (event.event === "on_chat_model_stream" && event.data?.chunk?.text) {
-        const text = event.data.chunk.text;
-        if (typeof text === "string" && text.length > 0) {
-          // AI SDK text event format
-          yield `data: ${JSON.stringify({ type: "text", id: messageId, content: text })}\n\n`;
-        }
-      } else if (event.event === "on_tool_start") {
-        // Tool invocation started - AI SDK tool-call event
-        const toolCallId = `tool-${event.name}-${Date.now()}`;
+    // Track in-flight tool calls so we can pair start/result events.
+    const toolCallIdByIndex = new Map<
+      number,
+      { toolCallId: string; toolName: string; argsBuffer: string }
+    >();
+
+    for await (const ev of runToolLoop({
+      config: {
+        provider: llmConfig.provider,
+        model: llmConfig.model,
+        apiKey: llmConfig.apiKey,
+        temperature: llmConfig.temperature,
+      },
+      messages: providerMessages,
+      tools,
+      callTool: async (name, args) => {
+        return await session.connector.callTool(name, args);
+      },
+      maxSteps: 10,
+    })) {
+      if (ev.type === "text-delta") {
+        yield `data: ${JSON.stringify({
+          type: "text",
+          id: messageId,
+          content: ev.delta,
+        })}\n\n`;
+      } else if (ev.type === "tool-call-start") {
+        toolCallIdByIndex.set(ev.index, {
+          toolCallId: ev.toolCallId,
+          toolName: ev.toolName,
+          argsBuffer: "",
+        });
+      } else if (ev.type === "tool-call-args-delta") {
+        const rec = toolCallIdByIndex.get(ev.index);
+        if (rec) rec.argsBuffer += ev.argsDelta;
+      } else if (ev.type === "tool-call-ready") {
         yield `data: ${JSON.stringify({
           type: "tool-call",
           id: messageId,
-          toolCallId,
-          toolName: event.name,
-          args: event.data?.input || {},
+          toolCallId: ev.toolCallId,
+          toolName: ev.toolName,
+          args: ev.args,
         })}\n\n`;
-      } else if (event.event === "on_tool_end") {
-        // Tool invocation completed - AI SDK tool-result event
-        const toolCallId = `tool-${event.name}-${Date.now()}`;
+      } else if (ev.type === "tool-result") {
         yield `data: ${JSON.stringify({
           type: "tool-result",
           id: messageId,
-          toolCallId,
-          toolName: event.name,
-          result: event.data?.output,
+          toolCallId: ev.toolCallId,
+          toolName: ev.toolName,
+          result: ev.result,
+        })}\n\n`;
+      } else if (ev.type === "error") {
+        yield `data: ${JSON.stringify({
+          type: "error",
+          id: messageId,
+          error: ev.message,
         })}\n\n`;
       }
     }
 
-    // Send final done event
     yield `data: ${JSON.stringify({ type: "done", id: messageId })}\n\n`;
   } finally {
-    // Clean up
     await client.closeAllSessions();
   }
 }
@@ -336,54 +261,18 @@ export async function handleChatRequest(requestBody: {
     );
   }
 
-  // Dynamically import mcp-use and LLM providers
-  // Note: MCPClient supports multiple servers via client.addServer(name, config)
-  // Import from main entry (not browser) since this runs server-side.
-  // MCPAgent and MCPClient are both exported from the main "mcp-use" entry point.
-  const { MCPAgent, MCPClient } = await import("mcp-use");
+  const { MCPClient } = await import("mcp-use");
 
-  // Create LLM instance based on provider
-  let llm: BaseLLM;
-  if (llmConfig.provider === "openai") {
-    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
-    const { ChatOpenAI } = await import("@langchain/openai");
-    llm = new ChatOpenAI({
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-    });
-  } else if (llmConfig.provider === "anthropic") {
-    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
-    const { ChatAnthropic } = await import("@langchain/anthropic");
-    llm = new ChatAnthropic({
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-    });
-  } else if (llmConfig.provider === "google") {
-    // @ts-ignore - Dynamic import of peer dependency available through mcp-use
-    const { ChatGoogleGenerativeAI } = await import("@langchain/google-genai");
-    llm = new ChatGoogleGenerativeAI({
-      model: llmConfig.model,
-      apiKey: llmConfig.apiKey,
-    });
-  } else {
-    throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
-  }
-
-  // Create MCP client and connect to server
-  // BrowserMCPClient from mcp-use/browser, aliased as MCPClient
   const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
 
-  // Add server with potential authentication headers
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
-    preventAutoAuth: true, // Prevent auto OAuth popup - tokens are passed via headers
+    preventAutoAuth: true,
   };
 
-  // Handle authentication - support both custom auth and OAuth
   if (authConfig && authConfig.type !== "none") {
     serverConfig.headers = {};
-
     if (
       authConfig.type === "basic" &&
       authConfig.username &&
@@ -394,26 +283,16 @@ export async function handleChatRequest(requestBody: {
     } else if (authConfig.type === "bearer" && authConfig.token) {
       serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
     } else if (authConfig.type === "oauth") {
-      // For OAuth, use the tokens passed from the frontend
       if (authConfig.oauthTokens?.access_token) {
-        // Capitalize the token type (e.g., "bearer" -> "Bearer")
         const tokenType = authConfig.oauthTokens.token_type
           ? authConfig.oauthTokens.token_type.charAt(0).toUpperCase() +
             authConfig.oauthTokens.token_type.slice(1)
           : "Bearer";
         serverConfig.headers.Authorization = `${tokenType} ${authConfig.oauthTokens.access_token}`;
-        console.log("Using OAuth access token for MCP server authentication");
-        console.log(
-          "Authorization header:",
-          `${tokenType} ${authConfig.oauthTokens.access_token.substring(0, 20)}...`
-        );
-      } else {
-        console.warn("OAuth selected but no access token provided");
       }
     }
   }
 
-  // If the URL contains authentication info, extract it (fallback)
   try {
     const url = new URL(mcpServerUrl);
     if (
@@ -421,118 +300,68 @@ export async function handleChatRequest(requestBody: {
       url.password &&
       (!authConfig || authConfig.type === "none")
     ) {
-      // Extract auth from URL
       const auth = toBase64(`${url.username}:${url.password}`);
       serverConfig.headers = serverConfig.headers || {};
       serverConfig.headers.Authorization = `Basic ${auth}`;
-      // Remove auth from URL to avoid double encoding
       serverConfig.url = `${url.protocol}//${url.host}${url.pathname}${url.search}`;
     }
   } catch (error) {
-    // If URL parsing fails, use original URL
     console.warn("Failed to parse MCP server URL for auth:", error);
   }
 
-  // Debug: Log the server config being used
-  console.log("Adding server with config:", {
-    url: serverConfig.url,
-    hasHeaders: !!serverConfig.headers,
-    headers: serverConfig.headers,
-  });
-
   client.addServer(serverName, serverConfig);
 
-  // Create agent with user's LLM
-  const agent = new MCPAgent({
-    llm,
-    client,
-    maxSteps: 10,
-    memoryEnabled: false, // Use externalHistory instead
-    exposeResourcesAsTools: false,
-    exposePromptsAsTools: false,
-    systemPrompt:
-      "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
-  });
-
-  // Import LangChain message types for history conversion
-  const { HumanMessage, AIMessage } = await import("@langchain/core/messages");
-
-  // Extract last user message as the query, and build history from all prior messages
-  const lastUserMessageIndex = messages
-    .map((msg: any, i: number) => ({ msg, i }))
-    .filter(({ msg }: any) => msg.role === "user")
-    .pop()?.i;
-
-  if (lastUserMessageIndex === undefined) {
-    throw new Error("No user message found");
-  }
-
-  const lastUserMessage = messages[lastUserMessageIndex];
-  const priorMessages = messages.slice(0, lastUserMessageIndex);
-
-  // Convert prior messages to LangChain format as externalHistory
-  const externalHistory = priorMessages.map((msg: any) => {
-    if (msg.role === "user") {
-      if (msg.attachments && msg.attachments.length > 0) {
-        const content: Array<any> = [
-          { type: "text", text: msg.content || "[no content]" },
-        ];
-        for (const attachment of msg.attachments) {
-          if (attachment.type === "image") {
-            content.push({
-              type: "image_url",
-              image_url: {
-                url: `data:${attachment.mimeType};base64,${attachment.data}`,
-              },
-            });
-          }
-        }
-        return new HumanMessage({ content });
-      }
-      return new HumanMessage(msg.content || "[no content]");
+  try {
+    await client.createAllSessions();
+    const session = client.getAllActiveSessions()[serverName];
+    if (!session) {
+      throw new Error(`Failed to create MCP session for ${serverName}`);
     }
-    return new AIMessage(msg.content || "[no content]");
-  });
 
-  // Convert last user message to LangChain format (supporting multimodal)
-  let messageInput: any;
-  if (lastUserMessage.attachments && lastUserMessage.attachments.length > 0) {
-    // Multimodal message with attachments
-    const content: Array<any> = [
-      {
-        type: "text",
-        text: lastUserMessage.content || "[no content]",
+    const mcpTools = session.connector.tools ?? [];
+    const tools: ProviderTool[] = mcpTools.map((t: any) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
+        type: "object",
       },
+    }));
+
+    const providerMessages: ProviderMessage[] = [
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
+      },
+      ...convertMessagesToProvider(messages as any),
     ];
 
-    // Add image attachments
-    for (const attachment of lastUserMessage.attachments) {
-      if (attachment.type === "image") {
-        content.push({
-          type: "image_url",
-          image_url: {
-            url: `data:${attachment.mimeType};base64,${attachment.data}`,
-          },
-        });
-      }
-    }
+    const { content, toolCalls } = await runToolLoopNonStreaming({
+      config: {
+        provider: llmConfig.provider,
+        model: llmConfig.model,
+        apiKey: llmConfig.apiKey,
+        temperature: llmConfig.temperature,
+      },
+      messages: providerMessages,
+      tools,
+      callTool: async (name, args) => {
+        return await session.connector.callTool(name, args);
+      },
+      maxSteps: 10,
+    });
 
-    messageInput = new HumanMessage({ content });
-  } else {
-    // Regular text message
-    messageInput = lastUserMessage.content;
+    return {
+      content,
+      toolCalls: toolCalls.map((tc) => ({
+        name: tc.toolName,
+        arguments: tc.args,
+        result: tc.result,
+      })),
+    };
+  } finally {
+    await client.closeAllSessions();
   }
-
-  // Get response from agent, passing conversation history
-  const response = await agent.run(messageInput, 10, true, externalHistory);
-
-  // Clean up
-  await client.closeAllSessions();
-
-  return {
-    content: response,
-    toolCalls: [],
-  };
 }
 
 /**
