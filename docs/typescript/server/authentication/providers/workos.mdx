@@ -95,7 +95,8 @@ server.tool(
     description: 'Get documents for the authenticated organization',
   },
   async (_args, ctx) => {
-    const orgId = ctx.auth.user.organization_id
+    // Custom claims come back as `unknown` — narrow before use
+    const orgId = ctx.auth.user.organization_id as string | undefined
 
     if (!orgId) {
       return { content: [{ type: 'text', text: 'Organization context required' }], isError: true }
@@ -112,7 +113,7 @@ server.tool(
 
 ## Resources
 
-- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
+- [Runnable mcp-use + WorkOS AuthKit example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
 - [WorkOS AuthKit MCP Guide](https://workos.com/docs/authkit/mcp)
 - [WorkOS Documentation](https://workos.com/docs)
 

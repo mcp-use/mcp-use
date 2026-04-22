@@ -106,7 +106,7 @@ const openIdConfigHandler = oauthProviderOpenIdConfigMetadata(auth, { headers: c
 server.app.get("/.well-known/openid-configuration", (c) => openIdConfigHandler(c.req.raw));
 server.app.get("/.well-known/openid-configuration/api/auth", (c) => openIdConfigHandler(c.req.raw));
 
-server.listen({ port: 3000 });
+await server.listen(3000);
 ```
 
 ### 4. Add login and consent pages
@@ -225,6 +225,6 @@ server.tool(
 
 ## Resources
 
-- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
+- [Runnable mcp-use + Better Auth example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
 - [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider)
 - [Better Auth MCP Adapter (legacy MCP plugin)](https://better-auth.com/docs/plugins/mcp)

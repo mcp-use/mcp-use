@@ -63,11 +63,18 @@ oauthCustomProvider({
     return { payload: payload as Record<string, unknown> }
   },
 
+  // Optional: JWKS endpoint advertised in discovery metadata
+  jwksUrl: 'https://auth.example.com/.well-known/jwks.json',
+
   // Optional: User info endpoint URL
   userInfoEndpoint: 'https://auth.example.com/userinfo',
 
   // Optional: Override advertised scopes
   scopesSupported: ['openid', 'profile', 'email'],
+
+  // Optional: Override advertised grant types
+  // Default: ['authorization_code', 'refresh_token']
+  grantTypesSupported: ['authorization_code', 'refresh_token'],
 
   // Optional: Audience for JWT verification
   audience: 'your-api-identifier',
@@ -86,6 +93,10 @@ oauthCustomProvider({
 ## OAuth Proxy (non-DCR providers)
 
 Use `oauthProxy` for providers that don't support DCR — Google, GitHub, Okta, Azure AD, and any provider where you register an app in a dashboard and receive a fixed `clientId`/`clientSecret`.
+
+<Note>
+  Any `verifyToken` function you write — including those returned by `jwksVerifier` — **must resolve to `{ payload: Record<string, unknown> }`** or throw on an invalid token. The proxy surfaces `payload` to `getUserInfo` and to `ctx.auth`.
+</Note>
 
 ```typescript
 import { MCPServer, oauthProxy, jwksVerifier } from 'mcp-use/server'

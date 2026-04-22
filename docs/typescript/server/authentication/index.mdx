@@ -110,7 +110,7 @@ oauthProxy({
 })
 ```
 
-The `jwksVerifier` helper handles JWT signature verification, issuer checking, and audience validation against a remote JWKS endpoint. For non-JWT providers (e.g. GitHub opaque tokens), pass a custom `verifyToken` function instead.
+The `jwksVerifier` helper handles JWT signature verification, issuer checking, and optional audience validation (when `audience` is passed) against a remote JWKS endpoint. For non-JWT providers (e.g. GitHub opaque tokens), pass a custom `verifyToken` function instead.
 
 ## How it works
 

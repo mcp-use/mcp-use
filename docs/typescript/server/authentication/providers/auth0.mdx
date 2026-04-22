@@ -11,7 +11,7 @@ Auth0 supports two integration modes depending on whether you have access to Aut
     Auth0's built-in DCR feature is currently in **Early Access**. MCP clients register and authenticate directly with Auth0
     
     <Note>
-      To use the built-in Auth0 provider, you need to join Auth0's Early Access program. Complete [this form](https://forms.gle/hvJ1ZRLmHr9YjV2a9) to get access.
+      To use the built-in Auth0 provider, you need to join Auth0's Early Access program. See the [Auth0 MCP Authorization Guide](https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server) for details on how to get access.
     </Note>
 
     ## Auth0 Setup
@@ -66,7 +66,7 @@ Auth0 supports two integration modes depending on whether you have access to Aut
       oauth: oauthAuth0Provider()
     })
 
-    server.listen(3000)
+    await server.listen(3000)
     ```
 
     Or pass config explicitly:
@@ -146,7 +146,7 @@ Auth0 supports two integration modes depending on whether you have access to Aut
       }),
     })
 
-    server.listen(3000)
+    await server.listen(3000)
     ```
 
     The OAuth flow in proxy mode:
@@ -205,8 +205,8 @@ server.tool(
 
 ## Resources
 
-- [GitHub Example (DCR)](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0)
-- [GitHub Example (Proxy)](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0-proxy)
+- [Runnable mcp-use + Auth0 DCR example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0)
+- [Runnable mcp-use + Auth0 proxy example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0-proxy)
 - [Auth0 MCP Authorization Guide](https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server)
 - [Auth0 Documentation](https://auth0.com/docs)
 
